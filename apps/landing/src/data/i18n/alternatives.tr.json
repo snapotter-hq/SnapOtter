@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online; PDF düzenleme, imzalama, dönüştürme ve Acrobat abonelikleri için güçlüdür. SnapOtter, tüm Adobe ekosisteminin yerini almaya çalışmaz; ekiplere tek bir açık kaynaklı yığında kendi sunucunuzda barındırılan PDF araçlarının yanı sıra görüntü, video, ses ve dosya iş akışları sunar.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "7b234a419b37",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Her Acrobat iş akışı için değil. SnapOtter, kendi sunucunuzda barındırılan PDF işleme, dönüştürme, OCR, sıkıştırma, sayfa işlemleri ve otomasyona ihtiyaç duyduğunuzda en iyisidir. Acrobat, derin bir masaüstü ve bulut belge platformu olmaya devam eder.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "4c6729720152",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter, Adobe Acrobat Pro'nun yerini tutar mı?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "e1443c98b78a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Kurulum kontrolü, kaynak görünürlüğü, hava boşluklu kullanım veya tekrarlanabilir dosya iş hatları; Adobe hesap özelliklerinden ve geniş Acrobat ekosisteminden daha önemliyse SnapOtter'ı seçin.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "5f12f2604d6b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Neden Adobe Acrobat online yerine SnapOtter'ı seçmeliyim?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "0e4b252483ac",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat online'a açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "3de1d6a2f9da",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online, PDF'nin arkasındaki şirketten gelen, cilalı ve barındırılan bir PDF iş akışıdır. SnapOtter ise PDF işlerinin kendi altyapılarında kalması gereken ekipler için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "2af9856c57ee",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online, Adobe'nin barındırılan bir PDF araç setidir. SnapOtter, ekiplere kendi sunucunuzda barındırılan PDF araçları ve açık kaynaklı kurulumla daha geniş dosya iş akışları sunar.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "bd193b0c215b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat Online'a Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "456e1d36853b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe, çevrimiçi düzenleyici dosyalarının Adobe sunucuları tarafından işlendiğini belirtir",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "df613ada1184",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Ücretsiz çevrimiçi araçlar, denemeler ve ücretli Acrobat planları",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "abe946043c9e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF, e-imza, yapay zekâ ve Acrobat hesap iş akışları",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "aff9661c4f6a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF'nin ötesinde",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "1cbe138632e3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Ürüne bağlı olarak tarayıcı iş akışı veya sağlayıcı tarafından yönetilen API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "df8730a1317c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert, dönüştürme için geniş kapsamlı ve API dostudur. SnapOtter; görüntü, video, ses, PDF ve dosya biçimleri arasında dönüştürme yapar, ardından sıkıştırma, düzenleme, OCR, transkripsiyon ve yerel iş hatları ekler.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "43016ef67369",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Evet. SnapOtter açık kaynaklıdır ve Docker üzerinde çalışır. Görüntü, video, ses, PDF ve dosya biçimlerini yerel olarak dönüştürür; SnapOtter tarafından dönüştürme başına ücret alınmaz.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "23cbc51c04be",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "CloudConvert alternatifini kendi sunucumda barındırabilir miyim?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "562a4db8c8e5",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Evet. SnapOtter, video ve ses için arka planda FFmpeg kullanır; bunun yanında görüntüler için Sharp, belgeler için qpdf, LibreOffice ve ilgili araçları kullanır.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "7355e2e9210c",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter video ve ses de dönüştürüyor mu?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "d86e537f6f63",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert'e açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "f58cee261046",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert, olgun ve barındırılan bir dönüştürücü ve API'dir. SnapOtter ise dönüştürmenin kendi altyapınızın içinde, kontrol ettiğiniz iş hatlarıyla gerçekleşmesini istediğinizde tercih edeceğiniz, kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "a5268cbd3057",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert, API'li ve barındırılan bir dönüştürme platformudur. SnapOtter; görüntü, video, ses, PDF ve dosyaları kendi sunucunuzda açık kaynaklı iş hatlarıyla dönüştürür.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "cc364656175f",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert'e Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "97c901c207e3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Dosyalar işlenmek üzere sağlayıcı tarafından barındırılan bir servise yüklenir",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "883509fe1082",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Kullanıma ve plana dayalı bulut fiyatlandırması",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "f23965a7e9a3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Birçok dosya kategorisinde barındırılan dönüştürme",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "7a9162232d93",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Dosya dönüştürmenin ötesinde",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "bc7ee9fd3f28",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "Barındırılan API ve tarayıcı iş akışları",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "629a60938c0c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio; hızlı dönüştürmeler ve geliştirici API kullanımı için kullanışlıdır. SnapOtter, dönüştürmeyi yerel tutar ve daha geniş dosya işleme ekler: sıkıştırma, düzenleme, OCR, transkripsiyon, PDF işlemleri ve tekrarlanabilir iş hatları.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "20fb961e9b26",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter, Docker ile kurulabilen bir dönüştürücü ve dosya işleme paketi sunar. Dosyaları bulut tabanlı bir dönüştürücüye göndermek yerine dönüştürme iş hattını kendi sunucunuz çalıştırır.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "c843dd9fb354",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Convertio'ya kendi sunucunuzda barındırılan bir alternatif nedir?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "0371f758c44f",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Evet. SnapOtter, ekiplerin kendi ortamlarında dosya iş akışlarını otomatikleştirebilmesi için REST API'ler ve iş hattı desteği içerir.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "2cf6f143fcae",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter'ın bir API'si var mı?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "c90ff0fcbe45",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio'ya açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "28ee19b751f3",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio; birçok biçimde tarayıcı tabanlı dosya dönüştürme için bulut tabanlı bir dönüştürücüdür. SnapOtter ise dönüştürme işlerinin kendi altyapınızın içinde kalmasını istediğinizde tercih edeceğiniz, kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "1daaecc8fc4c",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio; tarayıcı araçları ve bir API'ye sahip bulut tabanlı bir dosya dönüştürücüdür. SnapOtter, özel dönüştürme iş akışları ve yerel iş hatları için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "4bf1e1378bae",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio'ya Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "a6685bc44255",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Bulut dönüştürme; Convertio, yüklenen dosyaların anında, dönüştürülen dosyaların ise 24 saat sonra silindiğini belirtir",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "6bafa29c47cb",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Dosya ve kredi sınırları olan ücretsiz katmanın yanı sıra premium planlar",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "030922b28b4a",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "300+ biçimde bulut dönüştürme ve API iş akışları",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "199a49ecfa63",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Dosya dönüştürmenin ötesinde",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "bc7ee9fd3f28",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "Barındırılan dönüştürme API'si ve tarayıcı iş akışları",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "dd5149758d73",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX, odaklı bir dönüştürücüdür ve çok uzun bir biçim listesini kaldırır. SnapOtter da dönüştürür, ardından sıkıştırma, düzenleme, sansürleme, OCR, transkripsiyon ve iş hatları ekler; böylece dönüştürme birçok adımdan yalnızca biri olduğunda uygun düşer.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "413684ecdfe3",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Öncelikli olarak birçok biçim arasında dönüştürmeye ihtiyacınız varsa ConvertX temiz ve odaklı bir seçenektir. Ayrıca düzenleme, sıkıştırma, sansürleme, OCR veya transkripsiyon yapıyorsanız SnapOtter bunların tümünü tek bir yığında halleder.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "671e6b2065bd",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "SnapOtter mı yoksa ConvertX mi kullanmalıyım?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "189e319e55df",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Evet. İkisi de kendi sunucunuzda barındırılır, bu yüzden dosyalar altyapınızda kalır. Fark, verilerinizin nerede yaşadığı değil kapsamdır.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "a3a7144ba5e4",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "İkisi de dosyaları sunucumda tutuyor mu?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "b5a8fbcedc71",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter ile ConvertX karşılaştırması",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "85b1e4b33b5e",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX ve SnapOtter'ın ikisi de kendi sunucunuzda barındırılır ve açık kaynaklıdır. ConvertX biçim dönüştürme etrafında kurulmuştur; SnapOtter ise dönüştürmenin yanı sıra bir dosya iş akışının geri kalanını da yapar.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "a4cb71e51c14",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX, 1000+ biçim için kendi sunucunuzda barındırılan bir dosya dönüştürücüdür. SnapOtter da dönüştürür ve beş modalitede düzenleme, sıkıştırma, OCR ve transkripsiyon ekler.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "e579bad6fecb",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter ile ConvertX Karşılaştırması: Kendi Sunucunuzda Barındırılan Dosya Araçları",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "09e8cc6ecc45",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Kendi sunucunuzda barındırma",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "5b92a5478c36",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Açık kaynak",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "bd2b4d1fc2b3",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Evet, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "bd607f74952c",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Biçim dönüştürme",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "07c16606a9fa",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Ana odak",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "039c550a569a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Beş türde eksiksiz dosya iş akışı",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "b6abcad0b648",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Dönüştürme merkezli iş akışı",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "c3abae593b9e",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Dönüştürmenin ötesinde",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "378b30217918",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Sıkıştırma, düzenleme, sansürleme, OCR, transkripsiyon",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "3853190a80b1",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ dönüştürme biçimi",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "ac96f2508da6",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Araç sayısı",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "900633504bc0",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Ana odak değil",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "51077b281674",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Yerel yapay zekâ araçları",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "33cc6da9695e",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, transkripsiyon, ölçek büyütme ve daha fazlası",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d3edc71bd929",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Ana odak değil",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "51077b281674",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Katman tabanlı görüntü düzenleyici",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "901a30a4c86a",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert, birçok kategoride hızlı çevrimiçi dönüştürmeler için kullanışlıdır. SnapOtter da dönüştürmeyi kapsar, ardından yerel görüntü araçları, video/ses iş akışları, PDF'ler, arşivler, dosya araçları, API'ler ve iş hatları ekler.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "89c02b762ba0",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Birçok görüntü, video, ses, PDF, arşiv ve dosya dönüştürmesi için evet. SnapOtter, dönüştürücüyü barındırılan bir web servisi kullanmak yerine özel olarak kurmak istediğinizde en güçlüdür.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "4e55d076dcc9",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter, FreeConvert'in yerini alabilir mi?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "05da1c78c202",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter'ın pratik sınırları; sunucunuzdan, depolamanızdan, belleğinizden ve yapılandırılmış çalışma zamanı sınırlarından gelir. Bu da kapasiteyi kendiniz ayarlamak istediğinizde onu daha iyi bir seçenek yapar.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "2189bf7922b6",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter büyük dosyaları destekliyor mu?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "e45cffda4007",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert'e açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "f152c5da248b",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert; tarayıcı tabanlı dosya dönüştürme ve sıkıştırma için geniş kapsamlı, barındırılan bir dönüştürücüdür. SnapOtter ise bu dosya işlemlerinin kendi kurulumunuzun içinde çalışmasını istediğinizde tercih edeceğiniz, kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "38934012406f",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert, dosyaları çevrimiçi olarak dönüştürür ve sıkıştırır. SnapOtter, görüntü, video, ses, PDF ve dosya dönüştürme için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "c7e8961eed95",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert'e Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "e0786f2c3fab",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Dosyalar FreeConvert'e yüklenir; FreeConvert, dönüştürülen dosyaların birkaç saat sonra otomatik olarak silindiğini belirtir",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "9af180c064e8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Ücretsiz web katmanının yanı sıra daha büyük veya daha yüksek öncelikli iş yükleri için ücretli planlar",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "4196c3600108",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Birçok biçimde çevrimiçi dönüştürme ve sıkıştırma",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "676d0f462ceb",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Dosya dönüştürmenin ötesinde",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "bc7ee9fd3f28",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Ürüne bağlı olarak tarayıcı iş akışı veya sağlayıcı tarafından yönetilen API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "df8730a1317c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF, çevrimiçi PDF işlerinde güçlüdür. SnapOtter, PDF araçlarını görüntü, video, ses ve dosya araçlarıyla birleştirir; böylece aynı kurulum bir sözleşmeyi, bir ekran kaydını ve bir podcast düzenlemesini kaldırabilir.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "f9fa45bdc71a",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. AGPLv3 altında açık kaynaklıdır, Docker ile kurulur ve kendi donanımınızda birleştirme, bölme, sıkıştırma, dönüştürme, koruma, OCR ve ilgili PDF iş akışlarını sunar.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "8076134803c3",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "iLovePDF'e kendi sunucunuzda barındırılan bir alternatif nedir?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "0691c7caf333",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Açık kaynaklı sürüm ücretsizdir. Ücretli kurumsal katman, SSO ve denetim günlüğü gibi kontroller ekler; ancak dosya araçları açık kaynaklı yığının içinde yer alır.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "e8767414addc",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter ücretsiz mi?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "ece95d7b7439",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF'e açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "358e11eb0574",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF, hızlı ve tarayıcı tabanlı belge işleri için barındırılan bir PDF servisidir. SnapOtter ise aynı türden PDF iş akışının kendi sunucunuzda çalışmasını istediğinizde tercih edeceğiniz, kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "4744cff30ff0",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF çevrimiçi bir PDF servisidir. SnapOtter, ekiplere kendi sunucunuzda barındırılan PDF araçlarının yanı sıra tek bir açık kaynaklı yığında görüntü, video, ses ve dosya iş akışları sunar.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "2afeb9eba492",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF'e Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "5639acb3a482",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Dosyalar işlenmek üzere sağlayıcı tarafından barındırılan bir servise yüklenir",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "883509fe1082",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Plana özel özellikleri olan ücretsiz ve premium planlar",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "c32dbc9770e5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF iş akışı paketi",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "612b5c8e0733",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF'nin ötesinde",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "1cbe138632e3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Ürüne bağlı olarak tarayıcı iş akışı veya sağlayıcı tarafından yönetilen API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "df8730a1317c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert, birçok dönüştürme kategorisini kapsar ve API2Convert aracılığıyla bir API ekosistemine sahiptir. SnapOtter ise dönüştürme, sıkıştırma, PDF işleri, ses/video işleme ve yerel yapay zekâ araçlarının tek bir yığında yer aldığı özel kurulumlar için tasarlanmıştır.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "3bbf9975f81d",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Gizlilik, dahili kurulum, açık kaynak kodu veya hava boşluklu dosya işleme önemliyse SnapOtter'ı seçin. Bakımını yapacak bir sunucu olmadan barındırılan bir dönüştürücüyü tercih ediyorsanız Online-Convert'i seçin.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "1e20e286c4de",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Neden Online-Convert yerine SnapOtter'ı seçmeliyim?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "de8225fe50c2",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Evet. SnapOtter; dönüştürme, sıkıştırma, düzenleme, OCR, transkripsiyon, PDF işlemleri, meta veri araçları, arşivler, dosya araçları ve iş hatları içerir.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "1db9ef6cdb3a",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter dönüştürmeden fazlasını kapsıyor mu?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "3eccab645d6e",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert'e açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "4fde642b578c",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert; birçok dosya kategorisi için uzun süredir hizmet veren, barındırılan bir dönüştürücüdür. SnapOtter ise dönüştürme ve işlemenin kendi sunucularında gerçekleşmesini isteyen ekipler için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "56a03b202003",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert; video, görüntü, ses, belge, e-kitap ve arşiv dosyalarını çevrimiçi olarak dönüştürür. SnapOtter ise özel dosya iş akışları için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "d32c50d4c166",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert'e Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "1126b9775fb9",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Online-Convert/API2Convert bulut servislerine tarayıcı üzerinden yüklemeler",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "37ca6aab73b7",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Ücretsiz deneme, kredi paketleri, abonelikler ve kurumsal seçenekler",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "65b84c817701",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Medya, belge, e-kitap ve arşivler için çevrimiçi dönüştürücüler",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "83ade792f8b0",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Dosya dönüştürmenin ötesinde",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "bc7ee9fd3f28",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "Barındırılan API2Convert API'si ve tarayıcı iş akışları",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "d94d48268144",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai; toplantılar, notlar ve iş birliği etrafında kurulmuştur. SnapOtter ise yerel konuşmadan metne dönüştürmeye ve bir ses iş akışının geri kalanına odaklanır: kırpma, normalleştirme, gürültü azaltma, biçim dönüştürme, video altyazıları, görüntü, PDF ve dosya araçları.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "b081ddf8c051",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Evet. SnapOtter, transkripsiyonu kendi CPU'nuzda veya NVIDIA CUDA GPU'nuzda Whisper modelleriyle yerel olarak çalıştırır. Toplantı asistanı iş birliğinden çok özel ses ve video dosyaları için daha uygundur.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "ad97ced5bb4f",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Otter.ai'ye kendi sunucunuzda barındırılan bir alternatif var mı?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "4958fefb299c",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU daha hızlıdır, ancak transkripsiyon CPU'da da çalışır. Modeller, özelliği ilk kullandığınızda talep üzerine kurulur.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "b47dd0ff5d8a",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "GPU'ya ihtiyacım var mı?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "4d3e4a68b7db",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai'ye açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "aeb945d87bf8",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai, barındırılan bir toplantı transkripsiyon platformudur. SnapOtter ise transkripsiyonun kendi CPU'nuzda veya NVIDIA CUDA GPU'nuzda yerel modellerle çalışmasını istediğinizde tercih edeceğiniz, kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "9e81832c6237",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai, toplantıları bulutta yazıya döker. SnapOtter, konuşmadan metne dönüştürmeyi kendi CPU'nuzda veya NVIDIA CUDA GPU'nuzda yerel Whisper modelleriyle, ses yüklemeden çalıştırır.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "143209a782fe",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai'ye Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "b4f5a453c4d2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Ses ve toplantı içeriği, barındırılan Otter.ai servisi tarafından işlenir",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "6de09446dd34",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Plana göre dakika/içe aktarma sınırları olan ücretsiz ve ücretli planlar",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "27d462d2b689",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Toplantı notları, yapay zekâ özetleri, iş birliği ve transkripsiyon",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "29b6b280aeda",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Transkripsiyonun ötesinde",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "2d5d7694457d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Barındırılan uygulama entegrasyonları ve toplantı iş akışları",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "ec0ab9c32676",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf, PDF'lere odaklanır ve pek çok kişinin ihtiyacı da tam olarak budur. SnapOtter bu alanı birleştirme, bölme, sıkıştırma, dönüştürme, sansürleme, OCR ve daha fazlasıyla kapsar, ardından aynı kuruluma görüntü, video, ses ve dosya iş akışlarını ekler.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "9a728ec43345",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Evet. SnapOtter, AGPLv3 altında açık kaynaklıdır ve Docker ile kendi sunucunuzda çalışır. Birleştirme, bölme, sıkıştırma, dönüştürme, koruma, sansürleme, filigran, sayfa numaraları ve OCR işlemlerini SnapOtter tarafından dosya başına ücret alınmadan kapsar.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "10c7968bbf44",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Smallpdf'e ücretsiz, kendi sunucunuzda barındırılan bir alternatif var mı?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "e8b6fd224bb9",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter, dosyaları çalıştırdığınız makinede işler. Kendi ağınızın içine kurarsanız dosyalar, üçüncü taraf bir PDF servisine gitmek yerine bu kurulumun içinde kalır.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "6b51a04eb1de",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Belgelerim herhangi bir yere yükleniyor mu?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "9e43fd5b7ace",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Evet. PDF araçlarının ötesinde SnapOtter, görüntü, video, ses ve dosya işlerini de halleder; böylece tek bir kurulum günlük dosya iş akışlarınızın birçoğunu kapsayabilir.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "281d5b1122a1",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter PDF'den fazlasını yapıyor mu?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "72f586460e92",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf'e açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "fe8ca3832718",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf, cilalı ve barındırılan bir PDF paketidir. SnapOtter ise PDF araçlarının kendi kontrolündeki altyapıda çalışmasını isteyen, hassas belgelerini üçüncü taraf bir PDF servisine göndermek istemeyen ekipler için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "d34bed407bd7",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf, barındırılan bir PDF araç setidir. SnapOtter; PDF birleştirme, bölme, sıkıştırma, dönüştürme, OCR ve daha fazlasını kendi sunucunuzda çalıştırır ve beş dosya türünde 200+ ek araç sunar.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "7c0d146f7f8a",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf'e Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "9f9e0b7f5832",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Dosyalar işlenmek üzere sağlayıcı tarafından barındırılan bir servise yüklenir",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "883509fe1082",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Plana özel özellikleri olan ücretsiz ve ücretli planlar",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "9f80a418d846",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF iş akışı paketi",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "612b5c8e0733",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF'nin ötesinde",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "1cbe138632e3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Ürüne bağlı olarak tarayıcı iş akışı veya sağlayıcı tarafından yönetilen API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "df8730a1317c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Yalnızca PDF'lerle çalışıyorsanız Stirling-PDF mükemmeldir ve göz atmaya değer. Ayrıca görüntü yeniden boyutlandırıyor, video dönüştürüyor, ses yazıya döküyor veya dosyaları toplu işliyorsanız SnapOtter, birden fazla aracı yan yana çalıştırmak yerine bunların tümünü tek bir kurulumda halleder.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "2606cb9494c7",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "PDF'lerin ötesinde tek bir yığın istiyorsanız tutabilir. SnapOtter'ın PDF kapsamı geniştir ve buna görüntü, video, ses ile dosya araçları ekler. Yalnızca PDF'e yönelik bir kurulum içinse Stirling-PDF sağlam ve odaklı bir seçenektir.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "405dd6ed28e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter, Stirling-PDF'in yerini tutar mı?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "991903c70f61",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Her iki proje de açık kaynaklıdır ve kendi sunucunuzda barındırılabilir. SnapOtter AGPLv3'tür ve SSO, denetim günlüğü ve benzeri kontroller için isteğe bağlı ücretli bir kurumsal katman ekler.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "1ae9627d418e",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "İkisi de ücretsiz ve açık kaynaklı mı?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "8cbc8d4c6957",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter ile Stirling-PDF karşılaştırması",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "28d364788ad9",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF ve SnapOtter'ın ikisi de kendi sunucunuzda barındırılır ve açık kaynaklıdır; yani her iki durumda da dosyalar sunucunuzda kalır. Fark kapsamda: Stirling-PDF PDF'lere odaklanırken SnapOtter beş dosya türünün tümünü kapsar.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "4cd8313e0839",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF, güçlü ve kendi sunucunuzda barındırılan bir PDF araç setidir. SnapOtter da PDF'leri kapsar; ayrıca tek bir yığında görüntü, video, ses ve dosya araçları sunar. İkisi de açık kaynaklıdır.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "801aba3a0032",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter ile Stirling-PDF Karşılaştırması: Kendi Sunucunuzda Barındırılan Dosya Araçları",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "3e93b52b5097",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Kendi sunucunuzda barındırma",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "5b92a5478c36",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Açık kaynak",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "bd2b4d1fc2b3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Evet, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "bd607f74952c",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF iş akışları",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "e2b1018e8ab5",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Ana odak",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "039c550a569a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Beş türde eksiksiz dosya iş akışı",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "b6abcad0b648",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ PDF işlemi",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "bc77c9422f2c",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Araç sayısı",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "900633504bc0",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF odaklı OCR iş akışları",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "11abcc9cef55",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "Yerel yapay zekâ (OCR, transkripsiyon, ölçek büyütme)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "29886a470d08",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, transkripsiyon, ölçek büyütme ve daha fazlası",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d3edc71bd929",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Odak noktası değil",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "fb7bbff72012",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Katman tabanlı görüntü düzenleyici",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "901a30a4c86a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF otomasyon iş akışları",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "3d49c4b6d826",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "İş hatları ve toplu işleme",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "6138832a1012",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Evet",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "00e9738b77c7",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG, iş görüntü sıkıştırma olduğunda mükemmeldir. SnapOtter; PNG, JPEG, WebP ve AVIF sıkıştırır, ardından yeniden boyutlandırma, kırpma, dönüştürme, filigran ekleme, meta veri araçları, video, ses, PDF ve dosya iş akışlarıyla devam eder.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "eb820199f0d4",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Evet. SnapOtter, görüntü sıkıştırmayı yerel olarak çalıştırır; böylece pratik sınır, üçüncü taraf bir görüntü servisinin kotası yerine kurulum donanımınız olur.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "fa682776a9af",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "TinyPNG'ye kendi sunucunuzda barındırılan bir alternatif var mı?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "1477c3431c7b",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP ve AVIF; biçimler arasında dönüştürme ile birlikte. SnapOtter ayrıca kamera RAW biçimleri dahil birçok giriş biçimini okur.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "335f31449aac",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter hangi biçimleri sıkıştırabilir?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "530efefada1e",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG'ye açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "a914a1f9b779",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG, odaklı bir çevrimiçi görüntü sıkıştırıcıdır. SnapOtter ise sıkıştırma, dönüştürme, yeniden boyutlandırma, meta veri ve diğer görüntü işlerinin yerel olarak çalışmasını isteyen ekipler için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "2fc16874d1e4",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG, görüntüleri çevrimiçi olarak ve Tinify'ın API'si üzerinden sıkıştırır. SnapOtter, görüntüleri kendi sunucunuzda sıkıştırır ve dönüştürür, tek bir yığında daha geniş dosya iş akışları sunar.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "588bc02bb8e1",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG'ye Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "e6cd9e165361",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Barındırılan web servisi",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4af1de848b30",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Dosyalar işlenmek üzere sağlayıcı tarafından barındırılan bir servise yüklenir",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "883509fe1082",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Ücretsiz web kullanımı ve ücretli/geliştirici API seçenekleri",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "98b9c8637983",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Görüntü sıkıştırma ve Tinify API iş akışları",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "aaa4a5d437e9",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Görüntü sıkıştırmanın ötesinde",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "7d168971b378",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Ürüne bağlı olarak tarayıcı iş akışı veya sağlayıcı tarafından yönetilen API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "df8730a1317c",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow, hızlı bir tarayıcı aracı istediğinizde ve hiçbir şey kurmak istemediğinizde kullanışlıdır. SnapOtter bu dengenin diğer tarafı için tasarlanmıştır: özel kurulumlar, dahili iş akışları, tekrarlanabilir iş hatları ve görüntü, video, ses, PDF ile dosyalar arasında yerel dosya işleme.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "2f30c57f3b5e",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Hayır. TinyWow, geniş kapsamlı ve barındırılan bir web araç kutusudur. SnapOtter ise özel kurulum, kaynak görünürlüğü, API'ler ve iş hatları isteyen ekipler için kendi sunucunuzda barındırılan bir dosya işleme paketidir.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "d3725e68fc69",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter bir TinyWow kopyası mı?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "27f1be103be1",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Barındırılan işlemenin kabul edilebilir olduğu hızlı, tek seferlik tarayıcı işleri için TinyWow'u kullanın. Dosyalar hassassa, iş akışları tekrarlanıyorsa ya da kuruluşunuzun işlemenin kendi kontrolündeki altyapıda gerçekleşmesini gerektirdiği durumlarda SnapOtter'ı kullanın.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "2a9b4a071748",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "TinyWow mu yoksa SnapOtter mı kullanmalıyım?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "89ab63ac2b30",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Doğrudan değil. SnapOtter dosya işlemeye odaklanır: görüntüler, video, ses, PDF, arşivler ve dosyalar. Yazma şablonlarından çok dosya işleme katmanının önemli olduğu durumlarda daha iyi bir seçenektir.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "1caf93dffa23",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter, TinyWow'un yapay zekâ ile yazma araçlarının yerini alır mı?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "ab0c8c689203",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow'a açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "f22bd1db586c",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow; hızlı PDF, görüntü, video, yapay zekâ ile yazma ve dosya işleri için geniş kapsamlı, barındırılan bir araç kutusudur. SnapOtter ise günlük dosya araçlarını kendi kontrolündeki altyapıda isteyen ekipler için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "7d48e441fd37",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow; PDF, görüntü, video, yapay zekâ ile yazma ve dosya işleri için geniş kapsamlı, barındırılan bir araç kutusudur. SnapOtter ise özel dosya iş akışları için kendi sunucunuzda barındırılan alternatiftir.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "579768a720ef",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow'a Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "38f5298e8e8a",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Barındırılan çevrimiçi araç kutusu",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "49873a2aaeba",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Dağıtım modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "bfe1da8115ae",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "TinyWow sunucularına yüklenir; TinyWow, dosyaların 1 saat sonra silindiğini belirtir",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "7dcadcf59ff0",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Kendi altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "3af89b22858b",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF, görüntü, video, yapay zekâ ile yazma ve dosya araçları",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "4f302f7e7897",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Araç kapsamı",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "6b34b132beb6",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Görüntü, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bf805327f1bd",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Ücretsiz araçların yanı sıra ücretli destekçi/içerik planları",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "53d3d1cd61c5",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınır donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "95e099b544b0",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Çevrimdışı / hava boşluklu kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "043897ced98e",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Kendi ağınıza kurulduğunda desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8e8138e954c9",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen servis; kaynak erişilebilirliği ürün modelinin parçası değil",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5c33075fe220",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Öncelikli olarak hızlı web aracı iş akışları",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "773eb65cc68c",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş hatları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6d3db6aaeea7",
+    "stale": false
+  }
+}

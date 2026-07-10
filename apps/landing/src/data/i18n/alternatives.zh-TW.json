@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online 在 PDF 編輯、簽署、轉檔與 Acrobat 訂閱方面很強。SnapOtter 並不打算取代整個 Adobe 生態系；它在同一套開源技術堆疊中，為團隊提供自架 PDF 工具，以及影像、影片、音訊與檔案工作流程。",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "0adf1bc0e126",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "並非每一種 Acrobat 工作流程都能取代。當你需要自架的 PDF 處理、轉檔、OCR、壓縮、頁面操作與自動化時，SnapOtter 最為合適。Acrobat 仍是功能深厚的桌面與雲端文件平台。",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "84cb57dc541b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter 能取代 Adobe Acrobat Pro 嗎？",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "fd19ca09c183",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "當部署掌控權、原始碼透明、隔離網路使用或可重複的檔案流程管線比 Adobe 帳號功能與更廣的 Acrobat 生態系更重要時，就選 SnapOtter。",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "35c0f5002472",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "為什麼選 SnapOtter 而不是 Adobe Acrobat online？",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "ec0e8e2beede",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat online 的開源自架替代方案",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "1bb31da4270b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online 是出自 PDF 締造者的精緻託管式 PDF 工作流程。SnapOtter 則是自架替代方案，適合需要讓 PDF 作業留在自己基礎架構上的團隊。",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "bcac6b81d37d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online 是 Adobe 提供的託管式 PDF 工具組。SnapOtter 讓團隊透過開源部署，取得自架 PDF 工具與更廣的檔案工作流程。",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "4aabf1bcb09b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat online 的開源自架替代方案",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "1bb31da4270b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe 表示線上編輯器的檔案由 Adobe 伺服器處理",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "7c00d1159206",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "免費線上工具、試用，以及付費的 Acrobat 方案",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "129792307fc3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF、電子簽章、AI 與 Acrobat 帳號工作流程",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "3eb41537e57e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF 以外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "08b8a2323dd3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "瀏覽器工作流程或供應商託管的 API，視產品而定",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "c5e36482cc74",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert 涵蓋廣、對 API 友善，很適合做轉檔。SnapOtter 能轉換影像、影片、音訊、PDF 與各種檔案格式，並加上壓縮、編輯、OCR、語音轉文字與本機流程管線。",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "1f9ad93bc98a",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "可以。SnapOtter 是開源軟體，可在 Docker 上執行。它在本機轉換影像、影片、音訊、PDF 與各種檔案格式，且 SnapOtter 不收取按次轉換的費用。",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "9412f09e6c50",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "我可以自架 CloudConvert 的替代方案嗎？",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "08e45efbed26",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "可以。SnapOtter 底層以 FFmpeg 處理影片與音訊，影像則用 Sharp，文件則搭配 qpdf、LibreOffice 及相關工具。",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "2ed042a7b6f2",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter 也能轉換影片與音訊嗎？",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "d2d4ffda209f",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert 的開源自架替代方案",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "23098ceb8ecb",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert 是成熟的託管式轉檔工具與 API。當轉檔應在你自己的基礎架構中進行、並由你掌控流程管線時，SnapOtter 就是自架替代方案。",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "4daf9a740177",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert 是附帶 API 的託管式轉檔平台。SnapOtter 透過開源流程管線，在你自己的伺服器上轉換影像、影片、音訊、PDF 與檔案。",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "3fab02ff0bd8",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert 的開源自架替代方案",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "23098ceb8ecb",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "檔案上傳至供應商託管的服務進行處理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "b8ffeac4ea59",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "依用量與方案計費的雲端定價",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "81721dcc4d07",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "涵蓋多種檔案類別的託管式轉檔",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "2dee88292a83",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "檔案轉換以外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "be125cb65dbd",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "託管式 API 與瀏覽器工作流程",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "6b2e06585dd2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio 很適合快速轉檔與開發者 API 用途。SnapOtter 讓轉檔留在本機，並加上更廣的檔案處理：壓縮、編輯、OCR、語音轉文字、PDF 操作與可重複的流程管線。",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "c5374867ea3f",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter 提供一套可用 Docker 部署的轉換器與檔案處理套件。與其把檔案送往雲端轉換器，不如讓你的伺服器執行轉檔流程管線。",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "ae13f17edc81",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "什麼是可自架的 Convertio 替代方案？",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "53b7013c0faf",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "有。SnapOtter 內建 REST API 與流程管線支援，讓團隊能在自己的環境中自動化檔案工作流程。",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "37d86fe3d22e",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter 有 API 嗎？",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "c5f990b2e031",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio 的開源自架替代方案",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "df44d18ee8d6",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio 是一套雲端轉換器，用於瀏覽器上橫跨多種格式的檔案轉換。當你希望轉檔工作留在自己的基礎架構內時，SnapOtter 就是自架替代方案。",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "0ec3148c4ca1",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio 是附帶瀏覽器工具與 API 的雲端檔案轉換器。SnapOtter 則是自架替代方案，用於私有轉檔工作流程與本機流程管線。",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "ce7b4597bd00",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio 的開源自架替代方案",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "df44d18ee8d6",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "雲端轉換；Convertio 表示上傳的檔案會立即刪除，轉換後的檔案則於 24 小時後刪除",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "382423e1febc",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "帶有檔案與點數限制的免費層級，另有付費（Premium）方案",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "572a9c191263",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "橫跨 300+ 種格式的雲端轉換與 API 工作流程",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "3143954bc17a",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "檔案轉換以外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "be125cb65dbd",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "託管式轉換 API 與瀏覽器工作流程",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "08b1a58b737b",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX 是專注的轉換器，能處理龐大的格式清單。SnapOtter 同樣能轉檔，並加上壓縮、編輯、遮蔽、OCR、轉錄與流程管線，因此當轉檔只是眾多步驟之一時，它更能派上用場。",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "27cc3011c64d",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "如果你主要需要橫跨多種格式的格式轉換，ConvertX 是簡潔又專注的選擇。如果你還要編輯、壓縮、遮蔽、OCR 或轉錄，SnapOtter 能在一套堆疊中全部完成。",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "fb561090cb3b",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "我該用 SnapOtter 還是 ConvertX？",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "fd4d866fd08a",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "是的。兩者都是自架，因此檔案都留在你的基礎架構上。差別在於涵蓋範圍，而不是資料存放的位置。",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "3eda7bc8e2fa",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "兩者都把檔案留在我的伺服器上嗎？",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "ce92185cb92f",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter 與 ConvertX 比較",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "c839dbdd07d4",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX 與 SnapOtter 都是自架且開源。ConvertX 圍繞格式轉換而打造；SnapOtter 則在轉檔之外，還涵蓋檔案工作流程的其餘部分。",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "60f6c9abe33f",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX 是一套支援 1000+ 種格式的自架檔案轉換器。SnapOtter 同樣能轉檔，並在五種模態上加上編輯、壓縮、OCR 與轉錄。",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "07b4e48fd19a",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter 與 ConvertX 比較：自架檔案工具對決",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "921a84dbf717",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "自架",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "dafbcd36eb42",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "開源",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "1588d65450a0",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "是，AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "8b99217ec94b",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "格式轉換",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "264c341faf3c",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "主要專注",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "4a3c1cd74275",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "橫跨五種類型的完整檔案工作流程",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "d4c6ecb9d3c8",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "以轉換為中心的工作流程",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "58216dc5b27e",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "轉換以外",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "18595266b6d9",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "壓縮、編輯、遮蔽、OCR、轉錄",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "2496a2adb7e0",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ 種轉換格式",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "d99d21b4382c",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "工具數量",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "6053f8a2cf1a",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "非主要專注領域",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "95155598316a",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "本機 AI 工具",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "6ae65be17cd2",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR、轉錄、放大等",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "1b44b42f8898",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "非主要專注領域",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "95155598316a",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "圖層式影像編輯器",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "9072de23653c",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert 很適合橫跨多種類別的快速線上轉檔。SnapOtter 同樣涵蓋轉檔，並加上本機影像工具、影片／音訊工作流程、PDF、壓縮檔、檔案工具、API 與流程管線。",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "20c1445d3c50",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "對於許多影像、影片、音訊、PDF、壓縮檔與檔案的轉換來說，可以。當你想私有部署轉檔器、而不是使用託管式網頁服務時，SnapOtter 最能發揮實力。",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "cac3afef2d74",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter 能取代 FreeConvert 嗎？",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "8806df48c005",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter 的實際上限取決於你的伺服器、儲存空間、記憶體與設定的執行限制。因此當你想自行調整處理量時，它會是更合適的選擇。",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "a681e83d0d51",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter 支援大型檔案嗎？",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "bff6a362a7ac",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert 的開源自架替代方案",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "ba34f32ea331",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert 是一套廣泛的託管式轉檔工具，用於瀏覽器上的檔案轉換與壓縮。當你希望這些檔案操作在自己的部署中執行時，SnapOtter 就是自架替代方案。",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "071733726387",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert 在線上轉換並壓縮檔案。SnapOtter 是自架替代方案，讓影像、影片、音訊、PDF 與檔案轉換都在你自己的伺服器上進行。",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "94b286edfc70",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert 的開源自架替代方案",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "ba34f32ea331",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "檔案上傳至 FreeConvert；FreeConvert 表示轉換後的檔案會在數小時後自動刪除",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "e735a6e26044",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "免費網頁層級，另有付費方案應付更大或更高優先度的工作負載",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "6fa53d7b8f4c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "橫跨多種格式的線上轉換與壓縮",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "1cd6b7122247",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "檔案轉換以外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "be125cb65dbd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "瀏覽器工作流程或供應商託管的 API，視產品而定",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "c5e36482cc74",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF 擅長線上 PDF 任務。SnapOtter 把 PDF 工具與影像、影片、音訊及檔案工具結合在一起，因此同一套部署就能搞定一份合約、一段螢幕錄影，以及一次 Podcast 剪輯。",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "fbde17d0b580",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "就是 SnapOtter。它依 AGPLv3 開源，可用 Docker 部署，讓你在自己的硬體上使用合併、分割、壓縮、轉檔、加密保護、OCR 等相關 PDF 工作流程。",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "0b16494f0281",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "有哪些可自架的 iLovePDF 替代方案？",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "549e1bf2789e",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "開源版免費。付費的企業級方案會加入 SSO 與稽核紀錄等控管功能，但檔案工具本身都在開源技術堆疊裡。",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "c4c4bf23a413",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter 免費嗎？",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "bf9670f5b185",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF 的開源自架替代方案",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "cdd11709466c",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF 是託管式 PDF 服務，主打快速的瀏覽器文件作業。當你希望同類 PDF 工作流程在自己的伺服器上執行時，SnapOtter 就是自架替代方案。",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "0712dc19fb38",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF 是線上 PDF 服務。SnapOtter 讓團隊在同一套開源技術堆疊中，取得自架 PDF 工具以及影像、影片、音訊與檔案工作流程。",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "cbc368f2af98",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF 的開源自架替代方案",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "cdd11709466c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "檔案上傳至供應商託管的服務進行處理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "b8ffeac4ea59",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "免費與付費（Premium）方案，功能依方案而異",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "f51e247694e4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF 工作流程套件",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "df08b56043b3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF 以外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "08b8a2323dd3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "瀏覽器工作流程或供應商託管的 API，視產品而定",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "c5e36482cc74",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert 涵蓋多種轉換類別，並透過 API2Convert 建立了 API 生態系。SnapOtter 專為私有部署而生，讓轉檔、壓縮、PDF 作業、音訊／影片處理與本機 AI 工具同處一套堆疊。",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "f456fc1144b0",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "當隱私、內部部署、開源程式碼或隔離網路的檔案處理很重要時，就選 SnapOtter。當你偏好一個無需自行維護伺服器的託管式轉換器時，就選 Online-Convert。",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "a30b83898e05",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "為什麼選 SnapOtter 而不是 Online-Convert？",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "8fb0558435a5",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "是的。SnapOtter 包含轉檔、壓縮、編輯、OCR、語音轉文字、PDF 操作、中繼資料工具、壓縮檔、檔案工具與流程管線。",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "540971f9cda8",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter 涵蓋的不只轉檔嗎？",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "d40a2506a556",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert 的開源自架替代方案",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "a607bb385999",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert 是一套經營多年的託管式轉換器，涵蓋許多檔案類別。SnapOtter 則是自架替代方案，適合希望轉檔與處理都在自己伺服器上進行的團隊。",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "8746b9668b9d",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert 在線上轉換影片、影像、音訊、文件、電子書與壓縮檔。SnapOtter 則是打造私有檔案工作流程的自架替代方案。",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "df91a162c428",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert 的開源自架替代方案",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "a607bb385999",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "由瀏覽器上傳至 Online-Convert／API2Convert 雲端服務",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "eef0b1449272",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "免費試用、點數方案、訂閱與企業方案",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "d693b74dfe54",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "面向媒體、文件、電子書與壓縮檔的線上轉換器",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "1cf0f070e0c0",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "檔案轉換以外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "be125cb65dbd",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "託管式 API2Convert API 與瀏覽器工作流程",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "6efab0aba3ce",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai 圍繞會議、筆記與協作而打造。SnapOtter 專注於本機語音轉文字，並涵蓋音訊工作流程的其餘部分：裁剪、正規化、降噪、格式轉換、影片字幕，以及影像、PDF 與檔案工具。",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "16fea024d565",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "有。SnapOtter 以 Whisper 模型在你自己的 CPU 或 NVIDIA CUDA GPU 上本機執行轉錄。相較於會議代理協作，它更適合處理私有的音訊與影片檔案。",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "c9a847ca745d",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "有可自架的 Otter.ai 替代方案嗎？",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "708b1a2bd9c8",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "有 GPU 會更快，但轉錄也能在 CPU 上執行。模型會在你首次使用該功能時依需求安裝。",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "6333ab73a2cb",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "我需要 GPU 嗎？",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "dce04adb3cab",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai 的開源自架替代方案",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "63af2a638ee6",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai 是託管式會議轉錄平台。當你希望轉錄以本機模型在自己的 CPU 或 NVIDIA CUDA GPU 上執行時，SnapOtter 就是自架替代方案。",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "ad453b9e6de4",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai 在雲端轉錄會議內容。SnapOtter 以本機 Whisper 模型，在你自己的 CPU 或 NVIDIA CUDA GPU 上執行語音轉文字，而且不上傳音訊。",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "29ae8a0ec58d",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai 的開源自架替代方案",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "63af2a638ee6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "音訊與會議內容由託管式 Otter.ai 服務處理",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "32d5f5e1ef2d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "免費與付費方案，分鐘數／匯入量限制依方案而異",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "dcfcd96ce9dc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "會議筆記、AI 摘要、協作與轉錄",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "f65e41ddbab6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "轉錄以外",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "f318a7e2b2f3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "託管式應用程式整合與會議工作流程",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "7138acf3967b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf 專注於 PDF，這正是許多人所需要的。SnapOtter 同樣涵蓋這個領域，提供合併、分割、壓縮、轉檔、遮蔽、OCR 等功能，並在同一套部署中加上影像、影片、音訊與檔案工作流程。",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "6bb673ce8648",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "有。SnapOtter 依 AGPLv3 開源，可用 Docker 在你自己的伺服器上執行。它涵蓋合併、分割、壓縮、轉檔、加密保護、遮蔽、浮水印、頁碼與 OCR，且 SnapOtter 不收取任何按檔案計費的費用。",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "7436843cfd7d",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "有沒有免費、可自架的 Smallpdf 替代方案？",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "a7ee7ecf6a0a",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter 在你執行它的機器上處理檔案。若部署在自己的網路內，檔案會留在該部署環境中，而不會送往第三方 PDF 服務。",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "d344f38f2cef",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "我的文件會被上傳到任何地方嗎？",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "724398ba49cb",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "是的。除了 PDF 工具之外，SnapOtter 也能處理影像、影片、音訊與檔案任務，因此單一套部署就能涵蓋多種日常檔案工作流程。",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "5b523f430ea9",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter 的功能不只 PDF 嗎？",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "54b69395e4a9",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf 的開源自架替代方案",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "41db6715cc0b",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf 是一套精緻的託管式 PDF 套件。SnapOtter 則是自架替代方案，適合希望 PDF 工具在自己掌控的基礎架構上執行、不必把敏感文件送往第三方 PDF 服務的團隊。",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "34fdc6e4cca3",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf 是託管式 PDF 工具組。SnapOtter 讓 PDF 合併、分割、壓縮、轉檔、OCR 等操作全都在你自己的伺服器上執行，還額外提供橫跨五種檔案類型的 200+ 種工具。",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "89eff36ed1c5",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf 的開源自架替代方案",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "41db6715cc0b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "檔案上傳至供應商託管的服務進行處理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "b8ffeac4ea59",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "免費與付費方案，功能依方案而異",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "b27bfbf125e0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF 工作流程套件",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "df08b56043b3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF 以外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "08b8a2323dd3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "瀏覽器工作流程或供應商託管的 API，視產品而定",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "c5e36482cc74",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "如果你只會用到 PDF，Stirling-PDF 相當出色、值得一試。但如果你還要調整影像尺寸、轉換影片、轉錄音訊或批次處理檔案，SnapOtter 能在同一套部署中全部搞定，而不必同時執行好幾套工具。",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "dae689fe6050",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "如果你想用一套堆疊處理 PDF 以外的事，那就可以。SnapOtter 的 PDF 涵蓋範圍很廣，還加上影像、影片、音訊與檔案工具。若只需要純 PDF 環境，Stirling-PDF 是穩健又專注的選擇。",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "18a1ac15cf16",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter 能取代 Stirling-PDF 嗎？",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "121660551460",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "兩個專案都是開源且可自架的。SnapOtter 採 AGPLv3，並額外提供選用的付費企業級方案，內含 SSO、稽核紀錄等類似控管功能。",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "b36dfdf1f910",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "兩者都免費且開源嗎？",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "4523d9982d23",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter 與 Stirling-PDF 比較",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "e1186e89bbcb",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF 與 SnapOtter 都是自架且開源，因此無論選哪個，檔案都會留在你的伺服器上。差別在於範圍：Stirling-PDF 專注於 PDF，SnapOtter 則橫跨全部五種檔案類型。",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "521d8f22a9a7",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF 是一套強大的自架 PDF 工具組。SnapOtter 同樣涵蓋 PDF，並在同一套堆疊中加上影像、影片、音訊與檔案工具。兩者皆為開源。",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "6a309b665299",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter 與 Stirling-PDF 比較：自架檔案工具對決",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "8f2a9530e7c8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "自架",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "dafbcd36eb42",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "開源",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "1588d65450a0",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "是，AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "8b99217ec94b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF 工作流程",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "645c20b6d7ef",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "主要專注",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "4a3c1cd74275",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "橫跨五種類型的完整檔案工作流程",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "d4c6ecb9d3c8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ 種 PDF 操作",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "31cfcc236067",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "工具數量",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "6053f8a2cf1a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "以 PDF 為導向的 OCR 工作流程",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "c87d2ff65aad",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "本機 AI（OCR、轉錄、放大）",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "2a82366b1139",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR、轉錄、放大等",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "1b44b42f8898",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "非其專注領域",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "6d4168d29eb3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "圖層式影像編輯器",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "9072de23653c",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF 自動化工作流程",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "ff373be94848",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "流程管線與批次處理",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "b8797477afe5",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "當任務就是影像壓縮時，TinyPNG 非常出色。SnapOtter 能壓縮 PNG、JPEG、WebP 與 AVIF，並進一步提供調整尺寸、裁切、轉檔、加浮水印、中繼資料工具，以及影片、音訊、PDF 與檔案工作流程。",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "9f9d9ea48d9a",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "有。SnapOtter 在本機執行影像壓縮，因此實際上限取決於你的部署硬體，而不是第三方影像服務的配額。",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "d7574ebb979c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "有可自架的 TinyPNG 替代方案嗎？",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "c1a8a0e6bdbb",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG、JPEG、WebP 與 AVIF，並可在各格式間轉換。SnapOtter 也能讀取許多輸入格式，包括相機 RAW 格式。",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "5fb6656c9f55",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter 可以壓縮哪些格式？",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "d8992c5aca93",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG 的開源自架替代方案",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "0ce480e5c12d",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG 是專注的線上影像壓縮工具。SnapOtter 則是自架替代方案，適合希望壓縮、轉檔、調整尺寸、中繼資料及其他影像作業都在本機執行的團隊。",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "b1e1d8874f0b",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG 透過線上服務與 Tinify 的 API 壓縮影像。SnapOtter 在你自己的伺服器上壓縮並轉換影像，還在同一套堆疊中提供更廣的檔案工作流程。",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "251cc0014b49",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG 的開源自架替代方案",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "0ce480e5c12d",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "託管式網路服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e56aaefc9698",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "檔案上傳至供應商託管的服務進行處理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "b8ffeac4ea59",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "免費網頁使用，另有付費／開發者 API 選項",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "a0d1ab5936cc",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "影像壓縮與 Tinify API 工作流程",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "a901b9c971a3",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "影像壓縮以外",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "4e528f883ea8",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "瀏覽器工作流程或供應商託管的 API，視產品而定",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "c5e36482cc74",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "當你想要一個快速的瀏覽器工具、又不想安裝任何東西時，TinyWow 很方便。SnapOtter 則為權衡的另一端而生：私有部署、內部工作流程、可重複的流程管線，以及橫跨影像、影片、音訊、PDF 與檔案的本機處理。",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "343172ff76ca",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "不是。TinyWow 是一套廣泛的託管式網頁工具箱。SnapOtter 是自架的檔案處理套件，專為想要私有部署、原始碼透明、API 與流程管線的團隊而設計。",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "2f3c7dc4c453",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter 是 TinyWow 的複製品嗎？",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "d2c0db799547",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "如果是一次性的快速瀏覽器任務、也能接受託管式處理，就用 TinyWow。當檔案敏感、工作流程會反覆進行，或組織需要在自己掌控的基礎架構上處理時，就用 SnapOtter。",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "90db0c43d1a0",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "我該用 TinyWow 還是 SnapOtter？",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "38609278228d",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "無法直接取代。SnapOtter 專注於檔案處理：影像、影片、音訊、PDF、壓縮檔與檔案。當檔案處理這一層比寫作範本更重要時，它會是更合適的選擇。",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "5a64da4ddc2c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter 能取代 TinyWow 的 AI 寫作工具嗎？",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "c8b331a527c6",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow 的開源自架替代方案",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "d5ef32f3ee7c",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow 是一套廣泛的託管工具箱，用來快速處理 PDF、影像、影片、AI 寫作與檔案任務。SnapOtter 則是自架替代方案，適合希望日常檔案工具在自己掌控的基礎架構上執行的團隊。",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "10431aad8b36",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow 是一套涵蓋 PDF、影像、影片、AI 寫作與檔案任務的廣泛託管工具箱。SnapOtter 則是打造私有檔案工作流程的自架替代方案。",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "228e278b7bba",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow 的開源自架替代方案",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "d5ef32f3ee7c",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "託管式線上工具箱",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "8816690fdd43",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "自架於你的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "c30f7db126a2",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "上傳至 TinyWow 伺服器；TinyWow 表示檔案會在 1 小時後刪除",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "321165ed68bb",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF、影像、影片、AI 寫作與檔案工具",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "6a2843e19404",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "工具涵蓋範圍",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "7f38d94e48aa",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "影像、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "148d8970fdb6",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "免費工具，另有付費贊助者／內容方案",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "bc5d15ca6b59",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "成本控管",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "273bcf236678",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "採 AGPLv3 免費授權；限制取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "733a485130ef",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "121c0972790d",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "部署於你的網路內即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "c162b092eea8",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "供應商營運的服務；提供原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f7a473bf33b",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 提供",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "0bc9b15cfccd",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "主要是快速的網頁工具工作流程",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "1e35332a56c2",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "你自己部署中的 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "164feffb8ba1",
+    "stale": false
+  }
+}

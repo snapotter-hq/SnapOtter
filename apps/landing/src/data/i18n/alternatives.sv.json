@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online är starkt för PDF-redigering, signering, konvertering och Acrobat-prenumerationer. SnapOtter försöker inte ersätta hela Adobe-ekosystemet; det ger team självhostade PDF-verktyg plus arbetsflöden för bild, video, ljud och filer i en enda stack med öppen källkod.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "aaab968190b7",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Inte för alla Acrobat-arbetsflöden. SnapOtter passar bäst när du behöver självhostad PDF-bearbetning, konvertering, OCR, komprimering, sidoperationer och automatisering. Acrobat förblir en djup dokumentplattform för dator och moln.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "4abde040f069",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "Är SnapOtter en ersättning för Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "386d34f86013",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Välj SnapOtter när driftkontroll, insyn i källkoden, luftgapad användning eller repeterbara filpipelines betyder mer än Adobe-kontofunktioner och det bredare Acrobat-ekosystemet.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "71509ce9724d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Varför välja SnapOtter framför Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "03343cff837a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Det öppna, självhostade alternativet till Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "dd184a9f8b68",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online är ett polerat molnbaserat PDF-arbetsflöde från företaget bakom PDF. SnapOtter är det självhostade alternativet för team som behöver att PDF-arbetet stannar på deras egen infrastruktur.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "f3bef4c8ac5a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online är en molnbaserad PDF-verktygsuppsättning från Adobe. SnapOtter ger team självhostade PDF-verktyg och bredare filarbetsflöden med drift baserad på öppen källkod.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "fa1ef500cc83",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till Adobe Acrobat online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "dd184a9f8b68",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe uppger att filer i onlineredigeraren hanteras av Adobes servrar",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "1a2ed7480dfe",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Gratis onlineverktyg, provperioder och betalda Acrobat-planer",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "d7e845592d7e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "Arbetsflöden för PDF, e-signering, AI och Acrobat-konto",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "07d8efe67b83",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Utöver PDF-filer",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0abda4908b0c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Webbläsarflöde eller leverantörshanterat API, beroende på produkt",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "e0c42588faff",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert är brett och API-vänligt för konvertering. SnapOtter konverterar mellan format för bild, video, ljud, PDF och filer, och lägger sedan till komprimering, redigering, OCR, transkribering och lokala pipelines.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "fed3a41c36d2",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Ja. SnapOtter har öppen källkod och körs på Docker. Det konverterar format för bild, video, ljud, PDF och filer lokalt, utan någon fakturering per konvertering från SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "99cd159d1d19",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Kan jag självhosta ett alternativ till CloudConvert?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "6bc7c4f6074d",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Ja. SnapOtter använder FFmpeg under huven för video och ljud, tillsammans med Sharp för bilder och qpdf, LibreOffice och relaterade verktyg för dokument.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "b9a57b6c3eaa",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "Konverterar SnapOtter även video och ljud?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "bf66ff933bdf",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Det öppna, självhostade alternativet till CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "349bb913dff2",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert är en mogen molnbaserad konverterare med API. SnapOtter är det självhostade alternativet när konvertering ska ske inom din egen infrastruktur, med pipelines du styr.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "fe55e4fe63f8",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert är en molnbaserad konverteringsplattform med ett API. SnapOtter konverterar bild, video, ljud, PDF och filer på din egen server med pipelines med öppen källkod.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "e55f118ef789",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "349bb913dff2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Filerna laddas upp till en leverantörsdriven tjänst för bearbetning",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "6fd677a94f7b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Molnprissättning baserad på användning och plan",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "551e90a169e8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Molnbaserad konvertering av många filkategorier",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "6e9ad720441a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Utöver filkonvertering",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "c95832438439",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "Molnbaserat API och webbläsarflöden",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "0c1adc945dc1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio är bekvämt för snabba konverteringar och utvecklar-API-användning. SnapOtter håller konverteringen lokal och lägger till bredare filbearbetning: komprimering, redigering, OCR, transkribering, PDF-operationer och repeterbara pipelines.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "6bab410b917d",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter ger dig en Docker-driftbar konverterare och svit för filbearbetning. I stället för att skicka filer till en molnbaserad konverterare kör din server konverteringspipelinen.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "782ee828a985",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Vad är ett självhostat alternativ till Convertio?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "8b50fd179407",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Ja. SnapOtter innehåller REST API:er och pipelinestöd så att team kan automatisera filarbetsflöden inom sin egen miljö.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "a833be48feed",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "Har SnapOtter ett API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "ba161acf4f81",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Det öppna, självhostade alternativet till Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "a5a2678f5c2a",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio är en molnbaserad konverterare för webbläsarbaserad filkonvertering mellan många format. SnapOtter är det självhostade alternativet när du vill att konverteringsjobben ska stanna inom din egen infrastruktur.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "906e8c1f0033",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio är en molnbaserad filkonverterare med webbverktyg och ett API. SnapOtter är det självhostade alternativet för privata konverteringsarbetsflöden och lokala pipelines.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "e30497ec62e4",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "a5a2678f5c2a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Molnbaserad konvertering; Convertio uppger att uppladdade filer raderas direkt och konverterade filer efter 24 timmar",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "1bcf353d0ca9",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Gratisnivå med fil- och kreditgränser plus premiumplaner",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "32287cad154c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Molnbaserad konvertering av 300+ format och API-arbetsflöden",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "9f99ac2efeaa",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Utöver filkonvertering",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "c95832438439",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "Molnbaserat konverterings-API och webbläsarflöden",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "748959f7e06d",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX är en fokuserad konverterare och hanterar en enorm lista med format. SnapOtter konverterar också, och lägger sedan till komprimering, redigering, borttagning av känslig text, OCR, transkribering och pipelines, så det passar när konvertering är ett steg bland många.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "bda5f6e551ab",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Om du främst behöver formatkonvertering mellan många format är ConvertX ett rent, fokuserat alternativ. Om du även redigerar, komprimerar, redigerar bort text, OCR:ar eller transkriberar gör SnapOtter allt det i en enda stack.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "2f1e716f980d",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Ska jag använda SnapOtter eller ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "1ea63ff072ba",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Ja. Båda är självhostade, så filerna stannar på din infrastruktur. Skillnaden är bredd, inte var dina data finns.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "e9d96b311c8c",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Behåller båda filerna på min server?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "eef61d76a29a",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter jämfört med ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "bbbd37c16f5b",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX och SnapOtter är båda självhostade och med öppen källkod. ConvertX är byggt kring formatkonvertering; SnapOtter gör konvertering plus resten av ett filarbetsflöde.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "540185149ef9",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX är en självhostad filkonverterare för 1000+ format. SnapOtter konverterar också, och lägger till redigering, komprimering, OCR och transkribering över fem modaliteter.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "d30c38d9a9bb",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter jämfört med ConvertX: självhostade filverktyg i jämförelse",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "bbb80ae86d32",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Självhostad",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "9808c4a94aed",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Öppen källkod",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "3a05af7fa3a6",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Ja, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cecbefe36c1a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Formatkonvertering",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "e75eab9f43d2",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Primärt fokus",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "c6e8e6c3f507",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Fullständigt filarbetsflöde över fem typer",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "8494a3e8fc43",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Konverteringscentrerat arbetsflöde",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "e785119ef0c9",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Utöver konvertering",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "84d00ceb9073",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Komprimera, redigera, redigera bort, OCR, transkribera",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "0b82b8eae51e",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ konverteringsformat",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "d9e03b34f118",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Antal verktyg",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "a36ee0ca5bd7",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Inte ett primärt fokus",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "24703f986742",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Lokala AI-verktyg",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "4516592951c6",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, transkribering, uppskalning och mer",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "ae1de466c11b",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Inte ett primärt fokus",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "24703f986742",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Lagerbaserad bildredigerare",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "2f2367771bbc",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert är användbart för snabba onlinekonverteringar i många kategorier. SnapOtter täcker även konvertering och lägger sedan till lokala bildverktyg, arbetsflöden för video/ljud, PDF-filer, arkiv, filverktyg, API:er och pipelines.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "07dd51ce3f57",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "För många konverteringar av bild, video, ljud, PDF, arkiv och filer, ja. SnapOtter är starkast när du vill driva konverteraren privat i stället för att använda en molnbaserad webbtjänst.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "24c8bc070e4f",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "Kan SnapOtter ersätta FreeConvert?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "f5d3ce6c20d7",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtters praktiska gränser kommer från din server, lagring, minne och konfigurerade körtidsgränser. Det gör det till ett bättre val när du själv vill justera kapaciteten.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "103b02a73ce8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "Har SnapOtter stöd för stora filer?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "284d4a8397d2",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Det öppna, självhostade alternativet till FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "f6a5d2fddca3",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert är en bred molnbaserad konverterare för webbläsarbaserad filkonvertering och komprimering. SnapOtter är det självhostade alternativet när du vill att dessa filoperationer ska köras inom din egen installation.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "5ef7752e4ead",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert konverterar och komprimerar filer online. SnapOtter är det självhostade alternativet för konvertering av bild, video, ljud, PDF och filer på din egen server.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "275524e3183a",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "f6a5d2fddca3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Filerna laddas upp till FreeConvert; FreeConvert uppger att konverterade filer raderas automatiskt efter några timmar",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "4287adb1ed64",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Gratis webbnivå plus betalda planer för större eller mer prioriterade arbetsbelastningar",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "def0b4c65a1c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Onlinekonvertering och komprimering av många format",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "6c12998a3a70",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Utöver filkonvertering",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "c95832438439",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Webbläsarflöde eller leverantörshanterat API, beroende på produkt",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "e0c42588faff",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF är starkt för online-PDF-uppgifter. SnapOtter kombinerar PDF-verktyg med verktyg för bild, video, ljud och filer, så att samma installation hanterar ett avtal, en skärminspelning och en poddredigering.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "61475c41b025",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. Det har öppen källkod under AGPLv3, driftas med Docker och ger dig slå ihop, dela, komprimera, konvertera, skydda, OCR och relaterade PDF-arbetsflöden på din egen hårdvara.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "0b6e771c797d",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Vad är ett självhostat alternativ till iLovePDF?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "55434a5bc751",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Utgåvan med öppen källkod är gratis. En betald företagsnivå lägger till kontroller som SSO och granskningsloggning, men filverktygen finns i stacken med öppen källkod.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "2650fd071550",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "Är SnapOtter gratis?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "7fe8070fcc01",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Det öppna, självhostade alternativet till iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "eea8d59b9478",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF är en molnbaserad PDF-tjänst för snabbt webbläsarbaserat dokumentarbete. SnapOtter är det självhostade alternativet när du vill att samma typ av PDF-arbetsflöde ska köras på din egen server.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "31c1e40cb278",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF är en online-PDF-tjänst. SnapOtter ger team självhostade PDF-verktyg plus arbetsflöden för bild, video, ljud och filer i en enda stack med öppen källkod.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "71a02261eb75",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "eea8d59b9478",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Filerna laddas upp till en leverantörsdriven tjänst för bearbetning",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "6fd677a94f7b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Gratis och premiumplaner med planspecifika funktioner",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "e631ff8884c6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF-arbetsflödessvit",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "981b43427a0a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Utöver PDF-filer",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0abda4908b0c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Webbläsarflöde eller leverantörshanterat API, beroende på produkt",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "e0c42588faff",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert täcker många konverteringskategorier och har ett API-ekosystem via API2Convert. SnapOtter är byggt för privata installationer där konvertering, komprimering, PDF-arbete, ljud-/videobearbetning och lokala AI-verktyg sitter i en enda stack.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "6c4e57422d42",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Välj SnapOtter när integritet, intern drift, öppen källkod eller luftgapad filbearbetning spelar roll. Välj Online-Convert när du föredrar en molnbaserad konverterare utan någon server att underhålla.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "21f9c3295991",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Varför välja SnapOtter framför Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "f3e8f4b553d2",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Ja. SnapOtter innehåller konvertering, komprimering, redigering, OCR, transkribering, PDF-operationer, metadataverktyg, arkiv, filverktyg och pipelines.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "5e560425412c",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "Täcker SnapOtter mer än konvertering?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "93d4bbb609ba",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Det öppna, självhostade alternativet till Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "550cb56ba657",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert är en långlivad molnbaserad konverterare för många filkategorier. SnapOtter är det självhostade alternativet för team som vill att konvertering och bearbetning ska ske på deras egen server.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "15206d5379af",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert konverterar filer för video, bild, ljud, dokument, e-böcker och arkiv online. SnapOtter är det självhostade alternativet för privata filarbetsflöden.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "a4bdb85bbaa7",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "550cb56ba657",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Webbläsaruppladdningar till molntjänsterna Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "db4c71d1cda1",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Gratis provperiod, kreditpaket, prenumerationer och företagsalternativ",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "6b1e3956c7e1",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Onlinekonverterare för media, dokument, e-böcker och arkiv",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "c9f8133c076f",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Utöver filkonvertering",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "c95832438439",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "Molnbaserat API2Convert-API och webbläsarflöden",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "73ec985da55e",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai är byggt kring möten, anteckningar och samarbete. SnapOtter fokuserar på lokal tal-till-text plus resten av ett ljudarbetsflöde: trimning, normalisering, brusreducering, formatkonvertering, videoundertexter samt verktyg för bild, PDF och filer.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "321a8c87da84",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Ja. SnapOtter kör transkribering lokalt med Whisper-modeller på din egen CPU eller NVIDIA CUDA GPU. Det passar bättre för privata ljud- och videofiler än för samarbete med mötesagenter.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "a62310eecb35",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Finns det ett självhostat alternativ till Otter.ai?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "c4baba23e6a4",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "En GPU är snabbare, men transkribering körs även på CPU. Modellerna installeras på begäran första gången du använder funktionen.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "61a3487de8d8",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Behöver jag en GPU?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "1aa96727cb8e",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Det öppna, självhostade alternativet till Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "f925a8e74a7e",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai är en molnbaserad plattform för mötestranskribering. SnapOtter är det självhostade alternativet när du vill att transkriberingen ska köras på din egen CPU eller NVIDIA CUDA GPU med lokala modeller.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "32237abacbe9",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai transkriberar möten i molnet. SnapOtter kör tal-till-text på din egen CPU eller NVIDIA CUDA GPU med lokala Whisper-modeller och utan uppladdning av ljud.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "84d3033b86d3",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "f925a8e74a7e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Ljud och mötesinnehåll bearbetas av den molnbaserade Otter.ai-tjänsten",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "e0664c9e5511",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Gratis och betalda planer med minut-/importgränser per plan",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "80d38def61b4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Mötesanteckningar, AI-sammanfattningar, samarbete och transkribering",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "678da696b0cf",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Utöver transkribering",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "79a2ccc87a68",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Molnbaserade appintegrationer och mötesarbetsflöden",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "bb0e4f112022",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf är inriktat på PDF-filer, vilket är precis vad många behöver. SnapOtter täcker det området med slå ihop, dela, komprimera, konvertera, redigera bort, OCR och mer, och lägger sedan till arbetsflöden för bild, video, ljud och filer i samma installation.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "ff1e73b0a92a",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Ja. SnapOtter har öppen källkod under AGPLv3 och körs på din egen server med Docker. Det täcker slå ihop, dela, komprimera, konvertera, skydda, redigera bort, vattenmärka, sidnumrera och OCR, utan någon avgift per fil från SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "276ab2be8e3b",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Finns det ett gratis, självhostat alternativ till Smallpdf?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "5464253ec90b",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter bearbetar filer på maskinen du kör det på. Om du driftar det inom ditt eget nätverk stannar filerna kvar i den installationen i stället för att skickas till en extern PDF-tjänst.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "d7817af7d763",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Laddas mina dokument upp någonstans?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "ac8057b17064",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Ja. Utöver PDF-verktygen hanterar SnapOtter även uppgifter för bild, video, ljud och filer, så att en enda installation kan täcka flera vardagliga filarbetsflöden.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "20649be2273a",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "Gör SnapOtter mer än PDF-filer?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "69a0fb952d63",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Det öppna, självhostade alternativet till Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "a432258453ba",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf är en polerad molnbaserad PDF-svit. SnapOtter är det självhostade alternativet för team som vill att PDF-verktygen ska köras på infrastruktur de själva styr, utan att skicka känsliga dokument till en extern PDF-tjänst.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "2dc7254cec1e",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf är en molnbaserad PDF-verktygslåda. SnapOtter kör slå ihop, dela, komprimera, konvertera, OCR och mer på din egen server, med 200+ extra verktyg för fem filtyper.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "37a9ec0487f2",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "a432258453ba",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Filerna laddas upp till en leverantörsdriven tjänst för bearbetning",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "6fd677a94f7b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Gratis och betalda planer med planspecifika funktioner",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "50bb08d98482",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF-arbetsflödessvit",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "981b43427a0a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Utöver PDF-filer",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0abda4908b0c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Webbläsarflöde eller leverantörshanterat API, beroende på produkt",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "e0c42588faff",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Om du bara någonsin hanterar PDF-filer är Stirling-PDF utmärkt och värt en titt. Om du även ändrar storlek på bilder, konverterar video, transkriberar ljud eller batchbearbetar filer hanterar SnapOtter allt det i en enda installation i stället för att köra flera verktyg sida vid sida.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "addf13f88cfb",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Det kan det vara, om du vill ha en enda stack för mer än PDF-filer. SnapOtters PDF-täckning är bred, och det lägger till verktyg för bild, video, ljud och filer. För en installation med enbart PDF är Stirling-PDF ett gediget, fokuserat val.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "33224530ec9e",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "Är SnapOtter en ersättning för Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "abd937e6fd76",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Båda projekten har öppen källkod och kan självhostas. SnapOtter är AGPLv3 och lägger till en valfri betald företagsnivå för SSO, granskningsloggning och liknande kontroller.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "5eb7fce20348",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Är båda gratis och med öppen källkod?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "7b9dd099feea",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter jämfört med Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "70504fd8e505",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF och SnapOtter är båda självhostade och med öppen källkod, så filerna stannar på din server oavsett vilket. Skillnaden är omfattningen: Stirling-PDF fokuserar på PDF-filer, medan SnapOtter spänner över alla fem filtyperna.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "f1e0565947b8",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF är en stark självhostad PDF-verktygslåda. SnapOtter täcker även PDF-filer, plus verktyg för bild, video, ljud och filer i en enda stack. Båda har öppen källkod.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "e9964716031d",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter jämfört med Stirling-PDF: självhostade filverktyg i jämförelse",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "00a56ff66755",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Självhostad",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "9808c4a94aed",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Öppen källkod",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "3a05af7fa3a6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Ja, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cecbefe36c1a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF-arbetsflöden",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "ca9e51f56553",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Primärt fokus",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "c6e8e6c3f507",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Fullständigt filarbetsflöde över fem typer",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "8494a3e8fc43",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ PDF-operationer",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "9427bc8a08c8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Antal verktyg",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "a36ee0ca5bd7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF-inriktade OCR-arbetsflöden",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "8679329dc886",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "Lokal AI (OCR, transkribering, uppskalning)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "2513fb6c6373",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, transkribering, uppskalning och mer",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "ae1de466c11b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Inte dess fokus",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "3cf130b0d266",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Lagerbaserad bildredigerare",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "2f2367771bbc",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF-automatiseringsarbetsflöden",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "4f11bd7a49d6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Pipelines och batchbearbetning",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "053418795620",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Ja",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cde9e58a9a4e",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG är utmärkt när jobbet är bildkomprimering. SnapOtter komprimerar PNG, JPEG, WebP och AVIF, och fortsätter sedan med storleksändring, beskärning, konvertering, vattenmärkning, metadataverktyg samt arbetsflöden för video, ljud, PDF och filer.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "ac5dfdbdb736",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Ja. SnapOtter kör bildkomprimering lokalt, så den praktiska gränsen är din installations hårdvara snarare än en kvot hos en extern bildtjänst.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "524ad48f874c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Finns det ett självhostat alternativ till TinyPNG?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "a4a6406e0765",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP och AVIF, med konvertering mellan format. SnapOtter läser även många indataformat, inklusive kamerans RAW-format.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "9e81300f6c87",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Vilka format kan SnapOtter komprimera?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "7388f4cd8290",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Det öppna, självhostade alternativet till TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "2c7538b5f083",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG är en fokuserad bildkomprimerare online. SnapOtter är det självhostade alternativet för team som vill att komprimering, konvertering, storleksändring, metadata och annat bildarbete ska köras lokalt.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "87a825c1fc3e",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG komprimerar bilder online och via Tinifys API. SnapOtter komprimerar och konverterar bilder på din egen server, med bredare filarbetsflöden i en enda stack.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "2823600ec2b8",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "2c7538b5f083",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Filerna laddas upp till en leverantörsdriven tjänst för bearbetning",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "6fd677a94f7b",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Gratis webbanvändning och betalda/utvecklar-API-alternativ",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "afd2dd7526d5",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Bildkomprimering och arbetsflöden med Tinify-API",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "ad850bf6bfc7",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Utöver bildkomprimering",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "201c7274453b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Webbläsarflöde eller leverantörshanterat API, beroende på produkt",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "e0c42588faff",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow är bekvämt när du vill ha ett snabbt webbverktyg och inte vill installera något. SnapOtter är byggt för den andra sidan av den avvägningen: privata installationer, interna arbetsflöden, repeterbara pipelines och lokal filbearbetning för bild, video, ljud, PDF och filer.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "b814ced24b25",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Nej. TinyWow är en bred molnbaserad webbverktygslåda. SnapOtter är en självhostad svit för filbearbetning för team som vill ha privat drift, insyn i källkoden, API:er och pipelines.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "86067fb46d0a",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "Är SnapOtter en kopia av TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "9f9d3fb56351",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Använd TinyWow för snabba engångsuppgifter i webbläsaren där molnbaserad bearbetning är okej. Använd SnapOtter när filerna är känsliga, arbetsflödena upprepas eller din organisation behöver att bearbetningen sker på infrastruktur den själv styr.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "d8bd743b0727",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Ska jag använda TinyWow eller SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "a939030072a4",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Inte direkt. SnapOtter fokuserar på filhantering: bilder, video, ljud, PDF, arkiv och filer. Det passar bättre när filbearbetningslagret betyder mer än skrivmallar.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "af9b608d5ef7",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "Ersätter SnapOtter TinyWows AI-skrivverktyg?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "f455897f402f",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Det öppna, självhostade alternativet till TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "608c2271ba4b",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow är en bred molnbaserad verktygslåda för snabba uppgifter inom PDF, bild, video, AI-skrivande och filer. SnapOtter är det självhostade alternativet för team som vill ha vardagliga filverktyg på infrastruktur de själva styr.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "4d19e4fd0590",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow är en bred molnbaserad verktygslåda för PDF, bild, video, AI-skrivande och filuppgifter. SnapOtter är det självhostade alternativet för privata filarbetsflöden.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "86e3cce1c420",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "608c2271ba4b",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Molnbaserad verktygslåda online",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "c616f2afc64e",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Laddas upp till TinyWows servrar; TinyWow uppger att filer raderas efter 1 timme",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "8ab01dc28f5a",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Plats för filbearbetning",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08bac9e9fe9c",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Verktyg för PDF, bild, video, AI-skrivande och filer",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "38394d2fd5b8",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Verktygstäckning",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "764675be2444",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Gratisverktyg plus betalda supporter-/innehållsplaner",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "2c4850f5c2d5",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Offline/luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "95ddb6f1463b",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Stöds när den driftas inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ae69075a5750",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; öppen källkod är inte affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "369389977600",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Främst snabba webbverktygsflöden",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "3b92c538056e",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  }
+}

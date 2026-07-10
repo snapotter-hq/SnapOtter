@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online, PDF एडिटिंग, साइनिंग, कन्वर्ज़न और Acrobat सब्सक्रिप्शन के लिए मज़बूत है। SnapOtter पूरे Adobe इकोसिस्टम की जगह लेने की कोशिश नहीं कर रहा; यह टीमों को सेल्फ-होस्टेड PDF टूल के साथ इमेज, वीडियो, ऑडियो और फ़ाइल वर्कफ़्लो एक ही ओपन-सोर्स स्टैक में देता है।",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "ef35b4df1c4a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "हर Acrobat वर्कफ़्लो के लिए नहीं। SnapOtter तब सबसे बढ़िया है जब आपको सेल्फ-होस्टेड PDF प्रोसेसिंग, कन्वर्ज़न, OCR, कंप्रेशन, पेज ऑपरेशन और ऑटोमेशन चाहिए। Acrobat एक गहरा डेस्कटॉप और क्लाउड दस्तावेज़ प्लेटफ़ॉर्म बना रहता है।",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "8b2852d6404b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "क्या SnapOtter, Adobe Acrobat Pro का विकल्प है?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "d4c009a5de71",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "SnapOtter तब चुनें जब डिप्लॉयमेंट नियंत्रण, सोर्स की दृश्यता, एयर-गैप्ड उपयोग या दोहराई जाने योग्य फ़ाइल पाइपलाइनें, Adobe अकाउंट फ़ीचर और व्यापक Acrobat इकोसिस्टम से ज़्यादा मायने रखती हों।",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "e5cd957a1a3c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Adobe Acrobat online के बजाय SnapOtter क्यों चुनें?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "7139f142d60d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat online का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "043246fc9d28",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online, PDF बनाने वाली कंपनी का एक बढ़िया होस्टेड PDF वर्कफ़्लो है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड विकल्प है जिन्हें PDF काम अपने इंफ्रास्ट्रक्चर पर ही रखना है।",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "f69396e87899",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online, Adobe का एक होस्टेड PDF टूलसेट है। SnapOtter टीमों को सेल्फ-होस्टेड PDF टूल और व्यापक फ़ाइल वर्कफ़्लो, ओपन-सोर्स डिप्लॉयमेंट के साथ देता है।",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "cf93af5051b6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat Online का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "dd48c7b10fef",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe का कहना है कि ऑनलाइन एडिटर की फ़ाइलें Adobe सर्वर द्वारा संभाली जाती हैं",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "9ffaf3b415f7",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "मुफ़्त ऑनलाइन टूल, ट्रायल और सशुल्क Acrobat प्लान",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "a494866aa90d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF, ई-सिग्नेचर, AI और Acrobat अकाउंट वर्कफ़्लो",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "14a459cef283",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF से आगे",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "289400e87a95",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "प्रोडक्ट के आधार पर ब्राउज़र वर्कफ़्लो या वेंडर-प्रबंधित API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "56bd68546fbd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert कन्वर्ज़न के लिए व्यापक और API-अनुकूल है। SnapOtter इमेज, वीडियो, ऑडियो, PDF और फ़ाइल फ़ॉर्मैट में कन्वर्ट करता है, फिर कंप्रेशन, एडिटिंग, OCR, ट्रांसक्रिप्शन और लोकल पाइपलाइनें जोड़ता है।",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "e53e8676a370",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "हाँ। SnapOtter ओपन सोर्स है और Docker पर चलता है। यह इमेज, वीडियो, ऑडियो, PDF और फ़ाइल फ़ॉर्मैट को लोकल स्तर पर कन्वर्ट करता है, और SnapOtter की ओर से कोई प्रति-कन्वर्ज़न बिलिंग नहीं है।",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "757b865343c8",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "क्या मैं CloudConvert का कोई विकल्प सेल्फ-होस्ट कर सकता हूँ?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "d49ff2f41606",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "हाँ। SnapOtter वीडियो और ऑडियो के लिए पर्दे के पीछे FFmpeg का उपयोग करता है, साथ ही इमेज के लिए Sharp और दस्तावेज़ों के लिए qpdf, LibreOffice और संबंधित टूल का।",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "64b1fbb316f4",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "क्या SnapOtter वीडियो और ऑडियो भी कन्वर्ट करता है?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "6e8be588e7e3",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "1f5498ecd8ae",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert एक परिपक्व होस्टेड कन्वर्टर और API है। SnapOtter सेल्फ-होस्टेड विकल्प है जब कन्वर्ज़न आपके अपने इंफ्रास्ट्रक्चर के भीतर, आपके नियंत्रण वाली पाइपलाइनों के साथ होना चाहिए।",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "643d79ef2d99",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert एक API वाला होस्टेड कन्वर्ज़न प्लेटफ़ॉर्म है। SnapOtter इमेज, वीडियो, ऑडियो, PDF और फ़ाइलों को आपके अपने सर्वर पर ओपन-सोर्स पाइपलाइनों के साथ कन्वर्ट करता है।",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "ce9e5bbf6f36",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "1f5498ecd8ae",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "प्रोसेसिंग के लिए फ़ाइलें वेंडर-होस्टेड सेवा पर अपलोड होती हैं",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "884822160301",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "उपयोग-आधारित और प्लान-आधारित क्लाउड कीमत",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "19cc2dcd0839",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "कई फ़ाइल श्रेणियों में होस्टेड कन्वर्ज़न",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "d7e216dd6f18",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "फ़ाइल कन्वर्ज़न से आगे",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "15bb64039d09",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "होस्टेड API और ब्राउज़र वर्कफ़्लो",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "404d06759e5b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "झटपट कन्वर्ज़न और डेवलपर API उपयोग के लिए Convertio सुविधाजनक है। SnapOtter कन्वर्ज़न को लोकल रखता है और व्यापक फ़ाइल प्रोसेसिंग जोड़ता है: कंप्रेशन, एडिटिंग, OCR, ट्रांसक्रिप्शन, PDF ऑपरेशन और दोहराए जाने योग्य पाइपलाइनें।",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "63d83dc3c727",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter आपको एक Docker-डिप्लॉय करने योग्य कन्वर्टर और फ़ाइल-प्रोसेसिंग सुइट देता है। फ़ाइलों को किसी क्लाउड कन्वर्टर पर भेजने के बजाय, आपका सर्वर कन्वर्ज़न पाइपलाइन चलाता है।",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "6b3fab8ee9c9",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Convertio का सेल्फ-होस्टेड विकल्प क्या है?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "ac459673d332",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "हाँ। SnapOtter में REST API और पाइपलाइन सपोर्ट शामिल है, ताकि टीमें अपने ही माहौल में फ़ाइल वर्कफ़्लो को ऑटोमेट कर सकें।",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "820f91f3f3fd",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "क्या SnapOtter में API है?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "d7b3c17360df",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "3fc06aa787ab",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio कई फ़ॉर्मैट में ब्राउज़र-आधारित फ़ाइल कन्वर्ज़न के लिए एक क्लाउड कन्वर्टर है। SnapOtter सेल्फ-होस्टेड विकल्प है जब आप चाहते हैं कि कन्वर्ज़न जॉब आपके अपने इंफ्रास्ट्रक्चर के भीतर ही रहें।",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "ea0368e8e9ed",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio ब्राउज़र टूल और एक API वाला क्लाउड फ़ाइल कन्वर्टर है। SnapOtter निजी कन्वर्ज़न वर्कफ़्लो और लोकल पाइपलाइनों के लिए सेल्फ-होस्टेड विकल्प है।",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "42332ef7ca34",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "3fc06aa787ab",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "क्लाउड कन्वर्ज़न; Convertio का कहना है कि अपलोड की गई फ़ाइलें तुरंत और कन्वर्ट की गई फ़ाइलें 24 घंटे बाद हटा दी जाती हैं",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "c02bf4605351",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "फ़ाइल और क्रेडिट सीमाओं वाला मुफ़्त टियर साथ ही प्रीमियम प्लान",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "ba7a3cc9082c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "300+ फ़ॉर्मैट में क्लाउड कन्वर्ज़न और API वर्कफ़्लो",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "e5b5ea83d25c",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "फ़ाइल कन्वर्ज़न से आगे",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "15bb64039d09",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "होस्टेड कन्वर्ज़न API और ब्राउज़र वर्कफ़्लो",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "6af241c8446c",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX एक केंद्रित कन्वर्टर है और फ़ॉर्मैट की एक बड़ी सूची संभालता है। SnapOtter भी कन्वर्ट करता है, फिर कंप्रेशन, एडिटिंग, रिडैक्शन, OCR, ट्रांसक्रिप्शन और पाइपलाइनें जोड़ता है, इसलिए जब कन्वर्ज़न कई चरणों में से एक हो, तब यह फ़िट बैठता है।",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "8193359c6069",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "अगर आपको मुख्य रूप से कई फ़ॉर्मैट में फ़ॉर्मैट कन्वर्ज़न चाहिए, तो ConvertX एक साफ़-सुथरा, केंद्रित विकल्प है। अगर आप एडिट, कंप्रेस, रिडैक्ट, OCR या ट्रांसक्राइब भी करते हैं, तो SnapOtter यह सब एक ही स्टैक में करता है।",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "be808f1644e0",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "मुझे SnapOtter इस्तेमाल करना चाहिए या ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "54f2e8518f0a",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "हाँ। दोनों सेल्फ-होस्टेड हैं, इसलिए फ़ाइलें आपके इंफ्रास्ट्रक्चर पर ही रहती हैं। फ़र्क दायरे का है, इसका नहीं कि आपका डेटा कहाँ रहता है।",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "f338b317c2c4",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "क्या दोनों फ़ाइलें मेरे सर्वर पर ही रखते हैं?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "1fd5fc0b82dc",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter बनाम ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "788cdab2d2bd",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX और SnapOtter दोनों सेल्फ-होस्टेड और ओपन सोर्स हैं। ConvertX फ़ॉर्मैट कन्वर्ज़न के इर्द-गिर्द बना है; SnapOtter कन्वर्ज़न के साथ-साथ बाकी फ़ाइल वर्कफ़्लो भी करता है।",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "4edd209286c1",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX 1000+ फ़ॉर्मैट के लिए एक सेल्फ-होस्टेड फ़ाइल कन्वर्टर है। SnapOtter भी कन्वर्ट करता है, और पाँच मोडैलिटी में एडिटिंग, कंप्रेशन, OCR तथा ट्रांसक्रिप्शन जोड़ता है।",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "ab3629d470ff",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter बनाम ConvertX: सेल्फ-होस्टेड फ़ाइल टूल की तुलना",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "93d7beb5f66a",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "सेल्फ-होस्टेड",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "8b84689bd0af",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "ओपन सोर्स",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "ae98d658c992",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "हाँ, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "88c5e95c0516",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "फ़ॉर्मैट कन्वर्ज़न",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "9998b55b57ba",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "मुख्य फ़ोकस",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "66731e5ea42d",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "पाँच प्रकारों में पूरा फ़ाइल वर्कफ़्लो",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "48565d5d02bf",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "कन्वर्ज़न-केंद्रित वर्कफ़्लो",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "6102e8da3556",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "कन्वर्ज़न से आगे",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "93d526951de1",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "कंप्रेस, एडिट, रिडैक्ट, OCR, ट्रांसक्राइब",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "9f2a3debb6a9",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ कन्वर्ज़न फ़ॉर्मैट",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "bbe902a29037",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "टूल की संख्या",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "eaddd884508e",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "मुख्य फ़ोकस नहीं",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "4fdb89dddf28",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "लोकल AI टूल",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "fe2b89443444",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, ट्रांसक्रिप्शन, अपस्केलिंग और बहुत कुछ",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "b73e1dd2afc3",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "मुख्य फ़ोकस नहीं",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "4fdb89dddf28",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "लेयर-आधारित इमेज एडिटर",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "ea79d5d8eea9",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "कई श्रेणियों में झटपट ऑनलाइन कन्वर्ज़न के लिए FreeConvert उपयोगी है। SnapOtter भी कन्वर्ज़न कवर करता है, फिर लोकल इमेज टूल, वीडियो/ऑडियो वर्कफ़्लो, PDF, आर्काइव, फ़ाइल टूल, API और पाइपलाइनें जोड़ता है।",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "d72fa6476cbf",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "कई इमेज, वीडियो, ऑडियो, PDF, आर्काइव और फ़ाइल कन्वर्ज़न के लिए, हाँ। SnapOtter तब सबसे मज़बूत है जब आप कन्वर्टर को किसी होस्टेड वेब सेवा के बजाय निजी तौर पर डिप्लॉय करना चाहते हों।",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "f64ca1658eb0",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "क्या SnapOtter, FreeConvert की जगह ले सकता है?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "1e4a6d5938df",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter की व्यावहारिक सीमाएँ आपके सर्वर, स्टोरेज, मेमोरी और कॉन्फ़िगर की गई रनटाइम सीमाओं से आती हैं। इससे यह तब बेहतर विकल्प बनता है जब आप क्षमता खुद ट्यून करना चाहें।",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "55a7dc266df3",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "क्या SnapOtter बड़ी फ़ाइलें सपोर्ट करता है?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "48e026073701",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "d95cdec58c6c",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert ब्राउज़र-आधारित फ़ाइल कन्वर्ज़न और कंप्रेशन के लिए एक व्यापक होस्टेड कन्वर्टर है। SnapOtter सेल्फ-होस्टेड विकल्प है जब आप चाहते हैं कि वे फ़ाइल ऑपरेशन आपके अपने डिप्लॉयमेंट के भीतर चलें।",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "f43e6758f472",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert फ़ाइलों को ऑनलाइन कन्वर्ट और कंप्रेस करता है। SnapOtter इमेज, वीडियो, ऑडियो, PDF और फ़ाइल कन्वर्ज़न के लिए आपके अपने सर्वर पर सेल्फ-होस्टेड विकल्प है।",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "d976ec8434f3",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "d95cdec58c6c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "फ़ाइलें FreeConvert पर अपलोड होती हैं; FreeConvert का कहना है कि कन्वर्ट की गई फ़ाइलें कुछ घंटों बाद अपने-आप हटा दी जाती हैं",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "118b1ee989ce",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "मुफ़्त वेब टियर के साथ बड़े या उच्च-प्राथमिकता वाले वर्कलोड के लिए सशुल्क प्लान",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "f0bb4ac35cc9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "कई फ़ॉर्मैट में ऑनलाइन कन्वर्ज़न और कंप्रेशन",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "30a7901db421",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "फ़ाइल कन्वर्ज़न से आगे",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "15bb64039d09",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "प्रोडक्ट के आधार पर ब्राउज़र वर्कफ़्लो या वेंडर-प्रबंधित API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "56bd68546fbd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF ऑनलाइन PDF कामों के लिए मज़बूत है। SnapOtter PDF टूल को इमेज, वीडियो, ऑडियो और फ़ाइल टूल के साथ जोड़ता है, ताकि एक ही डिप्लॉयमेंट एक कॉन्ट्रैक्ट, एक स्क्रीन रिकॉर्डिंग और एक पॉडकास्ट एडिट संभाल सके।",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "9fdfa6045330",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter। यह AGPLv3 के तहत ओपन सोर्स है, Docker के साथ डिप्लॉय होता है, और आपको अपने हार्डवेयर पर मर्ज, स्प्लिट, कंप्रेस, कन्वर्ट, प्रोटेक्ट, OCR और उससे जुड़े PDF वर्कफ़्लो देता है।",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "9205c51a4b1d",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "iLovePDF का सेल्फ-होस्टेड विकल्प क्या है?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "c384968c0b19",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "ओपन-सोर्स संस्करण मुफ़्त है। एक सशुल्क एंटरप्राइज़ टियर SSO और ऑडिट लॉगिंग जैसे कंट्रोल जोड़ता है, पर फ़ाइल टूल ओपन-सोर्स स्टैक में ही रहते हैं।",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "163342c32176",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "क्या SnapOtter मुफ़्त है?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "2f892d7aab73",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "3bacc8549c9a",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF तेज़ ब्राउज़र-आधारित दस्तावेज़ काम के लिए एक होस्टेड PDF सेवा है। SnapOtter सेल्फ-होस्टेड विकल्प है जब आप चाहते हैं कि वैसा ही PDF वर्कफ़्लो आपके अपने सर्वर पर चले।",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "e61bed8287d5",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF एक ऑनलाइन PDF सेवा है। SnapOtter टीमों को सेल्फ-होस्टेड PDF टूल के साथ-साथ इमेज, वीडियो, ऑडियो और फ़ाइल वर्कफ़्लो एक ही ओपन-सोर्स स्टैक में देता है।",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "ee11f5d53872",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "3bacc8549c9a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "प्रोसेसिंग के लिए फ़ाइलें वेंडर-होस्टेड सेवा पर अपलोड होती हैं",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "884822160301",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "मुफ़्त और प्रीमियम प्लान, फ़ीचर प्लान के हिसाब से",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "3e73b19ede2a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF वर्कफ़्लो सुइट",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "c836ac343725",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF से आगे",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "289400e87a95",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "प्रोडक्ट के आधार पर ब्राउज़र वर्कफ़्लो या वेंडर-प्रबंधित API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "56bd68546fbd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert कई कन्वर्ज़न श्रेणियाँ कवर करता है और API2Convert के ज़रिए इसका एक API इकोसिस्टम है। SnapOtter उन निजी डिप्लॉयमेंट के लिए बना है जहाँ कन्वर्ज़न, कंप्रेशन, PDF काम, ऑडियो/वीडियो प्रोसेसिंग और लोकल AI टूल एक ही स्टैक में हों।",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "640152ba7949",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "SnapOtter तब चुनें जब गोपनीयता, आंतरिक डिप्लॉयमेंट, ओपन-सोर्स कोड या एयर-गैप्ड फ़ाइल प्रोसेसिंग मायने रखती हो। Online-Convert तब चुनें जब आप बिना किसी सर्वर की देखभाल किए एक होस्टेड कन्वर्टर पसंद करते हों।",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "2da9d1e00e93",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Online-Convert के बजाय SnapOtter क्यों चुनें?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "16b9e99be843",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "हाँ। SnapOtter में कन्वर्ज़न, कंप्रेशन, एडिटिंग, OCR, ट्रांसक्रिप्शन, PDF ऑपरेशन, मेटाडेटा टूल, आर्काइव, फ़ाइल टूल और पाइपलाइनें शामिल हैं।",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "8342c2e91572",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "क्या SnapOtter कन्वर्ज़न से ज़्यादा कुछ कवर करता है?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "30ed0c7e11aa",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "58501b2f1d98",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert कई फ़ाइल श्रेणियों के लिए एक लंबे समय से चला आ रहा होस्टेड कन्वर्टर है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड विकल्प है जो चाहती हैं कि कन्वर्ज़न और प्रोसेसिंग उनके अपने सर्वर पर हो।",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "72cfe9a7ccd3",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert वीडियो, इमेज, ऑडियो, दस्तावेज़, ईबुक और आर्काइव फ़ाइलों को ऑनलाइन कन्वर्ट करता है। SnapOtter निजी फ़ाइल वर्कफ़्लो के लिए सेल्फ-होस्टेड विकल्प है।",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "42aab191d3d5",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "58501b2f1d98",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "ब्राउज़र से Online-Convert/API2Convert क्लाउड सेवाओं पर अपलोड",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "c4ea1f950bb4",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "मुफ़्त ट्रायल, क्रेडिट पैकेज, सब्सक्रिप्शन और एंटरप्राइज़ विकल्प",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "cfdddbfd7f4a",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "मीडिया, दस्तावेज़, ईबुक और आर्काइव के लिए ऑनलाइन कन्वर्टर",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "d75fa1386400",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "फ़ाइल कन्वर्ज़न से आगे",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "15bb64039d09",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "होस्टेड API2Convert API और ब्राउज़र वर्कफ़्लो",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "dc83c7acc072",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai मीटिंग, नोट्स और सहयोग के इर्द-गिर्द बना है। SnapOtter लोकल स्पीच-टू-टेक्स्ट के साथ-साथ बाकी ऑडियो वर्कफ़्लो पर केंद्रित है: ट्रिम, नॉर्मलाइज़, नॉइज़ रिडक्शन, फ़ॉर्मैट कन्वर्ज़न, वीडियो सबटाइटल, इमेज, PDF और फ़ाइल टूल।",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "99f08c609fc5",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "हाँ। SnapOtter ट्रांसक्रिप्शन को Whisper मॉडल के साथ आपके अपने CPU या NVIDIA CUDA GPU पर लोकल स्तर पर चलाता है। यह मीटिंग-एजेंट सहयोग की तुलना में निजी ऑडियो और वीडियो फ़ाइलों के लिए ज़्यादा उपयुक्त है।",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "c48910a02bb2",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "क्या Otter.ai का कोई सेल्फ-होस्टेड विकल्प है?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "b321a443cb9b",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU तेज़ होता है, पर ट्रांसक्रिप्शन CPU पर भी चलता है। फ़ीचर पहली बार इस्तेमाल करने पर मॉडल ऑन-डिमांड इंस्टॉल हो जाते हैं।",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "82970e41d1d6",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "क्या मुझे GPU चाहिए?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "af3c193974ac",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "e8ba821450b2",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai एक होस्टेड मीटिंग ट्रांसक्रिप्शन प्लेटफ़ॉर्म है। SnapOtter सेल्फ-होस्टेड विकल्प है जब आप चाहते हैं कि ट्रांसक्रिप्शन लोकल मॉडल के साथ आपके अपने CPU या NVIDIA CUDA GPU पर चले।",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "4e171fde23d5",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai मीटिंग को क्लाउड में ट्रांसक्राइब करता है। SnapOtter स्पीच-टू-टेक्स्ट को लोकल Whisper मॉडल के साथ आपके अपने CPU या NVIDIA CUDA GPU पर चलाता है, बिना ऑडियो अपलोड किए।",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "0e4d679a6124",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "e8ba821450b2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "ऑडियो और मीटिंग कंटेंट होस्टेड Otter.ai सेवा द्वारा प्रोसेस होता है",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "4f7d0c58d0b4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "मुफ़्त और सशुल्क प्लान, प्लान के हिसाब से मिनट/इम्पोर्ट सीमाओं के साथ",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "964773b52f46",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "मीटिंग नोट्स, AI सारांश, सहयोग और ट्रांसक्रिप्शन",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "9b5614e42678",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "ट्रांसक्रिप्शन से आगे",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "c3573f3403dc",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "होस्टेड ऐप इंटीग्रेशन और मीटिंग वर्कफ़्लो",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "c3392026e92a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf का ध्यान PDF पर है, और यही कई लोगों को चाहिए भी होता है। SnapOtter इस दायरे को मर्ज, स्प्लिट, कंप्रेस, कन्वर्ट, रिडैक्ट, OCR और बहुत कुछ के साथ कवर करता है, फिर उसी डिप्लॉयमेंट में इमेज, वीडियो, ऑडियो और फ़ाइल वर्कफ़्लो भी जोड़ देता है।",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "76cddd5ad889",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "हाँ। SnapOtter AGPLv3 के तहत ओपन सोर्स है और Docker के साथ आपके अपने सर्वर पर चलता है। यह मर्ज, स्प्लिट, कंप्रेस, कन्वर्ट, प्रोटेक्ट, रिडैक्ट, वॉटरमार्क, पेज नंबर और OCR कवर करता है, और SnapOtter की ओर से कोई प्रति-फ़ाइल शुल्क नहीं है।",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "5bf615457fd5",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "क्या Smallpdf का कोई मुफ़्त, सेल्फ-होस्टेड विकल्प है?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "2cdcc40b32b9",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter फ़ाइलों को उसी मशीन पर प्रोसेस करता है जिस पर आप इसे चलाते हैं। अगर आप इसे अपने नेटवर्क के भीतर डिप्लॉय करते हैं, तो फ़ाइलें किसी थर्ड-पार्टी PDF सेवा पर जाने के बजाय उसी डिप्लॉयमेंट के अंदर रहती हैं।",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "47c1e276abeb",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "क्या मेरे दस्तावेज़ कहीं अपलोड होते हैं?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "e69a5f309b72",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "हाँ। PDF टूल के अलावा SnapOtter इमेज, वीडियो, ऑडियो और फ़ाइल संबंधी काम भी संभालता है, ताकि एक ही डिप्लॉयमेंट रोज़मर्रा के कई फ़ाइल वर्कफ़्लो कवर कर सके।",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "979ccf4c5f15",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "क्या SnapOtter PDF के अलावा और भी काम करता है?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "46ad754567b8",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "b0fc8d24a860",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf एक बढ़िया होस्टेड PDF सुइट है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड विकल्प है जो चाहती हैं कि PDF टूल उनके नियंत्रण वाले इंफ्रास्ट्रक्चर पर चलें, बिना संवेदनशील दस्तावेज़ किसी थर्ड-पार्टी PDF सेवा को भेजे।",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "7530e7934307",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf एक होस्टेड PDF टूलकिट है। SnapOtter PDF मर्ज, स्प्लिट, कंप्रेस, कन्वर्ट, OCR और बहुत कुछ आपके अपने सर्वर पर चलाता है, साथ ही पाँच फ़ाइल प्रकारों में 200+ अतिरिक्त टूल देता है।",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "d650a14201d5",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "b0fc8d24a860",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "प्रोसेसिंग के लिए फ़ाइलें वेंडर-होस्टेड सेवा पर अपलोड होती हैं",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "884822160301",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "मुफ़्त और सशुल्क प्लान, फ़ीचर प्लान के हिसाब से",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "cb187f730a0f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF वर्कफ़्लो सुइट",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "c836ac343725",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF से आगे",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "289400e87a95",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "प्रोडक्ट के आधार पर ब्राउज़र वर्कफ़्लो या वेंडर-प्रबंधित API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "56bd68546fbd",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "अगर आप कभी सिर्फ़ PDF ही छूते हैं, तो Stirling-PDF बेहतरीन है और देखने लायक है। अगर आप इमेज भी रिसाइज़ करते हैं, वीडियो कन्वर्ट करते हैं, ऑडियो ट्रांसक्राइब करते हैं या फ़ाइलों को बैच में प्रोसेस करते हैं, तो SnapOtter यह सब एक ही डिप्लॉयमेंट में संभालता है, कई टूल साथ-साथ चलाने के बजाय।",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "ebb71439ae79",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "हो सकता है, अगर आप PDF से ज़्यादा के लिए एक ही स्टैक चाहते हैं। SnapOtter का PDF कवरेज व्यापक है, और यह इमेज, वीडियो, ऑडियो तथा फ़ाइल टूल जोड़ता है। सिर्फ़ PDF वाले सेटअप के लिए Stirling-PDF एक ठोस, केंद्रित विकल्प है।",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "264989908529",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "क्या SnapOtter, Stirling-PDF का विकल्प है?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "1915f8854bc7",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "दोनों प्रोजेक्ट ओपन सोर्स और सेल्फ-होस्ट करने योग्य हैं। SnapOtter AGPLv3 है और SSO, ऑडिट लॉगिंग तथा समान कंट्रोल के लिए एक वैकल्पिक सशुल्क एंटरप्राइज़ टियर जोड़ता है।",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "5ade0a7126ee",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "क्या दोनों मुफ़्त और ओपन सोर्स हैं?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "6d1e55dd6107",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter बनाम Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "5783c0283c1c",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF और SnapOtter दोनों सेल्फ-होस्टेड और ओपन सोर्स हैं, इसलिए किसी भी हाल में फ़ाइलें आपके सर्वर पर ही रहती हैं। फ़र्क दायरे का है: Stirling-PDF का ध्यान PDF पर है, जबकि SnapOtter पाँचों फ़ाइल प्रकारों में फैला है।",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "adb45bca886c",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF एक मज़बूत सेल्फ-होस्टेड PDF टूलकिट है। SnapOtter PDF भी कवर करता है, साथ ही एक ही स्टैक में इमेज, वीडियो, ऑडियो और फ़ाइल टूल देता है। दोनों ओपन सोर्स हैं।",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "5480cea55428",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter बनाम Stirling-PDF: सेल्फ-होस्टेड फ़ाइल टूल की तुलना",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "66e71b84e0bb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "सेल्फ-होस्टेड",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "8b84689bd0af",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "ओपन सोर्स",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "ae98d658c992",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "हाँ, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "88c5e95c0516",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF वर्कफ़्लो",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "968c48c5bff4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "मुख्य फ़ोकस",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "66731e5ea42d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "पाँच प्रकारों में पूरा फ़ाइल वर्कफ़्लो",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "48565d5d02bf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ PDF ऑपरेशन",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "bd11ed0eeac7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "टूल की संख्या",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "eaddd884508e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF-केंद्रित OCR वर्कफ़्लो",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "a0f0567d2e78",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "लोकल AI (OCR, ट्रांसक्रिप्शन, अपस्केलिंग)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "1b5dd697b1aa",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, ट्रांसक्रिप्शन, अपस्केलिंग और बहुत कुछ",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "b73e1dd2afc3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "इसका फ़ोकस नहीं",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "eda968008876",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "लेयर-आधारित इमेज एडिटर",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "ea79d5d8eea9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF ऑटोमेशन वर्कफ़्लो",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "11a5941c2858",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "पाइपलाइन और बैच प्रोसेसिंग",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "11cb3cfbc0bd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "हाँ",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4a3daa901d0a",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "जब काम इमेज कंप्रेशन का हो, तो TinyPNG बेहतरीन है। SnapOtter PNG, JPEG, WebP और AVIF को कंप्रेस करता है, फिर रिसाइज़, क्रॉप, कन्वर्ज़न, वॉटरमार्किंग, मेटाडेटा टूल, वीडियो, ऑडियो, PDF और फ़ाइल वर्कफ़्लो के साथ आगे बढ़ता है।",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "be936c28a5a5",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "हाँ। SnapOtter इमेज कंप्रेशन को लोकल स्तर पर चलाता है, इसलिए व्यावहारिक सीमा किसी थर्ड-पार्टी इमेज सेवा के कोटे के बजाय आपके डिप्लॉयमेंट हार्डवेयर तक ही होती है।",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "f56c3764d463",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "क्या TinyPNG का कोई सेल्फ-होस्टेड विकल्प है?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "160f37ff1a1c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP और AVIF, साथ ही फ़ॉर्मैट के बीच कन्वर्ज़न। SnapOtter कैमरा RAW फ़ॉर्मैट सहित कई इनपुट फ़ॉर्मैट भी पढ़ता है।",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "2bb97ae7f734",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter किन फ़ॉर्मैट को कंप्रेस कर सकता है?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "d10703f46c55",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "c7815b7d27b3",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG एक केंद्रित ऑनलाइन इमेज कंप्रेसर है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड विकल्प है जो चाहती हैं कि कंप्रेशन, कन्वर्ज़न, रिसाइज़, मेटाडेटा और अन्य इमेज काम लोकल स्तर पर चले।",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "395ae9055381",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG इमेज को ऑनलाइन और Tinify के API के ज़रिए कंप्रेस करता है। SnapOtter इमेज को आपके अपने सर्वर पर कंप्रेस और कन्वर्ट करता है, साथ ही एक ही स्टैक में व्यापक फ़ाइल वर्कफ़्लो देता है।",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "00589989e4ea",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "c7815b7d27b3",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "प्रोसेसिंग के लिए फ़ाइलें वेंडर-होस्टेड सेवा पर अपलोड होती हैं",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "884822160301",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "मुफ़्त वेब उपयोग और सशुल्क/डेवलपर API विकल्प",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "ab2fb2673d91",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "इमेज कंप्रेशन और Tinify API वर्कफ़्लो",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "170e49c26b0b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "इमेज कंप्रेशन से आगे",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "cdc96afa1576",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "प्रोडक्ट के आधार पर ब्राउज़र वर्कफ़्लो या वेंडर-प्रबंधित API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "56bd68546fbd",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "जब आपको एक झटपट ब्राउज़र टूल चाहिए और कुछ भी इंस्टॉल नहीं करना, तो TinyWow सुविधाजनक है। SnapOtter इस समझौते के दूसरे पहलू के लिए बना है: निजी डिप्लॉयमेंट, आंतरिक वर्कफ़्लो, दोहराए जाने योग्य पाइपलाइनें और इमेज, वीडियो, ऑडियो, PDF तथा फ़ाइलों में लोकल फ़ाइल प्रोसेसिंग।",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "658af326e631",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "नहीं। TinyWow एक व्यापक होस्टेड वेब टूलबॉक्स है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड फ़ाइल-प्रोसेसिंग सुइट है जो निजी डिप्लॉयमेंट, सोर्स की दृश्यता, API और पाइपलाइनें चाहती हैं।",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "b3569e99808f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "क्या SnapOtter TinyWow की नकल है?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "febb3bf77413",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "झटपट, एक-बार के ब्राउज़र कामों के लिए TinyWow इस्तेमाल करें जहाँ होस्टेड प्रोसेसिंग स्वीकार्य हो। SnapOtter तब इस्तेमाल करें जब फ़ाइलें संवेदनशील हों, वर्कफ़्लो बार-बार दोहराए जाते हों, या आपके संगठन को प्रोसेसिंग अपने नियंत्रण वाले इंफ्रास्ट्रक्चर पर चाहिए हो।",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "3d9f550ea429",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "मुझे TinyWow इस्तेमाल करना चाहिए या SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "abf16c325f9c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "सीधे तौर पर नहीं। SnapOtter फ़ाइल हेरफेर पर केंद्रित है: इमेज, वीडियो, ऑडियो, PDF, आर्काइव और फ़ाइलें। जब राइटिंग टेम्पलेट से ज़्यादा फ़ाइल-प्रोसेसिंग परत मायने रखती हो, तो यह बेहतर विकल्प है।",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "a9c99b9cd5f2",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "क्या SnapOtter TinyWow के AI राइटिंग टूल की जगह लेता है?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "115b85854ec9",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "a3a8b07a7d2d",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow तेज़ PDF, इमेज, वीडियो, AI राइटिंग और फ़ाइल कामों के लिए एक व्यापक होस्टेड टूलबॉक्स है। SnapOtter उन टीमों के लिए सेल्फ-होस्टेड विकल्प है जो अपने नियंत्रण वाले इंफ्रास्ट्रक्चर पर रोज़मर्रा की फ़ाइल यूटिलिटी चाहती हैं।",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "6c70efbf5ef8",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow PDF, इमेज, वीडियो, AI राइटिंग और फ़ाइल कामों के लिए एक व्यापक होस्टेड टूलबॉक्स है। SnapOtter निजी फ़ाइल वर्कफ़्लो के लिए सेल्फ-होस्टेड विकल्प है।",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "a96b0a028e70",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "a3a8b07a7d2d",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "होस्टेड ऑनलाइन टूलबॉक्स",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "1b310c6d3b84",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "TinyWow सर्वर पर अपलोड; TinyWow का कहना है कि फ़ाइलें 1 घंटे बाद हटा दी जाती हैं",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "8dc68891c5d7",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग का स्थान",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "db6baa03dd75",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF, इमेज, वीडियो, AI राइटिंग और फ़ाइल यूटिलिटी",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "981daa1c6d18",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "टूल कवरेज",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "ffe3083459e5",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "मुफ़्त टूल के साथ सशुल्क सपोर्टर/कंटेंट प्लान",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "96473a06e2a5",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "मुफ़्त AGPLv3; सीमाएँ आपके हार्डवेयर तक ही",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "9befeb94e99c",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए बनाया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "681010ebd282",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "आपके नेटवर्क के भीतर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "dea5e31cd8c3",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "edc27f6a6f4f",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "मुख्य रूप से झटपट वेब-टूल वर्कफ़्लो",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "d2e035cbe1e4",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइन",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "9d07075e2235",
+    "stale": false
+  }
+}

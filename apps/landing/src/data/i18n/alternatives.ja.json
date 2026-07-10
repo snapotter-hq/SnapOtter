@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online は PDF の編集、署名、変換、Acrobat のサブスクリプションに強みがあります。SnapOtter は Adobe のエコシステム全体を置き換えようとするものではなく、チームにセルフホストの PDF ツールと、画像、動画、音声、ファイルのワークフローを 1 つのオープンソーススタックで提供します。",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "6dbc51f5ac3e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "すべての Acrobat ワークフローの代わりになるわけではありません。SnapOtter は、セルフホストの PDF 処理、変換、OCR、圧縮、ページ操作、自動化が必要なときに最適です。Acrobat は依然として奥深いデスクトップおよびクラウドの文書プラットフォームです。",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "1304da288bf2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter は Adobe Acrobat Pro の代わりになりますか？",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "5adab426c3e6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Adobe アカウントの機能や幅広い Acrobat エコシステムよりも、デプロイの管理、ソースの可視性、エアギャップ環境での利用、または再現可能なファイルパイプラインが重要なときは SnapOtter を選んでください。",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "8601a605d524",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Adobe Acrobat online ではなく SnapOtter を選ぶ理由は？",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "3745bb70b974",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat online のオープンソース・セルフホスト代替",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "e3b6d6f405df",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online は、PDF を生み出した企業による洗練されたホスト型 PDF ワークフローです。SnapOtter は、PDF 作業を自社のインフラ内にとどめる必要があるチーム向けのセルフホスト代替です。",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "9576c4a26027",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online は Adobe によるホスト型の PDF ツールセットです。SnapOtter はチームにセルフホストの PDF ツールと、より幅広いファイルワークフローをオープンソースのデプロイで提供します。",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "9ad958c2b241",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat Online のオープンソース・セルフホスト代替",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "a543133dbca3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe はオンラインエディターのファイルを Adobe のサーバーで扱うとしている",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "be1ceebfe7e9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "無料のオンラインツール、体験版、有料の Acrobat プラン",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "1304516c3252",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF、電子署名、AI、Acrobat アカウントのワークフロー",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "8e52c4f4865f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF の枠を超えて",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "f8e2ba9e317f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "製品によりブラウザワークフローまたはベンダー管理の API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "1908c32036e3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert は変換において幅広く、API との相性も良いです。SnapOtter は画像、動画、音声、PDF、ファイル形式にまたがって変換し、さらに圧縮、編集、OCR、文字起こし、ローカルパイプラインを加えます。",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "28c5b7a847e7",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "はい。SnapOtter はオープンソースで Docker 上で動作します。画像、動画、音声、PDF、ファイル形式をローカルで変換し、SnapOtter 側での変換ごとの課金はありません。",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "97623573a1db",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "CloudConvert の代替をセルフホストできますか？",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "92c562f01512",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "はい。SnapOtter は動画と音声に FFmpeg を、画像に Sharp を、文書に qpdf、LibreOffice、関連ツールを内部で使用しています。",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "ac87a549f67a",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter は動画や音声も変換できますか？",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "42203626fa8f",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert のオープンソース・セルフホスト代替",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "e22859d30955",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert は成熟したホスト型のコンバーターおよび API です。SnapOtter は、変換を自社のインフラ内で、自分たちで管理するパイプラインとともに行いたいときのセルフホスト代替です。",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "8648b60cc169",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert は API を備えたホスト型の変換プラットフォームです。SnapOtter は画像、動画、音声、PDF、ファイルを自社サーバー上でオープンソースのパイプラインを使って変換します。",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "d4a087e31577",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert のオープンソース・セルフホスト代替",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "e22859d30955",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "処理のためにベンダーのホスト型サービスへファイルがアップロードされる",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ad4eae55de7f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "従量課金およびプランベースのクラウド料金",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "3a943064f1fa",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "多くのファイルカテゴリにまたがるホスト型変換",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "9cc51d36283d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "ファイル変換を超えて",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "6fd2146ffd51",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "ホスト型 API とブラウザワークフロー",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "e5c8d338ea82",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio は手早い変換や開発者向けの API 利用に便利です。SnapOtter は変換をローカルに保ちつつ、より幅広いファイル処理を加えます。圧縮、編集、OCR、文字起こし、PDF 操作、そして再現可能なパイプラインです。",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "2ad01dd5a701",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter は、Docker でデプロイできるコンバーターおよびファイル処理スイートを提供します。ファイルをクラウドコンバーターに送る代わりに、自社サーバーが変換パイプラインを実行します。",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "93878d284c5c",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Convertio のセルフホストできる代替とは何ですか？",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "a0c380cff277",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "はい。SnapOtter は REST API とパイプラインのサポートを備えており、チームは自分たちの環境内でファイルワークフローを自動化できます。",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "22ecbefc5ba9",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter には API がありますか？",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "292821d1b075",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio のオープンソース・セルフホスト代替",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "541f01e6f767",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio は、多くの形式にまたがるブラウザでのファイル変換に対応するクラウドコンバーターです。SnapOtter は、変換ジョブを自社のインフラ内にとどめたいときのセルフホスト代替です。",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "a9ca970f4756",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio は、ブラウザツールと API を備えたクラウドのファイルコンバーターです。SnapOtter は、プライベートな変換ワークフローとローカルパイプライン向けのセルフホスト代替です。",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "0549f40de56a",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio のオープンソース・セルフホスト代替",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "541f01e6f767",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "クラウドでの変換。Convertio はアップロードされたファイルを即座に、変換済みファイルを 24 時間後に削除するとしている",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "414be74b1ef0",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "ファイルとクレジットの上限がある無料層に加えてプレミアムプラン",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "460bfb544802",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "300 以上の形式にまたがるクラウド変換と API ワークフロー",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "a782f4745246",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "ファイル変換を超えて",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "6fd2146ffd51",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "ホスト型の変換 API とブラウザワークフロー",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "eaac21a38097",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX は焦点を絞ったコンバーターで、膨大な数の形式を扱えます。SnapOtter も変換を行い、さらに圧縮、編集、墨消し、OCR、文字起こし、パイプラインを加えるため、変換が数ある工程の 1 つであるときに適しています。",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "92f48c20ce99",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "多くの形式にまたがる形式変換が主な目的なら、ConvertX はすっきりと焦点の絞られた選択肢です。編集、圧縮、墨消し、OCR、文字起こしも行うなら、SnapOtter が 1 つのスタックでそのすべてを扱います。",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "8133a94ed606",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "SnapOtter と ConvertX のどちらを使うべきですか？",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "cd84f43671a3",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "はい。どちらもセルフホストなので、ファイルは自社のインフラ上にとどまります。違いはデータの置き場所ではなく、対応範囲の広さです。",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "da9e0a5d88f6",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "どちらもファイルを自社サーバー上に保持しますか？",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "4abf53a567ce",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter と ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "1f8628748b00",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX と SnapOtter はどちらもセルフホストでオープンソースです。ConvertX は形式変換を中心に作られており、SnapOtter は変換に加えてファイルワークフローの残りも扱います。",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "7bf38181471c",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX は 1000 以上の形式に対応するセルフホスト型ファイルコンバーターです。SnapOtter も変換を行い、さらに 5 つのモダリティにまたがる編集、圧縮、OCR、文字起こしを加えます。",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "ee9a606e6e90",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter と ConvertX の比較：セルフホスト型ファイルツール",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "f5e7c9579573",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "セルフホスト",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "8a10ac7fbe60",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "オープンソース",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "8c88e2c01da9",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "対応、AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "871e11b9ba22",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "形式変換",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "182f5defeb6a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "主な焦点",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "e509de2b4d38",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "5 つの種別にまたがる完全なファイルワークフロー",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "0bcbbb80a1ac",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "変換を中心としたワークフロー",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "8ce9c7b16182",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "変換を超えて",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "8fa79cf1c66a",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "圧縮、編集、墨消し、OCR、文字起こし",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "ec7ad9426bff",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000 以上の変換形式",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "205499502e97",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "ツール数",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "2f154657b41e",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "主な焦点ではない",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "b76ca13bac0f",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "ローカル AI ツール",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "32dccbaadf9a",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR、文字起こし、アップスケールなど",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "6f082eb11a8c",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "主な焦点ではない",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "b76ca13bac0f",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "レイヤーベースの画像エディター",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "1b64e1ca814c",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert は、多くのカテゴリにまたがる手早いオンライン変換に役立ちます。SnapOtter も変換をカバーし、さらにローカルの画像ツール、動画 / 音声のワークフロー、PDF、アーカイブ、ファイルツール、API、パイプラインを加えます。",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "1539164c43e9",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "多くの画像、動画、音声、PDF、アーカイブ、ファイルの変換については、なります。SnapOtter は、ホスト型 Web サービスを使う代わりにコンバーターをプライベートにデプロイしたいときに最も力を発揮します。",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "daefccfc1185",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter は FreeConvert の代わりになりますか？",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "7d0fc951a138",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter の実質的な上限は、サーバー、ストレージ、メモリ、設定したランタイム上限によって決まります。そのため、容量を自分で調整したいときに適しています。",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "bc4860c6a4fb",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter は大きなファイルに対応していますか？",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "8ed0ebfa9fcf",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert のオープンソース・セルフホスト代替",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "0c452db1bbcb",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert は、ブラウザでのファイル変換や圧縮に対応する幅広いホスト型コンバーターです。SnapOtter は、そうしたファイル操作を自社のデプロイ内で動かしたいときのセルフホスト代替です。",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "56f8a142f839",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert はファイルをオンラインで変換・圧縮します。SnapOtter は、画像、動画、音声、PDF、ファイルの変換を自社サーバー上で行うためのセルフホスト代替です。",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "1a20ef363bf4",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert のオープンソース・セルフホスト代替",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "0c452db1bbcb",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "FreeConvert へファイルがアップロードされる。FreeConvert は変換済みファイルを数時間後に自動削除するとしている",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "494e02366cb5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "無料の Web 層に加えて、より大規模または優先度の高い処理向けの有料プラン",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "472d766f18b5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "多くの形式にまたがるオンラインの変換と圧縮",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "25f69984821c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "ファイル変換を超えて",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "6fd2146ffd51",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "製品によりブラウザワークフローまたはベンダー管理の API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "1908c32036e3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF はオンラインの PDF 作業に強みがあります。SnapOtter は PDF ツールに画像、動画、音声、ファイルのツールを組み合わせるため、同じ環境で契約書、画面録画、ポッドキャストの編集まで扱えます。",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "0e8632ad8235",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter です。AGPLv3 のオープンソースで、Docker でデプロイでき、結合、分割、圧縮、変換、保護、OCR などの PDF ワークフローを自社のハードウェア上で提供します。",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "7121b5ffd763",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "iLovePDF のセルフホストできる代替は何ですか？",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "ff8dd8a2b2cd",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "オープンソース版は無料です。有料のエンタープライズ層では SSO や監査ログといった管理機能が加わりますが、ファイルツールはオープンソーススタックに含まれています。",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "71cdc84163d1",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter は無料ですか？",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "29e3efd66b15",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF のオープンソース・セルフホスト代替",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "3da210940756",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF は、ブラウザで手早く文書作業をこなすためのホスト型 PDF サービスです。SnapOtter は、同じような PDF ワークフローを自社サーバー上で動かしたいときのセルフホスト代替です。",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "35a8136d6508",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF はオンライン PDF サービスです。SnapOtter はチームにセルフホストの PDF ツールを提供し、さらに画像、動画、音声、ファイルのワークフローを 1 つのオープンソーススタックにまとめます。",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "5cd3595eae01",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF のオープンソース・セルフホスト代替",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "3da210940756",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "処理のためにベンダーのホスト型サービスへファイルがアップロードされる",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ad4eae55de7f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "プランごとに機能が異なる無料・プレミアムプラン",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "676aa862933a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF ワークフロースイート",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "546d7465564d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF の枠を超えて",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "f8e2ba9e317f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "製品によりブラウザワークフローまたはベンダー管理の API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "1908c32036e3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert は多くの変換カテゴリをカバーし、API2Convert を通じた API のエコシステムを備えています。SnapOtter は、変換、圧縮、PDF 作業、音声 / 動画処理、ローカルの AI ツールが 1 つのスタックに収まるプライベートなデプロイのために作られています。",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "ba16550e4637",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "プライバシー、社内デプロイ、オープンソースのコード、エアギャップ環境でのファイル処理が重要なときは SnapOtter を選んでください。維持するサーバーが不要なホスト型コンバーターを好むなら Online-Convert を選んでください。",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "5db218aa5ac3",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Online-Convert ではなく SnapOtter を選ぶ理由は？",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "e134361ca21b",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "はい。SnapOtter は変換、圧縮、編集、OCR、文字起こし、PDF 操作、メタデータツール、アーカイブ、ファイルツール、パイプラインを備えています。",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "09b6f667ae4b",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter は変換以外もカバーしますか？",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "3279d22c3c6c",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert のオープンソース・セルフホスト代替",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "cafcabb48778",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert は、多くのファイルカテゴリに対応する長年運営されているホスト型コンバーターです。SnapOtter は、変換と処理を自社サーバー上で行いたいチーム向けのセルフホスト代替です。",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "053c0fbacf1f",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert は動画、画像、音声、文書、電子書籍、アーカイブのファイルをオンラインで変換します。SnapOtter は、プライベートなファイルワークフロー向けのセルフホスト代替です。",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "5cfce9b0f9d7",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert のオープンソース・セルフホスト代替",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "cafcabb48778",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Online-Convert / API2Convert のクラウドサービスへブラウザからアップロード",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "dcb58e698ed2",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "無料トライアル、クレジットパッケージ、サブスクリプション、エンタープライズオプション",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "a8ebc88643a3",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "メディア、文書、電子書籍、アーカイブ向けのオンラインコンバーター",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "0064510b035a",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "ファイル変換を超えて",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "6fd2146ffd51",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "ホスト型の API2Convert API とブラウザワークフロー",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "cc161ec23f86",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai は会議、メモ、コラボレーションを中心に作られています。SnapOtter はローカルの音声認識に焦点を当て、さらに音声ワークフローの残りもカバーします。トリミング、ノーマライズ、ノイズ除去、形式変換、動画の字幕、画像、PDF、ファイルツールです。",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "6ec1615fd957",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "あります。SnapOtter は、Whisper モデルを使って自社の CPU または NVIDIA CUDA GPU 上でローカルに文字起こしを実行します。会議エージェントによるコラボレーションよりも、プライベートな音声・動画ファイルに適しています。",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "4436be51a907",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Otter.ai のセルフホストできる代替はありますか？",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "c18823e746fc",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU があれば高速ですが、文字起こしは CPU でも動作します。モデルは、その機能を初めて使うときにオンデマンドでインストールされます。",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "a797dbd4df08",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "GPU は必要ですか？",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "0723a25e4007",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai のオープンソース・セルフホスト代替",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "46c7af805c3a",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai はホスト型の会議文字起こしプラットフォームです。SnapOtter は、文字起こしをローカルモデルとともに自社の CPU または NVIDIA CUDA GPU 上で動かしたいときのセルフホスト代替です。",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "5c0146db5401",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai は会議をクラウドで文字起こしします。SnapOtter は、ローカルの Whisper モデルを使い、音声をアップロードせずに自社の CPU または NVIDIA CUDA GPU 上で音声認識を実行します。",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "9969a48857c0",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai のオープンソース・セルフホスト代替",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "46c7af805c3a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "音声や会議のコンテンツはホスト型の Otter.ai サービスで処理される",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "0c2e212574c8",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "プランごとに分数 / インポートの上限がある無料・有料プラン",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "3f94d664e5f6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "会議メモ、AI 要約、コラボレーション、文字起こし",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "95b692d462c6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "文字起こしを超えて",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "671ca1eb8cc2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "ホスト型アプリの連携と会議ワークフロー",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "38844d871604",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf は PDF に特化しており、それこそが多くの人に必要なものです。SnapOtter はその領域を結合、分割、圧縮、変換、墨消し、OCR などでカバーし、さらに同じ環境で画像、動画、音声、ファイルのワークフローも扱えます。",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "a0119d586f49",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "あります。SnapOtter は AGPLv3 のオープンソースで、Docker を使って自社サーバー上で動作します。結合、分割、圧縮、変換、保護、墨消し、透かし、ページ番号、OCR をカバーし、SnapOtter 側でのファイルごとの課金はありません。",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "eacebd81cc4d",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Smallpdf の無料でセルフホストできる代替はありますか？",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "1fc3d981b378",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter は、それを動かしているマシン上でファイルを処理します。自社ネットワーク内にデプロイすれば、ファイルは外部の PDF サービスへ送られることなく、その環境内にとどまります。",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "16071e28d529",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "文書はどこかにアップロードされますか？",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "a2b293128fc3",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "はい。SnapOtter は PDF ツールに加えて画像、動画、音声、ファイルの処理も扱えるため、1 つの環境で日常のさまざまなファイルワークフローをカバーできます。",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "4ca7b39b0fe6",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter は PDF 以外のことも扱えますか？",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "62e33532ab6a",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf のオープンソース・セルフホスト代替",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "873d5a4773f5",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf は洗練されたホスト型 PDF スイートです。SnapOtter は、PDF ツールを自分たちで管理するインフラ上で動かしたいチーム向けのセルフホスト代替であり、機密文書を外部の PDF サービスに送る必要がありません。",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "23b9232406ba",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf はホスト型の PDF ツールキットです。SnapOtter は PDF の結合、分割、圧縮、変換、OCR などを自社サーバー上で実行し、さらに 5 つのファイル種別にまたがる 200 以上のツールを備えています。",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "92187c448427",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf のオープンソース・セルフホスト代替",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "873d5a4773f5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "処理のためにベンダーのホスト型サービスへファイルがアップロードされる",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ad4eae55de7f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "プランごとに機能が異なる無料・有料プラン",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "87cb4efc9cdf",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF ワークフロースイート",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "546d7465564d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF の枠を超えて",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "f8e2ba9e317f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "製品によりブラウザワークフローまたはベンダー管理の API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "1908c32036e3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "扱うのが PDF だけであれば、Stirling-PDF は優れており一見の価値があります。画像のリサイズ、動画の変換、音声の文字起こし、ファイルの一括処理も行うなら、複数のツールを並べて動かす代わりに、SnapOtter が 1 つの環境でそのすべてを扱えます。",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "1129611c8eb4",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "PDF 以外も 1 つのスタックで扱いたいなら、代わりになり得ます。SnapOtter の PDF 対応は幅広く、さらに画像、動画、音声、ファイルのツールを加えます。PDF 専用の構成なら、Stirling-PDF は堅実で焦点の絞られた選択肢です。",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "4bb058a9deb7",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter は Stirling-PDF の代わりになりますか？",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "0363c3abdeee",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "どちらのプロジェクトもオープンソースでセルフホスト可能です。SnapOtter は AGPLv3 で、SSO、監査ログ、同様の管理機能向けにオプションの有料エンタープライズ層を加えています。",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "52a760040ac8",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "どちらも無料でオープンソースですか？",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "fa0f277506bc",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter と Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "5d2853e06d27",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF と SnapOtter はどちらもセルフホストでオープンソースなので、いずれの場合もファイルは自社サーバー上にとどまります。違いは範囲です。Stirling-PDF は PDF に焦点を当て、SnapOtter は 5 つのファイル種別すべてにまたがります。",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "d880a5a6189e",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF は強力なセルフホスト型 PDF ツールキットです。SnapOtter も PDF をカバーし、さらに画像、動画、音声、ファイルのツールを 1 つのスタックにまとめます。どちらもオープンソースです。",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "5d8ca89fedc2",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter と Stirling-PDF の比較：セルフホスト型ファイルツール",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "78613bbb8383",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "セルフホスト",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "8a10ac7fbe60",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "オープンソース",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "8c88e2c01da9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "対応、AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "871e11b9ba22",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF ワークフロー",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "8058c86d8f5d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "主な焦点",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "e509de2b4d38",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "5 つの種別にまたがる完全なファイルワークフロー",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "0bcbbb80a1ac",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60 以上の PDF 操作",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "4fcef0c30799",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "ツール数",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "2f154657b41e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF 向けの OCR ワークフロー",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "1c5aec64e5ee",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "ローカル AI（OCR、文字起こし、アップスケール）",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "e1b8c676d742",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR、文字起こし、アップスケールなど",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "6f082eb11a8c",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "焦点ではない",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "993323ba63e8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "レイヤーベースの画像エディター",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "1b64e1ca814c",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF の自動化ワークフロー",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "1a787d33dbf3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "パイプラインとバッチ処理",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "fdf4c23a76d2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "対応",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "cc3bf903e9e1",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "画像圧縮が目的であれば TinyPNG は優れています。SnapOtter は PNG、JPEG、WebP、AVIF を圧縮し、さらにリサイズ、トリミング、変換、透かし、メタデータツール、動画、音声、PDF、ファイルのワークフローまで扱えます。",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "b97b4b7b2a99",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "あります。SnapOtter は画像圧縮をローカルで実行するため、実質的な上限は外部の画像サービスのクォータではなく、デプロイ先のハードウェアで決まります。",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "0de78708e1c7",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "TinyPNG のセルフホストできる代替はありますか？",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "2f5631bfb441",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG、JPEG、WebP、AVIF に対応し、形式間の変換も可能です。SnapOtter はカメラの RAW 形式を含む多くの入力形式も読み込めます。",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "75184e5a9347",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter はどの形式を圧縮できますか？",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "09f31c90d0ef",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG のオープンソース・セルフホスト代替",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "71d1a76f6547",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG は画像圧縮に特化したオンラインツールです。SnapOtter は、圧縮、変換、リサイズ、メタデータ処理などの画像作業をローカルで動かしたいチーム向けのセルフホスト代替です。",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "ee02c690f9bd",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG はオンラインおよび Tinify の API 経由で画像を圧縮します。SnapOtter は自社サーバー上で画像を圧縮・変換し、より幅広いファイルワークフローを 1 つのスタックにまとめます。",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "fa95dc580123",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG のオープンソース・セルフホスト代替",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "71d1a76f6547",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "ホスト型 Web サービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6e192baec487",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "処理のためにベンダーのホスト型サービスへファイルがアップロードされる",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ad4eae55de7f",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "無料の Web 利用と有料 / 開発者向け API オプション",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "5bac4e74f4e4",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "画像圧縮と Tinify API ワークフロー",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "69361bb46b02",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "画像圧縮を超えて",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "939ba23502ae",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "製品によりブラウザワークフローまたはベンダー管理の API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "1908c32036e3",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "何もインストールせずに手早くブラウザツールを使いたいとき、TinyWow は便利です。SnapOtter はそのトレードオフのもう一方に向けて作られています。プライベートなデプロイ、社内ワークフロー、再現可能なパイプライン、そして画像、動画、音声、PDF、ファイルにまたがるローカルでのファイル処理です。",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "17b4d2e9f748",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "いいえ。TinyWow は幅広いホスト型の Web ツールボックスです。SnapOtter は、プライベートなデプロイ、ソースの可視性、API、パイプラインを求めるチーム向けのセルフホスト型ファイル処理スイートです。",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "dfff68e44ef1",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter は TinyWow のクローンですか？",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "28dae462bee8",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "ホスト型の処理でも問題ない、手早い単発のブラウザ作業には TinyWow を使ってください。ファイルが機密である場合、ワークフローが繰り返される場合、または組織が自分たちで管理するインフラ上での処理を必要とする場合は SnapOtter を使ってください。",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "94adbbfcf831",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "TinyWow と SnapOtter のどちらを使うべきですか？",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "8b749b9931c0",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "直接的には置き換えません。SnapOtter はファイル操作、つまり画像、動画、音声、PDF、アーカイブ、ファイルに焦点を当てています。ライティングのテンプレートよりもファイル処理の層が重要なときに適しています。",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "fb932e0d8745",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter は TinyWow の AI ライティングツールを置き換えますか？",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "3a0dbdfc81e4",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow のオープンソース・セルフホスト代替",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "47515c90d9f6",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow は、PDF、画像、動画、AI ライティング、ファイルの作業を手早くこなす幅広いホスト型ツールボックスです。SnapOtter は、日常のファイルユーティリティを自分たちで管理するインフラ上で使いたいチーム向けのセルフホスト代替です。",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "82a95c00491b",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow は PDF、画像、動画、AI ライティング、ファイル作業をカバーする幅広いホスト型ツールボックスです。SnapOtter は、プライベートなファイルワークフロー向けのセルフホスト代替です。",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "1555f2c32823",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow のオープンソース・セルフホスト代替",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "47515c90d9f6",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "ホスト型のオンラインツールボックス",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "14c49a6f79f9",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "自社サーバー上でセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4528aeafb821",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "TinyWow のサーバーへアップロード。TinyWow はファイルを 1 時間後に削除するとしている",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "1b2cec4897f2",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF、画像、動画、AI ライティング、ファイルユーティリティ",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "da71c8be2731",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "ツールの対応範囲",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "6275214e96d4",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "無料ツールに加えて有料のサポーター / コンテンツプラン",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "5071d77b1624",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "AGPLv3 で無料。上限はハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "ea6f4618b737",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "ブラウザベースのオンライン利用を想定した設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6e8226446657",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば利用可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "7c5d22712084",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソースの公開は製品モデルの前提ではない",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "88512e933233",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "ソースと監査性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "087aa29d1770",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "AGPLv3 でソースを公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "20ac3527780a",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "主に手軽な Web ツールのワークフロー",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "f2dad63f9ed6",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "自社環境内での REST API とパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dc61d6f2773d",
+    "stale": false
+  }
+}

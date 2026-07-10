@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat 在线版在 PDF 编辑、签署、转换以及 Acrobat 订阅方面表现出色。SnapOtter 并不试图取代整个 Adobe 生态；它在同一套开源技术栈中为团队提供自托管的 PDF 工具，外加图像、视频、音频和文件处理流程。",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "f6ffa665ffea",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "并非能替代每一种 Acrobat 工作流。当你需要自托管的 PDF 处理、转换、OCR、压缩、页面操作和自动化时，SnapOtter 最为合适。Acrobat 仍是功能深厚的桌面与云端文档平台。",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "14dcafdce132",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter 能替代 Adobe Acrobat Pro 吗？",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "c460b97fa13f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "当部署控制权、源码可见、隔离网络使用或可复用的文件处理流水线比 Adobe 账户功能和更广的 Acrobat 生态更重要时，就选择 SnapOtter。",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "21d7dcc2b31c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "为什么选择 SnapOtter 而非 Adobe Acrobat 在线版？",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "d98c1a321b91",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat 在线版的开源自托管替代方案",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "25eebc42c2d8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat 在线版是 PDF 缔造者出品的一套体验精致的托管式 PDF 工作流。SnapOtter 则是自托管替代方案，适合需要让 PDF 工作留在自己基础设施上的团队。",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "cfbd7915a8c4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat 在线版是 Adobe 提供的一套托管式 PDF 工具。SnapOtter 通过开源部署为团队提供自托管的 PDF 工具和更广泛的文件处理流程。",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "45924972465b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat 在线版的开源自托管替代方案",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "25eebc42c2d8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe 表示在线编辑器的文件由 Adobe 服务器处理",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "402f0b3da643",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "免费在线工具、试用及付费的 Acrobat 套餐",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "6c8b75f58d75",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF、电子签名、AI 及 Acrobat 账户工作流",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "172633a85783",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF 之外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "bfad2b8459c2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "视产品而定，采用浏览器工作流或厂商托管的 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "5ffde59d338c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert 覆盖面广，且转换对 API 友好。SnapOtter 支持在图像、视频、音频、PDF 和文件格式之间转换，并加入压缩、编辑、OCR、转录和本地处理流水线。",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "20c9a3200d53",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "能。SnapOtter 开源，且运行在 Docker 上。它在本地转换图像、视频、音频、PDF 和文件格式，且 SnapOtter 不按次转换收费。",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "84c712b54015",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "我能自托管一个 CloudConvert 替代方案吗？",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "c11a7490ffd5",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "能。SnapOtter 底层使用 FFmpeg 处理视频和音频，图像则使用 Sharp，文档处理使用 qpdf、LibreOffice 及相关工具。",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "9529dd5a4b78",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter 也能转换视频和音频吗？",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "0e25803c6ad2",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert 的开源自托管替代方案",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "1f52f99f3785",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert 是一款成熟的托管式转换工具和 API。SnapOtter 则是自托管替代方案，适合让转换在你自己的基础设施内进行、并由你自己掌控处理流水线的场景。",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "773958f8f83e",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert 是一个带 API 的托管式转换平台。SnapOtter 借助开源处理流水线，在你自己的服务器上转换图像、视频、音频、PDF 和文件。",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "b73e2f9621fd",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert 的开源自托管替代方案",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "1f52f99f3785",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "文件被上传到厂商托管的服务进行处理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "095b984c032e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "按用量及按套餐计费的云服务定价",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "0713bcf8b3db",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "面向多类文件的托管式转换",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "749255217da1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "文件转换之外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "07373cf0f2a8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "托管式 API 与浏览器工作流",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "f4322dd7aa4c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "对于快速转换和开发者 API 使用，Convertio 很方便。SnapOtter 把转换保留在本地，并加入更广泛的文件处理：压缩、编辑、OCR、转录、PDF 操作和可复用的处理流水线。",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "bd9af27c0f25",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter 为你提供一套可用 Docker 部署的转换器和文件处理套件。它不把文件发往云端转换器，而是由你的服务器运行整个转换流水线。",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "cdda77a9cead",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "什么是自托管的 Convertio 替代方案？",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "dd6d67cce38c",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "有。SnapOtter 内置 REST API 并支持处理流水线，团队可以在自己的环境中自动化文件工作流。",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "54b2fc2d382f",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter 有 API 吗？",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "edb3ad900c90",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio 的开源自托管替代方案",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "b0bf88c26c4e",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio 是一款云端转换器，适合在浏览器中跨多种格式转换文件。SnapOtter 则是自托管替代方案，让转换任务留在你自己的基础设施内。",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "164eabaf29b6",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio 是一款带浏览器工具和 API 的云端文件转换器。SnapOtter 则是自托管替代方案，面向私有转换工作流和本地处理流水线。",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "77f518426292",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio 的开源自托管替代方案",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "b0bf88c26c4e",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "云端转换；Convertio 称上传的文件会即时删除，转换后的文件会在 24 小时后删除",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "530aee389be7",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "带文件和额度限制的免费层，另有高级套餐",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "67bb0895c741",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "跨 300 多种格式的云端转换及 API 工作流",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "f9f4491c8178",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "文件转换之外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "07373cf0f2a8",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "托管式转换 API 与浏览器工作流",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "f433d913539a",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX 是一款专注的转换器，能处理数量庞大的格式清单。SnapOtter 同样支持转换，并加入压缩、编辑、涂黑、OCR、转录和处理流水线，因此当转换只是众多步骤之一时，它更为合适。",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "61c49aed6fbb",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "如果你主要需要跨多种格式的转换，ConvertX 是简洁而专注的选择。如果你还要编辑、压缩、涂黑、OCR 或转录，SnapOtter 能在一套技术栈中完成所有这些。",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "19dafdede688",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "我该用 SnapOtter 还是 ConvertX？",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "2b6cf2c65e75",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "是的。两者都是自托管的，因此文件都留在你的基础设施上。区别在于覆盖广度，而非数据存放位置。",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "5b0c353658bc",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "两者都会把文件留在我的服务器上吗？",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "a736fd56a1e1",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter 对比 ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "c4af2476f86e",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX 和 SnapOtter 都是自托管且开源的。ConvertX 围绕格式转换构建；SnapOtter 在转换之外还覆盖文件工作流的其余部分。",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "c087eb270038",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX 是一款支持 1000 多种格式的自托管文件转换器。SnapOtter 同样能转换，并在五种模态上加入编辑、压缩、OCR 和转录。",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "fa050231ba50",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter 对比 ConvertX：自托管文件工具全面比较",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "780465ab4258",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "自托管",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "a6ef96a473b5",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "开源",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "16dc8ea1cf48",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "是，AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "8b99217ec94b",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "格式转换",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "aa28ba764042",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "核心定位",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "18e49f444039",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "覆盖五类文件的完整文件工作流",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "d89c3a1de1ba",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "以转换为中心的工作流",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "3f6cbf3127e8",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "转换之外",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "a48c93024266",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "压缩、编辑、涂黑、OCR、转录",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "127a4cc7f5ab",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000 多种转换格式",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "727a41d3c4d4",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "工具数量",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "599f77bf3dda",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "非其核心定位",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "514458dc46ef",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "本地 AI 工具",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "190b7d5d5f02",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR、转录、放大等",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "1857a751d208",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "非其核心定位",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "514458dc46ef",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "基于图层的图像编辑器",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "62acdbd4fc43",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "对于跨多类文件的快速在线转换，FreeConvert 很好用。SnapOtter 同样覆盖转换，并加入本地图像工具、视频/音频工作流、PDF、压缩包、文件工具、API 和处理流水线。",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "186fcad03fac",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "对于许多图像、视频、音频、PDF、压缩包和文件的转换，可以。当你希望把转换器私有部署、而非使用托管式网络服务时，SnapOtter 的优势最为明显。",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "d540cf3457ed",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter 能替代 FreeConvert 吗？",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "7594910dcafa",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter 的实际上限取决于你的服务器、存储、内存以及配置的运行时限制。因此，当你希望自行调整容量时，它更为合适。",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "4b40cdd048a9",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter 支持大文件吗？",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "42be884403ae",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert 的开源自托管替代方案",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "8a127d58dcf7",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert 是一款覆盖面广的托管式转换工具，适合在浏览器中转换和压缩文件。SnapOtter 则是自托管替代方案，让这些文件操作在你自己的部署内运行。",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "7d50113251d2",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert 在线转换和压缩文件。SnapOtter 则是自托管替代方案，让图像、视频、音频、PDF 和文件转换在你自己的服务器上进行。",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "349309607974",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert 的开源自托管替代方案",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "8a127d58dcf7",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "文件被上传到 FreeConvert；FreeConvert 称转换后的文件会在数小时后自动删除",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "970217086c29",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "免费网页层，另有面向更大或更高优先级负载的付费套餐",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "d94b1863f4e9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "跨多种格式的在线转换和压缩",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "27af84636ba0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "文件转换之外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "07373cf0f2a8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "视产品而定，采用浏览器工作流或厂商托管的 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "5ffde59d338c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF 在在线 PDF 任务上表现出色。SnapOtter 将 PDF 工具与图像、视频、音频和文件工具结合在一起，因此同一次部署既能处理一份合同，也能处理一段屏幕录像和一次播客剪辑。",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "fae5e8fbc9d6",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "是 SnapOtter。它基于 AGPLv3 开源，可用 Docker 部署，让你在自己的硬件上使用合并、拆分、压缩、转换、加密、OCR 及相关的 PDF 工作流。",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "490856edc1ee",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "iLovePDF 的自托管替代方案是什么？",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "b50e533dca1c",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "开源版是免费的。付费的企业版会增加 SSO、审计日志等管控功能，但文件工具本身包含在开源技术栈中。",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "af2db011b804",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter 免费吗？",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "bc4247699deb",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF 的开源自托管替代方案",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "67fd8875f8cd",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF 是一项托管式 PDF 服务，适合在浏览器中快速处理文档。SnapOtter 则是自托管替代方案，让你能在自己的服务器上运行同类 PDF 工作流。",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "b7c74bbbccd4",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF 是一项在线 PDF 服务。SnapOtter 为团队提供自托管的 PDF 工具，并在同一套开源技术栈中加入图像、视频、音频和文件处理流程。",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "e052b041289d",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF 的开源自托管替代方案",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "67fd8875f8cd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "文件被上传到厂商托管的服务进行处理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "095b984c032e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "提供免费与高级套餐，功能因套餐而异",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "542f3a15c77e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF 工作流套件",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "243d41f11fe2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF 之外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "bfad2b8459c2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "视产品而定，采用浏览器工作流或厂商托管的 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "5ffde59d338c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert 覆盖多种转换类别，并通过 API2Convert 提供 API 生态。SnapOtter 面向私有部署而生，将转换、压缩、PDF 处理、音视频处理和本地 AI 工具集于一套技术栈。",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "2576a86bb972",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "当隐私、内部部署、开源代码或隔离网络的文件处理很重要时，选择 SnapOtter。当你更倾向使用无需维护服务器的托管式转换器时，选择 Online-Convert。",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "aaa90181b144",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "为什么选择 SnapOtter 而非 Online-Convert？",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "fe2dfe517506",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "是的。SnapOtter 包含转换、压缩、编辑、OCR、转录、PDF 操作、元数据工具、压缩包、文件工具和处理流水线。",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "b76a33eb953e",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter 覆盖的不只是转换吗？",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "6f3349d3182e",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert 的开源自托管替代方案",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "c553991c2cd9",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert 是一款运营多年、覆盖多类文件的托管式转换器。SnapOtter 则是自托管替代方案，适合希望在自己服务器上完成转换和处理的团队。",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "03b4d33dab1b",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert 在线转换视频、图像、音频、文档、电子书和压缩包文件。SnapOtter 则是面向私有文件处理流程的自托管替代方案。",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "100e21fa3c69",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert 的开源自托管替代方案",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "c553991c2cd9",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "由浏览器上传至 Online-Convert/API2Convert 云服务",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "d290dbf3d9b8",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "免费试用、额度套餐、订阅及企业方案",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "130d69e6d97a",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "面向媒体、文档、电子书和压缩包的在线转换器",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "3954c0e4815e",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "文件转换之外",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "07373cf0f2a8",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "托管式 API2Convert API 与浏览器工作流",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "a897714095f1",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai 围绕会议、笔记和协作构建。SnapOtter 专注于本地语音转文字，并覆盖音频工作流的其余部分：裁剪、标准化、降噪、格式转换、视频字幕，以及图像、PDF 和文件工具。",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "a2df43f25fbc",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "有。SnapOtter 使用 Whisper 模型在本地运行转录，运行在你自己的 CPU 或 NVIDIA CUDA GPU 上。相比会议助手式协作，它更适合处理私有的音频和视频文件。",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "c4fb3a17a8da",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "有没有自托管的 Otter.ai 替代方案？",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "dd57779d7804",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "有 GPU 会更快，但转录在 CPU 上也能运行。首次使用该功能时，模型会按需安装。",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "0f817fc6ada8",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "我需要 GPU 吗？",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "14938a7585b9",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai 的开源自托管替代方案",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "cf50d452c43e",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai 是一个托管式会议转录平台。SnapOtter 则是自托管替代方案，让转录使用本地模型，在你自己的 CPU 或 NVIDIA CUDA GPU 上运行。",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "5aecb37ab7ea",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai 在云端转录会议。SnapOtter 使用本地 Whisper 模型，在你自己的 CPU 或 NVIDIA CUDA GPU 上运行语音转文字，无需上传音频。",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "a149932ecd76",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai 的开源自托管替代方案",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "cf50d452c43e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "音频和会议内容由托管的 Otter.ai 服务处理",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "4f933f0d70c9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "提供免费与付费套餐，各套餐在时长/导入量上有不同限制",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "7fd05334bdb1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "会议笔记、AI 摘要、协作和转录",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "0b218b9b7934",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "转录之外",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "8e9f07c38180",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "托管式应用集成与会议工作流",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "93d7341da991",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf 专注于 PDF，这正是许多人所需要的。SnapOtter 同样覆盖这一领域，提供合并、拆分、压缩、转换、涂黑、OCR 等功能，并在同一次部署中加入图像、视频、音频和文件处理流程。",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "32b3796d4b38",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "有。SnapOtter 基于 AGPLv3 开源，可用 Docker 部署在你自己的服务器上。它涵盖合并、拆分、压缩、转换、加密、涂黑、加水印、添加页码和 OCR，且 SnapOtter 不按文件收费。",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "71838e87d6fc",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "有没有免费的、自托管的 Smallpdf 替代方案？",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "f020d76fc3a4",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter 在你运行它的机器上处理文件。如果你把它部署在自己的网络内，文件就留在该部署内，而不会发往第三方 PDF 服务。",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "17918215d507",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "我的文档会被上传到某处吗？",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "79808f48c77b",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "能。除了 PDF 工具，SnapOtter 还能处理图像、视频、音频和文件任务，因此一次部署即可覆盖多种日常文件处理流程。",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "6297fb47066e",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter 能处理 PDF 之外的东西吗？",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "560dac0cdf33",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf 的开源自托管替代方案",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "b10dba3baa27",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf 是一套体验精致的托管式 PDF 套件。SnapOtter 则是自托管替代方案，适合希望 PDF 工具运行在自己可控的基础设施上、不把敏感文档发往第三方 PDF 服务的团队。",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "529fc69dd6f8",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf 是一套托管式 PDF 工具。SnapOtter 让 PDF 合并、拆分、压缩、转换、OCR 等操作在你自己的服务器上运行，还额外提供覆盖五类文件的 200 多种工具。",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "527ebaae890e",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf 的开源自托管替代方案",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "b10dba3baa27",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "文件被上传到厂商托管的服务进行处理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "095b984c032e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "提供免费与付费套餐，功能因套餐而异",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "38e90152b601",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF 工作流套件",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "243d41f11fe2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF 之外",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "bfad2b8459c2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "视产品而定，采用浏览器工作流或厂商托管的 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "5ffde59d338c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "如果你只处理 PDF，Stirling-PDF 非常出色，值得一试。如果你还要调整图像尺寸、转换视频、转录音频或批量处理文件，SnapOtter 能在一次部署中完成所有这些，而不必并排运行好几个工具。",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "b9abc3974f23",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "如果你想用一套技术栈处理不止 PDF 的内容，那它可以。SnapOtter 的 PDF 覆盖面很广，还加入了图像、视频、音频和文件工具。若只需纯 PDF 方案，Stirling-PDF 是可靠而专注的选择。",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "7fa9e707b458",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter 能替代 Stirling-PDF 吗？",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "a1bb56d5269a",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "两个项目都开源且可自托管。SnapOtter 采用 AGPLv3，并提供可选的付费企业版，包含 SSO、审计日志等类似管控功能。",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "296ecfc87eec",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "两者都是免费且开源的吗？",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "40eba617e46a",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter 对比 Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "6af6a7a41c0e",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF 和 SnapOtter 都是自托管且开源的，因此无论用哪个，文件都留在你的服务器上。区别在于覆盖范围：Stirling-PDF 专注于 PDF，而 SnapOtter 覆盖全部五类文件。",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "76b825e3abb0",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF 是一套强大的自托管 PDF 工具包。SnapOtter 同样覆盖 PDF，并在一套技术栈中加入图像、视频、音频和文件工具。两者均为开源。",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "f9dd4a7039a0",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter 对比 Stirling-PDF：自托管文件工具全面比较",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "f155aaad019e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "自托管",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "a6ef96a473b5",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "开源",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "16dc8ea1cf48",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "是，AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "8b99217ec94b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF 工作流",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "643649ce9beb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "核心定位",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "18e49f444039",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "覆盖五类文件的完整文件工作流",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "d89c3a1de1ba",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60 多项 PDF 操作",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "b3f870e0d4ec",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "工具数量",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "599f77bf3dda",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "面向 PDF 的 OCR 工作流",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "7c3ec44a85fe",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "本地 AI（OCR、转录、放大）",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "6797b0605b1e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR、转录、放大等",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "1857a751d208",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "非其定位",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "a80d7bce4ebb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "基于图层的图像编辑器",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "62acdbd4fc43",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF 自动化工作流",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "66569dc4549d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "处理流水线与批量处理",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "c5ed1c3a369b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "是",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "b5141d3d19e9",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "在图像压缩这件事上，TinyPNG 非常出色。SnapOtter 能压缩 PNG、JPEG、WebP 和 AVIF，并进一步提供调整尺寸、裁剪、格式转换、加水印、元数据工具，以及视频、音频、PDF 和文件处理流程。",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "ec097f23c270",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "有。SnapOtter 在本地运行图像压缩，因此实际上限取决于你的部署硬件，而不是第三方图像服务的配额。",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "04f5e23bd132",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "有没有自托管的 TinyPNG 替代方案？",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "fedaa1b034df",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG、JPEG、WebP 和 AVIF，并支持格式间转换。SnapOtter 还能读取多种输入格式，包括相机 RAW 格式。",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "a5b6de28ac9c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter 能压缩哪些格式？",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "083803bb4e53",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG 的开源自托管替代方案",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "83588129e9b1",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG 是一款专注的在线图像压缩工具。SnapOtter 则是自托管替代方案，适合希望在本地运行压缩、转换、调整尺寸、元数据及其他图像处理工作的团队。",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "9f21be37d2a0",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG 通过在线工具和 Tinify 的 API 压缩图像。SnapOtter 在你自己的服务器上压缩和转换图像，并在同一套技术栈中提供更广泛的文件处理流程。",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "d162894c8e26",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG 的开源自托管替代方案",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "83588129e9b1",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "文件被上传到厂商托管的服务进行处理",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "095b984c032e",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "网页端免费使用，另有付费/开发者 API 选项",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "8ba5c87bfa08",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "图像压缩及 Tinify API 工作流",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "c62043d475e5",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "图像压缩之外",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "adbf47a56ae7",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "视产品而定，采用浏览器工作流或厂商托管的 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "5ffde59d338c",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "当你想用一个快速的浏览器工具、又不想安装任何东西时，TinyWow 很方便。SnapOtter 面向的是取舍的另一端：私有部署、内部工作流、可复用的处理流水线，以及跨图像、视频、音频、PDF 和文件的本地文件处理。",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "ca90ce88c240",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "不是。TinyWow 是一个综合的托管式网页工具箱。SnapOtter 是一套自托管的文件处理套件，面向需要私有部署、源码可见、API 和处理流水线的团队。",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "3e45e4922991",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter 是 TinyWow 的克隆吗？",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "92eabb817cfc",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "如果只是可以接受托管式处理的临时性浏览器任务，就用 TinyWow。如果文件涉及敏感信息、工作流会反复出现，或组织要求处理必须发生在自己可控的基础设施上，就用 SnapOtter。",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "ecc6f042da6f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "我该用 TinyWow 还是 SnapOtter？",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "9f94c879752a",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "不能直接替代。SnapOtter 专注于文件处理：图像、视频、音频、PDF、压缩包和文件。当文件处理这一层比写作模板更重要时，它更合适。",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "de4cbb9de82c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter 能替代 TinyWow 的 AI 写作工具吗？",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "cdad16427ad2",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow 的开源自托管替代方案",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "ea41f2555087",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow 是一个综合托管式工具箱，适合快速完成 PDF、图像、视频、AI 写作和文件任务。SnapOtter 则是自托管替代方案，适合希望在自己可控的基础设施上使用日常文件工具的团队。",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "c2b14a80d9d3",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow 是一个覆盖 PDF、图像、视频、AI 写作和文件任务的综合托管式工具箱。SnapOtter 则是面向私有文件处理流程的自托管替代方案。",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "4ba8a0c8fbf1",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow 的开源自托管替代方案",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "ea41f2555087",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "托管式在线工具箱",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "feab2625a38f",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "在你的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "0a87dccb5de0",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "上传到 TinyWow 的服务器；TinyWow 称文件会在 1 小时后删除",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "77a7921dba98",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF、图像、视频、AI 写作和文件工具",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "7889dd264d04",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "工具覆盖范围",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "c11479f3d68e",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "图像、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bda06e8f9a6f",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "免费工具，另有付费的支持者/内容套餐",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "071cdb8ef20c",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "遵循 AGPLv3 免费；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3f8ecc25ea20",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "面向浏览器在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3f7e053391a1",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "部署在你的网络内即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "d78f31deb83a",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "厂商运营的服务；提供源码并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "78d8838b45dd",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "源码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f9a592256404",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "基于 AGPLv3 提供源码",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f9c0ed676e1f",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "主要为快速的网页工具工作流",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "4278ae6a6e82",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 与处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "dfb49851df48",
+    "stale": false
+  }
+}

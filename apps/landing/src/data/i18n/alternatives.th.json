@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online โดดเด่นในการแก้ไข เซ็น แปลง PDF และการสมัครสมาชิก Acrobat ส่วน SnapOtter ไม่ได้พยายามแทนที่ระบบนิเวศทั้งหมดของ Adobe แต่ให้เครื่องมือ PDF แบบ self-hosted แก่ทีมพร้อมเวิร์กโฟลว์ด้านภาพ วิดีโอ เสียง และไฟล์ในสแตกโอเพนซอร์สเดียว",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "653711cc37b5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "ไม่ใช่ทุกเวิร์กโฟลว์ของ Acrobat SnapOtter เหมาะที่สุดเมื่อคุณต้องการการประมวลผล PDF แบบ self-hosted ทั้งการแปลง OCR การบีบอัด การจัดการหน้า และการทำงานอัตโนมัติ ส่วน Acrobat ยังคงเป็นแพลตฟอร์มเอกสารบนเดสก์ท็อปและคลาวด์ที่ครบเครื่อง",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "f5cdf97205a4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter ใช้แทน Adobe Acrobat Pro ได้ไหม",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "fd6cf5b544f6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "เลือก SnapOtter เมื่อการควบคุมการดีพลอย การมองเห็นซอร์สโค้ด การใช้งานแบบ air-gapped หรือไปป์ไลน์ไฟล์ที่ทำซ้ำได้สำคัญกว่าฟีเจอร์บัญชี Adobe และระบบนิเวศ Acrobat ที่กว้างกว่า",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "543054c3f58c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "ทำไมจึงเลือก SnapOtter แทน Adobe Acrobat online",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "7bc7ee7ee9d1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "e60ae0a7b513",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online เป็นเวิร์กโฟลว์ PDF แบบโฮสต์ที่ขัดเกลามาอย่างดีจากบริษัทผู้อยู่เบื้องหลัง PDF ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับทีมที่ต้องการให้งาน PDF อยู่บนโครงสร้างพื้นฐานของตัวเอง",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "2e586653e283",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online เป็นชุดเครื่องมือ PDF แบบโฮสต์จาก Adobe ส่วน SnapOtter ให้เครื่องมือ PDF แบบ self-hosted แก่ทีมพร้อมเวิร์กโฟลว์ไฟล์ที่กว้างกว่าด้วยการดีพลอยแบบโอเพนซอร์ส",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "d3506e6deecd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน Adobe Acrobat Online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "7ac245f8a81c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe ระบุว่าไฟล์ในตัวแก้ไขออนไลน์จะถูกจัดการโดยเซิร์ฟเวอร์ของ Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "5f7f9af7741d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "เครื่องมือออนไลน์ฟรี ทดลองใช้ และแพ็กเกจ Acrobat แบบเสียเงิน",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "3c3cae5def78",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "เวิร์กโฟลว์ PDF ลายเซ็นอิเล็กทรอนิกส์ AI และบัญชี Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "809d85fb4215",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "มากกว่าแค่ PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "6505cc08c76d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์ผ่านเบราว์เซอร์หรือ API ที่ผู้ให้บริการจัดการ ขึ้นอยู่กับผลิตภัณฑ์",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "0aff6b8c532c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert ครอบคลุมกว้างและเป็นมิตรกับ API สำหรับการแปลงไฟล์ ส่วน SnapOtter แปลงข้ามฟอร์แมตทั้งภาพ วิดีโอ เสียง PDF และไฟล์ แล้วยังเพิ่มการบีบอัด การแก้ไข OCR การถอดเสียง และไปป์ไลน์ในเครื่อง",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "b6a09dedb80c",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "ได้ SnapOtter เป็นโอเพนซอร์สและรันบน Docker มันแปลงฟอร์แมตภาพ วิดีโอ เสียง PDF และไฟล์ในเครื่อง โดย SnapOtter ไม่คิดค่าใช้จ่ายต่อการแปลง",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "668bbe9ba031",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "ฉันสามารถ self-host ทางเลือกแทน CloudConvert ได้ไหม",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "083202dd46bd",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "ได้ SnapOtter ใช้ FFmpeg เบื้องหลังสำหรับวิดีโอและเสียง ควบคู่กับ Sharp สำหรับภาพ และ qpdf, LibreOffice รวมถึงเครื่องมือที่เกี่ยวข้องสำหรับเอกสาร",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "e7df238cd7d6",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter แปลงวิดีโอและเสียงได้ด้วยไหม",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "677087071b6f",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "55635d3914a1",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert เป็นเครื่องมือแปลงไฟล์และ API แบบโฮสต์ที่โตเต็มที่ ส่วน SnapOtter คือทางเลือกแบบ self-hosted เมื่อการแปลงไฟล์ควรเกิดขึ้นภายในโครงสร้างพื้นฐานของคุณเอง ด้วยไปป์ไลน์ที่คุณควบคุมได้",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "3e67fd08494b",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert เป็นแพลตฟอร์มแปลงไฟล์แบบโฮสต์พร้อม API ส่วน SnapOtter แปลงภาพ วิดีโอ เสียง PDF และไฟล์บนเซิร์ฟเวอร์ของคุณเองด้วยไปป์ไลน์โอเพนซอร์ส",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "61691ad0a703",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "a25656396c75",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "ไฟล์ถูกอัปโหลดไปประมวลผลบนบริการที่ผู้ให้บริการโฮสต์",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7bb0e284a81e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "ราคาบนคลาวด์แบบอิงตามการใช้งานและแบบแพ็กเกจ",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "65b037f06d01",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "การแปลงไฟล์แบบโฮสต์ครอบคลุมไฟล์หลายหมวดหมู่",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "b78566232d9e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "มากกว่าแค่การแปลงไฟล์",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "8bccfa1709b6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "API แบบโฮสต์และเวิร์กโฟลว์ผ่านเบราว์เซอร์",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "2687772ed5fc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio สะดวกสำหรับการแปลงแบบรวดเร็วและการใช้ API สำหรับนักพัฒนา ส่วน SnapOtter เก็บการแปลงไว้ในเครื่องและเพิ่มการประมวลผลไฟล์ที่กว้างกว่า ทั้งการบีบอัด การแก้ไข OCR การถอดเสียง การจัดการ PDF และไปป์ไลน์ที่ทำซ้ำได้",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "48152a177575",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter ให้เครื่องมือแปลงไฟล์และชุดประมวลผลไฟล์ที่ดีพลอยด้วย Docker ได้ แทนที่จะส่งไฟล์ไปยังเครื่องมือแปลงบนคลาวด์ เซิร์ฟเวอร์ของคุณจะรันไปป์ไลน์การแปลงเอง",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "339db8c5d533",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "ทางเลือกแบบ self-hosted แทน Convertio คืออะไร",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "b328c782cf55",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "มี SnapOtter มี REST API และรองรับไปป์ไลน์ ทีมจึงทำเวิร์กโฟลว์ไฟล์อัตโนมัติภายในสภาพแวดล้อมของตัวเองได้",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "8e50e49dc97c",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter มี API ไหม",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "55720d89d59d",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "d63c71cbe2b7",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio เป็นเครื่องมือแปลงไฟล์บนคลาวด์สำหรับการแปลงไฟล์ผ่านเบราว์เซอร์ในหลายฟอร์แมต ส่วน SnapOtter คือทางเลือกแบบ self-hosted เมื่อคุณต้องการให้งานแปลงไฟล์อยู่ภายในโครงสร้างพื้นฐานของคุณเอง",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "735cdb23747c",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio เป็นเครื่องมือแปลงไฟล์บนคลาวด์ที่มีทั้งเครื่องมือบนเบราว์เซอร์และ API ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับเวิร์กโฟลว์การแปลงที่เป็นส่วนตัวและไปป์ไลน์ในเครื่อง",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "3c1dc10ecd33",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "cb24783c6758",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "การแปลงบนคลาวด์ โดย Convertio ระบุว่าไฟล์ที่อัปโหลดจะถูกลบทันที และไฟล์ที่แปลงแล้วจะถูกลบหลังจาก 24 ชั่วโมง",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "867cba732703",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "ระดับฟรีที่มีขีดจำกัดไฟล์และเครดิต พร้อมแพ็กเกจพรีเมียม",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "8dc6ab9caf2a",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "การแปลงบนคลาวด์ครอบคลุมกว่า 300 ฟอร์แมต และเวิร์กโฟลว์ผ่าน API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "c4e971c7dc9a",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "มากกว่าแค่การแปลงไฟล์",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "8bccfa1709b6",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "API การแปลงแบบโฮสต์และเวิร์กโฟลว์ผ่านเบราว์เซอร์",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "9e00372973e3",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX เป็นเครื่องมือแปลงที่โฟกัสเฉพาะทางและรองรับฟอร์แมตจำนวนมหาศาล ส่วน SnapOtter แปลงได้เช่นกัน แล้วยังเพิ่มการบีบอัด การแก้ไข การลบข้อมูลลับ OCR การถอดเสียง และไปป์ไลน์ จึงเหมาะเมื่อการแปลงเป็นเพียงขั้นตอนหนึ่งในหลาย ๆ ขั้น",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "f56d98b11328",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "ถ้าคุณต้องการแค่การแปลงฟอร์แมตในหลายฟอร์แมตเป็นหลัก ConvertX เป็นตัวเลือกที่เรียบและโฟกัส แต่ถ้าคุณต้องแก้ไข บีบอัด ลบข้อมูลลับ OCR หรือถอดเสียงด้วย SnapOtter ทำทั้งหมดนั้นได้ในสแตกเดียว",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "37cd023588d1",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "ฉันควรใช้ SnapOtter หรือ ConvertX",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "cde36db1a8ec",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "ใช่ ทั้งคู่เป็นแบบ self-hosted ไฟล์จึงอยู่บนโครงสร้างพื้นฐานของคุณ ความต่างอยู่ที่ความกว้างของขอบเขต ไม่ใช่ที่ว่าข้อมูลของคุณอยู่ที่ไหน",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "a94fde98b6d2",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "ทั้งคู่เก็บไฟล์ไว้บนเซิร์ฟเวอร์ของฉันไหม",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "c0a45eed836b",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter เทียบกับ ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "cc7c090f07e1",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX และ SnapOtter ต่างเป็นแบบ self-hosted และโอเพนซอร์ส ConvertX สร้างขึ้นรอบ ๆ การแปลงฟอร์แมต ส่วน SnapOtter แปลงได้และครอบคลุมเวิร์กโฟลว์ไฟล์ส่วนที่เหลือด้วย",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "b68502d187e3",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX เป็นเครื่องมือแปลงไฟล์แบบ self-hosted รองรับกว่า 1000 ฟอร์แมต ส่วน SnapOtter แปลงได้ด้วย และเพิ่มการแก้ไข การบีบอัด OCR และการถอดเสียงครอบคลุมห้าโมดาลิตี",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "a62fede43449",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter เทียบกับ ConvertX: เปรียบเทียบเครื่องมือไฟล์แบบ Self-Hosted",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "2dd471cc15ca",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Self-hosted",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "beafec79ffdd",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "โอเพนซอร์ส",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "943a539d6059",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "ใช่ AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "fcf0f3cfae7a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "การแปลงฟอร์แมต",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "3da559f78102",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "จุดโฟกัสหลัก",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "1e865e69d202",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "เวิร์กโฟลว์ไฟล์ครบวงจรครอบคลุมห้าประเภท",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "3b7aaa5e1892",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "เวิร์กโฟลว์ที่เน้นการแปลง",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "8bafb5cc1992",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "มากกว่าแค่การแปลง",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "26f4841e2f1c",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "บีบอัด แก้ไข ลบข้อมูลลับ OCR ถอดเสียง",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "00be48fb169e",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "รองรับการแปลงกว่า 1000 ฟอร์แมต",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "4762cc3634da",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "จำนวนเครื่องมือ",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "ec037139dfbb",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "ไม่ใช่จุดโฟกัสหลัก",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "00546bfd98a3",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "เครื่องมือ AI ในเครื่อง",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "5a8e6b98cbfa",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR ถอดเสียง ขยายความละเอียด และอื่น ๆ",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "271df43665c4",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "ไม่ใช่จุดโฟกัสหลัก",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "00546bfd98a3",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "ตัวแก้ไขภาพแบบเลเยอร์",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "a9a4a39c1314",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert มีประโยชน์สำหรับการแปลงไฟล์ออนไลน์แบบรวดเร็วในหลายหมวดหมู่ ส่วน SnapOtter ครอบคลุมการแปลงด้วย แล้วยังเพิ่มเครื่องมือภาพในเครื่อง เวิร์กโฟลว์วิดีโอ/เสียง PDF ไฟล์บีบอัด เครื่องมือไฟล์ API และไปป์ไลน์",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "d805784c6b18",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "สำหรับการแปลงภาพ วิดีโอ เสียง PDF ไฟล์บีบอัด และไฟล์อีกหลายอย่าง ได้ SnapOtter โดดเด่นที่สุดเมื่อคุณต้องการดีพลอยเครื่องมือแปลงไว้เป็นการส่วนตัวแทนการใช้บริการเว็บแบบโฮสต์",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "e1d4f60ec6b8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter ใช้แทน FreeConvert ได้ไหม",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "b283465539b8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "ขีดจำกัดที่แท้จริงของ SnapOtter มาจากเซิร์ฟเวอร์ พื้นที่จัดเก็บ หน่วยความจำ และขีดจำกัดรันไทม์ที่คุณตั้งค่า จึงเหมาะกว่าเมื่อคุณต้องการปรับกำลังการทำงานได้ด้วยตัวเอง",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "ebe0f688a75c",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter รองรับไฟล์ขนาดใหญ่ไหม",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "8a780f7707d2",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "58b32453e44c",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert เป็นเครื่องมือแปลงไฟล์แบบโฮสต์ที่กว้างสำหรับการแปลงและบีบอัดไฟล์ผ่านเบราว์เซอร์ ส่วน SnapOtter คือทางเลือกแบบ self-hosted เมื่อคุณต้องการให้การจัดการไฟล์เหล่านั้นรันภายในการดีพลอยของคุณเอง",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "1a5049e4218b",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert แปลงและบีบอัดไฟล์แบบออนไลน์ ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับการแปลงภาพ วิดีโอ เสียง PDF และไฟล์บนเซิร์ฟเวอร์ของคุณเอง",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "f19b7c03a898",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "06383e5978de",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "ไฟล์ถูกอัปโหลดไปยัง FreeConvert โดย FreeConvert ระบุว่าไฟล์ที่แปลงแล้วจะถูกลบอัตโนมัติหลังจากไม่กี่ชั่วโมง",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "578d8038d4d8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "เว็บระดับฟรี พร้อมแพ็กเกจเสียเงินสำหรับงานที่ใหญ่ขึ้นหรือมีลำดับความสำคัญสูงกว่า",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "7b21e3d30bb8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "การแปลงและบีบอัดออนไลน์ครอบคลุมหลายฟอร์แมต",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "9b51f95724bf",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "มากกว่าแค่การแปลงไฟล์",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "8bccfa1709b6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์ผ่านเบราว์เซอร์หรือ API ที่ผู้ให้บริการจัดการ ขึ้นอยู่กับผลิตภัณฑ์",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "0aff6b8c532c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF โดดเด่นในงาน PDF ออนไลน์ ส่วน SnapOtter จับคู่เครื่องมือ PDF เข้ากับเครื่องมือด้านภาพ วิดีโอ เสียง และไฟล์ ทำให้การดีพลอยเดียวจัดการทั้งสัญญา วิดีโอบันทึกหน้าจอ และการตัดต่อพอดแคสต์ได้",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "5d94121b27b3",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter เป็นโอเพนซอร์สภายใต้ AGPLv3 ดีพลอยด้วย Docker และให้เวิร์กโฟลว์ PDF อย่างการรวม แยก บีบอัด แปลง ป้องกัน OCR และงานที่เกี่ยวข้องบนฮาร์ดแวร์ของคุณเอง",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "5fe2ec8a4f97",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "ทางเลือกแบบ self-hosted แทน iLovePDF คืออะไร",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "f05aef057530",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "รุ่นโอเพนซอร์สฟรี ส่วนรุ่นเอนเทอร์ไพรส์แบบเสียเงินเพิ่มการควบคุมอย่าง SSO และการบันทึกล็อกเพื่อตรวจสอบ แต่เครื่องมือจัดการไฟล์อยู่ในสแตกโอเพนซอร์ส",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "f0ef8e64accc",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter ฟรีไหม",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "b54e94a86935",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "d0d27dad4983",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF เป็นบริการ PDF แบบโฮสต์สำหรับงานเอกสารผ่านเบราว์เซอร์ที่รวดเร็ว ส่วน SnapOtter คือทางเลือกแบบ self-hosted เมื่อคุณต้องการให้เวิร์กโฟลว์ PDF แบบเดียวกันรันบนเซิร์ฟเวอร์ของคุณเอง",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "f6e6f161d386",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF เป็นบริการ PDF ออนไลน์ ส่วน SnapOtter ให้เครื่องมือ PDF แบบ self-hosted แก่ทีม พร้อมเวิร์กโฟลว์ด้านภาพ วิดีโอ เสียง และไฟล์ในสแตกโอเพนซอร์สเดียว",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "37b9da6b1a80",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "11c1af61dff4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "ไฟล์ถูกอัปโหลดไปประมวลผลบนบริการที่ผู้ให้บริการโฮสต์",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7bb0e284a81e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "มีแพ็กเกจฟรีและพรีเมียม โดยฟีเจอร์ต่างกันตามแพ็กเกจ",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "0a4a2c180fd4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "ชุดเวิร์กโฟลว์ PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "bfbd52037431",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "มากกว่าแค่ PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "6505cc08c76d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์ผ่านเบราว์เซอร์หรือ API ที่ผู้ให้บริการจัดการ ขึ้นอยู่กับผลิตภัณฑ์",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "0aff6b8c532c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert ครอบคลุมหมวดหมู่การแปลงหลายอย่างและมีระบบนิเวศ API ผ่าน API2Convert ส่วน SnapOtter ถูกสร้างมาสำหรับการดีพลอยแบบส่วนตัวที่การแปลง การบีบอัด งาน PDF การประมวลผลเสียง/วิดีโอ และเครื่องมือ AI ในเครื่องอยู่ในสแตกเดียว",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "2ec0018f4e77",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "เลือก SnapOtter เมื่อความเป็นส่วนตัว การดีพลอยภายใน โค้ดโอเพนซอร์ส หรือการประมวลผลไฟล์แบบ air-gapped สำคัญ เลือก Online-Convert เมื่อคุณชอบเครื่องมือแปลงแบบโฮสต์ที่ไม่ต้องดูแลเซิร์ฟเวอร์",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "67bca28ca6b6",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "ทำไมจึงเลือก SnapOtter แทน Online-Convert",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "6a116d92b264",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "ครอบคลุม SnapOtter มีทั้งการแปลง การบีบอัด การแก้ไข OCR การถอดเสียง การจัดการ PDF เครื่องมือเมทาดาทา ไฟล์บีบอัด เครื่องมือไฟล์ และไปป์ไลน์",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "147e71977f18",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter ครอบคลุมมากกว่าแค่การแปลงไหม",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "91f2579f88ed",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "5c6be80eb8f9",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert เป็นเครื่องมือแปลงไฟล์แบบโฮสต์ที่เปิดให้บริการมานานสำหรับไฟล์หลายหมวดหมู่ ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับทีมที่ต้องการให้การแปลงและการประมวลผลเกิดขึ้นบนเซิร์ฟเวอร์ของตัวเอง",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "26abd6c91aba",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert แปลงไฟล์วิดีโอ ภาพ เสียง เอกสาร อีบุ๊ก และไฟล์บีบอัดแบบออนไลน์ ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับเวิร์กโฟลว์ไฟล์ที่เป็นส่วนตัว",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "28bf64d65df5",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "be3b36fa3e19",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "อัปโหลดผ่านเบราว์เซอร์ไปยังบริการคลาวด์ Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "5137212608b3",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "ทดลองใช้ฟรี แพ็กเกจเครดิต การสมัครสมาชิก และตัวเลือกสำหรับองค์กร",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "e542f09856f7",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "เครื่องมือแปลงออนไลน์สำหรับสื่อ เอกสาร อีบุ๊ก และไฟล์บีบอัด",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "035ed6422add",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "มากกว่าแค่การแปลงไฟล์",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "8bccfa1709b6",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "API2Convert API แบบโฮสต์และเวิร์กโฟลว์ผ่านเบราว์เซอร์",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "47ed7c773e26",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai สร้างขึ้นรอบ ๆ การประชุม การจดโน้ต และการทำงานร่วมกัน ส่วน SnapOtter โฟกัสที่การแปลงเสียงเป็นข้อความในเครื่อง พร้อมเวิร์กโฟลว์เสียงส่วนที่เหลือ ทั้งการตัด ปรับระดับเสียง ลดสัญญาณรบกวน แปลงฟอร์แมต ซับไตเติลวิดีโอ รวมถึงเครื่องมือด้านภาพ PDF และไฟล์",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "4e28f3591d5e",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "มี SnapOtter รันการถอดเสียงในเครื่องด้วยโมเดล Whisper บน CPU หรือ NVIDIA CUDA GPU ของคุณเอง มันเหมาะกับไฟล์เสียงและวิดีโอที่เป็นส่วนตัวมากกว่าการทำงานร่วมกันแบบเอเจนต์ช่วยประชุม",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "cb860ede387c",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "มีทางเลือกแบบ self-hosted แทน Otter.ai ไหม",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "9b404c24ef42",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU เร็วกว่า แต่การถอดเสียงก็รันบน CPU ได้เช่นกัน โมเดลจะติดตั้งตามความต้องการในครั้งแรกที่คุณใช้ฟีเจอร์นี้",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "b5d23439e11b",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "ฉันจำเป็นต้องมี GPU ไหม",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "3d2af5f5380f",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "62bd29111d8f",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai เป็นแพลตฟอร์มถอดเสียงการประชุมแบบโฮสต์ ส่วน SnapOtter คือทางเลือกแบบ self-hosted เมื่อคุณต้องการให้การถอดเสียงรันบน CPU หรือ NVIDIA CUDA GPU ของคุณเองด้วยโมเดลในเครื่อง",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "3670e4379300",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai ถอดเสียงการประชุมบนคลาวด์ ส่วน SnapOtter รันการแปลงเสียงเป็นข้อความบน CPU หรือ NVIDIA CUDA GPU ของคุณเองด้วยโมเดล Whisper ในเครื่อง โดยไม่ต้องอัปโหลดเสียง",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "70116657671f",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "8f934b06fd81",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "เสียงและเนื้อหาการประชุมถูกประมวลผลโดยบริการ Otter.ai แบบโฮสต์",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "7706ac3b2a40",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "มีแพ็กเกจฟรีและเสียเงิน โดยขีดจำกัดนาที/การนำเข้าต่างกันตามแพ็กเกจ",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "70a65c23acfa",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "โน้ตการประชุม สรุปด้วย AI การทำงานร่วมกัน และการถอดเสียง",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "13dfb1e0bc4e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "มากกว่าแค่การถอดเสียง",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "739db8da4a47",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "การผสานรวมแอปแบบโฮสต์และเวิร์กโฟลว์การประชุม",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "15e6b3137131",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf โฟกัสที่งาน PDF ซึ่งก็ตรงกับสิ่งที่หลายคนต้องการพอดี SnapOtter ครอบคลุมงานสายนั้นด้วยการรวม แยก บีบอัด แปลง ลบข้อมูลลับ OCR และอื่น ๆ แล้วยังเพิ่มเวิร์กโฟลว์ด้านภาพ วิดีโอ เสียง และไฟล์ไว้ในการดีพลอยเดียวกัน",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "0a8a6fe44af8",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "มี SnapOtter เป็นโอเพนซอร์สภายใต้ AGPLv3 และรันบนเซิร์ฟเวอร์ของคุณเองด้วย Docker ครอบคลุมทั้งการรวม แยก บีบอัด แปลง ป้องกัน ลบข้อมูลลับ ใส่ลายน้ำ ใส่เลขหน้า และ OCR โดย SnapOtter ไม่คิดค่าใช้จ่ายต่อไฟล์",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "3e5924fd8853",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "มีทางเลือกฟรีแบบ self-hosted แทน Smallpdf ไหม",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "fd773597eaa5",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter ประมวลผลไฟล์บนเครื่องที่คุณรันมันเอง หากคุณดีพลอยไว้ภายในเครือข่ายของตัวเอง ไฟล์จะอยู่ภายในการดีพลอยนั้นแทนที่จะถูกส่งไปยังบริการ PDF ของบุคคลที่สาม",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "512e914702cc",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "เอกสารของฉันถูกอัปโหลดไปที่ไหนหรือเปล่า",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "82a89cc61269",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "ได้ นอกจากเครื่องมือ PDF แล้ว SnapOtter ยังจัดการงานด้านภาพ วิดีโอ เสียง และไฟล์ได้ด้วย การดีพลอยเดียวจึงครอบคลุมเวิร์กโฟลว์ไฟล์ในชีวิตประจำวันได้หลายอย่าง",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "6612be8cc4f5",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter ทำได้มากกว่าแค่ PDF ไหม",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "3a9d6a309b15",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "91d3f30c120e",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf เป็นชุดเครื่องมือ PDF แบบโฮสต์ที่ขัดเกลามาอย่างดี ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับทีมที่ต้องการให้เครื่องมือ PDF รันบนโครงสร้างพื้นฐานที่ตัวเองควบคุมได้ โดยไม่ต้องส่งเอกสารสำคัญไปยังบริการ PDF ของบุคคลที่สาม",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "f0ab1b03c9de",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf เป็นชุดเครื่องมือ PDF แบบโฮสต์ ส่วน SnapOtter รันงานรวม แยก บีบอัด แปลง OCR ไฟล์ PDF และอื่น ๆ บนเซิร์ฟเวอร์ของคุณเอง พร้อมเครื่องมือเสริมกว่า 200 รายการครอบคลุมไฟล์ห้าประเภท",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "a28b045baa7b",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "8c7d65be4c06",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "ไฟล์ถูกอัปโหลดไปประมวลผลบนบริการที่ผู้ให้บริการโฮสต์",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7bb0e284a81e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "มีแพ็กเกจฟรีและเสียเงิน โดยฟีเจอร์ต่างกันตามแพ็กเกจ",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "451939a554a2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "ชุดเวิร์กโฟลว์ PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "bfbd52037431",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "มากกว่าแค่ PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "6505cc08c76d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์ผ่านเบราว์เซอร์หรือ API ที่ผู้ให้บริการจัดการ ขึ้นอยู่กับผลิตภัณฑ์",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "0aff6b8c532c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "ถ้าคุณยุ่งกับ PDF อย่างเดียวเท่านั้น Stirling-PDF ยอดเยี่ยมและควรลองดู แต่ถ้าคุณต้องปรับขนาดภาพ แปลงวิดีโอ ถอดเสียง หรือประมวลผลไฟล์เป็นชุดด้วย SnapOtter จัดการทั้งหมดในการดีพลอยเดียว แทนที่จะต้องรันเครื่องมือหลายตัวควบคู่กัน",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "f4246a11675e",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "ได้ ถ้าคุณต้องการสแตกเดียวสำหรับงานที่มากกว่า PDF SnapOtter ครอบคลุม PDF อย่างกว้างขวางและเพิ่มเครื่องมือด้านภาพ วิดีโอ เสียง และไฟล์ แต่ถ้าต้องการชุดที่ทำเฉพาะ PDF Stirling-PDF เป็นตัวเลือกที่โฟกัสและแข็งแรง",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "e8e053b6ee05",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter ใช้แทน Stirling-PDF ได้ไหม",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "6efdb6bbe006",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "ทั้งสองโปรเจกต์เป็นโอเพนซอร์สและ self-host ได้ SnapOtter ใช้ AGPLv3 และมีรุ่นเอนเทอร์ไพรส์แบบเสียเงินเป็นตัวเลือกเสริมสำหรับ SSO การบันทึกล็อกเพื่อตรวจสอบ และการควบคุมในลักษณะเดียวกัน",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "061b25267349",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "ทั้งคู่ฟรีและโอเพนซอร์สไหม",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "0c1137183009",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter เทียบกับ Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "e7fc5a9a3423",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF และ SnapOtter ต่างเป็นแบบ self-hosted และโอเพนซอร์ส ไฟล์จึงอยู่บนเซิร์ฟเวอร์ของคุณไม่ว่าจะเลือกอันไหน ความต่างอยู่ที่ขอบเขต Stirling-PDF โฟกัสที่ PDF ส่วน SnapOtter ครอบคลุมไฟล์ทั้งห้าประเภท",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "55ceab14ac98",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF เป็นชุดเครื่องมือ PDF แบบ self-hosted ที่แข็งแกร่ง ส่วน SnapOtter ครอบคลุม PDF ได้ด้วย พร้อมเครื่องมือด้านภาพ วิดีโอ เสียง และไฟล์ในสแตกเดียว ทั้งคู่เป็นโอเพนซอร์ส",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "08b83a7bc314",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter เทียบกับ Stirling-PDF: เปรียบเทียบเครื่องมือไฟล์แบบ Self-Hosted",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "a7ba8164758d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Self-hosted",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "beafec79ffdd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "โอเพนซอร์ส",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "943a539d6059",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "ใช่ AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "fcf0f3cfae7a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "เวิร์กโฟลว์ PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "6058c13ee50b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "จุดโฟกัสหลัก",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "1e865e69d202",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "เวิร์กโฟลว์ไฟล์ครบวงจรครอบคลุมห้าประเภท",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "3b7aaa5e1892",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "การจัดการ PDF กว่า 60 รายการ",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "3e4daad46acd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "จำนวนเครื่องมือ",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "ec037139dfbb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "เวิร์กโฟลว์ OCR ที่เน้น PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "43815d8c4c35",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "AI ในเครื่อง (OCR, ถอดเสียง, ขยายความละเอียด)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "418158a7f3bb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR ถอดเสียง ขยายความละเอียด และอื่น ๆ",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "271df43665c4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "ไม่ใช่จุดโฟกัส",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "6b81b4b1a506",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "ตัวแก้ไขภาพแบบเลเยอร์",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "a9a4a39c1314",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์อัตโนมัติสำหรับ PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "680cfea9ec54",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "ไปป์ไลน์และการประมวลผลเป็นชุด",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "a7ad90da2017",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "ใช่",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "673722dd77f3",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG ยอดเยี่ยมเมื่องานคือการบีบอัดภาพ ส่วน SnapOtter บีบอัด PNG, JPEG, WebP และ AVIF แล้วยังทำต่อได้ทั้งปรับขนาด ครอป แปลงไฟล์ ใส่ลายน้ำ เครื่องมือเมทาดาทา รวมถึงเวิร์กโฟลว์วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "05237947a7d8",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "มี SnapOtter รันการบีบอัดภาพในเครื่อง ขีดจำกัดที่แท้จริงจึงเป็นฮาร์ดแวร์ในการดีพลอยของคุณ ไม่ใช่โควตาของบริการภาพจากบุคคลที่สาม",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "f30fa1192dd3",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "มีทางเลือกแบบ self-hosted แทน TinyPNG ไหม",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "1c481eea08d2",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP และ AVIF พร้อมการแปลงข้ามฟอร์แมต SnapOtter ยังอ่านฟอร์แมตอินพุตได้อีกหลายชนิด รวมถึงฟอร์แมต RAW จากกล้อง",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "1f2f82bbeb3a",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter บีบอัดฟอร์แมตไหนได้บ้าง",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "9f3dacdb39ab",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "8dec84deda83",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG เป็นเครื่องมือบีบอัดภาพออนไลน์ที่โฟกัสเฉพาะทาง ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับทีมที่ต้องการให้การบีบอัด แปลง ปรับขนาด จัดการเมทาดาทา และงานภาพอื่น ๆ รันในเครื่องของตัวเอง",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "7e8e286a1452",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG บีบอัดภาพผ่านออนไลน์และผ่าน API ของ Tinify ส่วน SnapOtter บีบอัดและแปลงภาพบนเซิร์ฟเวอร์ของคุณเอง พร้อมเวิร์กโฟลว์ไฟล์ที่กว้างกว่าในสแตกเดียว",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "4c4c192cc809",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "6d27f3c9642d",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "ไฟล์ถูกอัปโหลดไปประมวลผลบนบริการที่ผู้ให้บริการโฮสต์",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7bb0e284a81e",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "ใช้งานเว็บฟรี และมีตัวเลือก API แบบเสียเงิน/สำหรับนักพัฒนา",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "dbcb3087d8a4",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "การบีบอัดภาพและเวิร์กโฟลว์ผ่าน Tinify API",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "814d9a2aff18",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "มากกว่าแค่การบีบอัดภาพ",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "4eeaf68bde0b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "เวิร์กโฟลว์ผ่านเบราว์เซอร์หรือ API ที่ผู้ให้บริการจัดการ ขึ้นอยู่กับผลิตภัณฑ์",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "0aff6b8c532c",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow สะดวกเมื่อคุณต้องการเครื่องมือบนเบราว์เซอร์แบบรวดเร็วและไม่อยากติดตั้งอะไร ส่วน SnapOtter ถูกสร้างมาสำหรับอีกด้านของการแลกเปลี่ยนนั้น คือการดีพลอยแบบส่วนตัว เวิร์กโฟลว์ภายในองค์กร ไปป์ไลน์ที่ทำซ้ำได้ และการประมวลผลไฟล์ในเครื่องทั้งภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "203e0863b398",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "ไม่ใช่ TinyWow เป็นกล่องเครื่องมือบนเว็บแบบโฮสต์ที่กว้าง ส่วน SnapOtter เป็นชุดเครื่องมือประมวลผลไฟล์แบบ self-hosted สำหรับทีมที่ต้องการการดีพลอยส่วนตัว การมองเห็นซอร์สโค้ด API และไปป์ไลน์",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "d292e127f9aa",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter เป็นโคลนของ TinyWow ไหม",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "7ba1bb9442af",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "ใช้ TinyWow สำหรับงานแบบครั้งเดียวบนเบราว์เซอร์ที่รวดเร็วและยอมรับการประมวลผลแบบโฮสต์ได้ ใช้ SnapOtter เมื่อไฟล์เป็นข้อมูลสำคัญ เวิร์กโฟลว์เกิดขึ้นซ้ำ ๆ หรือองค์กรของคุณต้องการให้การประมวลผลเกิดขึ้นบนโครงสร้างพื้นฐานที่ตัวเองควบคุมได้",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "e80817849a9c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "ฉันควรใช้ TinyWow หรือ SnapOtter",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "de6cef9ea7db",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "ไม่โดยตรง SnapOtter โฟกัสที่การจัดการไฟล์ ทั้งภาพ วิดีโอ เสียง PDF ไฟล์บีบอัด และไฟล์ทั่วไป มันเหมาะกว่าเมื่อชั้นการประมวลผลไฟล์สำคัญกว่าเทมเพลตการเขียน",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "5b810fec94e4",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter แทนที่เครื่องมือเขียนด้วย AI ของ TinyWow ได้ไหม",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "f64b576a705f",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "7b3cbc0e6af9",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow เป็นกล่องเครื่องมือแบบโฮสต์ที่กว้างสำหรับงาน PDF ภาพ วิดีโอ การเขียนด้วย AI และไฟล์แบบรวดเร็ว ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับทีมที่ต้องการเครื่องมือจัดการไฟล์ประจำวันบนโครงสร้างพื้นฐานที่ตัวเองควบคุมได้",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "b7e7360164d1",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow เป็นกล่องเครื่องมือแบบโฮสต์ที่กว้างสำหรับงาน PDF ภาพ วิดีโอ การเขียนด้วย AI และไฟล์ ส่วน SnapOtter คือทางเลือกแบบ self-hosted สำหรับเวิร์กโฟลว์ไฟล์ที่เป็นส่วนตัว",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "837adf258fe1",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "c54f82cb0135",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "กล่องเครื่องมือออนไลน์แบบโฮสต์",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "88c036a42a7f",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "รูปแบบการดีพลอย",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3c510520078a",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "อัปโหลดไปยังเซิร์ฟเวอร์ของ TinyWow โดย TinyWow ระบุว่าไฟล์จะถูกลบหลังจาก 1 ชั่วโมง",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "6f5493c479ec",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "ตำแหน่งที่ประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "1ae95d98ec5b",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f7646cd81b1c",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "เครื่องมือ PDF ภาพ วิดีโอ การเขียนด้วย AI และไฟล์",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "cf47147ca01e",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "ความครอบคลุมของเครื่องมือ",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "b57038aefc4b",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "ภาพ วิดีโอ เสียง PDF และไฟล์",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bed370486cf0",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "เครื่องมือฟรี พร้อมแพ็กเกจแบบผู้สนับสนุน/คอนเทนต์ที่เสียเงิน",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "09d9f150abda",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ขีดจำกัดคือฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "218e33a10f3a",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "ออกแบบมาสำหรับใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "fc68ddea6e9a",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "รองรับเมื่อดีพลอยภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "ebc1084af81d",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "บริการที่ผู้ให้บริการดำเนินการเอง การเปิดซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "bbd4ec126163",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "เปิดซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "e2f894c61ece",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "เน้นเวิร์กโฟลว์เครื่องมือบนเว็บแบบรวดเร็วเป็นหลัก",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "2fb936bb281f",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการดีพลอยของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d02b672ee5a8",
+    "stale": false
+  }
+}

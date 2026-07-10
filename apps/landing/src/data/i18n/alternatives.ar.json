@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "‏Adobe Acrobat عبر الإنترنت قوي في تحرير PDF والتوقيع والتحويل واشتراكات Acrobat. لا يحاول SnapOtter استبدال منظومة Adobe بأكملها؛ بل يمنح الفرق أدوات PDF مستضافة ذاتيًا إضافةً إلى مسارات عمل للصور والفيديو والصوت والملفات ضمن حزمة واحدة مفتوحة المصدر.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "3b1d60c79d93",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "ليس لكل مسارات عمل Acrobat. يتفوق SnapOtter عندما تحتاج إلى معالجة PDF مستضافة ذاتيًا وتحويل وOCR وضغط وعمليات على الصفحات وأتمتة. يبقى Acrobat منصة مستندات عميقة على سطح المكتب والسحابة.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "2b07ceb58d14",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "هل SnapOtter بديل لـ Adobe Acrobat Pro؟",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "3884ea2d1aab",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "اختر SnapOtter عندما يكون التحكم في النشر ورؤية الشيفرة والاستخدام المعزول عن الشبكة أو مسارات عمل الملفات القابلة للتكرار أهم من ميزات حساب Adobe ومنظومة Acrobat الأوسع.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "5e7147d171e3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "لماذا تختار SnapOtter بدلًا من Adobe Acrobat عبر الإنترنت؟",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "5ccfd18f9a09",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Adobe Acrobat عبر الإنترنت",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "ea19f8ce5ec0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "‏Adobe Acrobat عبر الإنترنت مسار عمل PDF مستضاف ومصقول من الشركة صاحبة PDF. أما SnapOtter فهو البديل المستضاف ذاتيًا للفرق التي تحتاج إلى إبقاء عمل PDF على بنيتها التحتية الخاصة.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "e3db35002fee",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "‏Adobe Acrobat عبر الإنترنت مجموعة أدوات PDF مستضافة من Adobe. يمنح SnapOtter الفرق أدوات PDF مستضافة ذاتيًا ومسارات عمل أوسع للملفات مع نشر مفتوح المصدر.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "12c9f13d9d3c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Adobe Acrobat Online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "5d5b0ed51ab7",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "تقول Adobe إن ملفات المحرّر عبر الإنترنت تعالجها خوادم Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "9bd6d9dcccd3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "أدوات مجانية عبر الإنترنت وتجارب وخطط Acrobat مدفوعة",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "c06bfb0058fd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "مسارات عمل PDF والتوقيع الإلكتروني والذكاء الاصطناعي وحساب Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "4d2ad5e14be9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "ما بعد ملفات PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "dc3484e868df",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "مسار عمل عبر المتصفح أو API يديره المورّد، حسب المنتج",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "b1c9f4a7d6a9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "‏CloudConvert واسع وملائم لـ API في التحويل. يحوّل SnapOtter عبر صيغ الصور والفيديو والصوت وPDF والملفات، ثم يضيف الضغط والتحرير وOCR والنسخ النصي ومسارات العمل المحلية.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "b41313d0931f",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "نعم. SnapOtter مفتوح المصدر ويعمل على Docker. يحوّل صيغ الصور والفيديو والصوت وPDF والملفات محليًا، دون فوترة لكل تحويل من SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "8fc9bd5fa46d",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "هل يمكنني استضافة بديل لـ CloudConvert ذاتيًا؟",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "204a4dacd78c",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "نعم. يستخدم SnapOtter محرك FFmpeg للفيديو والصوت، إلى جانب Sharp للصور وqpdf وLibreOffice والأدوات ذات الصلة للمستندات.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "e3263450b4d9",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "هل يحوّل SnapOtter الفيديو والصوت أيضًا؟",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "f46424f54fff",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "985f095d8c6f",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "‏CloudConvert محوّل مستضاف ناضج مع API. أما SnapOtter فهو البديل المستضاف ذاتيًا عندما يجب أن يحدث التحويل داخل بنيتك التحتية الخاصة، بمسارات عمل تتحكم بها.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "b7fc355dfcc4",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "‏CloudConvert منصة تحويل مستضافة مزوّدة بواجهة API. يحوّل SnapOtter الصور والفيديو والصوت وPDF والملفات على خادمك الخاص عبر مسارات عمل مفتوحة المصدر.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "f2e4b97c9fae",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "985f095d8c6f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "تُرفع الملفات إلى خدمة يستضيفها المورّد للمعالجة",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "c42bc4de2512",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "تسعير سحابي قائم على الاستخدام وعلى الخطط",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "569054ff1bb2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "تحويل مستضاف عبر فئات ملفات عديدة",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "93cd21f87805",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "ما بعد تحويل الملفات",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "126f391b3695",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "‏API مستضاف ومسارات عمل عبر المتصفح",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "6e9484c652fe",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "‏Convertio مريح للتحويلات السريعة واستخدام API للمطورين. يبقي SnapOtter التحويل محليًا ويضيف معالجة ملفات أوسع: الضغط والتحرير وOCR والنسخ النصي وعمليات PDF ومسارات عمل قابلة للتكرار.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "d9f9867c115f",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "يمنحك SnapOtter محوّلًا ومجموعة معالجة ملفات قابلين للنشر عبر Docker. بدلًا من إرسال الملفات إلى محوّل سحابي، يشغّل خادمك مسار عمل التحويل.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "8629882eea62",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "ما البديل المستضاف ذاتيًا لـ Convertio؟",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "89c5caa02e36",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "نعم. يشمل SnapOtter واجهات REST API ودعم مسارات العمل حتى تتمكن الفرق من أتمتة مسارات عمل الملفات داخل بيئتها الخاصة.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "af831f14ec08",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "هل يملك SnapOtter واجهة API؟",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "db5ee2186baf",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "f635006f364a",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "‏Convertio محوّل سحابي لتحويل الملفات عبر المتصفح في صيغ كثيرة. أما SnapOtter فهو البديل المستضاف ذاتيًا عندما تريد إبقاء مهام التحويل داخل بنيتك التحتية الخاصة.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "d02931c2bf00",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "‏Convertio محوّل ملفات سحابي بأدوات في المتصفح وواجهة API. أما SnapOtter فهو البديل المستضاف ذاتيًا لمسارات عمل التحويل الخاصة ومسارات العمل المحلية.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "232036dbfe14",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "f635006f364a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "تحويل سحابي؛ يقول Convertio إن الملفات المرفوعة تُحذف فورًا والملفات المحوّلة بعد 24 ساعة",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "e99d1792c181",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "فئة مجانية بحدود للملفات والأرصدة إضافةً إلى خطط مميزة",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "46e692d2246c",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "تحويل سحابي عبر أكثر من 300 صيغة ومسارات عمل API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "76a868920ab7",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "ما بعد تحويل الملفات",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "126f391b3695",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "‏API تحويل مستضاف ومسارات عمل عبر المتصفح",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "f536a4edcb01",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "‏ConvertX محوّل مركّز ويتعامل مع قائمة ضخمة من الصيغ. يحوّل SnapOtter كذلك، ثم يضيف الضغط والتحرير والتنقيح وOCR والنسخ النصي ومسارات العمل، فيناسب عندما يكون التحويل خطوة من بين خطوات كثيرة.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "cd760852b76b",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "إذا كنت تحتاج أساسًا إلى تحويل الصيغ عبر صيغ كثيرة، فإن ConvertX خيار نظيف ومركّز. أما إذا كنت تحرّر أو تضغط أو تنقّح أو تطبّق OCR أو تنسخ نصيًا أيضًا، فإن SnapOtter يفعل كل ذلك في حزمة واحدة.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "2d3b3c479a1d",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "هل أستخدم SnapOtter أم ConvertX؟",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "3d7265e410fb",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "نعم. كلاهما مستضاف ذاتيًا، فتبقى الملفات على بنيتك التحتية. الفرق في الاتساع، لا في مكان بياناتك.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "861031339180",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "هل يبقي كلاهما الملفات على خادمي؟",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "9491bbf5b96b",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "‏SnapOtter مقابل ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "86c2f1253c0f",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "‏ConvertX وSnapOtter كلاهما مستضاف ذاتيًا ومفتوح المصدر. بُني ConvertX حول تحويل الصيغ؛ أما SnapOtter فيقوم بالتحويل إضافةً إلى بقية مسار عمل الملفات.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "78bdac48b1a2",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "‏ConvertX محوّل ملفات مستضاف ذاتيًا لأكثر من 1000 صيغة. يحوّل SnapOtter أيضًا، ويضيف التحرير والضغط وOCR والنسخ النصي عبر خمس وسائط.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "a1d21f518969",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "‏SnapOtter مقابل ConvertX: مقارنة أدوات الملفات المستضافة ذاتيًا",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "8c831af2feef",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "مستضاف ذاتيًا",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "b544286819ce",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "مفتوح المصدر",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "897545ec3751",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "نعم، AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "f3d7cb5de560",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "تحويل الصيغ",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "173de251cad7",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "التركيز الأساسي",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "6fba9b522591",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "مسار عمل ملفات كامل عبر خمسة أنواع",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "e55f273db7ba",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "مسار عمل متمحور حول التحويل",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "8ea58294d8e3",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "ما بعد التحويل",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "64e11c5f1610",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "ضغط وتحرير وتنقيح وOCR ونسخ نصي",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "6c5ec9ae69b1",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "أكثر من 1000 صيغة تحويل",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "865d8ce87042",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "عدد الأدوات",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "a075adf6bcdf",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "ليس محور تركيز أساسي",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "a7334953b2bc",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "أدوات ذكاء اصطناعي محلية",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "2881caa3cbfa",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "‏OCR ونسخ نصي وتحسين الدقة والمزيد",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "a0011a1b7c80",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "ليس محور تركيز أساسي",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "a7334953b2bc",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "محرّر صور قائم على الطبقات",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "844e729b4528",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "‏FreeConvert مفيد للتحويلات السريعة عبر الإنترنت في فئات كثيرة. يغطي SnapOtter التحويل أيضًا، ثم يضيف أدوات صور محلية ومسارات عمل للفيديو والصوت وملفات PDF وأرشيفات وأدوات ملفات وواجهات API ومسارات عمل.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "f737d6bbfa1e",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "بالنسبة لكثير من تحويلات الصور والفيديو والصوت وPDF والأرشيفات والملفات، نعم. يتفوق SnapOtter عندما تريد نشر المحوّل بشكل خاص بدلًا من استخدام خدمة ويب مستضافة.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "348d14f4371b",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "هل يمكن لـ SnapOtter أن يحل محل FreeConvert؟",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "9d5d7625d94d",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "تأتي حدود SnapOtter العملية من خادمك وتخزينك وذاكرتك وحدود التشغيل المُعدّة. هذا يجعله أنسب عندما تريد ضبط السعة بنفسك.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "eca8d1a7854d",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "هل يدعم SnapOtter الملفات الكبيرة؟",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "45556730ebe4",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "87df6d64316d",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "‏FreeConvert محوّل مستضاف واسع لتحويل الملفات وضغطها عبر المتصفح. أما SnapOtter فهو البديل المستضاف ذاتيًا عندما تريد تشغيل تلك العمليات على الملفات داخل تثبيتك الخاص.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "9abd9ef496c1",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "يحوّل FreeConvert الملفات ويضغطها عبر الإنترنت. أما SnapOtter فهو البديل المستضاف ذاتيًا لتحويل الصور والفيديو والصوت وPDF والملفات على خادمك الخاص.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "45c33f84d61d",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "87df6d64316d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "تُرفع الملفات إلى FreeConvert؛ يقول FreeConvert إن الملفات المحوّلة تُحذف تلقائيًا بعد بضع ساعات",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "a0f7e0d71e0d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "فئة ويب مجانية إضافةً إلى خطط مدفوعة لأحمال أكبر أو أعلى أولوية",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "c42230e140d4",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "تحويل وضغط عبر الإنترنت في صيغ كثيرة",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "8fd45016ba4f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "ما بعد تحويل الملفات",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "126f391b3695",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "مسار عمل عبر المتصفح أو API يديره المورّد، حسب المنتج",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "b1c9f4a7d6a9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "‏iLovePDF قوي في مهام PDF على الإنترنت. يقرن SnapOtter أدوات PDF بأدوات للصور والفيديو والصوت والملفات، فيتعامل التثبيت نفسه مع عقد وتسجيل شاشة وتحرير حلقة بودكاست.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "139231b563f5",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "‏SnapOtter. إنه مفتوح المصدر بموجب AGPLv3، ويُنشر عبر Docker، ويمنحك الدمج والتقسيم والضغط والتحويل والحماية وOCR ومسارات عمل PDF ذات الصلة على عتادك الخاص.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "40f4e013a8f8",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "ما البديل المستضاف ذاتيًا لـ iLovePDF؟",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "3672eaf832d3",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "الإصدار مفتوح المصدر مجاني. تضيف الفئة المؤسسية المدفوعة ضوابط مثل SSO وتسجيل التدقيق، لكن أدوات الملفات موجودة في الحزمة مفتوحة المصدر.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "eee922ead875",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "هل SnapOtter مجاني؟",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "a5b27b8354b9",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "3618d9da3486",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "‏iLovePDF خدمة PDF مستضافة لعمل مستندي سريع عبر المتصفح. أما SnapOtter فهو البديل المستضاف ذاتيًا عندما تريد تشغيل النوع نفسه من مسار عمل PDF على خادمك الخاص.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "9ab8897e56c0",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "‏iLovePDF خدمة PDF عبر الإنترنت. يمنح SnapOtter الفرق أدوات PDF مستضافة ذاتيًا إضافةً إلى مسارات عمل للصور والفيديو والصوت والملفات ضمن حزمة واحدة مفتوحة المصدر.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "0c469d658f09",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "3618d9da3486",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "تُرفع الملفات إلى خدمة يستضيفها المورّد للمعالجة",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "c42bc4de2512",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "خطط مجانية ومميزة بميزات خاصة بكل خطة",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "0b38d6409010",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "مجموعة مسارات عمل PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "242beb3369b1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "ما بعد ملفات PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "dc3484e868df",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "مسار عمل عبر المتصفح أو API يديره المورّد، حسب المنتج",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "b1c9f4a7d6a9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "يغطي Online-Convert فئات تحويل عديدة ولديه منظومة API عبر API2Convert. صُمِّم SnapOtter لعمليات النشر الخاصة حيث يجتمع التحويل والضغط وعمل PDF ومعالجة الصوت والفيديو وأدوات الذكاء الاصطناعي المحلية في حزمة واحدة.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "057ad8c2e2b2",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "اختر SnapOtter عندما تهم الخصوصية أو النشر الداخلي أو الشيفرة مفتوحة المصدر أو معالجة الملفات المعزولة عن الشبكة. اختر Online-Convert عندما تفضّل محوّلًا مستضافًا دون خادم لصيانته.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "8228a885b075",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "لماذا تختار SnapOtter بدلًا من Online-Convert؟",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "dd9b72b31dba",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "نعم. يشمل SnapOtter التحويل والضغط والتحرير وOCR والنسخ النصي وعمليات PDF وأدوات البيانات الوصفية والأرشيفات وأدوات الملفات ومسارات العمل.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "4d28e12e55c0",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "هل يغطي SnapOtter أكثر من التحويل؟",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "84b421751b53",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "ee6a97cfbe6c",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "‏Online-Convert محوّل مستضاف قديم لفئات ملفات عديدة. أما SnapOtter فهو البديل المستضاف ذاتيًا للفرق التي تريد أن يحدث التحويل والمعالجة على خادمها الخاص.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "5979b8eb64c1",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "يحوّل Online-Convert ملفات الفيديو والصور والصوت والمستندات والكتب الإلكترونية والأرشيفات عبر الإنترنت. أما SnapOtter فهو البديل المستضاف ذاتيًا لمسارات عمل الملفات الخاصة.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "86ce66773ec5",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "ee6a97cfbe6c",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "رفع عبر المتصفح إلى خدمات Online-Convert/API2Convert السحابية",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "c94d1b1539a7",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "تجربة مجانية وحزم أرصدة واشتراكات وخيارات مؤسسية",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "143fa185ba24",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "محوّلات عبر الإنترنت للوسائط والمستندات والكتب الإلكترونية والأرشيفات",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "4221ab0b50d3",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "ما بعد تحويل الملفات",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "126f391b3695",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "‏API2Convert مستضاف ومسارات عمل عبر المتصفح",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "0c0d290c96d7",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "بُني Otter.ai حول الاجتماعات والملاحظات والتعاون. يركّز SnapOtter على تحويل الكلام إلى نص محليًا إضافةً إلى بقية مسار عمل الصوت: القص والتطبيع وتقليل الضوضاء وتحويل الصيغ وترجمات الفيديو وأدوات الصور وPDF والملفات.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "8a83db5eca32",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "نعم. يشغّل SnapOtter النسخ النصي محليًا بنماذج Whisper على CPU الخاص بك أو على NVIDIA CUDA GPU. إنه أنسب لملفات الصوت والفيديو الخاصة منه لتعاون وكيل الاجتماعات.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "9964be40a433",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "هل يوجد بديل مستضاف ذاتيًا لـ Otter.ai؟",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "35cad5a264f4",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "‏GPU أسرع، لكن النسخ النصي يعمل على CPU أيضًا. تُثبَّت النماذج عند الطلب في أول مرة تستخدم فيها الميزة.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "a14fe5280f6a",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "هل أحتاج إلى GPU؟",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "83e2041b7cbd",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "57e05e551f76",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "‏Otter.ai منصة نسخ اجتماعات مستضافة. أما SnapOtter فهو البديل المستضاف ذاتيًا عندما تريد تشغيل النسخ النصي على CPU الخاص بك أو على NVIDIA CUDA GPU بنماذج محلية.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "3e1edcbe7ed5",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "ينسخ Otter.ai الاجتماعات نصيًا في السحابة. يشغّل SnapOtter تحويل الكلام إلى نص على CPU الخاص بك أو على NVIDIA CUDA GPU بنماذج Whisper محلية ودون رفع أي صوت.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "ceb57ac14063",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "57e05e551f76",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "يعالج محتوى الصوت والاجتماعات عبر خدمة Otter.ai المستضافة",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "432e35ad635f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "خطط مجانية ومدفوعة بحدود للدقائق/الاستيراد حسب الخطة",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "5fa86c2af40b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "ملاحظات الاجتماعات وملخصات الذكاء الاصطناعي والتعاون والنسخ النصي",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "2fc2915dca2a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "ما بعد النسخ النصي",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "c81db09210a2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "تكاملات تطبيقات مستضافة ومسارات عمل للاجتماعات",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "5bc22fce5816",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "يركّز Smallpdf على ملفات PDF، وهو تحديدًا ما يحتاجه كثيرون. يغطي SnapOtter هذا المجال عبر الدمج والتقسيم والضغط والتحويل والتنقيح وOCR والمزيد، ثم يضيف مسارات عمل للصور والفيديو والصوت والملفات ضمن التثبيت نفسه.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "094c76af24ac",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "نعم. SnapOtter مفتوح المصدر بموجب AGPLv3 ويعمل على خادمك الخاص باستخدام Docker. يغطي الدمج والتقسيم والضغط والتحويل والحماية والتنقيح والعلامة المائية وترقيم الصفحات وOCR، دون رسوم لكل ملف من SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "1ee992c0e274",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "هل يوجد بديل مجاني ومستضاف ذاتيًا لـ Smallpdf؟",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "308a2db25686",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "يعالج SnapOtter الملفات على الجهاز الذي تشغّله عليه. إذا نشرته داخل شبكتك الخاصة، تبقى الملفات داخل ذلك التثبيت بدلًا من الذهاب إلى خدمة PDF تابعة لطرف ثالث.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "d2b1713bb478",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "هل تُرفع مستنداتي إلى أي مكان؟",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "8e296cfc3894",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "نعم. إلى جانب أدوات PDF، يتعامل SnapOtter مع مهام الصور والفيديو والصوت والملفات أيضًا، فيغطي تثبيت واحد عدة مسارات عمل يومية للملفات.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "cf7a54fad034",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "هل يفعل SnapOtter أكثر من ملفات PDF؟",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "8cf0d019a053",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "2548fc7b5789",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "‏Smallpdf مجموعة PDF مستضافة ومصقولة. أما SnapOtter فهو البديل المستضاف ذاتيًا للفرق التي تريد تشغيل أدوات PDF على بنية تحتية تتحكم بها، دون إرسال مستندات حساسة إلى خدمة PDF تابعة لطرف ثالث.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "2d5a7a642cf0",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "‏Smallpdf هي مجموعة أدوات PDF مستضافة. يشغّل SnapOtter دمج PDF وتقسيمه وضغطه وتحويله وتطبيق OCR والمزيد على خادمك الخاص، مع أكثر من 200 أداة إضافية عبر خمسة أنواع من الملفات.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "ad7c5bc419f0",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "2548fc7b5789",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "تُرفع الملفات إلى خدمة يستضيفها المورّد للمعالجة",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "c42bc4de2512",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "خطط مجانية ومدفوعة بميزات خاصة بكل خطة",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "fea653013f5c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "مجموعة مسارات عمل PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "242beb3369b1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "ما بعد ملفات PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "dc3484e868df",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "مسار عمل عبر المتصفح أو API يديره المورّد، حسب المنتج",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "b1c9f4a7d6a9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "إذا كنت لا تتعامل إلا مع ملفات PDF، فإن Stirling-PDF ممتاز ويستحق النظر. أما إذا كنت تغيّر حجم الصور أيضًا أو تحوّل الفيديو أو تنسخ الصوت نصيًا أو تعالج الملفات بالدفعات، فإن SnapOtter يتولى ذلك كله في تثبيت واحد بدلًا من تشغيل عدة أدوات جنبًا إلى جنب.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "d78cf60f88f1",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "يمكن أن يكون كذلك إذا أردت حزمة واحدة لأكثر من ملفات PDF. تغطية SnapOtter لـ PDF واسعة، وهو يضيف أدوات للصور والفيديو والصوت والملفات. أما لإعداد يقتصر على PDF، فإن Stirling-PDF خيار متين ومركّز.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "7b0786d197bd",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "هل SnapOtter بديل لـ Stirling-PDF؟",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "6580f01bd04e",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "كلا المشروعين مفتوح المصدر وقابل للاستضافة الذاتية. SnapOtter بموجب AGPLv3 ويضيف فئة مؤسسية مدفوعة اختيارية لـ SSO وتسجيل التدقيق وضوابط مماثلة.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "e8c9f2a74679",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "هل كلاهما مجاني ومفتوح المصدر؟",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "66bff2fa2a16",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "‏SnapOtter مقابل Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "2aa50cac34b6",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "‏Stirling-PDF وSnapOtter كلاهما مستضاف ذاتيًا ومفتوح المصدر، فتبقى الملفات على خادمك في الحالتين. الفرق هو النطاق: يركّز Stirling-PDF على ملفات PDF، بينما يمتد SnapOtter عبر أنواع الملفات الخمسة كلها.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "6239aa544a94",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "‏Stirling-PDF مجموعة أدوات PDF قوية مستضافة ذاتيًا. يغطي SnapOtter ملفات PDF أيضًا، إضافةً إلى أدوات للصور والفيديو والصوت والملفات ضمن حزمة واحدة. وكلاهما مفتوح المصدر.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "86f4968f6b5d",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "‏SnapOtter مقابل Stirling-PDF: مقارنة أدوات الملفات المستضافة ذاتيًا",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "cef62a162833",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "مستضاف ذاتيًا",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "b544286819ce",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "مفتوح المصدر",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "897545ec3751",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "نعم، AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "f3d7cb5de560",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "مسارات عمل PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "1834ef9bfc24",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "التركيز الأساسي",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "6fba9b522591",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "مسار عمل ملفات كامل عبر خمسة أنواع",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "e55f273db7ba",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "أكثر من 60 عملية PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "10f0daec85a7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "عدد الأدوات",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "a075adf6bcdf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "مسارات عمل OCR موجّهة نحو PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "80e5af29c45a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "ذكاء اصطناعي محلي (OCR، نسخ نصي، تحسين الدقة)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "5106b3b25708",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "‏OCR ونسخ نصي وتحسين الدقة والمزيد",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "a0011a1b7c80",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "ليس محور تركيزه",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "07633c1c867b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "محرّر صور قائم على الطبقات",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "844e729b4528",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "مسارات أتمتة PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "7ebc64fac754",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "مسارات العمل والمعالجة بالدفعات",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "d6e7e66a2202",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "نعم",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "4b2d2c65d365",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "‏TinyPNG ممتاز عندما تكون المهمة ضغط الصور. يضغط SnapOtter صيغ PNG وJPEG وWebP وAVIF، ثم يمضي أبعد مع تغيير الحجم والاقتصاص والتحويل والعلامة المائية وأدوات البيانات الوصفية ومسارات عمل الفيديو والصوت وPDF والملفات.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "a647fe5252a8",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "نعم. يشغّل SnapOtter ضغط الصور محليًا، فيكون الحد العملي هو عتاد تثبيتك بدلًا من حصة خدمة صور تابعة لطرف ثالث.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "0bc044b86b51",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "هل يوجد بديل مستضاف ذاتيًا لـ TinyPNG؟",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "cd73ddf5b328",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "‏PNG وJPEG وWebP وAVIF، مع التحويل بين الصيغ. كما يقرأ SnapOtter العديد من صيغ الإدخال، بما في ذلك صيغ RAW الخاصة بالكاميرات.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "4dbedc3ec7b1",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "ما الصيغ التي يمكن لـ SnapOtter ضغطها؟",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "be38d92d6eb5",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "16a1f5410aab",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "‏TinyPNG أداة مركزة لضغط الصور عبر الإنترنت. أما SnapOtter فهو البديل المستضاف ذاتيًا للفرق التي تريد تشغيل الضغط والتحويل وتغيير الحجم والبيانات الوصفية وأعمال الصور الأخرى محليًا.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "93da2c472442",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "يضغط TinyPNG الصور عبر الإنترنت وعبر واجهة Tinify API. يضغط SnapOtter الصور ويحوّلها على خادمك الخاص، مع مسارات عمل أوسع للملفات ضمن حزمة واحدة.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "327964b73b0f",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "16a1f5410aab",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "تُرفع الملفات إلى خدمة يستضيفها المورّد للمعالجة",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "c42bc4de2512",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "استخدام مجاني عبر الويب وخيارات API مدفوعة وللمطورين",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "b9fc69bd3a8c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "ضغط الصور ومسارات عمل Tinify API",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "d2495c46b0c2",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "ما بعد ضغط الصور",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "592fe104ea6d",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "مسار عمل عبر المتصفح أو API يديره المورّد، حسب المنتج",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "b1c9f4a7d6a9",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "‏TinyWow مريح عندما تريد أداة سريعة في المتصفح ولا تريد تثبيت أي شيء. صُمِّم SnapOtter للجانب الآخر من هذه المقايضة: عمليات نشر خاصة ومسارات عمل داخلية ومسارات قابلة للتكرار ومعالجة ملفات محلية عبر الصور والفيديو والصوت وPDF والملفات.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "68513359b033",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "لا. TinyWow صندوق أدوات ويب مستضاف واسع. أما SnapOtter فهو مجموعة معالجة ملفات مستضافة ذاتيًا للفرق التي تريد نشرًا خاصًا ورؤية للشيفرة وواجهات API ومسارات عمل.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "2dd0d44b089c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "هل SnapOtter نسخة مطابقة من TinyWow؟",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "fefa1fa4424f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "استخدم TinyWow للمهام السريعة العابرة في المتصفح حيث تكون المعالجة المستضافة مقبولة. استخدم SnapOtter عندما تكون الملفات حساسة، أو تتكرر مسارات العمل، أو تحتاج مؤسستك إلى أن تحدث المعالجة على بنية تحتية تتحكم بها.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "f5ab86e19594",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "هل أستخدم TinyWow أم SnapOtter؟",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "ebbbbbe1ada2",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "ليس مباشرةً. يركّز SnapOtter على معالجة الملفات: الصور والفيديو والصوت وPDF والأرشيفات والملفات. إنه خيار أنسب عندما تكون طبقة معالجة الملفات أهم من قوالب الكتابة.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "a5048bb23b1f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "هل يحل SnapOtter محل أدوات الكتابة بالذكاء الاصطناعي في TinyWow؟",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "d0e762ed2ce9",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "64082a774f11",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "‏TinyWow صندوق أدوات مستضاف واسع لمهام سريعة على PDF والصور والفيديو والكتابة بالذكاء الاصطناعي والملفات. أما SnapOtter فهو البديل المستضاف ذاتيًا للفرق التي تريد أدوات الملفات اليومية على بنية تحتية تتحكم بها.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "f00ae3d2382c",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "‏TinyWow صندوق أدوات مستضاف واسع لمهام PDF والصور والفيديو والكتابة بالذكاء الاصطناعي والملفات. أما SnapOtter فهو البديل المستضاف ذاتيًا لمسارات عمل الملفات الخاصة.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "8afce6795907",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "64082a774f11",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "صندوق أدوات مستضاف عبر الإنترنت",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "e0f9396f7408",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "يُرفع إلى خوادم TinyWow؛ يقول TinyWow إن الملفات تُحذف بعد ساعة واحدة",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "1a734fc5f30b",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "بنيتك التحتية",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "fe0edf7f14a0",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "أدوات PDF والصور والفيديو والكتابة بالذكاء الاصطناعي والملفات",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "40d27cc60b9d",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "تغطية الأدوات",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "1a85dab48814",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "صور وفيديو وصوت وPDF وملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "e6ac4c5f901d",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "أدوات مجانية إضافةً إلى خطط داعم/محتوى مدفوعة",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "706175d45b44",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "مصمم للاستخدام عبر المتصفح على الإنترنت",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "52de772a8cae",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "الاستخدام دون اتصال أو المعزول عن الشبكة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "e7babdd156a1",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "خدمة يشغّلها المورّد؛ إتاحة الشيفرة ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "2f5cf24c026c",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "الشيفرة وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ec1e62ae4908",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "الشيفرة متاحة بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fa7d84d6d804",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "مسارات عمل سريعة عبر أدوات الويب بالدرجة الأولى",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "529e33eba13b",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "‏REST API ومسارات عمل ضمن تثبيتك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6ea786759f3a",
+    "stale": false
+  }
+}

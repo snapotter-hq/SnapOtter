@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online сильний у редагуванні, підписанні, конвертації PDF та підписках Acrobat. SnapOtter не намагається замінити всю екосистему Adobe; він дає командам інструменти PDF із самостійним хостингом, а також роботу із зображеннями, відео, аудіо та файлами в одному опенсорсному стеку.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "bb80a4be39d5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Не для кожного процесу Acrobat. SnapOtter найкраще пасує, коли вам потрібні обробка PDF із самостійним хостингом, конвертація, OCR, стиснення, операції зі сторінками та автоматизація. Acrobat лишається потужною десктопною та хмарною платформою для документів.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "cf289754de1a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "Чи є SnapOtter заміною Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "02f371008656",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Обирайте SnapOtter, коли контроль над розгортанням, доступ до вихідного коду, робота в ізольованому середовищі чи повторювані файлові конвеєри важливіші за функції облікового запису Adobe та ширшу екосистему Acrobat.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "8e4aeada0fff",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Чому обрати SnapOtter замість Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "39f52dd0d3cc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Опенсорсна альтернатива Adobe Acrobat online для самостійного хостингу",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "871d75907314",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online це відшліфований хмарний процес роботи з PDF від компанії, що створила PDF. SnapOtter це альтернатива з самостійним хостингом для команд, яким потрібно, щоб робота з PDF залишалася на їхній власній інфраструктурі.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "daa59f5b4ab6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online це хмарний набір інструментів для PDF від Adobe. SnapOtter дає командам інструменти PDF із самостійним хостингом і ширші процеси роботи з файлами з опенсорсним розгортанням.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "83a9eae98929",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Опенсорсна альтернатива Adobe Acrobat online для самостійного хостингу",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "871d75907314",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe заявляє, що файли онлайн-редактора обробляються серверами Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "6cf940d8bea8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Безкоштовні онлайн-інструменти, пробні періоди та платні тарифи Acrobat",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "f34a44ac3b0d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "Процеси для PDF, електронного підпису, ШІ та облікового запису Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "b4a4421735fd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Не лише PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0938338dfb7a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Робота в браузері або API під керуванням постачальника, залежно від продукту",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "40bbc802947a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert широкий і зручний для конвертації через API. SnapOtter конвертує формати зображень, відео, аудіо, PDF і файлів, а потім додає стиснення, редагування, OCR, транскрипцію та локальні конвеєри.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "d89be7fd0c54",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Так. SnapOtter має відкритий код і працює через Docker. Він локально конвертує формати зображень, відео, аудіо, PDF і файлів, і SnapOtter не бере плати за кожну конвертацію.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "17859cd8f6f6",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Чи можна самостійно розгорнути альтернативу CloudConvert?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "7c661f6994b6",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Так. Для відео та аудіо SnapOtter використовує FFmpeg під капотом, поряд із Sharp для зображень і qpdf, LibreOffice та повʼязаними інструментами для документів.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "61cc316e584e",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "Чи конвертує SnapOtter також відео та аудіо?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "810f55136787",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Опенсорсна альтернатива CloudConvert для самостійного хостингу",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "803461992984",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert це зрілий хмарний конвертер з API. SnapOtter це альтернатива з самостійним хостингом, коли конвертація має відбуватися всередині вашої власної інфраструктури, з конвеєрами, які ви контролюєте.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "eb95bee1fc65",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert це хмарна платформа для конвертації з API. SnapOtter конвертує зображення, відео, аудіо, PDF і файли на вашому власному сервері за допомогою опенсорсних конвеєрів.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "713143241c3a",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Опенсорсна альтернатива CloudConvert для самостійного хостингу",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "803461992984",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Файли завантажуються для обробки на сервіс постачальника",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "cf499b5683cb",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Хмарні ціни за використанням і за тарифами",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "a2739f4bb14c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Хмарна конвертація багатьох категорій файлів",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "1d459c57f61a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Не лише конвертація файлів",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "98013057f072",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "Хмарний API та робота в браузері",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "40ae610bd5a8",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio зручний для швидких конвертацій і використання API розробниками. SnapOtter лишає конвертацію локальною та додає ширшу обробку файлів: стиснення, редагування, OCR, транскрипцію, операції з PDF і повторювані конвеєри.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "4bae774439a7",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter дає вам конвертер і набір для обробки файлів, які розгортаються через Docker. Замість надсилання файлів до хмарного конвертера ваш сервер запускає конвеєр конвертації.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "7922cf9e0ad1",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Що таке альтернатива Convertio для самостійного хостингу?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "5e9db8680059",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Так. SnapOtter містить REST API та підтримку конвеєрів, тож команди можуть автоматизувати процеси роботи з файлами у власному середовищі.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "21a3cb735e4d",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "Чи має SnapOtter API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "33063f71090e",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Опенсорсна альтернатива Convertio для самостійного хостингу",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "98f7f1c583ad",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio це хмарний конвертер для браузерної конвертації файлів у багатьох форматах. SnapOtter це альтернатива з самостійним хостингом, коли ви хочете, щоб завдання конвертації залишалися всередині вашої власної інфраструктури.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "21dbaf22c900",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio це хмарний конвертер файлів із браузерними інструментами та API. SnapOtter це альтернатива з самостійним хостингом для приватних процесів конвертації та локальних конвеєрів.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "26613321bea4",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Опенсорсна альтернатива Convertio для самостійного хостингу",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "98f7f1c583ad",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Хмарна конвертація; Convertio заявляє, що завантажені файли видаляються миттєво, а конвертовані через 24 години",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "60438e4ddb14",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Безкоштовний рівень з обмеженнями на файли та кредити плюс преміум-тарифи",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "10d060b1c894",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Хмарна конвертація понад 300 форматів і робота через API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "634e13fb4011",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Не лише конвертація файлів",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "98013057f072",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "Хмарний API для конвертації та робота в браузері",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "77e5d38cc133",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX це вузькоспеціалізований конвертер, який опрацьовує величезний список форматів. SnapOtter теж конвертує, а потім додає стиснення, редагування, редагування конфіденційних даних, OCR, транскрипцію та конвеєри, тож пасує, коли конвертація це один крок серед багатьох.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "b87eee188000",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Якщо вам переважно потрібна конвертація багатьох форматів, ConvertX це охайний вузькоспеціалізований варіант. Якщо ви також редагуєте, стискаєте, приховуєте конфіденційні дані, розпізнаєте текст через OCR чи транскрибуєте, SnapOtter робить усе це в одному стеку.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "efee2f4ea691",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Що обрати: SnapOtter чи ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "62c42d26867c",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Так. Обидва мають самостійний хостинг, тож файли залишаються на вашій інфраструктурі. Різниця в охопленні, а не в тому, де живуть ваші дані.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "dfc9ddb87db6",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Чи обидва зберігають файли на моєму сервері?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "222b6bbcda99",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter проти ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "29fae7d782de",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX і SnapOtter обидва мають самостійний хостинг і відкритий код. ConvertX побудований навколо конвертації форматів; SnapOtter виконує конвертацію та решту файлового процесу.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "b1e4e622cefe",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX це конвертер файлів із самостійним хостингом для понад 1000 форматів. SnapOtter теж конвертує, а ще додає редагування, стиснення, OCR і транскрипцію в пʼяти модальностях.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "083e73904d66",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter проти ConvertX: порівняння файлових інструментів із самостійним хостингом",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "69c9ebb4e5c0",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Самостійний хостинг",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "5fe9d87960bb",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Відкритий код",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "88c7709bb1d4",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Так, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cedc078ec7f6",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Конвертація форматів",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "96def96185b5",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Основний фокус",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "7cb47df1fc5a",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Повний файловий процес для пʼяти типів",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "cc830340862d",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Процес, орієнтований на конвертацію",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "4da372e9e6ee",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Не лише конвертація",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "76c50aadbc18",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Стиснення, редагування, редагування конфіденційних даних, OCR, транскрипція",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "ffa7c48b45db",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ форматів конвертації",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "140e7da4be55",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Кількість інструментів",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "b793fd8bd6eb",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Не основний фокус",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "2a40eef3bba7",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Локальні інструменти ШІ",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "02a0be7309b4",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, транскрипція, збільшення та інше",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "0947cc20fa18",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Не основний фокус",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "2a40eef3bba7",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Пошаровий редактор зображень",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "4c613b8ed8cb",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert зручний для швидких онлайн-конвертацій у багатьох категоріях. SnapOtter теж охоплює конвертацію, а потім додає локальні інструменти для зображень, роботу з відео та аудіо, PDF, архіви, файлові інструменти, API та конвеєри.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "a4af790d2e31",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Для багатьох конвертацій зображень, відео, аудіо, PDF, архівів і файлів так. SnapOtter найсильніший, коли ви хочете розгорнути конвертер приватно, а не користуватися хмарним вебсервісом.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "2c64975412a6",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "Чи може SnapOtter замінити FreeConvert?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "e1479b74eefb",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "Практичні обмеження SnapOtter залежать від вашого сервера, сховища, памʼяті та налаштованих обмежень середовища виконання. Це робить його зручнішим, коли ви хочете самі керувати обсягом.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "896f43d05196",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "Чи підтримує SnapOtter великі файли?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "73e3295685b9",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Опенсорсна альтернатива FreeConvert для самостійного хостингу",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "f704d8e77d5f",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert це широкий хмарний конвертер для браузерної конвертації та стиснення файлів. SnapOtter це альтернатива з самостійним хостингом, коли ви хочете, щоб ці операції з файлами виконувалися всередині вашого власного розгортання.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "901239d0c56d",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert конвертує та стискає файли онлайн. SnapOtter це альтернатива з самостійним хостингом для конвертації зображень, відео, аудіо, PDF і файлів на вашому власному сервері.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "0f6a2392a333",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Опенсорсна альтернатива FreeConvert для самостійного хостингу",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "f704d8e77d5f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Файли завантажуються на FreeConvert; FreeConvert заявляє, що конвертовані файли автоматично видаляються за кілька годин",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "ec7dea0db203",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Безкоштовний вебрівень плюс платні тарифи для більших або пріоритетніших навантажень",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "dbc2e4b05873",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Онлайн-конвертація та стиснення багатьох форматів",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "17d824c331e3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Не лише конвертація файлів",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "98013057f072",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Робота в браузері або API під керуванням постачальника, залежно від продукту",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "40bbc802947a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF добре справляється з онлайн-задачами для PDF. SnapOtter поєднує інструменти PDF із роботою над зображеннями, відео, аудіо та файлами, тож те саме розгортання опрацьовує і договір, і запис екрана, і монтаж подкасту.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "84299f1b1b9c",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. Він має відкритий код за AGPLv3, розгортається через Docker і дає обʼєднання, розділення, стиснення, конвертацію, захист, OCR та повʼязані процеси роботи з PDF на вашому власному обладнанні.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "33b248be7c2f",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Яка є альтернатива iLovePDF для самостійного хостингу?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "6f69398a43ec",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Опенсорсна версія безкоштовна. Платний корпоративний рівень додає засоби контролю на кшталт SSO та журналів аудиту, але інструменти для роботи з файлами живуть в опенсорсному стеку.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "f12a63904b0c",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "Чи безкоштовний SnapOtter?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "7d46c91637d8",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Опенсорсна альтернатива iLovePDF для самостійного хостингу",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "119a46c13fe2",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF це хмарний PDF-сервіс для швидкої роботи з документами в браузері. SnapOtter це альтернатива з самостійним хостингом, коли ви хочете, щоб той самий тип роботи з PDF виконувався на вашому власному сервері.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "7cbfeac70ca0",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF це онлайн-сервіс для роботи з PDF. SnapOtter дає командам інструменти PDF із самостійним хостингом, а також роботу із зображеннями, відео, аудіо та файлами в одному опенсорсному стеку.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "de0ec1284f39",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Опенсорсна альтернатива iLovePDF для самостійного хостингу",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "119a46c13fe2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Файли завантажуються для обробки на сервіс постачальника",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "cf499b5683cb",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Безкоштовні та преміум-тарифи з функціями, привʼязаними до тарифу",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "cc2a63335c9e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "Набір інструментів для роботи з PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "68295557d557",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Не лише PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0938338dfb7a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Робота в браузері або API під керуванням постачальника, залежно від продукту",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "40bbc802947a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert охоплює багато категорій конвертації та має екосистему API через API2Convert. SnapOtter створений для приватних розгортань, де конвертація, стиснення, робота з PDF, обробка аудіо та відео і локальні інструменти ШІ живуть в одному стеку.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "0f32418f3732",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Обирайте SnapOtter, коли важать приватність, внутрішнє розгортання, відкритий код або обробка файлів в ізольованому середовищі. Обирайте Online-Convert, якщо ви віддаєте перевагу хмарному конвертеру без сервера, який треба обслуговувати.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "f0b34ca007fb",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Чому обрати SnapOtter замість Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "36b561037e6d",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Так. SnapOtter містить конвертацію, стиснення, редагування, OCR, транскрипцію, операції з PDF, інструменти для метаданих, архіви, файлові інструменти та конвеєри.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "43bf319f63ae",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "Чи охоплює SnapOtter більше, ніж конвертацію?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "8fb6bc1c1ac5",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Опенсорсна альтернатива Online-Convert для самостійного хостингу",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "b3240589ae2e",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert це давній хмарний конвертер для багатьох категорій файлів. SnapOtter це альтернатива з самостійним хостингом для команд, яким потрібно, щоб конвертація та обробка відбувалися на їхньому власному сервері.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "408eba8d7203",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert конвертує відео, зображення, аудіо, документи, електронні книги та архіви онлайн. SnapOtter це альтернатива з самостійним хостингом для приватних процесів роботи з файлами.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "7a3dc25ccd8c",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Опенсорсна альтернатива Online-Convert для самостійного хостингу",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "b3240589ae2e",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Браузерні завантаження до хмарних сервісів Online-Convert / API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "62f89f4cf4b0",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Безкоштовний пробний період, пакети кредитів, підписки та корпоративні варіанти",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "6f9a90211cd9",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Онлайн-конвертери для медіа, документів, електронних книг та архівів",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "6d6cb2dd62eb",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Не лише конвертація файлів",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "98013057f072",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "Хмарний API2Convert та робота в браузері",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "8ce4c2996a8e",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai побудований навколо зустрічей, нотаток і спільної роботи. SnapOtter зосереджений на локальному перетворенні мовлення в текст, а також на решті аудіопроцесу: обрізання, нормалізація, шумозаглушення, конвертація форматів, субтитри до відео, а ще інструменти для зображень, PDF і файлів.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "423df95537b0",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Так. SnapOtter виконує транскрипцію локально з моделями Whisper на вашому власному CPU або GPU NVIDIA CUDA. Він краще пасує для приватних аудіо- та відеофайлів, ніж для спільної роботи з агентом для зустрічей.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "7f873d04b8f0",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Чи є альтернатива Otter.ai для самостійного хостингу?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "9c5cee318040",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "З GPU швидше, але транскрипція працює і на CPU. Моделі встановлюються на вимогу під час першого використання функції.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "d96382275666",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Чи потрібен мені GPU?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "d79f3e023e14",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Опенсорсна альтернатива Otter.ai для самостійного хостингу",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "a9508a3a8353",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai це хмарна платформа для транскрипції зустрічей. SnapOtter це альтернатива з самостійним хостингом, коли ви хочете, щоб транскрипція виконувалася на вашому власному CPU або GPU NVIDIA CUDA з локальними моделями.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "f4900d3a3bc8",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai транскрибує зустрічі в хмарі. SnapOtter виконує перетворення мовлення в текст на вашому власному CPU або GPU NVIDIA CUDA з локальними моделями Whisper і без завантаження аудіо.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "c52b97a11354",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Опенсорсна альтернатива Otter.ai для самостійного хостингу",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "a9508a3a8353",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Аудіо та вміст зустрічей обробляється хмарним сервісом Otter.ai",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "af1d826015c0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Безкоштовні та платні тарифи з лімітами на хвилини / імпорт за тарифом",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "63d73816e7f9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Нотатки до зустрічей, резюме з ШІ, спільна робота та транскрипція",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "e5e50f371c75",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Не лише транскрипція",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "8545a2f82caf",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Хмарні інтеграції з застосунками та процеси для зустрічей",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "17658cfeaaca",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf зосереджений на PDF, і саме це потрібно багатьом людям. SnapOtter закриває цей напрямок обʼєднанням, розділенням, стисненням, конвертацією, редагуванням, OCR та іншим, а потім додає роботу із зображеннями, відео, аудіо та файлами в межах того самого розгортання.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "eaab029d6f82",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Так. SnapOtter має відкритий код за AGPLv3 і працює на вашому власному сервері через Docker. Він охоплює обʼєднання, розділення, стиснення, конвертацію, захист, редагування, водяні знаки, нумерацію сторінок і OCR, і SnapOtter не бере жодної плати за файл.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "c9e665921801",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Чи є безкоштовна альтернатива Smallpdf для самостійного хостингу?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "0aacb23ea2e9",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter обробляє файли на тій машині, де ви його запускаєте. Якщо ви розгорнете його у власній мережі, файли залишаться всередині цього розгортання, а не потраплять до стороннього PDF-сервісу.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "0dbe01f10a38",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Чи завантажуються мої документи кудись?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "45ce7ad425d9",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Так. Окрім інструментів для PDF, SnapOtter працює із зображеннями, відео, аудіо та файлами, тож одне розгортання здатне закрити кілька щоденних робочих процесів із файлами.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "95814a6b92a2",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "Чи вміє SnapOtter щось більше, ніж PDF?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "5b6c58e1189f",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Опенсорсна альтернатива Smallpdf для самостійного хостингу",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "e9f3069652a6",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf це відшліфований хмарний набір для роботи з PDF. SnapOtter це альтернатива з самостійним хостингом для команд, яким потрібно, щоб інструменти PDF працювали на інфраструктурі, яку вони контролюють, без надсилання конфіденційних документів до стороннього PDF-сервісу.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "d9fe08adbc2e",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf це хмарний набір інструментів для PDF. SnapOtter виконує обʼєднання, розділення, стиснення, конвертацію, OCR та інші операції з PDF на вашому власному сервері, а ще додає понад 200 інструментів для пʼяти типів файлів.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "f61fe3030653",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Опенсорсна альтернатива Smallpdf для самостійного хостингу",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "e9f3069652a6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Файли завантажуються для обробки на сервіс постачальника",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "cf499b5683cb",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Безкоштовні та платні тарифи з функціями, привʼязаними до тарифу",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "da9e2884aea3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "Набір інструментів для роботи з PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "68295557d557",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Не лише PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "0938338dfb7a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Робота в браузері або API під керуванням постачальника, залежно від продукту",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "40bbc802947a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Якщо ви працюєте лише з PDF, Stirling-PDF чудовий і вартий уваги. Якщо ви також змінюєте розмір зображень, конвертуєте відео, транскрибуєте аудіо чи обробляєте файли пакетно, SnapOtter впорається з усім цим в одному розгортанні замість запуску кількох інструментів поруч.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "ebd03bc5fa4e",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Може бути, якщо вам потрібен один стек не лише для PDF. Охоплення PDF у SnapOtter широке, і він додає інструменти для зображень, відео, аудіо та файлів. Для конфігурації лише під PDF Stirling-PDF це надійний вузькоспеціалізований вибір.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "a3f97cec9649",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "Чи є SnapOtter заміною Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "a520ada845a8",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Обидва проєкти мають відкритий код і придатні для самостійного хостингу. SnapOtter поширюється за AGPLv3 і додає необовʼязковий платний корпоративний рівень для SSO, журналів аудиту та подібних засобів контролю.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "dd60fe49b118",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Чи обидва безкоштовні та з відкритим кодом?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "6afe378763bd",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter проти Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "430877d117bb",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF і SnapOtter обидва мають самостійний хостинг і відкритий код, тож файли в обох випадках залишаються на вашому сервері. Різниця в охопленні: Stirling-PDF зосереджений на PDF, тоді як SnapOtter охоплює всі пʼять типів файлів.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "3aeebd47c4fa",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF це потужний набір інструментів для PDF із самостійним хостингом. SnapOtter теж охоплює PDF, а ще додає інструменти для зображень, відео, аудіо та файлів в одному стеку. Обидва з відкритим кодом.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "7798449efa8c",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter проти Stirling-PDF: порівняння файлових інструментів із самостійним хостингом",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "6c0edef89826",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Самостійний хостинг",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "5fe9d87960bb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Відкритий код",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "88c7709bb1d4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Так, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "cedc078ec7f6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "Процеси роботи з PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "6c1cdad18de6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Основний фокус",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "7cb47df1fc5a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Повний файловий процес для пʼяти типів",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "cc830340862d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ операцій з PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "8ec63aa42dbc",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Кількість інструментів",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "b793fd8bd6eb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "Орієнтовані на PDF процеси OCR",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "371d0a48eb99",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "Локальний ШІ (OCR, транскрипція, збільшення)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "86c2aa2d4872",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, транскрипція, збільшення та інше",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "0947cc20fa18",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Не його фокус",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "30be88d85df9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Пошаровий редактор зображень",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "4c613b8ed8cb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "Процеси автоматизації PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "060070677bd3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Конвеєри та пакетна обробка",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "3ac224fbbd66",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Так",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "97ef44dfb0fd",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG чудовий, коли завдання це стиснення зображень. SnapOtter стискає PNG, JPEG, WebP та AVIF, а далі йде ще: зміна розміру, обрізання, конвертація, водяні знаки, інструменти для метаданих, а також робота з відео, аудіо, PDF і файлами.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "6c89a90bfa0c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Так. SnapOtter виконує стиснення зображень локально, тож практичне обмеження це обладнання вашого розгортання, а не квота стороннього сервісу для зображень.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "15d92b64ebcc",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Чи є альтернатива TinyPNG для самостійного хостингу?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "4f4bf3e44451",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP та AVIF, з конвертацією між форматами. SnapOtter також читає багато вхідних форматів, зокрема формати RAW з камер.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "040eafba75c4",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Які формати може стискати SnapOtter?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "97327abed067",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Опенсорсна альтернатива TinyPNG для самостійного хостингу",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "3875073077be",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG це вузькоспеціалізований онлайн-компресор зображень. SnapOtter це альтернатива з самостійним хостингом для команд, яким потрібно, щоб стиснення, конвертація, зміна розміру, робота з метаданими та інші операції із зображеннями виконувалися локально.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "3563cfd48019",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG стискає зображення онлайн і через API Tinify. SnapOtter стискає та конвертує зображення на вашому власному сервері, з ширшими процесами роботи з файлами в одному стеку.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "512eb45454b8",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Опенсорсна альтернатива TinyPNG для самостійного хостингу",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "3875073077be",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Файли завантажуються для обробки на сервіс постачальника",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "cf499b5683cb",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Безкоштовне вебвикористання та платні варіанти API для розробників",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "7a51051dbc4c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Стиснення зображень і процеси через API Tinify",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "6be71d2ba350",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Не лише стиснення зображень",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "815dc88df9b8",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Робота в браузері або API під керуванням постачальника, залежно від продукту",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "40bbc802947a",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow зручний, коли потрібен швидкий браузерний інструмент і ви не хочете нічого встановлювати. SnapOtter створений для іншого боку цього компромісу: приватні розгортання, внутрішні процеси, повторювані конвеєри та локальна обробка файлів для зображень, відео, аудіо, PDF і файлів.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "4189a5e5a53f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Ні. TinyWow це широкий хмарний браузерний набір інструментів. SnapOtter це набір для обробки файлів із самостійним хостингом для команд, яким потрібні приватне розгортання, доступ до вихідного коду, API та конвеєри.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "c274417eec38",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "Чи є SnapOtter клоном TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "05c25c6e171e",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Обирайте TinyWow для швидких разових браузерних задач, де хмарна обробка прийнятна. Обирайте SnapOtter, коли файли конфіденційні, процеси повторюються або вашій організації потрібно, щоб обробка відбувалася на інфраструктурі, яку вона контролює.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "f2c34e32b132",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Що обрати: TinyWow чи SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "8bdb342ab513",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Прямо ні. SnapOtter зосереджений на роботі з файлами: зображення, відео, аудіо, PDF, архіви та файли. Він краще пасує, коли рівень обробки файлів важливіший за шаблони для письма.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "781e15460370",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "Чи замінює SnapOtter інструменти письма з ШІ від TinyWow?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "844628f57f80",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Опенсорсна альтернатива TinyWow для самостійного хостингу",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "2d22b48d66e0",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow це широкий хмарний набір інструментів для швидких задач із PDF, зображеннями, відео, письмом з ШІ та файлами. SnapOtter це альтернатива з самостійним хостингом для команд, яким потрібні щоденні файлові утиліти на інфраструктурі, яку вони контролюють.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "7808620f1fa2",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow це широкий хмарний набір інструментів для PDF, зображень, відео, письма з ШІ та роботи з файлами. SnapOtter це альтернатива з самостійним хостингом для приватних процесів роботи з файлами.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "b26dfc4cddbe",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Опенсорсна альтернатива TinyWow для самостійного хостингу",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "2d22b48d66e0",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Хмарний онлайн-набір інструментів",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "865a596aff6d",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Завантаження на сервери TinyWow; TinyWow заявляє, що файли видаляються через 1 годину",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "6600dd55e13e",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Утиліти для PDF, зображень, відео, письма з ШІ та файлів",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "8c391e9f741c",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Охоплення інструментів",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "f85a1baa5549",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF і файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "fb12a20e2904",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Безкоштовні інструменти плюс платні тарифи для прихильників / створення контенту",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "3a7ce969df4c",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "43c00930a711",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Розрахований на онлайн-використання в браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "83d51bd09cb4",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Офлайн / ізольоване середовище",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9820231dbd81",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Підтримується при розгортанні у вашій мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "268448f3746b",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Сервіс під керуванням постачальника; доступність вихідного коду не є частиною продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "c59c4ebfc95f",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Відкритий код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "de87419cc7d5",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Вихідний код доступний за AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9d516e1ce56a",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Переважно швидкі браузерні інструменти",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "73dd0b9456b3",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  }
+}

@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "O Adobe Acrobat online é forte para edição, assinatura, conversão de PDF e assinaturas do Acrobat. O SnapOtter não tenta substituir todo o ecossistema da Adobe; ele oferece às equipes ferramentas de PDF auto-hospedadas, além de fluxos de imagem, vídeo, áudio e arquivos em um único stack open source.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "d438a19fe7f1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Não para todos os fluxos do Acrobat. O SnapOtter é a melhor escolha quando você precisa de processamento de PDF auto-hospedado, conversão, OCR, compressão, operações de página e automação. O Acrobat continua sendo uma plataforma de documentos completa para desktop e nuvem.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "43db7c739048",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "O SnapOtter substitui o Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "e1a2bf773023",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Escolha o SnapOtter quando controle de implantação, visibilidade do código-fonte, uso air-gapped ou pipelines de arquivo repetíveis importam mais do que os recursos de conta da Adobe e o ecossistema mais amplo do Acrobat.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "f9cf84509b39",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Por que escolher o SnapOtter em vez do Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "91cb6df51eca",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "A alternativa open source e auto-hospedada ao Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "599624187f63",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "O Adobe Acrobat online é um fluxo de PDF hospedado e bem-acabado, feito pela empresa por trás do PDF. O SnapOtter é a alternativa auto-hospedada para equipes que precisam que o trabalho com PDF permaneça na sua própria infraestrutura.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "4a9e5b02bf7c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "O Adobe Acrobat online é um conjunto de ferramentas de PDF hospedado da Adobe. O SnapOtter oferece às equipes ferramentas de PDF auto-hospedadas e fluxos de arquivo mais amplos, com implantação open source.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "52f1550d326d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao Adobe Acrobat Online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "fe9df3633179",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "A Adobe afirma que os arquivos do editor online são tratados pelos servidores da Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "f2b6a028922b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Ferramentas online gratuitas, testes e planos pagos do Acrobat",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "521e982d379d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "Fluxos de PDF, assinatura eletrônica, IA e conta do Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "567c7ebf1f41",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Além dos PDFs",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b22579ac4e5e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Fluxo no navegador ou API gerenciada pelo fornecedor, dependendo do produto",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "d5c6284671bf",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "O CloudConvert é amplo e amigável a APIs para conversão. O SnapOtter converte entre formatos de imagem, vídeo, áudio, PDF e arquivos, e acrescenta compressão, edição, OCR, transcrição e pipelines locais.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "12b4b880487e",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Sim. O SnapOtter é open source e roda em Docker. Ele converte formatos de imagem, vídeo, áudio, PDF e arquivos localmente, sem cobrança por conversão pelo SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "7de4eae08e2f",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Posso auto-hospedar uma alternativa ao CloudConvert?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "fc58311b786a",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Sim. O SnapOtter usa o FFmpeg por baixo dos panos para vídeo e áudio, junto com o Sharp para imagens e qpdf, LibreOffice e ferramentas relacionadas para documentos.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "a356135040cc",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "O SnapOtter também converte vídeo e áudio?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "58e9988125e6",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "A alternativa open source e auto-hospedada ao CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "ad6978ecf47e",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "O CloudConvert é um conversor hospedado e maduro, com API. O SnapOtter é a alternativa auto-hospedada para quando a conversão deve acontecer dentro da sua própria infraestrutura, com pipelines que você controla.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "f589ca36f0b1",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "O CloudConvert é uma plataforma de conversão hospedada com API. O SnapOtter converte imagem, vídeo, áudio, PDF e arquivos no seu próprio servidor, com pipelines open source.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "c7a2a422068b",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "ad6978ecf47e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Os arquivos são enviados a um serviço hospedado pelo fornecedor para processamento",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7857d48d1605",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Preços na nuvem baseados em uso e em planos",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "c92131a986d0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Conversão hospedada em muitas categorias de arquivo",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "c43b85ddc031",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Além da conversão de arquivos",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "46b4e7a0bb1e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "API hospedada e fluxos no navegador",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "08b9616eb095",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "O Convertio é conveniente para conversões rápidas e uso da API por desenvolvedores. O SnapOtter mantém a conversão local e acrescenta um processamento de arquivos mais amplo: compressão, edição, OCR, transcrição, operações de PDF e pipelines repetíveis.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "dd60facfaa2d",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "O SnapOtter oferece um conversor e uma suíte de processamento de arquivos que podem ser implantados com Docker. Em vez de enviar arquivos para um conversor na nuvem, o seu servidor executa o pipeline de conversão.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "a5bf6c02689f",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "O que é uma alternativa auto-hospedada ao Convertio?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "c9fef563f999",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Sim. O SnapOtter inclui APIs REST e suporte a pipelines, para que as equipes possam automatizar fluxos de arquivo dentro do seu próprio ambiente.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "0e224c939259",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "O SnapOtter tem uma API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "4c7412233d58",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "A alternativa open source e auto-hospedada ao Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "813672db3fd9",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "O Convertio é um conversor na nuvem para conversão de arquivos no navegador em muitos formatos. O SnapOtter é a alternativa auto-hospedada para quando você quer que os trabalhos de conversão permaneçam dentro da sua própria infraestrutura.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "bdd9723e10c9",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "O Convertio é um conversor de arquivos na nuvem com ferramentas de navegador e uma API. O SnapOtter é a alternativa auto-hospedada para fluxos de conversão privados e pipelines locais.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "1bc4ba434152",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "813672db3fd9",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Conversão na nuvem; o Convertio afirma que os arquivos enviados são excluídos instantaneamente e os arquivos convertidos após 24 horas",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "c1ed3155f86f",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Nível gratuito com limites de arquivo e de créditos, mais planos premium",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "5eb54b6cfc29",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Conversão na nuvem em mais de 300 formatos e fluxos via API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "df736389e1dc",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Além da conversão de arquivos",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "46b4e7a0bb1e",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "API de conversão hospedada e fluxos no navegador",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "c44b0497ae73",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "O ConvertX é um conversor focado e dá conta de uma lista enorme de formatos. O SnapOtter também converte, e acrescenta compressão, edição, redação, OCR, transcrição e pipelines, então ele se encaixa quando a conversão é uma etapa entre muitas.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "15e5f584a014",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Se você precisa principalmente de conversão de formatos em muitos formatos, o ConvertX é uma opção limpa e focada. Se você também edita, comprime, redige, faz OCR ou transcreve, o SnapOtter faz tudo isso em um único stack.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "40d53cf7ae5d",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Devo usar o SnapOtter ou o ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "8fdca7d631c5",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Sim. Ambos são auto-hospedados, então os arquivos ficam na sua infraestrutura. A diferença é a amplitude, não onde os seus dados ficam.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "b3c01e7a56a4",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Ambos mantêm os arquivos no meu servidor?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "4a520d9adb1d",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter vs ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "5a7d1e2440ce",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "O ConvertX e o SnapOtter são ambos auto-hospedados e open source. O ConvertX é construído em torno da conversão de formatos; o SnapOtter faz conversão, além do restante de um fluxo de arquivos.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "7e435ff9406f",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "O ConvertX é um conversor de arquivos auto-hospedado para mais de 1000 formatos. O SnapOtter também converte, e acrescenta edição, compressão, OCR e transcrição em cinco modalidades.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "7dd96d5b991a",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter vs ConvertX: ferramentas de arquivo auto-hospedadas comparadas",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "f8c4a425ca3c",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Auto-hospedado",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "0ee4c0f140f7",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Open source",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "67a0d2e0dab4",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Sim, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "88d8d4f3bcb2",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Conversão de formatos",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "c1a5be29d00b",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Foco principal",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "d6e39cf4e12f",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Fluxo completo de arquivos em cinco tipos",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "c6fe288b2a45",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Fluxo centrado em conversão",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "485a90f76788",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Além da conversão",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "e29f4d04c958",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Comprimir, editar, redigir, OCR, transcrever",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "ecd37e5ce6d1",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "Mais de 1000 formatos de conversão",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "31e07b818c81",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Quantidade de ferramentas",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "7fe454cc4e96",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Não é um foco principal",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "5fff891b4849",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Ferramentas de IA locais",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "841ee42efecd",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, transcrição, upscaling e mais",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "a64ce22e4c8f",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Não é um foco principal",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "5fff891b4849",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Editor de imagem baseado em camadas",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "78bf75011f64",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "O FreeConvert é útil para conversões online rápidas em muitas categorias. O SnapOtter também cobre conversão, e acrescenta ferramentas locais de imagem, fluxos de vídeo/áudio, PDFs, arquivos compactados, ferramentas de arquivo, APIs e pipelines.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "04bffe3e3f64",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Para muitas conversões de imagem, vídeo, áudio, PDF, arquivos compactados e arquivos, sim. O SnapOtter é mais forte quando você quer o conversor implantado de forma privada, em vez de usar um serviço web hospedado.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "facc6067f2c6",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "O SnapOtter pode substituir o FreeConvert?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "221be44abc96",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "Os limites práticos do SnapOtter vêm do seu servidor, do armazenamento, da memória e dos limites de execução configurados. Isso o torna uma escolha melhor quando você quer ajustar a capacidade por conta própria.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "d253134d9485",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "O SnapOtter suporta arquivos grandes?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "ac0daa731c41",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "A alternativa open source e auto-hospedada ao FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "ec98804ac15a",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "O FreeConvert é um conversor hospedado e amplo para conversão e compressão de arquivos no navegador. O SnapOtter é a alternativa auto-hospedada para quando você quer que essas operações de arquivo rodem dentro da sua própria implantação.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "70ee47c08357",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "O FreeConvert converte e comprime arquivos online. O SnapOtter é a alternativa auto-hospedada para conversão de imagem, vídeo, áudio, PDF e arquivos no seu próprio servidor.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "a3778d5f964f",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "ec98804ac15a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Os arquivos são enviados ao FreeConvert; o FreeConvert afirma que os arquivos convertidos são excluídos automaticamente após algumas horas",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "7645b48a3e3d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Nível web gratuito mais planos pagos para cargas maiores ou de maior prioridade",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "e4ec00cb4d34",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Conversão e compressão online em muitos formatos",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "a1aeb653c207",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Além da conversão de arquivos",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "46b4e7a0bb1e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Fluxo no navegador ou API gerenciada pelo fornecedor, dependendo do produto",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "d5c6284671bf",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "O iLovePDF é forte para tarefas de PDF online. O SnapOtter combina ferramentas de PDF com ferramentas de imagem, vídeo, áudio e arquivos, para que a mesma implantação dê conta de um contrato, uma gravação de tela e a edição de um podcast.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "833ac9ff475b",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "O SnapOtter. Ele é open source sob AGPLv3, é implantado com Docker e entrega junção, divisão, compressão, conversão, proteção, OCR e fluxos de PDF relacionados no seu próprio hardware.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "31f3bf36b88b",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Qual é uma alternativa auto-hospedada ao iLovePDF?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "f76ba9efeddf",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "A edição open source é gratuita. Um nível enterprise pago acrescenta controles como SSO e registro de auditoria, mas as ferramentas de arquivo estão no stack open source.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "a29cc2e86184",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "O SnapOtter é gratuito?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "5910c247c115",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "A alternativa open source e auto-hospedada ao iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "58e247e87b5c",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "O iLovePDF é um serviço de PDF hospedado para trabalho rápido com documentos no navegador. O SnapOtter é a alternativa auto-hospedada para quando você quer o mesmo tipo de fluxo de PDF rodando no seu próprio servidor.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "429123dcbe5f",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "O iLovePDF é um serviço de PDF online. O SnapOtter oferece às equipes ferramentas de PDF auto-hospedadas, além de fluxos de imagem, vídeo, áudio e arquivos em um único stack open source.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "36fb428e0930",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "58e247e87b5c",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Os arquivos são enviados a um serviço hospedado pelo fornecedor para processamento",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7857d48d1605",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Planos gratuitos e premium com recursos específicos por plano",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "bd3866985994",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "Suíte de fluxos de trabalho para PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "d43aedbe4726",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Além dos PDFs",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b22579ac4e5e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Fluxo no navegador ou API gerenciada pelo fornecedor, dependendo do produto",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "d5c6284671bf",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "O Online-Convert cobre muitas categorias de conversão e tem um ecossistema de API por meio do API2Convert. O SnapOtter foi feito para implantações privadas nas quais conversão, compressão, trabalho com PDF, processamento de áudio/vídeo e ferramentas locais de IA ficam em um único stack.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "2f1f2641505d",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Escolha o SnapOtter quando privacidade, implantação interna, código open source ou processamento de arquivos air-gapped importam. Escolha o Online-Convert quando você prefere um conversor hospedado sem servidor para manter.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "4004906ce5d7",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Por que escolher o SnapOtter em vez do Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "23c315578d43",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Sim. O SnapOtter inclui conversão, compressão, edição, OCR, transcrição, operações de PDF, ferramentas de metadados, arquivos compactados, ferramentas de arquivo e pipelines.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "3fb1d28d2209",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "O SnapOtter cobre mais do que conversão?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "348ed062dfdd",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "A alternativa open source e auto-hospedada ao Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "e71914eeaa4a",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "O Online-Convert é um conversor hospedado de longa data para muitas categorias de arquivo. O SnapOtter é a alternativa auto-hospedada para equipes que querem que a conversão e o processamento aconteçam no seu próprio servidor.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "a7c01ce14308",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "O Online-Convert converte arquivos de vídeo, imagem, áudio, documento, ebook e arquivo compactado online. O SnapOtter é a alternativa auto-hospedada para fluxos de arquivo privados.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "c2cd3dc79e82",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "e71914eeaa4a",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Envios pelo navegador para os serviços na nuvem do Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "b12044cd8ef3",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Teste gratuito, pacotes de créditos, assinaturas e opções enterprise",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "1ce8b68cf713",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Conversores online para mídia, documentos, ebooks e arquivos compactados",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "3ce1db671bc2",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Além da conversão de arquivos",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "46b4e7a0bb1e",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "API hospedada do API2Convert e fluxos no navegador",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "cdee5a7c014f",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "O Otter.ai é construído em torno de reuniões, notas e colaboração. O SnapOtter foca em fala em texto local, além do restante de um fluxo de áudio: corte, normalização, redução de ruído, conversão de formato, legendas de vídeo e ferramentas de imagem, PDF e arquivos.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "022e3651647a",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Sim. O SnapOtter roda a transcrição localmente com modelos Whisper na sua própria CPU ou GPU NVIDIA CUDA. Ele é mais adequado a arquivos privados de áudio e vídeo do que à colaboração com agentes de reunião.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "99377732cf78",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Existe uma alternativa auto-hospedada ao Otter.ai?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "7f68d0e59a76",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "Uma GPU é mais rápida, mas a transcrição também roda em CPU. Os modelos são instalados sob demanda na primeira vez que você usa o recurso.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "fc6be3132f03",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Preciso de uma GPU?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "2a4adfe8d3bb",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "A alternativa open source e auto-hospedada ao Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "9ccf3b376fa8",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "O Otter.ai é uma plataforma hospedada de transcrição de reuniões. O SnapOtter é a alternativa auto-hospedada para quando você quer que a transcrição rode na sua própria CPU ou GPU NVIDIA CUDA, com modelos locais.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "ccdffda4e94b",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "O Otter.ai transcreve reuniões na nuvem. O SnapOtter executa fala em texto na sua própria CPU ou GPU NVIDIA CUDA, com modelos Whisper locais e sem envio de áudio.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "0f63648d528c",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "9ccf3b376fa8",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "O áudio e o conteúdo de reuniões são processados pelo serviço hospedado do Otter.ai",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "1c59582cf54c",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Planos gratuitos e pagos com limites de minutos/importações por plano",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "4204628cb7ce",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Notas de reunião, resumos com IA, colaboração e transcrição",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "9caf7aebaa56",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Além da transcrição",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "c62e752e8db7",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Integrações de app hospedadas e fluxos de reunião",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "0f52f21666ff",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "O Smallpdf é focado em PDFs, que é exatamente o que muita gente precisa. O SnapOtter cobre essa área com junção, divisão, compressão, conversão, redação, OCR e mais, e ainda acrescenta fluxos de imagem, vídeo, áudio e arquivos na mesma implantação.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "75195e70ec66",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Sim. O SnapOtter é open source sob AGPLv3 e roda no seu próprio servidor com Docker. Ele cobre junção, divisão, compressão, conversão, proteção, redação, marca-d'água, numeração de páginas e OCR, sem taxa por arquivo cobrada pelo SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "ae2697e73ea4",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Existe uma alternativa gratuita e auto-hospedada ao Smallpdf?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "205b991fadea",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "O SnapOtter processa os arquivos na máquina em que você o executa. Se você o implantar dentro da sua própria rede, os arquivos permanecem dentro dessa implantação em vez de irem para um serviço de PDF de terceiros.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "67329f31f1fd",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Meus documentos são enviados para algum lugar?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "ed573bc4cbb0",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Sim. Além das ferramentas de PDF, o SnapOtter também lida com tarefas de imagem, vídeo, áudio e arquivos, de modo que uma única implantação cobre vários fluxos de arquivo do dia a dia.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "2379ab64e807",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "O SnapOtter faz mais do que PDFs?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "a7eb79ed6ef3",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "A alternativa open source e auto-hospedada ao Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "d6208641cf60",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "O Smallpdf é uma suíte de PDF hospedada e bem-acabada. O SnapOtter é a alternativa auto-hospedada para equipes que querem que as ferramentas de PDF rodem em uma infraestrutura que elas controlam, sem enviar documentos sensíveis a um serviço de PDF de terceiros.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "316f0bb3a2da",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "O Smallpdf é um kit de ferramentas de PDF hospedado. O SnapOtter executa junção, divisão, compressão, conversão, OCR e muito mais no seu próprio servidor, com mais de 200 ferramentas extras para cinco tipos de arquivo.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "01f5cccfc7fd",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "d6208641cf60",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Os arquivos são enviados a um serviço hospedado pelo fornecedor para processamento",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7857d48d1605",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Planos gratuitos e pagos com recursos específicos por plano",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "ccf8ce7ee10c",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "Suíte de fluxos de trabalho para PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "d43aedbe4726",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Além dos PDFs",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "b22579ac4e5e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Fluxo no navegador ou API gerenciada pelo fornecedor, dependendo do produto",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "d5c6284671bf",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Se você só mexe com PDFs, o Stirling-PDF é excelente e vale a pena conferir. Se você também redimensiona imagens, converte vídeo, transcreve áudio ou processa arquivos em lote, o SnapOtter dá conta de tudo isso em uma única implantação, em vez de rodar várias ferramentas lado a lado.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "e01ac6c68566",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Pode substituir, se você quiser um único stack para mais do que PDFs. A cobertura de PDF do SnapOtter é ampla, e ele acrescenta ferramentas de imagem, vídeo, áudio e arquivos. Para uma configuração só de PDF, o Stirling-PDF é uma escolha sólida e focada.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "350210345182",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "O SnapOtter substitui o Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "a160bc0f1e10",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Os dois projetos são open source e auto-hospedáveis. O SnapOtter é AGPLv3 e acrescenta um nível enterprise pago opcional para SSO, registro de auditoria e controles semelhantes.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "86cd212852c3",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Ambos são gratuitos e open source?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "fa53d555876a",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter vs Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "7d2d27eb6d3c",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "O Stirling-PDF e o SnapOtter são ambos auto-hospedados e open source, então os arquivos ficam no seu servidor de qualquer forma. A diferença é o escopo: o Stirling-PDF foca em PDFs, enquanto o SnapOtter abrange os cinco tipos de arquivo.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "ae7f6ab7e52d",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "O Stirling-PDF é um kit de ferramentas de PDF auto-hospedado e forte. O SnapOtter também cobre PDFs, além de ferramentas de imagem, vídeo, áudio e arquivos em um único stack. Ambos são open source.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "2ea492b9996d",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter vs Stirling-PDF: ferramentas de arquivo auto-hospedadas comparadas",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "0c564db2b2f1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Auto-hospedado",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "0ee4c0f140f7",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Open source",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "67a0d2e0dab4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Sim, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "88d8d4f3bcb2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "Fluxos de trabalho de PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "2d4636ac0700",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Foco principal",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "d6e39cf4e12f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Fluxo completo de arquivos em cinco tipos",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "c6fe288b2a45",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "Mais de 60 operações de PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "5983c74e6544",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Quantidade de ferramentas",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "7fe454cc4e96",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "Fluxos de OCR voltados para PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "a20f401e1c92",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "IA local (OCR, transcrição, upscaling)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "b4c954707325",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, transcrição, upscaling e mais",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "a64ce22e4c8f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Não é o seu foco",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "2d4d77da5179",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Editor de imagem baseado em camadas",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "78bf75011f64",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "Fluxos de automação de PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "c58fa1442e68",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Pipelines e processamento em lote",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "49d8981d9b4f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Sim",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "9313455e45aa",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "O TinyPNG é excelente quando a tarefa é comprimir imagens. O SnapOtter comprime PNG, JPEG, WebP e AVIF, e vai além com redimensionamento, corte, conversão, marca-d'água, ferramentas de metadados, vídeo, áudio, PDF e fluxos de arquivo.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "c49d0dcb3342",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Sim. O SnapOtter roda a compressão de imagens localmente, então o limite prático é o hardware da sua implantação, e não a cota de um serviço de imagens de terceiros.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "4ffa161db04e",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Existe uma alternativa auto-hospedada ao TinyPNG?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "847560e6b49a",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP e AVIF, com conversão entre formatos. O SnapOtter também lê muitos formatos de entrada, incluindo formatos RAW de câmera.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "d5d4cfb30837",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Quais formatos o SnapOtter consegue comprimir?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "59d6f10787d5",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "A alternativa open source e auto-hospedada ao TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "685c7b07ec40",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "O TinyPNG é um compressor de imagens online e focado. O SnapOtter é a alternativa auto-hospedada para equipes que querem compressão, conversão, redimensionamento, metadados e outros trabalhos com imagem rodando localmente.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "66409869ea1c",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "O TinyPNG comprime imagens online e pela API da Tinify. O SnapOtter comprime e converte imagens no seu próprio servidor, com fluxos de arquivo mais amplos em um único stack.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "0b98b2ec085f",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "685c7b07ec40",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Serviço web hospedado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "25cb3b97c974",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Os arquivos são enviados a um serviço hospedado pelo fornecedor para processamento",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "7857d48d1605",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Uso gratuito na web e opções pagas de API para desenvolvedores",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "ead9a2f5bb7c",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Compressão de imagens e fluxos com a API da Tinify",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "4fd57be07fbd",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Além da compressão de imagens",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "eaec50a23ed7",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Fluxo no navegador ou API gerenciada pelo fornecedor, dependendo do produto",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "d5c6284671bf",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "O TinyWow é conveniente quando você quer uma ferramenta rápida no navegador e não quer instalar nada. O SnapOtter foi feito para o outro lado desse tradeoff: implantações privadas, fluxos internos, pipelines repetíveis e processamento local de arquivos em imagem, vídeo, áudio, PDF e arquivos.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "dad5587dd272",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Não. O TinyWow é uma caixa de ferramentas web hospedada e ampla. O SnapOtter é uma suíte auto-hospedada de processamento de arquivos para equipes que querem implantação privada, visibilidade do código-fonte, APIs e pipelines.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "b6390b1eb07c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "O SnapOtter é um clone do TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "cdf11f0a0df9",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Use o TinyWow para tarefas rápidas e pontuais no navegador, onde o processamento hospedado é aceitável. Use o SnapOtter quando os arquivos são sensíveis, os fluxos se repetem ou sua organização precisa que o processamento aconteça em uma infraestrutura que ela controla.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "ea36ddabd375",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Devo usar o TinyWow ou o SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "f9be34a35bee",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Não diretamente. O SnapOtter foca na manipulação de arquivos: imagens, vídeo, áudio, PDF, arquivos compactados e arquivos. Ele é uma escolha melhor quando a camada de processamento de arquivos importa mais do que os modelos de escrita.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "a93a89653cd4",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "O SnapOtter substitui as ferramentas de escrita com IA do TinyWow?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "6f9d3072257d",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "A alternativa open source e auto-hospedada ao TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "cb3f9a9a44dd",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "O TinyWow é uma caixa de ferramentas hospedada e ampla para tarefas rápidas de PDF, imagem, vídeo, escrita com IA e arquivos. O SnapOtter é a alternativa auto-hospedada para equipes que querem utilitários de arquivo do dia a dia em uma infraestrutura que elas controlam.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "ccd1ad4782a0",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "O TinyWow é uma caixa de ferramentas hospedada e ampla para tarefas de PDF, imagem, vídeo, escrita com IA e arquivos. O SnapOtter é a alternativa auto-hospedada para fluxos de arquivo privados.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "a338d639bbcf",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "A alternativa open source e auto-hospedada ao TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "cb3f9a9a44dd",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Caixa de ferramentas online hospedada",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "4a6cc8c1b83b",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Modelo de implantação",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05a8256f1322",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Auto-hospedado no seu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "087409fa237f",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Envios para os servidores do TinyWow; o TinyWow afirma que os arquivos são excluídos após 1 hora",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "b31ecf0842d2",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Local de processamento dos arquivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "452ea392ee05",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Sua infraestrutura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "127ff3ff2524",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Utilitários de PDF, imagem, vídeo, escrita com IA e arquivos",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "5c06a7bd9fba",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Cobertura de ferramentas",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "c6f878b690c9",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Imagem, vídeo, áudio, PDF e arquivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "dc808083e254",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Ferramentas gratuitas mais planos pagos de apoiador/conteúdo",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "9c6c43689e89",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Controle de custos",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "04feb6ab96f0",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Gratuito sob AGPLv3; os limites são o seu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b9572a5565c9",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Projetado para uso online no navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "2dc1adab6780",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Uso offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "91108a50473e",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Suportado quando implantado dentro da sua rede",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5cb884e3d525",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Serviço operado pelo fornecedor; a disponibilidade do código-fonte não faz parte do modelo do produto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8969b9dd0739",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Código-fonte e auditabilidade",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "2703bcfe28f1",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Código-fonte disponível sob AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e54f5624da1",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Principalmente fluxos rápidos de ferramentas web",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "04cf18cb2835",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Automação",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "0c177757203d",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "API REST e pipelines na sua implantação",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "4f7bb092d763",
+    "stale": false
+  }
+}

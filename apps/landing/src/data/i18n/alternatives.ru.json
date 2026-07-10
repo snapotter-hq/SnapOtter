@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online силён в редактировании, подписании, конвертации PDF и подписках Acrobat. SnapOtter не пытается заменить всю экосистему Adobe; он даёт командам самостоятельно размещаемые инструменты PDF плюс рабочие процессы для изображений, видео, аудио и файлов в едином открытом стеке.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "bb56f4786d3e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Не для каждого рабочего процесса Acrobat. SnapOtter хорош, когда нужны самостоятельно размещаемая обработка PDF, конвертация, OCR, сжатие, операции со страницами и автоматизация. Acrobat остаётся глубокой настольной и облачной платформой для документов.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "b326c58c3915",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "Заменяет ли SnapOtter Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "07a1682201a2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Выбирайте SnapOtter, когда контроль над развёртыванием, доступ к исходному коду, работа в изолированной сети или повторяемые конвейеры для файлов важнее функций аккаунта Adobe и более широкой экосистемы Acrobat.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "ebd89329e2a2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Почему выбрать SnapOtter вместо Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "45151759ddaa",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "e4d10c9cfeed",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online — это отточенный облачный рабочий процесс с PDF от компании, стоящей за форматом PDF. SnapOtter — самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы работа с PDF оставалась на их собственной инфраструктуре.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "09427c28f3ba",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online — это облачный набор инструментов PDF от Adobe. SnapOtter даёт командам самостоятельно размещаемые инструменты PDF и более широкие рабочие процессы с файлами при открытом развёртывании.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "7421e8773795",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Adobe Acrobat online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "e4d10c9cfeed",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "По заявлению Adobe, файлы онлайн-редактора обрабатываются серверами Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "f486f5532ab3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Бесплатные онлайн-инструменты, пробные версии и платные тарифы Acrobat",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "c6930bf8fdff",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF, электронная подпись, ИИ и рабочие процессы аккаунта Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "91ec8d472b63",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Не только PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "10a137ddca71",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Работа в браузере или управляемый поставщиком API, в зависимости от продукта",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "fb579ce8a4b1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert широк и удобен для конвертации через API. SnapOtter конвертирует форматы изображений, видео, аудио, PDF и файлов, а затем добавляет сжатие, редактирование, OCR, транскрибацию и локальные конвейеры.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "53e9c90574d8",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Да. SnapOtter — это открытое ПО, работающее на Docker. Он конвертирует форматы изображений, видео, аудио, PDF и файлов локально, без оплаты за конвертацию со стороны SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "096ce3cee0a3",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Можно ли самостоятельно разместить альтернативу CloudConvert?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "ca2a229c736a",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Да. Для видео и аудио SnapOtter использует под капотом FFmpeg, наряду с Sharp для изображений и qpdf, LibreOffice и связанными инструментами для документов.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "db49a8bd8542",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "Конвертирует ли SnapOtter также видео и аудио?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "ce18b6537663",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "8465da98cabc",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert — это зрелый облачный конвертер с API. SnapOtter — самостоятельно размещаемая альтернатива, когда конвертация должна происходить внутри вашей собственной инфраструктуры, с подконтрольными вам конвейерами.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "6fd4a449d35f",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert — это облачная платформа конвертации с API. SnapOtter конвертирует изображения, видео, аудио, PDF и файлы на вашем собственном сервере с помощью открытых конвейеров.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "569cdc2b6b1d",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "8465da98cabc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Файлы загружаются для обработки в сервис, размещённый у поставщика",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "d87aa1d76ade",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Облачная оплата по использованию и по тарифам",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "66dd13d38abb",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Облачная конвертация во многих категориях файлов",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "72b920d5750b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Не только конвертация файлов",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "89f31a4a1b2b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "Облачный API и работа в браузере",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "874f4144763d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio удобен для быстрых конвертаций и использования API разработчиками. SnapOtter выполняет конвертацию локально и добавляет более широкую обработку файлов: сжатие, редактирование, OCR, транскрибацию, операции с PDF и повторяемые конвейеры.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "b2ed1319b507",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter даёт вам конвертер и набор для обработки файлов, разворачиваемые через Docker. Вместо отправки файлов в облачный конвертер конвейер конвертации выполняет ваш сервер.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "ce766cef0eb2",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Что такое самостоятельно размещаемая альтернатива Convertio?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "6cee2604c374",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Да. SnapOtter включает REST API и поддержку конвейеров, чтобы команды могли автоматизировать рабочие процессы с файлами внутри своей собственной среды.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "f2e58e993179",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "Есть ли у SnapOtter API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "59e5e4ec21eb",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "e24ac73255f6",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio — это облачный конвертер для конвертации файлов во многих форматах в браузере. SnapOtter — самостоятельно размещаемая альтернатива, когда вы хотите, чтобы задачи конвертации оставались внутри вашей собственной инфраструктуры.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "4c0496bcba97",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio — это облачный конвертер файлов с браузерными инструментами и API. SnapOtter — самостоятельно размещаемая альтернатива для приватных сценариев конвертации и локальных конвейеров.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "96e5da0ab96a",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "e24ac73255f6",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Облачная конвертация; по заявлению Convertio, загруженные файлы удаляются мгновенно, а сконвертированные — через 24 часа",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "f3c6c968b9d2",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Бесплатный уровень с лимитами на файлы и кредиты плюс премиум-тарифы",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "3478e5ddf2ea",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Облачная конвертация в 300+ форматов и работа через API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "83c9af5ecbec",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Не только конвертация файлов",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "89f31a4a1b2b",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "Облачный API конвертации и работа в браузере",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "b1d9f1dbf9ed",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX — это специализированный конвертер, который справляется с огромным списком форматов. SnapOtter тоже конвертирует, а затем добавляет сжатие, редактирование, сокрытие данных, OCR, транскрибацию и конвейеры, поэтому подходит, когда конвертация — лишь один из многих шагов.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "1a8a99188cbe",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Если вам в основном нужна конвертация форматов из большого их множества, ConvertX — это аккуратный, специализированный вариант. Если вы также редактируете, сжимаете, скрываете данные, применяете OCR или транскрибируете, SnapOtter делает всё это в одном стеке.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "20620f462972",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Что выбрать: SnapOtter или ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "bced3d923565",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Да. Оба самостоятельно размещаемые, поэтому файлы остаются на вашей инфраструктуре. Разница в широте охвата, а не в том, где хранятся ваши данные.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "92f8e788476e",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Хранят ли оба файлы на моём сервере?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "148fdec9a294",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter против ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "2933ecc4cb89",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX и SnapOtter оба самостоятельно размещаемые и с открытым кодом. ConvertX построен вокруг конвертации форматов; SnapOtter выполняет конвертацию плюс остальной рабочий процесс с файлами.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "5c13269eab2a",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX — это самостоятельно размещаемый конвертер файлов для 1000+ форматов. SnapOtter тоже конвертирует и добавляет редактирование, сжатие, OCR и транскрибацию для пяти модальностей.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "f68a97fbe20b",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter против ConvertX: сравнение самостоятельно размещаемых инструментов для файлов",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "f8d562ea9c3f",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Самостоятельное размещение",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "a5e844c27bb8",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Открытый код",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "474d7f630d71",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Да, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "e5ce98c41065",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Конвертация форматов",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "28b8cd9125c4",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Основная направленность",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "a202dbeb3ae9",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Полный рабочий процесс с файлами для пяти типов",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "50e441b13b13",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Рабочий процесс, ориентированный на конвертацию",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "c8d01ca9ac61",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Не только конвертация",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "e55b689ebe04",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Сжатие, редактирование, сокрытие данных, OCR, транскрибация",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "9402486bac67",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ форматов конвертации",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "576588e6d025",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Количество инструментов",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "1ac3c5487d98",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Не основная направленность",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "2a6e56c141fd",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Локальные ИИ-инструменты",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "22bb1ea800b8",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, транскрибация, апскейлинг и не только",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d09d5aa70323",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Не основная направленность",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "2a6e56c141fd",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Послойный редактор изображений",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "b4274a403c0a",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert полезен для быстрых онлайн-конвертаций во многих категориях. SnapOtter тоже покрывает конвертацию, а затем добавляет локальные инструменты для изображений, рабочие процессы для видео и аудио, PDF, архивы, инструменты для файлов, API и конвейеры.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "ade7652007a8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Для многих конвертаций изображений, видео, аудио, PDF, архивов и файлов — да. SnapOtter силён, когда вы хотите развернуть конвертер приватно, а не пользоваться облачным веб-сервисом.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "58492b13f97b",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "Может ли SnapOtter заменить FreeConvert?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "73f53147491d",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "Практические пределы SnapOtter определяются вашим сервером, хранилищем, памятью и настроенными лимитами выполнения. Это делает его удачным выбором, когда вы хотите сами настраивать пропускную способность.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "91ff0e8cc365",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "Поддерживает ли SnapOtter большие файлы?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "e92ddb556a21",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "6dec866b88fc",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert — это широкий облачный конвертер для конвертации и сжатия файлов в браузере. SnapOtter — самостоятельно размещаемая альтернатива, когда вы хотите, чтобы эти операции с файлами выполнялись внутри вашего собственного развёртывания.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "1ffb3dc971cd",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert конвертирует и сжимает файлы онлайн. SnapOtter — самостоятельно размещаемая альтернатива для конвертации изображений, видео, аудио, PDF и файлов на вашем собственном сервере.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "eeb672f9fea7",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "6dec866b88fc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Файлы загружаются в FreeConvert; по заявлению FreeConvert, сконвертированные файлы автоматически удаляются через несколько часов",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "60caf3d40b8f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Бесплатный веб-уровень плюс платные тарифы для больших или более приоритетных задач",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "b76e206eda40",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Онлайн-конвертация и сжатие во многих форматах",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "e94f18817b5b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Не только конвертация файлов",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "89f31a4a1b2b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Работа в браузере или управляемый поставщиком API, в зависимости от продукта",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "fb579ce8a4b1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF хорош для онлайн-задач с PDF. SnapOtter объединяет инструменты PDF с инструментами для изображений, видео, аудио и файлов, так что одно развёртывание справляется и с договором, и с записью экрана, и с монтажом подкаста.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "627498c6b6f7",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. Это открытое ПО под AGPLv3, которое разворачивается через Docker и даёт вам объединение, разделение, сжатие, конвертацию, защиту, OCR и связанные рабочие процессы с PDF на вашем собственном оборудовании.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "ae02fee4d4ec",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Что можно назвать самостоятельно размещаемой альтернативой iLovePDF?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "d9c05d945357",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Версия с открытым кодом бесплатна. Платный корпоративный уровень добавляет средства контроля, такие как SSO и журналирование аудита, но сами инструменты для файлов входят в открытый стек.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "ce669ad17276",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "Бесплатен ли SnapOtter?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "44a96600c06e",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "f21ec3813281",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF — это облачный PDF-сервис для быстрой работы с документами в браузере. SnapOtter — самостоятельно размещаемая альтернатива, когда вы хотите, чтобы тот же тип работы с PDF выполнялся на вашем собственном сервере.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "f0ae5d402085",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF — это онлайн-сервис для работы с PDF. SnapOtter даёт командам самостоятельно размещаемые инструменты PDF плюс рабочие процессы для изображений, видео, аудио и файлов в едином открытом стеке.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "bf6bc869ab57",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "f21ec3813281",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Файлы загружаются для обработки в сервис, размещённый у поставщика",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "d87aa1d76ade",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Бесплатные и премиум-тарифы с функциями, зависящими от тарифа",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "75582ec8c2da",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "Набор для работы с PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "63de9b6650b6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Не только PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "10a137ddca71",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Работа в браузере или управляемый поставщиком API, в зависимости от продукта",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "fb579ce8a4b1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert покрывает многие категории конвертации и располагает экосистемой API через API2Convert. SnapOtter создан для приватных развёртываний, где конвертация, сжатие, работа с PDF, обработка аудио и видео и локальные ИИ-инструменты объединены в одном стеке.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "39c4b7043c39",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Выбирайте SnapOtter, когда важны приватность, внутреннее развёртывание, открытый исходный код или обработка файлов в изолированной сети. Выбирайте Online-Convert, если предпочитаете облачный конвертер без сервера, за которым нужно ухаживать.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "646a70668633",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Почему выбрать SnapOtter вместо Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "bb577569761b",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Да. SnapOtter включает конвертацию, сжатие, редактирование, OCR, транскрибацию, операции с PDF, инструменты для метаданных, архивы, инструменты для файлов и конвейеры.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "016f8515db6a",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "Умеет ли SnapOtter больше, чем конвертация?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "bbb6394df2d8",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "b776a25c8307",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert — это давно работающий облачный конвертер для многих категорий файлов. SnapOtter — самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы конвертация и обработка происходили на их собственном сервере.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "973b72f833c0",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert конвертирует видео, изображения, аудио, документы, электронные книги и архивные файлы онлайн. SnapOtter — самостоятельно размещаемая альтернатива для приватных рабочих процессов с файлами.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "98033a2b5a40",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "b776a25c8307",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Загрузка из браузера в облачные сервисы Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "ccfb9f9a8d37",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Бесплатный пробный период, пакеты кредитов, подписки и корпоративные варианты",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "d13ebe2f06b1",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Онлайн-конвертеры для медиа, документов, электронных книг и архивов",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "074f3ac59eb5",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Не только конвертация файлов",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "89f31a4a1b2b",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "Облачный API API2Convert и работа в браузере",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "4f1233f6d21b",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai построен вокруг встреч, заметок и совместной работы. SnapOtter сосредоточен на локальном распознавании речи плюс остальной работе с аудио: обрезка, нормализация, шумоподавление, конвертация форматов, субтитры к видео, а также инструменты для изображений, PDF и файлов.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "47b8aed5be81",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Да. SnapOtter выполняет транскрибацию локально с моделями Whisper на вашем собственном CPU или NVIDIA CUDA GPU. Он лучше подходит для приватных аудио- и видеофайлов, чем для совместной работы с агентом встреч.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "686b5c6ac738",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Существует ли самостоятельно размещаемая альтернатива Otter.ai?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "993ff615da07",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "С GPU быстрее, но транскрибация работает и на CPU. Модели устанавливаются по требованию при первом использовании функции.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "49b8062d4be7",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Нужен ли мне GPU?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "248cdba6d63e",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "f71d65f085eb",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai — это облачная платформа для транскрибации встреч. SnapOtter — самостоятельно размещаемая альтернатива, когда вы хотите, чтобы транскрибация выполнялась на вашем собственном CPU или NVIDIA CUDA GPU с локальными моделями.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "a2c9349ad5cd",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai транскрибирует встречи в облаке. SnapOtter выполняет распознавание речи на вашем собственном CPU или NVIDIA CUDA GPU с локальными моделями Whisper и без загрузки аудио.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "68f453ea221a",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "f71d65f085eb",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Аудио и содержимое встреч обрабатывается облачным сервисом Otter.ai",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "ce2a6a44b589",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Бесплатные и платные тарифы с лимитами минут/импорта по тарифу",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "3484c318d3aa",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Заметки встреч, ИИ-резюме, совместная работа и транскрибация",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "796de8ca39e5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Не только транскрибация",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "b6b296fa9b4a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Облачные интеграции приложений и рабочие процессы встреч",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "5f4ed4bac579",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf сосредоточен на PDF, и многим именно это и нужно. SnapOtter закрывает это направление объединением, разделением, сжатием, конвертацией, редактированием с сокрытием, OCR и не только, а затем добавляет рабочие процессы для изображений, видео, аудио и файлов в том же развёртывании.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "b517cbcf0473",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Да. SnapOtter — это открытое ПО под AGPLv3, которое работает на вашем собственном сервере через Docker. Он покрывает объединение, разделение, сжатие, конвертацию, защиту, редактирование с сокрытием, водяные знаки, нумерацию страниц и OCR, без платы за файл со стороны SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "af8e24605c0e",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Есть ли бесплатная, самостоятельно размещаемая альтернатива Smallpdf?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "fc251c7134b7",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter обрабатывает файлы на той машине, где он запущен. Если развернуть его внутри вашей сети, файлы остаются внутри этого развёртывания, а не отправляются в сторонний PDF-сервис.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "eb3a2f09c1b3",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Загружаются ли мои документы куда-либо?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "2b10d50bd246",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Да. Помимо инструментов PDF, SnapOtter обрабатывает изображения, видео, аудио и файлы, так что одно развёртывание может закрыть сразу несколько повседневных задач с файлами.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "7fa9fc326111",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "Умеет ли SnapOtter больше, чем работать с PDF?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "99d0f96a2d53",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "eee72a1f1cec",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf — это отточенный облачный набор для работы с PDF. SnapOtter — самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы инструменты PDF работали на подконтрольной им инфраструктуре, без отправки конфиденциальных документов в сторонний PDF-сервис.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "7593512ac24d",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf — это облачный набор инструментов для работы с PDF. SnapOtter выполняет объединение, разделение, сжатие, конвертацию, OCR и другие операции с PDF на вашем собственном сервере, плюс 200+ дополнительных инструментов для пяти типов файлов.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "67067c31dc33",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "eee72a1f1cec",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Файлы загружаются для обработки в сервис, размещённый у поставщика",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "d87aa1d76ade",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Бесплатные и платные тарифы с функциями, зависящими от тарифа",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "e59ebff773f8",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "Набор для работы с PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "63de9b6650b6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Не только PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "10a137ddca71",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Работа в браузере или управляемый поставщиком API, в зависимости от продукта",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "fb579ce8a4b1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Если вы работаете только с PDF, Stirling-PDF отличен и заслуживает внимания. Если вы также меняете размер изображений, конвертируете видео, транскрибируете аудио или обрабатываете файлы пакетно, SnapOtter справляется со всем этим в одном развёртывании, вместо того чтобы запускать несколько инструментов бок о бок.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "9b96d927729b",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Может заменить, если вам нужен один стек не только для PDF. У SnapOtter широкое покрытие PDF, и он добавляет инструменты для изображений, видео, аудио и файлов. Для сценария только с PDF Stirling-PDF — солидный, специализированный выбор.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "815ce61afa4f",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "Заменяет ли SnapOtter Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "eefcbbad637a",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Оба проекта с открытым кодом и допускают самостоятельное размещение. SnapOtter распространяется под AGPLv3 и добавляет опциональный платный корпоративный уровень для SSO, журналирования аудита и подобных средств контроля.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "c5f464f5766d",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Оба ли бесплатны и с открытым кодом?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "e4379a394d00",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter против Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "94d0cdc655b9",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF и SnapOtter оба самостоятельно размещаемые и с открытым кодом, так что файлы в любом случае остаются на вашем сервере. Разница в охвате: Stirling-PDF сосредоточен на PDF, а SnapOtter охватывает все пять типов файлов.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "9a8f4ca63bac",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF — это мощный самостоятельно размещаемый набор инструментов PDF. SnapOtter тоже покрывает PDF, плюс инструменты для изображений, видео, аудио и файлов в одном стеке. Оба проекта с открытым кодом.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "f31a2e6f7af8",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter против Stirling-PDF: сравнение самостоятельно размещаемых инструментов для файлов",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "cca690e8c718",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Самостоятельное размещение",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "a5e844c27bb8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Открытый код",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "474d7f630d71",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Да, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "e5ce98c41065",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "Рабочие процессы с PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "006c8ed6d154",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Основная направленность",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "a202dbeb3ae9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Полный рабочий процесс с файлами для пяти типов",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "50e441b13b13",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ операций с PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "b1136c1c8e47",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Количество инструментов",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "1ac3c5487d98",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "OCR, ориентированный на PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "281b9c82052d",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "Локальный ИИ (OCR, транскрибация, апскейлинг)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "d30659b36c2f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, транскрибация, апскейлинг и не только",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d09d5aa70323",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Не его направленность",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "3aa9b6f0402b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Послойный редактор изображений",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "b4274a403c0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "Автоматизация рабочих процессов с PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "0cf277b28c0a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Конвейеры и пакетная обработка",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "a96fda855bb1",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Да",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "93e6073f9005",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG отлично справляется, когда задача — сжатие изображений. SnapOtter сжимает PNG, JPEG, WebP и AVIF, а затем идёт дальше: изменение размера, обрезка, конвертация, водяные знаки, инструменты для метаданных, а также работа с видео, аудио, PDF и файлами.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "43f37499d421",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Да. SnapOtter выполняет сжатие изображений локально, поэтому практическим пределом служит оборудование вашего развёртывания, а не квота стороннего сервиса для изображений.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "f9f2e276d0a7",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Существует ли самостоятельно размещаемая альтернатива TinyPNG?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "303795b1389b",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP и AVIF, с конвертацией между форматами. SnapOtter также читает множество входных форматов, включая форматы RAW с камер.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "3ba7b0de482e",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Какие форматы умеет сжимать SnapOtter?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "7a8ad3d3b754",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "bd787a68b330",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG — это узкоспециализированный онлайн-компрессор изображений. SnapOtter — самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы сжатие, конвертация, изменение размера, работа с метаданными и другие операции с изображениями выполнялись локально.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "b96f2e51a9bc",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG сжимает изображения онлайн и через API Tinify. SnapOtter сжимает и конвертирует изображения на вашем собственном сервере, охватывая более широкий круг задач с файлами в едином стеке.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "aa79812e508a",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "bd787a68b330",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Облачный веб-сервис",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "4372ee08eef4",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Файлы загружаются для обработки в сервис, размещённый у поставщика",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "d87aa1d76ade",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Бесплатное использование в вебе и платные варианты API для разработчиков",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "cc75dca6981a",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Сжатие изображений и работа через API Tinify",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "959740d32f5a",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Не только сжатие изображений",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "6b48ee6e76fc",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Работа в браузере или управляемый поставщиком API, в зависимости от продукта",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "fb579ce8a4b1",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow удобен, когда нужен быстрый браузерный инструмент и не хочется ничего устанавливать. SnapOtter создан для обратной стороны этого выбора: приватные развёртывания, внутренние рабочие процессы, повторяемые конвейеры и локальная обработка файлов для изображений, видео, аудио, PDF и файлов.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "6ccead6012bb",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Нет. TinyWow — это широкий облачный веб-набор инструментов. SnapOtter — самостоятельно размещаемый набор для обработки файлов для команд, которым нужны приватное развёртывание, доступ к исходному коду, API и конвейеры.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "e21eaf1b093b",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "Является ли SnapOtter клоном TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "4905254f08bb",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Используйте TinyWow для быстрых разовых задач в браузере, где облачная обработка приемлема. Используйте SnapOtter, когда файлы конфиденциальны, рабочие процессы повторяются или вашей организации нужно, чтобы обработка происходила на подконтрольной ей инфраструктуре.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "eae205f06cca",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Что выбрать: TinyWow или SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "3c6e8f6b472c",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Напрямую нет. SnapOtter сосредоточен на работе с файлами: изображения, видео, аудио, PDF, архивы и файлы. Он подходит лучше, когда важнее слой обработки файлов, чем шаблоны для письма.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "c6d32684d523",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "Заменяет ли SnapOtter инструменты ИИ-письма из TinyWow?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "1039704038cd",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "0f6fedbd5282",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow — это широкий облачный набор инструментов для быстрых задач с PDF, изображениями, видео, ИИ-письмом и файлами. SnapOtter — самостоятельно размещаемая альтернатива для команд, которым нужны повседневные утилиты для файлов на подконтрольной им инфраструктуре.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "46e02b00cbe9",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow — это широкий облачный набор инструментов для PDF, изображений, видео, ИИ-письма и работы с файлами. SnapOtter — самостоятельно размещаемая альтернатива для приватных рабочих процессов с файлами.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "08d8330bb4da",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Открытая, самостоятельно размещаемая альтернатива TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "0f6fedbd5282",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Облачный набор инструментов",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "a745804f8df6",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Модель развёртывания",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "c8e8659c5096",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Самостоятельное размещение на вашем сервере",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bbe94eb9535b",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Загрузка на серверы TinyWow; по заявлению TinyWow, файлы удаляются через 1 час",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "05a5df1ad6db",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Место обработки файлов",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "5a77a6a68362",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Ваша инфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "94855dde47fe",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Утилиты для PDF, изображений, видео, ИИ-письма и файлов",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "a39da6161a9d",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Охват инструментов",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "9c77eb0c2fca",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Изображения, видео, аудио, PDF и файлы",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f803dacb0e9b",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Бесплатные инструменты плюс платные тарифы для сторонников и контента",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "d7394dd1ad24",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Контроль затрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "d4a8e86801fb",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Бесплатно под AGPLv3; ограничения задаёт ваше оборудование",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "c9830c8ea298",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Рассчитан на онлайн-использование в браузере",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "b62f81040510",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Работа офлайн и в изолированной сети",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "39d45af164d4",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Поддерживается при развёртывании внутри вашей сети",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e8cf789fe08b",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Сервис под управлением поставщика; доступность исходного кода не является частью продукта",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "d17bc7333545",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Исходный код и возможность аудита",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "f3164ebe81bd",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Исходный код доступен под AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "f58411ca80a1",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "В основном быстрые сценарии работы с веб-инструментами",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "aba95169c8e7",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Автоматизация",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ef3f5a55db58",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API и конвейеры в вашем развёртывании",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "692267601a98",
+    "stale": false
+  }
+}

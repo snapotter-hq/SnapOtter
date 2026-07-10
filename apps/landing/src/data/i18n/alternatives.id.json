@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online andal untuk pengeditan, penandatanganan, dan konversi PDF, serta langganan Acrobat. SnapOtter tidak berupaya menggantikan seluruh ekosistem Adobe; ia memberi tim tools PDF self-hosted ditambah alur kerja gambar, video, audio, dan file dalam satu stack open-source.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "5356b06bc367",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Tidak untuk setiap alur kerja Acrobat. SnapOtter paling baik saat Anda membutuhkan pemrosesan PDF self-hosted, konversi, OCR, kompresi, operasi halaman, dan otomatisasi. Acrobat tetap menjadi platform dokumen desktop dan cloud yang mendalam.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "b481000c580a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "Apakah SnapOtter pengganti Adobe Acrobat Pro?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "9995935cf3a5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Pilih SnapOtter saat kendali deployment, visibilitas kode sumber, penggunaan air-gapped, atau pipeline file yang dapat diulang lebih penting daripada fitur akun Adobe dan ekosistem Acrobat yang lebih luas.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "0f9a3820d744",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Mengapa memilih SnapOtter dibanding Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "b9e351de4f8a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "344c88e1293b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online adalah alur kerja PDF berbasis hosting yang rapi dari perusahaan di balik PDF. SnapOtter adalah alternatif self-hosted untuk tim yang membutuhkan pekerjaan PDF tetap berada di infrastruktur mereka sendiri.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "f7bb5c94d964",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online adalah perangkat PDF berbasis hosting dari Adobe. SnapOtter memberi tim tools PDF self-hosted dan alur kerja file yang lebih luas dengan deployment open-source.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "fc8ce64a3419",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk Adobe Acrobat Online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "3d9e0593375e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe menyatakan file editor online ditangani oleh server Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "9f9b55787839",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Tools online gratis, uji coba, dan paket Acrobat berbayar",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "be563c53b9f3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "Alur kerja PDF, tanda tangan elektronik, AI, dan akun Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "dc70d586a73e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Di luar PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "2e639358ce1b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Alur kerja browser atau API yang dikelola vendor, tergantung produk",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f6cb796c3dd1",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert luas dan ramah API untuk konversi. SnapOtter mengonversi antara format gambar, video, audio, PDF, dan file, lalu menambahkan kompresi, pengeditan, OCR, transkripsi, dan pipeline lokal.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "e98014b5d8dc",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Ya. SnapOtter adalah open source dan berjalan di Docker. Ia mengonversi format gambar, video, audio, PDF, dan file secara lokal, tanpa penagihan per konversi dari SnapOtter.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "d0cb5d59a5f0",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Bisakah saya men-self-host alternatif CloudConvert?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "4447f40e57a7",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Ya. SnapOtter menggunakan FFmpeg di balik layar untuk video dan audio, bersama Sharp untuk gambar dan qpdf, LibreOffice, serta tools terkait untuk dokumen.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "29e1bd54859e",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "Apakah SnapOtter juga mengonversi video dan audio?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "1fee81c0bbbe",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "e032ef3655e7",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert adalah konverter dan API berbasis hosting yang matang. SnapOtter adalah alternatif self-hosted saat konversi harus terjadi di dalam infrastruktur Anda sendiri, dengan pipeline yang Anda kendalikan.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "b902a11c8e74",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert adalah platform konversi berbasis hosting dengan API. SnapOtter mengonversi gambar, video, audio, PDF, dan file di server Anda sendiri dengan pipeline open-source.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "a62e50b84155",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "384d00acd96d",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "File diunggah ke layanan milik vendor untuk diproses",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "41852c678ad4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Harga cloud berbasis penggunaan dan berbasis paket",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "21100adc794c",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Konversi berbasis hosting untuk banyak kategori file",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "74feba6c3ab6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Di luar konversi file",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "0ec5eb0de213",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "API berbasis hosting dan alur kerja browser",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "e46febb42855",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio praktis untuk konversi cepat dan penggunaan API developer. SnapOtter menjaga konversi tetap lokal dan menambahkan pemrosesan file yang lebih luas: kompresi, pengeditan, OCR, transkripsi, operasi PDF, dan pipeline yang dapat diulang.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "9e733ab73d59",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter memberi Anda konverter dan suite pemrosesan file yang dapat di-deploy dengan Docker. Alih-alih mengirim file ke konverter cloud, server Anda menjalankan pipeline konversinya.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "5f1eda51ae32",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Apa alternatif Convertio yang self-hosted?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "b5c7ef8540a8",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Ya. SnapOtter menyertakan REST API dan dukungan pipeline sehingga tim dapat mengotomatiskan alur kerja file di dalam lingkungan mereka sendiri.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "9bfedad6d26a",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "Apakah SnapOtter memiliki API?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "4d8dba17fec4",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "655b4dec1612",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio adalah konverter cloud untuk konversi file berbasis browser di banyak format. SnapOtter adalah alternatif self-hosted saat Anda ingin tugas konversi tetap berada di dalam infrastruktur Anda sendiri.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "3ba9779117c3",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio adalah konverter file cloud dengan tools browser dan API. SnapOtter adalah alternatif self-hosted untuk alur kerja konversi yang privat dan pipeline lokal.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "c043ebaf9d09",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "f4d684c143b6",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Konversi cloud; Convertio menyatakan file yang diunggah dihapus seketika dan file hasil konversi setelah 24 jam",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "11d46e866f9e",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Tingkat gratis dengan batas file dan kredit ditambah paket premium",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "eb6449fae78e",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Konversi cloud untuk 300+ format dan alur kerja API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "3202fa12218d",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Di luar konversi file",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "0ec5eb0de213",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "API konversi berbasis hosting dan alur kerja browser",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "22385f8aa2f7",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX adalah konverter yang fokus dan menangani daftar format yang sangat panjang. SnapOtter juga mengonversi, lalu menambahkan kompresi, pengeditan, redaksi, OCR, transkripsi, dan pipeline, sehingga cocok saat konversi adalah satu langkah di antara banyak langkah.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "67d8816329cc",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Jika Anda terutama membutuhkan konversi format di banyak format, ConvertX adalah opsi yang rapi dan fokus. Jika Anda juga mengedit, mengompresi, meredaksi, meng-OCR, atau mentranskripsi, SnapOtter melakukan semua itu dalam satu stack.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "f92082b68097",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Sebaiknya saya pakai SnapOtter atau ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "c18659b55ba5",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Ya. Keduanya self-hosted, jadi file tetap berada di infrastruktur Anda. Perbedaannya ada pada keluasan, bukan tempat data Anda berada.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "7cac4133a30b",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Apakah keduanya menyimpan file di server saya?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "5ca56bcfd244",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter vs ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "5a7d1e2440ce",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX dan SnapOtter sama-sama self-hosted dan open source. ConvertX dibangun di sekitar konversi format; SnapOtter melakukan konversi ditambah sisa alur kerja file.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "7a40e1b3f11c",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX adalah konverter file self-hosted untuk 1000+ format. SnapOtter juga mengonversi, dan menambahkan pengeditan, kompresi, OCR, dan transkripsi di lima modalitas.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "f0e17f191763",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter vs ConvertX: Perbandingan Tools File Self-Hosted",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "38e6892cb2af",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Self-hosted",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "beafec79ffdd",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Open source",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "67a0d2e0dab4",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Ya, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "bb81eaf9abe8",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Konversi format",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "0ac0dba227a3",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Fokus utama",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "bd948a9cd2e9",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Alur kerja file lengkap untuk lima jenis",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "bf6250d3f644",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Alur kerja berpusat pada konversi",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "4a333632b664",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Di luar konversi",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "2598df1d9275",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Kompresi, pengeditan, redaksi, OCR, transkripsi",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "d703f8cf4db9",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000+ format konversi",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "2116551ffc57",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Jumlah tools",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "d0d302274887",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Bukan fokus utama",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "f2c141a203df",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Tools AI lokal",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "24ff586ad89b",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, transkripsi, upscaling, dan lainnya",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "fed628e044e5",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Bukan fokus utama",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "f2c141a203df",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Editor gambar berbasis layer",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "f31e3fefe8c2",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert berguna untuk konversi online cepat di banyak kategori. SnapOtter juga mencakup konversi, lalu menambahkan tools gambar lokal, alur kerja video/audio, PDF, arsip, tools file, API, dan pipeline.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "5e74fa8066f1",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Untuk banyak konversi gambar, video, audio, PDF, arsip, dan file, ya. SnapOtter paling kuat saat Anda ingin konverter di-deploy secara privat alih-alih menggunakan layanan web berbasis hosting.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "9d7901d46ce8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "Bisakah SnapOtter menggantikan FreeConvert?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "1881d2320351",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "Batas praktis SnapOtter berasal dari server, penyimpanan, memori, dan batas runtime yang Anda konfigurasi. Itu membuatnya lebih cocok saat Anda ingin menyetel kapasitas sendiri.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "7c633769b6fc",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "Apakah SnapOtter mendukung file besar?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "41ca285b3736",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "3e5aeece35d7",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert adalah konverter hosting yang luas untuk konversi dan kompresi file berbasis browser. SnapOtter adalah alternatif self-hosted saat Anda ingin operasi file itu berjalan di dalam deployment Anda sendiri.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "a64db78a0053",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert mengonversi dan mengompresi file secara online. SnapOtter adalah alternatif self-hosted untuk konversi gambar, video, audio, PDF, dan file di server Anda sendiri.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "e28ae5fcbffc",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "74780107c020",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "File diunggah ke FreeConvert; FreeConvert menyatakan file hasil konversi otomatis dihapus setelah beberapa jam",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "644b86b51bbc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Tingkat web gratis ditambah paket berbayar untuk beban kerja yang lebih besar atau berprioritas lebih tinggi",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "b3fa2aeeb683",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Konversi dan kompresi online untuk banyak format",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "680b3a936828",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Di luar konversi file",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "0ec5eb0de213",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Alur kerja browser atau API yang dikelola vendor, tergantung produk",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f6cb796c3dd1",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF andal untuk tugas PDF online. SnapOtter memadukan tools PDF dengan tools gambar, video, audio, dan file, sehingga deployment yang sama menangani sebuah kontrak, rekaman layar, dan editan podcast.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "5471ee07257d",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter. Ia open source di bawah AGPLv3, di-deploy dengan Docker, dan memberi Anda penggabungan, pemisahan, kompresi, konversi, proteksi, OCR, serta alur kerja PDF terkait di perangkat keras Anda sendiri.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "98d22bdea466",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Apa alternatif self-hosted untuk iLovePDF?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "0a806aa08f8c",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Edisi open source gratis. Tingkat enterprise berbayar menambahkan kontrol seperti SSO dan audit logging, tetapi tools file-nya ada di dalam stack open source.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "d95b0fc8a0df",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "Apakah SnapOtter gratis?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "bde47643d847",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "13e36087fd4e",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF adalah layanan PDF berbasis hosting untuk pekerjaan dokumen cepat berbasis browser. SnapOtter adalah alternatif self-hosted saat Anda ingin alur kerja PDF serupa berjalan di server Anda sendiri.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "2602d3654f78",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF adalah layanan PDF online. SnapOtter memberi tim tools PDF self-hosted ditambah alur kerja gambar, video, audio, dan file dalam satu stack open-source.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "6491f036ac16",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "f9da8a549a43",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "File diunggah ke layanan milik vendor untuk diproses",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "41852c678ad4",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Paket gratis dan premium dengan fitur khusus per paket",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "bfb84187b3fb",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "Suite alur kerja PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "d0441341feae",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Di luar PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "2e639358ce1b",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Alur kerja browser atau API yang dikelola vendor, tergantung produk",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f6cb796c3dd1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert mencakup banyak kategori konversi dan memiliki ekosistem API melalui API2Convert. SnapOtter dibangun untuk deployment privat di mana konversi, kompresi, pekerjaan PDF, pemrosesan audio/video, dan tools AI lokal berada dalam satu stack.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "159a0acaac80",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Pilih SnapOtter saat privasi, deployment internal, kode open-source, atau pemrosesan file air-gapped menjadi penting. Pilih Online-Convert saat Anda lebih suka konverter berbasis hosting tanpa server yang harus dipelihara.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "ac09c480e2fd",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Mengapa memilih SnapOtter dibanding Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "fbb938063bb3",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Ya. SnapOtter menyertakan konversi, kompresi, pengeditan, OCR, transkripsi, operasi PDF, tools metadata, arsip, tools file, dan pipeline.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "6a43e4135d6a",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "Apakah SnapOtter mencakup lebih dari konversi?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "e46c52a87786",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "5e0be311fb66",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert adalah konverter hosting yang sudah lama berjalan untuk banyak kategori file. SnapOtter adalah alternatif self-hosted untuk tim yang ingin konversi dan pemrosesan terjadi di server mereka sendiri.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "9087f5287c4f",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert mengonversi file video, gambar, audio, dokumen, ebook, dan arsip secara online. SnapOtter adalah alternatif self-hosted untuk alur kerja file yang privat.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "03097159bddd",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "00988b6e17f1",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Unggahan browser ke layanan cloud Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "f9271433bd1c",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Uji coba gratis, paket kredit, langganan, dan opsi enterprise",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "6fa01f5d4c17",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Konverter online untuk media, dokumen, ebook, dan arsip",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "702d311673b5",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Di luar konversi file",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "0ec5eb0de213",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "API2Convert berbasis hosting dan alur kerja browser",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "7d4c1c35accf",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai dibangun di sekitar rapat, catatan, dan kolaborasi. SnapOtter berfokus pada speech-to-text lokal ditambah sisa alur kerja audio: pemangkasan, normalisasi, pengurangan noise, konversi format, subtitle video, serta tools gambar, PDF, dan file.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "6ced3f20a8ab",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Ya. SnapOtter menjalankan transkripsi secara lokal dengan model Whisper di CPU atau GPU NVIDIA CUDA Anda sendiri. Ia lebih cocok untuk file audio dan video yang privat daripada kolaborasi agen rapat.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "b45acdb10fef",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Adakah alternatif Otter.ai yang self-hosted?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "ca20fae4eeca",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU lebih cepat, tetapi transkripsi juga berjalan di CPU. Model-model dipasang sesuai permintaan saat pertama kali Anda menggunakan fitur ini.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "921a05e653b4",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Apakah saya butuh GPU?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "5bbb5095ed47",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "27fd60f2ffa4",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai adalah platform transkripsi rapat berbasis hosting. SnapOtter adalah alternatif self-hosted saat Anda ingin transkripsi berjalan di CPU atau GPU NVIDIA CUDA Anda sendiri dengan model lokal.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "093a7acba0ac",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai mentranskripsi rapat di cloud. SnapOtter menjalankan speech-to-text di CPU atau GPU NVIDIA CUDA Anda sendiri dengan model Whisper lokal dan tanpa mengunggah audio.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "d980d19ea704",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "a23a7b646aee",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Audio dan konten rapat diproses oleh layanan Otter.ai berbasis hosting",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "39d8f4bef541",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Paket gratis dan berbayar dengan batas menit/impor per paket",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "75f7c4a06f21",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Catatan rapat, ringkasan AI, kolaborasi, dan transkripsi",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "9f9ec4bb3c62",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Di luar transkripsi",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "3695b9ec5e04",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Integrasi aplikasi berbasis hosting dan alur kerja rapat",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "bd4ce8cc6795",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf fokus pada PDF, dan itulah yang dibutuhkan banyak orang. SnapOtter menutup jalur itu dengan penggabungan, pemisahan, kompresi, konversi, redaksi, OCR, dan lainnya, lalu menambahkan alur kerja gambar, video, audio, dan file dalam deployment yang sama.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "ec6731489481",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Ya. SnapOtter adalah open source di bawah AGPLv3 dan berjalan di server Anda sendiri dengan Docker. Ia mencakup penggabungan, pemisahan, kompresi, konversi, proteksi, redaksi, watermark, penomoran halaman, dan OCR, tanpa biaya per file dari SnapOtter.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "7ccf010e814a",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Adakah alternatif Smallpdf yang gratis dan self-hosted?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "f766a600e1e3",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter memproses file di mesin tempat Anda menjalankannya. Jika Anda men-deploy-nya di dalam jaringan Anda sendiri, file tetap berada di dalam deployment itu, bukan dikirim ke layanan PDF pihak ketiga.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "785e00d1d83e",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Apakah dokumen saya diunggah ke suatu tempat?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "0c8f46e60f90",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Ya. Selain tools PDF, SnapOtter juga menangani tugas gambar, video, audio, dan file, sehingga satu deployment dapat mencakup beberapa alur kerja file sehari-hari.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "421303521982",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "Apakah SnapOtter melakukan lebih dari sekadar PDF?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "1b929b450b33",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "4ef7376f1372",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf adalah suite PDF berbasis hosting yang rapi. SnapOtter adalah alternatif self-hosted untuk tim yang ingin tools PDF berjalan di infrastruktur yang mereka kendalikan, tanpa mengirim dokumen sensitif ke layanan PDF pihak ketiga.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "6432524a18d9",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf adalah toolkit PDF berbasis hosting. SnapOtter menjalankan penggabungan, pemisahan, kompresi, konversi, OCR PDF, dan banyak lagi di server Anda sendiri, dengan 200+ tools tambahan untuk lima jenis file.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "3bc5ec86698f",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "51c41682ed16",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "File diunggah ke layanan milik vendor untuk diproses",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "41852c678ad4",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Paket gratis dan berbayar dengan fitur khusus per paket",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "6dab209200dc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "Suite alur kerja PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "d0441341feae",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Di luar PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "2e639358ce1b",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Alur kerja browser atau API yang dikelola vendor, tergantung produk",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f6cb796c3dd1",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Jika Anda hanya pernah menyentuh PDF, Stirling-PDF sangat baik dan layak dilirik. Jika Anda juga mengubah ukuran gambar, mengonversi video, mentranskripsi audio, atau memproses file secara batch, SnapOtter menangani semuanya dalam satu deployment alih-alih menjalankan beberapa tools berdampingan.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "2cf3069c0d51",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Bisa jadi, jika Anda menginginkan satu stack untuk lebih dari sekadar PDF. Cakupan PDF SnapOtter luas, dan ia menambahkan tools gambar, video, audio, dan file. Untuk setup khusus PDF, Stirling-PDF adalah pilihan yang solid dan fokus.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "a510a353acfd",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "Apakah SnapOtter pengganti Stirling-PDF?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "dd192af980d2",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Kedua proyek adalah open source dan dapat di-self-host. SnapOtter berlisensi AGPLv3 dan menambahkan tingkat enterprise berbayar opsional untuk SSO, audit logging, dan kontrol serupa.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "12383344cd26",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Apakah keduanya gratis dan open source?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "2f7576542576",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter vs Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "7d2d27eb6d3c",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF dan SnapOtter sama-sama self-hosted dan open source, jadi file tetap berada di server Anda dalam kedua kasus. Perbedaannya ada pada cakupan: Stirling-PDF fokus pada PDF, sedangkan SnapOtter mencakup kelima jenis file.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "3ea9757fcfac",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF adalah toolkit PDF self-hosted yang kuat. SnapOtter juga mencakup PDF, ditambah tools gambar, video, audio, dan file dalam satu stack. Keduanya open source.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "1b5853ab13bb",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter vs Stirling-PDF: Perbandingan Tools File Self-Hosted",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "7bf06b694f2b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Self-hosted",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "beafec79ffdd",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Open source",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "67a0d2e0dab4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Ya, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "bb81eaf9abe8",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "Alur kerja PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "858112e60505",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Fokus utama",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "bd948a9cd2e9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Alur kerja file lengkap untuk lima jenis",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "bf6250d3f644",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60+ operasi PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "7494e325cf65",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Jumlah tools",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "d0d302274887",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "Alur kerja OCR berorientasi PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "0086e25badf9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "AI lokal (OCR, transkripsi, upscaling)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "fbfa5c38a2a6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, transkripsi, upscaling, dan lainnya",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "fed628e044e5",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Bukan fokusnya",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "65fb99ed33dc",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Editor gambar berbasis layer",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "f31e3fefe8c2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "Alur kerja otomatisasi PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "2e55dd6df915",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Pipeline dan pemrosesan batch",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "6a7b80f249cf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Ya",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "3bc5f88660e4",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG unggul saat tugasnya adalah kompresi gambar. SnapOtter mengompresi PNG, JPEG, WebP, dan AVIF, lalu berlanjut dengan pengubahan ukuran, crop, konversi, watermark, tools metadata, video, audio, PDF, dan alur kerja file.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "abcc578a04e0",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Ya. SnapOtter menjalankan kompresi gambar secara lokal, sehingga batas praktisnya adalah perangkat keras deployment Anda, bukan kuota layanan gambar pihak ketiga.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "0a86c8be5472",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Adakah alternatif TinyPNG yang self-hosted?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "748f8c653cb5",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP, dan AVIF, dengan konversi antarformat. SnapOtter juga membaca banyak format input, termasuk format RAW kamera.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "ee57e580dcd3",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "Format apa saja yang dapat dikompresi SnapOtter?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "dc6c6b9ecb5a",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "52d59c2347bc",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG adalah kompresor gambar online yang fokus. SnapOtter adalah alternatif self-hosted untuk tim yang ingin kompresi, konversi, pengubahan ukuran, metadata, dan pekerjaan gambar lainnya berjalan secara lokal.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "7f79ec056ad3",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG mengompresi gambar secara online dan melalui API Tinify. SnapOtter mengompresi dan mengonversi gambar di server Anda sendiri, dengan alur kerja file yang lebih luas dalam satu stack.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "607210e7a7f8",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "84381cc926d9",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Layanan web berbasis hosting",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "31cdddb9b5c5",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "File diunggah ke layanan milik vendor untuk diproses",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "41852c678ad4",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Penggunaan web gratis dan opsi API berbayar/developer",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "6d72c973f6db",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Kompresi gambar dan alur kerja API Tinify",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "436cad378eb2",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Di luar kompresi gambar",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "b91d1fd5b41d",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Alur kerja browser atau API yang dikelola vendor, tergantung produk",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f6cb796c3dd1",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow praktis saat Anda ingin tool browser cepat dan tidak ingin memasang apa pun. SnapOtter dibangun untuk sisi lain dari trade-off itu: deployment privat, alur kerja internal, pipeline yang dapat diulang, dan pemrosesan file lokal untuk gambar, video, audio, PDF, dan file.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "265c254adbb1",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Bukan. TinyWow adalah kotak perkakas web hosting yang luas. SnapOtter adalah suite pemrosesan file self-hosted untuk tim yang menginginkan deployment privat, visibilitas kode sumber, API, dan pipeline.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "a4a1be14fcda",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "Apakah SnapOtter tiruan TinyWow?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "03eb1934aec7",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Gunakan TinyWow untuk tugas browser sesaat yang cepat saat pemrosesan berbasis hosting bisa diterima. Gunakan SnapOtter saat file bersifat sensitif, alur kerja berulang, atau organisasi Anda membutuhkan pemrosesan yang terjadi di infrastruktur yang dikendalikannya.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "24026a223d70",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Sebaiknya saya pakai TinyWow atau SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "1369c8095bf1",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Tidak secara langsung. SnapOtter berfokus pada manipulasi file: gambar, video, audio, PDF, arsip, dan file. Ia lebih cocok saat lapisan pemrosesan file lebih penting daripada template penulisan.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "95873a45fab4",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "Apakah SnapOtter menggantikan tools penulisan AI milik TinyWow?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "e2b303a1d369",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Alternatif open-source dan self-hosted untuk TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "cdf567376a01",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow adalah kotak perkakas hosting yang luas untuk tugas cepat PDF, gambar, video, penulisan AI, dan file. SnapOtter adalah alternatif self-hosted untuk tim yang ingin utilitas file sehari-hari di infrastruktur yang mereka kendalikan.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "d245d78f79ab",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow adalah kotak perkakas hosting yang luas untuk tugas PDF, gambar, video, penulisan AI, dan file. SnapOtter adalah alternatif self-hosted untuk alur kerja file yang privat.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "93eeb0448156",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Alternatif Open-Source dan Self-Hosted untuk TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "b469b4795797",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Kotak perkakas online berbasis hosting",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "cf5813ed8556",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Diunggah ke server TinyWow; TinyWow menyatakan file dihapus setelah 1 jam",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "972a9278fd82",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Infrastruktur Anda",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7e915ed5d0f5",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Utilitas PDF, gambar, video, penulisan AI, dan file",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "2c1e06e3dee4",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Cakupan tools",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "a31c770948d1",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Tools gratis ditambah paket supporter/konten berbayar",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "af48dcd0cf25",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Gratis AGPLv3; batasnya adalah perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "3da8530080ae",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "0e9c8ed837b5",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Sumber dan auditabilitas",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a2b0ea99554f",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7d25e6410220",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Terutama alur kerja tool web cepat",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "eaee2b6c8233",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Otomatisasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "6dfa0815b150",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API dan pipeline di deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "0fe4d5d55062",
+    "stale": false
+  }
+}

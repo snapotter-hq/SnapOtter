@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online mạnh về chỉnh sửa, ký, chuyển đổi PDF và các gói đăng ký Acrobat. SnapOtter không cố thay thế toàn bộ hệ sinh thái Adobe; nó mang đến cho các nhóm công cụ PDF tự lưu trữ cùng các quy trình xử lý ảnh, video, âm thanh và tệp trong một hệ mã nguồn mở duy nhất.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "f1fe769758d8",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "Không cho mọi quy trình của Acrobat. SnapOtter tốt nhất khi bạn cần xử lý PDF tự lưu trữ, chuyển đổi, OCR, nén, thao tác trang và tự động hóa. Acrobat vẫn là một nền tảng tài liệu chuyên sâu trên máy tính và đám mây.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "c83f6000608e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter có phải là bản thay thế cho Adobe Acrobat Pro không?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "930a7f95e886",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Hãy chọn SnapOtter khi khả năng kiểm soát triển khai, thấy được mã nguồn, dùng trong môi trường cô lập mạng hoặc pipeline tệp lặp lại được quan trọng hơn các tính năng tài khoản Adobe và hệ sinh thái Acrobat rộng lớn.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "fa030bd85f1c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Vì sao chọn SnapOtter thay vì Adobe Acrobat online?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "ba3b28384f53",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Adobe Acrobat online",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "045f6aec9629",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online là quy trình PDF trên đám mây được trau chuốt từ chính công ty tạo ra PDF. SnapOtter là giải pháp tự lưu trữ thay thế cho các nhóm cần công việc PDF ở lại trên hạ tầng của riêng họ.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "8756e0cc3d45",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online là bộ công cụ PDF trên đám mây của Adobe. SnapOtter mang đến cho các nhóm công cụ PDF tự lưu trữ cùng các quy trình xử lý tệp rộng hơn với mô hình triển khai mã nguồn mở.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "b3e72d1da071",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Adobe Acrobat Online",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "5966b8f57be0",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe cho biết tệp trong trình chỉnh sửa trực tuyến được xử lý bởi máy chủ Adobe",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "fbc3a920d355",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "Công cụ trực tuyến miễn phí, bản dùng thử và các gói Acrobat trả phí",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "18c82bd6067c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF, chữ ký điện tử, AI và các quy trình tài khoản Acrobat",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "97f33ac0b712",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "Ngoài PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "430450c4440e",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "Quy trình trên trình duyệt hoặc API do nhà cung cấp quản lý, tùy sản phẩm",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f433958146bc",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert rộng và thân thiện với API cho việc chuyển đổi. SnapOtter chuyển đổi qua nhiều định dạng ảnh, video, âm thanh, PDF và tệp, rồi bổ sung nén, chỉnh sửa, OCR, phiên âm và pipeline tại chỗ.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "515969bb7af4",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "Có. SnapOtter là mã nguồn mở và chạy trên Docker. Nó chuyển đổi các định dạng ảnh, video, âm thanh, PDF và tệp tại chỗ, mà không tính phí theo từng lần chuyển đổi.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "a07ab5b6d8ed",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "Tôi có thể tự lưu trữ một giải pháp thay thế cho CloudConvert không?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "a382e076e0b7",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "Có. SnapOtter dùng FFmpeg bên dưới cho video và âm thanh, bên cạnh Sharp cho ảnh và qpdf, LibreOffice cùng các công cụ liên quan cho tài liệu.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "69d8601d81cb",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter có chuyển đổi cả video và âm thanh không?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "3a614a3b7e53",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho CloudConvert",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "d8c545563521",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert là một dịch vụ chuyển đổi và API trên đám mây trưởng thành. SnapOtter là giải pháp tự lưu trữ thay thế khi việc chuyển đổi nên diễn ra bên trong hạ tầng của riêng bạn, với các pipeline do bạn kiểm soát.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "223ddc1dacaf",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert là nền tảng chuyển đổi trên đám mây có API. SnapOtter chuyển đổi ảnh, video, âm thanh, PDF và tệp ngay trên máy chủ của bạn với các pipeline mã nguồn mở.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "335b71dd98aa",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho CloudConvert",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "d8c545563521",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "Tệp được tải lên dịch vụ do nhà cung cấp lưu trữ để xử lý",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ddfa997e620a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "Định giá đám mây theo mức dùng và theo gói",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "e2c8591babfe",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "Chuyển đổi trên đám mây qua nhiều nhóm tệp",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "b8525f43999b",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "Ngoài chuyển đổi tệp",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "351ab1a42212",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "API và quy trình trình duyệt trên đám mây",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "9801ed8c1f46",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio tiện lợi cho các lần chuyển đổi nhanh và sử dụng API cho lập trình viên. SnapOtter giữ việc chuyển đổi tại chỗ và bổ sung khả năng xử lý tệp rộng hơn: nén, chỉnh sửa, OCR, phiên âm, thao tác PDF và các pipeline lặp lại được.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "09b02e303696",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter mang đến cho bạn một công cụ chuyển đổi và bộ xử lý tệp triển khai được bằng Docker. Thay vì gửi tệp đến một công cụ chuyển đổi trên đám mây, máy chủ của bạn sẽ chạy pipeline chuyển đổi.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "c87ecd5f1d08",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "Giải pháp tự lưu trữ thay thế cho Convertio là gì?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "ac3656958684",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "Có. SnapOtter bao gồm REST API và hỗ trợ pipeline để các nhóm tự động hóa quy trình xử lý tệp bên trong môi trường của riêng họ.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "84f56f593b6e",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter có API không?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "0c54dd27b5d6",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Convertio",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "6e3cc5ac7b79",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio là công cụ chuyển đổi trên đám mây phục vụ chuyển đổi tệp qua trình duyệt trên nhiều định dạng. SnapOtter là giải pháp tự lưu trữ thay thế khi bạn muốn các tác vụ chuyển đổi ở lại bên trong hạ tầng của riêng mình.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "d0ba5f5eb958",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio là công cụ chuyển đổi tệp trên đám mây với công cụ trình duyệt và API. SnapOtter là giải pháp tự lưu trữ thay thế cho các quy trình chuyển đổi riêng tư và pipeline tại chỗ.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "c3a293fc210e",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Convertio",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "6e3cc5ac7b79",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "Chuyển đổi trên đám mây; Convertio cho biết tệp tải lên bị xóa ngay lập tức và tệp đã chuyển đổi sau 24 giờ",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "eb161e8231ec",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "Bậc miễn phí với giới hạn tệp và tín dụng, kèm các gói cao cấp",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "5ced25ea2cdb",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "Chuyển đổi trên đám mây qua hơn 300 định dạng và các quy trình API",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "6fe04ee6a819",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "Ngoài chuyển đổi tệp",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "351ab1a42212",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "API chuyển đổi trên đám mây và quy trình trình duyệt",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "f577dbe632df",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX là công cụ chuyển đổi chuyên biệt và xử lý được một danh sách định dạng khổng lồ. SnapOtter cũng chuyển đổi, rồi bổ sung nén, chỉnh sửa, che thông tin, OCR, phiên âm và pipeline, nên phù hợp khi chuyển đổi chỉ là một bước trong nhiều bước.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "b9b77d727826",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "Nếu bạn chủ yếu cần chuyển đổi định dạng trên nhiều định dạng, ConvertX là một lựa chọn gọn gàng và chuyên biệt. Nếu bạn còn chỉnh sửa, nén, che thông tin, OCR hay phiên âm, SnapOtter làm được tất cả trong một hệ duy nhất.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "3d4b65621dcc",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "Tôi nên dùng SnapOtter hay ConvertX?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "456d4051ae77",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "Có. Cả hai đều tự lưu trữ, nên tệp ở lại trên hạ tầng của bạn. Khác biệt nằm ở phạm vi, không phải ở nơi dữ liệu của bạn được đặt.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "f48ddf234e0c",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "Cả hai có giữ tệp trên máy chủ của tôi không?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "049dbec53c13",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter và ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "af3d61a60c5a",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX và SnapOtter đều tự lưu trữ và mã nguồn mở. ConvertX được xây quanh việc chuyển đổi định dạng; SnapOtter vừa chuyển đổi vừa lo phần còn lại của một quy trình tệp.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "c6ef409b3510",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX là một công cụ chuyển đổi tệp tự lưu trữ cho hơn 1000 định dạng. SnapOtter cũng chuyển đổi, và bổ sung chỉnh sửa, nén, OCR và phiên âm trên năm phương thức.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "5d4ddd02cab6",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter và ConvertX: So sánh công cụ tệp tự lưu trữ",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "f13dc00bfa2d",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "Tự lưu trữ",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "64458de6dafe",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "Mã nguồn mở",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "578df1441543",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "Có, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "3220986db012",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "Chuyển đổi định dạng",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "6cb9d55f89e6",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "Trọng tâm chính",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "bd115e2255c3",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "Quy trình tệp đầy đủ trên năm loại",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "67991c818234",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "Quy trình xoay quanh chuyển đổi",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "ac4ad3640bbf",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "Ngoài chuyển đổi",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "eaf7991ac15c",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "Nén, chỉnh sửa, che thông tin, OCR, phiên âm",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "0454ab564e75",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "Hơn 1000 định dạng chuyển đổi",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "ce5d3cd7d884",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "Số lượng công cụ",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "5a6330c4aaa0",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "Không phải trọng tâm chính",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "1f31fc72d7ad",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "Công cụ AI tại chỗ",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "55ea29955ee8",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, phiên âm, nâng độ phân giải và nhiều hơn nữa",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "e8ee817e061f",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "Không phải trọng tâm chính",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "1f31fc72d7ad",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "Trình chỉnh sửa ảnh theo lớp",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "837b084bcda2",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert hữu ích cho các lần chuyển đổi trực tuyến nhanh qua nhiều nhóm. SnapOtter cũng bao quát chuyển đổi, rồi bổ sung công cụ ảnh tại chỗ, quy trình video/âm thanh, PDF, kho lưu trữ, công cụ tệp, API và pipeline.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "01d6439247f7",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "Với nhiều lần chuyển đổi ảnh, video, âm thanh, PDF, kho lưu trữ và tệp thì có. SnapOtter mạnh nhất khi bạn muốn triển khai công cụ chuyển đổi một cách riêng tư thay vì dùng dịch vụ web được lưu trữ sẵn.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "d0cc630187d8",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter có thể thay thế FreeConvert không?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "ef7d4f9f36e0",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "Giới hạn thực tế của SnapOtter đến từ máy chủ, dung lượng lưu trữ, bộ nhớ và các giới hạn thời gian chạy mà bạn cấu hình. Điều đó khiến nó phù hợp hơn khi bạn muốn tự tinh chỉnh dung lượng.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "1fe12dfd4d23",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter có hỗ trợ tệp lớn không?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "f00725cc6f53",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho FreeConvert",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "e94e32ea5d50",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert là một công cụ chuyển đổi trên đám mây rộng, phục vụ chuyển đổi và nén tệp qua trình duyệt. SnapOtter là giải pháp tự lưu trữ thay thế khi bạn muốn các thao tác tệp đó chạy bên trong bản triển khai của riêng mình.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "e7365a3177ec",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert chuyển đổi và nén tệp trực tuyến. SnapOtter là giải pháp tự lưu trữ thay thế cho việc chuyển đổi ảnh, video, âm thanh, PDF và tệp ngay trên máy chủ của bạn.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "7a9ccc9b603c",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho FreeConvert",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "e94e32ea5d50",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "Tệp được tải lên FreeConvert; FreeConvert cho biết tệp đã chuyển đổi được tự động xóa sau vài giờ",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "a5b83eca937a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "Bậc web miễn phí kèm các gói trả phí cho khối lượng công việc lớn hơn hoặc ưu tiên cao hơn",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "d83f4ae510b3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "Chuyển đổi và nén trực tuyến qua nhiều định dạng",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "74def2b70328",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "Ngoài chuyển đổi tệp",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "351ab1a42212",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "Quy trình trên trình duyệt hoặc API do nhà cung cấp quản lý, tùy sản phẩm",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f433958146bc",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF mạnh với các tác vụ PDF trực tuyến. SnapOtter kết hợp công cụ PDF với công cụ ảnh, video, âm thanh và tệp, nên cùng một bản triển khai xử lý được một hợp đồng, một bản ghi màn hình và một bản chỉnh sửa podcast.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "c5ebb3430e18",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "Là SnapOtter. Nó là mã nguồn mở theo AGPLv3, triển khai bằng Docker, và cho bạn gộp, tách, nén, chuyển đổi, bảo vệ, OCR cùng các quy trình PDF liên quan ngay trên phần cứng của riêng bạn.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "426547a92e8a",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "Giải pháp tự lưu trữ thay thế cho iLovePDF là gì?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "5a9e1aa70458",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "Bản mã nguồn mở là miễn phí. Một gói doanh nghiệp trả phí bổ sung các tính năng kiểm soát như SSO và ghi nhật ký kiểm toán, nhưng các công cụ xử lý tệp nằm trong hệ mã nguồn mở.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "dc8000af9b0b",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter có miễn phí không?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "50b760d2767d",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho iLovePDF",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "b917acad0f15",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF là dịch vụ PDF trên đám mây cho công việc tài liệu nhanh gọn qua trình duyệt. SnapOtter là giải pháp tự lưu trữ thay thế khi bạn muốn quy trình PDF tương tự chạy trên máy chủ của riêng mình.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "335e13851a89",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF là một dịch vụ PDF trực tuyến. SnapOtter mang đến cho các nhóm công cụ PDF tự lưu trữ cùng các quy trình xử lý ảnh, video, âm thanh và tệp trong một hệ mã nguồn mở duy nhất.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "1b0e8308dfd1",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho iLovePDF",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "b917acad0f15",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "Tệp được tải lên dịch vụ do nhà cung cấp lưu trữ để xử lý",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ddfa997e620a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "Gói miễn phí và cao cấp với tính năng riêng theo từng gói",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "7f68884c6ca1",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "Bộ công cụ quy trình PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "7bb9b2def20a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "Ngoài PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "430450c4440e",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "Quy trình trên trình duyệt hoặc API do nhà cung cấp quản lý, tùy sản phẩm",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f433958146bc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert bao quát nhiều nhóm chuyển đổi và có một hệ sinh thái API qua API2Convert. SnapOtter được xây cho các bản triển khai riêng tư, nơi chuyển đổi, nén, công việc PDF, xử lý âm thanh/video và các công cụ AI tại chỗ nằm trong cùng một hệ.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "e6fcd62ec29a",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "Hãy chọn SnapOtter khi quyền riêng tư, triển khai nội bộ, mã nguồn mở hoặc xử lý tệp trong môi trường cô lập mạng là điều quan trọng. Hãy chọn Online-Convert khi bạn thích một công cụ chuyển đổi trên đám mây không phải bảo trì máy chủ.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "8868e1b5e07b",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Vì sao chọn SnapOtter thay vì Online-Convert?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "359810f85db0",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "Có. SnapOtter bao gồm chuyển đổi, nén, chỉnh sửa, OCR, phiên âm, thao tác PDF, công cụ metadata, kho lưu trữ, công cụ tệp và pipeline.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "b4ebd74bcc73",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter có bao quát nhiều hơn chuyển đổi không?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "5c0d952c157b",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Online-Convert",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "f5de41779c06",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert là một công cụ chuyển đổi trên đám mây lâu đời cho nhiều nhóm tệp. SnapOtter là giải pháp tự lưu trữ thay thế cho các nhóm muốn việc chuyển đổi và xử lý diễn ra trên máy chủ của riêng họ.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "deca81a0962b",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert chuyển đổi video, ảnh, âm thanh, tài liệu, ebook và tệp kho lưu trữ trực tuyến. SnapOtter là giải pháp tự lưu trữ thay thế cho các quy trình xử lý tệp riêng tư.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "e5e3063a3772",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Online-Convert",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "f5de41779c06",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "Tải lên qua trình duyệt đến các dịch vụ đám mây Online-Convert/API2Convert",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "c4c35f8e4ad9",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "Bản dùng thử miễn phí, gói tín dụng, gói đăng ký và tùy chọn doanh nghiệp",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "c95763a18153",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "Công cụ chuyển đổi trực tuyến cho media, tài liệu, ebook và kho lưu trữ",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "a24e5c8a6157",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "Ngoài chuyển đổi tệp",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "351ab1a42212",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "API API2Convert trên đám mây và quy trình trình duyệt",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "980261d5a886",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai được xây quanh cuộc họp, ghi chú và cộng tác. SnapOtter tập trung vào chuyển giọng nói thành văn bản tại chỗ cùng phần còn lại của một quy trình âm thanh: cắt, chuẩn hóa, giảm nhiễu, chuyển đổi định dạng, phụ đề video, cùng các công cụ ảnh, PDF và tệp.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "28ee23ead4a0",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "Có. SnapOtter chạy phiên âm tại chỗ với các mô hình Whisper ngay trên CPU hoặc GPU NVIDIA CUDA của bạn. Nó phù hợp hơn cho các tệp âm thanh và video riêng tư so với việc cộng tác bằng trợ lý cuộc họp.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "57a10300b1ad",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "Có giải pháp tự lưu trữ thay thế cho Otter.ai không?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "9749b7e54374",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU thì nhanh hơn, nhưng phiên âm cũng chạy được trên CPU. Các mô hình sẽ cài đặt theo yêu cầu ngay lần đầu bạn dùng tính năng này.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "9006a785bc5b",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "Tôi có cần GPU không?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "baaccc2899f7",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Otter.ai",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "25076e5badae",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai là nền tảng phiên âm cuộc họp trên đám mây. SnapOtter là giải pháp tự lưu trữ thay thế khi bạn muốn việc phiên âm chạy ngay trên CPU hoặc GPU NVIDIA CUDA của mình với các mô hình tại chỗ.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "f6a2c7c95636",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai phiên âm các cuộc họp trên đám mây. SnapOtter chạy chuyển giọng nói thành văn bản ngay trên CPU hoặc GPU NVIDIA CUDA của bạn với mô hình Whisper tại chỗ và không tải âm thanh lên.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "53dc74bcfcd4",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Otter.ai",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "25076e5badae",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "Nội dung âm thanh và cuộc họp được xử lý bởi dịch vụ Otter.ai trên đám mây",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "e8f8aab96216",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "Gói miễn phí và trả phí với giới hạn số phút/lượt nhập theo từng gói",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "643e2cd2ead7",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "Ghi chú cuộc họp, tóm tắt bằng AI, cộng tác và phiên âm",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "8a7ed383b7df",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "Ngoài phiên âm",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "8ab0ecc7ff17",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "Tích hợp ứng dụng trên đám mây và quy trình cuộc họp",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "5ec1884f87d5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf tập trung vào PDF, đúng thứ mà nhiều người cần. SnapOtter bao quát mảng đó với gộp, tách, nén, chuyển đổi, che thông tin, OCR và nhiều hơn nữa, rồi bổ sung thêm các quy trình xử lý ảnh, video, âm thanh và tệp trong cùng một lần triển khai.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "6db0801b5c1a",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "Có. SnapOtter là mã nguồn mở theo AGPLv3 và chạy trên máy chủ của riêng bạn với Docker. Nó hỗ trợ gộp, tách, nén, chuyển đổi, bảo vệ, che thông tin, đóng dấu mờ, đánh số trang và OCR, mà không tính phí theo từng tệp.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "c08cde5f0e0e",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Có giải pháp miễn phí, tự lưu trữ thay thế cho Smallpdf không?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "a75b6ee604ca",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter xử lý tệp ngay trên máy mà bạn chạy nó. Nếu bạn triển khai bên trong mạng của mình, tệp sẽ ở lại trong bản triển khai đó thay vì đi đến một dịch vụ PDF bên thứ ba.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "5e5b2cb7e996",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "Tài liệu của tôi có bị tải lên đâu đó không?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "4fcce813fcc4",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "Có. Ngoài các công cụ PDF, SnapOtter còn xử lý cả tác vụ ảnh, video, âm thanh và tệp, nên một lần triển khai có thể bao quát nhiều quy trình xử lý tệp hằng ngày.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "202ca911c948",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter có làm được nhiều hơn PDF không?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "4894e9648bb3",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Smallpdf",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "19d2d6cfb65e",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf là bộ công cụ PDF trên đám mây được trau chuốt kỹ. SnapOtter là giải pháp tự lưu trữ thay thế cho các nhóm muốn công cụ PDF chạy trên hạ tầng do chính họ kiểm soát, thay vì gửi tài liệu nhạy cảm đến một dịch vụ PDF bên thứ ba.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "7e5b24c8a76d",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf là bộ công cụ PDF chạy trên đám mây. SnapOtter chạy các thao tác gộp, tách, nén, chuyển đổi, OCR và nhiều hơn nữa ngay trên máy chủ của bạn, kèm hơn 200 công cụ bổ sung cho năm loại tệp.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "7a2fc24d6bf7",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho Smallpdf",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "19d2d6cfb65e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "Tệp được tải lên dịch vụ do nhà cung cấp lưu trữ để xử lý",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ddfa997e620a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "Gói miễn phí và trả phí với tính năng riêng theo từng gói",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "988c137cbcf6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "Bộ công cụ quy trình PDF",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "7bb9b2def20a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "Ngoài PDF",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "430450c4440e",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "Quy trình trên trình duyệt hoặc API do nhà cung cấp quản lý, tùy sản phẩm",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f433958146bc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "Nếu bạn chỉ làm việc với PDF, Stirling-PDF rất tốt và đáng để xem. Nếu bạn còn đổi kích thước ảnh, chuyển đổi video, phiên âm âm thanh hay xử lý tệp theo lô, SnapOtter làm được tất cả trong một lần triển khai thay vì chạy nhiều công cụ song song.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "b9fc38886be3",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "Có thể, nếu bạn muốn một hệ duy nhất cho nhiều thứ hơn PDF. Phạm vi PDF của SnapOtter rất rộng, và nó bổ sung thêm công cụ ảnh, video, âm thanh và tệp. Với thiết lập chỉ dùng PDF, Stirling-PDF là một lựa chọn chuyên biệt và vững chắc.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "e9c275a28269",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter có phải là bản thay thế cho Stirling-PDF không?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "dec1a74f06d0",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "Cả hai dự án đều là mã nguồn mở và tự lưu trữ được. SnapOtter theo giấy phép AGPLv3 và bổ sung một gói doanh nghiệp trả phí tùy chọn cho SSO, ghi nhật ký kiểm toán và các tính năng kiểm soát tương tự.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "049f0e9f1c41",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "Cả hai đều miễn phí và mã nguồn mở phải không?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "4a069522a913",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter và Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "afa7666f5f55",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF và SnapOtter đều tự lưu trữ và mã nguồn mở, nên dù dùng cái nào thì tệp cũng ở lại trên máy chủ của bạn. Khác biệt nằm ở phạm vi: Stirling-PDF tập trung vào PDF, còn SnapOtter trải rộng cả năm loại tệp.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "a9943462b719",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF là một bộ công cụ PDF tự lưu trữ mạnh mẽ. SnapOtter cũng bao quát PDF, cộng thêm công cụ ảnh, video, âm thanh và tệp trong một hệ duy nhất. Cả hai đều là mã nguồn mở.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "c9428785a47b",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter và Stirling-PDF: So sánh công cụ tệp tự lưu trữ",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "61b57bfb251a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "Tự lưu trữ",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "64458de6dafe",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "Mã nguồn mở",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "578df1441543",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "Có, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "3220986db012",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "Quy trình PDF",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "3d6201ccd8f2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "Trọng tâm chính",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "bd115e2255c3",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "Quy trình tệp đầy đủ trên năm loại",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "67991c818234",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "Hơn 60 thao tác PDF",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "4a23963e18f9",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "Số lượng công cụ",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "5a6330c4aaa0",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "Quy trình OCR thiên về PDF",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "26b68bb32794",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "AI tại chỗ (OCR, phiên âm, nâng độ phân giải)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "ed6b90889544",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, phiên âm, nâng độ phân giải và nhiều hơn nữa",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "e8ee817e061f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "Không phải trọng tâm của nó",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "1e3a365ce5f4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "Trình chỉnh sửa ảnh theo lớp",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "837b084bcda2",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "Quy trình tự động hóa PDF",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "6cd0460db3a4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "Pipeline và xử lý theo lô",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "6e6839c3561f",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "Có",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "e25427d0c2bf",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG rất tốt khi việc cần làm là nén ảnh. SnapOtter nén PNG, JPEG, WebP và AVIF, rồi đi tiếp với đổi kích thước, cắt, chuyển đổi, đóng dấu mờ, công cụ metadata, video, âm thanh, PDF và các quy trình xử lý tệp.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "f6617a705294",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "Có. SnapOtter chạy nén ảnh tại chỗ, nên giới hạn thực tế là phần cứng triển khai của bạn chứ không phải hạn mức của một dịch vụ ảnh bên thứ ba.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "72912748b900",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "Có giải pháp tự lưu trữ thay thế cho TinyPNG không?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "5efc1583866c",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP và AVIF, kèm chuyển đổi giữa các định dạng. SnapOtter cũng đọc được nhiều định dạng đầu vào, bao gồm cả các định dạng RAW của máy ảnh.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "f1f7cbda383d",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter có thể nén những định dạng nào?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "53c593df7745",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho TinyPNG",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "100a650bfab0",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG là công cụ nén ảnh trực tuyến chuyên biệt. SnapOtter là giải pháp tự lưu trữ thay thế cho các nhóm muốn nén, chuyển đổi, đổi kích thước, xử lý metadata và các thao tác ảnh khác chạy tại chỗ.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "68d167cd06ba",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG nén ảnh trực tuyến và qua API Tinify. SnapOtter nén và chuyển đổi ảnh ngay trên máy chủ của bạn, kèm các quy trình xử lý tệp rộng hơn trong một hệ duy nhất.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "3e3c1d581c3e",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho TinyPNG",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "100a650bfab0",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ sẵn",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "38d78ffb856a",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "Tệp được tải lên dịch vụ do nhà cung cấp lưu trữ để xử lý",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "ddfa997e620a",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "Dùng web miễn phí và tùy chọn API trả phí/dành cho lập trình viên",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "354244f88fc4",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "Nén ảnh và các quy trình qua API Tinify",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "09bcd8e12636",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "Ngoài nén ảnh",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "44017ae9ae3c",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "Quy trình trên trình duyệt hoặc API do nhà cung cấp quản lý, tùy sản phẩm",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "f433958146bc",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow tiện lợi khi bạn muốn một công cụ trình duyệt nhanh và không muốn cài đặt gì. SnapOtter được xây cho phía còn lại của sự đánh đổi đó: triển khai riêng tư, quy trình nội bộ, pipeline lặp lại được và xử lý tệp tại chỗ trên ảnh, video, âm thanh, PDF và tệp.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "36bfa092a452",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "Không. TinyWow là một hộp công cụ web trực tuyến rộng. SnapOtter là một bộ xử lý tệp tự lưu trữ dành cho các nhóm muốn triển khai riêng tư, thấy được mã nguồn, có API và pipeline.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "0e66b82168b7",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter có phải là bản sao của TinyWow không?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "11481e3b595d",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "Hãy dùng TinyWow cho các tác vụ trình duyệt nhanh, một lần, khi việc xử lý trên đám mây là chấp nhận được. Hãy dùng SnapOtter khi tệp nhạy cảm, quy trình lặp lại, hoặc tổ chức của bạn cần việc xử lý diễn ra trên hạ tầng mà họ kiểm soát.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "fcb6ea509cdd",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "Tôi nên dùng TinyWow hay SnapOtter?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "756e7f4de92f",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "Không trực tiếp. SnapOtter tập trung vào thao tác trên tệp: ảnh, video, âm thanh, PDF, kho lưu trữ và tệp. Nó phù hợp hơn khi lớp xử lý tệp quan trọng hơn các mẫu viết.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "28dadec0475e",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter có thay thế các công cụ viết bằng AI của TinyWow không?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "7b18869d717a",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho TinyWow",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "856f3c1cfba4",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow là một hộp công cụ trực tuyến rộng cho các tác vụ nhanh với PDF, ảnh, video, viết bằng AI và tệp. SnapOtter là giải pháp tự lưu trữ thay thế cho các nhóm muốn các tiện ích tệp hằng ngày chạy trên hạ tầng do họ kiểm soát.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "2000321978c9",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow là một hộp công cụ trực tuyến rộng cho PDF, ảnh, video, viết bằng AI và các tác vụ tệp. SnapOtter là giải pháp tự lưu trữ thay thế cho các quy trình xử lý tệp riêng tư.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "4210d6ec9d8f",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "Giải pháp mã nguồn mở, tự lưu trữ thay thế cho TinyWow",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "856f3c1cfba4",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "Hộp công cụ trực tuyến được lưu trữ sẵn",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "dc7443c97566",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "Tải lên máy chủ TinyWow; TinyWow cho biết tệp được xóa sau 1 giờ",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "909eb9bed387",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "Tiện ích PDF, ảnh, video, viết bằng AI và tệp",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "5438e0c3887a",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "Phạm vi công cụ",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "1532b9e7d525",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "Công cụ miễn phí kèm các gói ủng hộ/nội dung trả phí",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "3a75e9725824",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn là phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f9da925cf8e9",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "Thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3b8526c18282",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "Dùng ngoại tuyến / môi trường cô lập mạng",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "9760cfad4277",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "5020941ba72e",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "159a1c95aaab",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "Chủ yếu là các quy trình công cụ web nhanh",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "59c53aa3ede2",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "REST API và pipeline trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8cec7fdce571",
+    "stale": false
+  }
+}

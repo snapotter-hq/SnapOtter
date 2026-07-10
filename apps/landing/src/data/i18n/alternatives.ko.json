@@ -1,0 +1,2550 @@
+{
+  "alt:adobe-acrobat-online:breadth": {
+    "text": "Adobe Acrobat online은 PDF 편집, 서명, 변환, Acrobat 구독에 강합니다. SnapOtter는 Adobe 생태계 전체를 대체하려는 것이 아닙니다. 셀프호스팅형 PDF 도구에 더해 이미지, 비디오, 오디오, 파일 워크플로를 하나의 오픈소스 스택으로 팀에 제공합니다.",
+    "_sourceHash": "e23b01be4ae5",
+    "provenance": "machine",
+    "outputHash": "02baa74c95e9",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.a": {
+    "text": "모든 Acrobat 워크플로를 대체하지는 않습니다. SnapOtter는 셀프호스팅형 PDF 처리, 변환, OCR, 압축, 페이지 작업, 자동화가 필요할 때 가장 적합합니다. Acrobat은 여전히 깊이 있는 데스크톱 및 클라우드 문서 플랫폼입니다.",
+    "_sourceHash": "ce39eff159c3",
+    "provenance": "machine",
+    "outputHash": "159e09dbd252",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.0.q": {
+    "text": "SnapOtter는 Adobe Acrobat Pro의 대체품인가요?",
+    "_sourceHash": "70a3942c0244",
+    "provenance": "machine",
+    "outputHash": "c3a53e3b192c",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.a": {
+    "text": "Adobe 계정 기능이나 넓은 Acrobat 생태계보다 배포 통제, 소스 공개, 폐쇄망 사용, 반복 가능한 파일 파이프라인이 더 중요할 때 SnapOtter를 선택하세요.",
+    "_sourceHash": "97c06a0b4db6",
+    "provenance": "machine",
+    "outputHash": "143ba65b6205",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:faqs.1.q": {
+    "text": "Adobe Acrobat online 대신 SnapOtter를 선택하는 이유는 무엇인가요?",
+    "_sourceHash": "90231014d206",
+    "provenance": "machine",
+    "outputHash": "e71b7778e3b2",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:h1": {
+    "text": "Adobe Acrobat online의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "67bf6243d14a",
+    "provenance": "machine",
+    "outputHash": "5c961d3df865",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:intro": {
+    "text": "Adobe Acrobat online은 PDF를 만든 회사가 내놓은 완성도 높은 호스팅형 PDF 워크플로입니다. SnapOtter는 PDF 작업을 자체 인프라 안에 두어야 하는 팀을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "ad9723443697",
+    "provenance": "machine",
+    "outputHash": "82c76adb7b5d",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:metaDescription": {
+    "text": "Adobe Acrobat online은 Adobe가 제공하는 호스팅형 PDF 도구 세트입니다. SnapOtter는 오픈소스 배포로 셀프호스팅형 PDF 도구와 폭넓은 파일 워크플로를 팀에 제공합니다.",
+    "_sourceHash": "4ffe8ac323d0",
+    "provenance": "machine",
+    "outputHash": "70f23fbdd639",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:pageTitle": {
+    "text": "Adobe Acrobat Online의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "be9a4ec0ad42",
+    "provenance": "machine",
+    "outputHash": "9542179bb90f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.competitor": {
+    "text": "Adobe는 온라인 편집기 파일이 Adobe 서버에서 처리된다고 밝힘",
+    "_sourceHash": "b802aa4aad99",
+    "provenance": "machine",
+    "outputHash": "f5479722c23b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.competitor": {
+    "text": "무료 온라인 도구, 체험판, 유료 Acrobat 요금제",
+    "_sourceHash": "6c3c7be687a6",
+    "provenance": "machine",
+    "outputHash": "7654749cfe7b",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.competitor": {
+    "text": "PDF, 전자 서명, AI, Acrobat 계정 워크플로",
+    "_sourceHash": "9a4ac7c86318",
+    "provenance": "machine",
+    "outputHash": "bb80a51eb338",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.feature": {
+    "text": "PDF를 넘어서",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "83e3e7349969",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.competitor": {
+    "text": "제품에 따라 브라우저 워크플로 또는 공급업체 관리형 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "284e74fae2a5",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:adobe-acrobat-online:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:cloudconvert:breadth": {
+    "text": "CloudConvert는 변환에 폭넓고 API 친화적입니다. SnapOtter는 이미지, 비디오, 오디오, PDF, 파일 형식 전반을 변환하고, 여기에 압축, 편집, OCR, 전사, 로컬 파이프라인을 더합니다.",
+    "_sourceHash": "0c13071698b7",
+    "provenance": "machine",
+    "outputHash": "b5ce126071bb",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.a": {
+    "text": "있습니다. SnapOtter는 오픈소스이며 Docker에서 실행됩니다. 이미지, 비디오, 오디오, PDF, 파일 형식을 로컬에서 변환하며, SnapOtter가 부과하는 변환당 과금이 없습니다.",
+    "_sourceHash": "84f84023cec6",
+    "provenance": "machine",
+    "outputHash": "81de8d88e48c",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.0.q": {
+    "text": "CloudConvert 대안을 셀프호스팅할 수 있나요?",
+    "_sourceHash": "20891e803399",
+    "provenance": "machine",
+    "outputHash": "8abfd4151c0b",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.a": {
+    "text": "네. SnapOtter는 비디오와 오디오에 FFmpeg를 사용하고, 이미지에는 Sharp를, 문서에는 qpdf, LibreOffice 등의 도구를 함께 사용합니다.",
+    "_sourceHash": "914e1ccdec58",
+    "provenance": "machine",
+    "outputHash": "b008a99fd318",
+    "stale": false
+  },
+  "alt:cloudconvert:faqs.1.q": {
+    "text": "SnapOtter는 비디오와 오디오도 변환하나요?",
+    "_sourceHash": "5ed46353981a",
+    "provenance": "machine",
+    "outputHash": "5845f14cf721",
+    "stale": false
+  },
+  "alt:cloudconvert:h1": {
+    "text": "CloudConvert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "e2e567da065c",
+    "provenance": "machine",
+    "outputHash": "10cbd49876e4",
+    "stale": false
+  },
+  "alt:cloudconvert:intro": {
+    "text": "CloudConvert는 성숙한 호스팅형 변환기이자 API입니다. SnapOtter는 변환 작업을 자체 인프라 안에서, 직접 통제하는 파이프라인으로 처리하고 싶을 때 선택하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "c4d5c586a3e2",
+    "provenance": "machine",
+    "outputHash": "b6acd8dac6a4",
+    "stale": false
+  },
+  "alt:cloudconvert:metaDescription": {
+    "text": "CloudConvert는 API를 갖춘 호스팅형 변환 플랫폼입니다. SnapOtter는 이미지, 비디오, 오디오, PDF, 파일을 직접 운영하는 서버에서 오픈소스 파이프라인으로 변환합니다.",
+    "_sourceHash": "eade7e2c1ca2",
+    "provenance": "machine",
+    "outputHash": "aac0f1fee613",
+    "stale": false
+  },
+  "alt:cloudconvert:pageTitle": {
+    "text": "CloudConvert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "f54831c20d20",
+    "provenance": "machine",
+    "outputHash": "10cbd49876e4",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.competitor": {
+    "text": "처리를 위해 파일이 공급업체 호스팅 서비스로 업로드됨",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "23f7dab556fc",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.competitor": {
+    "text": "사용량 기반 및 요금제 기반 클라우드 가격",
+    "_sourceHash": "e78c5116907e",
+    "provenance": "machine",
+    "outputHash": "15f353a8db00",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.competitor": {
+    "text": "다양한 파일 범주에 걸친 호스팅형 변환",
+    "_sourceHash": "3125602122cd",
+    "provenance": "machine",
+    "outputHash": "0c0e7064087a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.feature": {
+    "text": "파일 변환을 넘어서",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "828d3d861c11",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.competitor": {
+    "text": "호스팅형 API와 브라우저 워크플로",
+    "_sourceHash": "6925a06e0569",
+    "provenance": "machine",
+    "outputHash": "5c8578c4d03e",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:cloudconvert:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:convertio:breadth": {
+    "text": "Convertio는 빠른 변환과 개발자 API 활용에 편리합니다. SnapOtter는 변환을 로컬에서 유지하면서 압축, 편집, OCR, 전사, PDF 작업, 반복 가능한 파이프라인 등 폭넓은 파일 처리를 더합니다.",
+    "_sourceHash": "d0aaba5397f8",
+    "provenance": "machine",
+    "outputHash": "ed631a8de040",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.a": {
+    "text": "SnapOtter는 Docker로 배포할 수 있는 변환기이자 파일 처리 도구 모음입니다. 파일을 클라우드 변환기로 보내는 대신, 내 서버가 변환 파이프라인을 실행합니다.",
+    "_sourceHash": "785f46c457d9",
+    "provenance": "machine",
+    "outputHash": "f1beb09687d2",
+    "stale": false
+  },
+  "alt:convertio:faqs.0.q": {
+    "text": "셀프호스팅형 Convertio 대안은 무엇인가요?",
+    "_sourceHash": "907c5448c479",
+    "provenance": "machine",
+    "outputHash": "c2d0beb204c9",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.a": {
+    "text": "네. SnapOtter는 REST API와 파이프라인 지원을 포함하므로, 팀이 자체 환경 안에서 파일 워크플로를 자동화할 수 있습니다.",
+    "_sourceHash": "8cf22d9b727d",
+    "provenance": "machine",
+    "outputHash": "41bd15201c93",
+    "stale": false
+  },
+  "alt:convertio:faqs.1.q": {
+    "text": "SnapOtter에 API가 있나요?",
+    "_sourceHash": "815b8995113f",
+    "provenance": "machine",
+    "outputHash": "3c5fcd86ce06",
+    "stale": false
+  },
+  "alt:convertio:h1": {
+    "text": "Convertio의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "260f57152975",
+    "provenance": "machine",
+    "outputHash": "ea3104de839b",
+    "stale": false
+  },
+  "alt:convertio:intro": {
+    "text": "Convertio는 여러 형식에 걸친 브라우저 기반 파일 변환을 위한 클라우드 변환기입니다. SnapOtter는 변환 작업을 자체 인프라 안에 두고 싶을 때 선택하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "c2aec92975d0",
+    "provenance": "machine",
+    "outputHash": "0411a7985f1f",
+    "stale": false
+  },
+  "alt:convertio:metaDescription": {
+    "text": "Convertio는 브라우저 도구와 API를 갖춘 클라우드 파일 변환기입니다. SnapOtter는 프라이빗한 변환 워크플로와 로컬 파이프라인을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "a839f2245150",
+    "provenance": "machine",
+    "outputHash": "bcb4ff4557aa",
+    "stale": false
+  },
+  "alt:convertio:pageTitle": {
+    "text": "Convertio의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "f93ce893c73a",
+    "provenance": "machine",
+    "outputHash": "ea3104de839b",
+    "stale": false
+  },
+  "alt:convertio:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:convertio:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:convertio:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:convertio:rows.1.competitor": {
+    "text": "클라우드 변환. Convertio는 업로드된 파일은 즉시, 변환된 파일은 24시간 후 삭제된다고 밝힘",
+    "_sourceHash": "f1fd34e5bd98",
+    "provenance": "machine",
+    "outputHash": "5ddac71e6966",
+    "stale": false
+  },
+  "alt:convertio:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:convertio:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:convertio:rows.2.competitor": {
+    "text": "파일 및 크레딧 제한이 있는 무료 등급과 프리미엄 요금제",
+    "_sourceHash": "47f6824a9492",
+    "provenance": "machine",
+    "outputHash": "84e9702688c2",
+    "stale": false
+  },
+  "alt:convertio:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:convertio:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:convertio:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:convertio:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:convertio:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:convertio:rows.4.competitor": {
+    "text": "300개 이상의 형식에 걸친 클라우드 변환과 API 워크플로",
+    "_sourceHash": "951d4611cd92",
+    "provenance": "machine",
+    "outputHash": "8a53b6a6e05f",
+    "stale": false
+  },
+  "alt:convertio:rows.4.feature": {
+    "text": "파일 변환을 넘어서",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "828d3d861c11",
+    "stale": false
+  },
+  "alt:convertio:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:convertio:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:convertio:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:convertio:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:convertio:rows.6.competitor": {
+    "text": "호스팅형 변환 API와 브라우저 워크플로",
+    "_sourceHash": "b355639bd222",
+    "provenance": "machine",
+    "outputHash": "bbdb7058c2c7",
+    "stale": false
+  },
+  "alt:convertio:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:convertio:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:convertx:breadth": {
+    "text": "ConvertX는 집중된 변환기로 방대한 형식 목록을 처리합니다. SnapOtter도 변환하고, 여기에 압축, 편집, 마스킹, OCR, 전사, 파이프라인을 더하므로 변환이 여러 단계 중 하나일 때 잘 맞습니다.",
+    "_sourceHash": "e7ab93bba8fd",
+    "provenance": "machine",
+    "outputHash": "e35019a4c18c",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.a": {
+    "text": "주로 다양한 형식 간 변환이 필요하다면 ConvertX는 깔끔하고 집중된 선택지입니다. 편집, 압축, 마스킹, OCR, 전사도 한다면 SnapOtter가 이 모두를 하나의 스택에서 처리합니다.",
+    "_sourceHash": "27280f3096d6",
+    "provenance": "machine",
+    "outputHash": "4c55d903ba7a",
+    "stale": false
+  },
+  "alt:convertx:faqs.0.q": {
+    "text": "SnapOtter와 ConvertX 중 무엇을 써야 하나요?",
+    "_sourceHash": "179ff901f012",
+    "provenance": "machine",
+    "outputHash": "a2e9b80f89c8",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.a": {
+    "text": "네. 둘 다 셀프호스팅이라 파일은 내 인프라에 머뭅니다. 차이는 범위이지, 데이터가 있는 위치가 아닙니다.",
+    "_sourceHash": "3f98f925abbf",
+    "provenance": "machine",
+    "outputHash": "cfc9e974b8a3",
+    "stale": false
+  },
+  "alt:convertx:faqs.1.q": {
+    "text": "둘 다 파일을 내 서버에 두나요?",
+    "_sourceHash": "87c7acaa8258",
+    "provenance": "machine",
+    "outputHash": "e8a29e01a464",
+    "stale": false
+  },
+  "alt:convertx:h1": {
+    "text": "SnapOtter vs ConvertX",
+    "_sourceHash": "5a7d1e2440ce",
+    "provenance": "machine",
+    "outputHash": "5a7d1e2440ce",
+    "stale": false
+  },
+  "alt:convertx:intro": {
+    "text": "ConvertX와 SnapOtter는 둘 다 셀프호스팅이자 오픈소스입니다. ConvertX는 형식 변환을 중심으로 만들어졌고, SnapOtter는 변환에 더해 파일 워크플로의 나머지까지 다룹니다.",
+    "_sourceHash": "982ba01f1d84",
+    "provenance": "machine",
+    "outputHash": "5c37f2cec0ea",
+    "stale": false
+  },
+  "alt:convertx:metaDescription": {
+    "text": "ConvertX는 1000개 이상의 형식을 지원하는 셀프호스팅형 파일 변환기입니다. SnapOtter도 변환하면서, 다섯 가지 모달리티에 걸쳐 편집, 압축, OCR, 전사를 더합니다.",
+    "_sourceHash": "674c8781223d",
+    "provenance": "machine",
+    "outputHash": "7ee331a49e0f",
+    "stale": false
+  },
+  "alt:convertx:pageTitle": {
+    "text": "SnapOtter vs ConvertX: 셀프호스팅 파일 도구 비교",
+    "_sourceHash": "01143ed1bca1",
+    "provenance": "machine",
+    "outputHash": "eceeadeb176c",
+    "stale": false
+  },
+  "alt:convertx:rows.0.competitor": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:convertx:rows.0.feature": {
+    "text": "셀프호스팅",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "d02afc20bbe6",
+    "stale": false
+  },
+  "alt:convertx:rows.0.snapotter": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.competitor": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:convertx:rows.1.feature": {
+    "text": "오픈소스",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "8cc0a83e3501",
+    "stale": false
+  },
+  "alt:convertx:rows.1.snapotter": {
+    "text": "예, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "91947920eff0",
+    "stale": false
+  },
+  "alt:convertx:rows.2.competitor": {
+    "text": "형식 변환",
+    "_sourceHash": "a23c6469bb4c",
+    "provenance": "machine",
+    "outputHash": "af78de7aad71",
+    "stale": false
+  },
+  "alt:convertx:rows.2.feature": {
+    "text": "핵심 초점",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "f5ca24c07568",
+    "stale": false
+  },
+  "alt:convertx:rows.2.snapotter": {
+    "text": "다섯 가지 유형에 걸친 완전한 파일 워크플로",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "81dbc9a7d4bc",
+    "stale": false
+  },
+  "alt:convertx:rows.3.competitor": {
+    "text": "변환 중심의 워크플로",
+    "_sourceHash": "a780c8c75d67",
+    "provenance": "machine",
+    "outputHash": "5f6d77ce48bc",
+    "stale": false
+  },
+  "alt:convertx:rows.3.feature": {
+    "text": "변환을 넘어서",
+    "_sourceHash": "909444b171de",
+    "provenance": "machine",
+    "outputHash": "f3a6a02448c8",
+    "stale": false
+  },
+  "alt:convertx:rows.3.snapotter": {
+    "text": "압축, 편집, 마스킹, OCR, 전사",
+    "_sourceHash": "ebed7a9d9dc1",
+    "provenance": "machine",
+    "outputHash": "563d6fdfbc67",
+    "stale": false
+  },
+  "alt:convertx:rows.4.competitor": {
+    "text": "1000개 이상의 변환 형식",
+    "_sourceHash": "40b49bd57ff8",
+    "provenance": "machine",
+    "outputHash": "0bfd6ca24ed5",
+    "stale": false
+  },
+  "alt:convertx:rows.4.feature": {
+    "text": "도구 수",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "635d8c73dd2b",
+    "stale": false
+  },
+  "alt:convertx:rows.4.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:convertx:rows.5.competitor": {
+    "text": "핵심 초점 아님",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "3cb30b69c857",
+    "stale": false
+  },
+  "alt:convertx:rows.5.feature": {
+    "text": "로컬 AI 도구",
+    "_sourceHash": "312c481e0097",
+    "provenance": "machine",
+    "outputHash": "4d13db8d12b8",
+    "stale": false
+  },
+  "alt:convertx:rows.5.snapotter": {
+    "text": "OCR, 전사, 업스케일링 등",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d7a17f5ed663",
+    "stale": false
+  },
+  "alt:convertx:rows.6.competitor": {
+    "text": "핵심 초점 아님",
+    "_sourceHash": "e65d6df92b5d",
+    "provenance": "machine",
+    "outputHash": "3cb30b69c857",
+    "stale": false
+  },
+  "alt:convertx:rows.6.feature": {
+    "text": "레이어 기반 이미지 편집기",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "e3ff58cdac57",
+    "stale": false
+  },
+  "alt:convertx:rows.6.snapotter": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:freeconvert:breadth": {
+    "text": "FreeConvert는 여러 범주에 걸친 빠른 온라인 변환에 유용합니다. SnapOtter도 변환을 다루고, 여기에 로컬 이미지 도구, 비디오/오디오 워크플로, PDF, 압축파일, 파일 도구, API, 파이프라인을 더합니다.",
+    "_sourceHash": "d4ae3acfe4da",
+    "provenance": "machine",
+    "outputHash": "6e3c3207ed12",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.a": {
+    "text": "이미지, 비디오, 오디오, PDF, 압축파일, 파일의 많은 변환 작업에서는 그렇습니다. SnapOtter는 호스팅형 웹 서비스를 쓰는 대신 변환기를 프라이빗하게 배포하고 싶을 때 가장 강점을 보입니다.",
+    "_sourceHash": "e68c7dbfbed7",
+    "provenance": "machine",
+    "outputHash": "0a36aa52b18f",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.0.q": {
+    "text": "SnapOtter가 FreeConvert를 대체할 수 있나요?",
+    "_sourceHash": "ba69b1948a12",
+    "provenance": "machine",
+    "outputHash": "ca1b9d87be32",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.a": {
+    "text": "SnapOtter의 실질적 한계는 서버, 스토리지, 메모리, 그리고 설정한 런타임 제한에서 옵니다. 그래서 용량을 직접 조정하고 싶을 때 더 잘 맞습니다.",
+    "_sourceHash": "e2d0b12b40ab",
+    "provenance": "machine",
+    "outputHash": "36c850adfb8c",
+    "stale": false
+  },
+  "alt:freeconvert:faqs.1.q": {
+    "text": "SnapOtter는 대용량 파일을 지원하나요?",
+    "_sourceHash": "be06fde09458",
+    "provenance": "machine",
+    "outputHash": "c7168ac8094e",
+    "stale": false
+  },
+  "alt:freeconvert:h1": {
+    "text": "FreeConvert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "bf4359240e67",
+    "provenance": "machine",
+    "outputHash": "00aa37db7f28",
+    "stale": false
+  },
+  "alt:freeconvert:intro": {
+    "text": "FreeConvert는 브라우저 기반 파일 변환과 압축을 위한 폭넓은 호스팅형 변환기입니다. SnapOtter는 그러한 파일 작업을 자체 배포 환경 안에서 실행하고 싶을 때 선택하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "c0f92d22b633",
+    "provenance": "machine",
+    "outputHash": "50051fd7df1a",
+    "stale": false
+  },
+  "alt:freeconvert:metaDescription": {
+    "text": "FreeConvert는 온라인에서 파일을 변환하고 압축합니다. SnapOtter는 이미지, 비디오, 오디오, PDF, 파일 변환을 직접 운영하는 서버에서 실행하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "ef01cd486fd0",
+    "provenance": "machine",
+    "outputHash": "d378f59e4dde",
+    "stale": false
+  },
+  "alt:freeconvert:pageTitle": {
+    "text": "FreeConvert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "11ce98dfa0ec",
+    "provenance": "machine",
+    "outputHash": "00aa37db7f28",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:freeconvert:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.competitor": {
+    "text": "파일이 FreeConvert로 업로드됨. FreeConvert는 변환된 파일이 몇 시간 후 자동 삭제된다고 밝힘",
+    "_sourceHash": "854ae75d1d71",
+    "provenance": "machine",
+    "outputHash": "97cdeffd3d9d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:freeconvert:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.competitor": {
+    "text": "무료 웹 등급과 대용량 또는 우선순위 높은 작업을 위한 유료 요금제",
+    "_sourceHash": "24a456326fe2",
+    "provenance": "machine",
+    "outputHash": "7c738f00436d",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:freeconvert:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:freeconvert:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.competitor": {
+    "text": "다양한 형식에 걸친 온라인 변환과 압축",
+    "_sourceHash": "0594ca930b3f",
+    "provenance": "machine",
+    "outputHash": "b140ae8c6014",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.feature": {
+    "text": "파일 변환을 넘어서",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "828d3d861c11",
+    "stale": false
+  },
+  "alt:freeconvert:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.competitor": {
+    "text": "제품에 따라 브라우저 워크플로 또는 공급업체 관리형 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "284e74fae2a5",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:freeconvert:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:ilovepdf:breadth": {
+    "text": "iLovePDF는 온라인 PDF 작업에 강합니다. SnapOtter는 PDF 도구에 이미지, 비디오, 오디오, 파일 도구를 결합해, 같은 배포 환경에서 계약서, 화면 녹화, 팟캐스트 편집을 모두 처리합니다.",
+    "_sourceHash": "9d2f9f123b8f",
+    "provenance": "machine",
+    "outputHash": "15bdb3ea3072",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.a": {
+    "text": "SnapOtter입니다. AGPLv3 기반 오픈소스이며 Docker로 배포하고, 병합, 분할, 압축, 변환, 보호, OCR을 비롯한 PDF 워크플로를 직접 운영하는 하드웨어에서 제공합니다.",
+    "_sourceHash": "e3279ee4dc59",
+    "provenance": "machine",
+    "outputHash": "79f249045356",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.0.q": {
+    "text": "iLovePDF의 셀프호스팅 대안은 무엇인가요?",
+    "_sourceHash": "42e8df58e519",
+    "provenance": "machine",
+    "outputHash": "febef8810d56",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.a": {
+    "text": "오픈소스 에디션은 무료입니다. 유료 엔터프라이즈 등급은 SSO나 감사 로깅 같은 통제 기능을 추가하지만, 파일 도구 자체는 오픈소스 스택에 들어 있습니다.",
+    "_sourceHash": "0ffe7157b9ba",
+    "provenance": "machine",
+    "outputHash": "f9f326a665b3",
+    "stale": false
+  },
+  "alt:ilovepdf:faqs.1.q": {
+    "text": "SnapOtter는 무료인가요?",
+    "_sourceHash": "7426122d8a57",
+    "provenance": "machine",
+    "outputHash": "289b23d18e4e",
+    "stale": false
+  },
+  "alt:ilovepdf:h1": {
+    "text": "iLovePDF의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "3227e8177b6e",
+    "provenance": "machine",
+    "outputHash": "ce50f1767e50",
+    "stale": false
+  },
+  "alt:ilovepdf:intro": {
+    "text": "iLovePDF는 빠른 브라우저 기반 문서 작업을 위한 호스팅형 PDF 서비스입니다. SnapOtter는 같은 유형의 PDF 워크플로를 직접 운영하는 서버에서 실행하고 싶을 때 선택하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "1fb95fc026e6",
+    "provenance": "machine",
+    "outputHash": "3c027e73a6d8",
+    "stale": false
+  },
+  "alt:ilovepdf:metaDescription": {
+    "text": "iLovePDF는 온라인 PDF 서비스입니다. SnapOtter는 셀프호스팅형 PDF 도구에 더해 이미지, 비디오, 오디오, 파일 워크플로를 하나의 오픈소스 스택으로 팀에 제공합니다.",
+    "_sourceHash": "56861cf54b43",
+    "provenance": "machine",
+    "outputHash": "b76484ddb4d4",
+    "stale": false
+  },
+  "alt:ilovepdf:pageTitle": {
+    "text": "iLovePDF의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "a656299ad903",
+    "provenance": "machine",
+    "outputHash": "ce50f1767e50",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.competitor": {
+    "text": "처리를 위해 파일이 공급업체 호스팅 서비스로 업로드됨",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "23f7dab556fc",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.competitor": {
+    "text": "무료 및 프리미엄 요금제, 요금제별 기능 차등",
+    "_sourceHash": "aaca88caff6e",
+    "provenance": "machine",
+    "outputHash": "8da11002a608",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.competitor": {
+    "text": "PDF 워크플로 도구 모음",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "b890e9dacbc9",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.feature": {
+    "text": "PDF를 넘어서",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "83e3e7349969",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.competitor": {
+    "text": "제품에 따라 브라우저 워크플로 또는 공급업체 관리형 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "284e74fae2a5",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:ilovepdf:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:online-convert:breadth": {
+    "text": "Online-Convert는 여러 변환 범주를 다루고 API2Convert를 통한 API 생태계를 갖추고 있습니다. SnapOtter는 변환, 압축, PDF 작업, 오디오/비디오 처리, 로컬 AI 도구가 하나의 스택에 놓이는 프라이빗 배포를 위해 만들어졌습니다.",
+    "_sourceHash": "64b3843396d2",
+    "provenance": "machine",
+    "outputHash": "7b2a7ea8f63f",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.a": {
+    "text": "프라이버시, 내부 배포, 오픈소스 코드, 폐쇄망 파일 처리가 중요할 때 SnapOtter를 선택하세요. 유지 관리할 서버 없이 호스팅형 변환기를 선호한다면 Online-Convert를 선택하세요.",
+    "_sourceHash": "9597566b8548",
+    "provenance": "machine",
+    "outputHash": "bf9cf0fbee38",
+    "stale": false
+  },
+  "alt:online-convert:faqs.0.q": {
+    "text": "Online-Convert 대신 SnapOtter를 선택하는 이유는 무엇인가요?",
+    "_sourceHash": "e456c6d72e72",
+    "provenance": "machine",
+    "outputHash": "4fc803dd00f7",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.a": {
+    "text": "네. SnapOtter는 변환, 압축, 편집, OCR, 전사, PDF 작업, 메타데이터 도구, 압축파일, 파일 도구, 파이프라인을 포함합니다.",
+    "_sourceHash": "aedbc1ce5df4",
+    "provenance": "machine",
+    "outputHash": "2b38e28b6fda",
+    "stale": false
+  },
+  "alt:online-convert:faqs.1.q": {
+    "text": "SnapOtter는 변환 이상을 지원하나요?",
+    "_sourceHash": "eac67a7e39cb",
+    "provenance": "machine",
+    "outputHash": "454e8c406bc8",
+    "stale": false
+  },
+  "alt:online-convert:h1": {
+    "text": "Online-Convert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "12ee1bce4b33",
+    "provenance": "machine",
+    "outputHash": "27b2632c1e19",
+    "stale": false
+  },
+  "alt:online-convert:intro": {
+    "text": "Online-Convert는 오랫동안 운영되어 온 다양한 파일 범주용 호스팅형 변환기입니다. SnapOtter는 변환과 처리를 직접 운영하는 서버에서 하고 싶은 팀을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "2a92a9864636",
+    "provenance": "machine",
+    "outputHash": "87654f16ad68",
+    "stale": false
+  },
+  "alt:online-convert:metaDescription": {
+    "text": "Online-Convert는 비디오, 이미지, 오디오, 문서, 전자책, 압축파일을 온라인에서 변환합니다. SnapOtter는 프라이빗한 파일 워크플로를 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "685f1d1bfa81",
+    "provenance": "machine",
+    "outputHash": "f7dce22ded13",
+    "stale": false
+  },
+  "alt:online-convert:pageTitle": {
+    "text": "Online-Convert의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "a8433c366c21",
+    "provenance": "machine",
+    "outputHash": "27b2632c1e19",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:online-convert:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.competitor": {
+    "text": "브라우저에서 Online-Convert/API2Convert 클라우드 서비스로 업로드됨",
+    "_sourceHash": "f92fc59c97a8",
+    "provenance": "machine",
+    "outputHash": "21ab48ea8909",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:online-convert:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.competitor": {
+    "text": "무료 체험, 크레딧 패키지, 구독, 엔터프라이즈 옵션",
+    "_sourceHash": "bc43c830cf45",
+    "provenance": "machine",
+    "outputHash": "be56dd85b081",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:online-convert:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:online-convert:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.competitor": {
+    "text": "미디어, 문서, 전자책, 압축파일용 온라인 변환기",
+    "_sourceHash": "1940d3566219",
+    "provenance": "machine",
+    "outputHash": "92be50c73db3",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.feature": {
+    "text": "파일 변환을 넘어서",
+    "_sourceHash": "2e496d48d7e4",
+    "provenance": "machine",
+    "outputHash": "828d3d861c11",
+    "stale": false
+  },
+  "alt:online-convert:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:online-convert:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.competitor": {
+    "text": "호스팅형 API2Convert API와 브라우저 워크플로",
+    "_sourceHash": "e2531e7a8eb2",
+    "provenance": "machine",
+    "outputHash": "4e992e749f25",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:online-convert:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:otter-ai:breadth": {
+    "text": "Otter.ai는 회의, 노트, 협업을 중심으로 만들어졌습니다. SnapOtter는 로컬 음성-텍스트 변환에 더해 트리밍, 정규화, 노이즈 제거, 형식 변환, 비디오 자막 등 오디오 워크플로의 나머지와 이미지, PDF, 파일 도구에 집중합니다.",
+    "_sourceHash": "690228a06555",
+    "provenance": "machine",
+    "outputHash": "e489b188dad6",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.a": {
+    "text": "있습니다. SnapOtter는 직접 운영하는 CPU 또는 NVIDIA CUDA GPU에서 Whisper 모델로 전사를 로컬 실행합니다. 회의 에이전트 협업보다 프라이빗한 오디오와 비디오 파일에 더 적합합니다.",
+    "_sourceHash": "a7222f6d501f",
+    "provenance": "machine",
+    "outputHash": "2420ff57eec0",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.0.q": {
+    "text": "셀프호스팅형 Otter.ai 대안이 있나요?",
+    "_sourceHash": "a79b3ec7dd1f",
+    "provenance": "machine",
+    "outputHash": "d716656f8b06",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.a": {
+    "text": "GPU가 더 빠르지만 전사는 CPU에서도 실행됩니다. 모델은 해당 기능을 처음 사용할 때 필요에 따라 설치됩니다.",
+    "_sourceHash": "36f766719ece",
+    "provenance": "machine",
+    "outputHash": "f4e5640abe13",
+    "stale": false
+  },
+  "alt:otter-ai:faqs.1.q": {
+    "text": "GPU가 필요한가요?",
+    "_sourceHash": "fad16a8eaf34",
+    "provenance": "machine",
+    "outputHash": "18829fb73d03",
+    "stale": false
+  },
+  "alt:otter-ai:h1": {
+    "text": "Otter.ai의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "7840ce03700d",
+    "provenance": "machine",
+    "outputHash": "131a53b859d1",
+    "stale": false
+  },
+  "alt:otter-ai:intro": {
+    "text": "Otter.ai는 호스팅형 회의 전사 플랫폼입니다. SnapOtter는 전사 작업을 직접 운영하는 CPU 또는 NVIDIA CUDA GPU에서 로컬 모델로 실행하고 싶을 때 선택하는 셀프호스팅 대안입니다.",
+    "_sourceHash": "42c55d0d0402",
+    "provenance": "machine",
+    "outputHash": "c18d7ddf4a98",
+    "stale": false
+  },
+  "alt:otter-ai:metaDescription": {
+    "text": "Otter.ai는 클라우드에서 회의를 전사합니다. SnapOtter는 로컬 Whisper 모델로 직접 운영하는 CPU 또는 NVIDIA CUDA GPU에서 음성-텍스트 변환을 실행하며, 오디오를 업로드하지 않습니다.",
+    "_sourceHash": "82705ba1b9ca",
+    "provenance": "machine",
+    "outputHash": "6dbb12e055e4",
+    "stale": false
+  },
+  "alt:otter-ai:pageTitle": {
+    "text": "Otter.ai의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "6923079cec77",
+    "provenance": "machine",
+    "outputHash": "131a53b859d1",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:otter-ai:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.competitor": {
+    "text": "오디오와 회의 콘텐츠가 호스팅형 Otter.ai 서비스에서 처리됨",
+    "_sourceHash": "67e8202b5f6f",
+    "provenance": "machine",
+    "outputHash": "52137c87e429",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:otter-ai:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.competitor": {
+    "text": "요금제별 분 단위/가져오기 제한이 있는 무료 및 유료 요금제",
+    "_sourceHash": "38cdff58d805",
+    "provenance": "machine",
+    "outputHash": "94ebc766c401",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:otter-ai:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:otter-ai:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.competitor": {
+    "text": "회의 노트, AI 요약, 협업, 전사",
+    "_sourceHash": "87b37c51fd4a",
+    "provenance": "machine",
+    "outputHash": "db743da7d2e2",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.feature": {
+    "text": "전사를 넘어서",
+    "_sourceHash": "7a17eecfef01",
+    "provenance": "machine",
+    "outputHash": "c11e86b2e860",
+    "stale": false
+  },
+  "alt:otter-ai:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:otter-ai:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.competitor": {
+    "text": "호스팅형 앱 연동과 회의 워크플로",
+    "_sourceHash": "dcc3d458df55",
+    "provenance": "machine",
+    "outputHash": "db4d7806422d",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:otter-ai:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:smallpdf:breadth": {
+    "text": "Smallpdf는 PDF에 집중하며, 이는 많은 사람에게 정확히 필요한 부분입니다. SnapOtter는 병합, 분할, 압축, 변환, 마스킹, OCR 등으로 그 영역을 다루고, 같은 배포 환경에서 이미지, 비디오, 오디오, 파일 워크플로까지 추가로 지원합니다.",
+    "_sourceHash": "f9e4c7657edb",
+    "provenance": "machine",
+    "outputHash": "bdb5161293a2",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.a": {
+    "text": "있습니다. SnapOtter는 AGPLv3 기반 오픈소스로, Docker를 이용해 직접 운영하는 서버에서 실행됩니다. 병합, 분할, 압축, 변환, 보호, 마스킹, 워터마크, 페이지 번호, OCR을 지원하며 SnapOtter가 부과하는 파일당 요금이 없습니다.",
+    "_sourceHash": "0396abd0dab4",
+    "provenance": "machine",
+    "outputHash": "7c8be12f0848",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.0.q": {
+    "text": "Smallpdf의 무료 셀프호스팅 대안이 있나요?",
+    "_sourceHash": "f97924a78c35",
+    "provenance": "machine",
+    "outputHash": "07ea97b741e7",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.a": {
+    "text": "SnapOtter는 실행 중인 그 장비에서 파일을 처리합니다. 자체 네트워크 내부에 배포하면 파일은 외부 PDF 서비스로 나가지 않고 해당 배포 환경 안에 머뭅니다.",
+    "_sourceHash": "3636790e608e",
+    "provenance": "machine",
+    "outputHash": "49d975a0cd5d",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.1.q": {
+    "text": "제 문서가 어딘가로 업로드되나요?",
+    "_sourceHash": "7ef6ed6ef5a1",
+    "provenance": "machine",
+    "outputHash": "f59a57c68e86",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.a": {
+    "text": "네. SnapOtter는 PDF 도구뿐 아니라 이미지, 비디오, 오디오, 파일 작업까지 처리하므로 하나의 배포 환경으로 일상적인 여러 파일 워크플로를 아우를 수 있습니다.",
+    "_sourceHash": "6ad830c923ed",
+    "provenance": "machine",
+    "outputHash": "1bd859a8c9d2",
+    "stale": false
+  },
+  "alt:smallpdf:faqs.2.q": {
+    "text": "SnapOtter는 PDF 말고도 지원하나요?",
+    "_sourceHash": "70feb4d36d28",
+    "provenance": "machine",
+    "outputHash": "d99cd0169d49",
+    "stale": false
+  },
+  "alt:smallpdf:h1": {
+    "text": "Smallpdf의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "c5a8ca636a06",
+    "provenance": "machine",
+    "outputHash": "7b50d3519eb0",
+    "stale": false
+  },
+  "alt:smallpdf:intro": {
+    "text": "Smallpdf는 완성도 높은 호스팅형 PDF 도구 모음입니다. SnapOtter는 민감한 문서를 외부 PDF 서비스로 보내지 않고, PDF 도구를 자체적으로 통제하는 인프라에서 실행하려는 팀을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "59d89e9a7965",
+    "provenance": "machine",
+    "outputHash": "e4a4d7c177ac",
+    "stale": false
+  },
+  "alt:smallpdf:metaDescription": {
+    "text": "Smallpdf는 호스팅형 PDF 도구 모음입니다. SnapOtter는 PDF 병합, 분할, 압축, 변환, OCR 등을 직접 운영하는 서버에서 실행하며, 다섯 가지 파일 유형에 걸쳐 200개 이상의 추가 도구를 제공합니다.",
+    "_sourceHash": "d81a013a718d",
+    "provenance": "machine",
+    "outputHash": "2c9e283da8fb",
+    "stale": false
+  },
+  "alt:smallpdf:pageTitle": {
+    "text": "Smallpdf의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "d0b8684604b8",
+    "provenance": "machine",
+    "outputHash": "7b50d3519eb0",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:smallpdf:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.competitor": {
+    "text": "처리를 위해 파일이 공급업체 호스팅 서비스로 업로드됨",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "23f7dab556fc",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:smallpdf:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.competitor": {
+    "text": "무료 및 유료 요금제, 요금제별 기능 차등",
+    "_sourceHash": "46c0b13c59da",
+    "provenance": "machine",
+    "outputHash": "73999a057135",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:smallpdf:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:smallpdf:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.competitor": {
+    "text": "PDF 워크플로 도구 모음",
+    "_sourceHash": "0490962ab5d3",
+    "provenance": "machine",
+    "outputHash": "b890e9dacbc9",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.feature": {
+    "text": "PDF를 넘어서",
+    "_sourceHash": "4b41d3ea8e9c",
+    "provenance": "machine",
+    "outputHash": "83e3e7349969",
+    "stale": false
+  },
+  "alt:smallpdf:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.competitor": {
+    "text": "제품에 따라 브라우저 워크플로 또는 공급업체 관리형 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "284e74fae2a5",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:smallpdf:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:stirling-pdf:breadth": {
+    "text": "PDF만 다룬다면 Stirling-PDF는 훌륭하고 살펴볼 만합니다. 이미지 크기 조정, 비디오 변환, 오디오 전사, 파일 일괄 처리도 한다면, SnapOtter는 여러 도구를 나란히 돌리는 대신 이 모두를 하나의 배포 환경에서 처리합니다.",
+    "_sourceHash": "313d117f9889",
+    "provenance": "machine",
+    "outputHash": "95b43fd8de77",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.a": {
+    "text": "PDF를 넘어서는 하나의 스택을 원한다면 그럴 수 있습니다. SnapOtter의 PDF 지원 범위는 넓고, 여기에 이미지, 비디오, 오디오, 파일 도구를 더합니다. PDF만 다루는 구성이라면 Stirling-PDF가 탄탄하고 집중된 선택입니다.",
+    "_sourceHash": "fe786c82b18a",
+    "provenance": "machine",
+    "outputHash": "b3875ad41e37",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.0.q": {
+    "text": "SnapOtter는 Stirling-PDF의 대체품인가요?",
+    "_sourceHash": "137ee3e26a04",
+    "provenance": "machine",
+    "outputHash": "d0d1a451207b",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.a": {
+    "text": "두 프로젝트 모두 오픈소스이며 셀프호스팅이 가능합니다. SnapOtter는 AGPLv3이며 SSO, 감사 로깅 등 통제 기능을 위한 선택형 유료 엔터프라이즈 등급을 추가로 제공합니다.",
+    "_sourceHash": "022e718ebced",
+    "provenance": "machine",
+    "outputHash": "db14b7026062",
+    "stale": false
+  },
+  "alt:stirling-pdf:faqs.1.q": {
+    "text": "둘 다 무료이자 오픈소스인가요?",
+    "_sourceHash": "4d9f144a07a6",
+    "provenance": "machine",
+    "outputHash": "3362074c5bf3",
+    "stale": false
+  },
+  "alt:stirling-pdf:h1": {
+    "text": "SnapOtter vs Stirling-PDF",
+    "_sourceHash": "7d2d27eb6d3c",
+    "provenance": "machine",
+    "outputHash": "7d2d27eb6d3c",
+    "stale": false
+  },
+  "alt:stirling-pdf:intro": {
+    "text": "Stirling-PDF와 SnapOtter는 둘 다 셀프호스팅이자 오픈소스라, 어느 쪽이든 파일은 내 서버에 머뭅니다. 차이는 범위입니다. Stirling-PDF는 PDF에 집중하는 반면, SnapOtter는 다섯 가지 파일 유형 전부를 아우릅니다.",
+    "_sourceHash": "20f16d6ce2b4",
+    "provenance": "machine",
+    "outputHash": "7521835c7411",
+    "stale": false
+  },
+  "alt:stirling-pdf:metaDescription": {
+    "text": "Stirling-PDF는 강력한 셀프호스팅형 PDF 도구 모음입니다. SnapOtter도 PDF를 다루면서, 이미지, 비디오, 오디오, 파일 도구를 하나의 스택에 담습니다. 둘 다 오픈소스입니다.",
+    "_sourceHash": "5a1e0e3abb93",
+    "provenance": "machine",
+    "outputHash": "848844883d50",
+    "stale": false
+  },
+  "alt:stirling-pdf:pageTitle": {
+    "text": "SnapOtter vs Stirling-PDF: 셀프호스팅 파일 도구 비교",
+    "_sourceHash": "190a754957d0",
+    "provenance": "machine",
+    "outputHash": "1bb368287751",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.competitor": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.feature": {
+    "text": "셀프호스팅",
+    "_sourceHash": "beafec79ffdd",
+    "provenance": "machine",
+    "outputHash": "d02afc20bbe6",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.0.snapotter": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.competitor": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.feature": {
+    "text": "오픈소스",
+    "_sourceHash": "67a0d2e0dab4",
+    "provenance": "machine",
+    "outputHash": "8cc0a83e3501",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.1.snapotter": {
+    "text": "예, AGPLv3",
+    "_sourceHash": "b6c92c9d82d0",
+    "provenance": "machine",
+    "outputHash": "91947920eff0",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.competitor": {
+    "text": "PDF 워크플로",
+    "_sourceHash": "803f35f807d5",
+    "provenance": "machine",
+    "outputHash": "78a942314d30",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.feature": {
+    "text": "핵심 초점",
+    "_sourceHash": "9fbf26470516",
+    "provenance": "machine",
+    "outputHash": "f5ca24c07568",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.2.snapotter": {
+    "text": "다섯 가지 유형에 걸친 완전한 파일 워크플로",
+    "_sourceHash": "147342dd6456",
+    "provenance": "machine",
+    "outputHash": "81dbc9a7d4bc",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.competitor": {
+    "text": "60개 이상의 PDF 작업",
+    "_sourceHash": "4d80b4dd60af",
+    "provenance": "machine",
+    "outputHash": "84ee5d3b0a34",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.feature": {
+    "text": "도구 수",
+    "_sourceHash": "5876b00a7d49",
+    "provenance": "machine",
+    "outputHash": "635d8c73dd2b",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.3.snapotter": {
+    "text": "241",
+    "_sourceHash": "749fc650cacb",
+    "provenance": "machine",
+    "outputHash": "749fc650cacb",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.competitor": {
+    "text": "PDF 중심의 OCR 워크플로",
+    "_sourceHash": "d38b918fa5b2",
+    "provenance": "machine",
+    "outputHash": "7a40b735bf19",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.feature": {
+    "text": "로컬 AI (OCR, 전사, 업스케일링)",
+    "_sourceHash": "e8f3f3fb04f0",
+    "provenance": "machine",
+    "outputHash": "172dcd97bb7a",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.4.snapotter": {
+    "text": "OCR, 전사, 업스케일링 등",
+    "_sourceHash": "4b65b7669b82",
+    "provenance": "machine",
+    "outputHash": "d7a17f5ed663",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.competitor": {
+    "text": "핵심 초점 아님",
+    "_sourceHash": "f6b730e6a344",
+    "provenance": "machine",
+    "outputHash": "3cb30b69c857",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.feature": {
+    "text": "레이어 기반 이미지 편집기",
+    "_sourceHash": "6da66cca58fe",
+    "provenance": "machine",
+    "outputHash": "e3ff58cdac57",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.5.snapotter": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.competitor": {
+    "text": "PDF 자동화 워크플로",
+    "_sourceHash": "b0e6dbe260ab",
+    "provenance": "machine",
+    "outputHash": "6755e34e292e",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.feature": {
+    "text": "파이프라인과 일괄 처리",
+    "_sourceHash": "a6729986a901",
+    "provenance": "machine",
+    "outputHash": "5bdf3b0545e4",
+    "stale": false
+  },
+  "alt:stirling-pdf:rows.6.snapotter": {
+    "text": "예",
+    "_sourceHash": "85a39ab345d6",
+    "provenance": "machine",
+    "outputHash": "2eb73fba696e",
+    "stale": false
+  },
+  "alt:tinypng:breadth": {
+    "text": "TinyPNG는 이미지 압축이 목적일 때 훌륭합니다. SnapOtter는 PNG, JPEG, WebP, AVIF를 압축하고, 나아가 크기 조정, 자르기, 변환, 워터마크, 메타데이터 도구, 비디오, 오디오, PDF, 파일 워크플로까지 이어갑니다.",
+    "_sourceHash": "baf335e6d1e7",
+    "provenance": "machine",
+    "outputHash": "b9bfce8657cf",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.a": {
+    "text": "있습니다. SnapOtter는 이미지 압축을 로컬에서 실행하므로, 실질적인 한계는 외부 이미지 서비스의 할당량이 아니라 내 배포 하드웨어입니다.",
+    "_sourceHash": "beb7b2950475",
+    "provenance": "machine",
+    "outputHash": "83db664b945f",
+    "stale": false
+  },
+  "alt:tinypng:faqs.0.q": {
+    "text": "TinyPNG의 셀프호스팅 대안이 있나요?",
+    "_sourceHash": "9d4fdf9cb579",
+    "provenance": "machine",
+    "outputHash": "474733bdfc51",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.a": {
+    "text": "PNG, JPEG, WebP, AVIF를 압축하며 형식 간 변환도 지원합니다. 또한 카메라 RAW 형식을 포함해 다양한 입력 형식을 읽습니다.",
+    "_sourceHash": "3f1cb2964516",
+    "provenance": "machine",
+    "outputHash": "0ccae8aba1d1",
+    "stale": false
+  },
+  "alt:tinypng:faqs.1.q": {
+    "text": "SnapOtter는 어떤 형식을 압축할 수 있나요?",
+    "_sourceHash": "832dd1b8f2b1",
+    "provenance": "machine",
+    "outputHash": "36ba743845e9",
+    "stale": false
+  },
+  "alt:tinypng:h1": {
+    "text": "TinyPNG의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "704f40413e98",
+    "provenance": "machine",
+    "outputHash": "379095bcc478",
+    "stale": false
+  },
+  "alt:tinypng:intro": {
+    "text": "TinyPNG는 이미지 압축에 특화된 온라인 도구입니다. SnapOtter는 압축, 변환, 크기 조정, 메타데이터 등 이미지 작업을 로컬에서 실행하려는 팀을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "13108e9c9f9f",
+    "provenance": "machine",
+    "outputHash": "4658e73e1c30",
+    "stale": false
+  },
+  "alt:tinypng:metaDescription": {
+    "text": "TinyPNG는 온라인과 Tinify API를 통해 이미지를 압축합니다. SnapOtter는 직접 운영하는 서버에서 이미지를 압축하고 변환하며, 폭넓은 파일 워크플로를 하나의 스택으로 제공합니다.",
+    "_sourceHash": "b80529549fd6",
+    "provenance": "machine",
+    "outputHash": "44fdfd1e5f70",
+    "stale": false
+  },
+  "alt:tinypng:pageTitle": {
+    "text": "TinyPNG의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "919183373830",
+    "provenance": "machine",
+    "outputHash": "379095bcc478",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.competitor": {
+    "text": "호스팅형 웹 서비스",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "803c99390637",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:tinypng:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.competitor": {
+    "text": "처리를 위해 파일이 공급업체 호스팅 서비스로 업로드됨",
+    "_sourceHash": "1b92e95a59a6",
+    "provenance": "machine",
+    "outputHash": "23f7dab556fc",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:tinypng:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.competitor": {
+    "text": "무료 웹 사용과 유료/개발자 API 옵션",
+    "_sourceHash": "174f196942c5",
+    "provenance": "machine",
+    "outputHash": "2517f86b781e",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:tinypng:rows.2.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:tinypng:rows.3.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.competitor": {
+    "text": "이미지 압축과 Tinify API 워크플로",
+    "_sourceHash": "779680a4ddb0",
+    "provenance": "machine",
+    "outputHash": "8d2f3d80c88b",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.feature": {
+    "text": "이미지 압축을 넘어서",
+    "_sourceHash": "23085b56da1d",
+    "provenance": "machine",
+    "outputHash": "8cf8b79e9b7a",
+    "stale": false
+  },
+  "alt:tinypng:rows.4.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:tinypng:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.competitor": {
+    "text": "제품에 따라 브라우저 워크플로 또는 공급업체 관리형 API",
+    "_sourceHash": "bce7bff56b5c",
+    "provenance": "machine",
+    "outputHash": "284e74fae2a5",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:tinypng:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  },
+  "alt:tinywow:breadth": {
+    "text": "TinyWow는 아무것도 설치하지 않고 빠른 브라우저 도구를 쓰고 싶을 때 편리합니다. SnapOtter는 그 반대편의 절충안을 위해 만들어졌습니다. 프라이빗 배포, 내부 워크플로, 반복 가능한 파이프라인, 그리고 이미지, 비디오, 오디오, PDF, 파일에 걸친 로컬 파일 처리가 그것입니다.",
+    "_sourceHash": "13847e15e3a5",
+    "provenance": "machine",
+    "outputHash": "1cc298a39432",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.a": {
+    "text": "아닙니다. TinyWow는 폭넓은 호스팅형 웹 도구 모음입니다. SnapOtter는 프라이빗 배포, 소스 공개, API, 파이프라인을 원하는 팀을 위한 셀프호스팅 파일 처리 도구 모음입니다.",
+    "_sourceHash": "2adcdbfb9aa9",
+    "provenance": "machine",
+    "outputHash": "ec1aaf025aef",
+    "stale": false
+  },
+  "alt:tinywow:faqs.0.q": {
+    "text": "SnapOtter는 TinyWow의 복제판인가요?",
+    "_sourceHash": "424e5ba67092",
+    "provenance": "machine",
+    "outputHash": "e601fa181636",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.a": {
+    "text": "호스팅형 처리가 무방한 일회성 브라우저 작업에는 TinyWow를 쓰세요. 파일이 민감하거나, 워크플로가 반복되거나, 조직이 직접 통제하는 인프라에서 처리가 이뤄져야 한다면 SnapOtter를 쓰세요.",
+    "_sourceHash": "5d618bd94898",
+    "provenance": "machine",
+    "outputHash": "dfdaf80575d6",
+    "stale": false
+  },
+  "alt:tinywow:faqs.1.q": {
+    "text": "TinyWow와 SnapOtter 중 무엇을 써야 하나요?",
+    "_sourceHash": "c5b563c2bfcc",
+    "provenance": "machine",
+    "outputHash": "0b93310d4493",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.a": {
+    "text": "직접적으로는 아닙니다. SnapOtter는 이미지, 비디오, 오디오, PDF, 압축파일, 파일 등 파일 조작에 집중합니다. 글쓰기 템플릿보다 파일 처리 계층이 더 중요할 때 잘 맞습니다.",
+    "_sourceHash": "a84574d442bc",
+    "provenance": "machine",
+    "outputHash": "2564edcc7f66",
+    "stale": false
+  },
+  "alt:tinywow:faqs.2.q": {
+    "text": "SnapOtter가 TinyWow의 AI 글쓰기 도구를 대체하나요?",
+    "_sourceHash": "400a9c23c387",
+    "provenance": "machine",
+    "outputHash": "df220353d729",
+    "stale": false
+  },
+  "alt:tinywow:h1": {
+    "text": "TinyWow의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "267dfe729674",
+    "provenance": "machine",
+    "outputHash": "cf50c2cf0ddf",
+    "stale": false
+  },
+  "alt:tinywow:intro": {
+    "text": "TinyWow는 빠른 PDF, 이미지, 비디오, AI 글쓰기, 파일 작업을 위한 폭넓은 호스팅형 도구 모음입니다. SnapOtter는 일상적인 파일 유틸리티를 직접 통제하는 인프라에서 쓰려는 팀을 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "15694143ff60",
+    "provenance": "machine",
+    "outputHash": "d4ec111b186d",
+    "stale": false
+  },
+  "alt:tinywow:metaDescription": {
+    "text": "TinyWow는 PDF, 이미지, 비디오, AI 글쓰기, 파일 작업을 위한 폭넓은 호스팅형 도구 모음입니다. SnapOtter는 프라이빗한 파일 워크플로를 위한 셀프호스팅 대안입니다.",
+    "_sourceHash": "5ab63ad9b614",
+    "provenance": "machine",
+    "outputHash": "7ac22f34235a",
+    "stale": false
+  },
+  "alt:tinywow:pageTitle": {
+    "text": "TinyWow의 오픈소스 셀프호스팅 대안",
+    "_sourceHash": "5f99d57874c8",
+    "provenance": "machine",
+    "outputHash": "cf50c2cf0ddf",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.competitor": {
+    "text": "호스팅형 온라인 도구 모음",
+    "_sourceHash": "d5765b88b775",
+    "provenance": "machine",
+    "outputHash": "2c0621d598a5",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.feature": {
+    "text": "배포 방식",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "4f0fd43b48bf",
+    "stale": false
+  },
+  "alt:tinywow:rows.0.snapotter": {
+    "text": "직접 운영하는 서버에서 셀프호스팅",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "60a423064649",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.competitor": {
+    "text": "TinyWow 서버로 업로드됨. TinyWow는 파일이 1시간 후 삭제된다고 밝힘",
+    "_sourceHash": "a7f51f9da902",
+    "provenance": "machine",
+    "outputHash": "dfa02b33066c",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.feature": {
+    "text": "파일 처리 위치",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f54faf14101f",
+    "stale": false
+  },
+  "alt:tinywow:rows.1.snapotter": {
+    "text": "내 인프라",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "15b44f417057",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.competitor": {
+    "text": "PDF, 이미지, 비디오, AI 글쓰기, 파일 유틸리티",
+    "_sourceHash": "7da6fcb1a5d0",
+    "provenance": "machine",
+    "outputHash": "4ad456d591ad",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.feature": {
+    "text": "도구 범위",
+    "_sourceHash": "293e4b8084c3",
+    "provenance": "machine",
+    "outputHash": "43be1af9973b",
+    "stale": false
+  },
+  "alt:tinywow:rows.2.snapotter": {
+    "text": "이미지, 비디오, 오디오, PDF, 파일",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "8bb6dbfda41a",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.competitor": {
+    "text": "무료 도구와 유료 후원/콘텐츠 요금제",
+    "_sourceHash": "7d6de7bf58d9",
+    "provenance": "machine",
+    "outputHash": "32c03f5b6e9a",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.feature": {
+    "text": "비용 통제",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5ee136710741",
+    "stale": false
+  },
+  "alt:tinywow:rows.3.snapotter": {
+    "text": "AGPLv3로 무료. 한계는 하드웨어에 달림",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f1bf4eb4af30",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.competitor": {
+    "text": "브라우저 기반 온라인 사용에 맞춰 설계됨",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9e4a2bfe1f6a",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.feature": {
+    "text": "오프라인 / 폐쇄망 사용",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "35bcb6d2f9ad",
+    "stale": false
+  },
+  "alt:tinywow:rows.4.snapotter": {
+    "text": "네트워크 내부에 배포하면 지원",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b02f0f8655d6",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.competitor": {
+    "text": "공급업체가 운영하는 서비스로, 소스 공개는 제품 모델이 아님",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4ce5105bb830",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.feature": {
+    "text": "소스 공개와 감사 가능성",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0726965379b5",
+    "stale": false
+  },
+  "alt:tinywow:rows.5.snapotter": {
+    "text": "AGPLv3로 소스 공개",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "1b3c6c817686",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.competitor": {
+    "text": "주로 빠른 웹 도구 중심의 워크플로",
+    "_sourceHash": "785307439941",
+    "provenance": "machine",
+    "outputHash": "47830c0adc98",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.feature": {
+    "text": "자동화",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "fc13d6bb5487",
+    "stale": false
+  },
+  "alt:tinywow:rows.6.snapotter": {
+    "text": "내 배포 환경 내 REST API와 파이프라인",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "6dd41a6f2530",
+    "stale": false
+  }
+}
