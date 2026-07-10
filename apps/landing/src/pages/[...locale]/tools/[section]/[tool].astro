@@ -7,16 +7,26 @@ import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { TOOL_SEO } from "@/data/tool-seo";
+import { LANDING_LOCALES, t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { seoArray, seoText } from "@/lib/seo-content";
+import { loadToolStrings } from "@/lib/tool-strings";
 import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
-  return TOOLS.map((tool) => ({
-    params: { section: toolSection(tool), tool: tool.id },
-    props: { tool },
-  }));
+  const paths = [];
+  for (const locale of LANDING_LOCALES) {
+    for (const tool of TOOLS) {
+      paths.push({
+        params: { locale: locale === "en" ? undefined : locale, section: toolSection(tool), tool: tool.id },
+        props: { tool, locale },
+      });
+    }
+  }
+  return paths;
 }
 
-const { tool } = Astro.props;
+const { tool, locale } = Astro.props;
 
 const section = toolSection(tool);
 const sectionInfo = SECTIONS.find((s) => s.id === section);
@@ -29,6 +39,26 @@ const related = TOOLS.filter((t) => t.category === tool.category && t.id !== too
 const catColor = category?.color ?? "#737373";
 const isAiTool = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(tool.id);
 const toolCount = TOOLS.length;
+
+// Tool name/description come from shared i18n (already translated in all 21 langs).
+const toolStrings = await loadToolStrings(locale);
+const toolName = toolStrings[tool.id]?.name ?? tool.name;
+const toolDescription = toolStrings[tool.id]?.description ?? tool.description;
+
+const base = `seo:${tool.id}`;
+const searchTitle = seo ? seoText(locale, `${base}:searchTitle`, seo.searchTitle) : toolName;
+const h1 = seo?.h1 ? seoText(locale, `${base}:h1`, seo.h1) : toolName;
+const longDescription = seo?.longDescription
+  ? seoText(locale, `${base}:longDescription`, seo.longDescription)
+  : toolDescription;
+const features = seo?.features ? seoArray(locale, base, "features", seo.features) : [];
+const useCases = seo?.useCases ? seoArray(locale, base, "useCases", seo.useCases) : [];
+const faqs = (seo?.faqs ?? []).map((faq, i) => ({
+  q: seoText(locale, `${base}:faqs.${i}.q`, faq.q),
+  a: seoText(locale, `${base}:faqs.${i}.a`, faq.a),
+}));
+
+const PATH = `/tools/${section}/${tool.id}/`;
 
 function renderIcon(iconName: string): string {
   const iconData = (lucideIcons as Record<string, unknown>)[iconName];
@@ -44,8 +74,8 @@ function renderIcon(iconName: string): string {
     .join("");
 }
 
-const title = seo ? `${seo.searchTitle} | SnapOtter` : `${tool.name} | SnapOtter`;
-const description = seo?.longDescription ?? tool.description;
+const title = seo ? `${searchTitle} | SnapOtter` : `${toolName} | SnapOtter`;
+const description = longDescription;
 
 // The full longDescription drives the on-page copy and structured data, but as a
 // <meta name="description"> it overflows the ~160-char SERP snippet. Keep as many
@@ -81,7 +111,7 @@ const breadcrumbJsonLd = {
     {
       "@type": "ListItem",
       position: 4,
-      name: tool.name,
+      name: toolName,
       item: `https://snapotter.com/tools/${section}/${tool.id}/`,
     },
   ],
@@ -90,7 +120,7 @@ const breadcrumbJsonLd = {
 const softwareJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: `SnapOtter ${tool.name}`,
+  name: `SnapOtter ${toolName}`,
   description,
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Linux, macOS, Windows (via Docker)",
@@ -98,7 +128,7 @@ const softwareJsonLd = {
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   license: "https://www.gnu.org/licenses/agpl-3.0.en.html",
   url: `https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`,
-  ...(seo?.features && { featureList: seo.features }),
+  ...(features.length > 0 && { featureList: features }),
   isPartOf: { "@type": "SoftwareApplication", name: "SnapOtter", url: "https://snapotter.com" },
 };
 
@@ -112,31 +142,33 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
 <Base
   title={title}
   description={metaDescription}
-  canonical={`https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
 >
   <Fragment slot="head">
     <JsonLd data={allJsonLd} />
   </Fragment>
 
-  <Navbar />
+  <Navbar locale={locale} path={PATH} />
 
   <main id="main">
     <!-- Breadcrumb -->
     <nav class="mx-auto max-w-4xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2 text-sm text-muted">
         <li>
-          <a href="/" class="transition-colors hover:text-foreground">Home</a>
+          <a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a>
         </li>
         <li aria-hidden="true">/</li>
         <li>
-          <a href="/tools" class="transition-colors hover:text-foreground">Tools</a>
+          <a href={localizeHref(locale, "/tools")} class="transition-colors hover:text-foreground">{t(locale, "common.tools")}</a>
         </li>
         <li aria-hidden="true">/</li>
         <li>
-          <a href={`/tools/${section}/`} class="transition-colors hover:text-foreground">{sectionName}</a>
+          <a href={localizeHref(locale, `/tools/${section}/`)} class="transition-colors hover:text-foreground">{sectionName}</a>
         </li>
         <li aria-hidden="true">/</li>
-        <li class="font-medium text-foreground">{tool.name}</li>
+        <li class="font-medium text-foreground">{toolName}</li>
       </ol>
     </nav>
 
@@ -173,7 +205,7 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
         </div>
 
         <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">
-          {seo?.h1 ?? tool.name}
+          {h1}
         </h1>
         <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">
           {description}
@@ -191,7 +223,7 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
               <path d="m22 17-5 5-5-5" />
               <path d="M17 22V12" />
             </svg>
-            Deploy with Docker
+            {t(locale, "common.deployWithDocker")}
           </a>
           <a
             href="https://github.com/snapotter-hq/snapotter"
@@ -202,14 +234,14 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
             <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
             </svg>
-            View Source
+            {t(locale, "common.viewSource")}
           </a>
         </div>
       </div>
     </section>
 
     <!-- Features -->
-    {seo?.features && seo.features.length > 0 && (
+    {features.length > 0 && (
       <section class="border-t border-border bg-background-alt py-16">
         <div class="mx-auto max-w-4xl px-6">
           <div class="reveal">
@@ -218,11 +250,11 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
               <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
-                Features
+                {t(locale, "tool.features")}
               </h2>
             </div>
             <ul class="grid gap-3 sm:grid-cols-2">
-              {seo.features.map((feature) => (
+              {features.map((feature) => (
                 <li class="flex gap-3">
                   <svg class="mt-0.5 h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke={catColor} stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -238,15 +270,15 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
     )}
 
     <!-- Use Cases -->
-    {seo?.useCases && seo.useCases.length > 0 && (
+    {useCases.length > 0 && (
       <section class="py-16">
         <div class="mx-auto max-w-4xl px-6">
           <div class="reveal">
             <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
-              What you can do
+              {t(locale, "tool.whatYouCanDo")}
             </h2>
             <ul class="mt-8 grid gap-4 sm:grid-cols-2">
-              {seo.useCases.map((useCase) => (
+              {useCases.map((useCase) => (
                 <li class="flex gap-3">
                   <svg class="mt-1 h-4 w-4 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
@@ -274,13 +306,13 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
             <div>
               <h2 class="font-display text-xl font-bold">
                 {isAiTool
-                  ? "AI that runs on your hardware. No cloud APIs, no usage limits."
-                  : "Self-hosted. Your files never leave your network."}
+                  ? t(locale, "tool.selfHosted.aiTitle")
+                  : t(locale, "tool.selfHosted.title")}
               </h2>
               <p class="mt-2 text-sm leading-relaxed text-muted">
                 {isAiTool
-                  ? `Unlike cloud AI services, SnapOtter's ${tool.name} runs the ML model directly on your server. Your files are processed locally with no data sent to external APIs. No per-file fees, no rate limits, no privacy concerns. Deploy once with Docker and use it as much as you need.`
-                  : `SnapOtter runs entirely on your own infrastructure. Files processed with ${tool.name} are never uploaded to third-party servers. Deploy a single Docker container and process files with full privacy, no watermarks, and no usage limits. Open source under AGPL-3.0.`}
+                  ? t(locale, "tool.selfHosted.aiBody", { tool: toolName })
+                  : t(locale, "tool.selfHosted.body", { tool: toolName })}
               </p>
             </div>
           </div>
@@ -289,15 +321,15 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
     </section>
 
     <!-- FAQs -->
-    {seo?.faqs && seo.faqs.length > 0 && (
+    {faqs.length > 0 && (
       <section class="py-16">
         <div class="mx-auto max-w-4xl px-6">
           <div class="reveal">
             <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
-              Frequently asked questions
+              {t(locale, "tool.faqTitle")}
             </h2>
             <dl class="mt-8 space-y-6">
-              {seo.faqs.map((faq) => (
+              {faqs.map((faq) => (
                 <div class="rounded-xl border border-border bg-surface p-6">
                   <dt class="text-sm font-semibold">{faq.q}</dt>
                   <dd class="mt-3 text-sm leading-relaxed text-muted">{faq.a}</dd>
@@ -315,15 +347,17 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
         <div class="mx-auto max-w-4xl px-6">
           <div class="reveal">
             <h2 class="font-display text-2xl font-bold tracking-tight">
-              More {category?.name} tools
+              {t(locale, "tool.moreCategoryTools", { category: category?.name ?? "" })}
             </h2>
             <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {related.map((t) => {
-                const relCat = categoryMap.get(t.category);
+              {related.map((t2) => {
+                const relCat = categoryMap.get(t2.category);
                 const relColor = relCat?.color ?? "#737373";
+                const relName = toolStrings[t2.id]?.name ?? t2.name;
+                const relDesc = toolStrings[t2.id]?.description ?? t2.description;
                 return (
                   <a
-                    href={`/tools/${toolSection(t)}/${t.id}/`}
+                    href={localizeHref(locale, `/tools/${toolSection(t2)}/${t2.id}/`)}
                     class="group flex flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
                   >
                     <svg
@@ -334,12 +368,12 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      set:html={renderIcon(t.icon)}
+                      set:html={renderIcon(t2.icon)}
                     />
-                    <span class="mt-3 text-sm font-bold">{t.name}</span>
-                    <p class="mt-1.5 text-xs leading-relaxed text-muted">{t.description}</p>
+                    <span class="mt-3 text-sm font-bold">{relName}</span>
+                    <p class="mt-1.5 text-xs leading-relaxed text-muted">{relDesc}</p>
                     <span class="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-medium text-primary transition-all group-hover:gap-2">
-                      Learn more
+                      {t(locale, "common.learnMore")}
                       <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                       </svg>
@@ -358,10 +392,10 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
       <div class="mx-auto max-w-4xl px-6 text-center">
         <div class="reveal">
           <h2 class="font-display text-3xl font-bold tracking-tight">
-            Ready to try {tool.name}?
+            {t(locale, "tool.readyToTry", { tool: toolName })}
           </h2>
           <p class="mx-auto mt-4 max-w-lg text-muted">
-            Deploy SnapOtter in under a minute. All {toolCount} tools included. Open source and free forever.
+            {t(locale, "tool.ctaBody", { count: toolCount })}
           </p>
           <div class="mt-8 flex flex-wrap justify-center gap-4">
             <a
@@ -370,16 +404,16 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
               rel="noopener noreferrer"
               class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
             >
-              Get Started
+              {t(locale, "common.getStarted")}
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
               </svg>
             </a>
             <a
-              href="/#pricing"
+              href={localizeHref(locale, "/#pricing")}
               class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
             >
-              View Pricing
+              {t(locale, "common.viewPricing")}
             </a>
           </div>
         </div>
