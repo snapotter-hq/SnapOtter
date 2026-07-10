@@ -35,7 +35,7 @@ const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "SnapOtter",
-  url: "https://snapotter.com",
+  url: `https://snapotter.com${localizeHref(locale, "/")}`,
   description: `Self-hosted file processing suite with ${toolCount} tools across 5 modalities.`,
   publisher: {
     "@type": "Organization",
@@ -92,7 +92,7 @@ const navSchema = {
     {
       "@type": "SiteNavigationElement",
       name: "FAQ",
-      url: "https://snapotter.com/faq",
+      url: `https://snapotter.com${localizeHref(locale, "/faq")}`,
       description: "Frequently asked questions",
     },
     {
@@ -104,7 +104,7 @@ const navSchema = {
     {
       "@type": "SiteNavigationElement",
       name: "Contact",
-      url: "https://snapotter.com/contact",
+      url: `https://snapotter.com${localizeHref(locale, "/contact")}`,
       description: "Book a demo or get enterprise licensing",
     },
     {

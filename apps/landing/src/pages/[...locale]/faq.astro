@@ -42,9 +42,14 @@ const breadcrumbJsonLd = {
       "@type": "ListItem",
       position: 1,
       name: t(locale, "common.home"),
-      item: "https://snapotter.com",
+      item: `https://snapotter.com${localizeHref(locale, "/")}`,
     },
-    { "@type": "ListItem", position: 2, name: "FAQ", item: "https://snapotter.com/faq" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "FAQ",
+      item: `https://snapotter.com${localizeHref(locale, PATH)}`,
+    },
   ],
 };
 ---
