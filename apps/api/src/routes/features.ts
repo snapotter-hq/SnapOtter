@@ -25,6 +25,7 @@ import { join } from "node:path";
 import { acquireVenvLock, shutdownDispatcher } from "@snapotter/ai";
 import { ANALYTICS_EVENTS, FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { env } from "../config.js";
 import { trackEvent } from "../lib/analytics.js";
 import {
   clearActive,
@@ -53,6 +54,7 @@ import {
   setInstallProgress,
   verifyBundleModels,
 } from "../lib/feature-status.js";
+import { evaluateInstallWatchdog } from "../lib/install-watchdog.js";
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
@@ -100,10 +102,32 @@ function startInstall(bundleId: string, jobId: string): void {
     // would release the file lock and active slot that pump() just handed to
     // the next queued bundle, letting two installers run into the same venv
     // at once (the corruption the lock exists to prevent).
+    // Install watchdog: a wedged installer (dead download socket, hung pip)
+    // otherwise holds the venv writer lock forever and blocks every other
+    // install with no way out but a server restart. Track the last progress
+    // frame; if the child goes silent past the stall budget, or blows the
+    // absolute ceiling, kill it so its close handler frees the locks and the
+    // user sees a retryable failure.
+    let lastProgressAt = Date.now();
+    let watchdog: ReturnType<typeof setInterval> | null = null;
+    let killGrace: ReturnType<typeof setTimeout> | null = null;
+    let watchdogError: string | null = null;
+    const clearWatchdog = () => {
+      if (watchdog) {
+        clearInterval(watchdog);
+        watchdog = null;
+      }
+      if (killGrace) {
+        clearTimeout(killGrace);
+        killGrace = null;
+      }
+    };
+
     let finalized = false;
     const finalizeOnce = (): boolean => {
       if (finalized) return false;
       finalized = true;
+      clearWatchdog();
       releaseVenvOnce();
       releaseInstallLock();
       clearActive();
@@ -118,6 +142,42 @@ function startInstall(bundleId: string, jobId: string): void {
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
       },
     });
+
+    const stallMs = env.INSTALL_STALL_MS;
+    const maxMs = env.INSTALL_MAX_MS;
+    if (stallMs > 0 || maxMs > 0) {
+      watchdog = setInterval(() => {
+        const verdict = evaluateInstallWatchdog(
+          Date.now(),
+          lastProgressAt,
+          installStartTime,
+          stallMs,
+          maxMs,
+        );
+        if (!verdict.kill) return;
+        watchdogError = verdict.reason;
+        setInstallProgress(bundleId, null, watchdogError);
+        if (watchdog) {
+          clearInterval(watchdog);
+          watchdog = null;
+        }
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // child already gone
+        }
+        // Escalate to SIGKILL if SIGTERM does not land (e.g. a C extension
+        // ignoring the signal); the close handler clears this grace timer.
+        killGrace = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            // already gone
+          }
+        }, 10_000);
+      }, 30_000);
+      watchdog.unref?.();
+    }
 
     let stderrBuffer = "";
     let stdoutBuffer = "";
@@ -143,6 +203,7 @@ function startInstall(bundleId: string, jobId: string): void {
         try {
           const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
           if (typeof parsed.progress === "number") {
+            lastProgressAt = Date.now();
             setInstallProgress(
               bundleId,
               { percent: parsed.progress, stage: parsed.stage ?? "" },
@@ -175,10 +236,12 @@ function startInstall(bundleId: string, jobId: string): void {
           duration_ms: Date.now() - installStartTime,
         });
       } else {
+        // A watchdog kill wins: the child's exit code/stderr would otherwise
+        // read as a generic signal death and bury why it was stopped.
+        let errorMsg: string | undefined = watchdogError ?? undefined;
         // Extract the structured error from Python's fail() function first.
         // fail() writes {"error": "..."} to stderr - prefer this over raw lines.
-        let errorMsg: string | undefined;
-        for (let i = lastStderrLines.length - 1; i >= 0; i--) {
+        for (let i = lastStderrLines.length - 1; !errorMsg && i >= 0; i--) {
           const line = lastStderrLines[i];
           if (line.startsWith("{")) {
             try {

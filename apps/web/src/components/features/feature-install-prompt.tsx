@@ -117,7 +117,11 @@ export function FeatureInstallPrompt({
       )
       .join(" + ") ||
     (bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize);
-  const showBundleBreakdown = !isRepair && toolId !== undefined && requiredBundles.length > 1;
+  // Show the per-bundle breakdown for any multi-bundle tool, including the
+  // repair state: when one bundle of a multi-bundle tool (e.g. passport-photo)
+  // errors, the user still needs to see that the sibling bundle is installing,
+  // queued, or already done. Hiding it during repair is exactly when it hurts.
+  const showBundleBreakdown = toolId !== undefined && requiredBundles.length > 1;
 
   function bundleStatusLabel(candidate: FeatureBundleState): string {
     if (installing[candidate.id]) return t.settings.aiFeatures.installing;
@@ -204,7 +208,9 @@ export function FeatureInstallPrompt({
               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               : isCandidateInstalling || isCandidateQueued
                 ? "bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground";
+                : candidate.status === "error"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted text-muted-foreground";
             return (
               <div
                 key={candidate.id}

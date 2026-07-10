@@ -33,6 +33,10 @@ const MODELS_DIR = join(AI_DIR, "models");
 const INSTALLED_PATH = join(AI_DIR, "installed.json");
 const INSTALLED_TMP_PATH = `${INSTALLED_PATH}.tmp`;
 const LOCK_PATH = join(AI_DIR, "install.lock");
+// Breadcrumb the installer drops right before it writes into the shared venv
+// site-packages and clears the instant that write completes. A survivor on boot
+// means the process died mid-write, so the venv may be torn (see move_tree).
+const VENV_WRITING_MARKER = join(AI_DIR, "venv.writing");
 const MANIFEST_PATH =
   process.env.FEATURE_MANIFEST_PATH || join(PROJECT_ROOT, "docker/feature-manifest.json");
 
@@ -435,6 +439,37 @@ export function recoverInterruptedInstalls(): void {
       } catch {
         // already gone
       }
+    }
+  }
+
+  // 4b. Heal a torn shared venv. If the venv-writing breadcrumb survived, an
+  // install died while rewriting the shared site-packages, which can leave a
+  // package half-replaced and break EVERY AI tool (not just the one installing).
+  // Model weight files under MODELS_DIR are unaffected, so the safe, automatic
+  // recovery is to reseed the venv from the image base and reset the install
+  // ledger; the user reinstalls bundles from a known-good state. This is the
+  // same repair as "Reset AI Environment", done automatically on next boot so a
+  // crash-broken install self-heals instead of leaving mysteriously dead tools.
+  if (existsSync(VENV_WRITING_MARKER)) {
+    if (isDockerEnvironment() && existsSync("/opt/venv")) {
+      console.warn(
+        "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
+      );
+      try {
+        execFileSync("/usr/local/bin/reseed-ai-venv.sh", { stdio: "ignore", timeout: 120_000 });
+        writeInstalled({ bundles: {} });
+      } catch (err) {
+        console.error("[feature-status] Failed to reseed AI venv after interrupted install:", err);
+      }
+    } else {
+      console.warn(
+        "[feature-status] An install was interrupted mid venv-write (non-Docker); the AI venv may be inconsistent. Reinstall the affected bundle.",
+      );
+    }
+    try {
+      unlinkSync(VENV_WRITING_MARKER);
+    } catch {
+      // best-effort
     }
   }
 

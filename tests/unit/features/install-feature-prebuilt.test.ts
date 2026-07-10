@@ -1,6 +1,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -58,7 +66,12 @@ function createTestTar(bundleId: string): { tarPath: string; sha256: string } {
   return { tarPath, sha256: hash };
 }
 
-function writeManifest(bundleId: string, tarPath: string, sha256: string) {
+function writeManifest(
+  bundleId: string,
+  tarPath: string,
+  sha256: string,
+  extra: Record<string, unknown> = {},
+) {
   const size = readFileSync(tarPath).length;
   const manifest = {
     manifestVersion: 2,
@@ -75,10 +88,18 @@ function writeManifest(bundleId: string, tarPath: string, sha256: string) {
         },
         models: [{ id: "testmodel", path: "testmodel/weights.bin", minSize: 0 }],
         enablesTools: [],
+        ...extra,
       },
     },
   };
   writeFileSync(manifestPath, JSON.stringify(manifest));
+}
+
+/** Put a real python3 at venv/bin/python3 so the post-install smoke check runs. */
+function linkVenvPython() {
+  const py = execFileSync("python3", ["-c", "import sys; print(sys.executable)"]).toString().trim();
+  mkdirSync(join(venvDir, "bin"), { recursive: true });
+  symlinkSync(py, join(venvDir, "bin", "python3"));
 }
 
 describe("install_feature.py prebuilt mode", () => {
@@ -149,5 +170,74 @@ describe("install_feature.py prebuilt mode", () => {
 
     const last = JSON.parse(progressLines[progressLines.length - 1]);
     expect(last.progress).toBe(100);
+  });
+
+  it("passes the post-install smoke import check and clears the venv-writing breadcrumb", () => {
+    linkVenvPython();
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256, { smokeImports: ["json", "sys"] });
+
+    const result = spawnSync("python3", [scriptPath, "face-detection", manifestPath, modelsDir], {
+      env: {
+        ...process.env,
+        DATA_DIR: tempDir,
+        PYTHON_VENV_PATH: venvDir,
+        SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+      },
+      timeout: 30_000,
+    });
+
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeDefined();
+    // The breadcrumb is cleared once the venv write completes cleanly.
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+  });
+
+  it("fails the install (and does NOT record it) when the smoke import cannot load", () => {
+    linkVenvPython();
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["snapotter_not_a_real_module_zzz"],
+    });
+
+    const result = spawnSync("python3", [scriptPath, "face-detection", manifestPath, modelsDir], {
+      env: {
+        ...process.env,
+        DATA_DIR: tempDir,
+        PYTHON_VENV_PATH: venvDir,
+        SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+      },
+      timeout: 30_000,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString()).toContain("verification failed");
+    // Not marked installed, so the tool shows as needing install and a retry is clean.
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+  });
+
+  it("honors SNAPOTTER_SKIP_INSTALL_SMOKE=1 as a safety valve for false positives", () => {
+    linkVenvPython();
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["snapotter_not_a_real_module_zzz"],
+    });
+
+    const result = spawnSync("python3", [scriptPath, "face-detection", manifestPath, modelsDir], {
+      env: {
+        ...process.env,
+        DATA_DIR: tempDir,
+        PYTHON_VENV_PATH: venvDir,
+        SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+        SNAPOTTER_SKIP_INSTALL_SMOKE: "1",
+      },
+      timeout: 30_000,
+    });
+
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeDefined();
   });
 });

@@ -122,15 +122,17 @@ During normal operation, the container makes **zero outbound network connections
 Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
 ```
 
-The only exception is **AI model downloads**: when a user installs an AI feature bundle through the UI, the container downloads model files from GitHub Releases and PyPI. These downloads happen once per bundle and are stored in the `/data` volume.
+The only exception is **AI model downloads**: when a user installs an AI feature bundle through the UI, the container downloads the pre-built bundle archive from Hugging Face, plus a few individual model files from GitHub Releases, Google Storage, and PyPI. These downloads happen once per bundle and are stored in the `/data` volume.
 
 **Firewall recommendations:**
 
 | Scenario | Outbound rule |
 |---|---|
 | Air-gapped (no AI) | Block all outbound traffic from the container |
-| AI bundles needed | Allow HTTPS to `github.com`, `objects.githubusercontent.com`, `pypi.org`, `files.pythonhosted.org` during install, then block |
+| AI bundles needed | Allow HTTPS to `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org` during install, then block |
 | After AI install | Block all outbound traffic - models are cached locally |
+
+Bundle archives are served from Hugging Face's Xet storage, which transfers over the `*.xethub.hf.co` endpoints in parallel and is what makes multi-GB bundle downloads fast. If your firewall allows `huggingface.co` but blocks `*.xethub.hf.co`, installs still succeed but fall back to a slower single-stream download, so allowlist the Xet hosts to stay on the fast path. Fully offline installs can skip all of this and use [Offline Bundle Import](/guide/deployment) instead.
 
 For reverse proxy configuration (Nginx, Traefik, Caddy, Cloudflare Tunnels), see the [Deployment guide](/guide/deployment#reverse-proxy).
 

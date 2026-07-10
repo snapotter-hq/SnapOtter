@@ -98,4 +98,39 @@ describe("FeatureInstallPrompt", () => {
     expect(installTool).toHaveBeenCalledWith("passport-photo");
     expect(installBundle).not.toHaveBeenCalled();
   });
+
+  it("keeps the multi-bundle breakdown visible when one bundle is in the error/repair state", () => {
+    const backgroundRemoval = makeBundleState({
+      status: "error",
+      error: "Checksum mismatch",
+    });
+    const faceDetection = makeBundleState({
+      id: "face-detection",
+      name: "Face Detection",
+      description: "Detect faces",
+      status: "installed",
+      estimatedSize: "200-300 MB",
+      enablesTools: ["blur-faces", "red-eye-removal", "smart-crop"],
+    });
+    useFeaturesStore.setState({
+      bundles: [backgroundRemoval, faceDetection],
+      installTool: vi.fn(),
+      installBundle: vi.fn(),
+    });
+
+    render(
+      <FeatureInstallPrompt
+        bundle={backgroundRemoval}
+        isAdmin
+        toolId="passport-photo"
+        toolName="Passport Photo"
+      />,
+    );
+
+    // The breakdown must still render during repair so the user can see the
+    // sibling bundle's state, not just the single failed one.
+    expect(screen.getByText("Background Removal")).toBeTruthy();
+    expect(screen.getByText("Face Detection")).toBeTruthy();
+    expect(screen.getByText("Installed")).toBeTruthy();
+  });
 });

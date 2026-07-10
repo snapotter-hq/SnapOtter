@@ -569,6 +569,23 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     expect(existsSync(lockPath)).toBe(false);
   });
 
+  it("consumes a surviving venv.writing breadcrumb (interrupted venv write)", () => {
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "ocr", startedAt: "2026-01-01T00:00:00.000Z" }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(() => mod.recoverInterruptedInstalls()).not.toThrow();
+
+    // The breadcrumb is always consumed so it can't retrigger recovery forever.
+    expect(existsSync(marker)).toBe(false);
+    // And the interruption is surfaced in the logs.
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/interrupted|venv/i);
+    warn.mockRestore();
+  });
+
   it("handles missing directories gracefully", async () => {
     vi.resetModules();
     const emptyTemp = mkdtempSync(join(tmpdir(), "snapotter-empty-"));

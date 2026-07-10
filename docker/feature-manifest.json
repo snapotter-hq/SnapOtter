@@ -6,7 +6,7 @@
     "numpy==1.26.4",
     "Pillow==12.2.0",
     "opencv-python-headless==4.10.0.84",
-    "huggingface-hub[hf_xet]==0.36.2"
+    "huggingface-hub[hf_xet,hf_transfer]==0.36.2"
   ],
   "constraints": [
     "numpy==1.26.4",
@@ -84,6 +84,7 @@
           "args": ["birefnet-hr-matting"]
         }
       ],
+      "smokeImports": ["rembg", "onnxruntime"],
       "enablesTools": [
         "remove-background",
         "passport-photo",
@@ -131,6 +132,7 @@
           "minSize": 1000000
         }
       ],
+      "smokeImports": ["mediapipe"],
       "enablesTools": ["blur-faces", "red-eye-removal", "smart-crop"]
     },
     "object-eraser-colorize": {
@@ -197,6 +199,7 @@
           "minSize": 0
         }
       ],
+      "smokeImports": ["onnxruntime"],
       "enablesTools": ["erase-object", "colorize", "ai-canvas-expand"]
     },
     "upscale-enhance": {
@@ -311,6 +314,7 @@
           "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
         }
       ],
+      "smokeImports": ["torch", "torchvision"],
       "enablesTools": ["upscale", "enhance-faces", "noise-removal"]
     },
     "photo-restoration": {
@@ -416,6 +420,7 @@
           "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
         }
       ],
+      "smokeImports": ["onnxruntime", "torch", "mediapipe"],
       "enablesTools": ["restore-photo"]
     },
     "ocr": {
@@ -492,6 +497,7 @@
           "args": ["PaddlePaddle/PaddleOCR-VL-1.5", "PaddleOCR-VL-1.5"]
         }
       ],
+      "smokeImports": ["paddle", "paddleocr"],
       "enablesTools": ["ocr", "ocr-pdf"]
     },
     "transcription": {
@@ -526,6 +532,7 @@
           "args": ["Systran/faster-whisper-small", "faster-whisper-small"]
         }
       ],
+      "smokeImports": ["faster_whisper", "ctranslate2"],
       "enablesTools": ["transcribe-audio", "auto-subtitles"]
     }
   }
