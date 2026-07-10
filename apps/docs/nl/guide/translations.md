@@ -1,17 +1,17 @@
 ---
 description: "21 ondersteunde talen en hoe je vertalingen voor SnapOtter maakt of verbetert met het door TypeScript afgedwongen i18n-systeem."
-i18n_source_hash: 0fdac8be0c98
+i18n_source_hash: 55837d9fdaef
 i18n_provenance: machine
-i18n_output_hash: 0c770d6f8bfa
+i18n_output_hash: d9f7dd1568a9
 ---
 
 # Vertaalgids {#translation-guide}
 
-SnapOtter wordt standaard geleverd met 21 talen. Het i18n-systeem gebruikt een lichte, op maat gemaakte runtime met door TypeScript afgedwongen volledigheid van locales en dynamische code-splitting.
+SnapOtter wordt standaard geleverd met 21 talen. Het i18n-systeem gebruikt een lichtgewicht eigen runtime met door TypeScript afgedwongen volledigheid van locales en dynamische code-splitting.
 
 ## Ondersteunde talen {#supported-languages}
 
-| Code | Taal | Eigen naam | Richting |
+| Code | Taal | Native Name | Direction |
 |------|----------|-------------|-----------|
 | `en` | Engels | English | LTR |
 | `zh-CN` | Chinees (vereenvoudigd) | 简体中文 | LTR |
@@ -33,23 +33,23 @@ SnapOtter wordt standaard geleverd met 21 talen. Het i18n-systeem gebruikt een l
 | `hi` | Hindi | हिन्दी | LTR |
 | `vi` | Vietnamees | Tiếng Việt | LTR |
 | `id` | Indonesisch | Bahasa Indonesia | LTR |
-| `th` | Thais | ไทย | LTR |
+| `th` | Thai | ไทย | LTR |
 
-## Hoe taalherkenning werkt {#how-language-detection-works}
+## Hoe taaldetectie werkt {#how-language-detection-works}
 
-SnapOtter gebruikt een resolutievolgorde in drie lagen:
+SnapOtter gebruikt een resolutievolgorde met drie niveaus:
 
-1. **Gebruikersvoorkeur** - opgeslagen in `localStorage("snapotter-locale")` en gesynchroniseerd met gebruikersinstellingen wanneer je bent aangemeld
-2. **Automatische browserdetectie** - loopt de `navigator.languages`-array af met BCP 47-prefixmatching
-3. **Instantiestandaard** - de `DEFAULT_LOCALE`-env-variabele van de beheerder (opgehaald uit `GET /api/v1/config/locale`)
+1. **Gebruikersvoorkeur** - opgeslagen in `localStorage("snapotter-locale")` en gesynchroniseerd met de gebruikersinstellingen bij authenticatie
+2. **Automatische browserdetectie** - loopt door de `navigator.languages`-array met BCP 47-prefixmatching
+3. **Standaard van de instantie** - de `DEFAULT_LOCALE` env-variabele van de beheerder (opgehaald uit `GET /api/v1/config/locale`)
 4. **Engelse terugval** - altijd beschikbaar
 
 Gebruikers kunnen de taal wijzigen via:
-- De **wereldbol-selector in de voettekst** (desktop, altijd zichtbaar)
-- De taalkiezer op de **aanmeldpagina** (voor aanmelding)
+- De **Globe-selector in de footer** (desktop, altijd zichtbaar)
+- De taalselector op de **loginpagina** (vóór authenticatie)
 - De sectie **Instellingen > Algemeen** (voorkeur per gebruiker)
-- De taal-dropdown in de **mobiele zijbalk**
-- De sectie **Instellingen > Systeem** stelt de standaard voor de hele instantie in (alleen beheerder)
+- De taalkeuzelijst in de **mobiele zijbalk**
+- De sectie **Instellingen > Systeem** stelt de standaardtaal voor de hele instantie in (alleen beheerder)
 
 ## Hoe vertalingen werken {#how-translations-work}
 
@@ -57,7 +57,7 @@ Alle UI-strings staan in `packages/shared/src/i18n/`. Het referentiebestand is `
 
 Het type `TranslationKeys` gebruikt `DeepStringRecord` om elke stringwaarde te accepteren terwijl de sleutelstructuur wordt afgedwongen. TypeScript vangt ontbrekende sleutels in elk vertaalbestand op tijdens het compileren.
 
-Alleen de actieve locale wordt tijdens runtime geladen via dynamische `import()`, waardoor de hoofdbundel klein blijft.
+Alleen de actieve locale wordt tijdens runtime geladen via een dynamische `import()`, zodat de hoofdbundel klein blijft.
 
 ## Vertalingen gebruiken in componenten {#using-translations-in-components}
 
@@ -85,10 +85,10 @@ We verwelkomen vertaal-PR's rechtstreeks. Je kunt een bestaande locale verbetere
 Om een verkeerde vertaling te melden zonder code in te dienen, open je een [GitHub Issue](https://github.com/snapotter-hq/SnapOtter/issues) met de taal, de onjuiste string en de voorgestelde correctie.
 
 ::: tip 
-Vertaal-PR's vereisen geen voorafgaande goedkeuring. Fork de repo, breng je wijzigingen aan en open een PR. Zie de [Bijdraaggids](/nl/guide/contributing) voor het volledige PR-proces en de CLA-vereiste.
+Vertaal-PR's vereisen geen voorafgaande goedkeuring. Fork de repo, breng je wijzigingen aan en open een PR. Zie de [Contributing Guide](/nl/guide/contributing) voor het volledige PR-proces en de CLA-vereiste.
 :::
 
-## Hoe je een vertaling maakt of bijwerkt {#how-to-create-or-update-a-translation}
+## Een vertaling maken of bijwerken {#how-to-create-or-update-a-translation}
 
 ### 1. Fork en clone {#_1-fork-and-clone}
 
@@ -108,7 +108,7 @@ cp packages/shared/src/i18n/en.ts packages/shared/src/i18n/XX.ts
 
 ### 3. Vertaal de strings {#_3-translate-the-strings}
 
-Open je nieuwe bestand en vertaal elke stringwaarde. Houd de objectstructuur en sleutels precies hetzelfde.
+Open je nieuwe bestand en vertaal elke stringwaarde. Houd de objectstructuur en sleutels exact hetzelfde.
 
 ```ts
 import type { TranslationKeys } from "./en.js";
@@ -126,7 +126,7 @@ Regels:
 - Vertaal geen objectsleutels, alleen stringwaarden
 - Houd `as const` aan het einde
 - Importeer `TranslationKeys` uit `./en.js` en typeer je export
-- Houd `{variable}`-placeholders precies zoals ze zijn
+- Houd `{variable}`-placeholders exact zoals ze zijn
 - Arrays (`rotatingPhrases`, `progressMessages`) moeten hetzelfde aantal items hebben
 - Vertaal niet: SnapOtter, JPEG, PNG, WebP, EXIF, API en andere technische termen
 
@@ -155,8 +155,8 @@ Open een PR tegen `main` met een titel zoals `feat(i18n): add Swedish translatio
 Wanneer je een nieuwe functie toevoegt die nieuwe UI-strings nodig heeft:
 
 1. Voeg de nieuwe sleutels eerst toe aan `en.ts` (het referentiebestand)
-2. Voer `pnpm typecheck` uit - elk locale-bestand faalt als het de nieuwe sleutel mist
-3. Voeg de nieuwe sleutel toe aan alle locale-bestanden (gebruik Engels als tijdelijke terugval)
+2. Voer `pnpm typecheck` uit - elk localebestand faalt als de nieuwe sleutel ontbreekt
+3. Voeg de nieuwe sleutel toe aan alle localebestanden (gebruik Engels als tijdelijke terugval)
 
 ## Configuratie {#configuration}
 
@@ -168,11 +168,67 @@ DEFAULT_LOCALE: "de"  # German as the default for all new users
 
 ## Bestandsreferentie {#file-reference}
 
-| Bestand | Doel |
+| File | Purpose |
 |------|---------|
-| `packages/shared/src/i18n/en.ts` | Engelse strings (referentie-locale, ~1500 sleutels) |
+| `packages/shared/src/i18n/en.ts` | Engelse strings (referentielocale, ~1500 sleutels) |
 | `packages/shared/src/i18n/index.ts` | `SUPPORTED_LOCALES`, `loadTranslations()`, type-exports |
 | `packages/shared/src/i18n/<locale>.ts` | Vertaalbestanden per taal |
-| `apps/web/src/contexts/i18n-context.tsx` | `I18nProvider`, `useTranslation()`-hook |
-| `apps/web/src/lib/format.ts` | `format()`, `plural()`, `formatFileSize()`-helpers |
-| `apps/api/src/routes/config.ts` | `GET /api/v1/config/locale` publiek endpoint |
+| `apps/web/src/contexts/i18n-context.tsx` | `I18nProvider`, `useTranslation()` hook |
+| `apps/web/src/lib/format.ts` | `format()`, `plural()`, `formatFileSize()` helpers |
+| `apps/api/src/routes/config.ts` | `GET /api/v1/config/locale` openbaar endpoint |
+
+## De website, docs en API-referentie vertalen {#translating-the-web-surfaces}
+
+De ondersteuning voor 21 talen hierboven geldt voor de **app**. De openbare website
+(snapotter.com), deze documentatiesite en de REST API-referentie worden ook
+in alle 21 talen vertaald, door een aparte hash-gated pipeline die dezelfde
+toolnamen en beschrijvingen uit `packages/shared/src/i18n` hergebruikt, zodat
+de terminologie overal consistent blijft.
+
+### Standaard machinaal vertaald {#machine-translated-by-default}
+
+Elke niet-Engelse pagina op de website en in de docs wordt in de eerste ronde
+**machinaal vertaald** (door een Claude Code-sessie, niet door een externe dienst) en
+draagt een kleine, wegklikbare banner die dat aangeeft, met een link terug naar hier. Dat is bewust:
+het levert alle 21 talen snel en eerlijk, en nodigt de community vervolgens uit om
+de belangrijkste pagina's te verfijnen. Machinevertaling brengt de betekenis over;
+menselijke revisie zorgt dat het natuurlijk leest.
+
+### Hoe de pipeline beslist wat er wordt vertaald {#how-the-web-pipeline-decides}
+
+Elke vertaalbare eenheid Engelse bron wordt gehasht, en de hash wordt naast
+de vertaling opgeslagen. Bij elke run doet de pipeline het volgende:
+
+- vertaalt elke eenheid die nog geen vertaling heeft,
+- slaat elke eenheid over waarvan de opgeslagen hash nog overeenkomt met de Engelse bron,
+- hervertaalt een **machine**-eenheid wanneer de Engelse bron ervan verandert,
+- en markeert een door een **mens** verfijnde eenheid als `stale` (moet worden gecontroleerd) wanneer de
+  Engelse bron verandert, in plaats van je werk te overschrijven.
+
+### Een webvertaling verfijnen via een PR {#refining-a-web-translation-by-pr}
+
+Je verbetert een vertaling van de website, docs of API-referentie op dezelfde manier als
+je een app-locale verbetert: door het gegenereerde bestand te bewerken en een PR te openen.
+
+1. Vind de gegenereerde vertaling voor jouw taal:
+   - UI-strings van de website: `apps/landing/src/i18n/<locale>.json`
+   - een docs-pagina: `apps/docs/<locale>/**.md`
+   - de API-referentie: `apps/api/src/openapi.<locale>.yaml`
+2. Bewerk de tekst. Houd code, links, `{placeholders}` en eventuele `⸤I18N…⸥`-markeringen
+   exact zoals ze zijn; de validator van de pipeline weigert een vertaling die ze weglaat
+   of herordent.
+3. Open een PR. Het bewerken van een eenheid wijzigt de herkomst van `machine` naar `human`, zodat
+   de pipeline die **nooit zal overschrijven** bij een latere run. Als de Engelse bron
+   daarna verandert, wordt je eenheid gemarkeerd als `stale` voor revisie in plaats van
+   stilzwijgend vervangen.
+
+Om een verkeerde vertaling te melden zonder code in te dienen, open je een
+[GitHub Issue](https://github.com/snapotter-hq/SnapOtter/issues) met de pagina-
+URL, de taal, de onjuiste tekst en je voorgestelde correctie.
+
+::: tip 
+Beheerders draaien de vertaalpipeline; je hebt geen API-sleutel nodig om
+bij te dragen. Bewerk gewoon het gegenereerde bestand en open een PR. Zie
+[`scripts/i18n/README.md`](https://github.com/snapotter-hq/SnapOtter/blob/main/scripts/i18n/README.md)
+voor hoe de pipeline draait.
+:::
