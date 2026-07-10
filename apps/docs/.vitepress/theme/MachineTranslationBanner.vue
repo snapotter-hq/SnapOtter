@@ -4,9 +4,18 @@ import { computed, ref } from "vue";
 import { normalizeLocale, t } from "../i18n/ui.mjs";
 
 const { lang } = useData();
-const dismissed = ref(
-  typeof localStorage !== "undefined" && localStorage.getItem("so-mt-banner") === "1",
-);
+// Guard both existence AND callability: VitePress SSR defines a `localStorage`
+// global that is not a real Storage, so `getItem` may not be a function there.
+function readDismissed() {
+  try {
+    return (
+      typeof localStorage?.getItem === "function" && localStorage.getItem("so-mt-banner") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+const dismissed = ref(readDismissed());
 const locale = computed(() => normalizeLocale(lang.value));
 const show = computed(() => locale.value !== "en" && !dismissed.value);
 const text = computed(() => t(locale.value, "banner.text"));

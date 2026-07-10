@@ -23,7 +23,7 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      "pnpm --filter @snapotter/docs docs:build && pnpm --filter @snapotter/docs docs:preview",
+      "apps/api/node_modules/.bin/tsx tests/e2e-docs/fixtures/seed-de-locale.mjs && pnpm --filter @snapotter/docs docs:build && pnpm --filter @snapotter/docs docs:preview",
     port: DOCS_PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
