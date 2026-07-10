@@ -224,7 +224,7 @@ const collectionJsonLd = {
                 </svg>
               </div>
               <h2 class="font-display text-2xl font-bold">
-                {group.category.name}
+                {t(locale, `category.${group.category.id}`)}
               </h2>
               <span class="text-sm text-muted">
                 {group.tools.length === 1

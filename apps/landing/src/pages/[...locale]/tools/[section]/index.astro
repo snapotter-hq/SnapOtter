@@ -41,7 +41,8 @@ const { locale, section, tools } = Astro.props;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 const PATH = `/tools/${section.id}/`;
 const canonical = `https://snapotter.com${localizeHref(locale, PATH)}`;
-const title = t(locale, "section.title", { section: section.name });
+const sectionName = t(locale, `section.${section.id}`);
+const title = t(locale, "section.title", { section: sectionName });
 
 const toolStrings = await loadToolStrings(locale);
 const toolName = (id: string, fallback: string) => toolStrings[id]?.name ?? fallback;
@@ -51,7 +52,7 @@ const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description 
 <Base
   canonical={canonical}
   title={`${title} | SnapOtter`}
-  description={t(locale, "section.metaDescription", { section: section.name })}
+  description={t(locale, "section.metaDescription", { section: sectionName })}
   locale={locale}
   path={PATH}
 >
@@ -68,7 +69,7 @@ const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description 
           <a href={localizeHref(locale, "/tools")} class="transition-colors hover:text-foreground">{t(locale, "common.tools")}</a>
         </li>
         <li aria-hidden="true">/</li>
-        <li class="font-medium text-foreground">{section.name}</li>
+        <li class="font-medium text-foreground">{sectionName}</li>
       </ol>
     </nav>
 
