@@ -1,4 +1,5 @@
 export * from "./analytics/baked.js";
+export * from "./analytics/error-sanitize.js";
 export * from "./analytics/events.js";
 export * from "./analytics/feedback.js";
 export * from "./analytics/types.js";
