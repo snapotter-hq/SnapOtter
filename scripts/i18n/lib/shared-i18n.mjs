@@ -25,6 +25,6 @@ function exportName(code) {
 export async function loadToolStrings(code) {
   const mod = await import(`../../../packages/shared/src/i18n/${code}.ts`);
   const dict = mod[exportName(code)];
-  if (!dict || !dict.tools) throw new Error(`No tools namespace in locale ${code}`);
+  if (!dict?.tools) throw new Error(`No tools namespace in locale ${code}`);
   return dict.tools;
 }

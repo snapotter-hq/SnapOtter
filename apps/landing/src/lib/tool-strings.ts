@@ -6,5 +6,8 @@ export async function loadToolStrings(
   locale: string,
 ): Promise<Record<string, { name: string; description: string }>> {
   const dict = await loadTranslations(locale);
-  return (dict as { tools?: Record<string, { name: string; description: string }> }).tools ?? {};
+  return (
+    (dict as unknown as { tools?: Record<string, { name: string; description: string }> }).tools ??
+    {}
+  );
 }

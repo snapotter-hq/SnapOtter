@@ -8,17 +8,21 @@ import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { TOOL_SEO } from "@/data/tool-seo";
 import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
 import { localizeHref } from "@/lib/i18n-page";
 import { seoArray, seoText } from "@/lib/seo-content";
 import { loadToolStrings } from "@/lib/tool-strings";
-import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
   const paths = [];
   for (const locale of LANDING_LOCALES) {
     for (const tool of TOOLS) {
       paths.push({
-        params: { locale: locale === "en" ? undefined : locale, section: toolSection(tool), tool: tool.id },
+        params: {
+          locale: locale === "en" ? undefined : locale,
+          section: toolSection(tool),
+          tool: tool.id,
+        },
         props: { tool, locale },
       });
     }

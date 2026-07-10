@@ -6,9 +6,9 @@ import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { ALTERNATIVES } from "@/data/alternatives";
 import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
 import { localizeHref } from "@/lib/i18n-page";
 import { seoText } from "@/lib/seo-content";
-import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
   return LANDING_LOCALES.map((locale) => ({

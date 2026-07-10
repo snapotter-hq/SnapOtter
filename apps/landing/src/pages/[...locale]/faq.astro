@@ -5,8 +5,8 @@ import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
-import { localizeHref } from "@/lib/i18n-page";
 import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
 
 export function getStaticPaths() {
   return LANDING_LOCALES.map((locale) => ({
@@ -38,7 +38,12 @@ const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: t(locale, "common.home"), item: "https://snapotter.com" },
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: t(locale, "common.home"),
+      item: "https://snapotter.com",
+    },
     { "@type": "ListItem", position: 2, name: "FAQ", item: "https://snapotter.com/faq" },
   ],
 };

@@ -6,9 +6,9 @@ import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import Navbar from "@/components/Navbar.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
 import { localizeHref } from "@/lib/i18n-page";
 import { loadToolStrings } from "@/lib/tool-strings";
-import Base from "@/layouts/Base.astro";
 
 export function getStaticPaths() {
   const paths = [];

@@ -25,7 +25,9 @@ function extractToolSeo(units, toolSeo) {
     for (const field of SEO_STRING_FIELDS) pushIfString(units, `${base}:${field}`, seo[field]);
     for (const field of SEO_ARRAY_FIELDS) {
       const arr = Array.isArray(seo[field]) ? seo[field] : [];
-      arr.forEach((v, i) => pushIfString(units, `${base}:${field}.${i}`, v));
+      arr.forEach((v, i) => {
+        pushIfString(units, `${base}:${field}.${i}`, v);
+      });
     }
     const faqs = Array.isArray(seo.faqs) ? seo.faqs : [];
     faqs.forEach((faq, i) => {
