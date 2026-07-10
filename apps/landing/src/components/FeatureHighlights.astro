@@ -1,25 +1,32 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
 const aiTools = [
-  "Remove Background",
-  "Image Upscaling",
-  "Face / PII Blur",
-  "Object Eraser",
-  "OCR / Text Extraction",
-  "PDF OCR",
-  "AI Colorization",
-  "Face Enhancement",
-  "Noise Removal",
-  "Smart Crop",
-  "Red Eye Removal",
-  "Photo Restoration",
-  "Passport Photo",
-  "PNG Transparency Fixer",
-  "AI Canvas Expand",
-  "Transcribe Audio",
-  "Auto Subtitles",
-  "Background Replace",
-  "Blur Background",
+  t(locale, "home.features.ai.removeBackground"),
+  t(locale, "home.features.ai.upscale"),
+  t(locale, "home.features.ai.faceBlur"),
+  t(locale, "home.features.ai.objectEraser"),
+  t(locale, "home.features.ai.ocr"),
+  t(locale, "home.features.ai.pdfOcr"),
+  t(locale, "home.features.ai.colorization"),
+  t(locale, "home.features.ai.faceEnhance"),
+  t(locale, "home.features.ai.noiseRemoval"),
+  t(locale, "home.features.ai.smartCrop"),
+  t(locale, "home.features.ai.redEye"),
+  t(locale, "home.features.ai.restoration"),
+  t(locale, "home.features.ai.passport"),
+  t(locale, "home.features.ai.pngTransparency"),
+  t(locale, "home.features.ai.canvasExpand"),
+  t(locale, "home.features.ai.transcribe"),
+  t(locale, "home.features.ai.subtitles"),
+  t(locale, "home.features.ai.bgReplace"),
+  t(locale, "home.features.ai.blurBackground"),
 ];
 
 const aiPillColors = [
@@ -36,13 +43,13 @@ const aiPillColors = [
   <div class="reveal mx-auto mb-16 max-w-3xl text-center md:mb-20">
     <span class="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary-dark">
       <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      Data sovereignty
+      {t(locale, "home.features.badge")}
     </span>
     <h2 class="mt-6 font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-      Built for regulated environments.
+      {t(locale, "home.features.title")}
     </h2>
     <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">
-      Your files stay on your infrastructure. No third-party processing, no data transfer risk.
+      {t(locale, "home.features.subtitle")}
     </p>
   </div>
 
@@ -51,21 +58,19 @@ const aiPillColors = [
     <!-- Feature 1: Data Sovereignty — text left, visual right -->
     <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
       <div class="md:order-1">
-        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">01 / Architecture</span>
+        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t(locale, "home.features.f1.kicker")}</span>
         <h3 class="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Compliant by architecture
+          {t(locale, "home.features.f1.title")}
         </h3>
         <p class="mt-4 text-base leading-relaxed text-muted">
-          No vendor DPAs. No data processing agreements. No third-party risk assessments.
-          Files are processed on your infrastructure and never transmitted to external services.
-          GDPR, HIPAA, and CCPA compliant from day one.
+          {t(locale, "home.features.f1.body")}
         </p>
       </div>
       <div class="md:order-2">
         <div class="rounded-xl border border-border bg-surface p-6 md:p-8">
           <!-- Outer infrastructure box -->
           <div class="rounded-lg border-2 border-dashed border-primary/30 p-5">
-            <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">Your Infrastructure</span>
+            <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">{t(locale, "home.features.f1.yourInfra")}</span>
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col items-center gap-2 rounded-lg bg-primary-subtle p-4">
                 <svg class="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -73,14 +78,14 @@ const aiPillColors = [
                   <path d="M8 12h8M8 16h5" />
                   <circle cx="18" cy="7" r="1" fill="currentColor" />
                 </svg>
-                <span class="text-xs font-semibold text-primary">SnapOtter</span>
+                <span class="text-xs font-semibold text-primary">{t(locale, "home.features.f1.snapotter")}</span>
               </div>
               <div class="flex flex-col items-center gap-2 rounded-lg bg-primary-subtle p-4">
                 <svg class="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
                   <polyline points="13 2 13 9 20 9" />
                 </svg>
-                <span class="text-xs font-semibold text-primary">Your Files</span>
+                <span class="text-xs font-semibold text-primary">{t(locale, "home.features.f1.yourFiles")}</span>
               </div>
             </div>
             <!-- Internal arrows -->
@@ -92,14 +97,14 @@ const aiPillColors = [
                 <polygon points="48,12 40,8 48,4" fill="currentColor" stroke="none" />
               </svg>
             </div>
-            <p class="mt-3 text-center text-xs text-muted">Data never leaves this boundary</p>
+            <p class="mt-3 text-center text-xs text-muted">{t(locale, "home.features.f1.dataBoundary")}</p>
           </div>
           <!-- External cloud — blocked -->
           <div class="mt-4 flex items-center justify-center gap-3 rounded-lg border border-danger/20 bg-danger/5 px-4 py-2.5">
             <svg class="h-4 w-4 shrink-0 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
             </svg>
-            <span class="text-xs text-danger">No external cloud connections</span>
+            <span class="text-xs text-danger">{t(locale, "home.features.f1.noExternal")}</span>
           </div>
         </div>
       </div>
@@ -108,23 +113,21 @@ const aiPillColors = [
     <!-- Feature 2: REST API — visual left, text right -->
     <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
       <div class="md:order-2">
-        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">02 / Automation</span>
+        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t(locale, "home.features.f2.kicker")}</span>
         <h3 class="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Integrate with your existing workflows
+          {t(locale, "home.features.f2.title")}
         </h3>
         <p class="mt-4 text-base leading-relaxed text-muted">
-          Full REST API with OpenAPI documentation for every tool. Chain tools into automated
-          pipelines. Batch process thousands of files. Trigger via webhooks and integrate
-          with your internal systems.
+          {t(locale, "home.features.f2.body")}
         </p>
       </div>
       <div class="md:order-1">
-        <pre class="code-block p-5"><span class="code-comment"># Resize an image via the API</span>
+        <pre class="code-block p-5"><span class="code-comment">{t(locale, "home.features.f2.codeComment1")}</span>
 <span class="code-url">$</span> curl <span class="code-flag">-X POST</span> <span class="code-url">localhost:1349/api/v1/tools/image/resize</span> \
   <span class="code-flag">-F</span> <span class="code-string">"file=@photo.jpg"</span> \
   <span class="code-flag">-F</span> <span class="code-string">'settings=&#123;"width":800&#125;'</span>
 
-<span class="code-comment"># Response</span>
+<span class="code-comment">{t(locale, "home.features.f2.codeComment2")}</span>
 &#123;
   <span class="code-flag">"jobId"</span>: <span class="code-string">"abc123"</span>,
   <span class="code-flag">"downloadUrl"</span>: <span class="code-string">"/api/v1/jobs/abc123/download"</span>
@@ -135,14 +138,12 @@ const aiPillColors = [
     <!-- Feature 3: AI Models — text left, visual right -->
     <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
       <div class="md:order-1">
-        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">03 / Local AI</span>
+        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t(locale, "home.features.f3.kicker")}</span>
         <h3 class="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          AI processing without external APIs
+          {t(locale, "home.features.f3.title")}
         </h3>
         <p class="mt-4 text-base leading-relaxed text-muted">
-          19 local AI tools for OCR, transcription, background removal, upscaling, and more.
-          No external API keys, no per-request charges, no data sent to third-party AI providers.
-          Runs on CPU or NVIDIA CUDA within your own infrastructure.
+          {t(locale, "home.features.f3.body")}
         </p>
       </div>
       <div class="md:order-2">
@@ -159,14 +160,12 @@ const aiPillColors = [
     <!-- Feature 4: Deployment — visual left, text right -->
     <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
       <div class="md:order-2">
-        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">04 / Deployment</span>
+        <span class="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">{t(locale, "home.features.f4.kicker")}</span>
         <h3 class="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Fits your infrastructure
+          {t(locale, "home.features.f4.title")}
         </h3>
         <p class="mt-4 text-base leading-relaxed text-muted">
-          One Docker Compose stack: app, Postgres, and Redis. Deploy on Kubernetes,
-          bare metal, or cloud VMs. ARM and x86 architectures. Works in air-gapped and classified
-          environments with zero internet dependency.
+          {t(locale, "home.features.f4.body")}
         </p>
       </div>
       <div class="md:order-1">

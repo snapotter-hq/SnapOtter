@@ -11,7 +11,19 @@ import Navbar from "@/components/Navbar.astro";
 import OpenSource from "@/components/OpenSource.astro";
 import Pricing from "@/components/Pricing.astro";
 import ToolGrid from "@/components/ToolGrid.astro";
+import { LANDING_LOCALES } from "@/i18n";
 import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/";
 
 const toolCount = TOOLS.length;
 
@@ -105,21 +117,27 @@ const navSchema = {
 };
 ---
 
-<Base title={pageTitle} description={pageDescription} canonical="https://snapotter.com">
+<Base
+  title={pageTitle}
+  description={pageDescription}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
   <Fragment slot="head">
     <JsonLd data={[websiteSchema, softwareSchema, navSchema]} />
   </Fragment>
 
-  <Navbar />
+  <Navbar locale={locale} path={PATH} />
 
   <main id="main">
-    <Hero />
-    <ToolGrid />
-    <EnterpriseSection />
-    <FeatureHighlights />
-    <Pricing />
-    <OpenSource />
+    <Hero locale={locale} />
+    <ToolGrid locale={locale} />
+    <EnterpriseSection locale={locale} />
+    <FeatureHighlights locale={locale} />
+    <Pricing locale={locale} />
+    <OpenSource locale={locale} />
   </main>
 
-  <Footer />
+  <Footer locale={locale} />
 </Base>

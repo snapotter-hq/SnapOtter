@@ -1,6 +1,12 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
 import { formatCompact, getImagePulls, getStarCount } from "@/lib/stats";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
 
 // Fetched at build time; refreshed by the scheduled landing rebuild.
 const starCount = await getStarCount();
@@ -8,24 +14,24 @@ const { display: pullsDisplay } = await getImagePulls();
 
 const stats = [
   {
-    value: "200+",
-    label: "Processing Tools",
-    sublabel: "Across 5 file modalities",
+    value: t(locale, "home.stats.tools.value"),
+    label: t(locale, "home.stats.tools.label"),
+    sublabel: t(locale, "home.stats.tools.sublabel"),
   },
   {
     value: formatCompact(starCount),
-    label: "GitHub Stars",
-    sublabel: "Open-source & growing",
+    label: t(locale, "home.stats.stars.label"),
+    sublabel: t(locale, "home.stats.stars.sublabel"),
   },
   {
     value: pullsDisplay,
-    label: "Image Pulls",
-    sublabel: "Deployed worldwide",
+    label: t(locale, "home.stats.pulls.label"),
+    sublabel: t(locale, "home.stats.pulls.sublabel"),
   },
   {
-    value: "20+",
-    label: "Languages",
-    sublabel: "Speaks your language",
+    value: t(locale, "home.stats.languages.value"),
+    label: t(locale, "home.stats.languages.label"),
+    sublabel: t(locale, "home.stats.languages.sublabel"),
   },
 ];
 ---

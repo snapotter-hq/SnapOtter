@@ -3,8 +3,19 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { loadToolStrings } from "@/lib/tool-strings";
 import type { ModalityFilter, ToolSearchItem } from "../lib/tool-search";
 import SectionHeading from "./SectionHeading.astro";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+// Tool name/description come from shared i18n (translated in all 21 langs).
+const toolStrings = await loadToolStrings(locale);
 
 const toolCount = TOOLS.length;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
@@ -12,67 +23,94 @@ const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 type ToolModality = ToolSearchItem["modality"];
 
 const modalities: { id: ModalityFilter; label: string; count: number }[] = [
-  { id: "all", label: "All", count: TOOLS.length },
-  { id: "image", label: "Image", count: TOOLS.filter((t) => t.modality === "image").length },
-  { id: "video", label: "Video", count: TOOLS.filter((t) => t.modality === "video").length },
-  { id: "audio", label: "Audio", count: TOOLS.filter((t) => t.modality === "audio").length },
+  { id: "all", label: t(locale, "home.toolGrid.filter.all"), count: TOOLS.length },
+  {
+    id: "image",
+    label: t(locale, "home.toolGrid.filter.image"),
+    count: TOOLS.filter((tool) => tool.modality === "image").length,
+  },
+  {
+    id: "video",
+    label: t(locale, "home.toolGrid.filter.video"),
+    count: TOOLS.filter((tool) => tool.modality === "video").length,
+  },
+  {
+    id: "audio",
+    label: t(locale, "home.toolGrid.filter.audio"),
+    count: TOOLS.filter((tool) => tool.modality === "audio").length,
+  },
   {
     id: "document,file",
-    label: "PDF & Files",
-    count: TOOLS.filter((t) => t.modality === "document" || t.modality === "file").length,
+    label: t(locale, "home.toolGrid.filter.pdfFiles"),
+    count: TOOLS.filter((tool) => tool.modality === "document" || tool.modality === "file").length,
   },
 ];
 
 const workflows = [
   {
     id: "optimize",
-    label: "Optimize delivery",
-    description: "Compress, resize, convert, and tune assets for fast delivery.",
+    label: t(locale, "home.toolGrid.workflow.optimize.label"),
+    description: t(locale, "home.toolGrid.workflow.optimize.description"),
     query: "optimize files for web",
     icon: "Gauge",
-    metric: "Media + PDF",
+    metric: t(locale, "home.toolGrid.workflow.optimize.metric"),
   },
   {
     id: "convert",
-    label: "Convert formats",
-    description: "Find exact converters by input, output, or plain-language intent.",
+    label: t(locale, "home.toolGrid.workflow.convert.label"),
+    description: t(locale, "home.toolGrid.workflow.convert.description"),
     query: "convert files to another format",
     icon: "Repeat2",
-    metric: "100+ routes",
+    metric: t(locale, "home.toolGrid.workflow.convert.metric"),
   },
   {
     id: "pdf",
-    label: "Prepare documents",
-    description: "Merge, split, compress, protect, redact, and normalize PDFs.",
+    label: t(locale, "home.toolGrid.workflow.pdf.label"),
+    description: t(locale, "home.toolGrid.workflow.pdf.description"),
     query: "prepare pdf documents",
     icon: "FileStack",
-    metric: "PDF workflows",
+    metric: t(locale, "home.toolGrid.workflow.pdf.metric"),
   },
   {
     id: "metadata",
-    label: "Clean metadata",
-    description: "Strip EXIF, GPS, document, media, and archive metadata.",
+    label: t(locale, "home.toolGrid.workflow.metadata.label"),
+    description: t(locale, "home.toolGrid.workflow.metadata.description"),
     query: "remove metadata",
     icon: "ShieldCheck",
-    metric: "Privacy",
+    metric: t(locale, "home.toolGrid.workflow.metadata.metric"),
   },
   {
     id: "batch",
-    label: "Batch operations",
-    description: "Rename, archive, extract, and process repeatable file sets.",
+    label: t(locale, "home.toolGrid.workflow.batch.label"),
+    description: t(locale, "home.toolGrid.workflow.batch.description"),
     query: "batch file operations",
     icon: "ListChecks",
-    metric: "Bulk tools",
+    metric: t(locale, "home.toolGrid.workflow.batch.metric"),
   },
   {
     id: "ai",
-    label: "Enhance with AI",
-    description: "Restore, upscale, remove backgrounds, OCR, and transcribe locally.",
+    label: t(locale, "home.toolGrid.workflow.ai.label"),
+    description: t(locale, "home.toolGrid.workflow.ai.description"),
     query: "ai enhance extract text remove background",
     icon: "Sparkles",
-    metric: "Local AI",
+    metric: t(locale, "home.toolGrid.workflow.ai.metric"),
   },
 ];
+
+// User-facing strings the client search script renders dynamically. Passed via an
+// inlined JSON blob so the script localizes without any runtime fetch.
+const toolGridStrings = {
+  suggested: t(locale, "home.toolGrid.suggested"),
+  curatedTools: t(locale, "home.toolGrid.curatedTools", { count: "{count}" }),
+  startingPoints: t(locale, "home.toolGrid.startingPoints", { modality: "{modality}" }),
+  countOfTools: t(locale, "home.toolGrid.countOfTools", { count: "{count}", total: "{total}" }),
+  recommended: t(locale, "home.toolGrid.recommended"),
+  countOfMatches: t(locale, "home.toolGrid.countOfMatches", { count: "{count}", total: "{total}" }),
+  requestOrRefine: t(locale, "home.toolGrid.requestOrRefine"),
+  closeToolsOne: t(locale, "home.toolGrid.closeToolsOne", { count: "{count}" }),
+  closeToolsOther: t(locale, "home.toolGrid.closeToolsOther", { count: "{count}" }),
+  noConfidentMatch: t(locale, "home.toolGrid.noConfidentMatch"),
+};
 
 const workflowAliasesByToolId: Record<string, string[]> = {
   "bulk-rename": ["batch file operations", "rename many files"],
@@ -128,11 +166,11 @@ function toToolSearchItem(tool: (typeof TOOLS)[number]): ToolSearchItem {
   const category = categoryMap.get(tool.category);
   return {
     id: tool.id,
-    name: tool.name,
-    description: tool.description,
+    name: toolStrings[tool.id]?.name ?? tool.name,
+    description: toolStrings[tool.id]?.description ?? tool.description,
     modality: tool.modality as ToolModality,
     category: tool.category,
-    url: `/tools/${toolSection(tool)}/${tool.id}/`,
+    url: localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`),
     icon: tool.icon,
     iconSvg: renderIcon(tool.icon),
     color: category?.color ?? "#E07832",
@@ -150,12 +188,13 @@ const defaultTools = defaultToolIds
 
 const safeSearchIndexJson = JSON.stringify(searchIndex).replace(/</g, "\\u003c");
 const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u003c");
+const safeStringsJson = JSON.stringify(toolGridStrings).replace(/</g, "\\u003c");
 ---
 
 <section class="bg-background-alt px-6 py-20 md:py-28" id="features">
   <SectionHeading
-    title="One platform. Every file workflow."
-    subtitle={`Search ${toolCount} self-hosted tools by task, format, modality, or workflow.`}
+    title={t(locale, "home.toolGrid.title")}
+    subtitle={t(locale, "home.toolGrid.subtitle", { count: toolCount })}
   />
 
   <div class="mx-auto max-w-6xl">
@@ -163,7 +202,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
       <div class="border-b border-border bg-background px-4 py-4 sm:px-5">
         <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div class="relative">
-            <label class="sr-only" for="tool-command-search">Search landing tools</label>
+            <label class="sr-only" for="tool-command-search">{t(locale, "home.toolGrid.searchLabel")}</label>
             <svg
               class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted"
               viewBox="0 0 24 24"
@@ -180,14 +219,14 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
               type="text"
               inputmode="search"
               autocomplete="off"
-              aria-label="Search landing tools"
-              placeholder="Workflow or extension"
-              class="h-13 w-full rounded-lg border border-border bg-surface py-3 pl-12 pr-12 text-base text-foreground outline-none transition-colors placeholder:text-muted focus:border-primary"
+              aria-label={t(locale, "home.toolGrid.searchLabel")}
+              placeholder={t(locale, "home.toolGrid.searchPlaceholder")}
+              class="h-13 w-full rounded-lg border border-border bg-surface py-3 ps-12 pe-12 text-base text-foreground outline-none transition-colors placeholder:text-muted focus:border-primary"
             />
             <button
               id="tool-command-clear"
               type="button"
-              aria-label="Clear landing tool search"
+              aria-label={t(locale, "home.toolGrid.clearLabel")}
               class="absolute right-3 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted transition-colors hover:bg-background-alt hover:text-foreground"
             >
               <svg
@@ -206,7 +245,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
 
           <div
             class="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1"
-            aria-label="Filter tools by modality"
+            aria-label={t(locale, "home.toolGrid.filterLabel")}
           >
             {modalities.map((modality) => (
               <button
@@ -231,13 +270,13 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
       <div class="grid border-b border-border lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside class="order-2 border-t border-border bg-background-alt/50 p-4 lg:order-1 lg:border-e lg:border-t-0">
           <div class="flex items-center justify-between gap-3">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Workflows</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{t(locale, "home.toolGrid.workflowsHeading")}</p>
             <button
               id="tool-command-reset-workflow"
               type="button"
               class="hidden rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary-subtle"
             >
-              Reset
+              {t(locale, "home.toolGrid.reset")}
             </button>
           </div>
           <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
@@ -278,13 +317,13 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
         <div class="order-1 min-w-0 p-4 sm:p-5 lg:order-2">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Tool finder</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{t(locale, "home.toolGrid.finderLabel")}</p>
               <h3 class="mt-1 text-xl font-bold tracking-tight text-foreground" id="tool-command-title">
-                Suggested starting points
+                {t(locale, "home.toolGrid.suggested")}
               </h3>
             </div>
             <p class="text-sm text-muted" id="tool-command-count" aria-live="polite">
-              {defaultTools.length} curated tools
+              {t(locale, "home.toolGrid.curatedTools", { count: defaultTools.length })}
             </p>
           </div>
 
@@ -331,9 +370,9 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
           >
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 class="text-lg font-bold tracking-tight text-foreground">No matching tool yet</h3>
+                <h3 class="text-lg font-bold tracking-tight text-foreground">{t(locale, "home.toolGrid.empty.title")}</h3>
                 <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-                  Open a GitHub Discussion with this search prefilled, or browse the closest tools already in SnapOtter.
+                  {t(locale, "home.toolGrid.empty.body")}
                 </p>
               </div>
               <a
@@ -343,7 +382,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
                 id="tool-command-request-empty"
                 class="btn-primary inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
               >
-                Request this tool
+                {t(locale, "home.toolGrid.empty.request")}
                 <svg
                   class="h-4 w-4"
                   viewBox="0 0 24 24"
@@ -358,7 +397,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
               </a>
             </div>
             <div class="mt-5 hidden">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Closest existing tools</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{t(locale, "home.toolGrid.closest")}</p>
               <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" id="tool-command-related"></div>
             </div>
           </div>
@@ -367,7 +406,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
 
       <div class="flex flex-col gap-3 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div class="text-sm text-muted">
-          Missing a workflow?
+          {t(locale, "home.toolGrid.missingWorkflow")}
           <a
             href="https://github.com/snapotter-hq/snapotter/discussions/new?category=ideas&title=Tool+request"
             target="_blank"
@@ -375,12 +414,12 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
             id="tool-command-request"
             class="font-semibold text-primary hover:underline"
           >
-            Request a tool
+            {t(locale, "home.toolGrid.requestTool")}
           </a>
-          and include the input, output, and privacy requirements.
+          {t(locale, "home.toolGrid.requestSuffix")}
         </div>
-        <a href="/tools" class="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
-          Browse full tool catalog
+        <a href={localizeHref(locale, "/tools")} class="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+          {t(locale, "home.toolGrid.browseCatalog")}
           <svg
             class="h-4 w-4"
             viewBox="0 0 24 24"
@@ -399,6 +438,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
 
   <script id="tool-command-index" type="application/json" is:inline set:html={safeSearchIndexJson}></script>
   <script id="tool-command-default-ids" type="application/json" is:inline set:html={safeDefaultToolIdsJson}></script>
+  <script id="tool-command-strings" type="application/json" is:inline set:html={safeStringsJson}></script>
 </section>
 
 <script>
@@ -412,6 +452,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
 
   const indexEl = document.getElementById("tool-command-index");
   const defaultIdsEl = document.getElementById("tool-command-default-ids");
+  const stringsEl = document.getElementById("tool-command-strings");
   const searchInput = document.getElementById("tool-command-search") as HTMLInputElement | null;
   const clearButton = document.getElementById("tool-command-clear") as HTMLButtonElement | null;
   const resetWorkflowButton = document.getElementById(
@@ -432,6 +473,7 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
   if (
     indexEl?.textContent &&
     defaultIdsEl?.textContent &&
+    stringsEl?.textContent &&
     searchInput &&
     clearButton &&
     resetWorkflowButton &&
@@ -452,6 +494,11 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
     const tools = JSON.parse(indexEl.textContent) as ToolSearchItem[];
     const defaultToolIds = JSON.parse(defaultIdsEl.textContent) as string[];
     const defaultToolIdSet = new Set(defaultToolIds);
+    const strings = JSON.parse(stringsEl.textContent) as Record<string, string>;
+    const fill = (template: string, vars: Record<string, string | number>): string =>
+      template.replace(/\{(\w+)\}/g, (m, name) =>
+        name in vars ? String(vars[name]) : m,
+      );
     let activeModality: ModalityFilter = "all";
     let activeWorkflowQuery = "";
     let activeWorkflowLabel = "";
@@ -575,11 +622,13 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
       const modalityName = modalityLabels.get(activeModality) ?? "All";
 
       titleNode.textContent =
-        activeModality === "all" ? "Suggested starting points" : `${modalityName} starting points`;
+        activeModality === "all"
+          ? strings.suggested
+          : fill(strings.startingPoints, { modality: modalityName });
       countNode.textContent =
         activeModality === "all"
-          ? `${defaultTools.length} curated tools`
-          : `${defaultTools.length} of ${matchingTools.length} tools`;
+          ? fill(strings.curatedTools, { count: defaultTools.length })
+          : fill(strings.countOfTools, { count: defaultTools.length, total: matchingTools.length });
       resultContainer.innerHTML = defaultTools.map((tool) => renderCard(tool)).join("");
       resultContainer.classList.remove("hidden");
       hideEmptyState();
@@ -601,19 +650,24 @@ const safeDefaultToolIdsJson = JSON.stringify(defaultToolIds).replace(/</g, "\\u
       const response = searchTools(tools, { query, modality: activeModality, limit: 12 });
 
       if (response.hasConfidentMatch && response.results.length > 0) {
-        titleNode.textContent = activeWorkflowLabel || "Recommended tools";
-        countNode.textContent = `${response.results.length} of ${response.totalMatches} matches`;
+        titleNode.textContent = activeWorkflowLabel || strings.recommended;
+        countNode.textContent = fill(strings.countOfMatches, {
+          count: response.results.length,
+          total: response.totalMatches,
+        });
         resultContainer.innerHTML = response.results.map((result) => renderCard(result, true)).join("");
         resultContainer.classList.remove("hidden");
         hideEmptyState();
         return;
       }
 
-      titleNode.textContent = "Request or refine";
+      titleNode.textContent = strings.requestOrRefine;
       countNode.textContent =
         response.related.length > 0
-          ? `${response.related.length} close ${response.related.length === 1 ? "tool" : "tools"}`
-          : "No confident match";
+          ? fill(response.related.length === 1 ? strings.closeToolsOne : strings.closeToolsOther, {
+              count: response.related.length,
+            })
+          : strings.noConfidentMatch;
       resultContainer.classList.add("hidden");
       emptyContainer.classList.remove("hidden");
       relatedContainer.innerHTML = response.related.map((result) => renderCard(result, true)).join("");
