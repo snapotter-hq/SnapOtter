@@ -1,0 +1,53 @@
+---
+// apps/landing/src/components/MachineTranslationBanner.astro
+import { t } from "@/i18n";
+
+interface Props {
+  locale: string;
+}
+
+const { locale } = Astro.props;
+const CONTRIBUTE_URL = "https://docs.snapotter.com/guide/translations";
+---
+
+{locale !== "en" && (
+  <div
+    class="border-b border-border bg-primary-subtle px-4 py-2 text-center text-xs text-foreground"
+    data-mt-banner
+    hidden
+  >
+    <span>{t(locale, "banner.machineTranslated")} </span>
+    <a href={CONTRIBUTE_URL} target="_blank" rel="noopener noreferrer" class="font-semibold text-primary-dark underline">
+      {t(locale, "banner.machineTranslated")}
+    </a>
+    <button
+      type="button"
+      class="ms-2 font-semibold text-muted hover:text-foreground"
+      aria-label={t(locale, "banner.dismiss")}
+      data-mt-dismiss
+    >
+      &times;
+    </button>
+  </div>
+)}
+
+<script is:inline>
+  (function () {
+    var banner = document.querySelector("[data-mt-banner]");
+    if (!banner) return;
+    var KEY = "snapotter:mt-banner";
+    try {
+      if (localStorage.getItem(KEY) === "dismissed") return;
+    } catch (e) {}
+    banner.hidden = false;
+    var close = banner.querySelector("[data-mt-dismiss]");
+    if (close) {
+      close.addEventListener("click", function () {
+        banner.hidden = true;
+        try {
+          localStorage.setItem(KEY, "dismissed");
+        } catch (e) {}
+      });
+    }
+  })();
+</script>
