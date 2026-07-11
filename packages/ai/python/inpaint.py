@@ -22,8 +22,8 @@ LAMA_HF_URL = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onn
 # The ONNX model expects 512x512 fixed input.
 MODEL_SIZE = 512
 
-# Crop-and-composite tuning. Defaults validated against the real model in a POC
-# (see docs/superpowers/specs/2026-07-11-erase-object-inpainting-quality-design.md).
+# Crop-and-composite tuning. Defaults validated against the real LaMa model on
+# small/medium objects in high-res images; safe to tune.
 MIN_IMAGE_DIM = 8  # below this, inpainting is meaningless; return the original
 WHOLE_FRAME_RATIO = 0.95  # crop this fraction of the frame -> just use the whole frame
 DILATE_FRAC = 0.04  # mask dilation as a fraction of the mask bbox diagonal
@@ -145,53 +145,32 @@ def _get_model_path():
     return LAMA_LOCAL_PATH
 
 
-def _preprocess_image(img_array):
-    """Convert HWC uint8 RGB image to NCHW float32 [0,1] at MODEL_SIZE."""
-    import cv2
-    import numpy as np
+def _make_run_model(session):
+    """Build a run_model(crop_img, crop_mask) that runs LaMa at its fixed 512x512.
 
-    resized = cv2.resize(img_array, (MODEL_SIZE, MODEL_SIZE), interpolation=cv2.INTER_AREA)
-    # HWC -> CHW, normalize to [0, 1], add batch dim
-    chw = np.transpose(resized, (2, 0, 1)).astype(np.float32) / 255.0
-    return chw[np.newaxis, ...]  # (1, 3, 512, 512)
-
-
-def _preprocess_mask(mask_array):
-    """Convert HW uint8 grayscale mask to NC(1)HW float32 binary at MODEL_SIZE."""
-    import cv2
-    import numpy as np
-
-    resized = cv2.resize(mask_array, (MODEL_SIZE, MODEL_SIZE), interpolation=cv2.INTER_NEAREST)
-    # Threshold to binary 0/1
-    binary = (resized > 127).astype(np.float32)
-    return binary[np.newaxis, np.newaxis, ...]  # (1, 1, 512, 512)
-
-
-def _feathered_composite(original, inpainted, mask, feather_radius=5):
-    """Composite inpainted region into original using a feathered mask.
-
-    This preserves full quality in non-masked areas and smoothly blends
-    the inpainted region at the boundary.
+    Small crops are upscaled to 512 (INTER_LINEAR), large crops downscaled
+    (INTER_AREA); the result is resized back to the native crop size. Preserves
+    the model's I/O contract: image in as float32 [0,1] NCHW, output in [0,255].
     """
     import cv2
     import numpy as np
 
-    # Dilate mask slightly for smoother transition
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (feather_radius, feather_radius))
-    dilated = cv2.dilate(mask.astype(np.uint8), kernel, iterations=1)
+    def run_model(crop_img, crop_mask):
+        h, w = crop_img.shape[:2]
+        interp = cv2.INTER_AREA if (w > MODEL_SIZE or h > MODEL_SIZE) else cv2.INTER_LINEAR
+        img_resized = cv2.resize(crop_img, (MODEL_SIZE, MODEL_SIZE), interpolation=interp)
+        mask_resized = cv2.resize(
+            crop_mask, (MODEL_SIZE, MODEL_SIZE), interpolation=cv2.INTER_NEAREST
+        )
 
-    # Gaussian blur the dilated mask for feathering
-    blur_size = feather_radius * 2 + 1
-    alpha = cv2.GaussianBlur(dilated.astype(np.float32), (blur_size, blur_size), 0)
-    alpha = np.clip(alpha, 0.0, 1.0)
+        img_in = np.transpose(img_resized, (2, 0, 1)).astype(np.float32)[np.newaxis] / 255.0
+        mask_in = (mask_resized > 127).astype(np.float32)[np.newaxis, np.newaxis]
 
-    # Expand alpha to 3 channels
-    alpha_3ch = alpha[:, :, np.newaxis]
+        out = session.run(None, {"image": img_in, "mask": mask_in})[0][0]
+        out = np.clip(np.transpose(out, (1, 2, 0)), 0, 255).astype(np.uint8)
+        return cv2.resize(out, (w, h), interpolation=cv2.INTER_LANCZOS4)
 
-    # Composite: original * (1 - alpha) + inpainted * alpha
-    result = (original.astype(np.float32) * (1.0 - alpha_3ch) +
-              inpainted.astype(np.float32) * alpha_3ch)
-    return np.clip(result, 0, 255).astype(np.uint8)
+    return run_model
 
 
 def main():
@@ -206,10 +185,14 @@ def main():
 
         try:
             import cv2
-            import onnxruntime
+            import onnxruntime  # noqa: F401
         except ImportError as e:
             msg = str(e)
-            hint = "Fix with: apt-get install -y libgl1" if "libGL" in msg else "Requires opencv-python-headless and onnxruntime."
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Requires opencv-python-headless and onnxruntime."
+            )
             print(json.dumps({
                 "success": False,
                 "error": f"Missing dependency: {msg}. {hint}",
@@ -225,43 +208,20 @@ def main():
         emit_progress(20, "Loading images")
         img = Image.open(input_path).convert("RGB")
         mask = Image.open(mask_path).convert("L")
-
-        orig_w, orig_h = img.size
         img_array = np.array(img)
         mask_array = np.array(mask)
 
-        # Resize mask to match image if needed
+        # Resize mask to match the image if the client sent a different size.
         if mask_array.shape[:2] != img_array.shape[:2]:
             mask_array = cv2.resize(
-                mask_array, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST
+                mask_array,
+                (img_array.shape[1], img_array.shape[0]),
+                interpolation=cv2.INTER_NEAREST,
             )
 
-        # Threshold mask to binary
-        _, mask_binary = cv2.threshold(mask_array, 127, 255, cv2.THRESH_BINARY)
-
-        emit_progress(30, "Preprocessing")
-        img_input = _preprocess_image(img_array)
-        mask_input = _preprocess_mask(mask_binary)
-
-        emit_progress(40, "Erasing objects")
-        outputs = session.run(
-            None,
-            {"image": img_input, "mask": mask_input},
+        result = inpaint_array(
+            img_array, mask_array, _make_run_model(session), progress=emit_progress
         )
-
-        emit_progress(75, "Compositing")
-        # Output shape: (1, 3, 512, 512) with values in [0, 255]
-        raw_output = outputs[0][0]  # (3, 512, 512)
-        raw_output = np.transpose(raw_output, (1, 2, 0))  # (512, 512, 3)
-        raw_output = np.clip(raw_output, 0, 255).astype(np.uint8)
-
-        # Resize inpainted result back to original dimensions
-        inpainted_full = cv2.resize(raw_output, (orig_w, orig_h), interpolation=cv2.INTER_LANCZOS4)
-
-        # Feathered composite: preserve quality outside mask, blend at edges
-        mask_full = mask_binary.astype(np.float32) / 255.0
-        feather_r = max(3, min(orig_w, orig_h) // 200)
-        result = _feathered_composite(img_array, inpainted_full, mask_full, feather_r)
 
         emit_progress(90, "Saving")
         Image.fromarray(result).save(output_path)
