@@ -35,6 +35,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     estimatedSize: "4-5 GB",
     enablesTools: [
       "remove-background",
+      "remove-gif-background",
       "passport-photo",
       "transparency-fixer",
       "background-replace",

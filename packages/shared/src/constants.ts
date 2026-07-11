@@ -227,6 +227,29 @@ const BASE_TOOLS: Tool[] = [
     executionHint: "long",
   },
   {
+    id: "remove-gif-background",
+    name: "Remove GIF Background",
+    description: "AI background removal for animated GIFs, WebP, and APNG",
+    category: "enhance",
+    icon: "Film",
+    route: "/remove-gif-background",
+    modality: "image",
+    acceptedInputs: [".gif", ".webp", ".apng", ".png"],
+    executionHint: "long",
+    keywords: [
+      "gif",
+      "animated",
+      "transparent gif",
+      "animated webp",
+      "apng",
+      "remove gif background",
+      "gif background",
+      "animated background removal",
+      "transparent background gif",
+      "gif cutout",
+    ],
+  },
+  {
     id: "upscale",
     name: "Image Upscaling",
     description: "AI super-resolution enhancement",
@@ -2635,6 +2658,7 @@ export const APP_VERSION = "2.1.0";
  */
 export const PYTHON_SIDECAR_TOOLS = [
   "remove-background",
+  "remove-gif-background",
   "upscale",
   "blur-faces",
   "erase-object",
