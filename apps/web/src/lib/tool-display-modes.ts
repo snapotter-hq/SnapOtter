@@ -89,6 +89,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
 
   // AI tools
   "remove-background": "before-after",
+  "remove-gif-background": "before-after",
   upscale: "before-after",
   ocr: "before-after",
   "blur-faces": "before-after",

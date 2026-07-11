@@ -271,6 +271,11 @@ const RemoveBgSettings = lazy(() =>
     default: m.RemoveBgSettings,
   })),
 );
+const RemoveGifBackgroundSettings = lazy(() =>
+  import("@/components/tools/remove-gif-background-settings").then((m) => ({
+    default: m.RemoveGifBackgroundSettings,
+  })),
+);
 const UpscaleSettings = lazy(() =>
   import("@/components/tools/upscale-settings").then((m) => ({ default: m.UpscaleSettings })),
 );
@@ -994,6 +999,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
 
   // AI Tools
   ["remove-background", { Settings: RemoveBgSettings }],
+  ["remove-gif-background", { Settings: RemoveGifBackgroundSettings }],
   ["upscale", { Settings: UpscaleSettings }],
   ["ocr", { Settings: OcrSettings }],
   ["ocr-pdf", { accept: ".pdf", Settings: OcrPdfSettings, ResultsPanel: OcrPdfView }],
