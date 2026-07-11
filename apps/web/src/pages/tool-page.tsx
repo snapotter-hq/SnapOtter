@@ -361,6 +361,7 @@ export function ToolPage() {
   const eraserRef = useRef<EraserCanvasRef | null>(null);
   const [eraserHasStrokes, setEraserHasStrokes] = useState(false);
   const [eraserBrushSize, setEraserBrushSize] = useState(30);
+  const [eraserMode, setEraserMode] = useState<"brush" | "lasso">("brush");
   const [eraserMaskedCount, setEraserMaskedCount] = useState(0);
   // Center of the painted mask as a 0-100 percentage, used to init the slider at the erased spot
   const [eraserSliderInitPos, setEraserSliderInitPos] = useState<number | null>(null);
@@ -660,6 +661,8 @@ export function ToolPage() {
             hasStrokes: eraserHasStrokes,
             brushSize: eraserBrushSize,
             onBrushSizeChange: setEraserBrushSize,
+            mode: eraserMode,
+            onModeChange: setEraserMode,
             onMaskCenter: setEraserSliderInitPos,
             maskedFileCount: eraserMaskedCount,
           }
@@ -851,6 +854,7 @@ export function ToolPage() {
           ref={eraserRef}
           imageSrc={originalBlobUrl}
           brushSize={eraserBrushSize}
+          mode={eraserMode}
           onStrokeChange={setEraserHasStrokes}
           onMaskedCountChange={setEraserMaskedCount}
         />

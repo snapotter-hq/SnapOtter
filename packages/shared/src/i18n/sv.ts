@@ -1528,6 +1528,8 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Uppskalar {count} bilder",
     },
     "erase-object": {
+      brushMode: "Pensel",
+      lassoMode: "Lasso",
       brushSize: "Penselstorlek",
       fine: "Fin",
       wide: "Bred",
@@ -1536,6 +1538,7 @@ export const sv: TranslationKeys = {
       outputFormat: "Utdataformat",
       quality: "Kvalitet",
       paintHint: "Måla över objekten du vill ta bort. Använd Ctrl+Z för att ångra.",
+      lassoHint: "Rita en ögla runt objektet du vill ta bort. Använd Ctrl+Z för att ångra.",
       submit: "Radera objekt",
       submitBatch: "Radera alla ({count})",
       progressLabel: "Raderar objekt",

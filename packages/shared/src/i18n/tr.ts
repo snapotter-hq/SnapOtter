@@ -1532,6 +1532,8 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntü büyütülüyor",
     },
     "erase-object": {
+      brushMode: "Fırça",
+      lassoMode: "Kement",
       brushSize: "Fırça Boyutu",
       fine: "İnce",
       wide: "Geniş",
@@ -1541,6 +1543,8 @@ export const tr: TranslationKeys = {
       quality: "Kalite",
       paintHint:
         "Kaldırmak istediğiniz nesnelerin üzerini boyayın. Geri almak için Ctrl+Z kullanın.",
+      lassoHint:
+        "Kaldırmak istediğiniz nesnenin etrafına bir ilmek çizin. Geri almak için Ctrl+Z kullanın.",
       submit: "Nesneyi Sil",
       submitBatch: "Tümünü Sil ({count})",
       progressLabel: "Nesne siliniyor",

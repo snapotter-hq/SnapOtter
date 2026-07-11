@@ -1483,6 +1483,8 @@ export const en = {
       progressLabelBatch: "Upscaling {count} images",
     },
     "erase-object": {
+      brushMode: "Brush",
+      lassoMode: "Lasso",
       brushSize: "Brush Size",
       fine: "Fine",
       wide: "Wide",
@@ -1491,6 +1493,7 @@ export const en = {
       outputFormat: "Output Format",
       quality: "Quality",
       paintHint: "Paint over the objects you want to remove. Use Ctrl+Z to undo.",
+      lassoHint: "Draw a loop around the object you want to remove. Use Ctrl+Z to undo.",
       submit: "Erase Object",
       submitBatch: "Erase All ({count})",
       progressLabel: "Erasing object",

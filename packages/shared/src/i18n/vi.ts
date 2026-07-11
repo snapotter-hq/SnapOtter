@@ -1532,6 +1532,8 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang phóng to {count} ảnh",
     },
     "erase-object": {
+      brushMode: "Cọ",
+      lassoMode: "Lasso",
       brushSize: "Kích thước cọ",
       fine: "Mảnh",
       wide: "Rộng",
@@ -1540,6 +1542,7 @@ export const vi: TranslationKeys = {
       outputFormat: "Định dạng đầu ra",
       quality: "Chất lượng",
       paintHint: "Tô lên các đối tượng bạn muốn xóa. Nhấn Ctrl+Z để hoàn tác.",
+      lassoHint: "Vẽ một vòng quanh đối tượng bạn muốn xóa. Nhấn Ctrl+Z để hoàn tác.",
       submit: "Xóa đối tượng",
       submitBatch: "Xóa tất cả ({count})",
       progressLabel: "Đang xóa đối tượng",

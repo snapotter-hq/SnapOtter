@@ -1533,6 +1533,8 @@ export const it: TranslationKeys = {
       progressLabelBatch: "Ingrandimento di {count} immagini",
     },
     "erase-object": {
+      brushMode: "Pennello",
+      lassoMode: "Lazo",
       brushSize: "Dimensione pennello",
       fine: "Sottile",
       wide: "Largo",
@@ -1541,6 +1543,8 @@ export const it: TranslationKeys = {
       outputFormat: "Formato di output",
       quality: "Qualità",
       paintHint: "Dipingi sopra gli oggetti che vuoi rimuovere. Usa Ctrl+Z per annullare.",
+      lassoHint:
+        "Traccia un anello attorno all'oggetto che vuoi rimuovere. Usa Ctrl+Z per annullare.",
       submit: "Cancella oggetto",
       submitBatch: "Cancella tutti ({count})",
       progressLabel: "Cancellazione oggetto",

@@ -1529,6 +1529,8 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Увеличение {count} изображений",
     },
     "erase-object": {
+      brushMode: "Кисть",
+      lassoMode: "Лассо",
       brushSize: "Размер кисти",
       fine: "Тонкая",
       wide: "Широкая",
@@ -1537,6 +1539,7 @@ export const ru: TranslationKeys = {
       outputFormat: "Формат вывода",
       quality: "Качество",
       paintHint: "Закрасьте объекты, которые хотите удалить. Нажмите Ctrl+Z для отмены.",
+      lassoHint: "Обведите петлёй объект, который хотите удалить. Нажмите Ctrl+Z для отмены.",
       submit: "Удалить объект",
       submitBatch: "Удалить всё ({count})",
       progressLabel: "Удаление объекта",

@@ -1532,6 +1532,8 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Ampliando {count} imagens",
     },
     "erase-object": {
+      brushMode: "Pincel",
+      lassoMode: "Laço",
       brushSize: "Tamanho do pincel",
       fine: "Fino",
       wide: "Largo",
@@ -1540,6 +1542,7 @@ export const ptBR: TranslationKeys = {
       outputFormat: "Formato de saída",
       quality: "Qualidade",
       paintHint: "Pinte sobre os objetos que deseja remover. Use Ctrl+Z para desfazer.",
+      lassoHint: "Desenhe um laço ao redor do objeto que deseja remover. Use Ctrl+Z para desfazer.",
       submit: "Apagar objeto",
       submitBatch: "Apagar todos ({count})",
       progressLabel: "Apagando objeto",

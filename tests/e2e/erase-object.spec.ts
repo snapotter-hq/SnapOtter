@@ -134,6 +134,47 @@ test.describe("Erase Object tool", () => {
     }
   });
 
+  test("lasso mode toggle switches modes and hides the brush size", async ({
+    loggedInPage: page,
+  }) => {
+    await skipIfFeatureNotInstalled(page);
+
+    // Brush is the default mode: the brush-size slider is shown.
+    await expect(page.locator("#eraser-brush-size")).toBeVisible();
+
+    // Switch to lasso: the brush-size slider is hidden.
+    await page.getByTestId("eraser-mode-lasso").click();
+    await expect(page.locator("#eraser-brush-size")).not.toBeVisible();
+
+    // Switch back to brush: the slider returns.
+    await page.getByTestId("eraser-mode-brush").click();
+    await expect(page.locator("#eraser-brush-size")).toBeVisible();
+  });
+
+  test("drawing a lasso loop enables submit", async ({ loggedInPage: page }) => {
+    await skipIfFeatureNotInstalled(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+
+    await page.getByTestId("eraser-mode-lasso").click();
+
+    const canvas = page.locator("canvas");
+    await canvas.waitFor({ state: "visible", timeout: 5_000 });
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas not found");
+
+    // Drag a closed quad around the middle of the canvas (>= 3 points, real area).
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5);
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.7);
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+    await page.mouse.up();
+
+    // A lasso region counts as a stroke: Undo appears and submit is enabled.
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+  });
+
   test("shows Erase All button when multiple files have masks", async ({ loggedInPage: page }) => {
     await skipIfFeatureNotInstalled(page);
 

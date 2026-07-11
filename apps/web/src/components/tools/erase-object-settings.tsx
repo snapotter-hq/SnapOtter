@@ -1,4 +1,4 @@
-import { Download, Redo, Trash2 } from "lucide-react";
+import { Download, Lasso, Paintbrush, Redo, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -117,6 +117,8 @@ interface EraseObjectSettingsProps {
   hasStrokes: boolean;
   brushSize: number;
   onBrushSizeChange: (size: number) => void;
+  mode: "brush" | "lasso";
+  onModeChange: (mode: "brush" | "lasso") => void;
   onMaskCenter?: (centerPct: number) => void;
   maskedFileCount: number;
 }
@@ -126,6 +128,8 @@ export function EraseObjectSettings({
   hasStrokes,
   brushSize,
   onBrushSizeChange: setBrushSize,
+  mode,
+  onModeChange,
   onMaskCenter,
   maskedFileCount,
 }: EraseObjectSettingsProps) {
@@ -439,28 +443,62 @@ export function EraseObjectSettings({
 
   return (
     <div className="space-y-4">
-      {/* Brush size */}
-      <div>
-        <div className="flex justify-between items-center">
-          <label htmlFor="eraser-brush-size" className="text-xs text-muted-foreground">
-            {t.toolSettings["erase-object"].brushSize}
-          </label>
-          <span className="text-xs font-mono text-foreground">{brushSize}px</span>
-        </div>
-        <input
-          id="eraser-brush-size"
-          type="range"
-          min={5}
-          max={100}
-          value={brushSize}
-          onChange={(e) => setBrushSize(Number(e.target.value))}
-          className="w-full mt-1"
-        />
-        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>{t.toolSettings["erase-object"].fine}</span>
-          <span>{t.toolSettings["erase-object"].wide}</span>
-        </div>
+      {/* Mode: brush vs lasso */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1">
+        <button
+          type="button"
+          data-testid="eraser-mode-brush"
+          aria-pressed={mode === "brush"}
+          onClick={() => onModeChange("brush")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            mode === "brush"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Paintbrush className="h-3.5 w-3.5" />
+          {t.toolSettings["erase-object"].brushMode}
+        </button>
+        <button
+          type="button"
+          data-testid="eraser-mode-lasso"
+          aria-pressed={mode === "lasso"}
+          onClick={() => onModeChange("lasso")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            mode === "lasso"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Lasso className="h-3.5 w-3.5" />
+          {t.toolSettings["erase-object"].lassoMode}
+        </button>
       </div>
+
+      {/* Brush size (brush mode only) */}
+      {mode === "brush" && (
+        <div>
+          <div className="flex justify-between items-center">
+            <label htmlFor="eraser-brush-size" className="text-xs text-muted-foreground">
+              {t.toolSettings["erase-object"].brushSize}
+            </label>
+            <span className="text-xs font-mono text-foreground">{brushSize}px</span>
+          </div>
+          <input
+            id="eraser-brush-size"
+            type="range"
+            min={5}
+            max={100}
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+            className="w-full mt-1"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+            <span>{t.toolSettings["erase-object"].fine}</span>
+            <span>{t.toolSettings["erase-object"].wide}</span>
+          </div>
+        </div>
+      )}
 
       {/* Clear / Undo */}
       {hasStrokes && (
@@ -528,7 +566,9 @@ export function EraseObjectSettings({
       {/* Hint */}
       {hasFile && !hasStrokes && (
         <p className="text-[10px] text-muted-foreground">
-          Paint over the objects you want to remove. Use Ctrl+Z to undo.
+          {mode === "lasso"
+            ? t.toolSettings["erase-object"].lassoHint
+            : t.toolSettings["erase-object"].paintHint}
         </p>
       )}
 

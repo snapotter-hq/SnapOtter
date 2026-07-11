@@ -1474,6 +1474,8 @@ export const ko: TranslationKeys = {
       progressLabelBatch: "{count}개 이미지 업스케일 중",
     },
     "erase-object": {
+      brushMode: "브러시",
+      lassoMode: "올가미",
       brushSize: "브러시 크기",
       fine: "가늘게",
       wide: "굵게",
@@ -1482,6 +1484,7 @@ export const ko: TranslationKeys = {
       outputFormat: "출력 포맷",
       quality: "품질",
       paintHint: "제거할 객체 위를 칠하세요. Ctrl+Z로 실행 취소할 수 있습니다.",
+      lassoHint: "제거할 객체 주위에 올가미를 그리세요. Ctrl+Z로 실행 취소할 수 있습니다.",
       submit: "객체 지우기",
       submitBatch: "모두 지우기 ({count})",
       progressLabel: "객체 지우는 중",

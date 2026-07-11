@@ -1518,6 +1518,8 @@ export const es: TranslationKeys = {
       progressLabelBatch: "Escalando {count} imágenes",
     },
     "erase-object": {
+      brushMode: "Pincel",
+      lassoMode: "Lazo",
       brushSize: "Tamaño del pincel",
       fine: "Fino",
       wide: "Ancho",
@@ -1526,6 +1528,8 @@ export const es: TranslationKeys = {
       outputFormat: "Formato de salida",
       quality: "Calidad",
       paintHint: "Pinta sobre los objetos que quieras eliminar. Usa Ctrl+Z para deshacer.",
+      lassoHint:
+        "Dibuja un lazo alrededor del objeto que quieras eliminar. Usa Ctrl+Z para deshacer.",
       submit: "Borrar objeto",
       submitBatch: "Borrar todos ({count})",
       progressLabel: "Borrando objeto",

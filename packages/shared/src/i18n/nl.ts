@@ -1533,6 +1533,8 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "{count} afbeeldingen opschalen",
     },
     "erase-object": {
+      brushMode: "Penseel",
+      lassoMode: "Lasso",
       brushSize: "Penseelgrootte",
       fine: "Fijn",
       wide: "Breed",
@@ -1542,6 +1544,8 @@ export const nl: TranslationKeys = {
       quality: "Kwaliteit",
       paintHint:
         "Verf over de objecten die je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
+      lassoHint:
+        "Teken een lus rond het object dat je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
       submit: "Object verwijderen",
       submitBatch: "Alles verwijderen ({count})",
       progressLabel: "Object verwijderen",

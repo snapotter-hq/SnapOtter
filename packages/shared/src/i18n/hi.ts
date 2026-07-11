@@ -1350,6 +1350,8 @@ export const hi: TranslationKeys = {
       progressLabelBatch: "{count} इमेज अपस्केल हो रही हैं",
     },
     "erase-object": {
+      brushMode: "ब्रश",
+      lassoMode: "लासो",
       brushSize: "ब्रश साइज़",
       fine: "महीन",
       wide: "चौड़ा",
@@ -1358,6 +1360,7 @@ export const hi: TranslationKeys = {
       outputFormat: "आउटपुट फॉर्मेट",
       quality: "क्वालिटी",
       paintHint: "जिन वस्तुओं को हटाना है उन पर पेंट करें। पूर्ववत के लिए Ctrl+Z दबाएं।",
+      lassoHint: "जिस वस्तु को हटाना है उसके चारों ओर लूप बनाएं। पूर्ववत के लिए Ctrl+Z दबाएं।",
       submit: "ऑब्जेक्ट मिटाएं",
       submitBatch: "सभी मिटाएं ({count})",
       progressLabel: "ऑब्जेक्ट मिटाया जा रहा है",

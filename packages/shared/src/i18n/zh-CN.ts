@@ -1298,6 +1298,8 @@ export const zhCN: TranslationKeys = {
       progressLabelBatch: "正在放大 {count} 张图片",
     },
     "erase-object": {
+      brushMode: "画笔",
+      lassoMode: "套索",
       brushSize: "画笔大小",
       fine: "细",
       wide: "粗",
@@ -1306,6 +1308,7 @@ export const zhCN: TranslationKeys = {
       outputFormat: "输出格式",
       quality: "质量",
       paintHint: "涂抹要移除的物体。按 Ctrl+Z 撤销。",
+      lassoHint: "在要移除的物体周围画一个圈。按 Ctrl+Z 撤销。",
       submit: "擦除物体",
       submitBatch: "全部擦除（{count}）",
       progressLabel: "正在擦除物体",

@@ -1490,6 +1490,8 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像をアップスケール中",
     },
     "erase-object": {
+      brushMode: "ブラシ",
+      lassoMode: "投げ縄",
       brushSize: "ブラシサイズ",
       fine: "細い",
       wide: "太い",
@@ -1498,6 +1500,7 @@ export const ja: TranslationKeys = {
       outputFormat: "出力フォーマット",
       quality: "品質",
       paintHint: "除去したいオブジェクトの上を塗ってください。Ctrl+Zで元に戻せます。",
+      lassoHint: "除去したいオブジェクトを囲むように輪を描いてください。Ctrl+Zで元に戻せます。",
       submit: "消去",
       submitBatch: "すべて消去（{count}）",
       progressLabel: "オブジェクトを消去中",

@@ -49,6 +49,8 @@ export interface EraserProps {
   hasStrokes: boolean;
   brushSize: number;
   onBrushSizeChange: (size: number) => void;
+  mode: "brush" | "lasso";
+  onModeChange: (mode: "brush" | "lasso") => void;
   onMaskCenter?: (centerPct: number) => void;
   maskedFileCount: number;
 }

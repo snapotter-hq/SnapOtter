@@ -1535,6 +1535,8 @@ export const de: TranslationKeys = {
       progressLabelBatch: "{count} Bilder werden hochskaliert",
     },
     "erase-object": {
+      brushMode: "Pinsel",
+      lassoMode: "Lasso",
       brushSize: "Pinselgröße",
       fine: "Fein",
       wide: "Breit",
@@ -1544,6 +1546,8 @@ export const de: TranslationKeys = {
       quality: "Qualität",
       paintHint:
         "Malen Sie über die Objekte, die Sie entfernen möchten. Strg+Z zum Rückgängigmachen.",
+      lassoHint:
+        "Ziehen Sie eine Schlaufe um das Objekt, das Sie entfernen möchten. Strg+Z zum Rückgängigmachen.",
       submit: "Objekt entfernen",
       submitBatch: "Alle entfernen ({count})",
       progressLabel: "Objekt wird entfernt",
