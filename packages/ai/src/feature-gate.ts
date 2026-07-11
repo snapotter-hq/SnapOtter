@@ -12,6 +12,7 @@ import { join } from "node:path";
  */
 export const SCRIPT_BUNDLE_MAP: Record<string, string> = {
   remove_bg: "background-removal",
+  gif_remove_bg: "background-removal",
   detect_faces: "face-detection",
   face_landmarks: "face-detection",
   red_eye_removal: "face-detection",
