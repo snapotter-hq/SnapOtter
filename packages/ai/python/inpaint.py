@@ -22,6 +22,112 @@ LAMA_HF_URL = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onn
 # The ONNX model expects 512x512 fixed input.
 MODEL_SIZE = 512
 
+# Crop-and-composite tuning. Defaults validated against the real model in a POC
+# (see docs/superpowers/specs/2026-07-11-erase-object-inpainting-quality-design.md).
+MIN_IMAGE_DIM = 8  # below this, inpainting is meaningless; return the original
+WHOLE_FRAME_RATIO = 0.95  # crop this fraction of the frame -> just use the whole frame
+DILATE_FRAC = 0.04  # mask dilation as a fraction of the mask bbox diagonal
+DILATE_MIN = 6
+DILATE_MAX = 96
+MARGIN_FRAC = 0.5  # context margin around the dilated mask, fraction of its max side
+MARGIN_MIN = 32
+
+
+def _mask_bbox(mask_bin):
+    """Return (x0, y0, x1, y1) tight bounds of nonzero pixels, or None if empty."""
+    import numpy as np
+
+    ys, xs = np.where(mask_bin > 0)
+    if xs.size == 0:
+        return None
+    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+
+
+def dilate_mask(mask_bin, d):
+    """Grow a binary mask by d px with an elliptical kernel. d<=0 is a no-op copy."""
+    import cv2
+
+    if d <= 0:
+        return mask_bin.copy()
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * d + 1, 2 * d + 1))
+    return cv2.dilate(mask_bin, kernel, iterations=1)
+
+
+def compute_crop_box(mask_dil, image_shape, margin_frac, margin_min):
+    """Bounding box of the dilated mask, expanded by a context margin, clamped."""
+    h, w = image_shape[:2]
+    x0, y0, x1, y1 = _mask_bbox(mask_dil)
+    margin = int(max(margin_min, round(margin_frac * max(x1 - x0, y1 - y0))))
+    return (
+        max(0, x0 - margin),
+        max(0, y0 - margin),
+        min(w, x1 + margin),
+        min(h, y1 + margin),
+    )
+
+
+def composite(original, inpainted_crop, mask_dil_native, crop_box, feather):
+    """Blend the inpainted crop into a copy of the full-res original.
+
+    Only the crop_box region is written, and within it only where the feathered
+    dilated mask has alpha > 0. Pixels beyond the feather stay byte-identical.
+    """
+    import cv2
+    import numpy as np
+
+    x0, y0, x1, y1 = crop_box
+    result = original.copy()
+    ksize = 2 * feather + 1
+    alpha = cv2.GaussianBlur((mask_dil_native > 0).astype(np.float32), (ksize, ksize), 0)
+    alpha = np.clip(alpha, 0.0, 1.0)[:, :, np.newaxis]
+    region = result[y0:y1, x0:x1].astype(np.float32)
+    blended = region * (1.0 - alpha) + inpainted_crop.astype(np.float32) * alpha
+    result[y0:y1, x0:x1] = np.clip(blended, 0, 255).astype(np.uint8)
+    return result
+
+
+def inpaint_array(img_array, mask_array, run_model, progress=None):
+    """Crop-and-composite inpainting orchestrator (model-agnostic).
+
+    img_array: HxWx3 uint8 RGB. mask_array: HxW uint8 (white = erase).
+    run_model(crop_img, crop_mask) -> inpainted crop, same HxWx3 size as crop_img.
+    progress(percent, stage) optional; called for the SSE progress UI.
+    """
+    import numpy as np
+
+    def _p(percent, stage):
+        if progress:
+            progress(percent, stage)
+
+    h, w = img_array.shape[:2]
+    mask_bin = (mask_array > 127).astype(np.uint8) * 255
+
+    # Guards: nothing to erase, or an image too small to inpaint meaningfully.
+    if int(mask_bin.max()) == 0 or min(h, w) < MIN_IMAGE_DIM:
+        return img_array.copy()
+
+    _p(30, "Preprocessing")
+    x0, y0, x1, y1 = _mask_bbox(mask_bin)
+    diag = float(np.hypot(x1 - x0, y1 - y0))
+    d = int(np.clip(round(DILATE_FRAC * diag), DILATE_MIN, DILATE_MAX))
+    mask_dil = dilate_mask(mask_bin, d)
+
+    bx0, by0, bx1, by1 = compute_crop_box(mask_dil, img_array.shape, MARGIN_FRAC, MARGIN_MIN)
+    if (bx1 - bx0) * (by1 - by0) >= WHOLE_FRAME_RATIO * w * h:
+        bx0, by0, bx1, by1 = 0, 0, w, h
+
+    crop_img = img_array[by0:by1, bx0:bx1]
+    crop_mask = mask_dil[by0:by1, bx0:bx1]
+
+    _p(40, "Erasing objects")
+    inpainted_crop = run_model(crop_img, crop_mask)
+
+    _p(75, "Compositing")
+    side = max(bx1 - bx0, by1 - by0)
+    feather = int(np.clip(round(0.01 * side), 2, 12))
+    feather = min(feather, max(1, d // 2))
+    return composite(img_array, inpainted_crop, crop_mask, (bx0, by0, bx1, by1), feather)
+
 
 def _get_model_path():
     """Return path to the LaMa ONNX model, downloading only if allowed."""
