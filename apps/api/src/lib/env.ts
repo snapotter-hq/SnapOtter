@@ -32,6 +32,7 @@ const envSchema = z
     MAX_BATCH_SIZE: z.coerce.number().default(100),
     CONCURRENT_JOBS: z.coerce.number().default(0),
     MAX_MEGAPIXELS: z.coerce.number().default(0),
+    GIF_BG_MAX_FRAMES: z.coerce.number().default(150),
     RATE_LIMIT_PER_MIN: z.coerce.number().default(1000),
     API_KEYS_RATE_LIMIT_PER_MIN: z.coerce.number().default(30),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
