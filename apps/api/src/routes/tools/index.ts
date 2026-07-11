@@ -110,6 +110,7 @@ import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
 import { registerRedactPdf } from "./redact-pdf.js";
 import { registerRemoveBackground } from "./remove-background.js";
+import { registerRemoveGifBackground } from "./remove-gif-background.js";
 import { registerRemovePages } from "./remove-pages.js";
 import { registerRepairPdf } from "./repair-pdf.js";
 import { registerReplaceAudio } from "./replace-audio.js";
@@ -360,6 +361,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "background-replace", register: registerBackgroundReplace },
     { id: "blur-background", register: registerBlurBackground },
     { id: "remove-background", register: registerRemoveBackground },
+    { id: "remove-gif-background", register: registerRemoveGifBackground },
     { id: "upscale", register: registerUpscale },
     { id: "ocr", register: registerOcr },
     { id: "ocr-pdf", register: registerOcrPdf },

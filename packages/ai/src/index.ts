@@ -1,4 +1,14 @@
 export { isMemoryAllocError, removeBackground } from "./background-removal.js";
+export {
+  AnimatedRemovalCanceledError,
+  animatedTimeoutMs,
+  type GifBgFormat,
+  gifBgContentType,
+  gifBgExt,
+  type RemoveBackgroundAnimatedOptions,
+  removeBackgroundAnimated,
+  resolveGifBgFormat,
+} from "./background-removal-animated.js";
 export type { DispatcherStatus } from "./bridge.js";
 export {
   getDispatcherStatus,
