@@ -6,16 +6,24 @@ test.describe("Landing Homepage", () => {
   });
 
   test("page loads with self-hosted title", async ({ page }) => {
-    await expect(page).toHaveTitle(
-      /SnapOtter \| Self-Hosted File Processing for Privacy-Sensitive Teams/,
-    );
+    await expect(page).toHaveTitle(/SnapOtter \| Self-Hosted File-Processing Infrastructure/);
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
+    const nav = page.locator("nav");
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
-    for (const name of ["Features", "Enterprise", "Pricing", "Docs", "Talk to a human"]) {
-      await expect(page.getByRole("link", { name }).first()).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Product" })).toBeVisible();
+    for (const name of ["Enterprise", "Pricing", "Docs", "Talk to a human"]) {
+      await expect(nav.getByRole("link", { name }).first()).toBeVisible();
     }
+  });
+
+  test("Product dropdown reveals its items on hover", async ({ page }) => {
+    const nav = page.locator("nav");
+    await nav.getByRole("button", { name: "Product" }).hover();
+    await expect(nav.getByRole("link", { name: /Developers/ })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /Self-hosted tools/ })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /Alternatives/ })).toBeVisible();
   });
 
   test("navbar renders Book a Demo CTA", async ({ page }) => {
@@ -23,12 +31,12 @@ test.describe("Landing Homepage", () => {
   });
 
   test("hero renders the headline", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("File processing for privacy-sensitive teams.");
+    await expect(page.locator("h1")).toContainText("Private file processing for data that");
   });
 
   test("hero renders the subtitle", async ({ page }) => {
     await expect(
-      page.getByText("Run image, video, audio, PDF, and file tools with local AI"),
+      page.getByText("run local AI across image, video, audio, PDF, and documents"),
     ).toBeVisible();
   });
 
@@ -132,8 +140,9 @@ test.describe("Landing Homepage", () => {
   });
 
   test("footer renders all column titles", async ({ page }) => {
+    const footer = page.locator("footer");
     for (const col of ["Product", "Solutions", "Resources", "Community", "Legal"]) {
-      await expect(page.getByText(col, { exact: true })).toBeVisible();
+      await expect(footer.getByText(col, { exact: true })).toBeVisible();
     }
   });
 

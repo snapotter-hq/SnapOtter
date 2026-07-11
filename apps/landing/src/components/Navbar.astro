@@ -14,11 +14,27 @@ const { locale = "en", path = "/" } = Astro.props;
 // Fetched at build time; refreshed by the scheduled landing rebuild.
 const starCount = formatCompact(await getStarCount());
 
-const links = [
-  { label: t(locale, "nav.features"), href: localizeHref(locale, "/#features") },
+type NavItem = { label: string; href: string; external?: boolean; desc?: string };
+const productLinks: NavItem[] = [
+  {
+    label: t(locale, "nav.product.developers.label"),
+    href: localizeHref(locale, "/self-hosted/file-conversion-api"),
+    desc: t(locale, "nav.product.developers.desc"),
+  },
+  {
+    label: t(locale, "nav.product.selfHosted.label"),
+    href: localizeHref(locale, "/self-hosted"),
+    desc: t(locale, "nav.product.selfHosted.desc"),
+  },
+  {
+    label: t(locale, "nav.product.alternatives.label"),
+    href: localizeHref(locale, "/alternatives"),
+    desc: t(locale, "nav.product.alternatives.desc"),
+  },
+];
+const links: NavItem[] = [
   { label: t(locale, "nav.enterprise"), href: localizeHref(locale, "/#enterprise") },
   { label: t(locale, "nav.pricing"), href: localizeHref(locale, "/#pricing") },
-  { label: t(locale, "nav.alternatives"), href: localizeHref(locale, "/alternatives") },
   { label: t(locale, "nav.docs"), href: "https://docs.snapotter.com", external: true },
   { label: t(locale, "nav.talkToHuman"), href: localizeHref(locale, "/contact") },
 ];
@@ -27,17 +43,41 @@ const links = [
 <nav class="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:bg-gradient-to-r after:from-transparent after:via-primary/20 after:to-transparent">
   <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
     <!-- Logo -->
-    <a href={localizeHref(locale, "/")} class="flex items-center gap-2.5">
+    <a href={localizeHref(locale, "/")} class="flex shrink-0 items-center gap-2.5">
       <img src="/logo.png" alt="SnapOtter" class="h-8 w-8" width="32" height="32" />
       <span class="font-display text-lg font-bold tracking-tight">SnapOtter</span>
     </a>
 
     <!-- Desktop nav links -->
-    <div class="hidden items-center gap-7 lg:flex">
+    <div class="hidden items-center gap-6 lg:flex">
+      <!-- Product dropdown (CSS-only: opens on hover and on keyboard focus) -->
+      <div class="group relative">
+        <button
+          type="button"
+          class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground group-focus-within:text-foreground"
+          aria-haspopup="menu"
+        >
+          {t(locale, "nav.product")}
+          <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="absolute left-0 top-full hidden pt-3 group-hover:block group-focus-within:block">
+          <div class="w-64 rounded-xl border border-border bg-surface p-2 shadow-lg">
+            {productLinks.map((item) => (
+              <a
+                href={item.href}
+                class="block rounded-lg px-3 py-2 transition-colors hover:bg-background-alt"
+              >
+                <span class="block text-sm font-semibold text-foreground">{item.label}</span>
+                <span class="mt-0.5 block text-xs text-muted">{item.desc}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
       {links.map((item) => (
         <a
           href={item.href}
-          class="text-sm font-medium text-muted transition-colors hover:text-foreground"
+          class="whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground"
           {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         >
           {item.label}
@@ -46,7 +86,7 @@ const links = [
     </div>
 
     <!-- Desktop CTAs -->
-    <div class="hidden items-center gap-3 md:flex">
+    <div class="hidden shrink-0 items-center gap-3 md:flex">
       <LanguageSwitcher locale={locale} path={path} />
       <a
         href="https://github.com/snapotter-hq/snapotter"
@@ -60,7 +100,7 @@ const links = [
       </a>
       <a
         href={localizeHref(locale, "/contact")}
-        class="rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
+        class="whitespace-nowrap rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
       >
         {t(locale, "nav.bookDemo")}
       </a>
@@ -68,7 +108,7 @@ const links = [
         href="https://docs.snapotter.com/guide/getting-started.html"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-primary rounded-lg px-4 py-1.5 text-sm font-semibold"
+        class="btn-primary whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-semibold"
       >
         {t(locale, "nav.getStartedFree")}
       </a>
@@ -86,7 +126,7 @@ const links = [
 
   <!-- Mobile menu panel -->
   <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block lg:hidden">
-    {links.map((item) => (
+    {[...productLinks, ...links].map((item) => (
       <a
         href={item.href}
         class="block py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground"

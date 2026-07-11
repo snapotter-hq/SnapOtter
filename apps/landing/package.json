@@ -1,11 +1,11 @@
 {
   "name": "@snapotter/landing",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 1350",
-    "prebuild": "../../apps/api/node_modules/.bin/tsx scripts/generate-redirects.mjs",
+    "prebuild": "../../apps/api/node_modules/.bin/tsx scripts/generate-redirects.mjs && ../../apps/api/node_modules/.bin/tsx scripts/validate-use-cases.ts",
     "build": "astro build",
     "preview": "astro preview --port 1350",
     "lint": "biome check src/",

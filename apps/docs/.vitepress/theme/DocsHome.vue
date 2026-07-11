@@ -52,11 +52,10 @@ function copyCommand() {
 <template>
   <div class="so-home">
     <section class="hero">
-      <p class="eyebrow">{{ tt("home.eyebrow") }}</p>
       <h1 class="hero-title">{{ tt("home.title") }}</h1>
       <p class="hero-sub">
-        <strong>Self-hosted file processing.</strong> 200+ tools across image, video, audio, PDF &amp;
-        files, all on your own hardware. Choose your path below, or get running in one command:
+        Install, operate, and build on your self-hosted file-processing infrastructure. Get running
+        in one command:
       </p>
       <div class="cmd" title="Click to copy" @click="copyCommand">
         <code>$ {{ command }}</code>
@@ -95,7 +94,7 @@ function copyCommand() {
         <ul class="door-links">
           <li v-for="l in entLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
         </ul>
-        <a class="door-cta" href="/guide/architecture">{{ tt("home.evaluate") }}</a>
+        <a class="door-cta" href="https://snapotter.com/enterprise">{{ tt("home.evaluate") }}</a>
       </div>
     </section>
 
@@ -121,7 +120,6 @@ function copyCommand() {
 <style scoped>
 .so-home { max-width: 1080px; margin: 0 auto; padding: 16px 24px 64px; }
 .hero { text-align: center; padding: 48px 16px 28px; }
-.eyebrow { font: 600 11px/1 var(--vp-font-family-mono); letter-spacing: .16em; text-transform: uppercase; color: #A85518; margin-bottom: 14px; }
 .hero-title { font-family: var(--so-font-heading); font-size: 42px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 12px; }
 .hero-sub { color: var(--vp-c-text-2); font-size: 17px; max-width: 60ch; margin: 0 auto 20px; }
 .cmd { display: flex; gap: 14px; align-items: center; max-width: 860px; margin: 0 auto; background: #15100B; border: 1px solid #3A2A1E; border-radius: 10px; padding: 13px 16px; text-align: left; cursor: pointer; transition: border-color .15s, background-color .15s; }
@@ -174,7 +172,7 @@ function copyCommand() {
 :root.dark .door.self { background: linear-gradient(180deg, #2A1F16, #221A13); border-color: #3A2C20; color: #F0EBE4; }
 :root.dark .door.self .door-links li { border-color: #3A2C20; }
 :root.dark .chip-count { color: #F0A766; }
-:root.dark .hero-meta a, :root.dark .eyebrow { color: #F0A766; }
+:root.dark .hero-meta a { color: #F0A766; }
 :root.dark .door.self .door-sub { color: #C9BCAE; }
 :root.dark .door.self .door-links a:hover { color: #F09550; }
 :root.dark .door.self .door-cta { background: #A85518; }

@@ -5,6 +5,7 @@ const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const upsertSettingMock = vi.hoisted(() => vi.fn());
 const decryptMock = vi.hoisted(() => vi.fn());
 const isEncryptedMock = vi.hoisted(() => vi.fn());
+const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
 
 function queryChain<T>(result: T, terminalWhere = false) {
@@ -24,6 +25,8 @@ async function loadSiemForward() {
   upsertSettingMock.mockReset();
   decryptMock.mockReset();
   isEncryptedMock.mockReset();
+  isFeatureEnabledMock.mockReset();
+  isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
 
   vi.doMock("drizzle-orm", () => ({
@@ -73,6 +76,10 @@ async function loadSiemForward() {
 
   vi.doMock("../../../../apps/api/src/routes/enterprise/siem.js", () => ({
     readSiemConfig: readSiemConfigMock,
+  }));
+
+  vi.doMock("@snapotter/enterprise", () => ({
+    isFeatureEnabled: isFeatureEnabledMock,
   }));
 
   return import("../../../../apps/api/src/jobs/siem-forward.js");

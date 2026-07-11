@@ -5,7 +5,8 @@ const bakedConfig = vi.hoisted(() => ({
   posthogApiKey: "",
   posthogHost: "",
   sentryDsn: "",
-  sampleRate: 1.0,
+  sentryDsnWeb: "",
+  posthogSampleRate: 1.0,
 }));
 
 const mockCapture = vi.hoisted(() => vi.fn());
@@ -20,6 +21,13 @@ const MockPostHog = vi.hoisted(() =>
 const mockSentryCapture = vi.hoisted(() => vi.fn());
 const mockSentryClose = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockSentryInit = vi.hoisted(() => vi.fn());
+// The captureException shim routes through reportError, which captures
+// inside Sentry.withScope; the mock must invoke the callback.
+const mockSentryWithScope = vi.hoisted(() =>
+  vi.fn((cb: (scope: unknown) => unknown) =>
+    cb({ setTag: () => {}, setLevel: () => {}, setFingerprint: () => {} }),
+  ),
+);
 
 vi.mock("@snapotter/shared", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -56,6 +64,7 @@ vi.mock("@sentry/node", () => ({
   init: mockSentryInit,
   captureException: mockSentryCapture,
   close: mockSentryClose,
+  withScope: mockSentryWithScope,
 }));
 
 type AnalyticsModule = typeof import("../../../apps/api/src/lib/analytics.js");
@@ -66,7 +75,8 @@ beforeEach(async () => {
   bakedConfig.posthogApiKey = "";
   bakedConfig.posthogHost = "";
   bakedConfig.sentryDsn = "";
-  bakedConfig.sampleRate = 1.0;
+  bakedConfig.sentryDsnWeb = "";
+  bakedConfig.posthogSampleRate = 1.0;
 
   mockCapture.mockClear();
   mockShutdown.mockClear();
@@ -74,6 +84,7 @@ beforeEach(async () => {
   mockSentryCapture.mockClear();
   mockSentryClose.mockClear();
   mockSentryInit.mockClear();
+  mockSentryWithScope.mockClear();
 
   vi.resetModules();
   mod = await import("../../../apps/api/src/lib/analytics.js");
@@ -165,10 +176,10 @@ describe("trackEvent", () => {
     await expect(mod.trackEvent("test_event", { key: "value" })).resolves.toBeUndefined();
   });
 
-  it("does nothing when sampleRate is 0", async () => {
+  it("does nothing when posthogSampleRate is 0", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
-    bakedConfig.sampleRate = 0;
+    bakedConfig.posthogSampleRate = 0;
     await mod.initAnalytics();
 
     await mod.trackEvent("test_event", { key: "value" });
@@ -178,7 +189,7 @@ describe("trackEvent", () => {
   it("captures event with only allow-listed properties when enabled", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
-    bakedConfig.sampleRate = 1.0;
+    bakedConfig.posthogSampleRate = 1.0;
     await mod.initAnalytics();
 
     await mod.trackEvent("tool_used", {
@@ -197,7 +208,7 @@ describe("trackEvent", () => {
   it("uses provided distinctId when given", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
-    bakedConfig.sampleRate = 1.0;
+    bakedConfig.posthogSampleRate = 1.0;
     await mod.initAnalytics();
 
     await mod.trackEvent("tool_used", { tool: "crop" }, "custom-id-123");
@@ -211,7 +222,7 @@ describe("trackEvent", () => {
   it("does not throw when capture throws internally", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
-    bakedConfig.sampleRate = 1.0;
+    bakedConfig.posthogSampleRate = 1.0;
     await mod.initAnalytics();
 
     mockCapture.mockImplementationOnce(() => {

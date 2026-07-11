@@ -4,6 +4,7 @@ import { mkdir, readFile, statfs, unlink, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
+import { SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
@@ -13,9 +14,12 @@ async function assertDiskSpace(dir: string): Promise<void> {
     const stats = await statfs(dir);
     const freeBytes = stats.bfree * stats.bsize;
     if (freeBytes < MIN_FREE_BYTES) {
-      const err = new Error("Insufficient disk space") as Error & { statusCode: number };
-      err.statusCode = 507;
-      throw err;
+      // ENOSPC here is synthesized from the free-space floor check, not a syscall errno.
+      throw new SafeError("Insufficient disk space", {
+        kind: "operational",
+        code: "ENOSPC",
+        statusCode: 507,
+      });
     }
   } catch (e) {
     if (e instanceof Error && (e as Error & { statusCode?: number }).statusCode === 507) throw e;
@@ -102,11 +106,11 @@ export async function ensureStorageDir(): Promise<void> {
     await mkdir(env.FILES_STORAGE_PATH, { recursive: true });
   } catch (e) {
     if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
-      const err = new Error("Storage directory is not writable") as Error & {
-        statusCode: number;
-      };
-      err.statusCode = 503;
-      throw err;
+      throw new SafeError("Storage directory is not writable", {
+        kind: "operational",
+        code: (e as NodeJS.ErrnoException).code,
+        statusCode: 503,
+      });
     }
     throw e;
   }
@@ -126,11 +130,11 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
     await writeFile(join(env.FILES_STORAGE_PATH, storedName), buffer);
   } catch (e) {
     if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
-      const err = new Error("Storage directory is not writable") as Error & {
-        statusCode: number;
-      };
-      err.statusCode = 503;
-      throw err;
+      throw new SafeError("Storage directory is not writable", {
+        kind: "operational",
+        code: (e as NodeJS.ErrnoException).code,
+        statusCode: 503,
+      });
     }
     throw e;
   }
@@ -185,7 +189,11 @@ async function ensureThumbDir(): Promise<void> {
     await mkdir(join(env.FILES_STORAGE_PATH, THUMB_DIR), { recursive: true });
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "EACCES") {
-      throw Object.assign(new Error("Storage directory is not writable"), { statusCode: 503 });
+      throw new SafeError("Storage directory is not writable", {
+        kind: "operational",
+        code: (err as NodeJS.ErrnoException).code,
+        statusCode: 503,
+      });
     }
     throw err;
   }

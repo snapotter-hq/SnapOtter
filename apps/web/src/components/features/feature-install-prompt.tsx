@@ -1,4 +1,8 @@
-import type { FeatureBundleState } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  type FeatureBundleState,
+  getRequiredBundlesForTool,
+} from "@snapotter/shared";
 import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -48,18 +52,45 @@ function formatTimeRemaining(ms: number): string {
 interface FeatureInstallPromptProps {
   bundle: FeatureBundleState;
   isAdmin: boolean;
+  toolId?: string;
   toolName?: string;
   toolDescription?: string;
+}
+
+function fallbackBundleState(bundleId: string): FeatureBundleState | null {
+  const info = FEATURE_BUNDLES[bundleId];
+  if (!info) return null;
+  return {
+    id: info.id,
+    name: info.name,
+    description: info.description,
+    status: "not_installed",
+    installedVersion: null,
+    estimatedSize: info.estimatedSize,
+    enablesTools: info.enablesTools,
+    progress: null,
+    error: null,
+  };
 }
 
 export function FeatureInstallPrompt({
   bundle,
   isAdmin,
+  toolId,
   toolName,
   toolDescription,
 }: FeatureInstallPromptProps) {
   const { t } = useTranslation();
-  const { installBundle, clearError, installing, errors, startTimes, queued } = useFeaturesStore();
+  const {
+    bundles,
+    installBundle,
+    installTool,
+    clearError,
+    installing,
+    errors,
+    startTimes,
+    queued,
+  } = useFeaturesStore();
   const progress = installing[bundle.id] ?? null;
   const error = errors[bundle.id] ?? null;
   const isInstalling = !!progress;
@@ -68,6 +99,37 @@ export function FeatureInstallPrompt({
   const displayName = toolName || bundle.name;
   const displayDescription = toolDescription || bundle.description;
   const isRepair = bundle.status === "error";
+  const requiredBundleIds = toolId ? getRequiredBundlesForTool(toolId) : [bundle.id];
+  const requiredBundles = requiredBundleIds
+    .map(
+      (bundleId) =>
+        bundles.find((candidate) => candidate.id === bundleId) ??
+        (bundle.id === bundleId ? bundle : fallbackBundleState(bundleId)),
+    )
+    .filter((candidate): candidate is FeatureBundleState => candidate !== null);
+  const bundlesNeedingDownload = requiredBundles.filter(
+    (candidate) => candidate.status !== "installed",
+  );
+  const downloadSizeLabel =
+    bundlesNeedingDownload
+      .map((candidate) =>
+        candidate.downloadBytes ? formatFileSize(candidate.downloadBytes) : candidate.estimatedSize,
+      )
+      .join(" + ") ||
+    (bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize);
+  // Show the per-bundle breakdown for any multi-bundle tool, including the
+  // repair state: when one bundle of a multi-bundle tool (e.g. passport-photo)
+  // errors, the user still needs to see that the sibling bundle is installing,
+  // queued, or already done. Hiding it during repair is exactly when it hurts.
+  const showBundleBreakdown = toolId !== undefined && requiredBundles.length > 1;
+
+  function bundleStatusLabel(candidate: FeatureBundleState): string {
+    if (installing[candidate.id]) return t.settings.aiFeatures.installing;
+    if (queued.includes(candidate.id)) return t.settings.aiFeatures.queued;
+    if (candidate.status === "installed") return t.settings.aiFeatures.installed;
+    if (candidate.status === "error") return t.settings.aiFeatures.repair;
+    return t.settings.aiFeatures.notInstalled;
+  }
 
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * PROGRESS_MESSAGES.length),
@@ -94,7 +156,11 @@ export function FeatureInstallPrompt({
 
   function handleInstall() {
     clearError(bundle.id);
-    installBundle(bundle.id);
+    if (toolId) {
+      installTool(toolId);
+    } else {
+      installBundle(bundle.id);
+    }
   }
 
   // Defensive guard: if the bundle is already installed (status may have
@@ -126,13 +192,48 @@ export function FeatureInstallPrompt({
         {!isRepair && (
           <p className="text-sm text-muted-foreground">
             {format(t.features.requiresDownload, {
-              size: bundle.downloadBytes
-                ? formatFileSize(bundle.downloadBytes)
-                : bundle.estimatedSize,
+              size: downloadSizeLabel,
             })}
           </p>
         )}
       </div>
+
+      {showBundleBreakdown && (
+        <div className="w-full max-w-md rounded-lg border border-border bg-background text-start overflow-hidden">
+          {requiredBundles.map((candidate) => {
+            const isCandidateInstalling = !!installing[candidate.id];
+            const isCandidateQueued = queued.includes(candidate.id);
+            const isCandidateInstalled = candidate.status === "installed";
+            const statusClass = isCandidateInstalled
+              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : isCandidateInstalling || isCandidateQueued
+                ? "bg-primary/10 text-primary"
+                : candidate.status === "error"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted text-muted-foreground";
+            return (
+              <div
+                key={candidate.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border last:border-b-0"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{candidate.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {candidate.downloadBytes
+                      ? formatFileSize(candidate.downloadBytes)
+                      : candidate.estimatedSize}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}`}
+                >
+                  {bundleStatusLabel(candidate)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {(error || (isRepair && bundle.error)) && (
         <div className="flex items-center gap-2 bg-destructive/10 text-destructive rounded-lg px-4 py-3 max-w-md w-full">

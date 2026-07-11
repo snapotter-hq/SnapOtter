@@ -1,7 +1,7 @@
 ---
 layout: page
 title: SnapOtter Docs
-description: "Self-hosted file processing. 200+ tools for image, video, audio, PDF, and files, plus a free layer-based image editor. Local AI, pipelines, REST API. Your files never leave your server."
+description: "Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, via UI, REST API, and pipelines. Self-host with one Docker command. Your files never leave your server."
 sidebar: false
 ---
 

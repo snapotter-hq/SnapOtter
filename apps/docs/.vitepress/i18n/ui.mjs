@@ -5,14 +5,13 @@ import { SUPPORTED_LOCALES } from "../../../../packages/shared/src/i18n/index.ts
 // missing keys fall back to English via t().
 const EN = {
   // DocsHome.vue
-  "home.eyebrow": "Self-hosted · Open source · AGPLv3",
   "home.title": "SnapOtter Documentation",
   "home.copy": "Copy",
   "home.copied": "Copied!",
   "home.selfHosting": "Self-hosting",
   "home.enterprise": "Enterprise",
   "home.startSelfHosting": "Start self-hosting →",
-  "home.evaluate": "Evaluate for your org →",
+  "home.evaluate": "See enterprise features →",
   "home.modalities": "200+ tools across 5 modalities",
   "home.browseByType": "browse the full reference by type",
   // FundButton.vue

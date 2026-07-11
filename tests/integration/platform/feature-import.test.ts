@@ -298,6 +298,23 @@ describe("importBundleArchive", () => {
       /invalid model path/,
     );
   });
+
+  it("rejects a corrupt gzip stream with ImportValidationError, not a ZlibError", async () => {
+    // Gzip magic bytes followed by garbage: minizlib raises a ZlibError
+    // during tar parse (Sentry NODE-1Z shape).
+    const corruptPath = join(tmpdir(), `snapotter-corrupt-${randomUUID()}.tar.gz`);
+    writeFileSync(
+      corruptPath,
+      Buffer.concat([Buffer.from([0x1f, 0x8b, 0x08]), Buffer.alloc(64, 0x41)]),
+    );
+
+    await expect(importBundleArchive(createReadStream(corruptPath))).rejects.toThrow(
+      ImportValidationError,
+    );
+    await expect(importBundleArchive(createReadStream(corruptPath))).rejects.toThrow(
+      /not a valid bundle archive/i,
+    );
+  });
 });
 
 describe("site-packages import", () => {
@@ -439,6 +456,30 @@ describe("POST /api/v1/admin/features/import", () => {
     });
 
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
+  });
+
+  it("rejects a non-archive upload with 400, not a crash", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "corrupt.tar.gz",
+        contentType: "application/gzip",
+        content: Buffer.from("this is not gzip data"),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/import",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${token}`,
+      },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/not a valid bundle archive/i);
   });
 
   it("returns 409 when lock is held", async () => {

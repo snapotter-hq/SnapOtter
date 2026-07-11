@@ -15,6 +15,7 @@ Final result is a JSON object on stdout.
 import errno
 import glob
 import hashlib
+import importlib
 import json
 import os
 import platform
@@ -26,6 +27,9 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+
+DOWNLOAD_CHUNK_BYTES = 4 * 1024 * 1024
+DOWNLOAD_META_BYTES = 64 * 1024 * 1024
 
 
 # -- Helpers --
@@ -149,6 +153,166 @@ def verify_sha256(filepath: str, expected: str) -> bool:
 
 # -- Download with resume --
 
+def _set_env_temporarily(key: str, value: str):
+    previous = os.environ.get(key)
+    os.environ[key] = value
+    return previous
+
+
+def _restore_env(key: str, previous) -> None:
+    if previous is None:
+        os.environ.pop(key, None)
+    else:
+        os.environ[key] = previous
+
+
+def _cleanup_hf_local_dir(local_dir: str, archive_file: str) -> None:
+    if "/" in archive_file:
+        top_level = archive_file.split("/", 1)[0]
+        shutil.rmtree(os.path.join(local_dir, top_level), ignore_errors=True)
+    shutil.rmtree(os.path.join(local_dir, ".cache"), ignore_errors=True)
+
+
+def ensure_hf_hub(venv_path: str) -> None:
+    """Guarantee the accelerated Hugging Face client is importable before the
+    download so the multi-GB bundle transfer takes the fast Xet path.
+
+    The installer runs under the on-disk venv (PYTHON_VENV_PATH, i.e.
+    /data/ai/venv in Docker). That venv is normally seeded from the image's
+    /opt/venv, which bakes huggingface-hub[hf_xet]. But an install whose venv
+    predates the base package (an upgrade where the reseed stamp didn't move, a
+    hand-copied or offline-imported venv) would import-fail in
+    download_with_hf_hub and silently fall back to the slow single-stream urllib
+    downloader. Self-heal by pip-installing the client into this same venv.
+
+    A bundle install already requires network and lifts the offline guard (see
+    main()), so this adds no new offline dependency; if the pip install fails we
+    fall through to the resumable urllib downloader, the correct degraded path.
+    """
+    try:
+        import huggingface_hub  # noqa: F401
+
+        return
+    except Exception:
+        pass
+
+    python_path = os.path.join(venv_path, "bin", "python3")
+    if not os.path.exists(python_path):
+        return
+
+    emit_progress(1, "Preparing accelerated download client...")
+    try:
+        subprocess.run(
+            [
+                python_path, "-m", "pip", "install", "--quiet",
+                "huggingface-hub[hf_xet,hf_transfer]==0.36.2",
+            ],
+            capture_output=True, text=True, timeout=300, check=True,
+        )
+        # The finder caches the venv's site-packages listing; drop it so the
+        # just-installed package is visible to the import in download_with_hf_hub.
+        importlib.invalidate_caches()
+    except Exception as e:
+        emit_progress(1, f"Accelerated client unavailable ({e}); using resumable download.")
+
+
+def download_with_hf_hub(
+    bundle_repo: str,
+    archive_file: str,
+    dest: str,
+    expected_size: int,
+    progress_start: int,
+    progress_end: int,
+    force_download: bool = False,
+) -> bool:
+    """Download through huggingface_hub when available.
+
+    huggingface_hub 0.32+ can use hf_xet for faster large-file transfers and
+    manages retries/resume internally. Return False when the client is missing
+    or fails so callers can fall back to the manual urllib downloader.
+    """
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception:
+        return False
+
+    # Enable hf_transfer (Rust multi-connection downloader) ONLY when the
+    # package is actually importable. For a Xet-backed repo hf_xet takes
+    # precedence and this is a no-op, but if the Xet CAS endpoint is unreachable
+    # (e.g. a firewall that allows huggingface.co but blocks transfer.xethub.hf.co)
+    # hf_hub_download falls back to plain HTTP, and hf_transfer makes that
+    # fallback multi-connection instead of single-stream. Gating on the import
+    # avoids the "HF_HUB_ENABLE_HF_TRANSFER set but package missing" hard error
+    # on a venv that only has hf_xet.
+    try:
+        import hf_transfer  # noqa: F401
+
+        os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+    except Exception:
+        pass
+
+    local_dir = os.path.dirname(dest)
+    os.makedirs(local_dir, exist_ok=True)
+    emit_progress(progress_start, "Downloading with accelerated Hugging Face client...")
+
+    previous_progress = _set_env_temporarily("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    try:
+        downloaded_path = hf_hub_download(
+            repo_id=bundle_repo,
+            filename=archive_file,
+            repo_type="model",
+            local_dir=local_dir,
+            force_download=force_download,
+        )
+    except Exception as e:
+        emit_progress(
+            progress_start,
+            f"Accelerated download unavailable, using resumable fallback: {e}",
+        )
+        # Reclaim any partial blob/metadata hf_hub_download staged under
+        # local_dir/.cache so the urllib fallback starts clean and disk is freed.
+        _cleanup_hf_local_dir(local_dir, archive_file)
+        return False
+    finally:
+        _restore_env("HF_HUB_DISABLE_PROGRESS_BARS", previous_progress)
+
+    try:
+        if not os.path.exists(downloaded_path):
+            emit_progress(
+                progress_start,
+                "Accelerated download did not produce an archive, using resumable fallback...",
+            )
+            return False
+
+        if os.path.abspath(downloaded_path) != os.path.abspath(dest):
+            if os.path.exists(dest):
+                os.unlink(dest)
+            os.replace(downloaded_path, dest)
+
+        size = os.path.getsize(dest)
+        if expected_size > 0:
+            pct = min(size / expected_size, 1.0)
+            progress = int(progress_start + pct * (progress_end - progress_start))
+        else:
+            progress = progress_end
+        emit_progress(
+            min(progress, progress_end),
+            f"Downloaded with accelerated client ({size / (1024**3):.1f} GB)",
+        )
+        return True
+    except Exception as e:
+        emit_progress(
+            progress_start,
+            f"Accelerated download post-processing failed, using resumable fallback: {e}",
+        )
+        return False
+    finally:
+        # Always drop the hf staging tree (local_dir/<top>, local_dir/.cache).
+        # On success the archive is already moved to dest; on any failure this
+        # stops the transient hf cache copy from leaking across the fallback.
+        _cleanup_hf_local_dir(local_dir, archive_file)
+
+
 def download_with_resume(
     url: str,
     dest: str,
@@ -180,7 +344,15 @@ def download_with_resume(
     if bytes_downloaded == 0 and os.path.exists(partial_path):
         os.unlink(partial_path)
 
-    max_retries = 3
+    def _cleanup_partial() -> None:
+        for p in (partial_path, meta_path):
+            if os.path.exists(p):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             headers = {"User-Agent": "snapotter-installer/2.0"}
@@ -193,10 +365,19 @@ def download_with_resume(
 
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=300) as resp:
+                status = getattr(resp, "status", None) or resp.getcode()
+                # If we asked to resume (sent a Range) but the server sent the
+                # whole file back (200 instead of 206 Partial Content -- a proxy
+                # or CDN that ignores Range), restart from byte 0. Appending a
+                # full body onto the existing partial would corrupt the archive
+                # and fail the checksum on every retry.
+                if bytes_downloaded > 0 and status != 206:
+                    bytes_downloaded = 0
                 mode = "ab" if bytes_downloaded > 0 else "wb"
+                next_meta_at = bytes_downloaded + DOWNLOAD_META_BYTES
                 with open(partial_path, mode) as f:
                     while True:
-                        chunk = resp.read(65536)
+                        chunk = resp.read(DOWNLOAD_CHUNK_BYTES)
                         if not chunk:
                             break
                         f.write(chunk)
@@ -212,10 +393,20 @@ def download_with_resume(
                             stage = f"Downloading... {bytes_downloaded / (1024**3):.1f} GB"
                             emit_progress(progress, stage)
 
-                        # Write meta periodically (every 10 MB)
-                        if bytes_downloaded % (10 * 1024 * 1024) < 65536:
+                        # Write meta periodically so a crash can resume.
+                        if bytes_downloaded >= next_meta_at:
                             with open(meta_path, "w") as mf:
                                 json.dump({"bytesDownloaded": bytes_downloaded}, mf)
+                            next_meta_at = bytes_downloaded + DOWNLOAD_META_BYTES
+
+            # Guard against a truncated body or an error page served as the
+            # archive: the completed size must match what the manifest expects.
+            # A mismatch is retryable (transient truncation / a stale CDN edge).
+            if expected_size > 0 and bytes_downloaded != expected_size:
+                raise RuntimeError(
+                    f"incomplete download: got {bytes_downloaded} bytes, "
+                    f"expected {expected_size} (truncated response or error page)"
+                )
 
             # Download complete
             os.rename(partial_path, dest)
@@ -223,27 +414,58 @@ def download_with_resume(
                 os.unlink(meta_path)
             return
 
-        except Exception as e:
-            # Write meta for resume on next attempt
-            with open(meta_path, "w") as mf:
-                json.dump({"bytesDownloaded": bytes_downloaded}, mf)
-
-            if attempt < max_retries - 1:
-                delay = 10 * (2 ** attempt)
-                emit_progress(
-                    progress_start,
-                    f"Download failed (attempt {attempt + 1}/{max_retries}), "
-                    f"retrying in {delay}s: {e}",
-                )
-                time.sleep(delay)
-            else:
-                # Clean up on final failure
-                for p in (partial_path, meta_path):
-                    if os.path.exists(p):
-                        os.unlink(p)
+        except urllib.error.HTTPError as e:
+            # HTTPError subclasses OSError, so it MUST be caught before the
+            # OSError clause below. 4xx (except 408 Timeout / 429 Too Many
+            # Requests) won't fix on retry -- a wrong URL, a private repo, or a
+            # removed archive -- so fail fast with the manual-download hint.
+            if 400 <= e.code < 500 and e.code not in (408, 429):
+                _cleanup_partial()
                 raise RuntimeError(
-                    f"Failed to download after {max_retries} attempts: {e}"
+                    f"Download failed with HTTP {e.code} ({e.reason}). The archive "
+                    f"URL may be wrong or access-restricted."
                 )
+            _retry_or_raise(e, attempt, max_retries, bytes_downloaded, meta_path,
+                            progress_start, _cleanup_partial)
+        except OSError as e:
+            # Disk full is not transient: retrying can't create space. Fail fast
+            # with an actionable message instead of burning the backoff budget.
+            # (URLError/connection errors also land here; their errno is None, so
+            # they fall through to the retry path.)
+            if getattr(e, "errno", None) == errno.ENOSPC:
+                _cleanup_partial()
+                raise RuntimeError(
+                    "Ran out of disk space while downloading the bundle. "
+                    "Free up space and retry."
+                )
+            _retry_or_raise(e, attempt, max_retries, bytes_downloaded, meta_path,
+                            progress_start, _cleanup_partial)
+        except Exception as e:
+            _retry_or_raise(e, attempt, max_retries, bytes_downloaded, meta_path,
+                            progress_start, _cleanup_partial)
+
+
+def _retry_or_raise(err, attempt, max_retries, bytes_downloaded, meta_path,
+                    progress_start, cleanup) -> None:
+    """Shared transient-failure handler for download_with_resume: persist resume
+    metadata and back off, or clean up and raise on the final attempt."""
+    try:
+        with open(meta_path, "w") as mf:
+            json.dump({"bytesDownloaded": bytes_downloaded}, mf)
+    except OSError:
+        pass
+
+    if attempt < max_retries - 1:
+        delay = min(60, 5 * (2 ** attempt))
+        emit_progress(
+            progress_start,
+            f"Download failed (attempt {attempt + 1}/{max_retries}), "
+            f"retrying in {delay}s: {err}",
+        )
+        time.sleep(delay)
+    else:
+        cleanup()
+        raise RuntimeError(f"Failed to download after {max_retries} attempts: {err}")
 
 
 # -- Safe tar extraction --
@@ -270,11 +492,15 @@ def safe_extract(tar_path: str, staging_dir: str) -> None:
 # -- File move --
 
 def move_tree(src: str, dst: str) -> None:
-    """Merge src into dst, overwriting existing files. Renames entries where
-    possible so that on the same filesystem no copy (and thus no transient
-    doubling of the payload on disk) occurs; falls back to a copy only across
-    filesystems. The old copytree+rmtree approach duplicated the whole tree on
-    disk during the move, which could exhaust the host on a tight-disk node."""
+    """Merge src into dst, replacing entries crash-atomically where possible.
+
+    This writes into the SHARED /data/ai/venv site-packages, so a crash mid-move
+    must never leave a package in a half-replaced state (that tears the venv and
+    breaks every other AI tool). For a file replacing a file, os.replace swaps in
+    place with NO delete-then-write window, so an interruption leaves either the
+    old or the new file intact, never a missing one. Cross-filesystem copies go
+    through a temp sibling then an atomic rename for the same reason. Renames
+    (vs copytree) also avoid transiently doubling the payload on disk."""
     if not os.path.isdir(src):
         return
     os.makedirs(dst, exist_ok=True)
@@ -285,22 +511,31 @@ def move_tree(src: str, dst: str) -> None:
             # Both dirs exist: merge recursively rather than replace.
             move_tree(s, d)
             continue
-        if os.path.exists(d):
-            if os.path.isdir(d):
-                shutil.rmtree(d)
-            else:
-                os.remove(d)
         try:
-            os.rename(s, d)
-        except OSError as e:
-            if getattr(e, "errno", None) == errno.EXDEV:
-                # Cross-filesystem: rename isn't allowed, fall back to a copy.
-                if os.path.isdir(s):
-                    shutil.copytree(s, d)
+            # A type mismatch (dir<->file) can't be atomically swapped by rename,
+            # so clear the destination first. A file-over-file or new entry needs
+            # no pre-delete: os.replace is atomic and leaves no torn window.
+            if os.path.exists(d) and os.path.isdir(d) != os.path.isdir(s):
+                if os.path.isdir(d):
+                    shutil.rmtree(d)
                 else:
-                    shutil.copy2(s, d)
-            else:
+                    os.remove(d)
+            os.replace(s, d)
+            continue
+        except OSError as e:
+            if getattr(e, "errno", None) != errno.EXDEV:
                 raise
+        # Cross-filesystem: rename isn't allowed. Copy to a temp sibling and then
+        # atomically replace, so a mid-copy ENOSPC never leaves a truncated file
+        # where a working one used to be.
+        if os.path.isdir(s):
+            if os.path.exists(d):
+                shutil.rmtree(d)
+            shutil.copytree(s, d)
+        else:
+            tmp = d + ".part"
+            shutil.copy2(s, tmp)
+            os.replace(tmp, d)
     # Remove whatever remains of src (emptied by renames, or copied originals).
     shutil.rmtree(src, ignore_errors=True)
 
@@ -461,8 +696,20 @@ def _install() -> None:
 
         emit_progress(2, f"Downloading {bundle.get('name', bundle_id)} bundle...")
 
+        # Make sure the accelerated Xet client is importable in this venv, so a
+        # drifted/upgraded venv doesn't silently fall back to slow urllib.
+        ensure_hf_hub(venv_path)
+
         try:
-            download_with_resume(url, tar_path, compressed_size, 2, 85)
+            if not download_with_hf_hub(
+                bundle_repo,
+                archive_file,
+                tar_path,
+                compressed_size,
+                2,
+                85,
+            ):
+                download_with_resume(url, tar_path, compressed_size, 2, 85)
         except RuntimeError as e:
             fail(
                 f"{e}\n\n"
@@ -478,7 +725,16 @@ def _install() -> None:
             os.unlink(tar_path)
             emit_progress(86, "Checksum mismatch, retrying download...")
             try:
-                download_with_resume(url, tar_path, compressed_size, 2, 85)
+                if not download_with_hf_hub(
+                    bundle_repo,
+                    archive_file,
+                    tar_path,
+                    compressed_size,
+                    2,
+                    85,
+                    force_download=True,
+                ):
+                    download_with_resume(url, tar_path, compressed_size, 2, 85)
             except RuntimeError as e:
                 fail(str(e))
 
@@ -501,6 +757,11 @@ def _install() -> None:
     except Exception as e:
         if os.path.exists(staging_dir):
             shutil.rmtree(staging_dir, ignore_errors=True)
+        if isinstance(e, OSError) and getattr(e, "errno", None) == errno.ENOSPC:
+            fail(
+                "Ran out of disk space while extracting the bundle. "
+                "Free up space and retry."
+            )
         fail(f"Failed to extract archive: {e}")
 
     # -- Read bundle.json from tar --
@@ -539,10 +800,28 @@ def _install() -> None:
     # -- Move site-packages --
     emit_progress(92, "Installing packages...")
     site_packages_dir = get_site_packages_dir(venv_path)
+    venv_writing_marker = os.path.join(ai_dir, "venv.writing")
 
     try:
         if os.path.isdir(staging_sp) and site_packages_dir:
+            # Breadcrumb the destructive shared-venv write. If the process is
+            # killed mid-move (OOM/SIGKILL/power loss), move_tree can leave the
+            # venv torn, which breaks OTHER installed tools. The marker survives
+            # the crash; on next boot recoverInterruptedInstalls sees it and
+            # reseeds the venv back to a known-good base. We clear it the instant
+            # the site-packages move completes, since the venv is consistent
+            # again then (a later models-move failure can't tear the venv).
+            with open(venv_writing_marker, "w") as mf:
+                json.dump(
+                    {
+                        "bundleId": bundle_id,
+                        "startedAt": datetime.now(timezone.utc).isoformat(),
+                    },
+                    mf,
+                )
             move_tree(staging_sp, site_packages_dir)
+            if os.path.exists(venv_writing_marker):
+                os.unlink(venv_writing_marker)
 
         # -- Move models --
         emit_progress(95, "Installing models...")
@@ -559,6 +838,39 @@ def _install() -> None:
     # -- Apply fixups --
     emit_progress(97, "Finalizing...")
     apply_fixups(staging_dir, venv_path)
+
+    # -- Verify the bundle actually imports --
+    # File-copy completion does NOT prove the bundle works: an incomplete
+    # extraction or an ABI mismatch (e.g. a numpy/torch/protobuf skew) can leave
+    # every file present yet the module unimportable, so the tool "installs" but
+    # fails at first use. Import the bundle's key native libraries in the venv
+    # now; if that fails, refuse to mark the bundle installed so the user gets a
+    # clear retry instead of a silently broken tool.
+    smoke_imports = bundle.get("smokeImports") or []
+    if smoke_imports and os.environ.get("SNAPOTTER_SKIP_INSTALL_SMOKE") != "1":
+        emit_progress(99, "Verifying installation...")
+        venv_python = os.path.join(venv_path, "bin", "python3")
+        if os.path.exists(venv_python):
+            import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
+            try:
+                proc = subprocess.run(
+                    [venv_python, "-c", import_stmt],
+                    capture_output=True, text=True, timeout=300,
+                )
+            except subprocess.TimeoutExpired:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+                fail("Installation verification timed out. Please retry the install.")
+            if proc.returncode != 0:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+                tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
+                fail(
+                    "Installation verification failed: the bundle installed but its "
+                    "libraries could not be loaded, so the tool would not work.\n"
+                    f"{tail}\n\n"
+                    "This usually means an interrupted or corrupted install. Retry the "
+                    "install; if it keeps failing, use Settings > AI Features > Reset AI "
+                    "Environment, then reinstall."
+                )
 
     # -- Write installed.json --
     emit_progress(98, "Recording installation...")

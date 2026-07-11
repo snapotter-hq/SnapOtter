@@ -3484,7 +3484,7 @@ export const en = {
       heading: "About",
       appName: "SnapOtter",
       appDescription:
-        "A self-hosted, privacy-first file processing suite with 200+ tools. Convert, compress, edit, transcribe, OCR, and automate image, video, audio, PDF, and file workflows without sending data to the cloud.",
+        "Open-source, self-hosted file-processing infrastructure with 200+ tools. Convert, compress, edit, transcribe, OCR, and automate image, video, audio, PDF, and document workflows without sending data to the cloud.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub Repository",

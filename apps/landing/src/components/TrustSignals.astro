@@ -14,11 +14,6 @@ const { display: pullsDisplay } = await getImagePulls();
 
 const stats = [
   {
-    value: t(locale, "home.stats.tools.value"),
-    label: t(locale, "home.stats.tools.label"),
-    sublabel: t(locale, "home.stats.tools.sublabel"),
-  },
-  {
     value: formatCompact(starCount),
     label: t(locale, "home.stats.stars.label"),
     sublabel: t(locale, "home.stats.stars.sublabel"),
@@ -27,6 +22,11 @@ const stats = [
     value: pullsDisplay,
     label: t(locale, "home.stats.pulls.label"),
     sublabel: t(locale, "home.stats.pulls.sublabel"),
+  },
+  {
+    value: t(locale, "home.stats.tools.value"),
+    label: t(locale, "home.stats.tools.label"),
+    sublabel: t(locale, "home.stats.tools.sublabel"),
   },
   {
     value: t(locale, "home.stats.languages.value"),

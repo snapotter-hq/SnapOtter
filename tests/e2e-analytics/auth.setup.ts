@@ -15,5 +15,14 @@ setup("authenticate for analytics tests", async ({ page }) => {
 
   await page.waitForURL("/", { timeout: 30_000 });
   await expect(page).toHaveURL("/");
+
+  // This suite runs with analytics baked on against a fresh DB, so the admin
+  // usage-survey overlay would cover the UI and swallow every click. Mark it
+  // dismissed the same way the overlay itself does before any spec runs.
+  const res = await page.request.put("/api/v1/settings", {
+    data: { "onboarding.usageSurvey.dismissedAt": new Date().toISOString() },
+  });
+  expect(res.ok()).toBe(true);
+
   await page.context().storageState({ path: authFile });
 });

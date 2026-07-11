@@ -1,3 +1,4 @@
+import { ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import sharp from "sharp";
@@ -207,26 +208,26 @@ export function registerChartMaker(app: FastifyInstance) {
       try {
         data = parseInput(input.buffer, input.filename);
       } catch (err) {
-        throw new Error(err instanceof Error ? err.message : "Failed to parse input");
+        throw new ToolInputError(err instanceof Error ? err.message : "Failed to parse input");
       }
 
       if (data.length === 0) {
-        throw new Error("No data points found in input");
+        throw new ToolInputError("No data points found in input");
       }
       if (data.length > 100) {
-        throw new Error("Too many data points (max 100)");
+        throw new ToolInputError("Too many data points (max 100)");
       }
 
       // Validate numeric values
       for (const point of data) {
         if (Number.isNaN(point.value)) {
-          throw new Error("Column 2 must be numeric");
+          throw new ToolInputError("Column 2 must be numeric");
         }
       }
       // Negative values render as invalid/degenerate SVG (negative bar heights,
       // backward pie arcs that Sharp silently drops); reject with a clear message.
       if (data.some((point) => point.value < 0)) {
-        throw new Error("Chart values must be zero or greater");
+        throw new ToolInputError("Chart values must be zero or greater");
       }
 
       let svg: string;

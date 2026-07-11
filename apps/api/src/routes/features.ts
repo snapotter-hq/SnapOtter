@@ -2,11 +2,12 @@
  * Feature bundle management routes.
  *
  * GET  /api/v1/features                           - List feature bundles and their statuses
- * POST /api/v1/admin/features/:bundleId/install    - Install a feature bundle (async)
- * POST /api/v1/admin/features/:bundleId/uninstall  - Uninstall a feature bundle
- * POST /api/v1/admin/features/reset                - Wipe the AI venv/models, reset all bundles
- * GET  /api/v1/admin/features/disk-usage           - Get AI model disk usage
- * POST /api/v1/admin/features/import               - Import an offline bundle archive
+ * POST /api/v1/admin/features/:bundleId/install       - Install a feature bundle (async)
+ * POST /api/v1/admin/tools/:toolId/features/install   - Install every bundle a tool requires
+ * POST /api/v1/admin/features/:bundleId/uninstall     - Uninstall a feature bundle
+ * POST /api/v1/admin/features/reset                   - Wipe the AI venv/models, reset all bundles
+ * GET  /api/v1/admin/features/disk-usage              - Get AI model disk usage
+ * POST /api/v1/admin/features/import                  - Import an offline bundle archive
  */
 
 import { spawn } from "node:child_process";
@@ -22,8 +23,9 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { acquireVenvLock, shutdownDispatcher } from "@snapotter/ai";
-import { ANALYTICS_EVENTS, FEATURE_BUNDLES } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { env } from "../config.js";
 import { trackEvent } from "../lib/analytics.js";
 import {
   clearActive,
@@ -52,6 +54,7 @@ import {
   setInstallProgress,
   verifyBundleModels,
 } from "../lib/feature-status.js";
+import { evaluateInstallWatchdog } from "../lib/install-watchdog.js";
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import { updateSingleFileProgress } from "./progress.js";
@@ -99,10 +102,32 @@ function startInstall(bundleId: string, jobId: string): void {
     // would release the file lock and active slot that pump() just handed to
     // the next queued bundle, letting two installers run into the same venv
     // at once (the corruption the lock exists to prevent).
+    // Install watchdog: a wedged installer (dead download socket, hung pip)
+    // otherwise holds the venv writer lock forever and blocks every other
+    // install with no way out but a server restart. Track the last progress
+    // frame; if the child goes silent past the stall budget, or blows the
+    // absolute ceiling, kill it so its close handler frees the locks and the
+    // user sees a retryable failure.
+    let lastProgressAt = Date.now();
+    let watchdog: ReturnType<typeof setInterval> | null = null;
+    let killGrace: ReturnType<typeof setTimeout> | null = null;
+    let watchdogError: string | null = null;
+    const clearWatchdog = () => {
+      if (watchdog) {
+        clearInterval(watchdog);
+        watchdog = null;
+      }
+      if (killGrace) {
+        clearTimeout(killGrace);
+        killGrace = null;
+      }
+    };
+
     let finalized = false;
     const finalizeOnce = (): boolean => {
       if (finalized) return false;
       finalized = true;
+      clearWatchdog();
       releaseVenvOnce();
       releaseInstallLock();
       clearActive();
@@ -117,6 +142,42 @@ function startInstall(bundleId: string, jobId: string): void {
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
       },
     });
+
+    const stallMs = env.INSTALL_STALL_MS;
+    const maxMs = env.INSTALL_MAX_MS;
+    if (stallMs > 0 || maxMs > 0) {
+      watchdog = setInterval(() => {
+        const verdict = evaluateInstallWatchdog(
+          Date.now(),
+          lastProgressAt,
+          installStartTime,
+          stallMs,
+          maxMs,
+        );
+        if (!verdict.kill) return;
+        watchdogError = verdict.reason;
+        setInstallProgress(bundleId, null, watchdogError);
+        if (watchdog) {
+          clearInterval(watchdog);
+          watchdog = null;
+        }
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // child already gone
+        }
+        // Escalate to SIGKILL if SIGTERM does not land (e.g. a C extension
+        // ignoring the signal); the close handler clears this grace timer.
+        killGrace = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            // already gone
+          }
+        }, 10_000);
+      }, 30_000);
+      watchdog.unref?.();
+    }
 
     let stderrBuffer = "";
     let stdoutBuffer = "";
@@ -142,6 +203,7 @@ function startInstall(bundleId: string, jobId: string): void {
         try {
           const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
           if (typeof parsed.progress === "number") {
+            lastProgressAt = Date.now();
             setInstallProgress(
               bundleId,
               { percent: parsed.progress, stage: parsed.stage ?? "" },
@@ -174,10 +236,12 @@ function startInstall(bundleId: string, jobId: string): void {
           duration_ms: Date.now() - installStartTime,
         });
       } else {
+        // A watchdog kill wins: the child's exit code/stderr would otherwise
+        // read as a generic signal death and bury why it was stopped.
+        let errorMsg: string | undefined = watchdogError ?? undefined;
         // Extract the structured error from Python's fail() function first.
         // fail() writes {"error": "..."} to stderr - prefer this over raw lines.
-        let errorMsg: string | undefined;
-        for (let i = lastStderrLines.length - 1; i >= 0; i--) {
+        for (let i = lastStderrLines.length - 1; !errorMsg && i >= 0; i--) {
           const line = lastStderrLines[i];
           if (line.startsWith("{")) {
             try {
@@ -250,6 +314,23 @@ interface BundleIdParams {
   bundleId: string;
 }
 
+interface ToolIdParams {
+  toolId: string;
+}
+
+interface EnqueuedBundleInstall {
+  bundleId: string;
+  jobId: string;
+  queued: boolean;
+}
+
+interface ToolBundleInstallResult {
+  bundleId: string;
+  jobId?: string;
+  queued: boolean;
+  skipped?: boolean;
+}
+
 interface ManifestModel {
   id: string;
   path?: string;
@@ -273,6 +354,32 @@ function readManifest(): Manifest | null {
   } catch {
     return null;
   }
+}
+
+function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | null {
+  if (isFeatureInstalled(bundleId)) {
+    const modelError = verifyBundleModels(bundleId);
+    if (!modelError) return null;
+    markUninstalled(bundleId);
+  }
+
+  // Queue the install on the server so the POST is durable: enqueue()
+  // dedups an already-active/queued bundle and returns the effective jobId,
+  // then pump() starts it immediately if nothing else is installing. A bundle
+  // that lands behind another install stays queued server-side and starts
+  // automatically when the running install finishes.
+  const jobId = crypto.randomUUID();
+  const effectiveJobId = enqueue({ bundleId, jobId });
+  pump();
+
+  // queued === true means it did NOT start right now (another install is
+  // active, or an offline import holds the lock). The client polls queued
+  // bundles and opens SSE only for the active install.
+  return {
+    bundleId,
+    jobId: effectiveJobId,
+    queued: getActiveBundleId() !== bundleId,
+  };
 }
 
 /** Recursively calculate total size of a directory in bytes. */
@@ -348,30 +455,40 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
       }
 
-      if (isFeatureInstalled(bundleId)) {
-        const modelError = verifyBundleModels(bundleId);
-        if (!modelError) {
-          return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
-        }
-        markUninstalled(bundleId);
+      const result = queueBundleInstallIfNeeded(bundleId);
+      if (!result) {
+        return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
 
-      // Queue the install on the server so the POST is durable: enqueue()
-      // dedups an already-active/queued bundle and returns the effective jobId,
-      // then pump() starts it immediately if nothing else is installing. A
-      // bundle that lands behind another install stays queued server-side and
-      // starts automatically when the running install finishes.
-      const jobId = crypto.randomUUID();
-      const effectiveJobId = enqueue({ bundleId, jobId });
-      pump();
+      return reply.status(202).send({ jobId: result.jobId, queued: result.queued });
+    },
+  );
 
-      // queued === true means it did NOT start right now (another install is
-      // active, or an offline import holds the lock). The client still opens
-      // the SSE stream for the returned jobId; the progress route tolerates a
-      // not-yet-started jobId and streams once the installer begins.
-      const queued = getActiveBundleId() !== bundleId;
+  // POST /api/v1/admin/tools/:toolId/features/install - Install all bundles a tool needs
+  app.post(
+    "/api/v1/admin/tools/:toolId/features/install",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest<{ Params: ToolIdParams }>, reply: FastifyReply) => {
+      const admin = await requirePermission("features:manage")(request, reply);
+      if (!admin) return;
 
-      return reply.status(202).send({ jobId: effectiveJobId, queued });
+      const { toolId } = request.params;
+      const requiredBundles = getRequiredBundlesForTool(toolId);
+      if (requiredBundles.length === 0) {
+        return reply.status(404).send({ error: `No feature bundles required for tool: ${toolId}` });
+      }
+
+      const bundles: ToolBundleInstallResult[] = [];
+      for (const bundleId of requiredBundles) {
+        if (!FEATURE_BUNDLES[bundleId]) {
+          return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
+        }
+
+        const result = queueBundleInstallIfNeeded(bundleId);
+        bundles.push(result ?? { bundleId, queued: false, skipped: true });
+      }
+
+      return reply.status(202).send({ bundles });
     },
   );
 

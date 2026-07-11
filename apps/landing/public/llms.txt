@@ -1,6 +1,6 @@
 # SnapOtter
 
-> Open-source, self-hostable file processing suite with 200+ tools across 5 modalities (image, video, audio, PDF, files). Single Docker container, no external services. Dual-licensed AGPLv3 / commercial.
+> SnapOtter is open-source, self-hosted file-processing infrastructure. Conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. 200+ tools in one stack. Files never leave your network.
 
 SnapOtter runs entirely on your own infrastructure. Files are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need. Supports GDPR, HIPAA, and CCPA compliance by architecture.
 

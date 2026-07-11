@@ -388,6 +388,16 @@ describe("Feature status queries", () => {
     expect(mod.isToolInstalled("passport-photo")).toBe(true);
   });
 
+  it("isToolInstalled is false for enhance-faces when only upscale-enhance is installed", () => {
+    mod.markInstalled("upscale-enhance", "1.0.0", []);
+    expect(mod.isToolInstalled("enhance-faces")).toBe(false);
+  });
+
+  it("getFirstMissingBundleForTool names face-detection for enhance-faces when only upscale-enhance is installed", () => {
+    mod.markInstalled("upscale-enhance", "1.0.0", []);
+    expect(mod.getFirstMissingBundleForTool("enhance-faces")).toBe("face-detection");
+  });
+
   it("getFirstMissingBundleForTool names face-detection when only background-removal is installed", () => {
     mod.markInstalled("background-removal", "1.0.0", []);
     expect(mod.getFirstMissingBundleForTool("passport-photo")).toBe("face-detection");
@@ -557,6 +567,23 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     );
     mod.recoverInterruptedInstalls();
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("consumes a surviving venv.writing breadcrumb (interrupted venv write)", () => {
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "ocr", startedAt: "2026-01-01T00:00:00.000Z" }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(() => mod.recoverInterruptedInstalls()).not.toThrow();
+
+    // The breadcrumb is always consumed so it can't retrigger recovery forever.
+    expect(existsSync(marker)).toBe(false);
+    // And the interruption is surfaced in the logs.
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/interrupted|venv/i);
+    warn.mockRestore();
   });
 
   it("handles missing directories gracefully", async () => {

@@ -17,7 +17,6 @@ const { locale = "en" } = Astro.props;
 // Tool name/description come from shared i18n (translated in all 21 langs).
 const toolStrings = await loadToolStrings(locale);
 
-const toolCount = TOOLS.length;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 
 type ToolModality = ToolSearchItem["modality"];
@@ -194,7 +193,7 @@ const safeStringsJson = JSON.stringify(toolGridStrings).replace(/</g, "\\u003c")
 <section class="bg-background-alt px-6 py-20 md:py-28" id="features">
   <SectionHeading
     title={t(locale, "home.toolGrid.title")}
-    subtitle={t(locale, "home.toolGrid.subtitle", { count: toolCount })}
+    subtitle={t(locale, "home.toolGrid.subtitle")}
   />
 
   <div class="mx-auto max-w-6xl">

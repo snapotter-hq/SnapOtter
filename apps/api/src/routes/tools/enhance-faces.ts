@@ -3,14 +3,14 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { enhanceFaces } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { FEATURE_BUNDLES, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
-import { isToolInstalled } from "../../lib/feature-status.js";
+import { getFirstMissingBundleForTool, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
@@ -64,12 +64,13 @@ export function registerEnhanceFaces(app: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const toolId = "enhance-faces";
       if (!isToolInstalled(toolId)) {
-        const bundle = getBundleForTool(toolId);
+        const missingBundleId = getFirstMissingBundleForTool(toolId) ?? TOOL_BUNDLE_MAP[toolId];
+        const bundle = FEATURE_BUNDLES[missingBundleId];
         return reply.status(501).send({
           error: "Feature not installed",
           code: "FEATURE_NOT_INSTALLED",
-          feature: TOOL_BUNDLE_MAP[toolId],
-          featureName: bundle?.name ?? toolId,
+          feature: missingBundleId,
+          featureName: bundle?.name ?? missingBundleId,
           estimatedSize: bundle?.estimatedSize ?? "unknown",
         });
       }

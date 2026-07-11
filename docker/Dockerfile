@@ -68,9 +68,11 @@ COPY apps/web/public ./apps/web/public
 ARG SNAPOTTER_ANALYTICS=on
 ARG SNAPOTTER_POSTHOG_PROJECT_ID=
 ARG SNAPOTTER_SENTRY_DSN=
+ARG SNAPOTTER_SENTRY_DSN_WEB=
 COPY scripts/bake-analytics.mjs ./scripts/
 RUN SNAPOTTER_POSTHOG_PROJECT_ID="${SNAPOTTER_POSTHOG_PROJECT_ID}" \
     SNAPOTTER_SENTRY_DSN="${SNAPOTTER_SENTRY_DSN}" \
+    SNAPOTTER_SENTRY_DSN_WEB="${SNAPOTTER_SENTRY_DSN_WEB}" \
     node scripts/bake-analytics.mjs ${SNAPOTTER_ANALYTICS}
 
 # Build only the web frontend (API runs from TS source via tsx). When a
@@ -366,6 +368,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         Pillow==12.2.0 \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84 \
+        "huggingface-hub[hf_xet,hf_transfer]==0.36.2" \
         pikepdf==10.8.0 \
         PyMuPDF==1.27.2.3 \
         weasyprint==69.0 \

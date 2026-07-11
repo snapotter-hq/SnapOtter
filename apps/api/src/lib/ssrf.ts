@@ -172,6 +172,29 @@ function normalizeSafeFetchOptions(options?: AbortSignal | SafeFetchOptions): Sa
   return options;
 }
 
+// Statuses that undici's Response constructor rejects a body for. An empty
+// Buffer still counts as a body, so these must pass null explicitly. A remote
+// server controls this status; before this guard, a 204/304 reply crashed the
+// whole process from inside the 'end' event handler (Sentry NODE-20).
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
+
+export function toFetchResponse(
+  // ArrayBuffer-backed (what Buffer.concat/from/alloc return); the Response
+  // constructor's BodyInit does not accept SharedArrayBuffer-backed views.
+  body: Buffer<ArrayBuffer>,
+  statusCode: number | undefined,
+  statusText: string,
+  headers: Headers,
+): Response {
+  const status =
+    statusCode !== undefined && statusCode >= 200 && statusCode <= 599 ? statusCode : 502;
+  return new Response(NULL_BODY_STATUSES.has(status) ? null : body, {
+    status,
+    statusText,
+    headers,
+  });
+}
+
 function withResponseSizeLimit(response: Response, maxBytes?: number): Response {
   if (maxBytes === undefined || !response.body) return response;
 
@@ -275,13 +298,18 @@ export async function safeFetch(
                   for (const v of vals) headers.append(key, v);
                 }
               }
-              resolve(
-                new Response(body, {
-                  status: incomingMessage.statusCode ?? 500,
-                  statusText: incomingMessage.statusMessage ?? "",
-                  headers,
-                }),
-              );
+              try {
+                resolve(
+                  toFetchResponse(
+                    body,
+                    incomingMessage.statusCode,
+                    incomingMessage.statusMessage ?? "",
+                    headers,
+                  ),
+                );
+              } catch (err) {
+                reject(err);
+              }
             });
             incomingMessage.on("error", (err) => {
               if (settled) return;

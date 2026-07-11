@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { useTranslation } from "@/contexts/i18n-context";
 import { toNormalizedRect } from "@/lib/sign-geometry";
 import type { SavedSignature } from "@/lib/signature-store";
+import { safeRandomUUID } from "@/lib/uuid";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -90,7 +91,11 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       setPageCount(doc.numPages);
       setPage(0);
       setDocReady(true);
-    })();
+    })().catch(() => {
+      // loadingTask.destroy() in the cleanup rejects the in-flight promise;
+      // swallowing it is the fix for Sentry NODE-1N. A genuine load failure
+      // leaves docReady false, which the existing UI already handles.
+    });
     return () => {
       cancelled = true;
       docRef.current?.loadingTask.destroy();
@@ -181,7 +186,10 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       }
       layer.batchDraw();
       onSelectionChange?.(false);
-    })();
+    })().catch(() => {
+      // getPage()/render() reject when the loadingTask is destroyed mid-render
+      // (file swap or unmount); expected teardown, same as the load effect.
+    });
     return () => {
       cancelled = true;
     };
@@ -241,7 +249,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           layer.add(node);
           tr.nodes([node]);
           layer.batchDraw();
-          placementsRef.current.push({ id: crypto.randomUUID(), page, node });
+          placementsRef.current.push({ id: safeRandomUUID(), page, node });
           onSelectionChange?.(true);
           emitCount();
         };

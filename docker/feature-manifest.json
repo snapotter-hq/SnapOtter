@@ -2,7 +2,12 @@
   "manifestVersion": 2,
   "imageVersion": "2.0.0",
   "pythonVersion": { "amd64": "3.12", "arm64": "3.11" },
-  "basePackages": ["numpy==1.26.4", "Pillow==12.2.0", "opencv-python-headless==4.10.0.84"],
+  "basePackages": [
+    "numpy==1.26.4",
+    "Pillow==12.2.0",
+    "opencv-python-headless==4.10.0.84",
+    "huggingface-hub[hf_xet,hf_transfer]==0.36.2"
+  ],
   "constraints": [
     "numpy==1.26.4",
     "scipy==1.12.0",
@@ -79,6 +84,7 @@
           "args": ["birefnet-hr-matting"]
         }
       ],
+      "smokeImports": ["rembg", "onnxruntime"],
       "enablesTools": [
         "remove-background",
         "passport-photo",
@@ -126,6 +132,7 @@
           "minSize": 1000000
         }
       ],
+      "smokeImports": ["mediapipe"],
       "enablesTools": ["blur-faces", "red-eye-removal", "smart-crop"]
     },
     "object-eraser-colorize": {
@@ -147,7 +154,7 @@
         }
       },
       "packages": {
-        "common": ["huggingface-hub"],
+        "common": ["huggingface-hub[hf_xet]==0.36.2"],
         "amd64": ["onnxruntime-gpu==1.20.1"],
         "arm64": ["onnxruntime==1.20.1", "protobuf>=4.25.3,<5"]
       },
@@ -192,6 +199,7 @@
           "minSize": 0
         }
       ],
+      "smokeImports": ["onnxruntime"],
       "enablesTools": ["erase-object", "colorize", "ai-canvas-expand"]
     },
     "upscale-enhance": {
@@ -213,7 +221,12 @@
         }
       },
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "huggingface-hub", "einops", "setuptools<75"],
+        "common": [
+          "codeformer-pip==0.0.4",
+          "huggingface-hub[hf_xet]==0.36.2",
+          "einops",
+          "setuptools<75"
+        ],
         "amd64": [
           "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
@@ -301,6 +314,7 @@
           "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
         }
       ],
+      "smokeImports": ["torch", "torchvision"],
       "enablesTools": ["upscale", "enhance-faces", "noise-removal"]
     },
     "photo-restoration": {
@@ -322,7 +336,7 @@
         }
       },
       "packages": {
-        "common": ["codeformer-pip==0.0.4", "huggingface-hub", "setuptools<75"],
+        "common": ["codeformer-pip==0.0.4", "huggingface-hub[hf_xet]==0.36.2", "setuptools<75"],
         "amd64": [
           "onnxruntime-gpu==1.20.1",
           "mediapipe>=0.10.21",
@@ -406,6 +420,7 @@
           "replace": "from torchvision.transforms.functional import rgb_to_grayscale"
         }
       ],
+      "smokeImports": ["onnxruntime", "torch", "mediapipe"],
       "enablesTools": ["restore-photo"]
     },
     "ocr": {
@@ -427,7 +442,7 @@
         }
       },
       "packages": {
-        "common": ["huggingface-hub"],
+        "common": ["huggingface-hub[hf_xet]==0.36.2"],
         "amd64": [
           "paddlepaddle-gpu>=3.2.1 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ --extra-index-url https://pypi.org/simple/",
           "paddleocr[doc-parser]>=3.4.0,<3.5.0"
@@ -482,6 +497,7 @@
           "args": ["PaddlePaddle/PaddleOCR-VL-1.5", "PaddleOCR-VL-1.5"]
         }
       ],
+      "smokeImports": ["paddle", "paddleocr"],
       "enablesTools": ["ocr", "ocr-pdf"]
     },
     "transcription": {
@@ -516,6 +532,7 @@
           "args": ["Systran/faster-whisper-small", "faster-whisper-small"]
         }
       ],
+      "smokeImports": ["faster_whisper", "ctranslate2"],
       "enablesTools": ["transcribe-audio", "auto-subtitles"]
     }
   }

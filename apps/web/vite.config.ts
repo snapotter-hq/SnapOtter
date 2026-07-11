@@ -18,7 +18,8 @@ export default defineConfig({
     // Must come after the other plugins so it sees the final bundle.
     sentryVitePlugin({
       org: "snapotter",
-      project: "node",
+      // Web source maps upload to the browser project; api events live on "node".
+      project: "web",
       authToken: sentryAuthToken,
       telemetry: false,
       disable: !sentryAuthToken,

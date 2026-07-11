@@ -67,6 +67,7 @@ describe("buildMinimalEnv - env passthrough", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.DATA_DIR;
     delete process.env.SNAPOTTER_GPU;
     delete process.env.MODELS_PATH;
     delete process.env.MODELS_DIR;
@@ -108,6 +109,24 @@ describe("buildMinimalEnv - env passthrough", () => {
     const env = getSpawnEnv();
     expect(env).toBeDefined();
     expect(env?.MODELS_PATH).toBe("/data/ai/models");
+  });
+
+  it("sets matching native DATA_DIR and MODELS_PATH defaults", async () => {
+    delete process.env.DATA_DIR;
+    delete process.env.MODELS_PATH;
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("test.py", []);
+    mock.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mock.emitEvent("close", 0, null);
+    await promise;
+
+    const env = getSpawnEnv();
+    expect(env).toBeDefined();
+    expect(env?.DATA_DIR).toBe("./data");
+    expect(env?.MODELS_PATH).toBe("./data/ai/models");
   });
 
   it("does not pass MODELS_DIR (removed dead entry)", async () => {

@@ -47,7 +47,8 @@ const enabledConfig = {
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
   sentryDsn: "https://sentry.test/123",
-  sampleRate: 1,
+  sentryDsnWeb: "https://sentry.test/web/456",
+  posthogSampleRate: 1,
   instanceId: "inst-1",
 };
 
@@ -56,7 +57,8 @@ const disabledConfig = {
   posthogApiKey: "",
   posthogHost: "",
   sentryDsn: "",
-  sampleRate: 0,
+  sentryDsnWeb: "",
+  posthogSampleRate: 0,
   instanceId: "",
 };
 
@@ -68,6 +70,7 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
     mockPosthogInit.mockClear();
     mockCapture.mockClear();
     mockSentryInit.mockClear();
+    mockBrowserTracingIntegration.mockClear();
     vi.resetModules();
     mod = await import("../../../apps/web/src/lib/analytics");
   });
@@ -103,15 +106,72 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       expect(mockCapture).toHaveBeenCalledWith("tool_opened", { tool_id: "resize" });
     });
 
-    it("initAnalytics initializes Sentry when sentryDsn provided", async () => {
+    it("initAnalytics initializes Sentry with the web DSN when sentryDsnWeb provided", async () => {
       await mod.initAnalytics(enabledConfig);
       expect(mockSentryInit).toHaveBeenCalledOnce();
       expect(mockSentryInit).toHaveBeenCalledWith(
         expect.objectContaining({
-          dsn: "https://sentry.test/123",
+          dsn: "https://sentry.test/web/456",
           sendDefaultPii: false,
         }),
       );
+    });
+  });
+
+  describe("errors-only web Sentry init", () => {
+    async function getSentryOptions() {
+      await mod.initAnalytics(enabledConfig);
+      return mockSentryInit.mock.calls[0]?.[0];
+    }
+
+    it("passes no tracesSampleRate and never constructs a tracing integration", async () => {
+      const options = await getSentryOptions();
+      expect(options).toBeDefined();
+      expect("tracesSampleRate" in options).toBe(false);
+      expect("tracesSampler" in options).toBe(false);
+      expect(mockBrowserTracingIntegration).not.toHaveBeenCalled();
+    });
+
+    it("disables SDK client reports", async () => {
+      const options = await getSentryOptions();
+      expect(options.sendClientReports).toBe(false);
+    });
+
+    it("filters the release-health session integration out of the defaults", async () => {
+      const options = await getSentryOptions();
+      const filtered = options.integrations([{ name: "BrowserSession" }, { name: "Dedupe" }]);
+      expect(filtered).toEqual([{ name: "Dedupe" }]);
+    });
+
+    it("does not init Sentry when sentryDsnWeb is empty even if sentryDsn is set", async () => {
+      await mod.initAnalytics({ ...enabledConfig, sentryDsnWeb: "" });
+      expect(mockSentryInit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("web-DSN-only init (no PostHog key)", () => {
+    const sentryOnlyConfig = { ...enabledConfig, posthogApiKey: "", posthogHost: "" };
+
+    it("skips posthog.init entirely but still initializes Sentry", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      expect(mockPosthogInit).not.toHaveBeenCalled();
+      expect(mockSentryInit).toHaveBeenCalledOnce();
+      expect(mockSentryInit).toHaveBeenCalledWith(
+        expect.objectContaining({ dsn: "https://sentry.test/web/456" }),
+      );
+    });
+
+    it("keeps beforeSend active: error events still pass the enabled gate", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      const beforeSend = mockSentryInit.mock.calls[0]?.[0]?.beforeSend;
+      expect(beforeSend).toBeDefined();
+      const result = beforeSend({
+        exception: { values: [{ type: "TypeError", value: "boom" }] },
+      });
+      // A null here would mean the enabled gate never opened for a web-DSN-only
+      // bake; the event must survive (scrubbed to type-only).
+      expect(result).not.toBeNull();
+      expect(result.exception.values[0].value).toBe("TypeError");
     });
   });
 

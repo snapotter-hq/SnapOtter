@@ -3,6 +3,8 @@
 // Keep competitor claims sourced, dated, and framed around deployment model,
 // data control, and workflow fit instead of brittle point-by-point parity.
 
+import { DOCKER_CMD } from "./use-cases";
+
 export interface ComparisonRow {
   feature: string;
   snapotter: string;
@@ -37,6 +39,14 @@ export interface Alternative {
   intro: string;
   /** What SnapOtter brings beyond this competitor's single lane */
   breadth: string;
+  /** Optional deepening: the status-quo workflow with the competitor */
+  whatYouDoToday?: string;
+  /** Optional deepening: sourced/dated risk of the hosted approach */
+  whyRisky?: string;
+  /** Optional deepening: single-container command (usually DOCKER_CMD) */
+  dockerSnippet?: string;
+  /** Optional deepening: REST API example */
+  apiSnippet?: string;
   /** true when the competitor is itself open-source / self-hostable (shifts framing to breadth) */
   competitorOpenSource: boolean;
   /** YYYY-MM-DD date when public vendor pages were last checked */
@@ -193,6 +203,16 @@ export const ALTERNATIVES: Alternative[] = [
       "TinyPNG is a focused online image compressor. SnapOtter is the self-hosted alternative for teams that want compression, conversion, resize, metadata, and other image work to run locally.",
     breadth:
       "TinyPNG is excellent when the job is image compression. SnapOtter compresses PNG, JPEG, WebP, and AVIF, then keeps going with resize, crop, conversion, watermarking, metadata tools, video, audio, PDF, and file workflows.",
+    whatYouDoToday:
+      "You drop images into TinyPNG or call the Tinify API, and it compresses them on Tinify's servers, counting each one against a monthly quota.",
+    whyRisky:
+      "The originals are uploaded to a third party to be compressed, and the free quota caps you at a few hundred images a month. For product imagery or anything with people or data in frame, that is an upload you may not want to make.",
+    dockerSnippet: DOCKER_CMD,
+    apiSnippet: `# Compress an image on your own server (sync: returns a downloadUrl)
+curl -s -X POST http://localhost:1349/api/v1/tools/image/compress \\
+  -H "Authorization: Bearer si_YOUR_KEY" \\
+  -F "file=@photo.jpg" \\
+  -F 'settings={"quality":75}' | jq -r .downloadUrl`,
     competitorOpenSource: false,
     lastReviewed: REVIEW_DATE,
     sources: [{ label: "TinyPNG / Tinify", url: "https://tinypng.com/" }],
@@ -224,6 +244,16 @@ export const ALTERNATIVES: Alternative[] = [
       "CloudConvert is a mature hosted converter and API. SnapOtter is the self-hosted alternative when conversion should happen inside your own infrastructure, with pipelines you control.",
     breadth:
       "CloudConvert is broad and API-friendly for conversion. SnapOtter converts across image, video, audio, PDF, and file formats, then adds compression, editing, OCR, transcription, and local pipelines.",
+    whatYouDoToday:
+      "You send files to CloudConvert's cloud, wait for the conversion, and download the result, often wiring it into an app through the hosted API and paying per conversion.",
+    whyRisky:
+      "Every file that hits the API leaves your network, and the bill scales with volume. For user uploads or internal documents, a third party handles your data and you inherit their retention terms, none of which works in an air-gapped or on-prem setup.",
+    dockerSnippet: DOCKER_CMD,
+    apiSnippet: `# Convert a file on your own server, no cloud round-trip
+curl -s -X POST http://localhost:1349/api/v1/tools/video/convert-video \\
+  -H "Authorization: Bearer si_YOUR_KEY" \\
+  -F "file=@clip.mov" \\
+  -F 'settings={"format":"mp4"}'   # -> {"jobId":"...","async":true}`,
     competitorOpenSource: false,
     lastReviewed: REVIEW_DATE,
     sources: [
@@ -489,6 +519,16 @@ export const ALTERNATIVES: Alternative[] = [
       "Otter.ai is a hosted meeting transcription platform. SnapOtter is the self-hosted alternative when you want transcription to run on your own CPU or NVIDIA CUDA GPU with local models.",
     breadth:
       "Otter.ai is built around meetings, notes, and collaboration. SnapOtter focuses on local speech-to-text plus the rest of an audio workflow: trim, normalize, noise reduction, format conversion, video subtitles, image, PDF, and file tools.",
+    whatYouDoToday:
+      "You upload a recording or connect a meeting, and Otter.ai transcribes it in the cloud, storing the audio and transcript on its servers under your plan.",
+    whyRisky:
+      "Meeting audio is dense with confidential content, and a hosted transcriber processes and retains it under terms you do not set. For regulated or sensitive conversations, that is hard to audit and impossible to run offline.",
+    dockerSnippet: DOCKER_CMD,
+    apiSnippet: `# Transcribe on your own server (long tool: 202, then stream progress)
+curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
+  -H "Authorization: Bearer si_YOUR_KEY" \\
+  -F "file=@meeting.m4a" \\
+  -F 'settings={"outputFormat":"srt"}'   # -> {"jobId":"...","async":true}`,
     competitorOpenSource: false,
     lastReviewed: REVIEW_DATE,
     sources: [
@@ -553,7 +593,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         feature: "Tool count",
-        snapotter: "241",
+        snapotter: "200+",
         competitor: "60+ PDF operations",
         snapotterWins: true,
       },
@@ -629,7 +669,7 @@ export const ALTERNATIVES: Alternative[] = [
       },
       {
         feature: "Tool count",
-        snapotter: "241",
+        snapotter: "200+",
         competitor: "1000+ conversion formats",
         snapotterWins: false,
       },
@@ -654,6 +694,48 @@ export const ALTERNATIVES: Alternative[] = [
       {
         q: "Do both keep files on my server?",
         a: "Yes. Both are self-hosted, so files stay on your infrastructure. The difference is breadth, not where your data lives.",
+      },
+    ],
+  },
+  {
+    slug: "removebg",
+    competitor: "remove.bg",
+    category: "Background removal",
+    pageTitle: "The Open-Source, Self-Hosted Alternative to remove.bg",
+    h1: "The open-source, self-hosted alternative to remove.bg",
+    metaDescription:
+      "remove.bg removes image backgrounds in the cloud. SnapOtter runs background removal locally on your own server, with 200+ more tools in the same stack.",
+    intro:
+      "remove.bg is a fast hosted background remover. SnapOtter is the self-hosted alternative that runs the same kind of AI on your own hardware, so product and people images never go to a third-party service.",
+    breadth:
+      "remove.bg focuses on one job and does it well. SnapOtter runs local background removal, then adds compression, conversion, upscaling, OCR, and the rest of the catalog in one deployment.",
+    whatYouDoToday:
+      "You upload an image to remove.bg or its API, and it returns a cutout, charging a credit per image processed on its servers.",
+    whyRisky:
+      "Background removal runs on your most sensitive images: unreleased product shots, headshots, user uploads. Sending each to a per-credit cloud API means a third party sees them, and the cost climbs exactly when you want to batch thousands.",
+    dockerSnippet: DOCKER_CMD,
+    apiSnippet: `# Remove a background on your own server (long tool: 202, then stream progress)
+curl -s -X POST http://localhost:1349/api/v1/tools/image/remove-background \\
+  -H "Authorization: Bearer si_YOUR_KEY" \\
+  -F "file=@photo.jpg"   # -> {"jobId":"...","async":true}`,
+    competitorOpenSource: false,
+    lastReviewed: REVIEW_DATE,
+    sources: [{ label: "remove.bg", url: "https://www.remove.bg" }],
+    rows: hostedRows({
+      category: "background removal",
+      competitorCoverage: "Background removal",
+      pricing: "Credit-based pricing per image",
+      fileHandling: "Images are uploaded to a vendor-hosted API for processing",
+      automation: "Vendor-hosted API with per-image credits",
+    }),
+    faqs: [
+      {
+        q: "Is there a self-hosted alternative to remove.bg?",
+        a: "Yes. SnapOtter's background removal runs locally after a one-time model-bundle install, so images never leave your network and there is no per-image credit.",
+      },
+      {
+        q: "Does it need a GPU?",
+        a: "No. It runs on CPU, and uses a GPU automatically if one is available for faster batches.",
       },
     ],
   },

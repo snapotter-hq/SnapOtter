@@ -1,7 +1,6 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
-import { TOOLS } from "@snapotter/shared";
 import { t } from "@/i18n";
 import { localizeHref } from "@/lib/i18n-page";
 import SectionHeading from "./SectionHeading.astro";
@@ -11,10 +10,8 @@ interface Props {
 }
 const { locale = "en" } = Astro.props;
 
-const toolCount = TOOLS.length;
-
 const ossFeatures = [
-  t(locale, "home.pricing.oss.feature.allTools", { count: toolCount }),
+  t(locale, "home.pricing.oss.feature.allTools"),
   t(locale, "home.pricing.oss.feature.unlimited"),
   t(locale, "home.pricing.oss.feature.api"),
   t(locale, "home.pricing.oss.feature.pipelines"),

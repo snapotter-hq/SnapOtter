@@ -13,7 +13,8 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
         posthogApiKey: "",
         posthogHost: "",
         sentryDsn: "",
-        sampleRate: 0,
+        sentryDsnWeb: "",
+        posthogSampleRate: 0,
         instanceId: "",
       };
     }
@@ -28,7 +29,8 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       posthogApiKey: ANALYTICS_BAKED.posthogApiKey,
       posthogHost: ANALYTICS_BAKED.posthogHost,
       sentryDsn: ANALYTICS_BAKED.sentryDsn,
-      sampleRate: ANALYTICS_BAKED.sampleRate,
+      sentryDsnWeb: ANALYTICS_BAKED.sentryDsnWeb,
+      posthogSampleRate: ANALYTICS_BAKED.posthogSampleRate,
       instanceId: row?.value ?? "",
     };
   });
