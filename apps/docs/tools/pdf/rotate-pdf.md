@@ -2,24 +2,24 @@
 description: Rotate pages in a PDF by 90, 180, or 270 degrees.
 ---
 
-# Rotate PDF
+# Rotate PDF {#rotate-pdf}
 
 Rotate all or selected pages in a PDF by a specified angle.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/rotate-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | angle | integer | No | `90` | Rotation angle: `90`, `180`, or `270` |
 | range | string | No | `"1-z"` | Page range in qpdf syntax, e.g. `"1-5,8"` (`"1-z"` = all pages) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/rotate-pdf \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/rotate-pdf \
   -F 'settings={"angle": 90, "range": "1-3"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/rotate-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Rotation is clockwise.
 - Page ranges use qpdf syntax: `1-5` for pages 1 through 5, `z` for the last page, and commas to combine ranges.

@@ -1,3 +1,31 @@
+# [2.1.0](https://github.com/snapotter-hq/snapotter/compare/v2.0.0...v2.1.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* **demo:** boot to dashboard, sample-data notice, robust mobile editor icon ([#464](https://github.com/snapotter-hq/snapotter/issues/464)) ([a94b69b](https://github.com/snapotter-hq/snapotter/commit/a94b69b14f783c07abfe757e21314f580fbda556))
+* **demo:** point banner "Self-host SnapOtter" link at the docs guide ([#466](https://github.com/snapotter-hq/snapotter/issues/466)) ([463ccff](https://github.com/snapotter-hq/snapotter/commit/463ccff5cb91c4b2d0f2c7309ea77789544ad2c3))
+* **demo:** populate admin data, fix settings crash and mobile editor icon ([#463](https://github.com/snapotter-hq/snapotter/issues/463)) ([7329bc6](https://github.com/snapotter-hq/snapotter/commit/7329bc6a1334b925cf95384d6ddc172f04a86610))
+* error-only Sentry telemetry, storm-proof capture, and crash fixes ([#476](https://github.com/snapotter-hq/snapotter/issues/476)) ([ae6a4c8](https://github.com/snapotter-hq/snapotter/commit/ae6a4c8b7c9275ccd8930251d429181568f83453))
+* **landing:** clarify OIDC is free, SAML is enterprise on pricing ([#461](https://github.com/snapotter-hq/snapotter/issues/461)) ([c2c9a9e](https://github.com/snapotter-hq/snapotter/commit/c2c9a9ed9bea9c66efec84b9e0b9b2ebbf863073))
+* **landing:** fix top nav overflow and text overlap ([#473](https://github.com/snapotter-hq/snapotter/issues/473)) ([ffeacd4](https://github.com/snapotter-hq/snapotter/commit/ffeacd4b3c7b5858d9048c2521569256e3569490))
+* **landing:** green the landing e2e suite ([#470](https://github.com/snapotter-hq/snapotter/issues/470)) ([10ae6d1](https://github.com/snapotter-hq/snapotter/commit/10ae6d1d3d6ce8a527937bfa31e76ba392bc09e0))
+* **landing:** highlight Open Source as Most Popular tier ([#462](https://github.com/snapotter-hq/snapotter/issues/462)) ([e468cef](https://github.com/snapotter-hq/snapotter/commit/e468cef6c0e28b4736dee32d2cf8c2ab1968a59c))
+* **landing:** reposition residual meta framing and demote homepage tool count ([#471](https://github.com/snapotter-hq/snapotter/issues/471)) ([958c3e8](https://github.com/snapotter-hq/snapotter/commit/958c3e8513eb3a4c3be7488894981fc8794b1c5f))
+* reliable, self-healing AI feature-bundle installs ([#472](https://github.com/snapotter-hq/snapotter/issues/472)) ([a731c3d](https://github.com/snapotter-hq/snapotter/commit/a731c3d1fe8303296e90cd138a01e903df871bb7))
+* restyle sponsor button ([37a3cfc](https://github.com/snapotter-hq/snapotter/commit/37a3cfc84477c10831f9ae61f183f4ab4ef45d50))
+* reword sponsor button to "Support us" ([#468](https://github.com/snapotter-hq/snapotter/issues/468)) ([331e3bf](https://github.com/snapotter-hq/snapotter/commit/331e3bfde04035151612275d9ae269909fed87a8))
+* update python protobuf dependency ([780624e](https://github.com/snapotter-hq/snapotter/commit/780624e168cfda5abf3b2501455fe62674550fcf))
+
+
+### Features
+
+* **demo:** populate the Files library with sample files ([#465](https://github.com/snapotter-hq/snapotter/issues/465)) ([a6e8f75](https://github.com/snapotter-hq/snapotter/commit/a6e8f75074e38b8e5d856311d4423e8a936ae690))
+* **landing:** add dismissible 2.0 launch banner ([ea7a671](https://github.com/snapotter-hq/snapotter/commit/ea7a671ccf29bcbab7a94c28efcbf6e1b9506b34))
+* **landing:** add Product dropdown to nav ([#475](https://github.com/snapotter-hq/snapotter/issues/475)) ([3d1744a](https://github.com/snapotter-hq/snapotter/commit/3d1744aec84049f1f296f1cce8f6fb726cf7f835))
+* **landing:** restore Developers nav link, swap out Features anchor ([#474](https://github.com/snapotter-hq/snapotter/issues/474)) ([a08afbc](https://github.com/snapotter-hq/snapotter/commit/a08afbc80afefb11cbc13e629d31225a6dceda2f))
+* reposition to self-hosted file-processing infrastructure ([#469](https://github.com/snapotter-hq/snapotter/issues/469)) ([af011d5](https://github.com/snapotter-hq/snapotter/commit/af011d55381f8b57797984b1c5b2ca974a033d1c))
+
 # [2.0.0](https://github.com/snapotter-hq/snapotter/compare/v1.17.2...v2.0.0) (2026-07-07)
 
 

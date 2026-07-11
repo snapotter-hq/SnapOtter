@@ -2,17 +2,17 @@
 description: Convert images to base64 data URIs for embedding in HTML, CSS, and more.
 ---
 
-# Image to Base64
+# Image to Base64 {#image-to-base64}
 
 Convert one or more images to base64-encoded strings and data URIs. Supports optional format conversion, quality control, and resizing. Useful for embedding images directly in HTML, CSS, JSON, or email templates.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/image-to-base64`
 
 Accepts multipart form data with one or more image files and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with one or more image files and an optional JSON `s
 | maxWidth | number | No | `0` | Maximum width in pixels (0 = no resize, will not enlarge) |
 | maxHeight | number | No | `0` | Maximum height in pixels (0 = no resize, will not enlarge) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/image-to-base64 \
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-base64 \
   -F 'settings={"outputFormat": "original"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -62,14 +62,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-base64 \
 }
 ```
 
-## Response Fields
+## Response Fields {#response-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
 | results | array | Successfully converted images |
 | errors | array | Images that failed to process (with filename and error message) |
 
-### Result Object
+### Result Object {#result-object}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -83,7 +83,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-base64 \
 | base64 | string | Raw base64-encoded image data |
 | dataUri | string | Complete data URI ready for use in `src` attributes |
 
-## Notes
+## Notes {#notes}
 
 - Base64 encoding typically increases size by approximately 33% compared to the binary file. The `overheadPercent` field shows the actual difference.
 - When `outputFormat` is `"original"`, HEIC/HEIF files are converted to JPEG (since browsers cannot display HEIC in data URIs).

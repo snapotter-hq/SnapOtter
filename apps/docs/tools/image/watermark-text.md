@@ -2,17 +2,17 @@
 description: Add text watermarks with configurable position, opacity, rotation, and tiling.
 ---
 
-# Text Watermark
+# Text Watermark {#text-watermark}
 
 Add a text watermark overlay to images. Supports single placement at corners/center or tiled repetition across the entire image, with configurable font size, color, opacity, and rotation.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/watermark-text`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | position | string | No | `"center"` | Placement: `center`, `top-left`, `top-right`, `bottom-left`, `bottom-right`, `tiled` |
 | rotation | number | No | `0` | Text rotation angle in degrees (-360 to 360) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/watermark-text \
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/watermark-text \
   -F 'settings={"text": "DRAFT", "fontSize": 36, "opacity": 20, "position": "tiled", "rotation": -45}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -52,7 +52,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/watermark-text \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The watermark is rendered as SVG text and composited onto the image, preserving output quality.
 - Tiled mode spaces text elements based on font size (6x horizontal, 4x vertical spacing), capped at 500 elements maximum.

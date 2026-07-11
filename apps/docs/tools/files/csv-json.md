@@ -2,23 +2,23 @@
 description: Convert between CSV and JSON, both directions.
 ---
 
-# CSV to JSON
+# CSV to JSON {#csv-to-json}
 
 Convert between CSV and JSON formats in both directions. Upload a CSV or TSV file to get a JSON array of objects, or upload a JSON array to get a CSV file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/csv-json`
 
 Accepts multipart form data with a CSV, TSV, or JSON file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | pretty | boolean | No | `true` | Pretty-print JSON output with indentation |
 
-## Example Request
+## Example Request {#example-request}
 
 CSV to JSON:
 
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
   -F 'settings={}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Conversion direction is auto-detected from the input file extension: `.csv` or `.tsv` produces `.json`, and `.json` produces `.csv`.
 - The `pretty` parameter only affects JSON output. When set to `false`, the output is a compact single-line JSON string.

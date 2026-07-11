@@ -2,21 +2,21 @@
 description: Convert between YAML and JSON, both directions.
 ---
 
-# YAML / JSON
+# YAML / JSON {#yaml-json}
 
 Convert between YAML and JSON formats in both directions. Upload a YAML file to get JSON, or upload a JSON file to get YAML.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/yaml-json`
 
 Accepts multipart form data with a YAML or JSON file. No settings field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. The conversion direction is determined by the input file extension.
 
-## Example Request
+## Example Request {#example-request}
 
 YAML to JSON:
 
@@ -34,7 +34,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/yaml-json \
   -F "file=@config.json"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -45,7 +45,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/yaml-json \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Conversion direction is auto-detected from the input file extension: `.yaml` or `.yml` produces `.json`, and `.json` produces `.yaml`.
 - Both `.yaml` and `.yml` extensions are accepted.

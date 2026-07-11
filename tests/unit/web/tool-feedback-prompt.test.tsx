@@ -42,7 +42,8 @@ beforeEach(() => {
       posthogApiKey: "phc_test",
       posthogHost: "https://us.i.posthog.com",
       sentryDsn: "",
-      sampleRate: 1,
+      sentryDsnWeb: "",
+      posthogSampleRate: 1,
       instanceId: "instance-1",
     },
   });
@@ -70,7 +71,8 @@ describe("ToolFeedbackPrompt", () => {
         posthogApiKey: "",
         posthogHost: "",
         sentryDsn: "",
-        sampleRate: 0,
+        sentryDsnWeb: "",
+        posthogSampleRate: 0,
         instanceId: "",
       },
     });

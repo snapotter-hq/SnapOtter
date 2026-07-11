@@ -9,15 +9,18 @@ import {
 
 let tempDir: string;
 let savedDataDir: string | undefined;
+let savedCwd: string;
 
 beforeEach(() => {
   savedDataDir = process.env.DATA_DIR;
+  savedCwd = process.cwd();
   tempDir = mkdtempSync(join(tmpdir(), "snapotter-gate-"));
   mkdirSync(join(tempDir, "ai"), { recursive: true });
   process.env.DATA_DIR = tempDir;
 });
 
 afterEach(() => {
+  process.chdir(savedCwd);
   if (savedDataDir === undefined) delete process.env.DATA_DIR;
   else process.env.DATA_DIR = savedDataDir;
   rmSync(tempDir, { recursive: true, force: true });
@@ -72,6 +75,28 @@ describe("missingBundleForScript", () => {
     setInstalled(["background-removal"]); // face-detection still missing
     expect(missingBundleForScript("face_landmarks")).toBe("face-detection");
     expect(missingBundleForScript("remove_bg")).toBeNull();
+  });
+
+  it("uses the native ./data fallback when DATA_DIR is unset", () => {
+    delete process.env.DATA_DIR;
+    process.chdir(tempDir);
+    const defaultAiDir = join(tempDir, "data", "ai");
+    mkdirSync(defaultAiDir, { recursive: true });
+    writeFileSync(
+      join(defaultAiDir, "installed.json"),
+      JSON.stringify({
+        bundles: {
+          "object-eraser-colorize": {
+            version: "1.0.0-test",
+            installedAt: "2026-01-01T00:00:00.000Z",
+            models: [],
+          },
+        },
+      }),
+      "utf-8",
+    );
+
+    expect(missingBundleForScript("inpaint.py")).toBeNull();
   });
 });
 

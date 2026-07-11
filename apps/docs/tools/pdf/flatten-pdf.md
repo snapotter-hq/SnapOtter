@@ -2,21 +2,21 @@
 description: Bake forms and annotations into page content.
 ---
 
-# Flatten PDF
+# Flatten PDF {#flatten-pdf}
 
 Bake interactive form fields and annotations into the page content, producing a static PDF that looks the same everywhere.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/flatten-pdf`
 
 Accepts multipart form data with a PDF file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a PDF and all forms and annotations will be flattened.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/flatten-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/flatten-pdf \
   -F "file=@form.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/flatten-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - This is a fast (synchronous) tool that returns the result directly.

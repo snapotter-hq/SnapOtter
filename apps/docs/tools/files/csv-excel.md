@@ -2,23 +2,23 @@
 description: Convert between CSV and Excel (XLSX), both directions.
 ---
 
-# CSV to Excel
+# CSV to Excel {#csv-to-excel}
 
 Convert between CSV and Excel (XLSX) formats in both directions. Upload a CSV or TSV file to get XLSX, or upload an XLSX file to get CSV.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/csv-excel`
 
 Accepts multipart form data with a CSV, TSV, or XLSX file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | sheet | integer | No | `1` | Worksheet number to export when converting from XLSX (min 1) |
 
-## Example Request
+## Example Request {#example-request}
 
 CSV to Excel:
 
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-excel \
   -F 'settings={"sheet": 2}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-excel \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Conversion direction is auto-detected from the input file extension: `.csv` or `.tsv` produces `.xlsx`, and `.xlsx` produces `.csv`.
 - The `sheet` parameter only applies when converting from XLSX. It selects which worksheet to export.

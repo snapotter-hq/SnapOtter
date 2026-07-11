@@ -2,23 +2,23 @@
 description: Reduce background noise from audio with FFT-based denoising.
 ---
 
-# Noise Reduction
+# Noise Reduction {#noise-reduction}
 
 Reduce background noise in an audio file using FFT-based denoising with selectable strength.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/noise-reduction`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | strength | string | No | `"medium"` | Denoising strength: `light`, `medium`, `strong` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/noise-reduction \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/noise-reduction \
   -F 'settings={"strength": "strong"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/noise-reduction \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - `light` preserves more detail but removes less noise. `strong` removes more noise but may introduce subtle artifacts.
 - Best results on recordings with consistent background noise (fan hum, air conditioning, static).

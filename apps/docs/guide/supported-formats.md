@@ -2,17 +2,17 @@
 description: Supported file formats across all modalities - 55+ image input formats, video, audio, PDF, and file formats.
 ---
 
-# Supported Formats
+# Supported Formats {#supported-formats}
 
 SnapOtter processes files across five modalities: image, video, audio, PDF, and files. This page lists all supported formats.
 
-## Image Formats
+## Image Formats {#image-formats}
 
 SnapOtter supports 55+ image formats for input and 13 formats for output.
 
-## Input Formats
+## Input Formats {#input-formats}
 
-### Web Standards (9)
+### Web Standards (9) {#web-standards-9}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
@@ -26,7 +26,7 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | APNG | .apng | Sharp (native) | First frame only |
 | JPEG XL | .jxl | djxl / ImageMagick | Two-tier fallback |
 
-### Professional (7)
+### Professional (7) {#professional-7}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
@@ -38,7 +38,7 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | DPX | .dpx | ImageMagick | Log-to-sRGB conversion |
 | Cineon | .cin | ImageMagick | Film/VFX format |
 
-### Camera RAW (23)
+### Camera RAW (23) {#camera-raw-23}
 
 | Format | Extensions | Camera Brand | Decoder |
 |--------|-----------|-------------|---------|
@@ -66,7 +66,7 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | ERF | .erf | Epson | exiftool / ImageMagick + LibRaw |
 | PTX | .ptx | Pentax (compact) | exiftool / ImageMagick + LibRaw |
 
-### Modern Formats (3)
+### Modern Formats (3) {#modern-formats-3}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
@@ -74,7 +74,7 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | QOI | .qoi | Inline TypeScript codec | Game dev, embedded systems |
 | HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhone photos |
 
-### Legacy/System (4)
+### Legacy/System (4) {#legacy-system-4}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
@@ -83,14 +83,14 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | CUR | .cur | ImageMagick | Windows cursor (ICO variant) |
 | TGA | .tga | ImageMagick | Extension-only detection |
 
-### Scientific and Gaming (2)
+### Scientific and Gaming (2) {#scientific-and-gaming-2}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
 | FITS | .fits, .fit, .fts | ImageMagick | Astronomy (NASA standard) |
 | DDS | .dds | ImageMagick | Game textures (DirectX) |
 
-### Interchange (6)
+### Interchange (6) {#interchange-6}
 
 | Format | Extensions | Decoder | Notes |
 |--------|-----------|---------|-------|
@@ -101,7 +101,7 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | PAM | .pam | Sharp (native) | Arbitrary map |
 | PFM | .pfm | Sharp (native) | Float map |
 
-## Output Formats (13)
+## Output Formats (13) {#output-formats-13}
 
 | Format | Encoder | Quality Control | Available In |
 |--------|---------|----------------|-------------|
@@ -119,11 +119,11 @@ SnapOtter supports 55+ image formats for input and 13 formats for output.
 | JP2 | opj_compress CLI | Compression ratio | Convert tool |
 | QOI | Inline codec | Lossless | Convert tool |
 
-## Video Formats
+## Video Formats {#video-formats}
 
 Video decoding and encoding are handled by FFmpeg (static build), so every common container and codec is supported on input.
 
-### Input Containers (15)
+### Input Containers (15) {#input-containers-15}
 
 | Format | Extensions | Typical codecs | Notes |
 |--------|-----------|----------------|-------|
@@ -142,7 +142,7 @@ Video decoding and encoding are handled by FFmpeg (static build), so every commo
 | MPEG-TS | .ts | MPEG-2, H.264 | Broadcast transport stream |
 | Ogg | .ogv | Theora | Open Ogg video |
 
-### Output Formats
+### Output Formats {#output-formats}
 
 | Format | Extension | Video codec | Produced by |
 |--------|-----------|-------------|-------------|
@@ -152,7 +152,7 @@ Video decoding and encoding are handled by FFmpeg (static build), so every commo
 | GIF | .gif | - | Video to GIF |
 | WebP | .webp | - | Video to WebP (animated) |
 
-### Subtitles
+### Subtitles {#subtitles}
 
 | Format | Extension | Operations |
 |--------|-----------|-----------|
@@ -160,11 +160,11 @@ Video decoding and encoding are handled by FFmpeg (static build), so every commo
 | WebVTT | .vtt | Embed, burn-in, extract, auto-generate |
 | ASS / SSA | .ass | Embed, burn-in (supports styling) |
 
-## Audio Formats
+## Audio Formats {#audio-formats}
 
 Audio is also processed by FFmpeg.
 
-### Input Formats (11)
+### Input Formats (11) {#input-formats-11}
 
 | Format | Extensions | Compression | Notes |
 |--------|-----------|-------------|-------|
@@ -180,7 +180,7 @@ Audio is also processed by FFmpeg.
 | AMR | .amr | Lossy | Speech / mobile |
 | AC-3 | .ac3 | Lossy | Dolby Digital |
 
-### Output Formats
+### Output Formats {#output-formats-1}
 
 | Format | Extension | Codec | Produced by |
 |--------|-----------|-------|-------------|
@@ -190,11 +190,11 @@ Audio is also processed by FFmpeg.
 | Ogg | .ogg | Vorbis | Convert Audio |
 | M4A | .m4a | AAC | Convert Audio, Extract Audio |
 
-## Document Formats
+## Document Formats {#document-formats}
 
 Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
 
-### Input Formats (15)
+### Input Formats (15) {#input-formats-15}
 
 | Format | Extensions | Engine | Notes |
 |--------|-----------|--------|-------|
@@ -209,7 +209,7 @@ Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
 | HTML | .html | WeasyPrint | Rendered to PDF |
 | EPUB | .epub | Pandoc, LibreOffice | E-book format |
 
-### Output Formats
+### Output Formats {#output-formats-2}
 
 | Format | Extensions | Produced by |
 |--------|-----------|-------------|
@@ -222,7 +222,7 @@ Document processing uses qpdf, LibreOffice, Ghostscript, Pandoc, and WeasyPrint.
 | EPUB | .epub | Convert to EPUB |
 | Images | .png, .jpg | PDF to Image |
 
-## File Formats
+## File Formats {#file-formats}
 
 Data and archive tools convert between structured formats and bundle files.
 

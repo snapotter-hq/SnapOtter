@@ -1,0 +1,46 @@
+---
+description: "フォームと注釈をページコンテンツに焼き込みます。"
+i18n_source_hash: b25c2a2b6f40
+i18n_provenance: human
+i18n_output_hash: 3553408332ad
+---
+
+# Flatten PDF {#flatten-pdf}
+
+インタラクティブなフォームフィールドと注釈をページコンテンツに焼き込み、どこでも同じ見た目になる静的な PDF を生成します。
+
+## API Endpoint {#api-endpoint}
+
+`POST /api/v1/tools/pdf/flatten-pdf`
+
+PDF ファイルを含む multipart フォームデータを受け付けます。
+
+## Parameters {#parameters}
+
+このツールに設定可能なパラメータはありません。PDF をアップロードすると、すべてのフォームと注釈が焼き込まれます。
+
+## Example Request {#example-request}
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/pdf/flatten-pdf \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@form.pdf"
+```
+
+## Example Response {#example-response}
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/form.pdf",
+  "originalSize": 185000,
+  "processedSize": 172000
+}
+```
+
+## Notes {#notes}
+
+- 受け付ける入力形式: `.pdf`。
+- これは結果を直接返す高速（同期）ツールです。
+- フォームフィールドの値は出力内で静的なテキストとして保持されます。
+- 注釈（コメント、ハイライト、付箋）はページコンテンツの一部となり、以降は編集できなくなります。

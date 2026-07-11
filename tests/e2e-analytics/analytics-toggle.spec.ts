@@ -23,7 +23,8 @@ interface AnalyticsConfig {
   posthogApiKey: string;
   posthogHost: string;
   sentryDsn: string;
-  sampleRate: number;
+  sentryDsnWeb: string;
+  posthogSampleRate: number;
   instanceId: string;
 }
 
@@ -87,7 +88,8 @@ test.describe("Analytics opt-out toggle", () => {
       posthogApiKey: "",
       posthogHost: "",
       sentryDsn: "",
-      sampleRate: 0,
+      sentryDsnWeb: "",
+      posthogSampleRate: 0,
       instanceId: "",
     });
 

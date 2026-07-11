@@ -2,23 +2,23 @@
 description: Pull the audio track out of a video.
 ---
 
-# Extract Audio
+# Extract Audio {#extract-audio}
 
 Extract the audio track from a video file and save it as MP3, WAV, M4A, or OGG.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/extract-audio`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | No | `"mp3"` | Output audio format: `mp3`, `wav`, `m4a`, `ogg` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/extract-audio \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/extract-audio \
   -F 'settings={"format": "mp3"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/extract-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - If the video has no audio track, the request returns a 400 error.
 - MP3 is lossy but widely compatible. WAV is lossless but large. M4A (AAC) offers a good balance of quality and size. OGG is available for open codec workflows.

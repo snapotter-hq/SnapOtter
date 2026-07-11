@@ -56,7 +56,7 @@ class ErrorBoundary extends Component<
     track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, { error_name: error.name });
     import("@sentry/react")
       .then((Sentry) => {
-        Sentry.captureException(error);
+        Sentry.captureReactException(error, info);
       })
       .catch(() => {});
   }

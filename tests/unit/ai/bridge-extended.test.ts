@@ -1309,6 +1309,7 @@ describe("bridge - env passthrough for sidecar-specific vars", () => {
     vi.restoreAllMocks();
     delete process.env.U2NET_HOME;
     delete process.env.DATA_DIR;
+    delete process.env.MODELS_PATH;
     delete process.env.DISPATCHER_MAX_REQUESTS;
   });
 
@@ -1360,9 +1361,10 @@ describe("bridge - env passthrough for sidecar-specific vars", () => {
     expect(getLastSpawnEnv()?.DISPATCHER_MAX_REQUESTS).toBe("100");
   });
 
-  it("does not include unset vars in subprocess env", async () => {
+  it("defaults data/model paths but does not include other unset vars in subprocess env", async () => {
     delete process.env.U2NET_HOME;
     delete process.env.DATA_DIR;
+    delete process.env.MODELS_PATH;
     delete process.env.DISPATCHER_MAX_REQUESTS;
 
     const mock = createMockProcess();
@@ -1375,7 +1377,8 @@ describe("bridge - env passthrough for sidecar-specific vars", () => {
 
     const env = getLastSpawnEnv();
     expect(env?.U2NET_HOME).toBeUndefined();
-    expect(env?.DATA_DIR).toBeUndefined();
+    expect(env?.DATA_DIR).toBe("./data");
+    expect(env?.MODELS_PATH).toBe("./data/ai/models");
     expect(env?.DISPATCHER_MAX_REQUESTS).toBeUndefined();
   });
 });

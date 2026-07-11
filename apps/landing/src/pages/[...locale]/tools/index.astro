@@ -1,0 +1,386 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
+import * as lucideIcons from "lucide";
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+import { loadToolStrings } from "@/lib/tool-strings";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/tools";
+
+const toolStrings = await loadToolStrings(locale);
+const toolName = (id: string, fallback: string) => toolStrings[id]?.name ?? fallback;
+const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description ?? fallback;
+
+function renderIcon(iconName: string): string {
+  const iconData = (lucideIcons as Record<string, unknown>)[iconName];
+  if (!iconData || !Array.isArray(iconData))
+    return '<rect width="14" height="14" x="5" y="5" rx="2" />';
+  return iconData
+    .map(([tag, attrs]: [string, Record<string, string>]) => {
+      const attrStr = Object.entries(attrs)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ");
+      return `<${tag} ${attrStr}/>`;
+    })
+    .join("");
+}
+
+const groups = CATEGORIES.map((cat) => ({
+  category: cat,
+  tools: TOOLS.filter((t) => t.category === cat.id),
+})).filter((group) => group.tools.length > 0);
+
+const toolCount = TOOLS.length;
+
+const modalityFilters = [
+  { id: "all", label: t(locale, "toolsIndex.filter.all"), count: TOOLS.length },
+  {
+    id: "image",
+    label: t(locale, "toolsIndex.filter.image"),
+    count: TOOLS.filter((t) => t.modality === "image").length,
+  },
+  {
+    id: "video",
+    label: t(locale, "toolsIndex.filter.video"),
+    count: TOOLS.filter((t) => t.modality === "video").length,
+  },
+  {
+    id: "audio",
+    label: t(locale, "toolsIndex.filter.audio"),
+    count: TOOLS.filter((t) => t.modality === "audio").length,
+  },
+  {
+    id: "document",
+    label: t(locale, "toolsIndex.filter.document"),
+    count: TOOLS.filter((t) => t.modality === "document").length,
+  },
+  {
+    id: "file",
+    label: t(locale, "toolsIndex.filter.file"),
+    count: TOOLS.filter((t) => t.modality === "file").length,
+  },
+];
+
+const searchPlaceholder = t(locale, "toolsIndex.searchPlaceholder", { count: toolCount });
+const showingAll = t(locale, "toolsIndex.showingAll", { count: toolCount });
+// Templates the client script fills in with live counts (kept build-time to avoid
+// bundling the i18n catalog into browser JS).
+const showingCountTpl = t(locale, "toolsIndex.showingCount");
+const showingCountAllTpl = t(locale, "toolsIndex.showingCountAll");
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://snapotter.com/tools" },
+  ],
+};
+
+const collectionJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "SnapOtter File Processing Tools",
+  description: `${toolCount} self-hosted file processing tools with local AI. Resize, compress, convert, remove backgrounds, upscale, OCR, and more.`,
+  url: "https://snapotter.com/tools",
+  isPartOf: {
+    "@type": "WebSite",
+    name: "SnapOtter",
+    url: "https://snapotter.com",
+  },
+  numberOfItems: toolCount,
+  mainEntity: {
+    "@type": "ItemList",
+    numberOfItems: toolCount,
+    itemListElement: TOOLS.map((tool, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: tool.name,
+      url: `https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`,
+    })),
+  },
+};
+---
+
+<Base
+  title={t(locale, "toolsIndex.metaTitle", { count: toolCount })}
+  description={t(locale, "toolsIndex.metaDescription", { count: toolCount })}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={[breadcrumbJsonLd, collectionJsonLd]} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main">
+    <!-- Breadcrumb -->
+    <nav class="mx-auto max-w-5xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2 text-sm text-muted">
+        <li>
+          <a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li class="font-medium text-foreground">{t(locale, "common.tools")}</li>
+      </ol>
+    </nav>
+
+    <!-- Hero -->
+    <section class="mx-auto max-w-5xl px-6 pt-8 pb-16">
+      <div class="reveal">
+        <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">
+          {t(locale, "toolsIndex.title", { count: toolCount })}
+        </h1>
+        <p class="mt-4 max-w-2xl text-lg leading-relaxed text-muted md:text-xl">
+          {t(locale, "toolsIndex.subtitle")}
+        </p>
+      </div>
+    </section>
+
+    <!-- Filter bar -->
+    <section class="sticky top-16 z-30 border-y border-border bg-background/95 backdrop-blur">
+      <div class="mx-auto max-w-5xl px-6 py-4">
+        <div class="relative">
+          <svg class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            id="tools-search"
+            type="text"
+            autocomplete="off"
+            placeholder={searchPlaceholder}
+            class="w-full rounded-xl border border-border bg-surface py-2.5 pe-4 ps-11 text-sm outline-none transition-colors placeholder:text-muted focus:border-primary"
+          />
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          {modalityFilters.map((m) => (
+            <button
+              type="button"
+              data-modality={m.id}
+              class:list={[
+                "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                m.id === "all" ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt",
+              ]}
+            >
+              {m.label} ({m.count})
+            </button>
+          ))}
+        </div>
+        <p
+          id="tools-count"
+          class="mt-3 text-sm text-muted"
+          data-showing-all={showingAll}
+          data-showing-count={showingCountTpl}
+          data-showing-count-all={showingCountAllTpl}
+        >{showingAll}</p>
+      </div>
+    </section>
+
+    <!-- Tool categories -->
+    {groups.map((group) => (
+      <section class="border-t border-border py-12 even:bg-background-alt" data-cat-section>
+        <div class="mx-auto max-w-5xl px-6">
+          <div class="reveal">
+            <div class="mb-8 flex items-center gap-3">
+              <div
+                class="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={`background-color: ${group.category.color}14`}
+              >
+                <svg
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={group.category.color}
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  {group.category.icon === "Layers" && <><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="m2 17 10 5 10-5" /><path d="m2 12 10 5 10-5" /></>}
+                  {group.category.icon === "Zap" && <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></>}
+                  {group.category.icon === "SlidersHorizontal" && <><line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" /><line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" /><line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" /><line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="16" x2="16" y1="18" y2="22" /></>}
+                  {group.category.icon === "Stamp" && <><path d="M5 22h14" /><path d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77Z" /><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13" /></>}
+                  {group.category.icon === "Wrench" && <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></>}
+                  {group.category.icon === "LayoutGrid" && <><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></>}
+                  {group.category.icon === "FileType" && <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 13v-1h6v1" /><path d="M12 12v6" /><path d="M11 18h2" /></>}
+                  {group.category.icon === "Video" && <><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" ry="2" /></>}
+                  {group.category.icon === "AudioLines" && <><path d="M2 10v3" /><path d="M6 6v11" /><path d="M10 3v18" /><path d="M14 8v7" /><path d="M18 5v13" /><path d="M22 10v3" /></>}
+                  {group.category.icon === "FileText" && <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" /></>}
+                  {group.category.icon === "Table" && <><path d="M12 3v18" /><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /></>}
+                  {group.category.icon === "Sparkles" && <><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /><path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" /></>}
+                </svg>
+              </div>
+              <h2 class="font-display text-2xl font-bold">
+                {t(locale, `category.${group.category.id}`)}
+              </h2>
+              <span class="text-sm text-muted">
+                {group.tools.length === 1
+                  ? t(locale, "toolsIndex.toolCountOne", { count: group.tools.length })
+                  : t(locale, "toolsIndex.toolCountOther", { count: group.tools.length })}
+              </span>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {group.tools.map((tool) => (
+                <a
+                  href={localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`)}
+                  class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
+                  data-name={toolName(tool.id, tool.name).toLowerCase()}
+                  data-desc={toolDesc(tool.id, tool.description).toLowerCase()}
+                  data-modality={tool.modality}
+                  data-keywords={(tool.keywords ?? []).join(" ")}
+                >
+                  <div
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                    style={`background-color: ${group.category.color}14`}
+                  >
+                    <svg
+                      class="h-[18px] w-[18px]"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={group.category.color}
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      set:html={renderIcon(tool.icon)}
+                    />
+                  </div>
+                  <div class="min-w-0">
+                    <span class="text-sm font-bold">{toolName(tool.id, tool.name)}</span>
+                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
+                      {toolDesc(tool.id, tool.description)}
+                    </p>
+                    <span class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary transition-all group-hover:gap-2">
+                      {t(locale, "common.learnMore")}
+                      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    ))}
+
+    <!-- Empty state -->
+    <p id="tools-empty" class="hidden border-t border-border py-20 text-center text-muted">
+      {t(locale, "toolsIndex.empty")}
+    </p>
+
+    <!-- Bottom CTA -->
+    <section class="border-t border-border py-20">
+      <div class="mx-auto max-w-5xl px-6 text-center">
+        <div class="reveal">
+          <h2 class="font-display text-3xl font-bold tracking-tight">
+            {t(locale, "toolsIndex.ctaTitle", { count: toolCount })}
+          </h2>
+          <p class="mx-auto mt-4 max-w-lg text-muted">
+            {t(locale, "toolsIndex.ctaBody")}
+          </p>
+          <div class="mt-8 flex flex-wrap justify-center gap-4">
+            <a
+              href="https://docs.snapotter.com/guide/getting-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
+            >
+              {t(locale, "common.getStarted")}
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+              </svg>
+            </a>
+            <a
+              href={localizeHref(locale, "/#pricing")}
+              class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
+            >
+              {t(locale, "common.viewPricing")}
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    import { matchTool } from "../../../lib/tool-search";
+
+    const search = document.getElementById("tools-search") as HTMLInputElement | null;
+    const countEl = document.getElementById("tools-count");
+    const emptyEl = document.getElementById("tools-empty");
+    const items = Array.from(document.querySelectorAll<HTMLElement>(".tool-item"));
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-cat-section]"));
+    const modBtns = Array.from(document.querySelectorAll<HTMLElement>(".tools-mod-btn"));
+    const total = items.length;
+    let activeMod = "all";
+
+    const fill = (tpl: string, vars: Record<string, string | number>) =>
+      tpl.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
+
+    if (search && countEl && emptyEl) {
+      const showingCountTpl = countEl.getAttribute("data-showing-count") ?? "";
+      const showingCountAllTpl = countEl.getAttribute("data-showing-count-all") ?? "";
+
+      const setBtns = () => {
+        for (const b of modBtns) {
+          const on = b.getAttribute("data-modality") === activeMod;
+          b.className =
+            "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
+            (on ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt");
+        }
+      };
+
+      const filter = () => {
+        const q = search.value.trim();
+        let visible = 0;
+        for (const el of items) {
+          const matchMod = activeMod === "all" || el.getAttribute("data-modality") === activeMod;
+          const hay =
+            `${el.getAttribute("data-name") || ""} ${el.getAttribute("data-desc") || ""} ` +
+            `${el.getAttribute("data-keywords") || ""}`;
+          const matchQ = !q || matchTool(q, hay);
+          const show = matchMod && matchQ;
+          el.style.display = show ? "" : "none";
+          if (show) visible++;
+        }
+        for (const sec of sections) {
+          const anyVisible = Array.from(sec.querySelectorAll<HTMLElement>(".tool-item")).some(
+            (el) => el.style.display !== "none",
+          );
+          sec.style.display = anyVisible ? "" : "none";
+        }
+        emptyEl.style.display = visible === 0 ? "block" : "none";
+        countEl.textContent =
+          q || activeMod !== "all"
+            ? fill(showingCountTpl, { visible, total })
+            : fill(showingCountAllTpl, { total });
+      };
+
+      search.addEventListener("input", filter);
+      for (const b of modBtns) {
+        b.addEventListener("click", () => {
+          activeMod = b.getAttribute("data-modality") ?? "all";
+          setBtns();
+          filter();
+        });
+      }
+    }
+  </script>
+
+  <Footer locale={locale} />
+</Base>

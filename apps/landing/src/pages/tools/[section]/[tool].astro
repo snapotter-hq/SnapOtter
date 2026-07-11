@@ -113,6 +113,8 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
   title={title}
   description={metaDescription}
   canonical={`https://snapotter.com/tools/${toolSection(tool)}/${tool.id}/`}
+  locale="en"
+  path={`/tools/${section}/${tool.id}/`}
 >
   <Fragment slot="head">
     <JsonLd data={allJsonLd} />

@@ -2,23 +2,23 @@
 description: Change the frame rate of a video.
 ---
 
-# Change FPS
+# Change FPS {#change-fps}
 
 Change the frame rate of a video to a target value between 1 and 120 fps.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/change-fps`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | fps | number | No | `30` | Target frame rate (1-120) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/change-fps \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/change-fps \
   -F 'settings={"fps": 24}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/change-fps \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Lowering the frame rate drops frames and reduces file size. Increasing it duplicates frames to fill the gap but does not add real motion detail.
 - Common target values: 24 (cinema), 30 (web/broadcast), 60 (smooth playback).

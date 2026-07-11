@@ -2,23 +2,23 @@
 description: Convert between Excel, OpenDocument, and CSV formats.
 ---
 
-# Convert Spreadsheet
+# Convert Spreadsheet {#convert-spreadsheet}
 
 Convert spreadsheets between Excel (XLSX), OpenDocument Spreadsheet (ODS), and CSV formats. Multi-sheet workbooks export the first sheet when converting to CSV.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/convert-spreadsheet`
 
 Accepts multipart form data with an Excel/ODS/CSV file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | Yes | - | Output format: `xlsx`, `ods`, `csv` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/convert-spreadsheet \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/convert-spreadsheet \
   -F 'settings={"format": "csv"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -38,7 +38,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.xlsx`, `.xls`, `.ods`, `.csv`.
 - When converting a multi-sheet workbook to CSV, only the first sheet is exported.

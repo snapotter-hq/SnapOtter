@@ -2,23 +2,23 @@
 description: Reorder pages in a PDF with an explicit page order.
 ---
 
-# Organize PDF
+# Organize PDF {#organize-pdf}
 
 Reorder pages in a PDF by specifying the desired page sequence.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/organize-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | order | string | Yes | - | Desired page order in qpdf syntax, e.g. `"3,1,2,5-z"` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/organize-pdf \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/organize-pdf \
   -F 'settings={"order": "3,1,2,5-z"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/organize-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Page ranges use qpdf syntax: `3,1,2` reorders the first three pages, and `5-z` appends pages 5 through the last page.
 - Pages can be duplicated by listing them more than once (e.g. `"1,1,2,3"` duplicates page 1).

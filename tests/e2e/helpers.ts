@@ -129,6 +129,43 @@ export async function uploadTestImage(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// mockAiFeaturesInstalled() — make AI-tool bundles report as installed.
+//
+// AI tools (erase-object, upscale, ...) render a FeatureInstallPrompt instead of
+// the tool UI when their bundle is missing, so their e2e specs otherwise skip in
+// CI and on any box without the bundle. Mock the feature-status endpoint so the
+// tool UI renders. Call BEFORE navigating to the tool page, then goto (a full
+// load resets the in-memory features store, which re-fetches through this mock).
+// These specs exercise client-side UI up to mask generation, not the real AI
+// backend / processing.
+// ---------------------------------------------------------------------------
+export async function mockAiFeaturesInstalled(
+  page: Page,
+  bundles: Array<{ id: string; enablesTools: string[]; name?: string }>,
+): Promise<void> {
+  await page.route("**/api/v1/features", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        bundles: bundles.map((b) => ({
+          id: b.id,
+          name: b.name ?? b.id,
+          description: "",
+          status: "installed",
+          installedVersion: "1.0.0",
+          estimatedSize: "",
+          downloadBytes: null,
+          installedBytes: null,
+          enablesTools: b.enablesTools,
+          progress: null,
+        })),
+      }),
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // waitForProcessing() — wait for processing to complete
 // ---------------------------------------------------------------------------
 export async function waitForProcessing(page: Page, timeoutMs = 30_000) {

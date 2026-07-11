@@ -1,5 +1,14 @@
 <script setup lang="ts">
-const command = "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
+import { useData } from "vitepress";
+import { computed, ref } from "vue";
+import { normalizeLocale, t } from "../i18n/ui.mjs";
+
+const { lang } = useData();
+const locale = computed(() => normalizeLocale(lang.value));
+const tt = (key: string) => t(locale.value, key);
+
+const command =
+  "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
 
 const selfLinks = [
   { label: "Quick start", href: "/guide/getting-started#quick-start" },
@@ -18,11 +27,11 @@ const entLinks = [
   { label: "Compliance & SBOM", href: "/guide/security#compliance-artifacts" },
 ];
 const modalities = [
-  { label: "Image", count: 64, href: "/tools/resize" },
-  { label: "Video", count: 29, href: "/tools/convert-video" },
-  { label: "Audio", count: 17, href: "/tools/convert-audio" },
-  { label: "PDF", count: 37, href: "/tools/merge-pdf" },
-  { label: "Files", count: 10, href: "/tools/chart-maker" },
+  { label: "Image", count: 64, href: "/tools/image/resize" },
+  { label: "Video", count: 29, href: "/tools/video/convert-video" },
+  { label: "Audio", count: 17, href: "/tools/audio/convert-audio" },
+  { label: "PDF", count: 37, href: "/tools/pdf/merge-pdf" },
+  { label: "Files", count: 10, href: "/tools/files/chart-maker" },
 ];
 const shared = [
   { label: "REST API", sub: "Keys, endpoints & OpenAPI", href: "/api/rest" },
@@ -30,23 +39,23 @@ const shared = [
   { label: "llms.txt", sub: "AI-friendly docs", href: "/llms.txt" },
 ];
 
-import { ref } from "vue";
-const copyLabel = ref("Copy");
+const copyLabel = ref(t(locale.value, "home.copy"));
 function copyCommand() {
   navigator.clipboard?.writeText(command);
-  copyLabel.value = "Copied!";
-  setTimeout(() => { copyLabel.value = "Copy"; }, 1500);
+  copyLabel.value = t(locale.value, "home.copied");
+  setTimeout(() => {
+    copyLabel.value = t(locale.value, "home.copy");
+  }, 1500);
 }
 </script>
 
 <template>
   <div class="so-home">
     <section class="hero">
-      <p class="eyebrow">Self-hosted · Open source · AGPLv3</p>
-      <h1 class="hero-title">SnapOtter Documentation</h1>
+      <h1 class="hero-title">{{ tt("home.title") }}</h1>
       <p class="hero-sub">
-        <strong>Self-hosted file processing.</strong> 200+ tools across image, video, audio, PDF &amp;
-        files, all on your own hardware. Choose your path below, or get running in one command:
+        Install, operate, and build on your self-hosted file-processing infrastructure. Get running
+        in one command:
       </p>
       <div class="cmd" title="Click to copy" @click="copyCommand">
         <code>$ {{ command }}</code>
@@ -65,13 +74,13 @@ function copyCommand() {
           <span class="door-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
           </span>
-          <h2>Self-hosting</h2>
+          <h2>{{ tt("home.selfHosting") }}</h2>
         </div>
         <p class="door-sub">Get SnapOtter running and keep it healthy.</p>
         <ul class="door-links">
           <li v-for="l in selfLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
         </ul>
-        <a class="door-cta" href="/guide/getting-started">Start self-hosting →</a>
+        <a class="door-cta" href="/guide/getting-started">{{ tt("home.startSelfHosting") }}</a>
       </div>
 
       <div class="door ent">
@@ -79,18 +88,18 @@ function copyCommand() {
           <span class="door-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
           </span>
-          <h2>Enterprise</h2>
+          <h2>{{ tt("home.enterprise") }}</h2>
         </div>
         <p class="door-sub">Evaluate, secure &amp; govern your deployment.</p>
         <ul class="door-links">
           <li v-for="l in entLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
         </ul>
-        <a class="door-cta" href="/guide/architecture">Evaluate for your org →</a>
+        <a class="door-cta" href="https://snapotter.com/enterprise">{{ tt("home.evaluate") }}</a>
       </div>
     </section>
 
     <section class="mod">
-      <p class="mod-head"><strong>200+ tools across 5 modalities</strong> <span>browse the full reference by type</span></p>
+      <p class="mod-head"><strong>{{ tt("home.modalities") }}</strong> <span>{{ tt("home.browseByType") }}</span></p>
       <div class="chips">
         <a v-for="m in modalities" :key="m.href" class="chip" :href="m.href">
           <span class="chip-label">{{ m.label }}</span>
@@ -111,7 +120,6 @@ function copyCommand() {
 <style scoped>
 .so-home { max-width: 1080px; margin: 0 auto; padding: 16px 24px 64px; }
 .hero { text-align: center; padding: 48px 16px 28px; }
-.eyebrow { font: 600 11px/1 var(--vp-font-family-mono); letter-spacing: .16em; text-transform: uppercase; color: #A85518; margin-bottom: 14px; }
 .hero-title { font-family: var(--so-font-heading); font-size: 42px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 12px; }
 .hero-sub { color: var(--vp-c-text-2); font-size: 17px; max-width: 60ch; margin: 0 auto 20px; }
 .cmd { display: flex; gap: 14px; align-items: center; max-width: 860px; margin: 0 auto; background: #15100B; border: 1px solid #3A2A1E; border-radius: 10px; padding: 13px 16px; text-align: left; cursor: pointer; transition: border-color .15s, background-color .15s; }
@@ -164,7 +172,7 @@ function copyCommand() {
 :root.dark .door.self { background: linear-gradient(180deg, #2A1F16, #221A13); border-color: #3A2C20; color: #F0EBE4; }
 :root.dark .door.self .door-links li { border-color: #3A2C20; }
 :root.dark .chip-count { color: #F0A766; }
-:root.dark .hero-meta a, :root.dark .eyebrow { color: #F0A766; }
+:root.dark .hero-meta a { color: #F0A766; }
 :root.dark .door.self .door-sub { color: #C9BCAE; }
 :root.dark .door.self .door-links a:hover { color: #F09550; }
 :root.dark .door.self .door-cta { background: #A85518; }

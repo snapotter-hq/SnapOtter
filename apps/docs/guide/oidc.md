@@ -2,7 +2,7 @@
 description: Set up Single Sign-On with OpenID Connect. Step-by-step guides for Keycloak, Authentik, Google, and other OIDC providers.
 ---
 
-# OIDC / Single Sign-On
+# OIDC / Single Sign-On {#oidc-single-sign-on}
 
 SnapOtter supports OpenID Connect (OIDC) for single sign-on. Users can log in with an external identity provider such as Keycloak, Authentik, or Google instead of (or alongside) local username/password authentication.
 
@@ -10,7 +10,7 @@ SnapOtter supports OpenID Connect (OIDC) for single sign-on. Users can log in wi
 [SAML SSO](/guide/saml) | [SCIM Provisioning](/guide/scim) | [Users, Roles & Permissions](/guide/users-roles)
 :::
 
-## Quick start
+## Quick start {#quick-start}
 
 Add these environment variables to your `docker-compose.yml`:
 
@@ -34,7 +34,7 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 
 For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your provider's redirect URI as `https://photos.example.com/api/auth/oidc/callback`.
 
-## Configuration reference
+## Configuration reference {#configuration-reference}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -52,9 +52,9 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your p
 | `EXTERNAL_URL` | | The public URL where SnapOtter is reachable. Required for OIDC to build the correct redirect URI. |
 | `COOKIE_SECRET` | auto-generated | Secret for signing session cookies. Set this explicitly when running multiple replicas. |
 
-## Provider guides
+## Provider guides {#provider-guides}
 
-### Keycloak
+### Keycloak {#keycloak}
 
 1. Create a new realm (or use an existing one).
 2. Go to **Clients** and create a new client:
@@ -65,7 +65,7 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your p
 4. Copy the **Client secret** from the **Credentials** tab.
 5. Set `OIDC_ISSUER_URL` to `https://keycloak.example.com/realms/your-realm`.
 
-### Authentik
+### Authentik {#authentik}
 
 1. In the admin interface, go to **Applications > Providers** and create a new **OAuth2/OpenID Provider**.
    - **Client type**: Confidential
@@ -75,7 +75,7 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your p
 3. Copy the **Client ID** and **Client Secret** from the provider settings.
 4. Set `OIDC_ISSUER_URL` to `https://authentik.example.com/application/o/snapotter/` (the trailing slash matters).
 
-### Google
+### Google {#google}
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a project (or select an existing one).
@@ -87,15 +87,15 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your p
 6. Set `OIDC_ISSUER_URL` to `https://accounts.google.com`.
 7. Set `OIDC_USERNAME_CLAIM` to `email` (Google does not provide `preferred_username`).
 
-## User provisioning
+## User provisioning {#user-provisioning}
 
-### Auto-create
+### Auto-create {#auto-create}
 
 When `OIDC_AUTO_CREATE_USERS` is `true` (the default), a local user account is created the first time someone logs in via OIDC. The username is taken from the claim specified by `OIDC_USERNAME_CLAIM`, and the role is set to `OIDC_DEFAULT_ROLE`.
 
 If a username collision occurs, a numeric suffix is appended (e.g. `jane` becomes `jane_2`).
 
-### Auto-link
+### Auto-link {#auto-link}
 
 When `OIDC_AUTO_LINK_USERS` is `true`, SnapOtter links an OIDC identity to an existing local account if the email addresses match. This is useful when you have pre-created user accounts and want them to start using SSO without losing their data.
 
@@ -103,11 +103,11 @@ When `OIDC_AUTO_LINK_USERS` is `true`, SnapOtter links an OIDC identity to an ex
 Only enable auto-link if you trust your OIDC provider to verify email addresses. An unverified email could allow someone to take over another user's account.
 :::
 
-### Disabling local login
+### Disabling local login {#disabling-local-login}
 
 OIDC does not disable local username/password login. Both methods remain available. Admins can still log in with local credentials if the OIDC provider is unreachable.
 
-## Self-signed certificates
+## Self-signed certificates {#self-signed-certificates}
 
 If your OIDC provider uses a self-signed or private CA certificate, mount the CA bundle into the container and point `NODE_EXTRA_CA_CERTS` to it:
 
@@ -129,9 +129,9 @@ services:
 Do not set `NODE_TLS_REJECT_UNAUTHORIZED=0`. This disables all TLS verification and is a security risk.
 :::
 
-## Troubleshooting
+## Troubleshooting {#troubleshooting}
 
-### Redirect URI mismatch
+### Redirect URI mismatch {#redirect-uri-mismatch}
 
 The most common error. Check for these differences between what your provider expects and what SnapOtter sends:
 
@@ -142,15 +142,15 @@ The most common error. Check for these differences between what your provider ex
 
 Double-check `EXTERNAL_URL`. It must match the URL users type in their browser.
 
-### UNABLE_TO_VERIFY_LEAF_SIGNATURE
+### UNABLE_TO_VERIFY_LEAF_SIGNATURE {#unable-to-verify-leaf-signature}
 
 The OIDC provider is using a certificate that Node.js does not trust. See [Self-signed certificates](#self-signed-certificates) above.
 
-### Clock skew errors
+### Clock skew errors {#clock-skew-errors}
 
 If your server clock and the OIDC provider clock are out of sync, token validation may fail. Increase `OIDC_CLOCK_TOLERANCE` (default is 30 seconds). A better fix is to run NTP on both machines.
 
-### "OIDC provider unreachable"
+### "OIDC provider unreachable" {#oidc-provider-unreachable}
 
 SnapOtter fetches the provider's discovery document at startup and during login. Check:
 
@@ -158,7 +158,7 @@ SnapOtter fetches the provider's discovery document at startup and during login.
 - Firewall rules between the container and the provider
 - The `OIDC_ISSUER_URL` value - it must be reachable from the server, not just from your browser
 
-### Missing claims
+### Missing claims {#missing-claims}
 
 If usernames or emails are empty after login, your provider may not be returning the expected claims. Verify:
 

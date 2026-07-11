@@ -2,17 +2,17 @@
 description: Layer images with position, opacity, and blend modes for compositing.
 ---
 
-# Image Composition
+# Image Composition {#image-composition}
 
 Layer an overlay image on top of a base image with configurable position, opacity, and blend mode. Useful for compositing logos, graphics, or combining multiple images.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/compose`
 
 Accepts multipart form data with **two** image files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with **two** image files and a JSON `settings` field
 | opacity | number | No | `100` | Overlay opacity percentage (0 to 100) |
 | blendMode | string | No | `"over"` | Compositing blend mode |
 
-### Blend Modes
+### Blend Modes {#blend-modes}
 
 | Value | Description |
 |-------|-------------|
@@ -36,14 +36,14 @@ Accepts multipart form data with **two** image files and a JSON `settings` field
 | `difference` | Absolute difference between layers |
 | `exclusion` | Similar to difference but lower contrast |
 
-### File Fields
+### File Fields {#file-fields}
 
 | Field Name | Required | Description |
 |------------|----------|-------------|
 | file | Yes | The base/background image |
 | overlay | Yes | The overlay/foreground image |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compose \
@@ -63,7 +63,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compose \
   -F 'settings={"x": 0, "y": 0, "opacity": 50, "blendMode": "multiply"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -74,7 +74,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compose \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Both images are validated and decoded (HEIC, RAW, PSD, SVG supported) before compositing.
 - The overlay is placed at the exact pixel coordinates specified by `x` and `y`. It is not resized to fit.

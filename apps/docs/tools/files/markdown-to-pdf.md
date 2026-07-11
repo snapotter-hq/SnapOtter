@@ -2,21 +2,21 @@
 description: Convert a Markdown file to a styled PDF.
 ---
 
-# Markdown to PDF
+# Markdown to PDF {#markdown-to-pdf}
 
 Convert a Markdown file to a styled PDF document. Remote resources are disabled for privacy.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/markdown-to-pdf`
 
 Accepts multipart form data with a Markdown file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a Markdown file and it will be converted to PDF.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-pdf \
   -F "file=@document.md"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.md`, `.markdown`.
 - Remote resources (images, stylesheets referenced via URLs) are not fetched for privacy and security.

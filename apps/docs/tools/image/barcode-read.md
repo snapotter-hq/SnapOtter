@@ -2,23 +2,23 @@
 description: Scan images for QR codes, barcodes, and 2D codes with annotated output.
 ---
 
-# Barcode Reader
+# Barcode Reader {#barcode-reader}
 
 Scan uploaded images for all types of barcodes and QR codes. Returns decoded text, barcode type, and position data for each detected code. Also generates an annotated image with colored bounding boxes around detected codes.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/barcode-read`
 
 Accepts multipart form data with an image file and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | tryHarder | boolean | No | `true` | Enable aggressive scanning mode for harder-to-read barcodes (slower but more thorough) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/barcode-read \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-read \
   -F 'settings={"tryHarder": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -59,7 +59,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-read \
 }
 ```
 
-## Response Fields
+## Response Fields {#response-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -68,7 +68,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-read \
 | annotatedUrl | string or null | URL to download the annotated image (null if no barcodes found) |
 | previewUrl | string or null | Same as annotatedUrl (for frontend preview compatibility) |
 
-### Barcode Object
+### Barcode Object {#barcode-object}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -76,13 +76,13 @@ curl -X POST http://localhost:1349/api/v1/tools/image/barcode-read \
 | text | string | Decoded content of the barcode |
 | position | object | Bounding box with topLeft, topRight, bottomLeft, bottomRight coordinates |
 
-## Supported Barcode Types
+## Supported Barcode Types {#supported-barcode-types}
 
 1D barcodes: Code128, Code39, Code93, Codabar, EAN-8, EAN-13, ITF, UPC-A, UPC-E
 
 2D barcodes: QRCode, DataMatrix, PDF417, Aztec, MaxiCode
 
-## Notes
+## Notes {#notes}
 
 - Uses the zxing-wasm library for barcode detection.
 - The annotated image overlays colored polygon bounding boxes and numbered labels on each detected barcode.

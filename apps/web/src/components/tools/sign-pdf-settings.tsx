@@ -10,6 +10,7 @@ import {
   type SavedSignature,
 } from "@/lib/signature-store";
 import { generateId } from "@/lib/utils";
+import { safeRandomUUID } from "@/lib/uuid";
 import { useFileStore } from "@/stores/file-store";
 import type { SignCanvasRef } from "./sign-canvas";
 import { SignaturePad } from "./signature-pad";
@@ -126,7 +127,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const handleSavePad = (dataUrl: string, remember: boolean) => {
     const sig: SavedSignature = remember
       ? addSignature(dataUrl)
-      : { id: crypto.randomUUID(), dataUrl, createdAt: Date.now() };
+      : { id: safeRandomUUID(), dataUrl, createdAt: Date.now() };
     if (remember) refresh();
     signProps?.canvasRef.current?.addSignature(sig);
     setPadOpen(false);

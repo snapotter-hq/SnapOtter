@@ -2,21 +2,21 @@
 description: Safely extract files from a ZIP archive with bomb protection.
 ---
 
-# Extract ZIP
+# Extract ZIP {#extract-zip}
 
 Safely extract files from a ZIP archive. Single-file archives return the contained file directly; multi-file archives return a flat ZIP with the extracted contents.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/extract-zip`
 
 Accepts multipart form data with a ZIP file. No settings field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a `.zip` file to extract.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/extract-zip \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/extract-zip \
   -F "file=@archive.zip"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/extract-zip \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Only `.zip` files are accepted as input.
 - If the archive contains a single file, that file is returned directly (not wrapped in a ZIP).

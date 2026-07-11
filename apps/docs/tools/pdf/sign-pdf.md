@@ -2,17 +2,17 @@
 description: Stamp uploaded signature images onto a PDF using normalized page placements.
 ---
 
-# Sign PDF
+# Sign PDF {#sign-pdf}
 
 Stamp one or more uploaded signature PNG images onto any page of a PDF. This route uses a custom multipart contract because it needs the PDF, one or more signature images, and placement coordinates.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/sign-pdf`
 
 Accepts multipart form data. The PDF is sent as `file`; signatures are sent as `sig0`, `sig1`, and so on; placements are sent in a `placements` JSON field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data. The PDF is sent as `file`; signatures are sent as `
 | clientJobId | string | No | - | Optional UUID for progress tracking via SSE |
 | fileId | string | No | - | Optional file library ID to save the signed result as a new version |
 
-## Placement Coordinates
+## Placement Coordinates {#placement-coordinates}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -35,7 +35,7 @@ Accepts multipart form data. The PDF is sent as `file`; signatures are sent as `
 
 Coordinates use a top-left origin. Values may bleed slightly beyond the page edge; the PDF renderer clips the final stamp to the page.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/sign-pdf \
@@ -45,7 +45,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/sign-pdf \
   -F 'placements=[{"sig":0,"page":0,"x":0.64,"y":0.82,"w":0.22,"h":0.08}]'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -68,7 +68,7 @@ If the request cannot finish inside the synchronous wait window, the API returns
 
 Connect to `/api/v1/jobs/<jobId>/progress` and download the result when the job completes.
 
-## Notes
+## Notes {#notes}
 
 - Accepted PDF input format: `.pdf`.
 - Signature images must be valid image files, typically PNG with transparency.

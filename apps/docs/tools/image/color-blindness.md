@@ -2,23 +2,23 @@
 description: Simulate how images appear to people with different types of color vision deficiency.
 ---
 
-# Color Blindness Simulation
+# Color Blindness Simulation {#color-blindness-simulation}
 
 Simulate color vision deficiency (CVD) to preview how images appear to people with various types of color blindness. Useful for accessibility testing of designs, charts, and UI.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/color-blindness`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | simulationType | string | No | `"deuteranomaly"` | Type of color vision deficiency to simulate |
 
-### Simulation Types
+### Simulation Types {#simulation-types}
 
 | Value | Condition | Description |
 |-------|-----------|-------------|
@@ -31,7 +31,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | `achromatopsia` | Total color blind | Complete absence of color vision |
 | `blueConeMonochromacy` | Blue-cone only | Only blue cones functional |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/color-blindness \
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/color-blindness \
   -F 'settings={"simulationType": "deuteranopia"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/color-blindness \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Deuteranomaly (green-weak) is the default because it is the most common form of color vision deficiency, affecting approximately 6% of males.
 - The simulation uses color transformation matrices that model how reduced or absent cone photoreceptors alter perceived colors.

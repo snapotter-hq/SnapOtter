@@ -106,6 +106,33 @@ describe("UsageSurveyOverlay", () => {
     });
   });
 
+  it("includes install method and friction area when the admin selects them", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: {} });
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "Built from source" }));
+    fireEvent.change(screen.getByLabelText("Hardest setup area"), {
+      target: { value: "docker" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      expect(submitFeedback).toHaveBeenCalledWith({
+        source: "onboarding",
+        surveyId: "onboarding-usage-v1",
+        promptVariant: "onboarding-overlay-v1",
+        usageType: "personal",
+        importantAreas: [],
+        installMethod: "source",
+        frictionArea: "docker",
+      });
+    });
+  });
+
   it("does not resubmit feedback if only the settings write failed on the first attempt", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     apiGet.mockResolvedValue({ settings: {} });

@@ -920,7 +920,8 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
       posthogApiKey: "",
       posthogHost: "",
       sentryDsn: "",
-      sampleRate: 0,
+      sentryDsnWeb: "",
+      posthogSampleRate: 0,
       instanceId: "",
     });
   }

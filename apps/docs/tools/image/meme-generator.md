@@ -2,11 +2,11 @@
 description: Create memes with templates or custom images, styled text boxes, and font options.
 ---
 
-# Meme Generator
+# Meme Generator {#meme-generator}
 
 Create memes using built-in templates or custom images. Add text with classic meme styling (bold, outlined text), multiple layout presets, and font choices.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/meme-generator`
 
@@ -14,7 +14,7 @@ Accepts either:
 - **Multipart form data** with an image file and a JSON `settings` field (custom image mode)
 - **JSON body** with a `templateId` (template mode, no file upload needed)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -28,7 +28,7 @@ Accepts either:
 | textAlign | string | No | `"center"` | Text alignment: `left`, `center`, `right` |
 | allCaps | boolean | No | `true` | Convert text to uppercase |
 
-### Text Boxes
+### Text Boxes {#text-boxes}
 
 Each entry in the `textBoxes` array should have:
 
@@ -37,7 +37,7 @@ Each entry in the `textBoxes` array should have:
 | id | string | Box identifier matching the layout (e.g., `"top"`, `"bottom"`, `"left"`, `"right"`, `"center"`) |
 | text | string | The meme text to display |
 
-### Text Layout Box IDs
+### Text Layout Box IDs {#text-layout-box-ids}
 
 | Layout | Available Box IDs |
 |--------|-------------------|
@@ -47,7 +47,7 @@ Each entry in the `textBoxes` array should have:
 | `center` | `center` |
 | `side-by-side` | `left`, `right` |
 
-## Example Request
+## Example Request {#example-request}
 
 Custom image with top and bottom text:
 
@@ -67,7 +67,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/meme-generator \
   -d '{"templateId": "drake", "textBoxes": [{"id": "top", "text": "Manual testing"}, {"id": "bottom", "text": "Automated tests"}]}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -78,7 +78,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/meme-generator \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Either `templateId` or an uploaded image file is required. Providing both uses the template.
 - Templates define their own text box positions; the `textLayout` parameter is ignored when using templates.

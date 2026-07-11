@@ -2,24 +2,24 @@
 description: Create a ringtone clip from any audio file.
 ---
 
-# Ringtone Maker
+# Ringtone Maker {#ringtone-maker}
 
 Create a ringtone clip (.m4r) from any audio file by selecting a start time and duration.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/ringtone-maker`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | startS | number | No | `0` | Start time in seconds (minimum 0) |
 | durationS | number | No | `30` | Clip duration in seconds (1 to 30) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/ringtone-maker \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/ringtone-maker \
   -F 'settings={"startS": 15, "durationS": 20}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/ringtone-maker \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Output is always M4R format, compatible with iPhone ringtones.
 - Maximum ringtone duration is 30 seconds (Apple limit).

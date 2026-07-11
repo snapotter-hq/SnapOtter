@@ -35,6 +35,7 @@ function presetSchema(base: string) {
  * own parameterized registrars.
  */
 export function registerConversionPresets(app: FastifyInstance): number {
+  let skipped = 0;
   for (const preset of CONVERSION_PRESETS) {
     const cfg = BASE_CONFIG[preset.base];
     if (cfg.group === "image-to-pdf") {
@@ -53,9 +54,16 @@ export function registerConversionPresets(app: FastifyInstance): number {
     // group "registry": delegate to the base tool's processV2 with locked settings merged in.
     const baseConfig = getToolConfig(preset.base);
     if (!baseConfig) {
-      throw new Error(
-        `Preset "${preset.id}" base "${preset.base}" is not registered in the tool registry`,
+      // A missing base must degrade to a disabled preset, not a boot crash:
+      // one bad environment crash-looped an instance 287 times (Sentry
+      // NODE-21). CI still fails hard via the tool-route drift test, so the
+      // official image can't ship with a hole.
+      app.log.error(
+        { presetId: preset.id, base: preset.base },
+        "conversion preset base tool missing; preset disabled",
       );
+      skipped++;
+      continue;
     }
     createToolRoute(app, {
       toolId: preset.id,
@@ -73,5 +81,5 @@ export function registerConversionPresets(app: FastifyInstance): number {
     });
   }
 
-  return CONVERSION_PRESETS.length;
+  return CONVERSION_PRESETS.length - skipped;
 }

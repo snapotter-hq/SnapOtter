@@ -2,11 +2,11 @@
 description: Auto-detect and blur faces in images with AI face detection for privacy and GDPR-compliant anonymization.
 ---
 
-# Face / PII Blur
+# Face / PII Blur {#face-pii-blur}
 
 Auto-detect and blur faces in images using AI-powered face detection (MediaPipe).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/blur-faces`
 
@@ -14,7 +14,7 @@ Auto-detect and blur faces in images using AI-powered face detection (MediaPipe)
 
 **Model bundle:** `face-detection` (200-300 MB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Auto-detect and blur faces in images using AI-powered face detection (MediaPipe)
 | blurRadius | number | No | `30` | Blur radius applied to detected faces (1-100) |
 | sensitivity | number | No | `0.5` | Face detection sensitivity (0-1). Lower values detect fewer faces with higher confidence |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/blur-faces \
@@ -30,9 +30,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/blur-faces \
   -F 'settings={"blurRadius":40,"sensitivity":0.3}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -41,14 +41,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/blur-faces \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Detecting faces...","percent":40}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -69,7 +69,7 @@ data: {"phase":"processing","stage":"Detecting faces...","percent":40}
 }
 ```
 
-### No Faces Detected
+### No Faces Detected {#no-faces-detected}
 
 If no faces are found, the result includes a warning:
 
@@ -84,7 +84,7 @@ If no faces are found, the result includes a warning:
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `face-detection` model bundle to be installed (200-300 MB).
 - Output format matches the input format automatically.

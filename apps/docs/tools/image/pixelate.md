@@ -2,24 +2,24 @@
 description: Apply a pixelation effect to the full image or a specific region.
 ---
 
-# Pixelate
+# Pixelate {#pixelate}
 
 Apply a pixelation effect to an entire image or a specific rectangular region. Useful for obscuring sensitive content like faces, license plates, or personal information.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/pixelate`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | blockSize | integer | No | `12` | Pixel block size (2-128); larger values produce coarser pixelation |
 | region | object | No | - | Restrict pixelation to a rectangle (see below) |
 
-### Region Object
+### Region Object {#region-object}
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -28,7 +28,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | width | integer | Yes | Region width in pixels (>= 1) |
 | height | integer | Yes | Region height in pixels (>= 1) |
 
-## Example Request
+## Example Request {#example-request}
 
 Pixelate the full image:
 
@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/pixelate \
   -F 'settings={"blockSize": 16, "region": {"left": 100, "top": 50, "width": 200, "height": 150}}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -59,7 +59,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/pixelate \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - When `region` is omitted, the entire image is pixelated.
 - The region coordinates are in pixels relative to the top-left corner of the image. The region must fall within the image bounds.

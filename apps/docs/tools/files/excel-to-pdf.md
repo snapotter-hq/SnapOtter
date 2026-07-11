@@ -2,21 +2,21 @@
 description: Convert spreadsheets to PDF.
 ---
 
-# Excel to PDF
+# Excel to PDF {#excel-to-pdf}
 
 Convert Excel, OpenDocument, or CSV spreadsheets to PDF. Wide sheets may paginate across multiple pages.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/excel-to-pdf`
 
 Accepts multipart form data with an Excel/ODS/CSV file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a spreadsheet and it will be converted to PDF.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/excel-to-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/excel-to-pdf \
   -F "file=@budget.xlsx"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.xlsx`, `.xls`, `.ods`, `.csv`.
 - Wide sheets may be split across multiple pages in the resulting PDF.

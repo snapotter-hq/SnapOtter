@@ -1,0 +1,460 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/enterprise";
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Enterprise",
+      item: "https://snapotter.com/enterprise",
+    },
+  ],
+};
+
+const productJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  name: "SnapOtter Enterprise",
+  description:
+    "Enterprise-grade self-hosted file-processing infrastructure with 200+ tools, SAML SSO, audit logging, per-tool permissions, and multi-tenancy.",
+  brand: { "@type": "Organization", name: "SnapOtter" },
+  url: "https://snapotter.com/enterprise",
+  offers: {
+    "@type": "Offer",
+    priceCurrency: "USD",
+    availability: "https://schema.org/InStock",
+    url: "https://snapotter.com/contact",
+  },
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Docker, Linux, Kubernetes",
+};
+
+const whySelfHosted = [
+  {
+    title: t(locale, "enterprise.why.compliance.title"),
+    description: t(locale, "enterprise.why.compliance.description"),
+    icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  },
+  {
+    title: t(locale, "enterprise.why.zeroDeps.title"),
+    description: t(locale, "enterprise.why.zeroDeps.description"),
+    icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  },
+  {
+    title: t(locale, "enterprise.why.cost.title"),
+    description: t(locale, "enterprise.why.cost.description"),
+    icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  },
+];
+
+const identityProviders = [
+  t(locale, "enterprise.identity.provider.okta"),
+  t(locale, "enterprise.identity.provider.azure"),
+  t(locale, "enterprise.identity.provider.google"),
+  t(locale, "enterprise.identity.provider.oidc"),
+];
+
+const permissionMatrix = {
+  roles: [
+    t(locale, "enterprise.permissions.role.admin"),
+    t(locale, "enterprise.permissions.role.editor"),
+    t(locale, "enterprise.permissions.role.user"),
+  ],
+  features: [
+    t(locale, "enterprise.permissions.feature.allTools"),
+    t(locale, "enterprise.permissions.feature.pipelines"),
+    t(locale, "enterprise.permissions.feature.apiKeys"),
+    t(locale, "enterprise.permissions.feature.userMgmt"),
+    t(locale, "enterprise.permissions.feature.auditLog"),
+  ],
+  access: [
+    [true, true, true, true, true],
+    [true, true, true, false, false],
+    [true, false, false, false, false],
+  ],
+};
+
+const storageProviders = [
+  { name: t(locale, "enterprise.storage.provider.awsS3"), color: "text-[#FF9900]" },
+  { name: t(locale, "enterprise.storage.provider.minio"), color: "text-[#C72C48]" },
+  { name: t(locale, "enterprise.storage.provider.r2"), color: "text-[#F6821F]" },
+  { name: t(locale, "enterprise.storage.provider.local"), color: "text-primary" },
+];
+
+const deploymentTargets = [
+  {
+    id: "docker",
+    name: t(locale, "enterprise.deployment.target.docker"),
+    icon: '<path d="M13.98 11.08h2.12a.19.19 0 0 0 .19-.19V9.01a.19.19 0 0 0-.19-.19h-2.12a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.95-5.43h2.12a.19.19 0 0 0 .19-.19V3.58a.19.19 0 0 0-.19-.19h-2.12a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m0 2.71h2.12a.19.19 0 0 0 .19-.19V6.29a.19.19 0 0 0-.19-.19h-2.12a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.93 0h2.12a.19.19 0 0 0 .19-.19V6.29a.19.19 0 0 0-.19-.19H8.1a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.96 0h2.12a.19.19 0 0 0 .19-.19V6.29a.19.19 0 0 0-.19-.19H5.14a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m5.89 2.72h2.12a.19.19 0 0 0 .19-.19V9.01a.19.19 0 0 0-.19-.19h-2.12a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.93 0h2.12a.19.19 0 0 0 .19-.19V9.01a.19.19 0 0 0-.19-.19H8.1a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.96 0h2.12a.19.19 0 0 0 .19-.19V9.01a.19.19 0 0 0-.19-.19H5.14a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19m-2.92 0h2.12a.19.19 0 0 0 .19-.19V9.01a.19.19 0 0 0-.19-.19H2.22a.19.19 0 0 0-.19.19v1.88c0 .1.09.19.19.19M24 11.52c-.48-.41-1.59-.55-2.44-.38-.11-.79-.56-1.47-1.09-2.04l-.22-.2-.21.2c-.44.42-.7.99-.79 1.59a2.36 2.36 0 0 0 .33 1.72 3.46 3.46 0 0 1-1.62.4H.57a.56.56 0 0 0-.57.56c.02 2.19.36 4.37 1.37 6.3 1.1 2.08 2.83 3.44 5.28 4.14A17.5 17.5 0 0 0 10 24c2.19 0 4.45-.34 6.38-1.45 1.57-.9 2.83-2.27 3.68-3.93.57.04 1.81.06 3.04-.71.06-.04.14-.11.2-.17l.1-.17-.4-.25z"/>',
+  },
+  {
+    id: "kubernetes",
+    name: t(locale, "enterprise.deployment.target.kubernetes"),
+    icon: '<path d="M10.204 14.35l.007.01-.999 2.413a5.17 5.17 0 0 1-2.075-2.597l2.578-.437.004.005a.44.44 0 0 1 .484.606zm-.833-2.129a.44.44 0 0 0 .173-.756l.002-.011L7.585 9.7a5.17 5.17 0 0 0-.238 3.24l1.938-1.04.086.32zm1.926-1.621a.44.44 0 0 0 .752-.19h.01l.693-2.555a5.17 5.17 0 0 0-2.81 1.395l1.355 1.35zm1.474.639a.44.44 0 0 0-.064.776l-.003.01 1.956 1.753a5.17 5.17 0 0 0 .237-3.24l-2.127.7zm-.635 1.965a.44.44 0 0 0-.753.19h-.01l-.692 2.554a5.17 5.17 0 0 0 2.81-1.396l-1.355-1.348zM12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0-2a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z"/>',
+  },
+  {
+    id: "aws",
+    name: t(locale, "enterprise.deployment.target.aws"),
+    icon: '<path d="M6.763 10.036c0 .296.032.535.088.71.064.176.144.368.256.576.04.063.056.127.056.183 0 .08-.048.16-.152.24l-.503.335a.383.383 0 0 1-.208.072c-.08 0-.16-.04-.239-.112a2.47 2.47 0 0 1-.287-.375 6.18 6.18 0 0 1-.248-.471c-.622.734-1.405 1.101-2.347 1.101-.67 0-1.205-.191-1.596-.574-.391-.384-.59-.894-.59-1.533 0-.678.239-1.23.726-1.644.487-.415 1.133-.623 1.955-.623.272 0 .551.024.846.064.296.04.6.104.918.176v-.583c0-.607-.127-1.03-.375-1.277-.255-.248-.686-.367-1.3-.367-.28 0-.568.032-.863.104-.296.072-.583.16-.862.272a2.287 2.287 0 0 1-.28.104.488.488 0 0 1-.127.024c-.112 0-.168-.08-.168-.247v-.391c0-.128.016-.224.056-.28a.597.597 0 0 1 .224-.167c.279-.144.614-.264 1.005-.36a4.84 4.84 0 0 1 1.246-.151c.95 0 1.644.216 2.091.647.44.43.662 1.085.662 1.963v2.586zm-3.24 1.214c.263 0 .534-.048.822-.144.287-.096.543-.271.758-.51.128-.152.224-.32.272-.512.047-.191.08-.423.08-.694v-.335a6.66 6.66 0 0 0-.735-.136 6.02 6.02 0 0 0-.75-.048c-.535 0-.926.104-1.19.32-.263.215-.39.518-.39.917 0 .375.095.655.295.846.191.2.47.296.838.296zm6.41.862c-.144 0-.24-.024-.304-.08-.064-.048-.12-.16-.168-.311L7.586 5.55a1.398 1.398 0 0 1-.072-.32c0-.128.064-.2.191-.2h.783c.151 0 .255.025.31.08.065.048.113.16.16.312l1.342 5.284 1.245-5.284c.04-.16.088-.264.151-.312a.549.549 0 0 1 .32-.08h.638c.152 0 .256.025.32.08.063.048.12.16.151.312l1.261 5.348 1.381-5.348c.048-.16.104-.264.16-.312a.52.52 0 0 1 .311-.08h.743c.128 0 .2.064.2.2 0 .04-.009.08-.017.128a1.137 1.137 0 0 1-.056.2l-1.923 6.17c-.048.16-.104.264-.168.312a.52.52 0 0 1-.303.08h-.687c-.151 0-.255-.024-.32-.08-.063-.056-.119-.16-.15-.32l-1.238-5.148-1.23 5.14c-.04.16-.087.264-.15.32-.065.056-.177.08-.32.08zm10.256.215c-.415 0-.83-.048-1.229-.143-.399-.096-.71-.2-.918-.32-.128-.071-.215-.151-.247-.223a.563.563 0 0 1-.048-.224v-.407c0-.167.064-.247.183-.247.048 0 .096.008.144.024.048.016.12.048.2.08.271.12.566.215.878.279.319.064.63.096.95.096.502 0 .894-.088 1.165-.264a.86.86 0 0 0 .415-.758.777.777 0 0 0-.215-.559c-.144-.151-.415-.287-.806-.399l-1.157-.36c-.583-.183-1.013-.455-1.277-.815a1.903 1.903 0 0 1-.4-1.157c0-.335.073-.63.216-.886.144-.255.336-.479.575-.654.24-.184.51-.32.83-.415A3.64 3.64 0 0 1 18.2 6.2c.176 0 .359.008.535.032.183.024.35.056.518.088.16.04.312.08.455.127.144.048.256.096.336.144a.69.69 0 0 1 .24.2.43.43 0 0 1 .071.263v.375c0 .168-.064.256-.184.256a.83.83 0 0 1-.303-.096 3.652 3.652 0 0 0-1.532-.311c-.455 0-.815.071-1.062.223-.248.152-.375.383-.375.695 0 .224.08.416.24.567.16.152.455.304.878.44l1.134.358c.574.184.99.44 1.237.767.247.327.367.702.367 1.117 0 .343-.072.655-.207.926-.144.272-.336.511-.583.703-.248.2-.543.343-.886.447-.36.111-.742.167-1.142.167z"/><path d="M21.698 16.793c-2.812 2.08-6.89 3.187-10.399 3.187-4.92 0-9.35-1.82-12.7-4.843-.263-.24-.032-.567.287-.383 3.616 2.104 8.09 3.372 12.708 3.372 3.117 0 6.538-.647 9.693-1.987.471-.208.87.311.41.654z"/><path d="M22.874 15.416c-.36-.463-2.38-.223-3.29-.112-.272.032-.312-.208-.063-.383 1.605-1.133 4.245-.806 4.55-.423.304.391-.08 3.1-1.589 4.39-.232.2-.455.096-.35-.167.343-.855 1.102-2.75.742-3.305z"/>',
+  },
+  {
+    id: "azure",
+    name: t(locale, "enterprise.deployment.target.azure"),
+    icon: '<path d="M5.483 21.3H14.3L8.544 8.947l5.963-6.407H6.626L.008 15.29zm3.694-2.092l7.913-9.153 2.422 5.724-10.335 3.43z"/>',
+  },
+  {
+    id: "linux",
+    name: t(locale, "enterprise.deployment.target.linux"),
+    icon: '<path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 0 0-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.43.868.065 1.157-.45 1.354-.962.088-.233.167-.468.157-.707.003-.07-.003-.14-.004-.208.138-.071.233-.14.36-.252.126-.113.243-.276.32-.415.158-.263.245-.525.206-.8-.04-.26-.132-.48-.263-.695a3.3 3.3 0 0 1-.12-.198c-.048-.097-.085-.155-.085-.155a1.047 1.047 0 0 0-.32-.397 1.58 1.58 0 0 0-.402-.22c-.168-.067-.371-.128-.576-.18a7.09 7.09 0 0 0-.207-.04c-.02-.005-.04-.01-.057-.014-.159-.037-.32-.068-.385-.073-.238-.017-.398.008-.553.066-.116.043-.236.114-.378.236-.158-.19-.248-.358-.36-.597-.112-.24-.226-.515-.408-.814-.182-.304-.408-.593-.706-.799-.295-.21-.637-.334-.974-.379a3.294 3.294 0 0 0-1.002.007c.118-.607.098-1.252-.142-1.873-.237-.616-.624-1.178-1.1-1.654-.476-.474-1.005-.875-1.482-1.243-.717-.552-1.32-1.06-1.55-1.675-.115-.305-.14-.63-.058-.958.082-.327.268-.647.572-.985l.005-.003c.394-.408.666-.75.864-1.05.196-.3.32-.56.386-.805.133-.484.196-.965.165-1.44-.029-.475-.137-.95-.308-1.43-.341-.961-.828-1.934-1.094-2.893-.266-.954-.292-1.87.155-2.694.242-.47.597-.85 1.036-1.126.44-.278.963-.456 1.556-.508.1-.008.2-.013.3-.013z"/>',
+  },
+  {
+    id: "airGapped",
+    name: t(locale, "enterprise.deployment.target.airGapped"),
+    icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  },
+];
+
+const comparisonRows = [
+  {
+    label: t(locale, "enterprise.comparison.privacy.label"),
+    cloud: t(locale, "enterprise.comparison.privacy.cloud"),
+    self: t(locale, "enterprise.comparison.privacy.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.compliance.label"),
+    cloud: t(locale, "enterprise.comparison.compliance.cloud"),
+    self: t(locale, "enterprise.comparison.compliance.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.cost.label"),
+    cloud: t(locale, "enterprise.comparison.cost.cloud"),
+    self: t(locale, "enterprise.comparison.cost.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.internet.label"),
+    cloud: t(locale, "enterprise.comparison.internet.cloud"),
+    self: t(locale, "enterprise.comparison.internet.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.lockin.label"),
+    cloud: t(locale, "enterprise.comparison.lockin.cloud"),
+    self: t(locale, "enterprise.comparison.lockin.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.ai.label"),
+    cloud: t(locale, "enterprise.comparison.ai.cloud"),
+    self: t(locale, "enterprise.comparison.ai.self"),
+  },
+  {
+    label: t(locale, "enterprise.comparison.customization.label"),
+    cloud: t(locale, "enterprise.comparison.customization.cloud"),
+    self: t(locale, "enterprise.comparison.customization.self"),
+  },
+];
+
+const checkSvg =
+  '<svg class="h-4 w-4 shrink-0 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const xSvg =
+  '<svg class="h-4 w-4 shrink-0 text-danger/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+---
+
+<Base
+  title={t(locale, "enterprise.metaTitle")}
+  description={t(locale, "enterprise.metaDescription")}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={[breadcrumbJsonLd, productJsonLd]} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main">
+
+    <!-- ─── HERO (dark) ─── -->
+    <section class="section-dark bg-noise relative px-6 pt-32 pb-20 md:pt-44 md:pb-28">
+      <div class="relative mx-auto max-w-4xl text-center">
+        <!-- Breadcrumb -->
+        <nav class="animate-fade-up mb-8 text-sm text-dark-muted" aria-label="Breadcrumb">
+          <a href={localizeHref(locale, "/")} class="transition-colors hover:text-dark-fg">{t(locale, "common.home")}</a>
+          <span class="mx-2">/</span>
+          <span class="text-dark-fg">{t(locale, "enterprise.breadcrumb")}</span>
+        </nav>
+
+        <h1 class="animate-fade-up font-display text-4xl font-extrabold tracking-tight text-dark-fg sm:text-5xl md:text-6xl">
+          {t(locale, "enterprise.hero.title1")}<br class="hidden sm:block" />
+          <span class="text-primary-light">{t(locale, "enterprise.hero.title2")}</span>
+        </h1>
+
+        <p class="animate-fade-up mx-auto mt-6 max-w-2xl text-lg text-dark-muted md:text-xl" style="animation-delay: 0.1s;">
+          {t(locale, "enterprise.hero.subtitle")}
+        </p>
+
+        <div class="animate-fade-up mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row" style="animation-delay: 0.2s;">
+          <a href={localizeHref(locale, "/contact")} class="btn-primary rounded-xl px-8 py-3.5 text-base font-semibold">
+            {t(locale, "enterprise.hero.bookDemo")}
+          </a>
+          <a href={localizeHref(locale, "/#pricing")} class="rounded-xl border border-dark-border px-8 py-3.5 text-base font-semibold text-dark-fg transition-colors hover:border-primary hover:bg-primary/10">
+            {t(locale, "enterprise.hero.viewPricing")}
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── WHY SELF-HOSTED ─── -->
+    <section class="px-6 py-20 md:py-28">
+      <div class="reveal mx-auto mb-12 max-w-3xl text-center md:mb-16">
+        <h2 class="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+          {t(locale, "enterprise.why.title")}
+        </h2>
+        <p class="mt-4 text-lg text-muted md:text-xl">
+          {t(locale, "enterprise.why.subtitle")}
+        </p>
+      </div>
+
+      <div class="mx-auto grid max-w-5xl gap-6 sm:grid-cols-3">
+        {whySelfHosted.map((card, i) => (
+          <div class:list={["reveal card-hover rounded-xl border border-border bg-surface p-6", `reveal-delay-${i + 1}`]}>
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <svg class="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={card.icon} />
+            </div>
+            <h3 class="mt-4 font-display text-lg font-bold">{card.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{card.description}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- ─── ENTERPRISE FEATURES (alternating rows) ─── -->
+    <section class="px-6 py-20 md:py-28">
+      <div class="reveal mx-auto mb-12 max-w-3xl text-center md:mb-16">
+        <h2 class="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+          {t(locale, "enterprise.features.title")}
+        </h2>
+        <p class="mt-4 text-lg text-muted md:text-xl">
+          {t(locale, "enterprise.features.subtitle")}
+        </p>
+      </div>
+
+      <div class="mx-auto max-w-6xl space-y-20 md:space-y-28">
+
+        <!-- Row 1: Identity & Access — text left, visual right -->
+        <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <div class="md:order-1">
+            <h3 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {t(locale, "enterprise.identity.title")}
+            </h3>
+            <p class="mt-4 text-base leading-relaxed text-muted">
+              {t(locale, "enterprise.identity.body")}
+            </p>
+          </div>
+          <div class="md:order-2">
+            <div class="rounded-xl border border-border bg-surface p-6">
+              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">{t(locale, "enterprise.identity.supportedProviders")}</span>
+              <div class="flex flex-wrap gap-2.5">
+                {identityProviders.map((provider) => (
+                  <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary-subtle px-3.5 py-1.5 text-sm font-medium text-primary-dark">
+                    <svg class="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    {provider}
+                  </span>
+                ))}
+              </div>
+              <div class="mt-4 flex items-center gap-2 rounded-lg bg-primary-subtle/50 px-3 py-2">
+                <svg class="h-4 w-4 shrink-0 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="text-xs text-primary-dark">{t(locale, "enterprise.identity.mfaEnforced")}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Permissions & Audit — visual left, text right -->
+        <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <div class="md:order-2">
+            <h3 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {t(locale, "enterprise.permissions.title")}
+            </h3>
+            <p class="mt-4 text-base leading-relaxed text-muted">
+              {t(locale, "enterprise.permissions.body")}
+            </p>
+          </div>
+          <div class="md:order-1">
+            <div class="rounded-xl border border-border bg-surface p-6 overflow-x-auto">
+              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">{t(locale, "enterprise.permissions.matrix")}</span>
+              <table class="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th class="pb-2 text-start font-semibold text-muted">{t(locale, "enterprise.permissions.role")}</th>
+                    {permissionMatrix.features.map((f) => (
+                      <th class="pb-2 text-center font-semibold text-muted">{f}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {permissionMatrix.roles.map((role, ri) => (
+                    <tr class="border-t border-border">
+                      <td class="py-2 font-medium">{role}</td>
+                      {permissionMatrix.access[ri].map((allowed) => (
+                        <td class="py-2 text-center">
+                          {allowed
+                            ? <Fragment set:html={checkSvg.replace('class="', 'class="mx-auto ')} />
+                            : <Fragment set:html={xSvg.replace('class="', 'class="mx-auto ')} />
+                          }
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Storage & Infrastructure — text left, visual right -->
+        <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <div class="md:order-1">
+            <h3 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {t(locale, "enterprise.storage.title")}
+            </h3>
+            <p class="mt-4 text-base leading-relaxed text-muted">
+              {t(locale, "enterprise.storage.body")}
+            </p>
+          </div>
+          <div class="md:order-2">
+            <div class="grid grid-cols-2 gap-3">
+              {storageProviders.map((provider) => (
+                <div class="card-hover flex flex-col items-center gap-2.5 rounded-xl border border-border bg-surface p-5">
+                  <svg class:list={["h-8 w-8", provider.color]} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                  </svg>
+                  <span class="text-xs font-semibold">{provider.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: Deployment — visual left, text right -->
+        <div class="reveal grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+          <div class="md:order-2">
+            <h3 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {t(locale, "enterprise.deployment.title")}
+            </h3>
+            <p class="mt-4 text-base leading-relaxed text-muted">
+              {t(locale, "enterprise.deployment.body")}
+            </p>
+          </div>
+          <div class="md:order-1">
+            <div class="grid grid-cols-3 gap-3">
+              {deploymentTargets.map((target) => (
+                <div class="card-hover flex flex-col items-center gap-2 rounded-xl border border-border bg-surface p-4">
+                  {target.id === "airGapped" ? (
+                    <svg class="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" set:html={target.icon} />
+                  ) : (
+                    <svg class="h-8 w-8 text-foreground" viewBox="0 0 24 24" fill="currentColor" set:html={target.icon} />
+                  )}
+                  <span class="text-xs font-medium">{target.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── COMPARISON TABLE ─── -->
+    <section class="bg-background-alt px-6 py-20 md:py-28">
+      <div class="reveal mx-auto mb-12 max-w-3xl text-center md:mb-16">
+        <h2 class="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+          {t(locale, "enterprise.comparison.title")}
+        </h2>
+        <p class="mt-4 text-lg text-muted md:text-xl">
+          {t(locale, "enterprise.comparison.subtitle")}
+        </p>
+      </div>
+
+      <div class="reveal mx-auto max-w-4xl overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr>
+              <th class="pb-4 text-start text-sm font-semibold text-muted"></th>
+              <th class="pb-4 text-start text-sm font-semibold text-muted">{t(locale, "enterprise.comparison.cloudHeader")}</th>
+              <th class="pb-4 text-start text-sm font-semibold">
+                <span class="text-primary">SnapOtter</span> <span class="text-muted font-normal">{t(locale, "enterprise.comparison.selfHostedHeader")}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map((row) => (
+              <tr class="border-t border-border">
+                <td class="py-4 pe-6 font-medium">{row.label}</td>
+                <td class="py-4 pe-6">
+                  <div class="flex items-start gap-2">
+                    <Fragment set:html={xSvg} />
+                    <span class="text-muted">{row.cloud}</span>
+                  </div>
+                </td>
+                <td class="py-4">
+                  <div class="flex items-start gap-2">
+                    <Fragment set:html={checkSvg} />
+                    <span>{row.self}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─── CTA (dark) ─── -->
+    <section class="section-dark bg-noise relative px-6 py-20 md:py-28">
+      <div class="reveal relative mx-auto max-w-3xl text-center">
+        <h2 class="font-display text-3xl font-bold tracking-tight text-dark-fg sm:text-4xl md:text-5xl">
+          {t(locale, "enterprise.cta.title")}
+        </h2>
+        <p class="mt-4 text-lg text-dark-muted md:text-xl">
+          {t(locale, "enterprise.cta.subtitle")}
+        </p>
+        <div class="mt-10">
+          <a href={localizeHref(locale, "/contact")} class="btn-primary inline-block rounded-xl px-10 py-4 text-base font-semibold">
+            {t(locale, "enterprise.cta.bookDemo")}
+          </a>
+        </div>
+        <p class="mt-6 text-sm text-dark-muted">
+          {t(locale, "enterprise.cta.emailPrefix")} <a href="mailto:contact@snapotter.com" class="font-medium text-primary-light hover:underline">contact@snapotter.com</a>
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <Footer locale={locale} />
+</Base>

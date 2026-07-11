@@ -3,11 +3,17 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { SafeError } from "@snapotter/shared";
 import { missingBundleForScript } from "./feature-gate.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
+
+function appendEnvPath(base: string, suffix: string): string {
+  const normalizedBase = base.replace(/\/+$/, "");
+  return `${normalizedBase || "/"}${normalizedBase === "" ? "" : "/"}${suffix}`;
+}
 
 /**
  * Build a minimal environment for spawned Python processes.
@@ -44,6 +50,10 @@ function buildMinimalEnv(): Record<string, string> {
       env[key] = process.env[key] as string;
     }
   }
+
+  env.DATA_DIR ??= "./data";
+  env.MODELS_PATH ??= appendEnvPath(env.DATA_DIR, "ai/models");
+
   // Runtime model downloads are allowed by default (public model weights
   // only, never user data). SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict
   // offline mode for airgapped deployments: the sidecar then gets the
@@ -318,17 +328,24 @@ export class PythonDispatcher {
             if (req) {
               this.pending.delete(reqId);
               if (response.exitCode !== 0) {
-                const errText =
-                  extractPythonError({
-                    stdout: response.stdout,
-                    stderr: req.stderrLines.join("\n"),
-                  }) ||
-                  (response.exitCode === 137
-                    ? "Process killed (out of memory) -- try a lighter model or smaller image"
-                    : response.exitCode === 139
-                      ? "Process crashed (segmentation fault)"
-                      : `Python script exited with code ${response.exitCode}`);
-                req.reject(new Error(errText));
+                const extracted = extractPythonError({
+                  stdout: response.stdout,
+                  stderr: req.stderrLines.join("\n"),
+                });
+                if (!extracted && (response.exitCode === 137 || response.exitCode === 139)) {
+                  req.reject(
+                    new SafeError(
+                      response.exitCode === 137
+                        ? "Process killed (out of memory) -- try a lighter model or smaller image"
+                        : "Process crashed (segmentation fault)",
+                      { kind: "operational", code: `exit-${response.exitCode}` },
+                    ),
+                  );
+                } else {
+                  req.reject(
+                    new Error(extracted || `Python script exited with code ${response.exitCode}`),
+                  );
+                }
               } else {
                 req.resolve({
                   stdout: response.stdout || "",
@@ -412,7 +429,9 @@ export class PythonDispatcher {
         if (this.child && !this.child.killed) {
           this.child.kill("SIGTERM");
         }
-        rejectPromise(new Error("Python script timed out"));
+        rejectPromise(
+          new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
+        );
       }, timeout);
 
       const wrappedResolve = (result: { stdout: string; stderr: string }) => {
@@ -540,7 +559,9 @@ export class PythonDispatcher {
           }
 
           if (timedOut) {
-            rejectPromise(new Error("Python script timed out"));
+            rejectPromise(
+              new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
+            );
             return;
           }
 
@@ -555,8 +576,13 @@ export class PythonDispatcher {
                 : signal === "SIGSEGV" || code === 139
                   ? "Process crashed (segmentation fault)"
                   : null;
+            if (signalMsg) {
+              rejectPromise(
+                new SafeError(signalMsg, { kind: "operational", code: `exit-${code ?? signal}` }),
+              );
+              return;
+            }
             const errorText =
-              signalMsg ||
               extractPythonError({ stdout: stdout.trim(), stderr }) ||
               `Python script exited with code ${code}`;
             rejectPromise(new Error(errorText));

@@ -6,6 +6,7 @@ const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const decryptMock = vi.hoisted(() => vi.fn());
 const isEncryptedMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
+const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
 
 function queryChain<T>(result: T) {
@@ -24,6 +25,8 @@ async function loadAlertEvaluator() {
   decryptMock.mockReset();
   isEncryptedMock.mockReset();
   getActiveLicenseMock.mockReset();
+  isFeatureEnabledMock.mockReset();
+  isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
 
   vi.doMock("node:fs/promises", () => ({
@@ -71,6 +74,7 @@ async function loadAlertEvaluator() {
 
   vi.doMock("@snapotter/enterprise", () => ({
     getActiveLicense: getActiveLicenseMock,
+    isFeatureEnabled: isFeatureEnabledMock,
   }));
 
   return import("../../../../apps/api/src/jobs/alert-evaluator.js");
@@ -79,6 +83,17 @@ async function loadAlertEvaluator() {
 describe("alert evaluator behavior", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("returns before reading settings when the admin_alerts feature is unlicensed", async () => {
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    isFeatureEnabledMock.mockReturnValue(false);
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(getSettingStringMock).not.toHaveBeenCalled();
+    expect(statfsMock).not.toHaveBeenCalled();
+    expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
 
   it("returns early when webhook destination settings are invalid JSON", async () => {

@@ -2,17 +2,17 @@
 description: Combine multiple images into a single sprite sheet grid with frame metadata.
 ---
 
-# Sprite Sheet
+# Sprite Sheet {#sprite-sheet}
 
 Combine multiple images into a single sprite sheet grid. Each image is resized to match the first image's dimensions and placed into the grid. Returns the sprite sheet image along with per-frame coordinate metadata.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/sprite-sheet`
 
 Accepts multipart form data with two or more image files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with two or more image files and a JSON `settings` f
 | format | string | No | `"png"` | Output format: `png`, `webp`, or `jpeg` |
 | quality | integer | No | `90` | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/sprite-sheet \
@@ -34,7 +34,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/sprite-sheet \
   -F 'settings={"columns": 2, "padding": 4, "format": "png"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -57,7 +57,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/sprite-sheet \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepts 2 to 64 images. All images are resized to match the dimensions of the first uploaded image.
 - The `frames` array provides the exact pixel coordinates of each frame in the output, suitable for CSS sprite definitions or game engine frame maps.

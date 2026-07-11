@@ -2,17 +2,17 @@
 description: Burn a text watermark onto video frames.
 ---
 
-# Watermark Video
+# Watermark Video {#watermark-video}
 
 Burn a text watermark onto every frame of a video with configurable position, size, opacity, and color.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/watermark-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,13 +22,13 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 | opacity | number | No | `0.5` | Watermark opacity (0.05-1) |
 | color | string | No | `"#ffffff"` | Hex color for the text (e.g. `"#ffffff"`) |
 
-### Position Values
+### Position Values {#position-values}
 
 - **tl** - Top left, **tc** - Top center, **tr** - Top right
 - **l** - Middle left, **c** - Center, **r** - Middle right
 - **bl** - Bottom left, **bc** - Bottom center, **br** - Bottom right
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/watermark-video \
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/watermark-video \
   -F 'settings={"text": "PREVIEW", "position": "c", "fontSize": 48, "opacity": 0.3}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/watermark-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The watermark is permanently rendered into the video frames and cannot be removed after processing.
 - The watermark uses a sans-serif font built into FFmpeg.

@@ -2,23 +2,23 @@
 description: Arrange multiple PDF pages per sheet (2-up, 4-up, etc.).
 ---
 
-# N-up PDF
+# N-up PDF {#n-up-pdf}
 
 Arrange multiple pages per sheet to save paper when printing, such as 2-up or 4-up layouts.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/nup-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | perSheet | integer | No | `2` | Pages per sheet: `2`, `3`, `4`, `8`, `9`, `12`, or `16` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/nup-pdf \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/nup-pdf \
   -F 'settings={"perSheet": 4}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/nup-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Pages are arranged in reading order (left to right, top to bottom).
 - The output page size matches the original; individual pages are scaled down to fit the grid.

@@ -2,24 +2,24 @@
 description: Rename multiple files using a pattern template and download as ZIP.
 ---
 
-# Bulk Rename
+# Bulk Rename {#bulk-rename}
 
 Rename multiple files using a pattern template with placeholders for index, padded index, and original filename. Returns a ZIP archive containing all renamed files.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
 Accepts multipart form data with multiple files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | pattern | string | No | `"image-{{index}}"` | Naming pattern with placeholders (max 1000 characters) |
 | startIndex | number | No | `1` | Starting index number |
 
-### Pattern Placeholders
+### Pattern Placeholders {#pattern-placeholders}
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
@@ -29,7 +29,7 @@ Accepts multipart form data with multiple files and a JSON `settings` field.
 
 The original file extension is always preserved.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/bulk-rename \
@@ -54,7 +54,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/bulk-rename \
 
 This produces: `2024-trip-IMG_001-1.jpg`, `2024-trip-IMG_002-2.jpg`
 
-## Example Response
+## Example Response {#example-response}
 
 The response is a ZIP file streamed directly (not a JSON response). The response headers are:
 
@@ -63,7 +63,7 @@ Content-Type: application/zip
 Content-Disposition: attachment; filename="renamed-a1b2c3d4.zip"
 ```
 
-## Notes
+## Notes {#notes}
 
 - This tool does not process images. It only renames files and packages them into a ZIP archive.
 - The zero-padding width for `{{padded}}` is determined automatically based on the total number of files (e.g. 100 files would use 3-digit padding: `001`, `002`, etc.).

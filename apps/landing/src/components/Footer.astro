@@ -1,56 +1,70 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
 const year = new Date().getFullYear();
 
 const columns = [
   {
-    title: "Product",
+    title: t(locale, "footer.col.product"),
     links: [
-      { label: "Image Tools", href: "/tools/image/" },
-      { label: "Video Tools", href: "/tools/video/" },
-      { label: "Audio Tools", href: "/tools/audio/" },
-      { label: "PDF Tools", href: "/tools/pdf/" },
-      { label: "File Tools", href: "/tools/files/" },
-      { label: "Image Editor", href: "https://demo.snapotter.com/editor" },
+      { label: t(locale, "footer.link.imageTools"), href: localizeHref(locale, "/tools/image/") },
+      { label: t(locale, "footer.link.videoTools"), href: localizeHref(locale, "/tools/video/") },
+      { label: t(locale, "footer.link.audioTools"), href: localizeHref(locale, "/tools/audio/") },
+      { label: t(locale, "footer.link.pdfTools"), href: localizeHref(locale, "/tools/pdf/") },
+      { label: t(locale, "footer.link.fileTools"), href: localizeHref(locale, "/tools/files/") },
+      { label: t(locale, "footer.link.imageEditor"), href: "https://demo.snapotter.com/editor" },
     ],
   },
   {
-    title: "Solutions",
+    title: t(locale, "footer.col.solutions"),
     links: [
-      { label: "Enterprise", href: "/#enterprise" },
-      { label: "Self-Hosted", href: "/#features" },
-      { label: "Open Source", href: "/#open-source" },
-      { label: "Alternatives", href: "/alternatives" },
-      { label: "Pricing", href: "/#pricing" },
+      { label: t(locale, "footer.link.enterprise"), href: localizeHref(locale, "/#enterprise") },
+      { label: t(locale, "footer.link.selfHosted"), href: localizeHref(locale, "/self-hosted") },
+      { label: t(locale, "footer.link.openSource"), href: localizeHref(locale, "/#open-source") },
+      { label: t(locale, "footer.link.alternatives"), href: localizeHref(locale, "/alternatives") },
+      { label: t(locale, "footer.link.pricing"), href: localizeHref(locale, "/#pricing") },
     ],
   },
   {
-    title: "Resources",
+    title: t(locale, "footer.col.resources"),
     links: [
-      { label: "Documentation", href: "https://docs.snapotter.com" },
-      { label: "API Reference", href: "https://docs.snapotter.com/api/rest" },
-      { label: "Docker Hub", href: "https://hub.docker.com/r/snapotter/snapotter" },
-      { label: "FAQ", href: "/faq" },
-    ],
-  },
-  {
-    title: "Community",
-    links: [
-      { label: "GitHub", href: "https://github.com/snapotter-hq/snapotter" },
-      { label: "Discord", href: "https://discord.gg/hr3s7HPUsr" },
+      { label: t(locale, "footer.link.documentation"), href: "https://docs.snapotter.com" },
+      { label: t(locale, "footer.link.apiReference"), href: "https://docs.snapotter.com/api/rest" },
       {
-        label: "Contributing",
+        label: t(locale, "footer.link.dockerHub"),
+        href: "https://hub.docker.com/r/snapotter/snapotter",
+      },
+      { label: t(locale, "footer.link.faq"), href: localizeHref(locale, "/faq") },
+    ],
+  },
+  {
+    title: t(locale, "footer.col.community"),
+    links: [
+      { label: t(locale, "footer.link.github"), href: "https://github.com/snapotter-hq/snapotter" },
+      { label: t(locale, "footer.link.discord"), href: "https://discord.gg/hr3s7HPUsr" },
+      {
+        label: t(locale, "footer.link.contributing"),
         href: "https://github.com/snapotter-hq/snapotter/blob/main/CONTRIBUTING.md",
       },
-      { label: "Sponsors", href: "https://github.com/sponsors/snapotter-hq" },
+      {
+        label: t(locale, "footer.link.sponsors"),
+        href: "https://github.com/sponsors/snapotter-hq",
+      },
     ],
   },
   {
-    title: "Legal",
+    title: t(locale, "footer.col.legal"),
     links: [
-      { label: "Terms", href: "/terms" },
-      { label: "Privacy", href: "/privacy" },
-      { label: "Licensing", href: "/#pricing" },
+      { label: t(locale, "footer.link.terms"), href: localizeHref(locale, "/terms") },
+      { label: t(locale, "footer.link.privacy"), href: localizeHref(locale, "/privacy") },
+      { label: t(locale, "footer.link.licensing"), href: localizeHref(locale, "/#pricing") },
     ],
   },
 ];
@@ -65,8 +79,7 @@ const columns = [
         <span class="font-display text-lg font-bold">SnapOtter</span>
       </div>
       <p class="mt-3 text-sm leading-relaxed text-muted">
-        Self-hosted file processing.<br />
-        Your files, your infrastructure.
+        {t(locale, "footer.tagline")}
       </p>
       <div class="mt-4 flex items-center gap-3">
         <a
@@ -124,7 +137,7 @@ const columns = [
   <div class="section-divider mx-auto mt-12 max-w-6xl"></div>
   <div class="mx-auto mt-6 flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
     <p class="text-xs text-muted">
-      &copy; {year} Chocolate Wafers General Trading Pte. Ltd. All rights reserved.
+      {t(locale, "footer.copyright", { year })}
     </p>
     <p class="text-xs text-muted">
       contact@snapotter.com

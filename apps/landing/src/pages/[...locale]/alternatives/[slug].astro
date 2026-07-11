@@ -1,0 +1,340 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import EnterpriseCtaBand from "@/components/EnterpriseCtaBand.astro";
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import QuickstartBlock from "@/components/QuickstartBlock.astro";
+import RiskCallout from "@/components/RiskCallout.astro";
+import { ALTERNATIVES } from "@/data/alternatives";
+import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+import { seoText } from "@/lib/seo-content";
+
+export function getStaticPaths() {
+  const paths = [];
+  for (const locale of LANDING_LOCALES) {
+    for (const alt of ALTERNATIVES) {
+      paths.push({
+        params: { locale: locale === "en" ? undefined : locale, slug: alt.slug },
+        props: { alt, locale },
+      });
+    }
+  }
+  return paths;
+}
+
+const { alt, locale } = Astro.props;
+const PATH = `/alternatives/${alt.slug}`;
+const canonical = `https://snapotter.com${localizeHref(locale, PATH)}`;
+const others = ALTERNATIVES.filter((a) => a.slug !== alt.slug);
+const reviewedOn = new Intl.DateTimeFormat(locale, {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+}).format(new Date(`${alt.lastReviewed}T00:00:00Z`));
+
+const base = `alt:${alt.slug}`;
+const pageTitle = seoText(locale, `${base}:pageTitle`, alt.pageTitle);
+const h1 = seoText(locale, `${base}:h1`, alt.h1);
+const metaDescription = seoText(locale, `${base}:metaDescription`, alt.metaDescription);
+const intro = seoText(locale, `${base}:intro`, alt.intro);
+const breadth = seoText(locale, `${base}:breadth`, alt.breadth);
+const rows = alt.rows.map((row, i) => ({
+  ...row,
+  feature: seoText(locale, `${base}:rows.${i}.feature`, row.feature),
+  snapotter: seoText(locale, `${base}:rows.${i}.snapotter`, row.snapotter),
+  competitor: seoText(locale, `${base}:rows.${i}.competitor`, row.competitor),
+}));
+const faqs = alt.faqs.map((faq, i) => ({
+  q: seoText(locale, `${base}:faqs.${i}.q`, faq.q),
+  a: seoText(locale, `${base}:faqs.${i}.a`, faq.a),
+}));
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Alternatives",
+      item: "https://snapotter.com/alternatives",
+    },
+    { "@type": "ListItem", position: 3, name: alt.competitor, item: canonical },
+  ],
+};
+
+const faqJsonLd =
+  faqs.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faqs.map((faq) => ({
+          "@type": "Question",
+          name: faq.q,
+          acceptedAnswer: { "@type": "Answer", text: faq.a },
+        })),
+      }
+    : null;
+
+const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
+---
+
+<Base
+  title={`${pageTitle} | SnapOtter`}
+  description={metaDescription}
+  canonical={canonical}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={allJsonLd} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main">
+    <!-- Breadcrumb -->
+    <nav class="mx-auto max-w-4xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2 text-sm text-muted">
+        <li><a href={localizeHref(locale, "/")} class="transition-colors hover:text-foreground">{t(locale, "common.home")}</a></li>
+        <li aria-hidden="true">/</li>
+        <li>
+          <a href={localizeHref(locale, "/alternatives")} class="transition-colors hover:text-foreground">{t(locale, "nav.alternatives")}</a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li class="font-medium text-foreground">{alt.competitor}</li>
+      </ol>
+    </nav>
+
+    <!-- Hero -->
+    <section class="mx-auto max-w-4xl px-6 pt-8 pb-12">
+      <div class="reveal">
+        <span class="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary-dark">
+          {alt.category}
+        </span>
+        <h1 class="mt-5 font-display text-4xl font-bold tracking-tight md:text-5xl">
+          {h1}
+        </h1>
+        <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">
+          {intro}
+        </p>
+        <div class="mt-8 flex flex-wrap gap-4">
+          <a
+            href="https://docs.snapotter.com/guide/getting-started"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
+          >
+            {t(locale, "alt.deployWithDocker")}
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="https://demo.snapotter.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
+          >
+            {t(locale, "alt.tryDemo")}
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison table -->
+    <section class="border-t border-border bg-background-alt py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
+            {t(locale, "altSlug.snapotterVs", { competitor: alt.competitor })}
+          </h2>
+          <div class="mt-8 overflow-x-auto rounded-xl border border-border bg-surface">
+            <table class="w-full text-sm">
+              <thead class="border-b border-border bg-background-alt">
+                <tr>
+                  <th class="px-5 py-4 text-start font-semibold">&nbsp;</th>
+                  <th class="px-5 py-4 text-start font-semibold text-primary-dark">SnapOtter</th>
+                  <th class="px-5 py-4 text-start font-semibold">{alt.competitor}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr class="border-b border-border last:border-0">
+                    <td class="px-5 py-4 font-medium">{row.feature}</td>
+                    <td class="px-5 py-4">
+                      <span class="flex items-start gap-2">
+                        {row.snapotterWins && (
+                          <svg class="mt-0.5 h-4 w-4 shrink-0 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                        <span>{row.snapotter}</span>
+                      </span>
+                    </td>
+                    <td class="px-5 py-4 text-muted">{row.competitor}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-4 text-xs text-muted">
+            {t(locale, "altSlug.lastReviewed", { date: reviewedOn, competitor: alt.competitor })}
+          </p>
+          <div class="mt-5">
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">{t(locale, "altSlug.sourcesReviewed")}</p>
+            <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+              {alt.sources.map((source) => (
+                <li>
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary transition-colors hover:text-primary-dark"
+                  >
+                    {source.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Breadth callout -->
+    <section class="py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal flex items-start gap-4">
+          <svg class="mt-1 h-6 w-6 shrink-0 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
+            <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
+            <line x1="6" x2="6.01" y1="6" y2="6" />
+            <line x1="6" x2="6.01" y1="18" y2="18" />
+          </svg>
+          <div>
+            <h2 class="font-display text-xl font-bold">{t(locale, "altSlug.breadthTitle")}</h2>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{breadth}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- What you do today + why risky (optional deepening) -->
+    {(alt.whatYouDoToday || alt.whyRisky) && (
+      <section class="border-t border-border bg-background-alt py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          {alt.whatYouDoToday && (
+            <div class="reveal">
+              <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">What you do today with {alt.competitor}</h2>
+              <p class="mt-4 text-sm leading-relaxed text-muted md:text-base">{alt.whatYouDoToday}</p>
+            </div>
+          )}
+          {alt.whyRisky && (
+            <div class="mt-8">
+              <RiskCallout title="Why that matters for sensitive files" body={alt.whyRisky} />
+            </div>
+          )}
+        </div>
+      </section>
+    )}
+
+    <!-- Run it yourself (optional deepening) -->
+    {(alt.dockerSnippet || alt.apiSnippet) && (
+      <section class="py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          <div class="reveal">
+            <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">Run it yourself</h2>
+            <div class="mt-8">
+              <QuickstartBlock docker={alt.dockerSnippet ?? ""} curl={alt.apiSnippet} />
+            </div>
+          </div>
+        </div>
+      </section>
+    )}
+
+    <!-- FAQs -->
+    {faqs.length > 0 && (
+      <section class="border-t border-border bg-background-alt py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          <div class="reveal">
+            <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">
+              {t(locale, "altSlug.faqTitle")}
+            </h2>
+            <dl class="mt-8 space-y-6">
+              {faqs.map((faq) => (
+                <div class="rounded-xl border border-border bg-surface p-6">
+                  <dt class="text-sm font-semibold">{faq.q}</dt>
+                  <dd class="mt-3 text-sm leading-relaxed text-muted">{faq.a}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </section>
+    )}
+
+    <!-- Other comparisons -->
+    <section class="py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight">{t(locale, "alt.moreComparisons")}</h2>
+          <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {others.map((o) => (
+              <a
+                href={localizeHref(locale, `/alternatives/${o.slug}`)}
+                class="group flex flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
+              >
+                <span class="text-sm font-bold">{t(locale, "altSlug.cardVs", { competitor: o.competitor })}</span>
+                <span class="mt-1 text-xs text-muted">{o.category}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <section class="border-t border-border py-20">
+      <div class="mx-auto max-w-4xl px-6 text-center">
+        <div class="reveal">
+          <h2 class="font-display text-3xl font-bold tracking-tight">
+            {t(locale, "alt.runOnYourServer")}
+          </h2>
+          <p class="mx-auto mt-4 max-w-lg text-muted">
+            {t(locale, "altSlug.ctaBody")}
+          </p>
+          <div class="mt-8 flex flex-wrap justify-center gap-4">
+            <a
+              href="https://docs.snapotter.com/guide/getting-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold"
+            >
+              {t(locale, "common.getStarted")}
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+              </svg>
+            </a>
+            <a
+              href={localizeHref(locale, "/alternatives")}
+              class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
+            >
+              {t(locale, "alt.allAlternatives")}
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <EnterpriseCtaBand />
+  </main>
+
+  <Footer locale={locale} />
+</Base>

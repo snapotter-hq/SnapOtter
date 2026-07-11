@@ -2,17 +2,17 @@
 description: Resize images by pixels, percentage, or with fit modes.
 ---
 
-# Resize
+# Resize {#resize}
 
 Resize images by specifying exact pixel dimensions, a percentage scale factor, or a fit mode that controls how the image adapts to the target dimensions.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/resize`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 
 At least one of `width`, `height`, or `percentage` must be provided.
 
-### Fit Modes
+### Fit Modes {#fit-modes}
 
 - **contain** - Resize to fit within the dimensions, preserving aspect ratio (may leave empty space)
 - **cover** - Resize to cover the dimensions, preserving aspect ratio (may crop)
@@ -32,7 +32,7 @@ At least one of `width`, `height`, or `percentage` must be provided.
 - **inside** - Like `contain`, but only downscales, never upscales
 - **outside** - Like `cover`, but only downscales, never upscales
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/resize \
@@ -50,7 +50,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"percentage": 50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -61,7 +61,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Maximum dimension is 16383 pixels on either axis (Sharp/libvips limit).
 - Output format matches the input format. HEIC, RAW, PSD, and SVG inputs are automatically decoded before processing.

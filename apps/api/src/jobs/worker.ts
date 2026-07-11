@@ -25,14 +25,15 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { ANALYTICS_EVENTS, getBundleForTool, TOOLS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, getBundleForTool, isToolInputError, TOOLS } from "@snapotter/shared";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { captureException, trackEvent } from "../lib/analytics.js";
+import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
+import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -375,7 +376,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // friendlyError(finalError)). Expected validation rejections -- bad user
       // input, not a server fault -- would otherwise flood error logs, so skip
       // them here; they still reach the OTel span recorded below.
-      const isValidationError = err instanceof Error && err.name === "InputValidationError";
+      const isValidationError =
+        err instanceof Error && (err.name === "InputValidationError" || isToolInputError(err));
       if (!isCanceled && !isTimeout && !isValidationError) {
         logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
       }
@@ -383,7 +385,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Record error on the OTel span
       if (span) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: finalError });
-        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        span.recordException(err instanceof Error ? err : String(err));
         span.addEvent("job.failed");
       }
 
@@ -447,9 +449,6 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           },
           data.analyticsDistinctId,
         );
-        if (!isCanceled && !isTimeout) {
-          void captureException(err instanceof Error ? err : new Error(String(err)));
-        }
       }
 
       if (isCanceled) throw new UnrecoverableError("Canceled");
@@ -888,9 +887,12 @@ export function startWorkers(): void {
       });
 
       worker.on("failed", (job, err) => {
-        if (analyticsEnabled() && job) {
-          void captureException(err instanceof Error ? err : new Error(String(err)));
-        }
+        if (!job) return;
+        void reportError(err, {
+          source: "worker",
+          pool,
+          toolId: (job.data as ToolJobData | undefined)?.toolId,
+        });
       });
 
       workers.push(worker);
@@ -916,9 +918,12 @@ export function startWorkers(): void {
     });
 
     worker.on("failed", (job, err) => {
-      if (analyticsEnabled() && job) {
-        void captureException(err instanceof Error ? err : new Error(String(err)));
-      }
+      if (!job) return;
+      void reportError(err, {
+        source: "worker",
+        pool,
+        toolId: (job.data as ToolJobData | undefined)?.toolId,
+      });
     });
 
     workers.push(worker);

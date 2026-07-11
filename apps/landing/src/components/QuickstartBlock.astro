@@ -1,0 +1,90 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+interface Props {
+  // Canonical single-container command. Keep in sync with HeroQuickstart.astro,
+  // DOCKERHUB.md, README.md, and apps/docs/guide/getting-started.md.
+  docker: string;
+  // Optional REST API example (already newline-formatted).
+  curl?: string;
+  dockerLabel?: string;
+  curlLabel?: string;
+}
+const {
+  docker,
+  curl,
+  dockerLabel = "Self-host in one command",
+  curlLabel = "Process a file over the REST API",
+} = Astro.props;
+
+const blocks = [
+  ...(docker ? [{ label: dockerLabel, code: docker }] : []),
+  ...(curl ? [{ label: curlLabel, code: curl }] : []),
+];
+---
+
+<div class="not-prose space-y-5">
+  {blocks.map((b) => (
+    <div>
+      <p class="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+        {b.label}
+      </p>
+      <button
+        type="button"
+        class="so-copy group relative flex w-full items-start gap-3 rounded-xl border border-white/10 bg-terminal-bg px-4 py-3.5 text-start font-mono text-[0.8125rem] leading-[1.7] text-terminal-fg"
+        data-copy={b.code}
+        aria-label="Copy this command to your clipboard"
+        title="Click to copy"
+      >
+        <span class="shrink-0 select-none font-bold text-terminal-green">$</span>
+        <span dir="ltr" class="min-w-0 flex-1 overflow-x-auto">
+          <code class="whitespace-pre">{b.code}</code>
+        </span>
+        <span class="shrink-0 text-terminal-muted transition-colors group-hover:text-primary-light" aria-hidden="true">
+          <svg class="copy-idle h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <svg class="copy-done hidden h-4 w-4 text-terminal-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span class="copy-toast pointer-events-none absolute -top-7 end-3 rounded-md bg-foreground px-2 py-0.5 font-body text-[0.6875rem] font-semibold text-white opacity-0 transition-opacity">Copied</span>
+      </button>
+    </div>
+  ))}
+</div>
+
+<style>
+  .so-copy { transition: border-color 0.2s, box-shadow 0.2s; }
+  .so-copy:hover { border-color: rgba(224, 120, 50, 0.5); }
+  .so-copy:focus-visible { outline: 2px solid var(--color-primary-light); outline-offset: 3px; }
+  .so-copy.copied { border-color: rgba(74, 222, 128, 0.55); }
+  .so-copy.copied .copy-toast { opacity: 1; }
+</style>
+
+<script>
+  document.querySelectorAll(".so-copy").forEach((btn) => {
+    const idle = btn.querySelector(".copy-idle");
+    const done = btn.querySelector(".copy-done");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flip = (copied: boolean) => {
+      idle?.classList.toggle("hidden", copied);
+      done?.classList.toggle("hidden", !copied);
+      btn.classList.toggle("copied", copied);
+    };
+    btn.addEventListener("click", async () => {
+      const text = btn.getAttribute("data-copy") ?? "";
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+      }
+      flip(true);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => flip(false), 2000);
+    });
+  });
+</script>

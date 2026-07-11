@@ -2,11 +2,11 @@
 description: AI-powered background removal with optional effects (blur, shadow, gradient, custom background).
 ---
 
-# Remove Background
+# Remove Background {#remove-background}
 
 AI-powered background removal with optional effects (blur, shadow, gradient, custom background).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/remove-background`
 
@@ -14,7 +14,7 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 
 **Model bundle:** `background-removal` (4-5 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -33,7 +33,7 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 | edgeRefine | integer | No | - | Edge refinement level (0-3) |
 | decontaminate | boolean | No | - | Remove color bleed from edges |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
@@ -41,9 +41,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -52,14 +52,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Removing background...","percent":50}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -78,20 +78,20 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 }
 ```
 
-## Effects Endpoint (Phase 2)
+## Effects Endpoint (Phase 2) {#effects-endpoint-phase-2}
 
 `POST /api/v1/tools/image/remove-background/effects`
 
 Re-applies background effects without re-running the AI model. Uses cached mask and original from Phase 1.
 
-### Parameters
+### Parameters {#parameters-1}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON with effect settings (see below) |
 | backgroundImage | file | No | - | Custom background image (when backgroundType is `image`) |
 
-#### Settings JSON fields
+#### Settings JSON fields {#settings-json-fields}
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -108,14 +108,14 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 | shadowOpacity | number | No | Shadow opacity (0-100) |
 | outputFormat | string | No | `png`, `webp`, or `avif` |
 
-### Example Request
+### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects \
   -F 'settings={"jobId":"a1b2c3d4-...","filename":"photo.jpg","backgroundType":"color","backgroundColor":"#FF5500","outputFormat":"png"}'
 ```
 
-### Response (200 OK)
+### Response (200 OK) {#response-200-ok}
 
 ```json
 {
@@ -125,7 +125,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `background-removal` model bundle to be installed (4-5 GB).
 - Phase 1 caches the transparent mask and original image so that Phase 2 (effects) can re-apply different backgrounds instantly without re-running the AI model.

@@ -2,11 +2,11 @@
 description: Local development setup, commands, code conventions, and how to add a new tool to SnapOtter.
 ---
 
-# Developer guide
+# Developer guide {#developer-guide}
 
 How to set up a local development environment and contribute code to SnapOtter.
 
-## Prerequisites
+## Prerequisites {#prerequisites}
 
 - [Node.js](https://nodejs.org/) 22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
@@ -15,7 +15,7 @@ How to set up a local development environment and contribute code to SnapOtter.
 
 Python 3.10+ is only needed if you are working on the AI/ML sidecar (background removal, upscaling, OCR).
 
-## Setup
+## Setup {#setup}
 
 ```bash
 git clone https://github.com/snapotter-hq/snapotter.git
@@ -34,7 +34,7 @@ This starts two dev servers:
 
 Open http://localhost:1349 in your browser. Login with `admin` / `admin`. You will be prompted to change the password on first login.
 
-## Project structure
+## Project structure {#project-structure}
 
 ```
 apps/
@@ -54,7 +54,7 @@ tests/
   fixtures/         Small test images
 ```
 
-## Commands
+## Commands {#commands}
 
 ```bash
 pnpm dev                # start frontend + backend
@@ -69,7 +69,7 @@ pnpm test:e2e           # Playwright e2e tests
 pnpm test:coverage      # tests with coverage report
 ```
 
-## Code conventions
+## Code conventions {#code-conventions}
 
 - Double quotes, semicolons, 2-space indentation (enforced by Biome)
 - ES modules in all workspaces
@@ -77,7 +77,7 @@ pnpm test:coverage      # tests with coverage report
 - Zod for all API input validation
 - No modifications to Biome, TypeScript, or editor config files. Fix the code, not the linter.
 
-## Database
+## Database {#database}
 
 PostgreSQL 17 via Drizzle ORM (pg-core). Local dev requires Postgres and Redis running - start them with:
 
@@ -95,11 +95,11 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Schema is defined in `apps/api/src/db/schema.ts`. Tables: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
 
-## Adding a new tool
+## Adding a new tool {#adding-a-new-tool}
 
 Every tool follows the same pattern. Here is a minimal example.
 
-### 1. Backend route
+### 1. Backend route {#_1-backend-route}
 
 Create `apps/api/src/routes/tools/my-tool.ts`:
 
@@ -135,7 +135,7 @@ export function registerMyTool(app: FastifyInstance) {
 
 Then register it in `apps/api/src/routes/tools/index.ts`.
 
-### 2. Frontend settings component
+### 2. Frontend settings component {#_2-frontend-settings-component}
 
 Create `apps/web/src/components/tools/my-tool-settings.tsx`:
 
@@ -188,7 +188,7 @@ const MyToolSettings = lazy(() =>
 
 Display modes: `"side-by-side"`, `"before-after"`, `"live-preview"`, `"no-comparison"`, `"interactive-crop"`, `"interactive-eraser"`, `"no-dropzone"`.
 
-### 3. i18n entry
+### 3. i18n entry {#_3-i18n-entry}
 
 Add to `packages/shared/src/i18n/en.ts`:
 
@@ -199,11 +199,11 @@ Add to `packages/shared/src/i18n/en.ts`:
 },
 ```
 
-### 4. Tests
+### 4. Tests {#_4-tests}
 
 Add a `data-testid` attribute to your action button (as shown above) so e2e tests can target it reliably.
 
-## Docker builds
+## Docker builds {#docker-builds}
 
 Build the full production image locally:
 
@@ -217,7 +217,7 @@ Use BuildKit cache mounts for faster rebuilds:
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
-## Environment variables
+## Environment variables {#environment-variables}
 
 See the [Configuration guide](/guide/configuration) for the full list. Key ones for development:
 

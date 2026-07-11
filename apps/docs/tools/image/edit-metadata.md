@@ -2,25 +2,25 @@
 description: Edit EXIF, IPTC, GPS, and XMP metadata fields in images without re-encoding pixels.
 ---
 
-# Edit Metadata
+# Edit Metadata {#edit-metadata}
 
 Edit image metadata fields including EXIF, IPTC, GPS coordinates, dates, and keywords. Uses ExifTool under the hood, so metadata is written in-place without re-encoding pixels, preserving full image quality.
 
-## API Endpoints
+## API Endpoints {#api-endpoints}
 
-### Edit Metadata
+### Edit Metadata {#edit-metadata-1}
 
 `POST /api/v1/tools/image/edit-metadata`
 
 Writes metadata fields to the image and returns the modified file.
 
-### Inspect Metadata
+### Inspect Metadata {#inspect-metadata}
 
 `POST /api/v1/tools/image/edit-metadata/inspect`
 
 Returns the full metadata from the image via ExifTool as JSON. Does not modify the image.
 
-## Parameters (Edit)
+## Parameters (Edit) {#parameters-edit}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -47,7 +47,7 @@ Returns the full metadata from the image via ExifTool as JSON. Does not modify t
 | iptcState | string | No | - | IPTC Province/State |
 | iptcCountry | string | No | - | IPTC Country |
 
-## Example Request
+## Example Request {#example-request}
 
 Set author and copyright:
 
@@ -84,7 +84,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/edit-metadata/inspect \
   -F "file=@photo.jpg"
 ```
 
-## Example Response (Edit)
+## Example Response (Edit) {#example-response-edit}
 
 ```json
 {
@@ -95,7 +95,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/edit-metadata/inspect \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - This tool requires ExifTool to be installed on the server. It is included in the Docker image.
 - Metadata is written in-place, so no pixel re-encoding occurs. The file size change is minimal (just the metadata bytes).

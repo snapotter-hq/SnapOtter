@@ -2,24 +2,24 @@
 description: Convert speech to text with AI-powered transcription.
 ---
 
-# Transcribe Audio
+# Transcribe Audio {#transcribe-audio}
 
 Convert speech to text using AI-powered transcription (faster-whisper). Supports plain text, SRT, and VTT output formats with automatic or manual language selection.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/transcribe-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | language | string | No | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `id`, `th`, `vi` |
 | outputFormat | string | No | `"txt"` | Output format: `txt`, `srt`, `vtt` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \
   -F 'settings={"language": "en", "outputFormat": "srt"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 This is an async tool. The API returns `202 Accepted` immediately:
 
@@ -41,7 +41,7 @@ This is an async tool. The API returns `202 Accepted` immediately:
 
 Track progress via SSE at `GET /api/v1/jobs/{jobId}/progress`. When the job completes, the SSE stream delivers the final result with a `downloadUrl`.
 
-## Notes
+## Notes {#notes}
 
 - Requires the **transcription** feature bundle to be installed. Returns `501` with code `FEATURE_NOT_INSTALLED`, the missing `feature`, `featureName`, and `estimatedSize` if the bundle is not available.
 - Uses faster-whisper for transcription. Language `auto` detects the spoken language automatically.

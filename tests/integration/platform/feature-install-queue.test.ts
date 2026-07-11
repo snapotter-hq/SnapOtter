@@ -175,6 +175,14 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     });
   }
 
+  async function postToolInstall(toolId: string) {
+    return app.inject({
+      method: "POST",
+      url: `/api/v1/admin/tools/${toolId}/features/install`,
+      headers: auth(),
+    });
+  }
+
   async function getFeatures() {
     const res = await app.inject({ method: "GET", url: "/api/v1/features", headers: auth() });
     return JSON.parse(res.body).bundles as Array<{ id: string; status: string }>;
@@ -207,6 +215,29 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     const bundles = await getFeatures();
     expect(bundles.find((b) => b.id === "ocr")?.status).toBe("installing");
     expect(bundles.find((b) => b.id === "face-detection")?.status).toBe("queued");
+  });
+
+  it("tool install enqueues every missing hard dependency in one request", async () => {
+    const res = await postToolInstall("passport-photo");
+    expect(res.statusCode).toBe(202);
+    const body = JSON.parse(res.body) as {
+      bundles: Array<{ bundleId: string; jobId: string; queued: boolean }>;
+    };
+
+    expect(body.bundles.map((b) => b.bundleId)).toEqual(["background-removal", "face-detection"]);
+    expect(body.bundles[0].queued).toBe(false);
+    expect(body.bundles[1].queued).toBe(true);
+
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    expect(hoisted.spawnCalls[0].bundleId).toBe("background-removal");
+
+    const queuedBundles = await getFeatures();
+    expect(queuedBundles.find((b) => b.id === "background-removal")?.status).toBe("installing");
+    expect(queuedBundles.find((b) => b.id === "face-detection")?.status).toBe("queued");
+
+    hoisted.spawnCalls[0].emit("close", 0);
+    await waitFor(() => hoisted.spawnCalls.length === 2);
+    expect(hoisted.spawnCalls[1].bundleId).toBe("face-detection");
   });
 
   it("dedups a duplicate install POST of the active bundle (no second entry, same job)", async () => {

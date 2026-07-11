@@ -1,55 +1,60 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
 const features = [
   {
-    tag: "Identity",
-    title: "SAML SSO",
-    description: "Okta, Azure AD, Google Workspace, or any SAML 2.0 / OIDC identity provider.",
+    tag: t(locale, "home.enterprise.tag.identity"),
+    title: t(locale, "home.enterprise.feature.sso.title"),
+    description: t(locale, "home.enterprise.feature.sso.description"),
     icon: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
   },
   {
-    tag: "Identity",
-    title: "SCIM Provisioning",
-    description:
-      "Automated user provisioning and deprovisioning synced from your identity provider.",
+    tag: t(locale, "home.enterprise.tag.identity"),
+    title: t(locale, "home.enterprise.feature.scim.title"),
+    description: t(locale, "home.enterprise.feature.scim.description"),
     icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   },
   {
-    tag: "Access",
-    title: "Multi-Factor Auth",
-    description: "Enforce TOTP-based MFA across your organization. Protect every account.",
+    tag: t(locale, "home.enterprise.tag.access"),
+    title: t(locale, "home.enterprise.feature.mfa.title"),
+    description: t(locale, "home.enterprise.feature.mfa.description"),
     icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   },
   {
-    tag: "Access",
-    title: "Per-Tool Permissions",
-    description: "Granular role-based access control. Admin, editor, user, and custom roles.",
+    tag: t(locale, "home.enterprise.tag.access"),
+    title: t(locale, "home.enterprise.feature.permissions.title"),
+    description: t(locale, "home.enterprise.feature.permissions.description"),
     icon: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   },
   {
-    tag: "Isolation",
-    title: "Multi-Tenancy",
-    description: "Isolated workspaces per team or department with separate configurations.",
+    tag: t(locale, "home.enterprise.tag.isolation"),
+    title: t(locale, "home.enterprise.feature.multiTenancy.title"),
+    description: t(locale, "home.enterprise.feature.multiTenancy.description"),
     icon: '<rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/>',
   },
   {
-    tag: "Compliance",
-    title: "Audit Export",
-    description:
-      "Every action logged. Export immutable audit trails for SOC 2, ISO 27001, and compliance reporting.",
+    tag: t(locale, "home.enterprise.tag.compliance"),
+    title: t(locale, "home.enterprise.feature.audit.title"),
+    description: t(locale, "home.enterprise.feature.audit.description"),
     icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   },
   {
-    tag: "Infrastructure",
-    title: "S3-Compatible Storage",
-    description: "AWS S3, MinIO, or Cloudflare R2 for persistent, scalable file storage.",
+    tag: t(locale, "home.enterprise.tag.infrastructure"),
+    title: t(locale, "home.enterprise.feature.s3.title"),
+    description: t(locale, "home.enterprise.feature.s3.description"),
     icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
   },
   {
-    tag: "Integration",
-    title: "Webhooks",
-    description:
-      "Real-time notifications when processing completes. Integrate with any internal workflow.",
+    tag: t(locale, "home.enterprise.tag.integration"),
+    title: t(locale, "home.enterprise.feature.webhooks.title"),
+    description: t(locale, "home.enterprise.feature.webhooks.description"),
     icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   },
 ];
@@ -70,13 +75,13 @@ const frameworks = ["SOC 2", "ISO 27001", "HIPAA", "GDPR"];
     <div class="reveal mx-auto max-w-3xl text-center">
       <span class="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary-light">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-        Enterprise-grade security
+        {t(locale, "home.enterprise.badge")}
       </span>
       <h2 class="mt-6 font-display text-3xl font-bold tracking-tight text-dark-fg sm:text-4xl md:text-5xl">
-        Built for enterprise deployment.
+        {t(locale, "home.enterprise.title")}
       </h2>
       <p class="mt-4 text-lg leading-relaxed text-dark-muted md:text-xl">
-        Every identity, access, and compliance control your security team expects, running entirely on infrastructure you own.
+        {t(locale, "home.enterprise.subtitle")}
       </p>
     </div>
 
@@ -112,7 +117,7 @@ const frameworks = ["SOC 2", "ISO 27001", "HIPAA", "GDPR"];
 
     <!-- Compliance frameworks -->
     <div class="reveal mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-      <span class="text-xs font-medium uppercase tracking-[0.15em] text-dark-muted">Audit-ready for</span>
+      <span class="text-xs font-medium uppercase tracking-[0.15em] text-dark-muted">{t(locale, "home.enterprise.auditReadyFor")}</span>
       <div class="flex flex-wrap items-center justify-center gap-2.5">
         {frameworks.map((fw) => (
           <span class="inline-flex items-center gap-1.5 rounded-md border border-dark-border bg-dark-surface px-3 py-1.5 text-xs font-semibold text-dark-fg">
@@ -125,10 +130,10 @@ const frameworks = ["SOC 2", "ISO 27001", "HIPAA", "GDPR"];
 
     <!-- CTA -->
     <div class="reveal mt-14 text-center">
-      <a href="/contact" class="btn-primary inline-block rounded-xl px-8 py-3 text-base font-semibold">
-        Book a Demo
+      <a href={localizeHref(locale, "/contact")} class="btn-primary inline-block rounded-xl px-8 py-3 text-base font-semibold">
+        {t(locale, "home.enterprise.bookDemo")}
       </a>
-      <p class="mt-4 text-sm text-dark-muted">Talk to our team about enterprise licensing and deployment.</p>
+      <p class="mt-4 text-sm text-dark-muted">{t(locale, "home.enterprise.ctaBody")}</p>
     </div>
   </div>
 </section>

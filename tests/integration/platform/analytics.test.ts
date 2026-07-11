@@ -47,14 +47,16 @@ describe("GET /api/v1/config/analytics", () => {
     expect(config).toHaveProperty("posthogApiKey");
     expect(config).toHaveProperty("posthogHost");
     expect(config).toHaveProperty("sentryDsn");
-    expect(config).toHaveProperty("sampleRate");
+    expect(config).toHaveProperty("sentryDsnWeb");
+    expect(config).toHaveProperty("posthogSampleRate");
     expect(config).toHaveProperty("instanceId");
 
     expect(typeof config.enabled).toBe("boolean");
     expect(typeof config.posthogApiKey).toBe("string");
     expect(typeof config.posthogHost).toBe("string");
     expect(typeof config.sentryDsn).toBe("string");
-    expect(typeof config.sampleRate).toBe("number");
+    expect(typeof config.sentryDsnWeb).toBe("string");
+    expect(typeof config.posthogSampleRate).toBe("number");
     expect(typeof config.instanceId).toBe("string");
   });
 
@@ -76,7 +78,8 @@ describe("GET /api/v1/config/analytics", () => {
     expect(config.posthogApiKey).toBe("");
     expect(config.posthogHost).toBe("");
     expect(config.sentryDsn).toBe("");
-    expect(config.sampleRate).toBe(0);
+    expect(config.sentryDsnWeb).toBe("");
+    expect(config.posthogSampleRate).toBe(0);
     expect(config.instanceId).toBe("");
   });
 

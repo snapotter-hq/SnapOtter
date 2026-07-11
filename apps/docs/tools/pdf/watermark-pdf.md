@@ -2,17 +2,17 @@
 description: Add a text watermark to every page of a PDF.
 ---
 
-# Watermark PDF
+# Watermark PDF {#watermark-pdf}
 
 Stamp a text watermark on every page of a PDF with configurable position, size, opacity, and rotation.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/watermark-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,13 +22,13 @@ Accepts multipart form data with a PDF file and a JSON `settings` field.
 | opacity | number | No | `0.3` | Watermark opacity (0.05-1) |
 | rotation | number | No | `45` | Rotation angle in degrees (-180 to 180) |
 
-### Position Values
+### Position Values {#position-values}
 
 - `tl` top-left, `tc` top-center, `tr` top-right
 - `l` center-left, `c` center, `r` center-right
 - `bl` bottom-left, `bc` bottom-center, `br` bottom-right
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/watermark-pdf \
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/watermark-pdf \
   -F 'settings={"text": "CONFIDENTIAL", "position": "c", "opacity": 0.2, "rotation": 45}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/watermark-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The watermark is rendered as a text overlay on each page.
 - The same watermark text, position, and style are applied uniformly to all pages.

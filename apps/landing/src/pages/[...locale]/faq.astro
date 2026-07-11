@@ -1,0 +1,113 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/faq";
+
+const faqKeys = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"];
+const faqs = faqKeys.map((k) => ({
+  question: t(locale, `faq.${k}.q`),
+  answer: t(locale, `faq.${k}.a`),
+}));
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.question,
+    acceptedAnswer: { "@type": "Answer", text: faq.answer },
+  })),
+};
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: t(locale, "common.home"),
+      item: `https://snapotter.com${localizeHref(locale, "/")}`,
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "FAQ",
+      item: `https://snapotter.com${localizeHref(locale, PATH)}`,
+    },
+  ],
+};
+---
+
+<Base
+  title={t(locale, "faq.metaTitle")}
+  description={t(locale, "faq.metaDescription")}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={[faqJsonLd, breadcrumbJsonLd]} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main" class="px-6 pt-32 pb-20 md:pt-40 md:pb-28">
+    <div class="mx-auto max-w-3xl">
+      <h1 class="reveal font-display text-4xl font-bold tracking-tight md:text-5xl">
+        {t(locale, "faq.title")}
+      </h1>
+      <p class="reveal mt-4 text-lg text-muted">
+        {t(locale, "faq.subtitle")}
+      </p>
+
+      <div class="mt-12 divide-y divide-border">
+        {faqs.map((faq) => (
+          <details class="group reveal">
+            <summary class="flex cursor-pointer items-center justify-between py-5 text-base font-medium">
+              {faq.question}
+              <svg
+                class="h-4 w-4 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p class="pb-5 text-sm leading-relaxed text-muted">{faq.answer}</p>
+          </details>
+        ))}
+      </div>
+
+      <div class="reveal mt-16 rounded-xl border border-border bg-surface p-8 text-center">
+        <h2 class="font-display text-xl font-semibold">{t(locale, "faq.stillHave.title")}</h2>
+        <p class="mt-2 text-sm text-muted">{t(locale, "faq.stillHave.body")}</p>
+        <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <a href={localizeHref(locale, "/contact")} class="btn-primary rounded-lg px-6 py-2.5 text-sm font-semibold">{t(locale, "faq.stillHave.talk")}</a>
+          <a href="https://discord.gg/hr3s7HPUsr" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-border px-6 py-2.5 text-sm font-semibold transition-colors hover:bg-background-alt">{t(locale, "faq.stillHave.discord")}</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <Footer locale={locale} />
+</Base>

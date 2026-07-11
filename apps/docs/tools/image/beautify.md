@@ -2,15 +2,15 @@
 description: Turn plain screenshots into polished images with gradient backgrounds, device frames, shadows, and social media sizing.
 ---
 
-# Beautify Screenshot
+# Beautify Screenshot {#beautify-screenshot}
 
 Add gradient backgrounds, device frames, shadows, watermarks, and social media sizing to screenshots. Ideal for creating polished images for product marketing, social media, and documentation.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/beautify`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -34,7 +34,7 @@ Add gradient backgrounds, device frames, shadows, watermarks, and social media s
 | watermarkOpacity | number | No | 50 | Watermark opacity (0 to 100) |
 | outputFormat | string | No | `"png"` | Output format: `png`, `jpeg`, `webp` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/beautify \
@@ -42,7 +42,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/beautify \
   -F 'settings={"backgroundType":"linear-gradient","gradientStops":[{"color":"#667eea","position":0},{"color":"#764ba2","position":100}],"gradientAngle":135,"padding":64,"borderRadius":12,"shadowPreset":"medium","frame":"macos-dark","socialPreset":"twitter"}'
 ```
 
-### With Background Image
+### With Background Image {#with-background-image}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/beautify \
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/beautify \
   -F 'settings={"backgroundType":"image","padding":80,"borderRadius":16,"shadowPreset":"dramatic"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -62,7 +62,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/beautify \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepts two file fields: `file` (required, the main screenshot) and `backgroundImage` (optional, used when `backgroundType` is `image`).
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded).

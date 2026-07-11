@@ -2,24 +2,24 @@
 description: Convert images between formats including modern formats like AVIF, JXL, and HEIC.
 ---
 
-# Convert
+# Convert {#convert}
 
 Convert images between formats. Supports common web formats as well as specialized formats like HEIC, JXL, BMP, ICO, JP2, QOI, and PSD.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/convert`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | Yes | - | Target format: `jpg`, `png`, `webp`, `avif`, `tiff`, `gif`, `heic`, `heif`, `jxl`, `bmp`, `ico`, `jp2`, `qoi`, `psd`, `ppm`, `eps`, `tga` |
 | quality | number | No | - | Output quality (1-100). Applies to lossy formats like jpg, webp, avif, heic. |
 
-## Supported Output Formats
+## Supported Output Formats {#supported-output-formats}
 
 | Format | Type | Notes |
 |--------|------|-------|
@@ -40,7 +40,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | eps | Vector | Encapsulated PostScript |
 | tga | Lossless | Targa image format |
 
-## Example Request
+## Example Request {#example-request}
 
 Convert to WebP:
 
@@ -60,7 +60,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/convert \
   -F 'settings={"format": "png"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -71,7 +71,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/convert \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The output filename extension is automatically updated to match the target format.
 - SVG inputs are rasterized at 300 DPI before conversion.

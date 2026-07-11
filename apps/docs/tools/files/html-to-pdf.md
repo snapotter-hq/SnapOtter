@@ -2,21 +2,21 @@
 description: Convert an HTML file to PDF.
 ---
 
-# HTML to PDF
+# HTML to PDF {#html-to-pdf}
 
 Convert an HTML file to a styled PDF document. Remote resources (external images, stylesheets, scripts) are disabled for privacy.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/html-to-pdf`
 
 Accepts multipart form data with an HTML file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload an HTML file and it will be converted to PDF.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/html-to-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/html-to-pdf \
   -F "file=@page.html"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.html`, `.htm`.
 - Remote resources (images, stylesheets, scripts referenced via URLs) are not fetched for privacy and security.

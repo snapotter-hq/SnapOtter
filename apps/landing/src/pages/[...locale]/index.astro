@@ -1,0 +1,141 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import EnterpriseSection from "@/components/EnterpriseSection.astro";
+import FeatureHighlights from "@/components/FeatureHighlights.astro";
+import Footer from "@/components/Footer.astro";
+import Hero from "@/components/Hero.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import OpenSource from "@/components/OpenSource.astro";
+import Pricing from "@/components/Pricing.astro";
+import ToolGrid from "@/components/ToolGrid.astro";
+import { LANDING_LOCALES } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/";
+
+const pageTitle = "SnapOtter | Self-Hosted File-Processing Infrastructure";
+const pageDescription =
+  "Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. The private, self-hosted alternative to CloudConvert, Smallpdf, and TinyPNG.";
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "SnapOtter",
+  url: `https://snapotter.com${localizeHref(locale, "/")}`,
+  description:
+    "Open-source, self-hosted file-processing infrastructure with 200+ tools across image, video, audio, PDF, and documents.",
+  publisher: {
+    "@type": "Organization",
+    name: "SnapOtter",
+    logo: {
+      "@type": "ImageObject",
+      url: "https://snapotter.com/logo.png",
+    },
+    sameAs: [
+      "https://github.com/snapotter-hq/snapotter",
+      "https://x.com/SnapOtterHQ",
+      "https://discord.gg/hr3s7HPUsr",
+      "https://hub.docker.com/r/snapotter/snapotter",
+    ],
+  },
+};
+
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "SnapOtter",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Docker, Linux, macOS, Windows",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  license: "https://www.gnu.org/licenses/agpl-3.0.en.html",
+  downloadUrl: "https://hub.docker.com/r/snapotter/snapotter",
+  featureList: [
+    "200+ file processing tools",
+    "5 modalities: image, video, audio, PDF, files",
+    "Free layer-based image editor with brushes, shapes, filters, curves, and keyboard shortcuts",
+    "Local AI models for background removal, OCR, upscaling, transcription",
+    "Pipeline automation and batch processing",
+    "Full REST API with OpenAPI documentation",
+    "Self-hosted, fully offline, air-gapped capable",
+    "SAML SSO, SCIM, MFA, audit logging (Enterprise)",
+    "21 languages supported",
+  ],
+};
+
+const navSchema = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  itemListElement: [
+    {
+      "@type": "SiteNavigationElement",
+      name: "Documentation",
+      url: "https://docs.snapotter.com",
+      description: "Setup guides, API reference, and tool documentation",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      name: "FAQ",
+      url: `https://snapotter.com${localizeHref(locale, "/faq")}`,
+      description: "Frequently asked questions",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      name: "GitHub",
+      url: "https://github.com/snapotter-hq/snapotter",
+      description: "Source code and issue tracker",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      name: "Contact",
+      url: `https://snapotter.com${localizeHref(locale, "/contact")}`,
+      description: "Book a demo or get enterprise licensing",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      name: "Discord",
+      url: "https://discord.gg/hr3s7HPUsr",
+      description: "Community support and discussion",
+    },
+  ],
+};
+---
+
+<Base
+  title={pageTitle}
+  description={pageDescription}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={[websiteSchema, softwareSchema, navSchema]} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main">
+    <Hero locale={locale} />
+    <ToolGrid locale={locale} />
+    <EnterpriseSection locale={locale} />
+    <FeatureHighlights locale={locale} />
+    <Pricing locale={locale} />
+    <OpenSource locale={locale} />
+  </main>
+
+  <Footer locale={locale} />
+</Base>

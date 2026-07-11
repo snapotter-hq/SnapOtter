@@ -2,24 +2,24 @@
 description: Add password protection with AES-256 encryption to a PDF.
 ---
 
-# Protect PDF
+# Protect PDF {#protect-pdf}
 
 Add password protection to a PDF using AES-256 encryption.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/protect-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | userPassword | string | Yes | - | Password required to open the PDF (1-256 characters) |
 | ownerPassword | string | No | Same as `userPassword` | Owner password for permissions (1-256 characters) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/protect-pdf \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/protect-pdf \
   -F 'settings={"userPassword": "s3cret", "ownerPassword": "0wn3r"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/protect-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Encryption uses AES-256.
 - If `ownerPassword` is omitted, it defaults to the same value as `userPassword`.

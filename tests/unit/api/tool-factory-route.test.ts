@@ -100,6 +100,7 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
+  getFirstMissingBundleForTool: vi.fn(() => null),
   isToolInstalled: vi.fn(() => true),
 }));
 
@@ -139,7 +140,10 @@ vi.mock("sharp", () => ({
 
 import { apiToolPath } from "@snapotter/shared";
 import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
-import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
+import {
+  getFirstMissingBundleForTool,
+  isToolInstalled,
+} from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import {
@@ -281,6 +285,8 @@ function createMockRequest(opts: {
 describe("createToolRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getFirstMissingBundleForTool).mockReset();
+    vi.mocked(getFirstMissingBundleForTool).mockReturnValue(null);
     vi.mocked(isToolInstalled).mockReset();
     vi.mocked(isToolInstalled).mockReturnValue(true);
   });
@@ -422,6 +428,31 @@ describe("createToolRoute", () => {
       // For real AI tools with a mapping, it would return 501.
       // Since our test tool ID isn't in TOOL_BUNDLE_MAP, process continues.
       // This validates the guard code path exists without false positives.
+    });
+
+    it("returns 501 naming the first missing extra bundle for multi-bundle AI tools", async () => {
+      vi.mocked(isToolInstalled).mockReturnValueOnce(false);
+      vi.mocked(getFirstMissingBundleForTool).mockReturnValueOnce("face-detection");
+      const app = createMockApp();
+      const id = "enhance-faces";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(501);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "FEATURE_NOT_INSTALLED",
+          feature: "face-detection",
+          featureName: "Face Detection",
+        }),
+      );
     });
 
     it("returns 200 success envelope when waitForJob resolves", async () => {

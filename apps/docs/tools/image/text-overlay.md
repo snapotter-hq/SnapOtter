@@ -2,17 +2,17 @@
 description: Add styled text overlays with drop shadows and background boxes.
 ---
 
-# Text Overlay
+# Text Overlay {#text-overlay}
 
 Add styled text to images with optional drop shadow and semi-transparent background box. Suitable for titles, captions, or annotations on photos.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/text-overlay`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | backgroundColor | string | No | `"#000000"` | Background box color in hex format (`#RRGGBB`) |
 | shadow | boolean | No | `true` | Apply a drop shadow behind the text |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/text-overlay \
@@ -42,7 +42,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/text-overlay \
   -F 'settings={"text": "Caption", "fontSize": 36, "position": "bottom", "backgroundBox": true, "backgroundColor": "#000000"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -53,7 +53,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/text-overlay \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Text is always centered horizontally within the image.
 - The drop shadow uses a 2px offset with 3px blur at 70% black opacity.

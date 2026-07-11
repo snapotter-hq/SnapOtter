@@ -1100,8 +1100,19 @@ function isPublicRoute(url: string): boolean {
   return PUBLIC_PATHS.some((path) => url.startsWith(path));
 }
 
+/** SPA bundle assets are public by definition (the login page needs them). */
+export function isStaticAssetRequest(method: string, url: string): boolean {
+  return (
+    (method === "GET" || method === "HEAD") && url.startsWith("/assets/") && !url.includes("..")
+  );
+}
+
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
+    // Skip the session DB lookup for bundle assets: they are served on every
+    // page load and an unreachable DB must not 500 them (Sentry NODE-1D).
+    if (isStaticAssetRequest(request.method, request.url)) return;
+
     if (!env.AUTH_ENABLED) {
       (request as FastifyRequest & { user?: AuthUser }).user = {
         id: "anonymous",

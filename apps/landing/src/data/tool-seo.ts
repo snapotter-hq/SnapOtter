@@ -3023,6 +3023,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "remove-gif-background": {
+    searchTitle: "Remove Background from Animated GIF - Private AI",
+    longDescription:
+      "Remove the background from an animated GIF, WebP, or APNG. SnapOtter runs AI matting on every frame locally, keeps the original timing and loop, and reassembles a transparent animation. Output as animated WebP or APNG for smooth full-alpha edges, or GIF when you need the classic format. Nothing is uploaded.",
+    useCases: [
+      "Make a looping sticker or emote with a transparent background",
+      "Drop an animated logo onto any colored or image background",
+      "Turn a screen-recorded clip into a transparent overlay",
+      "Prep animated assets for slide decks, sites, and chat apps",
+    ],
+    features: [
+      "Per-frame AI matting (rembg) running 100% locally",
+      "Transparent animated WebP, APNG, or GIF output",
+      "Preserves frame timing and loop count",
+      "Optional solid color, gradient, blur, image background, or drop shadow",
+      "No data sent to external APIs or cloud services",
+    ],
+    faqs: [
+      {
+        q: "Which output format keeps the cleanest transparency?",
+        a: "Animated WebP and APNG both store full 8-bit alpha, so edges stay smooth. GIF supports only 1-bit transparency, which gives hard, sometimes haloed edges. Pick WebP or APNG unless you specifically need a .gif file.",
+      },
+      {
+        q: "Will the animation still loop and keep its speed?",
+        a: "Yes. The original per-frame delays and loop count are read from the source and written back into the output, so timing and looping match the input.",
+      },
+      {
+        q: "Why is a long GIF slow to process?",
+        a: "Every frame runs through the AI model, so cost scales with frame count. Short clips are quick; long or high-resolution animations take longer. An NVIDIA GPU speeds this up substantially.",
+      },
+    ],
+  },
   upscale: {
     searchTitle: "Upscale Image with AI - Enhance Resolution",
     longDescription:

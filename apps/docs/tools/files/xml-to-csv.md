@@ -2,21 +2,21 @@
 description: Extract repeating elements from XML into a CSV table.
 ---
 
-# XML to CSV
+# XML to CSV {#xml-to-csv}
 
 Extract repeating elements from an XML file into a flat CSV table. The tool automatically finds the first array of objects in the XML tree and maps each element to a row.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/xml-to-csv`
 
 Accepts multipart form data with an XML file. No settings field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. The repeating element is auto-detected from the XML structure.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/xml-to-csv \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/xml-to-csv \
   -F "file=@catalog.xml"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/xml-to-csv \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Only `.xml` files are accepted as input.
 - The tool scans the XML tree for the first repeating set of sibling elements and uses those as rows.

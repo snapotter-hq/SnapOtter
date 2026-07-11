@@ -49,6 +49,8 @@ export interface EraserProps {
   hasStrokes: boolean;
   brushSize: number;
   onBrushSizeChange: (size: number) => void;
+  mode: "brush" | "lasso";
+  onModeChange: (mode: "brush" | "lasso") => void;
   onMaskCenter?: (centerPct: number) => void;
   maskedFileCount: number;
 }
@@ -269,6 +271,11 @@ const ReplaceColorSettings = lazy(() =>
 const RemoveBgSettings = lazy(() =>
   import("@/components/tools/remove-bg-settings").then((m) => ({
     default: m.RemoveBgSettings,
+  })),
+);
+const RemoveGifBackgroundSettings = lazy(() =>
+  import("@/components/tools/remove-gif-background-settings").then((m) => ({
+    default: m.RemoveGifBackgroundSettings,
   })),
 );
 const UpscaleSettings = lazy(() =>
@@ -994,6 +1001,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
 
   // AI Tools
   ["remove-background", { Settings: RemoveBgSettings }],
+  ["remove-gif-background", { Settings: RemoveGifBackgroundSettings }],
   ["upscale", { Settings: UpscaleSettings }],
   ["ocr", { Settings: OcrSettings }],
   ["ocr-pdf", { accept: ".pdf", Settings: OcrPdfSettings, ResultsPanel: OcrPdfView }],

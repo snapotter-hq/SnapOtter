@@ -16,7 +16,25 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { getSettingString } from "../lib/settings-helpers.js";
 
+/**
+ * In-memory license check, no DB access. This evaluator runs every 60s on
+ * every instance and previously queried settings even when unlicensed, where
+ * no supported path can create alert destinations. Gated for licensing parity
+ * with the SIEM job's NODE-1E fix (that job's unguarded settings read is what
+ * stormed Sentry, not this one).
+ */
+async function alertsLicensed(): Promise<boolean> {
+  try {
+    const { isFeatureEnabled } = await import("@snapotter/enterprise");
+    return isFeatureEnabled("admin_alerts");
+  } catch {
+    return false;
+  }
+}
+
 export async function evaluateAlerts(): Promise<void> {
+  if (!(await alertsLicensed())) return;
+
   // 1. Read webhook destinations from settings
   const destJson = await getSettingString("webhook_destinations", "[]");
   let destinations: { url: string; authHeader: string; enabled: boolean; type: string }[];

@@ -2,21 +2,21 @@
 description: Swap the audio track of a video with another file.
 ---
 
-# Replace Audio
+# Replace Audio {#replace-audio}
 
 Swap the audio track of a video with an audio file. Upload both a video and an audio file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/replace-audio`
 
 Accepts multipart form data with exactly two files: a video file followed by an audio file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Upload a video file and an audio file as two `file` parts.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/replace-audio \
@@ -25,7 +25,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/replace-audio \
   -F "file=@voiceover.mp3"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -36,7 +36,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/replace-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Exactly two files must be uploaded: the first must be a video, the second must be an audio file.
 - If the audio file is longer than the video, it is trimmed to match the video duration. If shorter, the remaining video plays in silence.

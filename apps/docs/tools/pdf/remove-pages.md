@@ -2,23 +2,23 @@
 description: Delete specific pages from a PDF.
 ---
 
-# Remove Pages
+# Remove Pages {#remove-pages}
 
 Delete specific pages from a PDF, keeping all remaining pages intact.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/remove-pages`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | pages | string | Yes | - | Page range to remove in qpdf syntax, e.g. `"3,5-7"` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/remove-pages \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/remove-pages \
   -F 'settings={"pages": "3,5-7"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/remove-pages \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - You cannot remove every page from a document; at least one page must remain.
 - Page ranges use qpdf syntax: `3` for a single page, `5-7` for a range, and commas to combine (e.g. `1,3,5-7`).

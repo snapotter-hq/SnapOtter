@@ -2,9 +2,16 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import scalarPlugin, { type FastifyApiReferenceOptions } from "@scalar/fastify-api-reference";
-import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
+import {
+  loadTranslations,
+  SECTIONS,
+  SUPPORTED_LOCALES,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
+import { generateLocaleLlmsTxt, resolveSpecFile } from "./openapi-i18n.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -195,10 +202,33 @@ function generateLlmsFullTxt(spec: OpenAPISpec): string {
   return lines.join("\n");
 }
 
+/**
+ * Read the translated `tools` namespace ({ [toolId]: { name, description } })
+ * for a locale from the shared i18n package. Returns {} on any failure so a
+ * missing or partial locale never breaks the llms endpoint. `loadTranslations`
+ * already falls back to English internally, so a code with no locale module
+ * still yields the English tool strings rather than throwing.
+ */
+async function loadLocaleToolStrings(
+  code: string,
+): Promise<Record<string, { name: string; description: string }>> {
+  try {
+    const dict = await loadTranslations(code);
+    // The `tools` namespace also carries non-tool sub-keys (e.g. status/label
+    // strings) whose shape is wider than { name, description }; the llms
+    // generator only reads name/description and ignores the rest, so narrow at
+    // this boundary through unknown.
+    return (dict?.tools ?? {}) as unknown as Record<string, { name: string; description: string }>;
+  } catch {
+    return {};
+  }
+}
+
 export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const specPath = resolve(__dirname, "../openapi.yaml");
   const specContent = readFileSync(specPath, "utf-8");
   const spec = yaml.load(specContent) as OpenAPISpec;
+  const specDir = dirname(specPath); // apps/api/src
 
   const llmsTxt = generateLlmsTxt(spec);
   const llmsFullTxt = generateLlmsFullTxt(spec);
@@ -211,9 +241,45 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     reply.type("text/plain; charset=utf-8").send(llmsFullTxt);
   });
 
-  app.get("/api/v1/openapi.yaml", async (_request, reply) => {
-    reply.type("text/yaml").send(specContent);
+  app.get<{ Querystring: { lang?: string } }>("/api/v1/openapi.yaml", async (request, reply) => {
+    const file = resolveSpecFile(specDir, request.query.lang);
+    // English default is byte-identical to the file read at startup, preserving
+    // the ASCII-only guarantee; localized files are UTF-8 and only served with ?lang.
+    const body = file === specPath ? specContent : readFileSync(file, "utf-8");
+    reply.type("text/yaml; charset=utf-8").send(body);
   });
+
+  // Localized llms.txt for every supported non-English locale. Tag/section prose
+  // comes from the localized spec (English fallback when absent); tool name and
+  // description reuse the app's translated `tools` namespace. English keeps the
+  // richer /llms.txt above; these locale variants are a lean, LLM-friendly index.
+  const toolsBySection = SECTIONS.map((section) => ({
+    section,
+    tools: TOOLS.filter((tool) => toolSection(tool) === section.id),
+  }));
+
+  for (const localeInfo of SUPPORTED_LOCALES) {
+    if (localeInfo.code === "en") continue;
+    const code = localeInfo.code;
+    app.get(`/llms.${code}.txt`, async (_request, reply) => {
+      const file = resolveSpecFile(specDir, code);
+      const localeSpec =
+        file === specPath ? spec : (yaml.load(readFileSync(file, "utf-8")) as OpenAPISpec);
+      const toolStrings = await loadLocaleToolStrings(code);
+      const body = generateLocaleLlmsTxt({
+        spec: localeSpec,
+        sections: SECTIONS.map((s) => ({ id: s.id, name: s.name })),
+        toolsBySection: Object.fromEntries(
+          toolsBySection.map(({ section, tools }) => [
+            section.id,
+            tools.map((t) => ({ id: t.id, executionHint: t.executionHint })),
+          ]),
+        ),
+        toolStrings,
+      });
+      reply.type("text/plain; charset=utf-8").send(body);
+    });
+  }
 
   // Scalar's "Ask AI" (Agent Scalar), "Generate MCP", "Open API Client", and
   // the Configure/Share/Deploy toolbar are all Scalar cloud features: they
@@ -261,6 +327,13 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     hiddenClients: true,
   };
 
+  // i18n scope: the OpenAPI spec CONTENT is localized (served via
+  // /api/v1/openapi.yaml?lang=<code> and per-locale /llms.<code>.txt above).
+  // The Scalar interactive UI chrome (nav, auth panel, buttons) is NOT
+  // localized: @scalar/fastify-api-reference exposes no locale option and bakes
+  // its content at registration, so the shell stays English by design. This is
+  // a documented limitation, not a gap to fix here. See the web-surfaces i18n
+  // spec, "API reference (Scalar), scoped".
   await app.register(scalarPlugin, {
     routePrefix: "/api/docs",
     configuration,

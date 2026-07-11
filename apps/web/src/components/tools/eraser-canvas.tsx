@@ -4,12 +4,28 @@ import { useZoomPan } from "@/hooks/use-zoom-pan";
 import { renderSize } from "@/hooks/zoom-pan-math";
 
 type Point = { x: number; y: number };
-type Stroke = { points: Point[]; size: number };
+type StrokeKind = "brush" | "lasso";
+type Stroke = { points: Point[]; size: number; kind: StrokeKind };
 type ImageStrokeData = {
   strokes: Stroke[];
   canvasSize: { w: number; h: number };
   naturalSize: { w: number; h: number };
 };
+
+// A lasso must enclose at least this many points and this much fitted-px area to
+// count, so an accidental tap or tiny drag never leaves a stray filled region.
+const MIN_LASSO_POINTS = 3;
+const MIN_LASSO_AREA = 100;
+
+// Shoelace area of a polygon in fitted canvas coordinates.
+function lassoArea(points: Point[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return Math.abs(area) / 2;
+}
 
 export interface EraserCanvasRef {
   exportMask: () => Promise<Blob | null>;
@@ -23,12 +39,13 @@ export interface EraserCanvasRef {
 interface EraserCanvasProps {
   imageSrc: string;
   brushSize: number;
+  mode: StrokeKind;
   onStrokeChange: (hasStrokes: boolean) => void;
   onMaskedCountChange?: (count: number) => void;
 }
 
 export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(function EraserCanvas(
-  { imageSrc, brushSize, onStrokeChange, onMaskedCountChange },
+  { imageSrc, brushSize, mode, onStrokeChange, onMaskedCountChange },
   ref,
 ) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -120,6 +137,19 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
+    if (stroke.kind === "lasso") {
+      if (stroke.points.length < MIN_LASSO_POINTS) return;
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 60, 60, 0.4)";
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      return;
+    }
+
     if (stroke.points.length === 1) {
       ctx.beginPath();
       ctx.fillStyle = "rgba(255, 60, 60, 0.4)";
@@ -198,16 +228,19 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       drawingRef.current = true;
       currentPointsRef.current = [pt];
 
-      // Immediate dot
-      const ctx = prepCtx();
-      if (ctx) {
-        ctx.beginPath();
-        ctx.fillStyle = "rgba(255, 60, 60, 0.4)";
-        ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
-        ctx.fill();
+      // Brush: drop an immediate dot so a single tap erases. Lasso: draw nothing
+      // until the loop takes shape on move.
+      if (mode === "brush") {
+        const ctx = prepCtx();
+        if (ctx) {
+          ctx.beginPath();
+          ctx.fillStyle = "rgba(255, 60, 60, 0.4)";
+          ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     },
-    [getPoint, brushSize, isPanMode, beginPan, prepCtx],
+    [getPoint, brushSize, mode, isPanMode, beginPan, prepCtx],
   );
 
   const handleMove = useCallback(
@@ -224,9 +257,10 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
         return;
       }
 
-      // Update cursor position for brush preview
+      // Brush shows a round cursor preview; lasso uses a crosshair (no preview dot).
       const pt = getPoint(e);
-      if (pt) setCursorPos(pt);
+      if (pt && mode === "brush") setCursorPos(pt);
+      else setCursorPos(null);
 
       if (!drawingRef.current) return;
       if ("touches" in e) e.preventDefault();
@@ -237,8 +271,27 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       const ctx = prepCtx();
       if (!ctx) return;
       const pts = currentPointsRef.current;
-      if (pts.length < 2) return;
 
+      if (mode === "lasso") {
+        // The filled shape changes as points are added, so repaint the committed
+        // strokes then overlay the in-progress loop as a translucent preview.
+        redraw();
+        if (pts.length >= 2) {
+          ctx.beginPath();
+          ctx.fillStyle = "rgba(255, 60, 60, 0.25)";
+          ctx.strokeStyle = "rgba(255, 60, 60, 0.8)";
+          ctx.lineWidth = 2;
+          ctx.lineJoin = "round";
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+        return;
+      }
+
+      if (pts.length < 2) return;
       ctx.beginPath();
       ctx.strokeStyle = "rgba(255, 60, 60, 0.4)";
       ctx.lineWidth = brushSize;
@@ -247,7 +300,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
       ctx.lineTo(pt.x, pt.y);
       ctx.stroke();
     },
-    [getPoint, brushSize, isPanMode, movePan, prepCtx],
+    [getPoint, brushSize, mode, isPanMode, movePan, prepCtx, redraw],
   );
 
   const handleUp = useCallback(() => {
@@ -255,18 +308,23 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
     if (!drawingRef.current) return;
     drawingRef.current = false;
 
-    if (currentPointsRef.current.length > 0) {
-      strokesRef.current.push({
-        points: [...currentPointsRef.current],
-        size: brushSize,
-      });
-      currentPointsRef.current = [];
-      onStrokeChange(true);
+    const pts = currentPointsRef.current;
+    currentPointsRef.current = [];
+    if (pts.length > 0) {
+      if (mode === "lasso") {
+        // Auto-close the loop into a filled region; ignore accidental taps / tiny loops.
+        if (pts.length >= MIN_LASSO_POINTS && lassoArea(pts) >= MIN_LASSO_AREA) {
+          strokesRef.current.push({ points: [...pts], size: 0, kind: "lasso" });
+        }
+      } else {
+        strokesRef.current.push({ points: [...pts], size: brushSize, kind: "brush" });
+      }
+      onStrokeChange(strokesRef.current.length > 0);
       redraw();
       persistStrokes();
       onMaskedCountChange?.(allStrokesRef.current.size);
     }
-  }, [brushSize, onStrokeChange, onMaskedCountChange, redraw, persistStrokes, endPan]);
+  }, [brushSize, mode, onStrokeChange, onMaskedCountChange, redraw, persistStrokes, endPan]);
 
   const handleLeave = useCallback(() => {
     setCursorPos(null);
@@ -299,6 +357,18 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
         ctx.lineJoin = "round";
 
         for (const stroke of strokesRef.current) {
+          if (stroke.kind === "lasso") {
+            if (stroke.points.length < MIN_LASSO_POINTS) continue;
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x * sx, stroke.points[0].y * sy);
+            for (let i = 1; i < stroke.points.length; i++) {
+              ctx.lineTo(stroke.points[i].x * sx, stroke.points[i].y * sy);
+            }
+            ctx.closePath();
+            ctx.fill();
+            continue;
+          }
+
           const scaledSize = stroke.size * Math.max(sx, sy);
 
           if (stroke.points.length === 1) {
@@ -345,6 +415,18 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
           ctx.lineCap = "round";
           ctx.lineJoin = "round";
           for (const stroke of data.strokes) {
+            if (stroke.kind === "lasso") {
+              if (stroke.points.length < MIN_LASSO_POINTS) continue;
+              ctx.beginPath();
+              ctx.moveTo(stroke.points[0].x * sx, stroke.points[0].y * sy);
+              for (let i = 1; i < stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x * sx, stroke.points[i].y * sy);
+              }
+              ctx.closePath();
+              ctx.fill();
+              continue;
+            }
+
             const scaledSize = stroke.size * Math.max(sx, sy);
             if (stroke.points.length === 1) {
               ctx.beginPath();
@@ -463,7 +545,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
               style={{
                 width: canvasSize.w,
                 height: canvasSize.h,
-                cursor: isPanMode ? "grab" : "none",
+                cursor: isPanMode ? "grab" : mode === "lasso" ? "crosshair" : "none",
               }}
               onMouseDown={handleDown}
               onMouseMove={handleMove}
@@ -473,8 +555,8 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
               onTouchMove={handleMove}
               onTouchEnd={handleUp}
             />
-            {/* Brush cursor preview */}
-            {cursorPos && !isPanMode && (
+            {/* Brush cursor preview (brush mode only) */}
+            {cursorPos && !isPanMode && mode === "brush" && (
               <div
                 className="pointer-events-none absolute rounded-full border-2 border-white/80"
                 style={{

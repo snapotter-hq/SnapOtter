@@ -1,0 +1,51 @@
+---
+description: "从视频中裁剪出一个区域。"
+i18n_source_hash: fab11f71a202
+i18n_provenance: human
+i18n_output_hash: 5c0d802b3666
+---
+
+# Crop Video {#crop-video}
+
+通过指定区域的尺寸和位置，从视频中裁剪出一个矩形区域。
+
+## API Endpoint {#api-endpoint}
+
+`POST /api/v1/tools/video/crop-video`
+
+接受包含视频文件和 JSON `settings` 字段的 multipart 表单数据。
+
+## Parameters {#parameters}
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| width | integer | Yes | - | 裁剪区域宽度，单位为像素（最小 16） |
+| height | integer | Yes | - | 裁剪区域高度，单位为像素（最小 16） |
+| x | integer | No | `0` | 相对于左上角的水平偏移 |
+| y | integer | No | `0` | 相对于左上角的垂直偏移 |
+
+## Example Request {#example-request}
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/video/crop-video \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@clip.mp4" \
+  -F 'settings={"width": 640, "height": 480, "x": 100, "y": 50}'
+```
+
+## Example Response {#example-response}
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/clip.mp4",
+  "originalSize": 12500000,
+  "processedSize": 5200000
+}
+```
+
+## Notes {#notes}
+
+- 裁剪区域必须位于视频尺寸范围内。如果 `x + width` 或 `y + height` 超出源尺寸，请求将返回 400 错误。
+- 最小裁剪尺寸为 16x16 像素。
+- 根据大多数视频编解码器的要求，尺寸会被舍入为偶数。

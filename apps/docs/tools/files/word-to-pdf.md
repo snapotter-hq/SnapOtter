@@ -2,21 +2,21 @@
 description: Convert Word documents to PDF.
 ---
 
-# Word to PDF
+# Word to PDF {#word-to-pdf}
 
 Convert Word documents, OpenDocument text, RTF, or plain text files to PDF.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/word-to-pdf`
 
 Accepts multipart form data with a Word/ODT/RTF/TXT file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a document and it will be converted to PDF.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/word-to-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/word-to-pdf \
   -F "file=@report.docx"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.docx`, `.doc`, `.odt`, `.rtf`, `.txt`.
 - Conversion is handled by LibreOffice running headless on the server.

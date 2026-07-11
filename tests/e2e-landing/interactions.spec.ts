@@ -43,10 +43,10 @@ test.describe("Mobile Navigation", () => {
     await page.goto("/");
     const toggle = page.getByLabel("Toggle menu");
     await toggle.click();
-    await expect(page.getByRole("link", { name: "Features" }).last()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Developers" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Enterprise" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Pricing" }).last()).toBeVisible();
     await expect(page.getByRole("link", { name: "Docs" }).last()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Contact" }).last()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Talk to a human" }).last()).toBeVisible();
   });
 });

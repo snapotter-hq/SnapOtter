@@ -238,7 +238,9 @@ function ensureSubscriber(): void {
   sseSubscriber.on("error", (err) => {
     console.error("SSE progress subscriber error", err);
   });
-  void sseSubscriber.subscribe(progressChannel());
+  void sseSubscriber.subscribe(progressChannel()).catch((err) => {
+    console.error("SSE progress subscribe failed", err);
+  });
   sseSubscriber.on("message", (_channel: string, message: string) => {
     try {
       const parsed = JSON.parse(message) as { jobId?: string };

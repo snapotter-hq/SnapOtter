@@ -1,3 +1,4 @@
+import { FEEDBACK_FRICTION_AREA_VALUES, FEEDBACK_INSTALL_METHOD_VALUES } from "@snapotter/shared";
 import {
   Building2,
   FileText,
@@ -18,7 +19,9 @@ import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { apiGet, apiPut } from "@/lib/api";
 import { AUTH_GUARD_UNGATED_PATHS } from "@/lib/auth-routes";
 import {
+  type FeedbackFrictionArea,
   type FeedbackImportantArea,
+  type FeedbackInstallMethod,
   type FeedbackUsageType,
   promptVariantForSource,
   shouldShowUsageSurvey,
@@ -61,6 +64,10 @@ export function UsageSurveyOverlay() {
   const [settings, setSettings] = useState<Record<string, string> | null>(null);
   const [usageType, setUsageType] = useState<FeedbackUsageType | null>(null);
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
+  // Install method and friction area are optional: null until the admin picks one,
+  // so we never record an unanswered dropdown as a real value.
+  const [installMethod, setInstallMethod] = useState<FeedbackInstallMethod | null>(null);
+  const [frictionArea, setFrictionArea] = useState<FeedbackFrictionArea | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const busy = submitting || dismissing;
@@ -110,7 +117,12 @@ export function UsageSurveyOverlay() {
   async function handleContinue() {
     if (!usageType || busy) return;
     setSubmitting(true);
-    const answerKey = JSON.stringify({ usageType, importantAreas: [...importantAreas].sort() });
+    const answerKey = JSON.stringify({
+      usageType,
+      importantAreas: [...importantAreas].sort(),
+      installMethod,
+      frictionArea,
+    });
     try {
       if (submittedAnswerKeyRef.current !== answerKey) {
         await withTimeout(
@@ -120,6 +132,8 @@ export function UsageSurveyOverlay() {
             promptVariant: promptVariantForSource("onboarding"),
             usageType,
             importantAreas,
+            ...(installMethod ? { installMethod } : {}),
+            ...(frictionArea ? { frictionArea } : {}),
           }),
           WRITE_TIMEOUT_MS,
         );
@@ -162,7 +176,7 @@ export function UsageSurveyOverlay() {
       aria-labelledby="usage-survey-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-background p-4"
     >
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <div className="flex flex-col items-center text-center gap-3">
           <div
             aria-hidden="true"
@@ -234,6 +248,60 @@ export function UsageSurveyOverlay() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <p id="usage-survey-install-label" className="text-sm font-medium text-foreground">
+            {t.feedback.installMethodLabel}
+          </p>
+          <div
+            role="radiogroup"
+            aria-labelledby="usage-survey-install-label"
+            className="grid grid-cols-2 gap-2"
+          >
+            {FEEDBACK_INSTALL_METHOD_VALUES.map((value) => (
+              // biome-ignore lint/a11y/useSemanticElements: styled button acting as an ARIA radio, not a native input
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={installMethod === value}
+                onClick={() => setInstallMethod((current) => (current === value ? null : value))}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
+                  installMethod === value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-foreground hover:bg-muted",
+                )}
+              >
+                {t.feedback.installMethods[value]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="usage-survey-friction-area"
+            className="block text-sm font-medium text-foreground"
+          >
+            {t.feedback.frictionAreaLabel}
+          </label>
+          <select
+            id="usage-survey-friction-area"
+            value={frictionArea ?? ""}
+            onChange={(event) =>
+              setFrictionArea((event.target.value || null) as FeedbackFrictionArea | null)
+            }
+            className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+          >
+            <option value="" />
+            {FEEDBACK_FRICTION_AREA_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {t.feedback.frictionAreas[value]}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-3">

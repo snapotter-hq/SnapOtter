@@ -2,24 +2,24 @@
 description: Split a CSV into smaller files by row count.
 ---
 
-# Split CSV
+# Split CSV {#split-csv}
 
 Split a large CSV or TSV file into smaller files by row count. Returns a ZIP archive containing the parts.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/split-csv`
 
 Accepts multipart form data with a CSV file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | rowsPerFile | integer | No | `1000` | Number of data rows per output file (1-1,000,000) |
 | keepHeader | boolean | No | `true` | Repeat the header row in each output file |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/split-csv \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/split-csv \
   -F 'settings={"rowsPerFile": 500, "keepHeader": true}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/split-csv \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Output is always a ZIP archive containing the split CSV parts, named sequentially (e.g. `part-1.csv`, `part-2.csv`).
 - When `keepHeader` is `true`, each part includes the original header row so each file can be used independently.

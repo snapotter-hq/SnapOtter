@@ -62,6 +62,7 @@ ALLOWED_SCRIPTS = {
     "detect_faces",
     "enhance_faces",
     "face_landmarks",
+    "gif_remove_bg",
     "inpaint",
     "install_feature",
     "noise_removal",
@@ -110,6 +111,7 @@ MODELS_DIR = os.path.join(os.environ.get("DATA_DIR", "/data"), "ai", "models")
 
 TOOL_BUNDLE_MAP = {
     "remove_bg": "background-removal",
+    "gif_remove_bg": "background-removal",
     "detect_faces": "face-detection",
     "face_landmarks": "face-detection",
     "red_eye_removal": "face-detection",

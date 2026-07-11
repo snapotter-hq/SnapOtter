@@ -2,17 +2,17 @@
 description: Read and write PDF document metadata.
 ---
 
-# PDF Metadata
+# PDF Metadata {#pdf-metadata}
 
 Read and update PDF document metadata fields such as title, author, subject, and keywords. When no settings are provided, the existing metadata is returned without modification.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdf-metadata`
 
 Accepts multipart form data with a PDF file and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 
 All parameters are optional. Omitted fields are left unchanged.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
@@ -32,7 +32,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
   -F 'settings={"title": "Q2 Report", "author": "Finance Team"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - This is a fast (synchronous) tool that returns the result directly.

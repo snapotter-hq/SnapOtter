@@ -2,17 +2,17 @@
 description: Generate QR codes with custom colors and error correction levels.
 ---
 
-# QR Code Generator
+# QR Code Generator {#qr-code-generator}
 
 Generate QR code images from text or URLs with configurable size, error correction level, and custom foreground/background colors.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/qr-generate`
 
 Accepts a **JSON body** (not multipart). No file upload is needed.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Accepts a **JSON body** (not multipart). No file upload is needed.
 | background | string | No | `"#FFFFFF"` | QR code background color in hex (`#RRGGBB`) |
 | logoDataUri | string | No | - | Logo image as a data URI (`data:image/png;base64,...` or `data:image/jpeg;base64,...`, max 700 KB). Centered on the QR code at 22% of the QR size. Forces error correction to `H` |
 
-### Error Correction Levels
+### Error Correction Levels {#error-correction-levels}
 
 | Level | Recovery | Use Case |
 |-------|----------|----------|
@@ -32,7 +32,7 @@ Accepts a **JSON body** (not multipart). No file upload is needed.
 | `Q` | ~25% | Good for printed codes |
 | `H` | ~30% | Best for codes with logos overlay |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/qr-generate \
@@ -50,7 +50,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/qr-generate \
   -d '{"text": "Hello World", "size": 300, "foreground": "#1a365d", "background": "#f7fafc"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -61,7 +61,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/qr-generate \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - This endpoint accepts JSON, not multipart form data, since no image upload is needed.
 - The output is always a PNG image.

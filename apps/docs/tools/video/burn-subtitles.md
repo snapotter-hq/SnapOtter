@@ -2,23 +2,23 @@
 description: Permanently render subtitles onto video frames.
 ---
 
-# Burn Subtitles
+# Burn Subtitles {#burn-subtitles}
 
 Permanently render (hard-code) subtitles from an SRT, VTT, or ASS file onto every frame of a video.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/burn-subtitles`
 
 Accepts multipart form data with a video file and a subtitle file. This is an async endpoint - it returns `202 Accepted` immediately and progress is streamed via SSE at `GET /api/v1/jobs/{jobId}/progress`.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | fontSize | integer | No | `24` | Subtitle font size in pixels (8-72) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/burn-subtitles \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/burn-subtitles \
   -F 'settings={"fontSize": 28}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/burn-subtitles \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Upload two files: the first must be a video, the second must be a subtitle file (.srt, .vtt, or .ass).
 - Burned subtitles are permanently part of the video and cannot be turned off by the viewer. For toggleable subtitles, use the Embed Subtitles tool instead.

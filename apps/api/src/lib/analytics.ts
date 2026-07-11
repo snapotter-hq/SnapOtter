@@ -59,13 +59,10 @@ export async function initAnalytics(): Promise<void> {
 }
 
 export async function captureException(error: unknown): Promise<void> {
-  try {
-    if (!analyticsEnabled()) return;
-    const Sentry = await import("@sentry/node");
-    Sentry.captureException(error);
-  } catch {
-    // analytics must never throw
-  }
+  // Deprecated shim: route through the classified path. New code calls
+  // reportError directly with a source.
+  const { reportError } = await import("./error-report.js");
+  await reportError(error, { source: "boot" });
 }
 
 export async function shutdownAnalytics(): Promise<void> {
@@ -90,8 +87,13 @@ export async function trackEvent(
 ): Promise<void> {
   try {
     if (!analyticsEnabled() || !posthogClient) return;
-    if (ANALYTICS_BAKED.sampleRate < 1.0) {
-      if (ANALYTICS_BAKED.sampleRate <= 0.0 || Math.random() >= ANALYTICS_BAKED.sampleRate) return;
+    if (ANALYTICS_BAKED.posthogSampleRate < 1.0) {
+      if (
+        ANALYTICS_BAKED.posthogSampleRate <= 0.0 ||
+        Math.random() >= ANALYTICS_BAKED.posthogSampleRate
+      ) {
+        return;
+      }
     }
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),

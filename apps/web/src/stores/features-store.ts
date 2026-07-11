@@ -20,6 +20,13 @@ interface BundleProgress {
   stage: string;
 }
 
+interface ToolBundleInstallResult {
+  bundleId: string;
+  jobId?: string;
+  queued?: boolean;
+  skipped?: boolean;
+}
+
 interface FeaturesState {
   bundles: FeatureBundleState[];
   loaded: boolean;
@@ -35,6 +42,7 @@ interface FeaturesState {
   isToolInstalled: (toolId: string) => boolean;
   getBundleForTool: (toolId: string) => FeatureBundleState | null;
   installBundle: (bundleId: string) => Promise<void>;
+  installTool: (toolId: string) => Promise<void>;
   uninstallBundle: (bundleId: string) => Promise<void>;
   reinstallBundle: (bundleId: string) => Promise<void>;
   installAll: () => Promise<void>;
@@ -343,6 +351,74 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         } else {
           onInstallSettled(bundleId, message);
         }
+      }
+    },
+
+    installTool: async (toolId: string) => {
+      const required = requiredBundlesForTool(toolId);
+      const targets = required.filter(
+        (bundleId) => get().bundles.find((b) => b.id === bundleId)?.status !== "installed",
+      );
+      if (targets.length === 0) return;
+
+      const errors = { ...get().errors };
+      const installing = { ...get().installing };
+      const startTimes = { ...get().startTimes };
+      const now = Date.now();
+
+      for (const bundleId of targets) {
+        delete errors[bundleId];
+        if (!get().queued.includes(bundleId)) {
+          installing[bundleId] = installing[bundleId] ?? { percent: 5, stage: "Starting..." };
+        }
+        startTimes[bundleId] = startTimes[bundleId] ?? now;
+      }
+      set({ errors, installing, startTimes });
+
+      try {
+        const result = await apiPost<{ bundles: ToolBundleInstallResult[] }>(
+          `/v1/admin/tools/${toolId}/features/install`,
+          {},
+        );
+
+        for (const item of result.bundles) {
+          if (item.skipped) {
+            stopTracking(item.bundleId);
+            continue;
+          }
+
+          if (item.queued) {
+            const nextInstalling = { ...get().installing };
+            delete nextInstalling[item.bundleId];
+            set({
+              installing: nextInstalling,
+              queued: get().queued.includes(item.bundleId)
+                ? get().queued
+                : [...get().queued, item.bundleId],
+            });
+            startPolling(item.bundleId);
+            continue;
+          }
+
+          if (item.jobId) {
+            listenToProgress(item.bundleId, item.jobId);
+          }
+        }
+
+        if (result.bundles.every((item) => item.skipped)) {
+          await refreshBundles();
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to start installation";
+        const nextErrors = { ...get().errors };
+
+        for (const bundleId of targets) {
+          stopTracking(bundleId);
+          nextErrors[bundleId] = message;
+        }
+
+        set({ errors: nextErrors });
+        maybeFinishInstallAll();
       }
     },
 

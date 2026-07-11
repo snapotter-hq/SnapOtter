@@ -1,0 +1,49 @@
+---
+description: "Converte tra i formati Excel, OpenDocument e CSV."
+i18n_source_hash: b813b1b06962
+i18n_provenance: human
+i18n_output_hash: 7b99ca90cd84
+---
+
+# Convert Spreadsheet {#convert-spreadsheet}
+
+Converte i fogli di calcolo tra i formati Excel (XLSX), OpenDocument Spreadsheet (ODS) e CSV. Le cartelle di lavoro multi-foglio esportano il primo foglio quando si converte in CSV.
+
+## API Endpoint {#api-endpoint}
+
+`POST /api/v1/tools/files/convert-spreadsheet`
+
+Accetta dati form multipart con un file Excel/ODS/CSV e un campo JSON `settings`.
+
+## Parameters {#parameters}
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| format | string | Yes | - | Formato di output: `xlsx`, `ods`, `csv` |
+
+## Example Request {#example-request}
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/files/convert-spreadsheet \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@data.xlsx" \
+  -F 'settings={"format": "csv"}'
+```
+
+## Example Response {#example-response}
+
+Restituisce `202 Accepted`. Monitora l'avanzamento tramite SSE su `/api/v1/jobs/{jobId}/progress`.
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true
+}
+```
+
+## Notes {#notes}
+
+- Formati di input accettati: `.xlsx`, `.xls`, `.ods`, `.csv`.
+- Quando si converte una cartella di lavoro multi-foglio in CSV, viene esportato solo il primo foglio.
+- Le formule vengono valutate ed esportate come valori statici nell'output CSV.
+- Il formato di output deve essere diverso dal formato di input.

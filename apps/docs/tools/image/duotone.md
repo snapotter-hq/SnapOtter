@@ -2,17 +2,17 @@
 description: Apply a two-color duotone effect with custom shadow and highlight colors.
 ---
 
-# Duotone
+# Duotone {#duotone}
 
 Apply a two-color duotone effect to an image. The image is converted to grayscale, then mapped to a gradient between the shadow color (dark tones) and the highlight color (bright tones).
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/duotone`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | highlight | string | No | `"#fbbf24"` | Highlight hex color (applied to bright tones) |
 | intensity | integer | No | `100` | Effect intensity (0-100); 0 returns the original, 100 applies the full duotone |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/duotone \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/duotone \
   -F 'settings={"shadow": "#0f172a", "highlight": "#f97316", "intensity": 80}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/duotone \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Output format matches the input format. HEIC, RAW, PSD, and SVG inputs are automatically decoded before processing.
 - An `intensity` of less than 100 blends the duotone result with the original image, allowing for subtler effects.

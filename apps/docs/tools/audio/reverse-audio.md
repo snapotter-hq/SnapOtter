@@ -2,21 +2,21 @@
 description: Reverse an audio file so it plays backwards.
 ---
 
-# Reverse Audio
+# Reverse Audio {#reverse-audio}
 
 Reverse an audio file so it plays backwards.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/reverse-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. The entire audio file is reversed.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/reverse-audio \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/reverse-audio \
   -F "file=@audio.mp3"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/reverse-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The full audio track is reversed from end to start.
 - Output usually keeps the input container. AAC input is written as M4A, and unsupported decode-only inputs fall back to MP3.

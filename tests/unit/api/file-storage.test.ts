@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,18 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   env: config,
 }));
 
+// Passthrough fs mock: only statfs is overridable, to simulate a full disk.
+const diskState = vi.hoisted(() => ({ lowDisk: false }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    statfs: (path: string) =>
+      diskState.lowDisk ? Promise.resolve({ bfree: 0, bsize: 4096 }) : actual.statfs(path),
+  };
+});
+
 let testDir: string;
 
 beforeEach(async () => {
@@ -23,12 +35,20 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  diskState.lowDisk = false;
   await rm(testDir, { recursive: true, force: true });
 });
 
 async function importModule() {
   return await import("../../../apps/api/src/lib/file-storage.js");
 }
+
+type StorageError = Error & {
+  isSafeMessage?: unknown;
+  kind?: string;
+  code?: string;
+  statusCode?: number;
+};
 
 describe("saveFile", () => {
   it("saves buffer and returns UUID-based filename with correct extension", async () => {
@@ -187,5 +207,89 @@ describe("thumbnail functions", () => {
   it("deleteThumbnail does not throw for non-existent", async () => {
     const { deleteThumbnail } = await importModule();
     await expect(deleteThumbnail("ghost.png")).resolves.toBeUndefined();
+  });
+});
+
+describe("storage not writable (EACCES)", () => {
+  // chmod-based EACCES does not apply to root, which bypasses permission checks
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
+  it.skipIf(isRoot)("ensureStorageDir throws a SafeError carrying statusCode 503", async () => {
+    const roParent = join(tmpdir(), `snapotter-fs-ro-${randomUUID().slice(0, 8)}`);
+    await mkdir(roParent, { recursive: true });
+    config.FILES_STORAGE_PATH = join(roParent, "sub");
+    try {
+      await chmod(roParent, 0o555);
+      const { ensureStorageDir } = await importModule();
+      const err = (await ensureStorageDir().then(
+        () => null,
+        (e: unknown) => e,
+      )) as StorageError | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("EACCES");
+      expect(err?.statusCode).toBe(503);
+    } finally {
+      await chmod(roParent, 0o755).catch(() => {});
+      await rm(roParent, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(isRoot)("saveFile throws a SafeError when the directory is read-only", async () => {
+    const { saveFile } = await importModule();
+    try {
+      await chmod(testDir, 0o555);
+      const err = (await saveFile(Buffer.from("x"), "a.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as StorageError | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.statusCode).toBe(503);
+    } finally {
+      await chmod(testDir, 0o755).catch(() => {});
+    }
+  });
+
+  it.skipIf(isRoot)(
+    "saveThumbnail throws a SafeError when the directory is read-only",
+    async () => {
+      const { saveThumbnail } = await importModule();
+      try {
+        await chmod(testDir, 0o555);
+        const err = (await saveThumbnail("pic.png", Buffer.from("t")).then(
+          () => null,
+          (e: unknown) => e,
+        )) as StorageError | null;
+        expect(err).toBeInstanceOf(Error);
+        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.isSafeMessage).toBe(true);
+        expect(err?.kind).toBe("operational");
+        expect(err?.code).toBe("EACCES");
+        expect(err?.statusCode).toBe(503);
+      } finally {
+        await chmod(testDir, 0o755).catch(() => {});
+      }
+    },
+  );
+});
+
+describe("disk space floor", () => {
+  it("saveFile throws a SafeError with statusCode 507 when free space is below the floor", async () => {
+    const { saveFile } = await importModule();
+    diskState.lowDisk = true;
+    const err = (await saveFile(Buffer.from("x"), "a.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).toBe("Insufficient disk space");
+    expect(err?.isSafeMessage).toBe(true);
+    expect(err?.kind).toBe("operational");
+    expect(err?.code).toBe("ENOSPC");
+    expect(err?.statusCode).toBe(507);
   });
 });

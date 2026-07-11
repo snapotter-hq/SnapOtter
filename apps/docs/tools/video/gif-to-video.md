@@ -2,23 +2,23 @@
 description: Convert an animated GIF into an MP4, WebM, or MOV video.
 ---
 
-# GIF to Video
+# GIF to Video {#gif-to-video}
 
 Convert an animated GIF into a compact MP4, WebM, or MOV video file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/gif-to-video`
 
 Accepts multipart form data with a GIF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | No | `"mp4"` | Output format: `mp4`, `webm`, `mov` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/gif-to-video \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/gif-to-video \
   -F 'settings={"format": "mp4"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/gif-to-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Converting GIF to video typically reduces file size by 80-90% while maintaining the same visual quality.
 - Only animated GIF files are accepted. Static images should use the image Convert tool.

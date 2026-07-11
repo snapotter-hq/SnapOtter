@@ -2,17 +2,17 @@
 description: Scale a video to a new resolution or preset size.
 ---
 
-# Resize Video
+# Resize Video {#resize-video}
 
 Scale a video to a new resolution using custom pixel dimensions or a standard preset.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/resize-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 
 When `preset` is `"custom"`, at least one of `width` or `height` must be provided. The other dimension scales proportionally.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/resize-video \
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/resize-video \
   -F 'settings={"width": 1280, "height": 720}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/resize-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Preset values map to standard heights (e.g. `720p` = 1280x720, `1080p` = 1920x1080). Width scales proportionally from the source aspect ratio.
 - Dimensions are rounded to even numbers as required by most video codecs.

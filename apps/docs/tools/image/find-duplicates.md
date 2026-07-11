@@ -2,27 +2,27 @@
 description: Detect duplicate and near-duplicate images using perceptual hashing.
 ---
 
-# Find Duplicates
+# Find Duplicates {#find-duplicates}
 
 Upload multiple images to detect duplicates and near-duplicates using perceptual hashing (dHash). Groups similar images together, identifies the best quality version in each group, and calculates potential space savings.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/find-duplicates`
 
 Accepts multipart form data with multiple image files and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | threshold | number | No | `8` | Maximum Hamming distance to consider images as duplicates (0 to 20). Lower = stricter matching |
 
-### File Fields
+### File Fields {#file-fields}
 
 Upload at least 2 image files in the multipart request (all using the `file` field name or any field name for file parts).
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/find-duplicates \
@@ -34,7 +34,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/find-duplicates \
   -F 'settings={"threshold": 8}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/find-duplicates \
 }
 ```
 
-## Response Fields
+## Response Fields {#response-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -82,14 +82,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/find-duplicates \
 | spaceSaveable | number | Total bytes that could be saved by removing non-best duplicates |
 | skippedFiles | array | Files that could not be processed (with filename and reason) |
 
-### Duplicate Group Object
+### Duplicate Group Object {#duplicate-group-object}
 
 | Field | Type | Description |
 |-------|------|-------------|
 | groupId | number | Group identifier |
 | files | array | Images in this duplicate group |
 
-### File Object (within a group)
+### File Object (within a group) {#file-object-within-a-group}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -102,7 +102,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/find-duplicates \
 | isBest | boolean | Whether this is the highest quality version (most pixels, largest file) |
 | thumbnail | string or null | Base64 JPEG thumbnail (200px wide) for preview |
 
-## Notes
+## Notes {#notes}
 
 - Uses a 128-bit dHash (64-bit row + 64-bit column) for perceptual similarity detection. This catches duplicates even across resizes, recompression, and minor edits.
 - The threshold represents maximum Hamming distance between hashes. Default of 8 catches near-duplicates while avoiding false positives. Use 0 for pixel-identical only, or 15-20 for very loose matching.

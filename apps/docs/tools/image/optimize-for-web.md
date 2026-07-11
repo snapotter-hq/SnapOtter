@@ -2,11 +2,11 @@
 description: Optimize images for web delivery with format conversion, quality control, resizing, and metadata stripping.
 ---
 
-# Optimize for Web
+# Optimize for Web {#optimize-for-web}
 
 Optimize images for web delivery in a single step. Combines format conversion, quality adjustment, optional resizing, progressive encoding, and metadata stripping.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/optimize-for-web`
 
@@ -14,7 +14,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 
 A live preview endpoint is also available at `POST /api/v1/tools/image/optimize-for-web/preview`, which returns the processed image directly as binary (no workspace creation) for real-time parameter tuning.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -25,7 +25,7 @@ A live preview endpoint is also available at `POST /api/v1/tools/image/optimize-
 | progressive | boolean | No | `true` | Enable progressive/interlaced encoding |
 | stripMetadata | boolean | No | `true` | Remove EXIF, GPS, ICC, and XMP metadata |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/optimize-for-web \
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-for-web \
   -F 'settings={"format": "avif", "quality": 50, "maxWidth": 1200, "maxHeight": 800}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -54,7 +54,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-for-web \
 }
 ```
 
-### Preview Endpoint Response
+### Preview Endpoint Response {#preview-endpoint-response}
 
 The preview endpoint (`/api/v1/tools/image/optimize-for-web/preview`) returns the binary image directly with informational headers:
 
@@ -62,7 +62,7 @@ The preview endpoint (`/api/v1/tools/image/optimize-for-web/preview`) returns th
 - `X-Processed-Size` - Processed file size in bytes
 - `X-Output-Filename` - URL-encoded output filename
 
-## Notes
+## Notes {#notes}
 
 - This tool is designed as a one-stop optimization pipeline for web assets. It handles format conversion, quality tuning, max dimension capping, and metadata removal in a single pass.
 - The output filename extension is updated to match the chosen format.

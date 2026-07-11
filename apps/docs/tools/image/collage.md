@@ -2,15 +2,15 @@
 description: Combine multiple images into grid collages with 25+ templates, adjustable gaps and corners, and per-cell pan and zoom.
 ---
 
-# Collage / Grid
+# Collage / Grid {#collage-grid}
 
 Combine multiple images into beautiful grid collages with 25+ templates. Supports 2-9 image layouts with customizable gap, corner radius, background color, and per-cell pan/zoom controls.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/collage`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -28,7 +28,7 @@ Combine multiple images into beautiful grid collages with 25+ templates. Support
 | outputFormat | string | No | `"png"` | Output format: `png`, `jpeg`, `webp`, `avif`, `jxl` |
 | quality | number | No | 90 | Output quality (1 to 100) |
 
-## Available Templates
+## Available Templates {#available-templates}
 
 | Template ID | Images | Layout |
 |-------------|--------|--------|
@@ -56,7 +56,7 @@ Combine multiple images into beautiful grid collages with 25+ templates. Support
 | `8-mosaic` | 8 | Mosaic layout |
 | `9-grid` | 9 | 3x3 grid |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/collage \
@@ -67,7 +67,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
   -F 'settings={"templateId":"4-grid","gap":12,"cornerRadius":8,"backgroundColor":"#F5F5F5","outputFormat":"png","quality":90}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -78,7 +78,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Upload multiple image files in the multipart request. The images are assigned to template cells in upload order.
 - If more images are uploaded than the template supports, extra images are ignored.

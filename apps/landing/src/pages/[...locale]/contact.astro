@@ -1,0 +1,143 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import Base from "@/layouts/Base.astro";
+import { localizeHref } from "@/lib/i18n-page";
+
+export function getStaticPaths() {
+  return LANDING_LOCALES.map((locale) => ({
+    params: { locale: locale === "en" ? undefined : locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+const PATH = "/contact";
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    { "@type": "ListItem", position: 2, name: "Contact", item: "https://snapotter.com/contact" },
+  ],
+};
+
+const benefits = [
+  {
+    title: t(locale, "contact.benefit.demo.title"),
+    description: t(locale, "contact.benefit.demo.description"),
+    icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  },
+  {
+    title: t(locale, "contact.benefit.deployment.title"),
+    description: t(locale, "contact.benefit.deployment.description"),
+    icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  },
+  {
+    title: t(locale, "contact.benefit.licensing.title"),
+    description: t(locale, "contact.benefit.licensing.description"),
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+  },
+];
+
+const subjects = [
+  t(locale, "contact.subject.bookDemo"),
+  t(locale, "contact.subject.enterpriseLicensing"),
+  t(locale, "contact.subject.deploymentHelp"),
+  t(locale, "contact.subject.generalInquiry"),
+];
+---
+
+<Base
+  title={t(locale, "contact.metaTitle")}
+  description={t(locale, "contact.metaDescription")}
+  canonical={`https://snapotter.com${localizeHref(locale, PATH)}`}
+  locale={locale}
+  path={PATH}
+>
+  <Fragment slot="head">
+    <JsonLd data={breadcrumbJsonLd} />
+  </Fragment>
+
+  <Navbar locale={locale} path={PATH} />
+
+  <main id="main" class="px-6 pt-32 pb-20 md:pt-40 md:pb-28">
+    <div class="mx-auto grid max-w-5xl gap-16 md:grid-cols-2">
+      <!-- Left column -->
+      <div class="reveal">
+        <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">{t(locale, "contact.title")}</h1>
+        <p class="mt-6 text-lg leading-relaxed text-muted">
+          {t(locale, "contact.intro")}
+        </p>
+
+        <div class="mt-12 space-y-4">
+          {benefits.map((item) => (
+            <div class="flex gap-4 rounded-xl border border-border bg-surface p-5">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <svg class="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={item.icon} />
+              </div>
+              <div>
+                <h3 class="font-display font-semibold">{item.title}</h3>
+                <p class="mt-1 text-sm leading-relaxed text-muted">{item.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p class="mt-10 text-sm text-muted">
+          {t(locale, "contact.emailPrefix")} <a href="mailto:contact@snapotter.com" class="font-medium text-primary hover:underline">contact@snapotter.com</a>
+        </p>
+      </div>
+
+      <!-- Right column: Contact form -->
+      <div class="reveal reveal-delay-1">
+        <form
+          action="https://formspree.io/f/mykllwek"
+          method="POST"
+          class="space-y-5 rounded-2xl border border-border bg-surface p-8"
+        >
+          <div>
+            <label for="name" class="block text-sm font-medium">{t(locale, "contact.form.name")}</label>
+            <input type="text" id="name" name="name" required class="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none" />
+          </div>
+
+          <div>
+            <label for="email" class="block text-sm font-medium">{t(locale, "contact.form.email")}</label>
+            <input type="email" id="email" name="email" required class="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none" />
+          </div>
+
+          <div>
+            <label for="company" class="block text-sm font-medium">{t(locale, "contact.form.company")}</label>
+            <input type="text" id="company" name="company" class="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none" />
+          </div>
+
+          <div>
+            <label for="subject" class="block text-sm font-medium">{t(locale, "contact.form.subject")}</label>
+            <select id="subject" name="subject" required class="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none">
+              <option value="" disabled selected>{t(locale, "contact.form.selectTopic")}</option>
+              {subjects.map((s) => (
+                <option value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label for="message" class="block text-sm font-medium">{t(locale, "contact.form.message")}</label>
+            <textarea id="message" name="message" rows={5} required class="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none resize-none"></textarea>
+          </div>
+
+          <button type="submit" class="btn-primary w-full rounded-lg px-6 py-3 text-sm font-semibold">
+            {t(locale, "contact.form.send")}
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <Footer locale={locale} />
+</Base>

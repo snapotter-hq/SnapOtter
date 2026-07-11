@@ -1,0 +1,65 @@
+---
+description: "สร้างแผนภูมิ RGB histogram พร้อมสถิติต่อช่องสัญญาณจากภาพ"
+i18n_source_hash: 57aa610206a5
+i18n_provenance: human
+i18n_output_hash: a43620cf15da
+---
+
+# Histogram {#histogram}
+
+สร้างแผนภูมิ RGB histogram จากภาพ คืนค่าเป็นภาพ histogram แบบ PNG พร้อมกับสถิติต่อช่องสัญญาณและข้อมูล histogram ดิบแบบ 256 bin ในการตอบกลับ JSON
+
+## API Endpoint {#api-endpoint}
+
+`POST /api/v1/tools/image/histogram`
+
+รับข้อมูลแบบ multipart form data ที่มีไฟล์ภาพและฟิลด์ JSON `settings`
+
+## Parameters {#parameters}
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| scale | string | No | `"linear"` | สเกลแกน Y: `linear` หรือ `log` |
+
+## Example Request {#example-request}
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/image/histogram \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"scale": "linear"}'
+```
+
+## Example Response {#example-response}
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/histogram.png",
+  "originalSize": 2450000,
+  "processedSize": 12000,
+  "bins": {
+    "r": [0, 12, 45, "... (256 values)"],
+    "g": [0, 8, 38, "... (256 values)"],
+    "b": [2, 15, 52, "... (256 values)"],
+    "lum": [0, 10, 40, "... (256 values)"]
+  },
+  "stats": {
+    "r": { "mean": 128, "median": 132, "stdev": 48.5 },
+    "g": { "mean": 119, "median": 121, "stdev": 44.2 },
+    "b": { "mean": 105, "median": 108, "stdev": 51.3 },
+    "lum": { "mean": 118, "median": 120, "stdev": 45.1 }
+  },
+  "mean": { "r": 128, "g": 119, "b": 105 },
+  "max": { "r": 4200, "g": 3800, "b": 4100 }
+}
+```
+
+## Notes {#notes}
+
+- `downloadUrl` ชี้ไปยังแผนภูมิ PNG histogram ที่เรนเดอร์แล้ว แสดงการกระจายของ R, G, B และความสว่าง
+- `bins` มีอาร์เรย์ 256 ค่าดิบสำหรับแต่ละช่องสัญญาณ (แดง เขียว น้ำเงิน ความสว่าง) เหมาะสำหรับการเรนเดอร์การแสดงผลแบบกำหนดเอง
+- `stats` ให้ค่าเฉลี่ย ค่ามัธยฐาน และส่วนเบี่ยงเบนมาตรฐานต่อช่องสัญญาณ
+- `mean` และ `max` เป็นฟิลด์แบบย่อที่เข้ากันได้กับเวอร์ชันก่อนหน้า
+- ใช้สเกล `log` เมื่อ histogram ถูกครอบงำด้วยยอดไม่กี่จุด และคุณต้องการเห็นรายละเอียดใน bin ที่ต่ำกว่า
+- อินพุต HEIC, RAW, PSD และ SVG จะถูกถอดรหัสโดยอัตโนมัติก่อนการวิเคราะห์

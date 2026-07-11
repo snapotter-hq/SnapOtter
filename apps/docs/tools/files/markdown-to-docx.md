@@ -2,21 +2,21 @@
 description: Convert a Markdown file to a Word document (DOCX).
 ---
 
-# Markdown to Word
+# Markdown to Word {#markdown-to-word}
 
 Convert a Markdown file to a Word document (DOCX), preserving headings, lists, code blocks, and other formatting.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/markdown-to-docx`
 
 Accepts multipart form data with a Markdown file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a Markdown file and it will be converted to DOCX.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-docx \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-docx \
   -F "file=@README.md"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/markdown-to-docx \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.md`, `.markdown`.
 - This is a fast (synchronous) tool that returns the result directly.

@@ -2,17 +2,17 @@
 description: Capture webpages or HTML snippets as high-quality images with device emulation.
 ---
 
-# HTML to Image
+# HTML to Image {#html-to-image}
 
 Capture a webpage URL or raw HTML content as a screenshot image. Supports device emulation (desktop, tablet, mobile), full-page capture, and multiple output formats.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/html-to-image`
 
 Accepts a **JSON body** (not multipart). No file upload is needed.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -27,7 +27,7 @@ Accepts a **JSON body** (not multipart). No file upload is needed.
 
 Either `url` or `html` must be provided, but not both.
 
-### Device Presets
+### Device Presets {#device-presets}
 
 | Preset | Width | Height | Mobile UA |
 |--------|-------|--------|-----------|
@@ -36,7 +36,7 @@ Either `url` or `html` must be provided, but not both.
 | `mobile` | 375 | 812 | Yes |
 | `custom` | (user-specified) | (user-specified) | No |
 
-## Example Request
+## Example Request {#example-request}
 
 Capture a webpage:
 
@@ -56,7 +56,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   -d '{"html": "<div style=\"padding: 20px; background: #f0f0f0;\"><h1>Hello</h1></div>", "format": "png"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -67,7 +67,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires Chromium to be installed on the server. Returns HTTP 503 if the browser service is not available.
 - URLs are validated against SSRF attacks (private/internal network addresses are blocked).

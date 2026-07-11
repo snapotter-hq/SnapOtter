@@ -2,17 +2,17 @@
 description: Replace a specific color in an image with another color or make it transparent.
 ---
 
-# Replace & Invert Color
+# Replace & Invert Color {#replace-invert-color}
 
 Replace pixels matching a source color with a target color, or make them transparent. Uses Euclidean distance in RGB space with configurable tolerance for smooth blending at color boundaries.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/replace-color`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | makeTransparent | boolean | No | `false` | Make matching pixels transparent instead of replacing with target color |
 | tolerance | number | No | `30` | Color matching tolerance (0 to 255). Higher values match a wider range of similar colors |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/replace-color \
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/replace-color \
   -F 'settings={"sourceColor": "#00FF00", "makeTransparent": true, "tolerance": 50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -50,7 +50,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/replace-color \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Color matching uses Euclidean distance in RGB space, scaled by `tolerance * sqrt(3)`.
 - Replacement blending is proportional to color distance: pixels closer to the source color receive more of the target color, creating smooth transitions.

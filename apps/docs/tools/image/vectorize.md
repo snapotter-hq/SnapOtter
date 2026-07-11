@@ -2,15 +2,15 @@
 description: Convert raster images to SVG with black-and-white (potrace) and full-color multi-layer vectorization.
 ---
 
-# Image to SVG
+# Image to SVG {#image-to-svg}
 
 Vectorize raster images into SVG using tracing algorithms. Supports black-and-white tracing (potrace) and full-color multi-layer vectorization.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/vectorize`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -23,7 +23,7 @@ Vectorize raster images into SVG using tracing algorithms. Supports black-and-wh
 | cornerThreshold | number | No | 60 | Angle threshold for corner detection in color mode (0 to 180 degrees) |
 | invert | boolean | No | `false` | Invert the image before tracing (swap black/white) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
@@ -31,7 +31,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   -F 'settings={"colorMode":"bw","threshold":128,"filterSpeckle":4,"pathMode":"spline"}'
 ```
 
-### Color Vectorization
+### Color Vectorization {#color-vectorization}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   -F 'settings={"colorMode":"color","colorPrecision":8,"layerDifference":6,"filterSpeckle":4}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -50,7 +50,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Output is always an SVG file regardless of input format.
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded to raster before tracing).

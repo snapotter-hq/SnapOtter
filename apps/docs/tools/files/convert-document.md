@@ -2,23 +2,23 @@
 description: Convert between Word, OpenDocument, RTF, and plain text formats.
 ---
 
-# Convert Document
+# Convert Document {#convert-document}
 
 Convert documents between Word (DOCX), OpenDocument (ODT), RTF, and plain text formats using LibreOffice.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/convert-document`
 
 Accepts multipart form data with a Word/ODT/RTF/TXT file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | Yes | - | Output format: `docx`, `odt`, `rtf`, `txt` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/convert-document \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/convert-document \
   -F 'settings={"format": "odt"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -38,7 +38,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input formats: `.docx`, `.doc`, `.odt`, `.rtf`, `.txt`.
 - Conversion is handled by LibreOffice running headless on the server.

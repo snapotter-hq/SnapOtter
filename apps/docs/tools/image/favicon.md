@@ -2,17 +2,17 @@
 description: Generate all standard favicon and app icon sizes from a source image.
 ---
 
-# Favicon Generator
+# Favicon Generator {#favicon-generator}
 
 Generate a complete set of favicon and app icon files from a source image. Produces all standard sizes needed for browsers, Apple devices, and Android, along with a web manifest and an HTML snippet.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/favicon`
 
 Accepts multipart form data with one or more image files and an optional JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with one or more image files and an optional JSON `s
 | sizes | integer[] | No | - | Restrict output to specific pixel sizes (e.g. `[16, 32, 180]`). Omit to generate all standard sizes. |
 | themeColor | string | No | `"#ffffff"` | Theme color hex for the web manifest |
 
-## Generated Files
+## Generated Files {#generated-files}
 
 For each input image, the following files are produced:
 
@@ -38,7 +38,7 @@ For each input image, the following files are produced:
 | `manifest.json` | - | Web app manifest with icon references |
 | `favicon-snippet.html` | - | Ready-to-use HTML link tags |
 
-## Example Request
+## Example Request {#example-request}
 
 Single source image with rounded corners and padding:
 
@@ -58,7 +58,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/favicon \
   -F "file=@logo-dark.png"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 The response is a ZIP file streamed directly. The response headers are:
 
@@ -67,7 +67,7 @@ Content-Type: application/zip
 Content-Disposition: attachment; filename="favicons-a1b2c3d4.zip"
 ```
 
-## HTML Snippet Included
+## HTML Snippet Included {#html-snippet-included}
 
 The ZIP includes a `favicon-snippet.html` file you can paste into your HTML `<head>`:
 
@@ -80,7 +80,7 @@ The ZIP includes a `favicon-snippet.html` file you can paste into your HTML `<he
 <link rel="manifest" href="/manifest.json">
 ```
 
-## Notes
+## Notes {#notes}
 
 - Source images are resized using `cover` fit mode, meaning they are cropped to fill each square size. For best results, use a square source image.
 - When multiple files are uploaded, each gets its own subfolder in the ZIP (named after the source file).

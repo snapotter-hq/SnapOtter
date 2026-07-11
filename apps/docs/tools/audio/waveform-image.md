@@ -2,17 +2,17 @@
 description: Generate a waveform visualization as a PNG image from an audio file.
 ---
 
-# Waveform Image
+# Waveform Image {#waveform-image}
 
 Generate a waveform visualization as a PNG image from an audio file, with configurable dimensions and color.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/waveform-image`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with an audio file and a JSON `settings` field.
 | height | integer | No | `256` | Image height in pixels (64 to 1080) |
 | color | string | No | `"#4f46e5"` | Waveform hex color (e.g. `"#4f46e5"`) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/waveform-image \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/waveform-image \
   -F 'settings={"width": 1920, "height": 400, "color": "#e07832"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/waveform-image \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The output is always a PNG image, regardless of the input audio format.
 - The waveform is rendered on a transparent background.

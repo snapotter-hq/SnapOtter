@@ -3,6 +3,17 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+import { loadToolStrings } from "@/lib/tool-strings";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+// Tool name/description come from shared i18n (translated in all 21 langs).
+const toolStrings = await loadToolStrings(locale);
 
 const MODALITY_META: Record<string, { label: string; color: string }> = {
   image: { label: "Image", color: "#E07832" },
@@ -33,9 +44,9 @@ function renderIcon(iconName: string): string {
       type="text"
       id="hero-tool-search"
       autocomplete="off"
-      placeholder="Search tools"
-      class="w-full rounded-2xl border border-border bg-surface py-4 pr-4 pl-12 text-base shadow-sm outline-none transition-all placeholder:text-muted focus:border-primary focus:shadow-md"
-      aria-label="Search tools"
+      placeholder={t(locale, "home.hero.searchPlaceholder")}
+      class="w-full rounded-2xl border border-border bg-surface py-4 pe-4 ps-12 text-base shadow-sm outline-none transition-all placeholder:text-muted focus:border-primary focus:shadow-md"
+      aria-label={t(locale, "home.hero.searchPlaceholder")}
       aria-expanded="false"
       aria-controls="hero-search-results"
     />
@@ -49,17 +60,19 @@ function renderIcon(iconName: string): string {
     <ul id="hero-search-list" class="max-h-80 overflow-y-auto py-1.5">
       {TOOLS.map((tool) => {
         const mod = MODALITY_META[tool.modality];
+        const toolName = toolStrings[tool.id]?.name ?? tool.name;
+        const toolDescription = toolStrings[tool.id]?.description ?? tool.description;
         return (
           <li
             class="hero-result"
-            data-name={tool.name.toLowerCase()}
-            data-desc={tool.description.toLowerCase()}
+            data-name={toolName.toLowerCase()}
+            data-desc={toolDescription.toLowerCase()}
             data-mod={(mod?.label || "").toLowerCase()}
             data-keywords={(tool.keywords ?? []).join(" ")}
             hidden
           >
             <a
-              href={`/tools/${toolSection(tool)}/${tool.id}/`}
+              href={localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`)}
               class="flex items-center gap-3 px-4 py-2.5 no-underline transition-colors hover:bg-primary-subtle"
             >
               <svg
@@ -73,7 +86,7 @@ function renderIcon(iconName: string): string {
                 stroke-linejoin="round"
                 set:html={renderIcon(tool.icon)}
               />
-              <span class="flex-1 text-sm font-medium text-foreground">{tool.name}</span>
+              <span class="flex-1 text-sm font-medium text-foreground">{toolName}</span>
               <span
                 class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 style={`background-color: ${mod?.color}1a; color: ${mod?.color}`}
@@ -86,7 +99,7 @@ function renderIcon(iconName: string): string {
       })}
     </ul>
     <p id="hero-search-empty" class="hidden px-4 py-3 text-sm text-muted">
-      No tools match. Try "resize", "convert", or "compress".
+      {t(locale, "home.hero.searchEmpty")}
     </p>
   </div>
 </div>

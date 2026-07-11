@@ -2,11 +2,11 @@
 description: Expand an image canvas with AI outpainting, extending it in any direction and filling new areas to match the original.
 ---
 
-# AI Canvas Expand
+# AI Canvas Expand {#ai-canvas-expand}
 
 Expand the canvas of an image with AI-powered fill (outpainting). Extends the image in any direction and fills the new areas with AI-generated content that matches the existing image.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/ai-canvas-expand`
 
@@ -14,7 +14,7 @@ Expand the canvas of an image with AI-powered fill (outpainting). Extends the im
 
 **Model bundle:** `object-eraser-colorize` (1-2 GB)
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -29,7 +29,7 @@ Expand the canvas of an image with AI-powered fill (outpainting). Extends the im
 
 At least one extend direction must be greater than 0.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/ai-canvas-expand \
@@ -37,9 +37,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ai-canvas-expand \
   -F 'settings={"extendTop":200,"extendBottom":200,"extendLeft":100,"extendRight":100,"tier":"balanced"}'
 ```
 
-## Response
+## Response {#response}
 
-### Initial Response (202 Accepted)
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
@@ -48,14 +48,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ai-canvas-expand \
 }
 ```
 
-### Progress (SSE at `/api/v1/jobs/{jobId}/progress`)
+### Progress (SSE at `/api/v1/jobs/{jobId}/progress`) {#progress-sse-at-api-v1-jobs-jobid-progress}
 
 ```
 event: progress
 data: {"phase":"processing","stage":"Expanding canvas...","percent":50}
 ```
 
-### Final Result (via SSE)
+### Final Result (via SSE) {#final-result-via-sse}
 
 ```json
 {
@@ -71,7 +71,7 @@ data: {"phase":"processing","stage":"Expanding canvas...","percent":50}
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `object-eraser-colorize` model bundle to be installed (1-2 GB).
 - Uses LaMa-based outpainting to generate content for the expanded regions.

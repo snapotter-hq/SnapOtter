@@ -2,17 +2,17 @@
 description: Replace image background with a solid color or gradient using AI.
 ---
 
-# Background Replace
+# Background Replace {#background-replace}
 
 Replace the background of an image with a solid color or gradient. The AI model detects the subject, removes the original background, and composites the subject onto your chosen background.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/background-replace`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | feather | integer | No | `0` | Edge feathering radius (0-20) |
 | format | string | No | `"png"` | Output format: `png` or `webp` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/background-replace \
@@ -33,7 +33,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/background-replace \
   -F 'settings={"backgroundType": "color", "color": "#2563eb", "feather": 2}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/background-replace \
 
 Track progress via SSE at `GET /api/v1/jobs/{jobId}/progress`. When the job completes, the SSE stream emits a `completed` event with the download URL.
 
-## Notes
+## Notes {#notes}
 
 - This is an AI-powered tool that returns `202 Accepted` and processes asynchronously. Connect to the SSE endpoint to receive progress updates and the final result.
 - Requires the **background-removal** feature bundle to be installed. Returns `501` if the bundle is not available.

@@ -2,15 +2,15 @@
 description: PostgreSQL database schema, tables, migrations, and backup procedures for SnapOtter.
 ---
 
-# Database
+# Database {#database}
 
 SnapOtter uses PostgreSQL 17 with [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) for data persistence. The schema is defined in `apps/api/src/db/schema.ts`.
 
 The connection is configured via the `DATABASE_URL` environment variable (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, the Postgres container stores its data in the `SnapOtter-pgdata` named volume.
 
-## Tables
+## Tables {#tables}
 
-### users
+### users {#users}
 
 Stores user accounts. Created automatically on first run from `DEFAULT_USERNAME` and `DEFAULT_PASSWORD`.
 
@@ -24,7 +24,7 @@ Stores user accounts. Created automatically on first run from `DEFAULT_USERNAME`
 | `createdAt` | timestamp | Creation time |
 | `updatedAt` | timestamp | Last update time |
 
-### sessions
+### sessions {#sessions}
 
 Active login sessions. Each row ties a session token to a user.
 
@@ -35,7 +35,7 @@ Active login sessions. Each row ties a session token to a user.
 | `expiresAt` | timestamp | Expiry time |
 | `createdAt` | timestamp | Creation time |
 
-### teams
+### teams {#teams}
 
 Groups for organizing users. Admins can assign users to teams.
 
@@ -45,7 +45,7 @@ Groups for organizing users. Admins can assign users to teams.
 | `name` | varchar (unique, max 50 chars) | Team name |
 | `createdAt` | timestamp | Creation time |
 
-### api_keys
+### api_keys {#api-keys}
 
 API keys for programmatic access. The raw key is shown once on creation; only the hash is stored.
 
@@ -60,7 +60,7 @@ API keys for programmatic access. The raw key is shown once on creation; only th
 
 Keys are prefixed with `si_` followed by 96 hex characters (48 random bytes).
 
-### pipelines
+### pipelines {#pipelines}
 
 Saved tool chains that users create in the UI.
 
@@ -72,7 +72,7 @@ Saved tool chains that users create in the UI.
 | `steps` | jsonb | Array of `{ toolId, settings }` objects |
 | `createdAt` | timestamp | Creation time |
 
-### user_files
+### user_files {#user-files}
 
 Persistent file library with version chain tracking. Each processing step that saves a result creates a new row linked to its parent via `parentId`, forming a version tree.
 
@@ -91,7 +91,7 @@ Persistent file library with version chain tracking. Each processing step that s
 | `toolChain` | jsonb | Tool IDs applied in order to produce this version |
 | `createdAt` | timestamp | Creation time |
 
-### jobs
+### jobs {#jobs}
 
 Tracks processing jobs for progress reporting and cleanup.
 
@@ -108,7 +108,7 @@ Tracks processing jobs for progress reporting and cleanup.
 | `createdAt` | timestamp | Creation time |
 | `completedAt` | timestamp | Completion time |
 
-### settings
+### settings {#settings}
 
 Key-value store for server-wide settings that admins can change from the UI.
 
@@ -118,7 +118,7 @@ Key-value store for server-wide settings that admins can change from the UI.
 | `value` | varchar | Setting value |
 | `updatedAt` | timestamp | Last update time |
 
-### roles
+### roles {#roles}
 
 Custom roles with granular permissions.
 
@@ -130,7 +130,7 @@ Custom roles with granular permissions.
 | `permissions` | jsonb | Array of permission strings |
 | `createdAt` | timestamp | Creation time |
 
-### audit_log
+### audit_log {#audit-log}
 
 Security-relevant action log.
 
@@ -142,7 +142,7 @@ Security-relevant action log.
 | `details` | jsonb | Action-specific data |
 | `createdAt` | timestamp | Action time |
 
-## Migrations
+## Migrations {#migrations}
 
 Drizzle handles schema migrations. Migration files live in `apps/api/drizzle/`. During development:
 
@@ -154,7 +154,7 @@ npx drizzle-kit migrate    # apply pending migrations
 
 In production, pending migrations are applied automatically on startup.
 
-## Backup and restore
+## Backup and restore {#backup-and-restore}
 
 The relational database lives in the Postgres container's `SnapOtter-pgdata` volume, not the app's `/data` volume.
 
@@ -177,6 +177,6 @@ docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
   alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
 ```
 
-### Migrating from 1.x (SQLite)
+### Migrating from 1.x (SQLite) {#migrating-from-1-x-sqlite}
 
 Upgrading from SnapOtter 1.x has its own guide: see [Upgrading from 1.x to 2.0](./upgrading). In short, reuse your existing `/data` volume and 2.0 auto-detects and imports `/data/snapotter.db` on first boot (or set `SQLITE_MIGRATE_PATH` to point at it explicitly). Back up the whole `/data` volume first, not just `snapotter.db`: 1.x uses SQLite WAL mode, so a stopped container often leaves most of its data in `snapotter.db-wal` beside an almost-empty `snapotter.db`.

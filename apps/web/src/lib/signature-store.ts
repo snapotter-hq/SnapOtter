@@ -1,3 +1,5 @@
+import { safeRandomUUID } from "@/lib/uuid";
+
 export interface SavedSignature {
   id: string;
   dataUrl: string;
@@ -31,7 +33,7 @@ export function listSignatures(): SavedSignature[] {
 
 export function addSignature(dataUrl: string): SavedSignature {
   const sig: SavedSignature = {
-    id: crypto.randomUUID(),
+    id: safeRandomUUID(),
     dataUrl,
     createdAt: Date.now(),
   };

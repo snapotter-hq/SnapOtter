@@ -2,21 +2,21 @@
 description: Join multiple video clips into one file.
 ---
 
-# Merge Videos
+# Merge Videos {#merge-videos}
 
 Join multiple video clips into a single MP4 file. All inputs are normalized to the first video's resolution and 30 fps.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/merge-videos`
 
 Accepts multipart form data with two or more video files. This is an async endpoint - it returns `202 Accepted` immediately and progress is streamed via SSE at `GET /api/v1/jobs/{jobId}/progress`.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Upload 2-10 video files as multiple `file` parts.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/merge-videos \
@@ -26,7 +26,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/merge-videos \
   -F "file=@outro.mp4"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/merge-videos \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Clips are concatenated in the order they are uploaded.
 - All clips are re-encoded to match the first clip's resolution, frame rate (30 fps), and codec (H.264). Mismatched inputs are automatically normalized.

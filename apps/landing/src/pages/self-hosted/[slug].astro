@@ -1,0 +1,186 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import EnterpriseCtaBand from "@/components/EnterpriseCtaBand.astro";
+import Footer from "@/components/Footer.astro";
+import JsonLd from "@/components/JsonLd.astro";
+import Navbar from "@/components/Navbar.astro";
+import QuickstartBlock from "@/components/QuickstartBlock.astro";
+import RiskCallout from "@/components/RiskCallout.astro";
+import { ALTERNATIVES } from "@/data/alternatives";
+import { USE_CASES } from "@/data/use-cases";
+import Base from "@/layouts/Base.astro";
+
+export function getStaticPaths() {
+  return USE_CASES.map((uc) => ({ params: { slug: uc.slug }, props: { uc } }));
+}
+
+const { uc } = Astro.props;
+const canonical = `https://snapotter.com/self-hosted/${uc.slug}`;
+const alt = uc.alternativeSlug
+  ? ALTERNATIVES.find((a) => a.slug === uc.alternativeSlug)
+  : undefined;
+const others = USE_CASES.filter((u) => u.slug !== uc.slug);
+const reviewedOn = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+}).format(new Date(`${uc.lastReviewed}T00:00:00Z`));
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://snapotter.com" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Self-hosted",
+      item: "https://snapotter.com/self-hosted",
+    },
+    { "@type": "ListItem", position: 3, name: uc.h1, item: canonical },
+  ],
+};
+const faqJsonLd =
+  uc.faqs.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: uc.faqs.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      }
+    : null;
+const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
+---
+
+<Base title={`${uc.pageTitle} | SnapOtter`} description={uc.metaDescription} canonical={canonical}>
+  <Fragment slot="head">
+    <JsonLd data={allJsonLd} />
+  </Fragment>
+
+  <Navbar />
+
+  <main id="main">
+    <nav class="mx-auto max-w-4xl px-6 pt-28 md:pt-36" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2 text-sm text-muted">
+        <li><a href="/" class="transition-colors hover:text-foreground">Home</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="/self-hosted" class="transition-colors hover:text-foreground">Self-hosted</a></li>
+        <li aria-hidden="true">/</li>
+        <li class="font-medium text-foreground">{uc.h1}</li>
+      </ol>
+    </nav>
+
+    <!-- Hero -->
+    <section class="mx-auto max-w-4xl px-6 pt-8 pb-12">
+      <div class="reveal">
+        <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">{uc.h1}</h1>
+        <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">{uc.intro}</p>
+        {uc.isAiBundle && (
+          <p class="mt-4 inline-flex rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary-dark">
+            Local AI, one-time bundle install
+          </p>
+        )}
+        <div class="mt-8 flex flex-wrap gap-4">
+          <a href="https://docs.snapotter.com/guide/getting-started" target="_blank" rel="noopener noreferrer" class="btn-primary inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold">
+            Deploy with Docker
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+          <a href="/contact" class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt">Book a demo</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- What you do today + why risky -->
+    <section class="border-t border-border bg-background-alt py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">What most teams do today</h2>
+          <p class="mt-4 text-sm leading-relaxed text-muted md:text-base">{uc.whatYouDoToday}</p>
+        </div>
+        <div class="mt-8">
+          <RiskCallout title="Why that's a problem for sensitive files" body={uc.whyRisky} />
+        </div>
+      </div>
+    </section>
+
+    <!-- How SnapOtter does it + quickstart -->
+    <section class="py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">How SnapOtter does it privately</h2>
+          <p class="mt-4 text-sm leading-relaxed text-muted md:text-base">{uc.howSnapotter}</p>
+          <div class="mt-8">
+            <QuickstartBlock docker={uc.docker} curl={uc.curl} />
+          </div>
+          <div class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {uc.toolRoutes.map((route, i) => (
+              <a href={route} class="text-primary transition-colors hover:text-primary-dark">
+                Open the {uc.toolIds[i]} tool
+              </a>
+            ))}
+            {alt && (
+              <a href={`/alternatives/${alt.slug}`} class="text-primary transition-colors hover:text-primary-dark">
+                Compare with {alt.competitor}
+              </a>
+            )}
+          </div>
+          <p class="mt-6 text-xs text-muted">
+            Last reviewed {reviewedOn}. Commands match the current single-container image and REST API.
+            {uc.sources.length > 0 && " Competitor references: "}
+            {uc.sources.map((s, i) => (
+              <Fragment>
+                {i > 0 && ", "}
+                <a href={s.url} target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary-dark">{s.label}</a>
+              </Fragment>
+            ))}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQs -->
+    {uc.faqs.length > 0 && (
+      <section class="border-t border-border bg-background-alt py-16">
+        <div class="mx-auto max-w-4xl px-6">
+          <div class="reveal">
+            <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">Frequently asked questions</h2>
+            <dl class="mt-8 space-y-6">
+              {uc.faqs.map((f) => (
+                <div class="rounded-xl border border-border bg-surface p-6">
+                  <dt class="text-sm font-semibold">{f.q}</dt>
+                  <dd class="mt-3 text-sm leading-relaxed text-muted">{f.a}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </section>
+    )}
+
+    <!-- More self-hosted use cases -->
+    <section class="py-16">
+      <div class="mx-auto max-w-4xl px-6">
+        <div class="reveal">
+          <h2 class="font-display text-2xl font-bold tracking-tight">More self-hosted workflows</h2>
+          <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {others.map((o) => (
+              <a href={`/self-hosted/${o.slug}`} class="group flex flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md">
+                <span class="text-sm font-bold">{o.h1}</span>
+                <span class="mt-1 text-xs text-muted">{o.primaryKeyword}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <EnterpriseCtaBand />
+  </main>
+
+  <Footer />
+</Base>

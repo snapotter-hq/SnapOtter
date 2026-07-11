@@ -3,6 +3,7 @@ export interface AnalyticsConfig {
   posthogApiKey: string;
   posthogHost: string;
   sentryDsn: string;
-  sampleRate: number;
+  sentryDsnWeb: string;
+  posthogSampleRate: number;
   instanceId: string;
 }

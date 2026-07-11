@@ -2,17 +2,17 @@
 description: Shrink PDF file size by compressing embedded images.
 ---
 
-# Compress PDF
+# Compress PDF {#compress-pdf}
 
 Reduce PDF file size by downsampling embedded images. Choose between a quality slider or a target file size.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/compress-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with a PDF file and a JSON `settings` field.
 | quality | integer | No | `75` | Compression quality, 1-100 (higher = less compression). Used in `quality` mode |
 | targetSizeKb | number | No | - | Target file size in kilobytes. Used in `targetSize` mode |
 
-## Example Request
+## Example Request {#example-request}
 
 Compress by quality:
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/compress-pdf \
   -F 'settings={"mode": "targetSize", "targetSizeKb": 500}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/compress-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - In `quality` mode, lower values produce smaller files with more image degradation.
 - In `targetSize` mode, a binary search finds the highest DPI that fits the requested size.

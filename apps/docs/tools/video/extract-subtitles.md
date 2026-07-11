@@ -2,21 +2,21 @@
 description: Pull the subtitle track out of a video as an SRT file.
 ---
 
-# Extract Subtitles
+# Extract Subtitles {#extract-subtitles}
 
 Extract the embedded subtitle track from a video container and download it as an SRT file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/extract-subtitles`
 
 Accepts multipart form data with a video file. This tool has no configurable settings.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no parameters. It extracts the first subtitle track found in the video container.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/extract-subtitles \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/extract-subtitles \
   -F "file=@clip.mp4"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/extract-subtitles \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The video must contain an embedded subtitle track. If no subtitle track is found, the request returns a 400 error.
 - If the video has multiple subtitle tracks, the first one is extracted.

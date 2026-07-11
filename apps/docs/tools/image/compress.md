@@ -2,17 +2,17 @@
 description: Reduce image file size by quality level or to a target file size.
 ---
 
-# Compress
+# Compress {#compress}
 
 Reduce image file size by specifying a quality level or a target file size in kilobytes. The tool uses iterative binary search to hit size targets accurately.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/compress`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -20,7 +20,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | quality | number | No | `80` | Quality level (1-100). Used when mode is `quality`. |
 | targetSizeKb | number | No | - | Target file size in kilobytes. Used when mode is `targetSize`. |
 
-## Example Request
+## Example Request {#example-request}
 
 Compress to quality 60:
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compress \
   -F 'settings={"mode": "targetSize", "targetSizeKb": 200}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compress \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - In `quality` mode, lower values produce smaller files with more compression artifacts. A value of 80 is a good default for web use.
 - In `targetSize` mode, the engine performs iterative compression to get as close to the target as possible without exceeding it.

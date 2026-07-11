@@ -2,13 +2,13 @@
 description: Install SnapOtter with Docker in one command. Includes Docker Compose setup, building from source, and a full feature overview.
 ---
 
-# Getting Started
+# Getting Started {#getting-started}
 
 ::: tip Try before installing
 Explore the full UI at [demo.snapotter.com](https://demo.snapotter.com) - no signup or install required.
 :::
 
-## Quick Start
+## Quick Start {#quick-start}
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
@@ -20,6 +20,10 @@ You will be asked to change your password on first login.
 
 ::: tip Anonymous Product Analytics
 SnapOtter includes anonymous product analytics by default. To turn it off, open **Settings → System → Privacy** and switch off **Anonymous Product Analytics**. It stops immediately for the whole instance.
+
+You can also set the environment variable `SNAPOTTER_TELEMETRY=0` (`false` and `off` work too) to disable all telemetry for the instance without a rebuild.
+
+Error monitoring is powered by [Sentry](https://sentry.io), which sponsors SnapOtter through its open-source program.
 
 For details about what is collected, see [What SnapOtter collects](/guide/telemetry).
 :::
@@ -42,7 +46,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Both registries publish the same image on every release.
 :::
 
-## Docker Compose
+## Docker Compose {#docker-compose}
 
 ```yaml
 services:
@@ -100,7 +104,7 @@ volumes:
 
 See [Configuration](/guide/configuration) for all environment variables.
 
-## Build from Source
+## Build from Source {#build-from-source}
 
 **Prerequisites:** Node.js 22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
 
@@ -115,19 +119,19 @@ pnpm dev
 - Frontend: [http://localhost:1349](http://localhost:1349)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
-## What You Can Do
+## What You Can Do {#what-you-can-do}
 
-### File Processing (241 Tools)
+### File Processing (200+ Tools) {#file-processing-200-tools}
 
 | Modality | Count | Example Tools |
 |----------|-------|---------------|
-| **Image** | 105 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
+| **Image** | 106 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
 | **PDF / Document** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
 | **Files** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
-### Pipelines
+### Pipelines {#pipelines}
 
 Chain tools into multi-step workflows and apply them to one image or a whole batch:
 
@@ -138,13 +142,13 @@ Chain tools into multi-step workflows and apply them to one image or a whole bat
 
 Pipelines allow 20 steps by default. Set `MAX_PIPELINE_STEPS=0` to make the limit unlimited.
 
-### File Library
+### File Library {#file-library}
 
 Every file you process can be saved to your **Files** library. SnapOtter tracks the full version history so you can trace every processing step from the original upload to the final output.
 
 Saving is explicit: results you save to the library are kept until you delete them, while results you process and leave unsaved are cleared automatically after 72 hours (configurable via `FILE_MAX_AGE_HOURS`).
 
-### REST API & API Keys
+### REST API & API Keys {#rest-api-api-keys}
 
 Every tool is accessible via HTTP:
 
@@ -157,7 +161,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 Generate API keys under **Settings → API Keys**. See the [REST API reference](/api/rest) for all endpoints, or visit [http://localhost:1349/api/docs](http://localhost:1349/api/docs) for the interactive reference.
 
-### Multi-User & Teams
+### Multi-User & Teams {#multi-user-teams}
 
 Enable multiple users with role-based access control:
 

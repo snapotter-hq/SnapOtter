@@ -2,11 +2,11 @@
 description: AI-powered passport and ID photo generator with face detection, background removal, and print sheet tiling.
 ---
 
-# Passport Photo
+# Passport Photo {#passport-photo}
 
 AI-powered passport and ID photo generator. Two-phase workflow: analyze (face detection + background removal) then generate (crop, resize, and tile for printing).
 
-## API Endpoints
+## API Endpoints {#api-endpoints}
 
 This tool uses a two-phase flow with separate endpoints for analysis and generation.
 
@@ -14,27 +14,27 @@ This tool uses a two-phase flow with separate endpoints for analysis and generat
 
 ---
 
-### Phase 1: Analyze
+### Phase 1: Analyze {#phase-1-analyze}
 
 `POST /api/v1/tools/image/passport-photo/analyze`
 
 Detects face landmarks and removes the background. Returns landmark data and a preview for the frontend to display a crop preview.
 
-#### Parameters
+#### Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Image file (multipart) |
 | clientJobId | string | No | - | Optional job ID for progress tracking via SSE |
 
-#### Example Request
+#### Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
   -F "file=@headshot.jpg"
 ```
 
-#### Response (200 OK)
+#### Response (200 OK) {#response-200-ok}
 
 ```json
 {
@@ -58,11 +58,11 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 }
 ```
 
-#### Progress (SSE, optional)
+#### Progress (SSE, optional) {#progress-sse-optional}
 
 If `clientJobId` is provided, progress is streamed (0-30% for face detection, 30-95% for background removal).
 
-#### Error: No Face Detected (422)
+#### Error: No Face Detected (422) {#error-no-face-detected-422}
 
 ```json
 {
@@ -73,13 +73,13 @@ If `clientJobId` is provided, progress is streamed (0-30% for face detection, 30
 
 ---
 
-### Phase 2: Generate
+### Phase 2: Generate {#phase-2-generate}
 
 `POST /api/v1/tools/image/passport-photo/generate`
 
 Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached images from Phase 1 (no AI re-run).
 
-#### Parameters (JSON body)
+#### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -100,7 +100,7 @@ Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached i
 | imageWidth | number | Yes | - | Image width from Phase 1 response |
 | imageHeight | number | Yes | - | Image height from Phase 1 response |
 
-#### Example Request
+#### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
@@ -122,7 +122,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
   }'
 ```
 
-#### Response (200 OK)
+#### Response (200 OK) {#response-200-ok-1}
 
 ```json
 {
@@ -147,7 +147,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 
 ---
 
-### Base Route
+### Base Route {#base-route}
 
 `POST /api/v1/tools/image/passport-photo`
 
@@ -159,7 +159,7 @@ Returns guidance to use the correct sub-endpoint.
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires the `background-removal` and `face-detection` model bundles to be installed.
 - Phase 1 runs AI (face landmarks + background removal) and caches results. Phase 2 is pure Sharp image manipulation (fast, no AI needed).

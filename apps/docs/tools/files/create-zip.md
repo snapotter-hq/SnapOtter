@@ -2,21 +2,21 @@
 description: Bundle multiple files into a single ZIP archive.
 ---
 
-# Create ZIP
+# Create ZIP {#create-zip}
 
 Bundle multiple files of any type into a single ZIP archive. Duplicate filenames are automatically deduplicated.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/files/create-zip`
 
 Accepts multipart form data with two or more files. No settings field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload 2-50 files of any type to bundle.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/files/create-zip \
@@ -26,7 +26,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/create-zip \
   -F "file=@photo.jpg"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -37,7 +37,7 @@ curl -X POST http://localhost:1349/api/v1/tools/files/create-zip \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Requires between 2 and 50 input files.
 - Any file type is accepted; there are no restrictions on input format.

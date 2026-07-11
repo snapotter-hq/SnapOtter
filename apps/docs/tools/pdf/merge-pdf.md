@@ -2,17 +2,17 @@
 description: Combine multiple PDFs into a single document.
 ---
 
-# Merge PDFs
+# Merge PDFs {#merge-pdfs}
 
 Combine two or more PDF files into a single document, preserving the page order of each input file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/merge-pdf`
 
 Accepts multipart form data with two or more PDF files. No `settings` field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Simply upload two or more PDF files.
 
@@ -21,7 +21,7 @@ This tool has no settings parameters. Simply upload two or more PDF files.
 | Minimum files | 2 |
 | Maximum files | 20 |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/merge-pdf \
@@ -31,7 +31,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/merge-pdf \
   -F "file=@document3.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -42,7 +42,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/merge-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Files are merged in the order they are uploaded.
 - At least two PDF files are required; the request will fail with a 400 error if fewer are provided.

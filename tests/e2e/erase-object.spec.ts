@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "./helpers";
+import { expect, mockAiFeaturesInstalled, test } from "./helpers";
 
 function fixturePath(name: string): string {
   return path.join(process.cwd(), "tests", "fixtures", name);
@@ -15,61 +15,68 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 }
 
 test.describe("Erase Object tool", () => {
-  async function skipIfFeatureNotInstalled(page: import("@playwright/test").Page) {
+  // The eraser is an AI tool: without its bundle it renders a FeatureInstallPrompt
+  // instead of the tool, which made this whole suite silently skip in CI and on
+  // any box without the bundle. Mock the feature as installed so the UI actually
+  // renders and these tests run. The settings panel (brush size, mode toggle,
+  // submit) only mounts once a file is loaded, so tests that touch it upload first.
+  async function gotoEraser(page: import("@playwright/test").Page) {
+    await mockAiFeaturesInstalled(page, [
+      {
+        id: "object-eraser-colorize",
+        name: "Object Eraser",
+        enablesTools: ["erase-object", "colorize"],
+      },
+    ]);
     await page.goto("/image/erase-object");
-    // Guard against route rot: a wrong/404 route must fail loudly, not silently skip
-    // (skipping on a missing submit button previously masked the route being broken).
+    // A wrong/404 route must fail loudly, not silently pass.
     await expect(page.getByRole("heading", { name: "404" })).toHaveCount(0);
-    try {
-      await page.getByTestId("erase-object-submit").waitFor({ state: "visible", timeout: 15_000 });
-    } catch {
-      test.skip(true, "object-eraser-colorize feature bundle not installed");
-    }
+    // Installed => the tool renders its dropzone (not the install prompt). Failing
+    // here means the feature gate wasn't bypassed, not that a bundle is missing.
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .waitFor({ state: "visible", timeout: 15_000 });
   }
 
-  test("page loads with correct UI controls", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
-
-    // Brush size slider
-    await expect(page.getByText("Brush Size")).toBeVisible();
-    await expect(page.locator("#eraser-brush-size")).toBeVisible();
-
-    // Output format dropdown
-    await expect(page.locator("#eraser-format")).toBeVisible();
-
-    // Submit button is disabled with no file
-    await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
-  });
-
-  test("submit button disabled without file", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
-
-    await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
-  });
-
-  test("submit button remains disabled with file but no strokes", async ({
+  test("shows the tool (not an install prompt) when the feature is available", async ({
     loggedInPage: page,
   }) => {
-    await skipIfFeatureNotInstalled(page);
+    await gotoEraser(page);
+    // Dropzone is shown; the settings panel and submit only appear after a file.
+    await expect(page.getByRole("button", { name: /upload from computer/i })).toBeVisible();
+    await expect(page.getByTestId("erase-object-submit")).toHaveCount(0);
+  });
+
+  test("loads settings controls once a file is added", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
     await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
-    // Submit should still be disabled because no strokes have been painted
+    await expect(page.getByText("Brush Size")).toBeVisible();
+    await expect(page.locator("#eraser-brush-size")).toBeVisible();
+    await expect(page.locator("#eraser-format")).toBeVisible();
+    // No strokes yet -> submit disabled.
+    await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
+  });
+
+  test("submit stays disabled with a file but no strokes", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
     await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
   });
 
   test("brush size slider is interactive", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
     const slider = page.locator("#eraser-brush-size");
     await expect(slider).toBeVisible();
-
-    // Change slider value
     await slider.fill("75");
     await expect(page.getByText("75px")).toBeVisible();
   });
 
   test("quality slider shows for lossy formats only", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
 
     const qualitySlider = page.locator("#eraser-quality");
     const formatSelect = page.locator("#eraser-format");
@@ -90,8 +97,15 @@ test.describe("Erase Object tool", () => {
     await expect(qualitySlider).not.toBeVisible();
   });
 
-  test("strokes persist when switching between files", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
+  // FIXME(pre-existing): cross-file stroke persistence is broken. tool-page renders
+  // the image area under `key={`pending-${selectedIndex}`}`, so switching files
+  // REMOUNTS EraserCanvas and wipes its in-component `allStrokesRef` (the per-image
+  // stroke cache the multi-file design relies on): draw on A, switch to B and back,
+  // and A's strokes are gone. The key predates the lasso work; the fix belongs in
+  // tool-page's key logic. Un-fixme once EraserCanvas survives file switches. This
+  // suite previously skipped entirely (feature gate), so it never caught this.
+  test.fixme("strokes persist when switching between files", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
 
     // Upload first file
     await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
@@ -110,32 +124,72 @@ test.describe("Erase Object tool", () => {
     // Undo/Clear buttons should appear
     await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
 
-    // Upload second file via the "+ Add more" button
+    // Add a DISTINCT second file so the file entries are unambiguous.
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: /Add more/i }).click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(fixturePath("image/valid/test-200x150.png"));
+    await fileChooser.setFiles(fixturePath("image/valid/test-100x100.jpg"));
     await page.waitForTimeout(500);
 
-    // Switch to second file (click thumbnail or file entry)
-    // The file list shows buttons with the filename - click the second one
-    const fileEntries = page.locator("button").filter({ hasText: "test-200x150.png" });
-    const count = await fileEntries.count();
-    if (count >= 2) {
-      await fileEntries.nth(1).click();
-      await page.waitForTimeout(300);
+    // Switch to the second file, then back to the first (select by unique name).
+    await page.locator("button").filter({ hasText: "test-100x100.jpg" }).first().click();
+    await page.waitForTimeout(300);
+    await page.locator("button").filter({ hasText: "test-200x150.png" }).first().click();
+    await page.waitForTimeout(300);
 
-      // Switch back to first file
-      await fileEntries.first().click();
-      await page.waitForTimeout(300);
-
-      // Undo button should still be visible (strokes were preserved)
-      await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
-    }
+    // The first file's stroke was preserved -> Undo is still available.
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
   });
 
-  test("shows Erase All button when multiple files have masks", async ({ loggedInPage: page }) => {
-    await skipIfFeatureNotInstalled(page);
+  test("lasso mode toggle switches modes and hides the brush size", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+
+    // Brush is the default mode: the brush-size slider is shown.
+    await expect(page.locator("#eraser-brush-size")).toBeVisible();
+
+    // Switch to lasso: the brush-size slider is hidden.
+    await page.getByTestId("eraser-mode-lasso").click();
+    await expect(page.locator("#eraser-brush-size")).not.toBeVisible();
+
+    // Switch back to brush: the slider returns.
+    await page.getByTestId("eraser-mode-brush").click();
+    await expect(page.locator("#eraser-brush-size")).toBeVisible();
+  });
+
+  test("drawing a lasso loop enables submit", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+
+    await page.getByTestId("eraser-mode-lasso").click();
+
+    const canvas = page.locator("canvas");
+    await canvas.waitFor({ state: "visible", timeout: 5_000 });
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas not found");
+
+    // Drag a closed quad around the middle of the canvas (>= 3 points, real area).
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5);
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.7);
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+    await page.mouse.up();
+
+    // A lasso region counts as a stroke: Undo appears and submit is enabled.
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+  });
+
+  // FIXME(pre-existing): needs per-file masks to persist across file switches,
+  // which is broken by the EraserCanvas remount on switch (see the strokes-persist
+  // fixme above). Un-fixme once that's fixed.
+  test.fixme("shows Erase All button when multiple files have masks", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoEraser(page);
 
     // Upload first file
     await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
@@ -154,32 +208,27 @@ test.describe("Erase Object tool", () => {
     // Button should say "Erase Object" (only one file has mask)
     await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase Object");
 
-    // Upload second file
+    // Add a DISTINCT second file and paint on it too.
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: /Add more/i }).click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(fixturePath("image/valid/test-200x150.png"));
+    await fileChooser.setFiles(fixturePath("image/valid/test-100x100.jpg"));
     await page.waitForTimeout(500);
 
-    // Switch to second file and paint
-    const fileEntries = page.locator("button").filter({ hasText: "test-200x150.png" });
-    const count = await fileEntries.count();
-    if (count >= 2) {
-      await fileEntries.nth(1).click();
-      await page.waitForTimeout(500);
+    await page.locator("button").filter({ hasText: "test-100x100.jpg" }).first().click();
+    await page.waitForTimeout(500);
 
-      const canvas2 = page.locator("canvas");
-      await canvas2.waitFor({ state: "visible", timeout: 5_000 });
-      box = await canvas2.boundingBox();
-      if (!box) throw new Error("Canvas not found");
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2);
-      await page.mouse.up();
-      await page.waitForTimeout(200);
+    const canvas2 = page.locator("canvas");
+    await canvas2.waitFor({ state: "visible", timeout: 5_000 });
+    box = await canvas2.boundingBox();
+    if (!box) throw new Error("Canvas not found");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
 
-      // Now button should say "Erase All (2)"
-      await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
-    }
+    // Both files now have masks -> batch submit button.
+    await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
   });
 });

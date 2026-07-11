@@ -29,4 +29,4 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_README }}
           repository: snapotter/snapotter
           readme-filepath: ./DOCKERHUB.md
-          short-description: "Self-hosted file toolkit. 200+ tools for Image, Video, Audio, PDF, and Files. Open source."
+          short-description: "Open-source, self-hosted file-processing infrastructure. 200+ tools, air-gap ready."

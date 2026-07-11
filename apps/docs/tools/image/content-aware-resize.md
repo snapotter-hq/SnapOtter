@@ -2,11 +2,11 @@
 description: Seam-carving resize that adds or removes pixels along low-importance paths to preserve key content and faces.
 ---
 
-# Content-Aware Resize
+# Content-Aware Resize {#content-aware-resize}
 
 Seam carving resize that intelligently removes or adds pixels along paths of least visual importance, preserving important content and optionally protecting faces.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/content-aware-resize`
 
@@ -14,7 +14,7 @@ Seam carving resize that intelligently removes or adds pixels along paths of lea
 
 **Model bundle:** None required for basic operation. Face protection uses the `face-detection` bundle (200-300 MB) if enabled.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -28,7 +28,7 @@ Seam carving resize that intelligently removes or adds pixels along paths of lea
 
 At least one of `width`, `height`, or `square` must be specified.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
@@ -36,7 +36,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK)
+## Response (200 OK) {#response-200-ok}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - This custom route currently returns a synchronous 200 response.
 - Uses the `caire` seam carving library for content-aware resizing.

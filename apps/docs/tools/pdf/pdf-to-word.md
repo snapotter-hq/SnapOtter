@@ -2,21 +2,21 @@
 description: Convert a PDF to a Word document (DOCX).
 ---
 
-# PDF to Word
+# PDF to Word {#pdf-to-word}
 
 Convert a text-based PDF to a Word document (DOCX). Best suited for PDFs with selectable text; scanned pages will need OCR first.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdf-to-word`
 
 Accepts multipart form data with a PDF file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a PDF and it will be converted to DOCX.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-word \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-word \
   -F "file=@report.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress`.
 
@@ -35,7 +35,7 @@ Returns `202 Accepted`. Track progress via SSE at `/api/v1/jobs/{jobId}/progress
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - Works best with text-based PDFs. Scanned or image-only pages will produce empty or minimal output; use [PDF OCR](./ocr-pdf) to add a text layer first.

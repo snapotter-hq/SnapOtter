@@ -6,21 +6,6 @@ let posthog: PostHogInstance | null = null;
 let initialized = false;
 let enabled = false; // live runtime flag; gates track() and ErrorBoundary capture
 
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
-}
-
-// App bundle frames are http(s) URLs. Keep the host-less pathname so Sentry can
-// match the frame to its uploaded source map, but drop the instance hostname
-// (not anonymous). Filesystem-style paths collapse to the basename so a local
-// path or username can never leave the browser.
-function scrubFramePath(p: string): string {
-  const url = p.match(/^https?:\/\/[^/]+(\/[^?#]*)?/i);
-  if (url) return url[1] ?? "/";
-  return basename(p);
-}
-
 // Only these keys may leave the browser per event, and only as primitives.
 const ALLOWED: Record<string, ReadonlySet<string>> = {
   tool_opened: new Set(["tool_id", "category", "modality"]),
@@ -48,22 +33,30 @@ function sanitize(event: string, properties?: Record<string, unknown>): Record<s
 export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   if (initialized || !config.enabled) return;
 
-  try {
-    const posthogJs = (await import("posthog-js")).default;
-    posthog =
-      posthogJs.init(config.posthogApiKey, {
-        api_host: config.posthogHost,
-        autocapture: false,
-        capture_pageview: true,
-        disable_session_recording: true,
-        ip: false,
-        persistence: "localStorage",
-        person_profiles: "identified_only",
-      }) ?? null;
+  if (!config.posthogApiKey) {
+    // Web-DSN-only bake: no PostHog key, so skip the PostHog SDK entirely
+    // (mirrors the API guard) instead of feeding it an empty key. Still mark
+    // the module live so the Sentry beforeSend gate below stays active.
     initialized = true;
     enabled = true;
-  } catch (err) {
-    console.warn("[analytics] PostHog init failed:", err);
+  } else {
+    try {
+      const posthogJs = (await import("posthog-js")).default;
+      posthog =
+        posthogJs.init(config.posthogApiKey, {
+          api_host: config.posthogHost,
+          autocapture: false,
+          capture_pageview: true,
+          disable_session_recording: true,
+          ip: false,
+          persistence: "localStorage",
+          person_profiles: "identified_only",
+        }) ?? null;
+      initialized = true;
+      enabled = true;
+    } catch (err) {
+      console.warn("[analytics] PostHog init failed:", err);
+    }
   }
 
   if (posthog) {
@@ -80,51 +73,28 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 
   try {
-    if (config.sentryDsn) {
+    if (config.sentryDsnWeb) {
       const Sentry = await import("@sentry/react");
+      const { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } = await import("@/lib/sentry-scrub");
+      // buildWebBeforeSend is typed on loose Record shapes so sentry-scrub.ts
+      // never imports @sentry/react (this module loads the SDK lazily); cast
+      // at this one boundary to the SDK callback type.
+      type SentryOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
       Sentry.init({
-        dsn: config.sentryDsn,
+        dsn: config.sentryDsnWeb,
         release:
           import.meta.env.VITE_SENTRY_RELEASE || (await import("@snapotter/shared")).APP_VERSION,
         environment: "production",
-        tracesSampleRate: config.sampleRate,
         sendDefaultPii: false,
-        integrations: [Sentry.browserTracingIntegration()],
-        beforeSend(event) {
-          if (!enabled) return null;
-          event.message = undefined;
-          event.logentry = undefined;
-          event.request = undefined;
-          event.extra = undefined;
-          event.contexts = undefined;
-          event.breadcrumbs = undefined;
-          event.user = undefined;
-          if (event.exception?.values) {
-            for (const ex of event.exception.values) {
-              ex.value = ex.type;
-              if (ex.stacktrace?.frames) {
-                for (const frame of ex.stacktrace.frames) {
-                  if (frame.filename) frame.filename = scrubFramePath(frame.filename);
-                  if (frame.abs_path) frame.abs_path = scrubFramePath(frame.abs_path);
-                  frame.vars = undefined;
-                }
-              }
-            }
-          }
-          // Keep debug_meta image paths consistent with the scrubbed frames so
-          // debug-id source-map matching still resolves, minus the hostname.
-          if (event.debug_meta?.images) {
-            for (const img of event.debug_meta.images) {
-              if ("code_file" in img && img.code_file) {
-                img.code_file = scrubFramePath(img.code_file);
-              }
-            }
-          }
-          return event;
-        },
-        beforeBreadcrumb() {
-          return null;
-        },
+        sendClientReports: false,
+        // Errors only: no tracing options, and release-health sessions are
+        // dropped by removing the session integration below.
+        integrations: (defaults) => defaults.filter((i) => i.name !== "BrowserSession"),
+        ignoreErrors: IGNORE_ERRORS,
+        denyUrls: DENY_URLS,
+        maxBreadcrumbs: 0,
+        beforeBreadcrumb: () => null,
+        beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
       });
     }
   } catch (err) {

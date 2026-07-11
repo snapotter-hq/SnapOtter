@@ -14,7 +14,9 @@ test.describe("Privacy Policy Page", () => {
 
   test("mentions PostHog as analytics provider", async ({ loggedInPage: page }) => {
     await page.goto("/privacy");
-    await expect(page.getByText(/posthog/i)).toBeVisible({ timeout: 5_000 });
+    // The page legitimately mentions PostHog more than once; first() avoids a
+    // strict-mode collision without weakening the presence assertion.
+    await expect(page.getByText(/posthog/i).first()).toBeVisible({ timeout: 5_000 });
   });
 
   test("mentions Sentry as error tracking provider", async ({ loggedInPage: page }) => {

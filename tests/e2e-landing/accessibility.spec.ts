@@ -13,8 +13,8 @@ test.describe("Heading Hierarchy", () => {
   for (const { path, name } of pages) {
     test(`${name} page has exactly one h1`, async ({ page }) => {
       await page.goto(path);
-      const h1Count = await page.locator("h1").count();
-      expect(h1Count).toBe(1);
+      // toHaveCount auto-waits, so it doesn't race the dev server's on-demand render.
+      await expect(page.locator("h1")).toHaveCount(1);
     });
   }
 });

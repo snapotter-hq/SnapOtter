@@ -2,13 +2,13 @@
 description: Deploy SnapOtter to production with Docker. Hardware requirements, GPU setup, and reverse proxy configs for Nginx, Traefik, and Cloudflare.
 ---
 
-# Deployment
+# Deployment {#deployment}
 
 SnapOtter deploys as a 3-container Docker Compose stack: the SnapOtter app image, PostgreSQL 17, and Redis 8. The app image supports **linux/amd64** (with NVIDIA CUDA for AI acceleration) and **linux/arm64** (CPU), so it runs natively on Intel/AMD servers, Apple Silicon Macs, and ARM devices like the Raspberry Pi 4/5. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today.
 
 See [Docker Image](./docker-tags) for GPU setup, Docker Compose examples, and version pinning.
 
-## Quick Start (CPU)
+## Quick Start (CPU) {#quick-start-cpu}
 
 ```yaml
 # docker-compose.yml - Copy this file and run: docker compose up -d
@@ -108,7 +108,7 @@ The app is then available at `http://localhost:1349`.
 
 > **Docker Hub rate limits?** Replace `snapotter/snapotter:latest` with `ghcr.io/snapotter-hq/snapotter:latest` to pull from GitHub Container Registry instead. Both registries receive the same image on every release.
 
-## Quick Start (NVIDIA CUDA)
+## Quick Start (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
 For NVIDIA CUDA acceleration on AI tools (background removal, upscaling, face enhancement, OCR):
 
@@ -205,11 +205,11 @@ docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-## Hardware Requirements
+## Hardware Requirements {#hardware-requirements}
 
 These numbers come from benchmarks across a range of systems, from a modern amd64 workstation with an NVIDIA RTX 4070 down to a Raspberry Pi, running the whole tool catalog on each and sweeping Docker resource limits to find the real floor.
 
-### Quick Reference
+### Quick Reference {#quick-reference}
 
 | Tier | Use Case | CPU | RAM | GPU | Storage |
 |------|----------|-----|-----|-----|---------|
@@ -219,7 +219,7 @@ These numbers come from benchmarks across a range of systems, from a modern amd6
 
 **Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`) — no image is built for it — nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
 
-### Minimum (image, files, and light PDF tools; no AI)
+### Minimum (image, files, and light PDF tools; no AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
 | Resource | Requirement |
 |---|---|
@@ -242,7 +242,7 @@ deploy:
 
 **The one CPU-heavy exception is video re-encoding.** Stream-copy operations (trim, mute, container remux) are instant, but transcoding to a different codec is CPU-bound. A 1080p / 45-second clip re-encoded to VP9 (WebM) takes roughly **~40 s** on a fast modern CPU, ~45 s on Apple Silicon, ~80 s on an older mobile 4-core, and **~130 s** on an older 4-core server. If your workload is video-heavy, prioritize CPU cores and clock speed, or raise the container's `cpus:` limit — the shipped compose caps the app at 4 cores by default (8 on the GPU compose).
 
-### Recommended (AI tools on CPU)
+### Recommended (AI tools on CPU) {#recommended-ai-tools-on-cpu}
 
 | Resource | Requirement |
 |---|---|
@@ -264,6 +264,10 @@ Most AI tools are perfectly usable on CPU; a couple really want a GPU. Measured 
 | AI upscale (RealESRGAN) | ~33 s small; minutes on large images | Marginal — GPU strongly recommended |
 | Photo restoration (full pipeline) | several minutes | No — needs a GPU or a fast many-core CPU |
 
+SnapOtter intentionally does not bake these model downloads into the Docker image. AI bundles are pulled only when an admin enables the related tool, stored in the persistent `/data/ai` volume, and shared by every tool that depends on the same model stack. This keeps the final container image small while still letting a full AI installation reach the larger storage numbers below.
+
+Some tools depend on more than one shared bundle. For example, Passport Photo needs both `background-removal` and `face-detection`; if `background-removal` is already installed, enabling Passport Photo only downloads the missing `face-detection` bundle. The same reuse applies across all AI tools.
+
 AI model download sizes:
 
 | Bundle | Disk Size |
@@ -284,7 +288,7 @@ deploy:
       memory: 4G
 ```
 
-### Full (AI tools on NVIDIA CUDA)
+### Full (AI tools on NVIDIA CUDA) {#full-ai-tools-on-nvidia-cuda}
 
 | Resource | Requirement |
 |---|---|
@@ -324,7 +328,7 @@ deploy:
           capabilities: [gpu]
 ```
 
-### Concurrent Users
+### Concurrent Users {#concurrent-users}
 
 Parallel image-resize requests against the default 4-core-capped app container:
 
@@ -336,13 +340,13 @@ Parallel image-resize requests against the default 4-core-capped app container:
 
 Response time degrades sub-linearly with no errors as the worker pool saturates. Raising the app container's `cpus:` limit (or using a host with more cores) lifts the ceiling. Note that heavy jobs (video transcode, CPU AI) hold a worker for their full duration, so size CPU to your expected number of concurrent heavy jobs, not just request count.
 
-### Supported Image Formats
+### Supported Image Formats {#supported-image-formats}
 
 SnapOtter supports **55+ input formats** and **14 output formats**, including RAW files from 20+ camera brands, professional formats (PSD, EPS, OpenEXR, HDR), modern codecs (JPEG XL, AVIF, HEIC, QOI), and scientific/gaming formats (FITS, DDS).
 
 See the [complete format list](/guide/supported-formats) for details on every supported format, decoder used, and available quality controls.
 
-### Known Limitations
+### Known Limitations {#known-limitations}
 
 - **Content-aware resize** crashes on large images (>5 MP) due to a limitation in the caire binary. Works fine with smaller images.
 - **HEIF decode** takes 13-23 seconds. HEIC (Apple's variant) is much faster at 0.3-0.9 seconds.
@@ -350,7 +354,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 - **Upscale** times out on CPU for anything beyond small images. GPU required for practical use.
 - **CodeFormer** face enhancement is significantly slower than GFPGAN (53s vs 2s on GPU). GFPGAN is recommended for most use cases.
 
-## Volumes
+## Volumes {#volumes}
 
 | Mount / Volume | Purpose | Required? |
 |---|---|---|
@@ -359,7 +363,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 | `SnapOtter-pgdata` (postgres) | PostgreSQL data directory (users, settings, pipelines, jobs) | **Yes** - data loss without it |
 | `SnapOtter-redisdata` (redis) | Redis append-only file for durable job queues | Recommended |
 
-### Bind mounts vs. named volumes
+### Bind mounts vs. named volumes {#bind-mounts-vs-named-volumes}
 
 **Named volumes** (recommended) — Docker manages permissions automatically:
 ```yaml
@@ -376,7 +380,7 @@ environment:
   - PGID=1000    # Your host GID (run: id -g)
 ```
 
-### Storage permissions
+### Storage permissions {#storage-permissions}
 
 SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error.
 
@@ -408,7 +412,7 @@ The image's writable directories are group-owned by GID 0 and group-writable, so
 
 The startup error names the exact UID to use, so the quickest path is to start the app once, read the message, then `chown` (or adjust the user) accordingly.
 
-## Environment Variables
+## Environment Variables {#environment-variables}
 
 | Variable | Default | Description |
 |---|---|---|
@@ -427,7 +431,7 @@ The startup error names the exact UID to use, so the quickest path is to start t
 | `SESSION_DURATION_HOURS` | `168` | Login session lifetime (7 days) |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins, or empty for same-origin |
 
-## Health Check
+## Health Check {#health-check}
 
 The container includes a built-in health check:
 
@@ -440,11 +444,11 @@ curl http://localhost:1349/api/v1/health
 # {"status":"healthy","version":"x.y.z"}
 ```
 
-## Reverse Proxy
+## Reverse Proxy {#reverse-proxy}
 
 SnapOtter sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
 
-### Nginx
+### Nginx {#nginx}
 
 ```nginx
 server {
@@ -471,7 +475,7 @@ server {
 }
 ```
 
-### Nginx Proxy Manager
+### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Add a new Proxy Host
 2. Set Domain Name to your domain
@@ -479,7 +483,7 @@ server {
 4. Enable WebSocket support
 5. Under Advanced, add: `client_max_body_size 500M;` and `proxy_buffering off;`
 
-### Traefik
+### Traefik {#traefik}
 
 ```yaml
 # Add these labels to the SnapOtter service in docker-compose.yml
@@ -494,7 +498,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-### Caddy
+### Caddy {#caddy}
 
 ```txt
 images.example.com {
@@ -510,7 +514,7 @@ images.example.com {
 
 `flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs). The extended timeouts allow large file uploads to complete without Caddy closing the connection early.
 
-### Cloudflare Tunnels
+### Cloudflare Tunnels {#cloudflare-tunnels}
 
 ```bash
 cloudflared tunnel --url http://localhost:1349
@@ -518,7 +522,7 @@ cloudflared tunnel --url http://localhost:1349
 
 Note: Cloudflare has a 100 MB upload limit on free plans. Set `MAX_UPLOAD_SIZE_MB=100` to match.
 
-## CI/CD
+## CI/CD {#ci-cd}
 
 The GitHub repository has three workflows:
 
@@ -534,11 +538,11 @@ gh workflow run release.yml
 
 Semantic-release determines the version from commit history. The `latest` Docker tag always points to the most recent release.
 
-## Analytics
+## Analytics {#analytics}
 
 SnapOtter includes anonymous product analytics (tool usage patterns, error reports) to help catch bugs and improve features. It is on by default. Your files, file names, and personal data are never part of this. SnapOtter works normally with analytics disabled.
 
-### Disabling analytics
+### Disabling analytics {#disabling-analytics}
 
 The runtime opt-out is a one-click admin toggle. Open Settings > System > Privacy and turn off Anonymous Product Analytics. It stops immediately for the whole instance, no rebuild required.
 

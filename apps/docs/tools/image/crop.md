@@ -2,17 +2,17 @@
 description: Crop images by specifying a region with position and dimensions.
 ---
 
-# Crop
+# Crop {#crop}
 
 Crop images by defining a rectangular region using position and size. Supports both pixel and percentage units.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/crop`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | height | number | Yes | - | Height of the crop region |
 | unit | string | No | `"px"` | Unit for the values: `px` or `percent` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/crop \
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/crop \
   -F 'settings={"left": 10, "top": 10, "width": 80, "height": 80, "unit": "percent"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -51,7 +51,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/crop \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The crop region must fit within the image boundaries. If the region extends beyond the image, the request will fail.
 - When using `percent` unit, values represent percentages of the image dimensions (e.g. `left: 10` means 10% from the left edge).

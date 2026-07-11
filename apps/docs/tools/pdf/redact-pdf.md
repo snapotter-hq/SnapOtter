@@ -2,24 +2,24 @@
 description: Permanently remove text occurrences from a PDF (verified true redaction).
 ---
 
-# Redact PDF
+# Redact PDF {#redact-pdf}
 
 Permanently remove specified text occurrences from a PDF using verified true redaction. The redacted text is completely removed from the file, not just covered with a black box.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/redact-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | terms | string[] | Yes | - | Text strings to redact (1-50 terms, each up to 200 characters) |
 | caseSensitive | boolean | No | `false` | Whether matching is case-sensitive |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/redact-pdf \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/redact-pdf \
   -F 'settings={"terms": ["John Doe", "555-0123"], "caseSensitive": false}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/redact-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - This is a fast (synchronous) tool that returns the result directly.

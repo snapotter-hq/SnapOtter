@@ -2,17 +2,17 @@
 description: Generate a tiny low-quality image placeholder with base64 data URI.
 ---
 
-# LQIP Placeholder
+# LQIP Placeholder {#lqip-placeholder}
 
 Generate a tiny low-quality image placeholder (LQIP) from a source image. Returns a small placeholder file along with a base64 data URI, ready-to-use HTML `<img>` tag, and CSS `background-image` snippet for immediate embedding.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/lqip-placeholder`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | format | string | No | `"webp"` | Output format: `webp`, `png`, or `jpeg` |
 | quality | integer | No | `50` | Output quality (1-100) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/lqip-placeholder \
@@ -31,7 +31,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/lqip-placeholder \
   -F 'settings={"width": 20, "strategy": "blur", "format": "webp"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -49,7 +49,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/lqip-placeholder \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The `dataUri` field contains the complete data URI, ready for use in `src` attributes or CSS without any additional requests.
 - The `html` and `css` fields provide copy-paste snippets for common use cases.

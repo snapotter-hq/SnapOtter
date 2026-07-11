@@ -2,17 +2,17 @@
 description: Crop a region out of a video.
 ---
 
-# Crop Video
+# Crop Video {#crop-video}
 
 Crop a rectangular region out of a video by specifying the region's size and position.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/crop-video`
 
 Accepts multipart form data with a video file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with a video file and a JSON `settings` field.
 | x | integer | No | `0` | Horizontal offset from the top-left corner |
 | y | integer | No | `0` | Vertical offset from the top-left corner |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/crop-video \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/crop-video \
   -F 'settings={"width": 640, "height": 480, "x": 100, "y": 50}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -41,7 +41,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/crop-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The crop region must fit within the video dimensions. If `x + width` or `y + height` exceeds the source size, the request returns a 400 error.
 - Minimum crop size is 16x16 pixels.

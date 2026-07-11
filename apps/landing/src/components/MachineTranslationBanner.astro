@@ -1,0 +1,83 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// apps/landing/src/components/MachineTranslationBanner.astro
+import { t } from "@/i18n";
+
+interface Props {
+  locale: string;
+}
+
+const { locale } = Astro.props;
+const CONTRIBUTE_URL = "https://docs.snapotter.com/guide/translations";
+---
+
+{locale !== "en" && (
+  <div
+    class="mt-banner border-b border-border bg-primary-subtle px-4 py-2 text-center text-xs text-foreground"
+    data-mt-banner
+    hidden
+  >
+    <span>{t(locale, "banner.machineTranslated")} </span>
+    <a href={CONTRIBUTE_URL} target="_blank" rel="noopener noreferrer" class="font-semibold text-primary-dark underline">
+      {t(locale, "banner.machineTranslated")}
+    </a>
+    <button
+      type="button"
+      class="ms-2 font-semibold text-muted hover:text-foreground"
+      aria-label={t(locale, "banner.dismiss")}
+      data-mt-dismiss
+    >
+      &times;
+    </button>
+  </div>
+)}
+
+<style is:global>
+  /* The banner is a fixed bar stacked directly below the 2.0 launch banner and
+     above the fixed navbar, so it is both visible and its dismiss button is
+     clickable. It drives --mt-h so the navbar and page content shift down by its
+     height; --mt-h collapses to 0 on English pages and after dismissal. The
+     launch banner is temporary, so this composes with --lb-h via calc(). */
+  :root { --mt-h: 0px; }
+
+  .mt-banner {
+    position: fixed;
+    top: var(--lb-h, 0px);
+    left: 0;
+    right: 0;
+    z-index: 55; /* above the navbar (z-50), below the launch banner (z-60) */
+  }
+
+  html:has(.mt-banner:not([hidden])) { --mt-h: 36px; }
+
+  /* Shift the fixed navbar and page content down by the launch + MT banner
+     heights. These selectors also live in LaunchBanner.astro; the combined
+     calc() here supersedes them without fighting the cascade. */
+  body { padding-top: calc(var(--lb-h, 0px) + var(--mt-h)); }
+  nav.fixed { top: calc(var(--lb-h, 0px) + var(--mt-h)); }
+</style>
+
+<script is:inline>
+  (function () {
+    var banner = document.querySelector("[data-mt-banner]");
+    if (!banner) return;
+    var KEY = "snapotter:mt-banner";
+    try {
+      if (localStorage.getItem(KEY) === "dismissed") {
+        banner.remove();
+        return;
+      }
+    } catch (e) {}
+    banner.hidden = false;
+    var close = banner.querySelector("[data-mt-dismiss]");
+    if (close) {
+      close.addEventListener("click", function () {
+        banner.hidden = true;
+        try {
+          localStorage.setItem(KEY, "dismissed");
+        } catch (e) {}
+      });
+    }
+  })();
+</script>

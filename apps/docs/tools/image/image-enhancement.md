@@ -2,11 +2,11 @@
 description: One-click auto-enhance that analyzes an image and corrects exposure, contrast, white balance, saturation, and sharpness.
 ---
 
-# Image Enhancement
+# Image Enhancement {#image-enhancement}
 
 One-click auto-improve with smart analysis. Analyzes the image and applies exposure, contrast, white balance, saturation, sharpness, and denoising corrections.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/image-enhancement`
 
@@ -14,7 +14,7 @@ One-click auto-improve with smart analysis. Analyzes the image and applies expos
 
 **Model bundle:** None required for basic enhancement. The `upscale-enhance` bundle (5-6 GB) is used only when `deepEnhance` is enabled (for AI noise removal via SCUNet).
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ One-click auto-improve with smart analysis. Analyzes the image and applies expos
 | corrections | object | No | all `true` | Selective corrections to apply (see below) |
 | deepEnhance | boolean | No | `false` | Enable AI-powered noise removal (requires `noise-removal` tool installed) |
 
-### Corrections Object
+### Corrections Object {#corrections-object}
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -35,7 +35,7 @@ One-click auto-improve with smart analysis. Analyzes the image and applies expos
 | sharpness | boolean | `true` | Auto-sharpen |
 | denoise | boolean | `true` | Light denoising |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement \
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement \
   -F 'settings={"mode":"portrait","intensity":70,"corrections":{"exposure":true,"contrast":true,"sharpness":false}}'
 ```
 
-## Response (200 OK)
+## Response (200 OK) {#response-200-ok}
 
 ```json
 {
@@ -54,26 +54,26 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement \
 }
 ```
 
-## Analyze Endpoint
+## Analyze Endpoint {#analyze-endpoint}
 
 `POST /api/v1/tools/image/image-enhancement/analyze`
 
 Analyzes an image and returns correction recommendations without applying them.
 
-### Parameters
+### Parameters {#parameters-1}
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | file | file | Yes | Image file (multipart) |
 
-### Example Request
+### Example Request {#example-request-1}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement/analyze \
   -F "file=@photo.jpg"
 ```
 
-### Response (200 OK)
+### Response (200 OK) {#response-200-ok-1}
 
 ```json
 {
@@ -87,7 +87,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-enhancement/analyze 
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - This tool uses the synchronous `createToolRoute` factory, so it returns a standard response (not 202 async).
 - The `mode` parameter adjusts how corrections are weighted (e.g., portrait mode is gentler on skin tones, landscape mode boosts saturation).

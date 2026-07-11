@@ -2,17 +2,17 @@
 description: Turn a video clip into an animated GIF.
 ---
 
-# Video to GIF
+# Video to GIF {#video-to-gif}
 
 Turn a video clip into an animated GIF with configurable frame rate, width, start time, and duration.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/video-to-gif`
 
 Accepts multipart form data with a video file and a JSON `settings` field. This is an async endpoint - it returns `202 Accepted` immediately and progress is streamed via SSE at `GET /api/v1/jobs/{jobId}/progress`.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Accepts multipart form data with a video file and a JSON `settings` field. This 
 | startS | number | No | `0` | Start time in seconds (must be >= 0) |
 | durationS | number | No | `5` | Duration in seconds (above 0, max 60) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/video-to-gif \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-to-gif \
   -F 'settings={"fps": 15, "width": 320, "startS": 2, "durationS": 8}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-to-gif \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Lower `fps` and `width` values produce smaller GIF files. A 480px-wide GIF at 12 fps is usually a good balance.
 - Maximum duration is 60 seconds. Longer clips produce very large files.

@@ -2,17 +2,17 @@
 description: Crop an image to a centered circle with transparent corners.
 ---
 
-# Circle Crop
+# Circle Crop {#circle-crop}
 
 Crop an image to a centered circle with transparent corners. Supports adjustable zoom, offset, border, and output size.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/circle-crop`
 
 Accepts multipart form data with an image file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -24,7 +24,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | background | string | No | `"transparent"` | Corner fill: `"transparent"` or a hex color |
 | outputSize | integer | No | - | Final square dimension in pixels (16-4096) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/circle-crop \
@@ -33,7 +33,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/circle-crop \
   -F 'settings={"zoom": 1.2, "borderWidth": 4, "borderColor": "#333333"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/circle-crop \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Output is always PNG to preserve the transparent corners (unless `background` is set to a solid color).
 - The circle is inscribed within the shorter dimension of the image. Use `zoom` to crop tighter and `offsetX`/`offsetY` to shift the visible area.

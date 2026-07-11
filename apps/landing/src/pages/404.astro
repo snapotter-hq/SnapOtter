@@ -2,7 +2,12 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 import Footer from "@/components/Footer.astro";
 import Navbar from "@/components/Navbar.astro";
+import { t } from "@/i18n";
 import Base from "@/layouts/Base.astro";
+
+// Astro's static 404 page cannot use getStaticPaths, so it renders once in the
+// default locale (English). Strings still resolve through the catalog for parity.
+const locale = "en";
 ---
 
 <Base
@@ -14,12 +19,12 @@ import Base from "@/layouts/Base.astro";
 
   <main id="main" class="flex min-h-[60vh] flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
     <div class="reveal">
-      <p class="text-6xl font-bold text-primary">404</p>
+      <p class="text-6xl font-bold text-primary">{t(locale, "notFound.code")}</p>
       <h1 class="mt-4 font-display text-3xl font-bold tracking-tight md:text-4xl">
-        Page not found
+        {t(locale, "notFound.title")}
       </h1>
       <p class="mt-4 text-lg text-muted">
-        The page you are looking for does not exist or has been moved.
+        {t(locale, "notFound.body")}
       </p>
       <a
         href="/"
@@ -29,7 +34,7 @@ import Base from "@/layouts/Base.astro";
           <path d="m12 19-7-7 7-7" />
           <path d="M19 12H5" />
         </svg>
-        Back to homepage
+        {t(locale, "notFound.back")}
       </a>
     </div>
   </main>

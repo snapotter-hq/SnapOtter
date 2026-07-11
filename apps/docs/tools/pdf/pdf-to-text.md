@@ -2,21 +2,21 @@
 description: Extract plain text from a PDF.
 ---
 
-# PDF to Text
+# PDF to Text {#pdf-to-text}
 
 Extract all readable plain text from a PDF document into a text file.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/pdf-to-text`
 
 Accepts multipart form data with a PDF file.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload a PDF and its text content will be extracted.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-text \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-text \
   -F "file=@report.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -36,7 +36,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-to-text \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Accepted input format: `.pdf`.
 - This is a fast (synchronous) tool that returns the result directly.

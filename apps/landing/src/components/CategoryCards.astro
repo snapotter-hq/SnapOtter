@@ -2,6 +2,13 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
 
 function renderIcon(iconName: string): string {
   const iconData = (lucideIcons as Record<string, unknown>)[iconName];
@@ -20,47 +27,47 @@ const MODALITIES = [
   {
     id: "image",
     section: "image",
-    label: "Image Tools",
-    blurb: "Edit, resize, and enhance",
+    label: t(locale, "home.categoryCards.image.label"),
+    blurb: t(locale, "home.categoryCards.image.blurb"),
     icon: "Image",
     color: "#E07832",
   },
   {
     id: "video",
     section: "video",
-    label: "Video Tools",
-    blurb: "Trim, convert, and caption",
+    label: t(locale, "home.categoryCards.video.label"),
+    blurb: t(locale, "home.categoryCards.video.blurb"),
     icon: "Video",
     color: "#BE4A3C",
   },
   {
     id: "audio",
     section: "audio",
-    label: "Audio Tools",
-    blurb: "Convert, trim, and transcribe",
+    label: t(locale, "home.categoryCards.audio.label"),
+    blurb: t(locale, "home.categoryCards.audio.blurb"),
     icon: "Music",
     color: "#2C7A75",
   },
   {
     id: "document",
     section: "pdf",
-    label: "PDF & Documents",
-    blurb: "Merge, split, and convert",
+    label: t(locale, "home.categoryCards.document.label"),
+    blurb: t(locale, "home.categoryCards.document.blurb"),
     icon: "FileText",
     color: "#44568C",
   },
   {
     id: "file",
     section: "files",
-    label: "File Tools",
-    blurb: "Convert and transform",
+    label: t(locale, "home.categoryCards.file.label"),
+    blurb: t(locale, "home.categoryCards.file.blurb"),
     icon: "Database",
     color: "#5C8642",
   },
 ];
 
 const cards = MODALITIES.map((m) => {
-  const tools = TOOLS.filter((t) => toolSection(t) === m.section);
+  const tools = TOOLS.filter((tool) => toolSection(tool) === m.section);
   return { ...m, count: tools.length };
 });
 ---
@@ -69,7 +76,7 @@ const cards = MODALITIES.map((m) => {
   <div class="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
     {cards.map((c) => (
       <a
-        href={`/tools/${c.section}/`}
+        href={localizeHref(locale, `/tools/${c.section}/`)}
         class="group flex flex-col rounded-2xl p-4 text-start text-white no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
         style={`background-color: ${c.color}`}
       >
@@ -77,7 +84,7 @@ const cards = MODALITIES.map((m) => {
           <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={renderIcon(c.icon)} />
           </span>
-          <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{c.count} tools</span>
+          <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{t(locale, "home.categoryCards.toolCount", { count: c.count })}</span>
         </div>
 
         <div class="mt-4 flex items-center gap-1.5">

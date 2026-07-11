@@ -2,24 +2,24 @@
 description: Convert audio between MP3, WAV, OGG, FLAC, and M4A formats.
 ---
 
-# Convert Audio
+# Convert Audio {#convert-audio}
 
 Convert audio files between common formats including MP3, WAV, OGG, FLAC, and M4A, with configurable output bitrate.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/audio/convert-audio`
 
 Accepts multipart form data with an audio file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | format | string | No | `"mp3"` | Output format: `mp3`, `wav`, `ogg`, `flac`, `m4a` |
 | bitrateKbps | integer | No | `192` | Output bitrate in kbps (32 to 320) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
   -F 'settings={"format": "flac", "bitrateKbps": 256}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Supported input formats include MP3, WAV, OGG, FLAC, AAC, M4A, WMA, AIFF, and OPUS.
 - Bitrate only applies to lossy formats (MP3, OGG, M4A). Lossless formats like WAV and FLAC ignore this setting.

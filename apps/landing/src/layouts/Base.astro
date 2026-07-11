@@ -3,6 +3,9 @@
 import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import LaunchBanner from "@/components/LaunchBanner.astro";
+import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
+import { LANDING_LOCALES, t } from "@/i18n";
+import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
 
 interface Props {
   title?: string;
@@ -11,11 +14,13 @@ interface Props {
   ogImage?: string;
   ogType?: string;
   noindex?: boolean;
+  locale?: string;
+  path?: string; // un-prefixed page path for hreflang, e.g. "/faq" or "/"
 }
 
 const toolCount = TOOLS.length;
-const defaultTitle = `SnapOtter | Self-Hosted File Processing (Image, Video, Audio, PDF, Files)`;
-const defaultDescription = `Self-hosted, open-source file toolkit. ${toolCount} tools across image, video, audio, PDF, and files, plus a free layer-based image editor. The open-source alternative to Smallpdf, iLovePDF, and CloudConvert, on infrastructure you own.`;
+const defaultTitle = `SnapOtter | Self-Hosted File-Processing Infrastructure`;
+const defaultDescription = `Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, via UI, REST API, and pipelines. ${toolCount > 200 ? "200+" : toolCount} tools in one stack. Your files never leave your network.`;
 
 const {
   title = defaultTitle,
@@ -24,14 +29,46 @@ const {
   ogImage = "/og-image.png",
   ogType = "website",
   noindex = false,
+  locale = "en",
+  path = "/",
 } = Astro.props;
+
+const alternates = altLinks(path);
+const htmlDir = dirFor(locale);
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale} dir={htmlDir}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Locale recall: send a returning visitor to the language they explicitly picked
+         (stored on switch in LanguageSwitcher). Render-blocking so there is no flash.
+         Crawler-safe: bots have no localStorage. Only acts on the default English pages,
+         and never on the English-only tool-detail pages (which have no localized version),
+         so it can never redirect to a URL that does not exist. -->
+    <script
+      is:inline
+      define:vars={{
+        recallCurrent: locale,
+        recallPath: path,
+        recallLocales: LANDING_LOCALES.filter((c) => c !== "en"),
+      }}
+    >
+      (function () {
+        try {
+          if (recallCurrent !== "en") return;
+          var stored = localStorage.getItem("snapotter:locale");
+          if (!stored || recallLocales.indexOf(stored) === -1) return;
+          var segs = recallPath.split("/").filter(Boolean);
+          if (segs[0] === "tools" && segs.length === 3) return;
+          var target = "/" + stored + (recallPath === "/" ? "/" : recallPath);
+          if (target.charAt(target.length - 1) !== "/") target += "/";
+          location.replace(target + location.search + location.hash);
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- TEMP: 2.0 launch banner dismissal. Render-blocking so a returning visitor
          who closed the banner never sees it flash. Remove with the banner. -->
@@ -46,6 +83,9 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+
+    <!-- Reciprocal hreflang alternates + x-default (i18n) -->
+    {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
 
     {noindex && <meta name="robots" content="noindex, nofollow" />}
 
@@ -64,7 +104,10 @@ const {
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content="SnapOtter" />
     <meta property="og:type" content={ogType} />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content={ogLocale(locale)} />
+    {alternates
+      .filter((a) => a.hreflang !== "x-default" && a.hreflang !== locale)
+      .map((a) => <meta property="og:locale:alternate" content={ogLocale(a.hreflang)} />)}
     <meta property="og:image" content={`https://snapotter.com${ogImage}`} />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="640" />
@@ -94,7 +137,8 @@ const {
     <slot name="head" />
   </head>
   <body>
-    <a href="#main" class="skip-link">Skip to content</a>
+    <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
+    <MachineTranslationBanner locale={locale} />
     <LaunchBanner />
     <slot />
 

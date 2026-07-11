@@ -1,0 +1,83 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// apps/landing/src/components/LanguageSwitcher.astro
+import { LANDING_LOCALES, nativeName, t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+
+interface Props {
+  locale: string;
+  path: string; // the un-prefixed page path, e.g. "/faq"
+}
+
+const { locale, path } = Astro.props;
+const options = LANDING_LOCALES.map((code) => ({
+  code,
+  label: nativeName(code),
+  href: localizeHref(code, path),
+}));
+---
+
+<div class="relative" data-language-switcher>
+  <button
+    type="button"
+    class="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm font-medium transition-colors hover:bg-background-alt"
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    aria-label={t(locale, "switcher.label")}
+    data-switcher-button
+  >
+    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+    <span>{nativeName(locale)}</span>
+  </button>
+  <ul
+    class="absolute end-0 z-50 mt-2 hidden max-h-80 w-44 overflow-y-auto rounded-xl border border-border bg-surface py-1.5 text-sm shadow-xl"
+    role="listbox"
+    data-switcher-menu
+  >
+    {options.map((o) => (
+      <li>
+        <a
+          href={o.href}
+          class="block px-4 py-2 text-foreground no-underline transition-colors hover:bg-primary-subtle"
+          data-locale={o.code}
+          aria-current={o.code === locale ? "true" : undefined}
+        >
+          {o.label}
+        </a>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<script is:inline>
+  (function () {
+    document.querySelectorAll("[data-language-switcher]").forEach(function (root) {
+      var btn = root.querySelector("[data-switcher-button]");
+      var menu = root.querySelector("[data-switcher-menu]");
+      if (!btn || !menu) return;
+      btn.addEventListener("click", function () {
+        var open = !menu.classList.contains("hidden");
+        menu.classList.toggle("hidden");
+        btn.setAttribute("aria-expanded", String(!open));
+      });
+      menu.querySelectorAll("a[data-locale]").forEach(function (a) {
+        a.addEventListener("click", function () {
+          try {
+            localStorage.setItem("snapotter:locale", a.getAttribute("data-locale") || "en");
+          } catch (e) {}
+        });
+      });
+      document.addEventListener("click", function (e) {
+        if (!root.contains(e.target)) {
+          menu.classList.add("hidden");
+          btn.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+  })();
+</script>

@@ -2,21 +2,21 @@
 description: Convert all colors in a PDF to grayscale.
 ---
 
-# Grayscale PDF
+# Grayscale PDF {#grayscale-pdf}
 
 Convert all colors in a PDF to grayscale, producing a black-and-white version of the document.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/grayscale-pdf`
 
 Accepts multipart form data with a PDF file. No `settings` field is required.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no settings parameters. Upload the PDF file directly.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/grayscale-pdf \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/grayscale-pdf \
   -F "file=@document.pdf"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/grayscale-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - All color spaces (RGB, CMYK) are converted to grayscale, including embedded images, vector graphics, and text.
 - The output file is often smaller than the original because grayscale data requires fewer bytes per pixel.

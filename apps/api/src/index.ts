@@ -5,21 +5,22 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
-import { APP_VERSION } from "@snapotter/shared";
+import { APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
 import { closeDb, db, schema } from "./db/index.js";
 import { runMigrations } from "./db/migrate.js";
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
-import { closeRedis, pingRedis } from "./jobs/connection.js";
+import { assertRedisCompatible, closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
-import { captureException, initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
+import { initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
+import { reportError } from "./lib/error-report.js";
 import { stripInternalPaths } from "./lib/errors.js";
 import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
 import { logger } from "./lib/logger.js";
@@ -87,6 +88,16 @@ try {
     `FATAL: Cannot connect to Redis at ${safeUrl}. Is Redis running? (docker compose up, or set REDIS_URL)`,
   );
   console.error(err);
+  process.exit(1);
+}
+
+// BullMQ v5 requires Redis >= 6.2. Fail fast with an actionable message instead
+// of crash-looping later on ReplyErrors from an incompatible server.
+try {
+  await assertRedisCompatible();
+} catch (err) {
+  const detected = err instanceof SafeError && err.code ? ` (detected ${err.code})` : "";
+  console.error(`FATAL: ${(err as Error).message}${detected}`);
   process.exit(1);
 }
 console.log("Redis connected");
@@ -276,7 +287,12 @@ app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => 
       { err: error, url: request.url, method: request.method },
       "Unhandled request error",
     );
-    captureException(error);
+    void reportError(error, {
+      source: "http",
+      route: request.routeOptions?.url ?? undefined,
+      method: request.method,
+      statusCode,
+    });
   } else {
     request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
   }

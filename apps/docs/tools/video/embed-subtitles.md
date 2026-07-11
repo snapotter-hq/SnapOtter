@@ -2,23 +2,23 @@
 description: Mux a subtitle track into the video container.
 ---
 
-# Embed Subtitles
+# Embed Subtitles {#embed-subtitles}
 
 Mux a subtitle file into the video container as a soft subtitle track that viewers can toggle on or off.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/embed-subtitles`
 
 Accepts multipart form data with a video file and a subtitle file, plus a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | language | string | No | `"eng"` | ISO 639-2/B language code (3 lowercase letters, e.g. `"eng"`, `"fra"`, `"deu"`) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/embed-subtitles \
@@ -28,7 +28,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/embed-subtitles \
   -F 'settings={"language": "fra"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -39,7 +39,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/embed-subtitles \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Upload two files: the first must be a video, the second must be a subtitle file (.srt, .vtt, or .ass).
 - Embedded (soft) subtitles can be toggled by the viewer in their media player. For permanently visible subtitles, use the Burn Subtitles tool instead.

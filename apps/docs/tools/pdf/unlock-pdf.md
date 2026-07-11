@@ -2,23 +2,23 @@
 description: Remove password protection from a PDF.
 ---
 
-# Unlock PDF
+# Unlock PDF {#unlock-pdf}
 
 Remove password protection from an encrypted PDF by providing the correct password.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/pdf/unlock-pdf`
 
 Accepts multipart form data with a PDF file and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | password | string | Yes | - | Password to decrypt the PDF (1-256 characters) |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/pdf/unlock-pdf \
@@ -27,7 +27,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/unlock-pdf \
   -F 'settings={"password": "s3cret"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -38,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/unlock-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The correct password must be provided; an incorrect password returns a 400 error.
 - Either the user password or the owner password will work for decryption.

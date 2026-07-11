@@ -2,15 +2,15 @@
 description: Convert SVG files to PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF, or JXL at custom resolution and DPI, with batch support.
 ---
 
-# SVG to Raster
+# SVG to Raster {#svg-to-raster}
 
 Convert SVG files to raster image formats (PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF, or JXL) at custom resolution and DPI. Also supports batch conversion of multiple SVGs.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/svg-to-raster`
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -21,7 +21,7 @@ Convert SVG files to raster image formats (PNG, JPEG, WebP, AVIF, TIFF, GIF, HEI
 | backgroundColor | string | No | `"#00000000"` | Background color as hex (6 or 8 characters, 8-char includes alpha) |
 | outputFormat | string | No | `"png"` | Output format: `png`, `jpg`, `webp`, `avif`, `tiff`, `gif`, `heif`, `jxl` |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/svg-to-raster \
@@ -29,7 +29,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/svg-to-raster \
   -F 'settings={"width":1024,"dpi":300,"outputFormat":"png","backgroundColor":"#FFFFFF"}'
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -41,19 +41,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/svg-to-raster \
 }
 ```
 
-## Batch Endpoint
+## Batch Endpoint {#batch-endpoint}
 
 `POST /api/v1/tools/image/svg-to-raster/batch`
 
 Convert multiple SVG files in one request. Returns a ZIP archive.
 
-### Additional Batch Parameters
+### Additional Batch Parameters {#additional-batch-parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | clientJobId | string | No | - | Optional client-provided job ID for progress tracking (max 128 chars) |
 
-### Batch Example Request
+### Batch Example Request {#batch-example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/svg-to-raster/batch \
@@ -63,14 +63,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/svg-to-raster/batch \
   -F 'settings={"width":512,"outputFormat":"png","dpi":150}'
 ```
 
-### Batch Response
+### Batch Response {#batch-response}
 
 The batch endpoint streams a ZIP file directly with headers:
 - `Content-Type: application/zip`
 - `X-Job-Id: <jobId>`
 - `X-File-Results: <url-encoded JSON mapping of index to filename>`
 
-## Notes
+## Notes {#notes}
 
 - Only accepts SVG and SVGZ files (validates content, not just extension). SVGZ is automatically decompressed.
 - SVG content is sanitized before rendering to prevent XSS and external resource loading.

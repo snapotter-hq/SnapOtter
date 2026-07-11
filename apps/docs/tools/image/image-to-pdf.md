@@ -2,17 +2,17 @@
 description: Combine one or more images into a PDF document with page size, orientation, and target file size options.
 ---
 
-# Image to PDF
+# Image to PDF {#image-to-pdf}
 
 Combine one or more images into a PDF document. Supports multiple page sizes, orientations, margins, and optional file size targeting via quality adjustment.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/image-to-pdf`
 
 Accepts multipart form data with one or more image files and a JSON `settings` field.
 
-## Parameters
+## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -22,7 +22,7 @@ Accepts multipart form data with one or more image files and a JSON `settings` f
 | targetSize | object | No | - | Target file size constraint (see below) |
 | collate | boolean | No | `true` | Combine all images into one PDF. If `false`, creates one PDF per image. |
 
-### Target Size Object
+### Target Size Object {#target-size-object}
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -31,7 +31,7 @@ Accepts multipart form data with one or more image files and a JSON `settings` f
 
 Minimum target size is 50 KB.
 
-## Example Request
+## Example Request {#example-request}
 
 Basic multi-image PDF:
 
@@ -64,7 +64,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-pdf \
   -F 'settings={"collate": false}'
 ```
 
-## Example Response (Collated)
+## Example Response (Collated) {#example-response-collated}
 
 ```json
 {
@@ -76,7 +76,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-pdf \
 }
 ```
 
-## Example Response (Non-Collated)
+## Example Response (Non-Collated) {#example-response-non-collated}
 
 ```json
 {
@@ -89,7 +89,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-pdf \
 }
 ```
 
-## Example Response (With Target Size)
+## Example Response (With Target Size) {#example-response-with-target-size}
 
 ```json
 {
@@ -106,7 +106,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-pdf \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - Images are centered on the page and scaled to fit within the margins while preserving aspect ratio. Images are never upscaled.
 - When `collate` is `false`, each image becomes a separate PDF file, and the download is a ZIP archive containing all PDFs.

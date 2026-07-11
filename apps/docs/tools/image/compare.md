@@ -2,17 +2,17 @@
 description: Compare two images side by side with pixel-level diff visualization and similarity score.
 ---
 
-# Image Compare
+# Image Compare {#image-compare}
 
 Upload two images to compute a pixel-level difference map and a numerical similarity percentage. The output is a diff image highlighting changed regions in red.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/compare`
 
 Accepts multipart form data with **two** image files. No settings field is needed.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no configurable parameters. Upload exactly two image files.
 
@@ -21,7 +21,7 @@ This tool has no configurable parameters. Upload exactly two image files.
 | file (first) | file | Yes | The first image |
 | file (second) | file | Yes | The second image |
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compare \
@@ -30,7 +30,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compare \
   -F "file=@modified.jpg"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -43,7 +43,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compare \
 }
 ```
 
-## Response Fields
+## Response Fields {#response-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -54,7 +54,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/compare \
 | originalSize | number | Combined size of both input images in bytes |
 | processedSize | number | Size of the diff output image in bytes |
 
-## Notes
+## Notes {#notes}
 
 - Both images are resized to the same dimensions (the maximum of each axis) before comparison.
 - The diff image highlights differences in red with opacity proportional to the magnitude of change. Identical or near-identical pixels (difference < 10) are shown as semi-transparent versions of the original.

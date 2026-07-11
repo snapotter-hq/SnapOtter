@@ -2,21 +2,21 @@
 description: Remove the audio track from a video.
 ---
 
-# Mute Video
+# Mute Video {#mute-video}
 
 Remove the audio track from a video, leaving only the visual stream.
 
-## API Endpoint
+## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/video/mute-video`
 
 Accepts multipart form data with a video file. This tool has no configurable settings.
 
-## Parameters
+## Parameters {#parameters}
 
 This tool has no parameters. It strips the audio track from the uploaded video.
 
-## Example Request
+## Example Request {#example-request}
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/video/mute-video \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/mute-video \
   -F "file=@clip.mp4"
 ```
 
-## Example Response
+## Example Response {#example-response}
 
 ```json
 {
@@ -35,7 +35,7 @@ curl -X POST http://localhost:1349/api/v1/tools/video/mute-video \
 }
 ```
 
-## Notes
+## Notes {#notes}
 
 - The video stream is copied without re-encoding, so there is no quality loss.
 - If the input video has no audio track, the file is returned unchanged.
