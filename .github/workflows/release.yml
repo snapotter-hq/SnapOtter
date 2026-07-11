@@ -412,6 +412,12 @@ jobs:
     name: Create Multi-Arch Manifests
     needs: [release, docker, scan]
     runs-on: ubuntu-latest
+    # Manual publish gate: this job creates the public `latest` / version tags on
+    # Docker Hub + GHCR (the point at which images become pullable by tag). The
+    # `publish-images` environment requires a maintainer to approve the run in the
+    # Actions UI before it proceeds, so a release never auto-publishes to the
+    # registries. The image is already built and Trivy-scanned by this point.
+    environment: publish-images
     permissions:
       contents: read
       packages: write
