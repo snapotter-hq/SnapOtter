@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "0fe4d5d55062",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg fokus pada satu tugas dan melakukannya dengan baik. SnapOtter menjalankan penghapusan latar belakang secara lokal, lalu menambahkan kompresi, konversi, upscaling, OCR, dan seluruh katalog lainnya dalam satu deployment.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "5e65913d1a01",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Ya. Penghapusan latar belakang SnapOtter berjalan secara lokal setelah pemasangan model-bundle satu kali, sehingga gambar tidak pernah keluar dari jaringan Anda dan tidak ada kredit per gambar.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "c54a925c7ccb",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Apakah ada alternatif self-hosted untuk remove.bg?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "dba36af53067",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Tidak. Ia berjalan di CPU, dan menggunakan GPU secara otomatis jika tersedia untuk mempercepat pemrosesan batch.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "62733cb033ce",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Apakah membutuhkan GPU?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "248ea7e8bd48",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "Alternatif remove.bg yang open-source dan self-hosted",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "f3c6184e9e80",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg adalah penghapus latar belakang hosted yang cepat. SnapOtter adalah alternatif self-hosted yang menjalankan jenis AI yang sama di perangkat keras Anda sendiri, sehingga gambar produk dan orang tidak pernah dikirim ke layanan pihak ketiga.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "05ada0e397f8",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg menghapus latar belakang gambar di cloud. SnapOtter menjalankan penghapusan latar belakang secara lokal di server Anda sendiri, dengan 200+ tool lainnya dalam satu stack yang sama.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "3218e6240d21",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "Alternatif remove.bg yang Open-Source dan Self-Hosted",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "0ce7a21ff21d",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Layanan web hosted",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "18c0864aa8f1",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Model deployment",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "3a84d1dd78d7",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Self-hosted di server Anda",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "4e500df7b2b9",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Gambar diunggah ke API milik vendor untuk diproses",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "a3bfd202c3d5",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Lokasi pemrosesan file",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "47edcdf01b47",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Infrastruktur Anda sendiri",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "82cdc90ebd50",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Penetapan harga berbasis kredit per gambar",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "e3e7a28a9aad",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Kendali biaya",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "cf264e79ddda",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Gratis dengan lisensi AGPLv3; batasannya hanya perangkat keras Anda",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6408375f9490",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Dirancang untuk penggunaan online berbasis browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "04694cd2d170",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Penggunaan offline / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "931b79ecf028",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Didukung saat di-deploy di dalam jaringan Anda",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "fd7b6a6293b6",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Penghapusan latar belakang",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "c7b06b1ea612",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Selain penghapusan latar belakang",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "9b86cfeb4339",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Gambar, video, audio, PDF, dan file",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "77f19c1fa745",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Layanan yang dioperasikan vendor; ketersediaan kode sumber bukan bagian dari model produknya",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "4536d2a91b4e",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Sumber dan kemampuan audit",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "8398912ccdc7",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Kode sumber tersedia di bawah lisensi AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "09d32c0f3b45",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API milik vendor dengan kredit per gambar",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "7ff0d6ac967b",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Otomasi",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "63acc300e886",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API dan pipeline di dalam deployment Anda",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "8c4fcf0a26ff",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf fokus pada PDF, dan itulah yang dibutuhkan banyak orang. SnapOtter menutup jalur itu dengan penggabungan, pemisahan, kompresi, konversi, redaksi, OCR, dan lainnya, lalu menambahkan alur kerja gambar, video, audio, dan file dalam deployment yang sama.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

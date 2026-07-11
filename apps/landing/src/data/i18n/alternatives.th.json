@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "d02b672ee5a8",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg มุ่งเน้นทำงานเดียวและทำได้ดี ส่วน SnapOtter รันการลบพื้นหลังในเครื่อง แล้วยังเพิ่มการบีบอัด การแปลงไฟล์ การขยายความละเอียด OCR และเครื่องมืออื่นๆ ทั้งหมดในการติดตั้งเดียว",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "60ea7f23444f",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "มี การลบพื้นหลังของ SnapOtter ทำงานในเครื่องหลังจากติดตั้งชุดโมเดลเพียงครั้งเดียว รูปภาพจึงไม่ออกจากเครือข่ายของคุณ และไม่มีค่าเครดิตต่อรูปภาพ",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "a934f303d539",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "มีทางเลือกแบบ self-hosted แทน remove.bg ไหม?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "4d36883ef2f3",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "ไม่ต้อง ทำงานบน CPU ได้ และจะใช้ GPU โดยอัตโนมัติหากมี เพื่อประมวลผลแบบชุดได้เร็วขึ้น",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "aa7c62c4458a",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "ต้องใช้ GPU ไหม?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "9e97645a4968",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ self-hosted แทน remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "459b6e0ce65c",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg เป็นตัวลบพื้นหลังแบบโฮสต์ที่ทำงานได้รวดเร็ว ส่วน SnapOtter เป็นทางเลือกแบบ self-hosted ที่รัน AI ประเภทเดียวกันบนฮาร์ดแวร์ของคุณเอง รูปภาพสินค้าและรูปภาพบุคคลจึงไม่ถูกส่งออกไปยังบริการของบุคคลที่สามเลย",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "ae579f45dd6c",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg ลบพื้นหลังรูปภาพบนคลาวด์ ส่วน SnapOtter ประมวลผลการลบพื้นหลังในเครื่องบนเซิร์ฟเวอร์ของคุณเอง พร้อมเครื่องมืออีกกว่า 200+ ตัวในสแตกเดียวกัน",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "1901aaa0c116",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "ทางเลือกโอเพนซอร์สแบบ Self-Hosted แทน remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "f98651759f01",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "บริการเว็บแบบโฮสต์",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "6ac04ced7d38",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "รูปแบบการติดตั้ง",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "6d02db248e6b",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Self-hosted บนเซิร์ฟเวอร์ของคุณ",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "bcd7ddd66057",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "รูปภาพถูกอัปโหลดไปยัง API ที่ผู้ให้บริการโฮสต์เพื่อประมวลผล",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "87e8926c8295",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "ตำแหน่งการประมวลผลไฟล์",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "0ddfc0890b93",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "โครงสร้างพื้นฐานของคุณเอง",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "00cb9ede6cc8",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "คิดราคาตามเครดิตต่อรูปภาพ",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "e2bc0350ec20",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "การควบคุมค่าใช้จ่าย",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "637f8359899c",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "ฟรีภายใต้ AGPLv3 ข้อจำกัดขึ้นอยู่กับฮาร์ดแวร์ของคุณ",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "d5a0acc1e90a",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "ออกแบบมาสำหรับการใช้งานออนไลน์ผ่านเบราว์เซอร์",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "3e62df5e9806",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "การใช้งานแบบออฟไลน์ / air-gapped",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "510015bd5fda",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "รองรับเมื่อติดตั้งภายในเครือข่ายของคุณ",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "8f6c6eb30a57",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "การลบพื้นหลัง",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "e1d17e53f52a",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "นอกเหนือจากการลบพื้นหลัง",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "a20205938348",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "รูปภาพ วิดีโอ เสียง PDF และไฟล์ต่างๆ",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "f7f209ca8556",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "บริการที่ดำเนินการโดยผู้ให้บริการ การเปิดเผยซอร์สโค้ดไม่ใช่รูปแบบของผลิตภัณฑ์",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "f337bc053077",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "ซอร์สโค้ดและการตรวจสอบได้",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "d47b7cf0421d",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "เปิดเผยซอร์สโค้ดภายใต้ AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "fabaccc94c09",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API ที่ผู้ให้บริการโฮสต์ พร้อมเครดิตต่อรูปภาพ",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "3dcc434495e5",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "การทำงานอัตโนมัติ",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "7d36984256d4",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API และไปป์ไลน์ในการติดตั้งของคุณ",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2defe3af3412",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf โฟกัสที่งาน PDF ซึ่งก็ตรงกับสิ่งที่หลายคนต้องการพอดี SnapOtter ครอบคลุมงานสายนั้นด้วยการรวม แยก บีบอัด แปลง ลบข้อมูลลับ OCR และอื่น ๆ แล้วยังเพิ่มเวิร์กโฟลว์ด้านภาพ วิดีโอ เสียง และไฟล์ไว้ในการดีพลอยเดียวกัน",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

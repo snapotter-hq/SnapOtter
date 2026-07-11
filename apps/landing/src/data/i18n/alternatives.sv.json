@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "43b6123b70ef",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg fokuserar på en enda uppgift och gör den bra. SnapOtter kör lokal bakgrundsborttagning och lägger sedan till komprimering, konvertering, uppskalning, OCR och resten av katalogen i en och samma installation.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "3f314e219312",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Ja. SnapOtters bakgrundsborttagning körs lokalt efter en engångsinstallation av modellpaketet, så bilderna lämnar aldrig ditt nätverk och det finns ingen kredit per bild.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "0f81898b665c",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Finns det ett självhostat alternativ till remove.bg?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "06ea213bf535",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Nej. Den körs på CPU och använder automatiskt en GPU om en sådan finns tillgänglig för snabbare batchar.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "39779d3a90b5",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Behövs det en GPU?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "b1b071fdddc5",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "Det öppna, självhostade alternativet till remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "a76f907dd59f",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg är en snabb molnbaserad bakgrundsborttagare. SnapOtter är det självhostade alternativet som kör samma sorts AI på din egen hårdvara, så att produkt- och personbilder aldrig skickas till en tredjepartstjänst.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "a6181d203e81",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg tar bort bildbakgrunder i molnet. SnapOtter kör bakgrundsborttagning lokalt på din egen server, med 200+ fler verktyg i samma stack.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "69503cc06c65",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "Det öppna, självhostade alternativet till remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "a76f907dd59f",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Molnbaserad webbtjänst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2155435fa86b",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Driftmodell",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "d97df98caae5",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Självhostad på din server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "6e438ca8c45c",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Bilder laddas upp till ett leverantörshostat API för behandling",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "95701964d422",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Plats för filbehandling",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "08d668e93598",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Din infrastruktur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "99cb2416167d",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Kreditbaserad prissättning per bild",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "f031444ec2be",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Kostnadskontroll",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "5035b517e475",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Gratis under AGPLv3; gränserna sätts av din hårdvara",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e5ae008926bc",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Utformad för webbläsarbaserad onlineanvändning",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a50f8c7e8c7e",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Offline- och luftgapad användning",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "efc7be7db833",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Stöds när den distribueras inom ditt nätverk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "1ba4e62a4c53",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Bakgrundsborttagning",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "c85dccbde95a",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Utöver bakgrundsborttagning",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "a6175cf99dad",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Bild, video, ljud, PDF och filer",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc18133d425a",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Leverantörsdriven tjänst; tillgänglig källkod är inte en del av affärsmodellen",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "3bcfc061374c",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Källkod och granskningsbarhet",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "339abebb73b6",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Källkod tillgänglig under AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "81f560258672",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "Leverantörshostat API med krediter per bild",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "b87a662562de",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API och pipelines i din installation",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "43b6123b70ef",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf är inriktat på PDF-filer, vilket är precis vad många behöver. SnapOtter täcker det området med slå ihop, dela, komprimera, konvertera, redigera bort, OCR och mer, och lägger sedan till arbetsflöden för bild, video, ljud och filer i samma installation.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

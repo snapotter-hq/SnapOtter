@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "04a0963b78f0",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg se centra en una sola tarea y la hace bien. SnapOtter ejecuta la eliminación de fondos localmente y, además, añade compresión, conversión, escalado, OCR y el resto del catálogo en un único despliegue.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "3f3a1485c84f",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Sí. La eliminación de fondos de SnapOtter se ejecuta localmente tras una instalación única del paquete de modelos, de modo que las imágenes nunca salen de tu red y no hay créditos por imagen.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "d592727d4944",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "¿Existe una alternativa autoalojada a remove.bg?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "5af6587c344c",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "No. Funciona en CPU y usa una GPU automáticamente si hay una disponible para procesar lotes más rápido.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "3e571e200b5d",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "¿Necesita una GPU?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "71940ac2f798",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "La alternativa de código abierto y autoalojada a remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "f28d96530b37",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg es un eliminador de fondos alojado y rápido. SnapOtter es la alternativa autoalojada que ejecuta el mismo tipo de IA en tu propio hardware, de modo que las imágenes de productos y personas nunca llegan a un servicio de terceros.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "6379ddc571a5",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg elimina fondos de imágenes en la nube. SnapOtter ejecuta la eliminación de fondos localmente en tu propio servidor, con más de 200 herramientas adicionales en el mismo stack.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "acf707e5ba21",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "La alternativa de código abierto y autoalojada a remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "f28d96530b37",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Servicio web alojado",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "a9b6abd1d488",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Modelo de despliegue",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "a4384c992368",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Autoalojado en tu servidor",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "44ce8594857f",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Las imágenes se suben a una API alojada por el proveedor para su procesamiento",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "e2d574b06b34",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Ubicación del procesamiento de archivos",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "0a4d78414d2f",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Tu infraestructura",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "c570e0ed1ce2",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Precios basados en créditos por imagen",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "c3b1e30d8c9f",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Control de costes",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6fdd90bf88df",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Gratis bajo AGPLv3; los límites son los de tu hardware",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b997870c16fe",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Diseñado para uso en línea desde el navegador",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "9978fc3bda85",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Uso sin conexión o aislado de la red",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "aff6cd34f083",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Compatible cuando se despliega dentro de tu red",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "6b6358ad92cd",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Eliminación de fondos",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "37cb9a70f64d",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Más allá de la eliminación de fondos",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "7a35063b2340",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Imagen, vídeo, audio, PDF y archivos",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "52da8ed1731e",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Servicio operado por el proveedor; la disponibilidad del código fuente no forma parte del modelo del producto",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "1b979a73428c",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Código fuente y auditabilidad",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "30bb122e991c",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Código fuente disponible bajo AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "b32aca1ac67b",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API alojada por el proveedor con créditos por imagen",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "a39b67756e08",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Automatización",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2f7b761b1a40",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "API REST y pipelines en tu despliegue",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "04a0963b78f0",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf se centra en los PDF, que es justo lo que muchas personas necesitan. SnapOtter cubre ese terreno con unión, división, compresión, conversión, redacción, OCR y más, y luego añade flujos de trabajo de imagen, vídeo, audio y archivos en el mismo despliegue.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

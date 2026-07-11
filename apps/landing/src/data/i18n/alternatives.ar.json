@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "6ea786759f3a",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "يركّز remove.bg على مهمة واحدة ويؤديها بإتقان. أما SnapOtter فيُشغّل إزالة الخلفية محليًا، ثم يضيف الضغط والتحويل ورفع الدقة و OCR وبقية مجموعة الأدوات ضمن عملية نشر واحدة.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "a9b1ffd9f9ca",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "نعم. تعمل ميزة إزالة الخلفية في SnapOtter محليًا بعد تثبيت حزمة النموذج لمرة واحدة، لذا لا تغادر الصور شبكتك أبدًا ولا توجد أي أرصدة لكل صورة.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "c3ab2246eecd",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "هل يوجد بديل مستضاف ذاتيًا لـ remove.bg؟",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "585dfafa708e",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "لا. يعمل على وحدة المعالجة المركزية CPU، ويستخدم وحدة معالجة الرسومات GPU تلقائيًا إن توفّرت لتسريع معالجة الدُفعات.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "d0450caf8787",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "هل يحتاج إلى وحدة معالجة رسومات GPU؟",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "14350436c910",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "51d26a8512d5",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg أداة سريعة لإزالة الخلفية تعمل عبر الاستضافة السحابية. أما SnapOtter فهو البديل المستضاف ذاتيًا الذي يُشغّل النوع نفسه من الذكاء الاصطناعي على عتادك الخاص، بحيث لا تصل صور المنتجات والأشخاص أبدًا إلى أي خدمة خارجية.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "8d55b2bf65f6",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "يزيل remove.bg خلفيات الصور عبر السحابة. أما SnapOtter فيُشغّل إزالة الخلفية محليًا على خادمك الخاص، مع أكثر من 200 أداة إضافية ضمن المنصة نفسها.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "3576e7a96fbf",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "البديل مفتوح المصدر والمستضاف ذاتيًا لـ remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "51d26a8512d5",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "خدمة ويب مستضافة",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "2526febbc9db",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "نموذج النشر",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "05e5497610f8",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "مستضاف ذاتيًا على خادمك",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "54fcdb44ac3c",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "تُرفع الصور إلى API مستضاف لدى المزوّد لمعالجتها",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "1ff4fb646275",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "موقع معالجة الملفات",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4edb3bbe9b16",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "بنيتك التحتية الخاصة",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "7b389db4c0f8",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "تسعير قائم على الأرصدة لكل صورة",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "c7655d073564",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "التحكم في التكلفة",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "ff1e22fcab46",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "مجاني بموجب AGPLv3؛ الحدود هي حدود عتادك",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "6d7f6f74f743",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "مصمّم للاستخدام عبر الإنترنت من المتصفح",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "a82889328ae2",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "الاستخدام دون اتصال أو في بيئة معزولة",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4363c7fc214b",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "مدعوم عند النشر داخل شبكتك",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "e228685f2fef",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "إزالة الخلفية",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "8ce1d211eac0",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "ما يتجاوز إزالة الخلفية",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "0da6d2b4f5b3",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "الصور والفيديو والصوت و PDF والملفات",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "bc9c803406a1",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "خدمة يديرها المزوّد؛ إتاحة المصدر ليست جزءًا من نموذج المنتج",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "a735875c4a4a",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "المصدر وقابلية التدقيق",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "0a3884580ff0",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "المصدر متاح بموجب AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "2ae2c27e25cc",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API مستضاف لدى المزوّد مع أرصدة لكل صورة",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "ce14d890d3d7",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "الأتمتة",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "41676cbdcf03",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API وسلاسل معالجة ضمن عملية نشرك",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "fbf5beef3825",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "يركّز Smallpdf على ملفات PDF، وهو تحديدًا ما يحتاجه كثيرون. يغطي SnapOtter هذا المجال عبر الدمج والتقسيم والضغط والتحويل والتنقيح وOCR والمزيد، ثم يضيف مسارات عمل للصور والفيديو والصوت والملفات ضمن التثبيت نفسه.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

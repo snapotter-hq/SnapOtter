@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "dfb49851df48",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg 专注于把一件事做好。SnapOtter 在本地运行背景去除的同时，还在同一次部署中加入了压缩、格式转换、放大、OCR 以及整套工具目录。",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "0479d2c907bc",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "有。SnapOtter 的背景去除功能在一次性安装模型包后即可本地运行，图片绝不会离开你的网络，也没有按图片计费的积分。",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "908e9d1a665e",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "有没有 remove.bg 的自托管替代方案？",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "622f5f76bfbb",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "不需要。它可在 CPU 上运行，若检测到可用的 GPU 则会自动使用，从而更快地处理批量任务。",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "491b28ac1e8f",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "需要 GPU 吗？",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "6d63a824dbb2",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "remove.bg 的开源自托管替代方案",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "fc1c856d13a7",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg 是一款快速的托管式背景去除工具。SnapOtter 则是自托管替代方案，在你自己的硬件上运行同类 AI，因此产品图和人物照片绝不会发送给任何第三方服务。",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "cadc7180761d",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg 在云端去除图片背景。SnapOtter 在你自己的服务器上本地运行背景去除，同一套系统中还内置了 200+ 更多工具。",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "3feb40ebe70a",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "remove.bg 的开源自托管替代方案",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "fc1c856d13a7",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "托管式网络服务",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "fa097f85669a",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "部署模式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "eb02e1bc8d97",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "在你自己的服务器上自托管",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "79d06e2c0134",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "图片会上传到厂商托管的 API 进行处理",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "dc24f26754de",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "文件处理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f7197b9d0d37",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "你自己的基础设施",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "5f3ed1045200",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "按图片计费的积分制定价",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "19ebfbbec31c",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "成本控制",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6936ad230a9c",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "免费，采用 AGPLv3 许可；上限取决于你的硬件",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "f7fbd3b11105",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "为基于浏览器的在线使用而设计",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "16f0394b5adb",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "离线 / 隔离网络使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "a615c0394865",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "在你的网络内部署时即可支持",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "bea45e300e49",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "背景去除",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "bf36a9a386ee",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "背景去除之外",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "c4d7917b4d07",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "图片、视频、音频、PDF 和文件",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "322dc74bb0af",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "厂商运营的服务；源代码公开并非其产品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "fbf4aa74f971",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "源代码与可审计性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "ff9bfe148722",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "源代码依据 AGPLv3 公开可获取",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "7e533e3b80e6",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "厂商托管的 API，按图片计积分",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "33396891093d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "自动化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "829a35554fa1",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 和处理流水线",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "a0eff7668fcf",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf 专注于 PDF，这正是许多人所需要的。SnapOtter 同样覆盖这一领域，提供合并、拆分、压缩、转换、涂黑、OCR 等功能，并在同一次部署中加入图像、视频、音频和文件处理流程。",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

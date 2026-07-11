@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "69d86711bad5",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg richt zich op één taak en doet die goed. SnapOtter draait achtergrondverwijdering lokaal en voegt daarnaast compressie, conversie, upscaling, OCR en de rest van de catalogus toe in één installatie.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "88d7a44d3ae4",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Ja. De achtergrondverwijdering van SnapOtter draait lokaal na een eenmalige installatie van het modelpakket, zodat afbeeldingen je netwerk nooit verlaten en er geen credits per afbeelding zijn.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "92be7a6ada4c",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Is er een zelf-gehost alternatief voor remove.bg?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "3ab231d3e460",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Nee. Het draait op de CPU en gebruikt automatisch een GPU als die beschikbaar is voor snellere batches.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "3dc8a838b8f8",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Is er een GPU nodig?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "82a929e7497d",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "Het open-source, zelf-gehoste alternatief voor remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "472a3533d29d",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg is een snelle, gehoste achtergrondverwijderaar. SnapOtter is het zelf-gehoste alternatief dat hetzelfde soort AI op je eigen hardware draait, zodat product- en persoonsafbeeldingen nooit naar een externe dienst gaan.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "88ab014b32c8",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg verwijdert achtergronden van afbeeldingen in de cloud. SnapOtter voert achtergrondverwijdering lokaal uit op je eigen server, met 200+ extra tools in dezelfde stack.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "a36ba12c06c8",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "Het open-source, zelf-gehoste alternatief voor remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "472a3533d29d",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Gehoste webdienst",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "379fea34ce80",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Implementatiemodel",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "61e9f087dd89",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Zelf-gehost op je eigen server",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "9b15a1768b22",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Afbeeldingen worden geüpload naar een door de leverancier gehoste API voor verwerking",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "4e49df9e3ac7",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Locatie van bestandsverwerking",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "54ef54d9f453",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Je eigen infrastructuur",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "d6c7e7b0f4c3",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Prijsstelling op basis van credits per afbeelding",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "900ed5f58839",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Kostenbeheersing",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "8687cd14afd7",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Gratis onder AGPLv3; je hardware is de enige limiet",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "e12c1e2777a9",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Ontworpen voor online gebruik via de browser",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "0e344a061ccb",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Offline / air-gapped gebruik",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "c8ab119e1317",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Ondersteund bij implementatie binnen je eigen netwerk",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "baf7757d5390",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Achtergrondverwijdering",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "9292dbc4ae1b",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Meer dan achtergrondverwijdering",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "02d328a7d6a4",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Afbeelding, video, audio, PDF en bestanden",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "5541fda8037e",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Door de leverancier beheerde dienst; beschikbaarheid van broncode maakt geen deel uit van het model",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "79077e9ed7dd",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Broncode en controleerbaarheid",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "a7069bb61c8b",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Broncode beschikbaar onder AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "823f927f0e97",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "Door de leverancier gehoste API met credits per afbeelding",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "a170d5ef6a33",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Automatisering",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "8efedca1b9cc",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API en pipelines in je eigen installatie",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d21a4ef2fbef",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf richt zich op PDF's, en dat is precies wat veel mensen nodig hebben. SnapOtter dekt dat terrein met samenvoegen, splitsen, comprimeren, converteren, redigeren, OCR en meer, en voegt daar in dezelfde implementatie workflows voor beeld, video, audio en bestanden aan toe.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

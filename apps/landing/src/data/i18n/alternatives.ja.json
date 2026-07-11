@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200以上",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "58443c7104e4",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "dc61d6f2773d",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bgは一つの作業に特化し、それを見事にこなします。SnapOtterはローカルで背景を除去したうえで、圧縮、変換、アップスケーリング、OCR、そしてその他のツール群まで、すべてを一つの環境で提供します。",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "30e870681631",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "はい。SnapOtterの背景除去は、一度モデルバンドルをインストールすればローカルで実行されるため、画像がネットワークの外に出ることはなく、画像ごとのクレジット課金もありません。",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "e07ab0038853",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "remove.bgのセルフホスト型代替ツールはありますか？",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "011831de6e21",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "いいえ。CPUで動作し、GPUが利用できる場合は自動的に活用してバッチ処理を高速化します。",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "2ddb11023b77",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "GPUは必要ですか？",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "bb61c3d4e351",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "remove.bgのオープンソース・セルフホスト型代替ツール",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "cffefb71efb9",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bgは高速なホスト型の背景除去サービスです。SnapOtterは同種のAIを自分のハードウェア上で動かすセルフホスト型の代替ツールで、商品画像や人物画像を第三者のサービスに送信することは一切ありません。",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "3cbe296b0bc4",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bgは画像の背景をクラウドで除去します。SnapOtterは背景除去を自分のサーバー上でローカルに実行し、同じ環境の中でさらに200以上のツールを利用できます。",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "844c99faad67",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "remove.bgのオープンソース・セルフホスト型代替ツール",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "cffefb71efb9",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "ホスト型のWebサービス",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "e7b8fff9689f",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "デプロイ形態",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "87845ee1158b",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "自分のサーバーでセルフホスト",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "ab10c6ffc2f7",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "処理のため画像はベンダーがホストするAPIにアップロードされます",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "8194b89050d4",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "ファイル処理の場所",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "3844acce7218",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "自社のインフラ",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "783326459d91",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "画像ごとのクレジット制課金",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "9c0748fef35d",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "コスト管理",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "e42052d80da0",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "AGPLv3で無料。上限は自分のハードウェア次第",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "046948da31f1",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "ブラウザベースのオンライン利用を前提に設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "f2e60442e24a",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "オフライン / エアギャップ環境での利用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "4d6d893ee168",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "自社ネットワーク内にデプロイすれば対応可能",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "a4f25ecc7022",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "背景除去",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "bda0aeac44e6",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "背景除去にとどまらない機能",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "32b94ff7803e",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "画像、動画、音声、PDF、ファイル",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1ed2c203cac6",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "ベンダー運営のサービス。ソース公開は事業モデルの対象外",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "ffa2cc4a5ac2",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "ソースと監査可能性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "8f4077640738",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "AGPLv3のもとでソース公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "c03c32552966",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "画像ごとのクレジット制のベンダーホスト型API",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "eb38fb2cc332",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "自社環境内でのREST APIとパイプライン",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "207313bfc866",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf は PDF に特化しており、それこそが多くの人に必要なものです。SnapOtter はその領域を結合、分割、圧縮、変換、墨消し、OCR などでカバーし、さらに同じ環境で画像、動画、音声、ファイルのワークフローも扱えます。",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200以上",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "58443c7104e4",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

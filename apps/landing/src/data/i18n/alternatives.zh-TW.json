@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "164feffb8ba1",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg 專注做好一件事。SnapOtter 除了本機背景移除，還在同一次部署中提供壓縮、格式轉換、放大、OCR 以及完整工具目錄中的其他功能。",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "ace6f28390b1",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "有。SnapOtter 的背景移除只需一次性安裝模型套件，之後即在本機運行，圖片絕不離開你的網路，也沒有每張圖片的點數費用。",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "970ff623e468",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "有沒有 remove.bg 的自架替代方案？",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "c429d4535aff",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "不需要。它可在 CPU 上運行，若有可用的 GPU，也會自動使用以加速批次處理。",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "8f3eb769fe69",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "需要 GPU 嗎？",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "002a7d2a0b4a",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "remove.bg 的開源自架替代方案",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "da212a943241",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg 是速度飛快的雲端背景移除服務。SnapOtter 則是自架替代方案，在你自己的硬體上運行同類型的 AI，讓產品與人物圖片永遠不會傳送到第三方服務。",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "98b45582b10e",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg 在雲端移除圖片背景。SnapOtter 在你自己的伺服器上進行本機背景移除，同一套系統還內建 200+ 種工具。",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "45599602674c",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "remove.bg 的開源自架替代方案",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "da212a943241",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "雲端網頁服務",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "df1bde4a24b4",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "部署方式",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "597320937748",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "自架於你自己的伺服器",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "5877822f12f8",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "圖片會上傳到廠商託管的 API 進行處理",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "8c5ba4a0cf8b",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "檔案處理位置",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "be666df93ccf",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "你自己的基礎架構",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "f72eaa6caa01",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "依每張圖片計費的點數制定價",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "681b67d8e625",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "成本掌控",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "3aae1e7d7b5b",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "免費採用 AGPLv3 授權；上限取決於你的硬體",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "5987b66518c5",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "專為瀏覽器線上使用而設計",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "d0b9305908d7",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "離線／隔離網路使用",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "861f364d695c",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "部署於你的內部網路時即可支援",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "b9bdc8280268",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "背景移除",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "5c9b5646272e",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "背景移除之外",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "99725ba1ca6f",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "圖片、影片、音訊、PDF 與檔案",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "6bb4eb43fbe4",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "由廠商營運的服務；公開原始碼並非其產品模式",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "8453a31ec5f0",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "原始碼與可稽核性",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "749f99f80fd2",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "原始碼依 AGPLv3 授權公開",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "47f582bfd863",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "廠商託管的 API，按每張圖片扣點",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "3fdff083407b",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "自動化",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "ad3a6e25729d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "在你的部署中提供 REST API 與流程管線",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "45516d723c2d",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf 專注於 PDF，這正是許多人所需要的。SnapOtter 同樣涵蓋這個領域，提供合併、分割、壓縮、轉檔、遮蔽、OCR 等功能，並在同一套部署中加上影像、影片、音訊與檔案工作流程。",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

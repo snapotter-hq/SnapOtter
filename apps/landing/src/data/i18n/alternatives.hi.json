@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "9d07075e2235",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg एक ही काम पर ध्यान देता है और उसे बखूबी करता है। SnapOtter लोकल बैकग्राउंड रिमूवल चलाता है, और फिर एक ही डिप्लॉयमेंट में कंप्रेशन, कन्वर्ज़न, अपस्केलिंग, OCR और बाकी पूरा कैटलॉग जोड़ देता है।",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "6950710190ef",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "हाँ। SnapOtter का बैकग्राउंड रिमूवल एक बार मॉडल-बंडल इंस्टॉल करने के बाद लोकल रूप से चलता है, इसलिए इमेज कभी आपके नेटवर्क से बाहर नहीं जातीं और कोई प्रति-इमेज क्रेडिट नहीं लगता।",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "cb75c9403633",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "क्या remove.bg का कोई सेल्फ-होस्टेड विकल्प है?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "49b2cf77df68",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "नहीं। यह CPU पर चलता है, और तेज़ बैच के लिए GPU उपलब्ध होने पर उसका अपने आप उपयोग कर लेता है।",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "d2eb002712a0",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "क्या इसके लिए GPU ज़रूरी है?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "2560255847d1",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "remove.bg का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "3d0ab5f0382f",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg एक तेज़ होस्टेड बैकग्राउंड रिमूवर है। SnapOtter वह सेल्फ-होस्टेड विकल्प है जो उसी तरह का AI आपके अपने हार्डवेयर पर चलाता है, ताकि प्रोडक्ट और लोगों की तस्वीरें कभी किसी थर्ड-पार्टी सेवा तक न जाएँ।",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "662f23d32bb6",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg क्लाउड में इमेज बैकग्राउंड हटाता है। SnapOtter बैकग्राउंड रिमूवल को आपके अपने सर्वर पर लोकल रूप से चलाता है, और उसी स्टैक में 200+ अतिरिक्त टूल देता है।",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "9d899627ce33",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "remove.bg का ओपन-सोर्स, सेल्फ-होस्टेड विकल्प",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "3d0ab5f0382f",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "होस्टेड वेब सेवा",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "d9a0e518e909",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "डिप्लॉयमेंट मॉडल",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "935cd67f0c39",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "आपके सर्वर पर सेल्फ-होस्टेड",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "dd8682ff3f8f",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "इमेज प्रोसेसिंग के लिए वेंडर-होस्टेड API पर अपलोड की जाती हैं",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "63c1191802bf",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "फ़ाइल प्रोसेसिंग की जगह",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "850e3da2cb3e",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "आपका इंफ्रास्ट्रक्चर",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "49f7b6ad658c",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "प्रति इमेज क्रेडिट-आधारित मूल्य निर्धारण",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "c2801320f9cc",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "लागत नियंत्रण",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "a924e8562515",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "AGPLv3 के तहत मुफ़्त; सीमाएँ बस आपके हार्डवेयर तक",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "bc13d6a4a6b1",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "ब्राउज़र-आधारित ऑनलाइन उपयोग के लिए डिज़ाइन किया गया",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "dd61e72f4564",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "ऑफ़लाइन / एयर-गैप्ड उपयोग",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "adab4e319411",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "आपके नेटवर्क के अंदर डिप्लॉय करने पर समर्थित",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "2712c42a2897",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "बैकग्राउंड रिमूवल",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "ff31324c5794",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "बैकग्राउंड रिमूवल से आगे",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "e8e5ea7d184d",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "इमेज, वीडियो, ऑडियो, PDF और फ़ाइलें",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "ca486b962648",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "वेंडर-संचालित सेवा; सोर्स की उपलब्धता इसका प्रोडक्ट मॉडल नहीं है",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "b87ca049f567",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "सोर्स और ऑडिट क्षमता",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "9ec6b89ad813",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "AGPLv3 के तहत सोर्स उपलब्ध",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "674dba4b5e59",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "प्रति-इमेज क्रेडिट के साथ वेंडर-होस्टेड API",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "c3dbc77d69b0",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "ऑटोमेशन",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "af8f313cc83f",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "आपके डिप्लॉयमेंट में REST API और पाइपलाइनें",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2d0c2e929490",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf का ध्यान PDF पर है, और यही कई लोगों को चाहिए भी होता है। SnapOtter इस दायरे को मर्ज, स्प्लिट, कंप्रेस, कन्वर्ट, रिडैक्ट, OCR और बहुत कुछ के साथ कवर करता है, फिर उसी डिप्लॉयमेंट में इमेज, वीडियो, ऑडियो और फ़ाइल वर्कफ़्लो भी जोड़ देता है।",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

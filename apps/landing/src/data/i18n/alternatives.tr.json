@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "6d3db6aaeea7",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg tek bir işe odaklanır ve onu iyi yapar. SnapOtter yerel arka plan kaldırma işlemini çalıştırır, ardından tek bir kurulumda sıkıştırma, dönüştürme, büyütme, OCR ve kataloğun geri kalanını da ekler.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "d7f1bdc1ca86",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Evet. SnapOtter'ın arka plan kaldırma özelliği, tek seferlik bir model paketi kurulumundan sonra yerel olarak çalışır; böylece görseller ağınızdan hiç çıkmaz ve görsel başına kredi ödemezsiniz.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "8b987500d812",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "remove.bg'ye kendi sunucunuzda barındırılan bir alternatif var mı?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "c6a1b231ee3b",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Hayır. CPU üzerinde çalışır ve daha hızlı toplu işlemler için bir GPU mevcutsa onu otomatik olarak kullanır.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "6d2a31b0e959",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "GPU gerektirir mi?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "cb9c6584ef5b",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "remove.bg'ye açık kaynaklı, kendi sunucunuzda barındırılan alternatif",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "64973f5bf0a2",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg, hızlı ve bulutta barındırılan bir arka plan kaldırma aracıdır. SnapOtter ise aynı türden yapay zekayı kendi donanımınızda çalıştıran, kendi sunucunuzda barındırılan alternatiftir; böylece ürün ve insan görselleri asla üçüncü taraf bir hizmete gitmez.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "d97f29d0c645",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg, görsel arka planlarını bulutta kaldırır. SnapOtter ise arka plan kaldırma işlemini kendi sunucunuzda yerel olarak çalıştırır ve aynı yapıda 200+ tane daha araç sunar.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "28b055999b58",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "remove.bg'ye Açık Kaynaklı, Kendi Sunucunuzda Barındırılan Alternatif",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "395aa1438c5a",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Bulutta barındırılan web hizmeti",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "958290736ee5",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Kurulum modeli",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "95c35fd47e11",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Kendi sunucunuzda barındırılır",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "91ca1f670263",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Görseller işlenmek üzere sağlayıcı tarafından barındırılan bir API'ye yüklenir",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "2ad818880416",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Dosya işleme konumu",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "7cb36fa99dea",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Sizin altyapınız",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "8a4e479f326d",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Görsel başına kredi tabanlı fiyatlandırma",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "eb5e5024dd3c",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Maliyet kontrolü",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "2302303bfb18",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "AGPLv3 ile ücretsiz; sınırlar donanımınızdır",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "1e8c45dfeee9",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Tarayıcı tabanlı çevrimiçi kullanım için tasarlanmıştır",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "6569d553f2e8",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Çevrimdışı / ağdan yalıtılmış kullanım",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7a8562e0c970",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Kendi ağınızın içinde dağıtıldığında desteklenir",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "a65028bba608",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Arka plan kaldırma",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "02d5269d63e6",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Arka plan kaldırmanın ötesinde",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "f9b5e3a44c6f",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Görsel, video, ses, PDF ve dosyalar",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "1a6349a7df6a",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Sağlayıcı tarafından işletilen hizmet; kaynak erişilebilirliği ürün modelinin bir parçası değildir",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "48392c2b1db7",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Kaynak ve denetlenebilirlik",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "15b262db4200",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Kaynak kodu AGPLv3 altında erişilebilir",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "207a47bf0a51",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "Görsel başına kredi ile sağlayıcı tarafından barındırılan API",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "865e2236aa1d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Otomasyon",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2dd23b6cb0c3",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "Kendi kurulumunuzda REST API ve iş akışları",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "229fe3d390d8",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf, PDF'lere odaklanır ve pek çok kişinin ihtiyacı da tam olarak budur. SnapOtter bu alanı birleştirme, bölme, sıkıştırma, dönüştürme, sansürleme, OCR ve daha fazlasıyla kapsar, ardından aynı kuruluma görüntü, video, ses ve dosya iş akışlarını ekler.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

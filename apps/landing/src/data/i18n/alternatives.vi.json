@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "8cec7fdce571",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg tập trung vào một nhiệm vụ và làm rất tốt. SnapOtter chạy xóa nền ngay tại chỗ, rồi bổ sung thêm nén ảnh, chuyển đổi định dạng, phóng to, OCR và toàn bộ danh mục công cụ còn lại trong một lần triển khai.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "aef9f4be095e",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Có. Tính năng xóa nền của SnapOtter chạy ngay tại chỗ sau khi cài đặt gói mô hình một lần, nhờ vậy ảnh không bao giờ rời khỏi mạng của bạn và không tính tín dụng cho mỗi ảnh.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "4bf665be8e3d",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Có giải pháp tự lưu trữ nào thay thế cho remove.bg không?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "4a6aa2848269",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Không. Công cụ chạy được trên CPU, và tự động dùng GPU nếu có sẵn để xử lý hàng loạt nhanh hơn.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "65f1b9c77bbd",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Có cần GPU không?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "a72056b7c763",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "Giải pháp thay thế mã nguồn mở, tự lưu trữ cho remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "3dcbf124597a",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg là công cụ xóa nền được lưu trữ trên đám mây, xử lý nhanh chóng. SnapOtter là giải pháp tự lưu trữ chạy cùng loại AI đó trên phần cứng của chính bạn, nhờ vậy ảnh sản phẩm và ảnh con người không bao giờ phải gửi đến dịch vụ bên thứ ba.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "b80651747165",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg xóa nền ảnh trên đám mây. SnapOtter chạy xóa nền ngay tại máy chủ của riêng bạn, cùng với hơn 200 công cụ khác trong cùng một hệ thống.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "285dc773a478",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "Giải pháp thay thế mã nguồn mở, tự lưu trữ cho remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "3dcbf124597a",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Dịch vụ web được lưu trữ trên đám mây",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "97f389ce1140",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Mô hình triển khai",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "9f39cffbcf2a",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Tự lưu trữ trên máy chủ của bạn",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f513f2657065",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Ảnh được tải lên API do nhà cung cấp lưu trữ để xử lý",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "0fc8f38d8435",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Nơi xử lý tệp",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "450bb7052ed9",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Hạ tầng của bạn",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "a00f058732df",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Giá tính theo tín dụng cho mỗi ảnh",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "625cf80722ae",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Kiểm soát chi phí",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "7dfc2b8e76f5",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Miễn phí theo AGPLv3; giới hạn phụ thuộc vào phần cứng của bạn",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b2b5c80276ac",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Được thiết kế để dùng trực tuyến qua trình duyệt",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "770f71d63be9",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Sử dụng ngoại tuyến / trong mạng cô lập",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "b634ed4c7a4f",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Được hỗ trợ khi triển khai bên trong mạng nội bộ của bạn",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "0cd69ebc8012",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Xóa nền",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "a2780c30aac6",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Ngoài xóa nền",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "afbadb4f5152",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Ảnh, video, âm thanh, PDF và tệp",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "acabdde9a8b3",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Dịch vụ do nhà cung cấp vận hành; công khai mã nguồn không phải là mô hình sản phẩm",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "00867578f4e6",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Mã nguồn và khả năng kiểm toán",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "6aa5ce1e5499",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Mã nguồn công khai theo giấy phép AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "9b4e740591c1",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API do nhà cung cấp lưu trữ, tính tín dụng cho mỗi ảnh",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "63eac094253d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Tự động hóa",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "64fa0ee04267",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API và quy trình xử lý ngay trong bản triển khai của bạn",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "a45706bf61e5",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf tập trung vào PDF, đúng thứ mà nhiều người cần. SnapOtter bao quát mảng đó với gộp, tách, nén, chuyển đổi, che thông tin, OCR và nhiều hơn nữa, rồi bổ sung thêm các quy trình xử lý ảnh, video, âm thanh và tệp trong cùng một lần triển khai.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "d7b62c82fdde",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg se concentre sur une seule tâche et l'accomplit bien. SnapOtter réalise la suppression d'arrière-plan en local, puis ajoute la compression, la conversion, l'agrandissement, l'OCR et le reste du catalogue dans un seul déploiement.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "9470edbb9ba2",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Oui. La suppression d'arrière-plan de SnapOtter s'exécute en local après une installation unique du pack de modèles, de sorte que les images ne quittent jamais votre réseau et qu'aucun crédit n'est facturé à l'image.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "0bf0e2d258b5",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Existe-t-il une alternative auto-hébergée à remove.bg ?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "585baeb98f84",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Non. Le traitement fonctionne sur CPU et utilise automatiquement un GPU, s'il en existe un, pour accélérer les traitements par lots.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "78b877662ad0",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Un GPU est-il nécessaire ?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "fed4bc49133a",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "L'alternative open source et auto-hébergée à remove.bg",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "1b6aa75fed81",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg est un outil de suppression d'arrière-plan hébergé et rapide. SnapOtter est l'alternative auto-hébergée qui exécute le même type d'IA sur votre propre matériel, afin que vos images de produits et de personnes ne soient jamais envoyées à un service tiers.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "98870147b4fd",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg supprime l'arrière-plan des images dans le cloud. SnapOtter effectue la suppression d'arrière-plan localement, sur votre propre serveur, avec plus de 200 outils supplémentaires dans le même environnement.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "d7d3286d2363",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "L'alternative open source et auto-hébergée à remove.bg",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "1b6aa75fed81",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Service web hébergé",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "a0c1a168ede2",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Modèle de déploiement",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e50370113c92",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Auto-hébergé sur votre serveur",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "36d67a67afb5",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Les images sont envoyées à une API hébergée par le fournisseur pour être traitées",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "0c90ca0f2003",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Emplacement du traitement des fichiers",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "f357957503f9",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Votre infrastructure",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "0c9d076ddf3e",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Tarification par image basée sur des crédits",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "b3f8c02213bc",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Maîtrise des coûts",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "50c6c37b999d",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Gratuit sous AGPLv3 ; vos seules limites sont celles de votre matériel",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "b92282889587",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Conçu pour une utilisation en ligne via le navigateur",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "160ae5658150",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Utilisation hors ligne / en réseau isolé",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "7afc795eb3d0",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Pris en charge en cas de déploiement au sein de votre réseau",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "006e3488bd0f",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Suppression d'arrière-plan",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "2cd3e50747f0",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Au-delà de la suppression d'arrière-plan",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "881d28cec010",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Image, vidéo, audio, PDF et fichiers",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "7696f3985782",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Service exploité par le fournisseur ; la disponibilité du code source ne fait pas partie du modèle du produit",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "5285d031f4a0",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Code source et auditabilité",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "93995130ee6a",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Code source disponible sous AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "52ae3e0cf64e",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API hébergée par le fournisseur avec des crédits facturés à l'image",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "5c2a6e589a7d",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Automatisation",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "2b8c8c172c38",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "API REST et pipelines dans votre déploiement",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "d7b62c82fdde",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf se concentre sur les PDF, ce qui correspond exactement au besoin de beaucoup de gens. SnapOtter couvre ce terrain avec la fusion, la division, la compression, la conversion, le caviardage, l'OCR et plus encore, puis ajoute les flux de travail image, vidéo, audio et fichier dans le même déploiement.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {

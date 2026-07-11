@@ -791,10 +791,10 @@
     "stale": false
   },
   "alt:convertx:rows.4.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:convertx:rows.5.competitor": {
@@ -1679,6 +1679,216 @@
     "outputHash": "2e40c073bd14",
     "stale": false
   },
+  "alt:removebg:breadth": {
+    "text": "remove.bg зосереджений на одному завданні й виконує його добре. SnapOtter локально видаляє тло, а потім додає стиснення, конвертацію, збільшення роздільної здатності, OCR та решту каталогу в одному розгортанні.",
+    "_sourceHash": "a6e13984792c",
+    "provenance": "machine",
+    "outputHash": "5a7b343f1456",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.a": {
+    "text": "Так. Видалення тла в SnapOtter працює локально після одноразового встановлення набору моделей, тож зображення ніколи не залишають вашу мережу й немає плати за кожне зображення.",
+    "_sourceHash": "4a0966445802",
+    "provenance": "machine",
+    "outputHash": "5da6e5023609",
+    "stale": false
+  },
+  "alt:removebg:faqs.0.q": {
+    "text": "Чи існує альтернатива remove.bg із самостійним хостингом?",
+    "_sourceHash": "f82403b5e42c",
+    "provenance": "machine",
+    "outputHash": "aa70ede15bc7",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.a": {
+    "text": "Ні. Він працює на процесорі й автоматично використовує графічний процесор, якщо той доступний, для швидшої обробки пакетів.",
+    "_sourceHash": "45938e537dea",
+    "provenance": "machine",
+    "outputHash": "49fff2cbd12d",
+    "stale": false
+  },
+  "alt:removebg:faqs.1.q": {
+    "text": "Чи потрібен графічний процесор?",
+    "_sourceHash": "2fa610ebdf19",
+    "provenance": "machine",
+    "outputHash": "36d8e9ffeb37",
+    "stale": false
+  },
+  "alt:removebg:h1": {
+    "text": "Альтернатива remove.bg з відкритим кодом і самостійним хостингом",
+    "_sourceHash": "e797312a375c",
+    "provenance": "machine",
+    "outputHash": "063c8f70238b",
+    "stale": false
+  },
+  "alt:removebg:intro": {
+    "text": "remove.bg це швидкий хмарний сервіс для видалення тла. SnapOtter це альтернатива з самостійним хостингом, яка запускає такий самий ШІ на вашому власному обладнанні, тож зображення товарів і людей ніколи не потрапляють до стороннього сервісу.",
+    "_sourceHash": "3ce831680d32",
+    "provenance": "machine",
+    "outputHash": "948e2296aed2",
+    "stale": false
+  },
+  "alt:removebg:metaDescription": {
+    "text": "remove.bg видаляє тло зображень у хмарі. SnapOtter виконує видалення тла локально на вашому власному сервері, з понад 200 додатковими інструментами в одному стеку.",
+    "_sourceHash": "4ae6f4194ec0",
+    "provenance": "machine",
+    "outputHash": "95e9ea1c3230",
+    "stale": false
+  },
+  "alt:removebg:pageTitle": {
+    "text": "Альтернатива remove.bg з відкритим кодом і самостійним хостингом",
+    "_sourceHash": "87c485b2a42f",
+    "provenance": "machine",
+    "outputHash": "063c8f70238b",
+    "stale": false
+  },
+  "alt:removebg:rows.0.competitor": {
+    "text": "Хмарний вебсервіс",
+    "_sourceHash": "a7a016748e17",
+    "provenance": "machine",
+    "outputHash": "51c753e9de5f",
+    "stale": false
+  },
+  "alt:removebg:rows.0.feature": {
+    "text": "Модель розгортання",
+    "_sourceHash": "48b995f6f08d",
+    "provenance": "machine",
+    "outputHash": "e3ae7484b84b",
+    "stale": false
+  },
+  "alt:removebg:rows.0.snapotter": {
+    "text": "Самостійний хостинг на вашому сервері",
+    "_sourceHash": "b1dac99272dd",
+    "provenance": "machine",
+    "outputHash": "f12ce1563bd3",
+    "stale": false
+  },
+  "alt:removebg:rows.1.competitor": {
+    "text": "Зображення завантажуються для обробки на API, розміщений постачальником",
+    "_sourceHash": "10ba97e44e6c",
+    "provenance": "machine",
+    "outputHash": "75a901b6aa97",
+    "stale": false
+  },
+  "alt:removebg:rows.1.feature": {
+    "text": "Місце обробки файлів",
+    "_sourceHash": "0ceb74dd7de8",
+    "provenance": "machine",
+    "outputHash": "4b28671d386f",
+    "stale": false
+  },
+  "alt:removebg:rows.1.snapotter": {
+    "text": "Ваша інфраструктура",
+    "_sourceHash": "23d6fa83321f",
+    "provenance": "machine",
+    "outputHash": "9e88aa9c9224",
+    "stale": false
+  },
+  "alt:removebg:rows.2.competitor": {
+    "text": "Ціноутворення на основі кредитів за кожне зображення",
+    "_sourceHash": "829521ab58e0",
+    "provenance": "machine",
+    "outputHash": "7c040e3854ee",
+    "stale": false
+  },
+  "alt:removebg:rows.2.feature": {
+    "text": "Контроль витрат",
+    "_sourceHash": "22be6dda6262",
+    "provenance": "machine",
+    "outputHash": "6f209a3600e2",
+    "stale": false
+  },
+  "alt:removebg:rows.2.snapotter": {
+    "text": "Безкоштовно за AGPLv3; обмеження задає лише ваше обладнання",
+    "_sourceHash": "687e241f57c1",
+    "provenance": "machine",
+    "outputHash": "d018d64a0d89",
+    "stale": false
+  },
+  "alt:removebg:rows.3.competitor": {
+    "text": "Розроблено для роботи онлайн у браузері",
+    "_sourceHash": "8907a163d968",
+    "provenance": "machine",
+    "outputHash": "403562fd18a0",
+    "stale": false
+  },
+  "alt:removebg:rows.3.feature": {
+    "text": "Робота офлайн та в ізольованій мережі",
+    "_sourceHash": "e4a80d68819d",
+    "provenance": "machine",
+    "outputHash": "cffaf0950bfb",
+    "stale": false
+  },
+  "alt:removebg:rows.3.snapotter": {
+    "text": "Підтримується під час розгортання всередині вашої мережі",
+    "_sourceHash": "4beb5ebfedbf",
+    "provenance": "machine",
+    "outputHash": "267c2a70780d",
+    "stale": false
+  },
+  "alt:removebg:rows.4.competitor": {
+    "text": "Видалення тла",
+    "_sourceHash": "719d0ee714fc",
+    "provenance": "machine",
+    "outputHash": "46e8ff0b452e",
+    "stale": false
+  },
+  "alt:removebg:rows.4.feature": {
+    "text": "Більше, ніж видалення тла",
+    "_sourceHash": "59d03d7534b5",
+    "provenance": "machine",
+    "outputHash": "2948dc85ea62",
+    "stale": false
+  },
+  "alt:removebg:rows.4.snapotter": {
+    "text": "Зображення, відео, аудіо, PDF та файли",
+    "_sourceHash": "e7a2fc51966a",
+    "provenance": "machine",
+    "outputHash": "2c761a5a3e28",
+    "stale": false
+  },
+  "alt:removebg:rows.5.competitor": {
+    "text": "Сервіс, керований постачальником; доступність вихідного коду не є частиною моделі продукту",
+    "_sourceHash": "bc334341e970",
+    "provenance": "machine",
+    "outputHash": "1737f8926159",
+    "stale": false
+  },
+  "alt:removebg:rows.5.feature": {
+    "text": "Вихідний код і можливість аудиту",
+    "_sourceHash": "787c52535666",
+    "provenance": "machine",
+    "outputHash": "34c5e637ecac",
+    "stale": false
+  },
+  "alt:removebg:rows.5.snapotter": {
+    "text": "Вихідний код доступний за ліцензією AGPLv3",
+    "_sourceHash": "01dd659eb6f9",
+    "provenance": "machine",
+    "outputHash": "a263a058cb27",
+    "stale": false
+  },
+  "alt:removebg:rows.6.competitor": {
+    "text": "API, розміщений постачальником, з кредитами за кожне зображення",
+    "_sourceHash": "ac59af091ef8",
+    "provenance": "machine",
+    "outputHash": "c1ef1d3043dd",
+    "stale": false
+  },
+  "alt:removebg:rows.6.feature": {
+    "text": "Автоматизація",
+    "_sourceHash": "d909750b1bbb",
+    "provenance": "machine",
+    "outputHash": "f15b6272d7b6",
+    "stale": false
+  },
+  "alt:removebg:rows.6.snapotter": {
+    "text": "REST API та конвеєри у вашому розгортанні",
+    "_sourceHash": "c201df2119aa",
+    "provenance": "machine",
+    "outputHash": "2e40c073bd14",
+    "stale": false
+  },
   "alt:smallpdf:breadth": {
     "text": "Smallpdf зосереджений на PDF, і саме це потрібно багатьом людям. SnapOtter закриває цей напрямок обʼєднанням, розділенням, стисненням, конвертацією, редагуванням, OCR та іншим, а потім додає роботу із зображеннями, відео, аудіо та файлами в межах того самого розгортання.",
     "_sourceHash": "f9e4c7657edb",
@@ -2044,10 +2254,10 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.3.snapotter": {
-    "text": "241",
-    "_sourceHash": "749fc650cacb",
+    "text": "200+",
+    "_sourceHash": "ed98fc54e23b",
     "provenance": "machine",
-    "outputHash": "749fc650cacb",
+    "outputHash": "ed98fc54e23b",
     "stale": false
   },
   "alt:stirling-pdf:rows.4.competitor": {
