@@ -23,6 +23,7 @@ import { createRequire } from "node:module";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IMAGE_VALID = join(__dirname, "image/valid");
 const DOC_VALID = join(__dirname, "document/valid");
+const DOC_EDGE = join(__dirname, "document/edge");
 const require = createRequire(join(__dirname, "../../apps/api/package.json"));
 const sharp = require("sharp");
 const QRCode = require("qrcode");
@@ -111,7 +112,10 @@ function barcodeSvg(text, width, height) {
 
 // ── Minimal PDF generator ──────────────────────────────────
 
-function generatePdf(pageCount) {
+function generatePdf(
+  pageCount,
+  contentForPage = (page) => `BT /F1 24 Tf 72 700 Td (Page ${page}) Tj ET`,
+) {
   const objects = [];
   let nextObj = 1;
   const addObj = (content) => {
@@ -126,7 +130,7 @@ function generatePdf(pageCount) {
 
   const pageIds = [];
   for (let i = 1; i <= pageCount; i++) {
-    const stream = `BT /F1 24 Tf 72 700 Td (Page ${i}) Tj ET`;
+    const stream = contentForPage(i);
     const sId = addObj(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     const pId = addObj(
       `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] ` +
@@ -156,6 +160,19 @@ function generatePdf(pageCount) {
   pdf += `startxref\n${xrefOffset}\n%%EOF\n`;
   return Buffer.from(pdf, "binary");
 }
+
+const COLORED_BLOCK_STREAM = [
+  "0.12 0.52 0.72 rg",
+  "72 520 240 65 re f",
+  "BT",
+  "/F1 14 Tf",
+  "1 1 1 rg",
+  "84 562 Td",
+  "(BLOCK LINE ONE) Tj",
+  "0 -24 Td",
+  "(BLOCK LINE TWO) Tj",
+  "ET",
+].join("\n");
 
 // ── SVG logo (project-owned, replaces ConvertICO brand) ───
 
@@ -310,6 +327,11 @@ async function main() {
   console.log("PDFs:");
   writeIfMissing(join(DOC_VALID, "alt-2page.pdf"), generatePdf(2), "alt-2page.pdf");
   writeIfMissing(join(DOC_VALID, "multipage-6.pdf"), generatePdf(6), "multipage-6.pdf");
+  writeIfMissing(
+    join(DOC_EDGE, "colored-block.pdf"),
+    generatePdf(1, () => COLORED_BLOCK_STREAM),
+    "colored-block.pdf",
+  );
 
   // ── SVG logo (B: replaces ConvertICO brand) ──
   console.log("SVG logo (replacing ConvertICO brand):");

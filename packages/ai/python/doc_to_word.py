@@ -13,13 +13,17 @@ def main():
         sys.exit(1)
     try:
         from pdf2docx import Converter
+        from pdf2docx_layout import install_pdf2docx_layout_fixes
     except ImportError:
         print(json.dumps({"error": "pdf2docx not installed"}))
         sys.exit(1)
     try:
+        install_pdf2docx_layout_fixes()
         cv = Converter(path)
-        cv.convert(out)
-        cv.close()
+        try:
+            cv.convert(out, max_border_width=2.0)
+        finally:
+            cv.close()
         print(json.dumps({"ok": True}))
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": str(exc)}))

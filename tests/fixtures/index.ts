@@ -140,6 +140,7 @@ export const fixtures = {
     pdf3: p("document/valid/test-3page.pdf"),
     pdfScanned: p("document/valid/ocr-scanned.pdf"),
     encrypted: p("document/valid/encrypted.pdf"),
+    coloredBlock: p("document/edge/colored-block.pdf"),
     tiny: (ext: string) => p(`document/formats/tiny.${ext}`),
     remoteImgHtml: p("document/edge/remote-img.html"),
     hostile: {
