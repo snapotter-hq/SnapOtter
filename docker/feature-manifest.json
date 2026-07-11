@@ -87,6 +87,7 @@
       "smokeImports": ["rembg", "onnxruntime"],
       "enablesTools": [
         "remove-background",
+        "remove-gif-background",
         "passport-photo",
         "transparency-fixer",
         "background-replace",
