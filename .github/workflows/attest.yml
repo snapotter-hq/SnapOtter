@@ -2,8 +2,12 @@ name: Attest Provenance
 
 # Generates SLSA build-provenance attestations for an already-published release,
 # so no image rebuild is required. Dispatch it after a release once the image
-# manifest and source archives exist. Provenance is pushed to the registries as
-# OCI referrers (verify with: gh attestation verify oci://<image>@<digest>).
+# manifest and source archives exist.
+#
+# Keep image attestations in GitHub's attestation API instead of pushing them
+# back to registries. GHCR renders OCI fallback sha256-* attestation tags as
+# package versions, which makes the package page recommend non-runtime artifacts.
+# Verify with: gh attestation verify oci://<image>@<digest> -R snapotter-hq/SnapOtter
 
 on:
   workflow_dispatch:
@@ -26,35 +30,21 @@ jobs:
     permissions:
       id-token: write
       attestations: write
-      packages: write
       contents: read
     steps:
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Attest GHCR image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/snapotter-hq/snapotter
           subject-digest: ${{ inputs.image_digest }}
-          push-to-registry: true
+          push-to-registry: false
 
       - name: Attest Docker Hub image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/snapotter/snapotter
           subject-digest: ${{ inputs.image_digest }}
-          push-to-registry: true
+          push-to-registry: false
 
   archives:
     name: Attest source archives

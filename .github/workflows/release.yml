@@ -252,6 +252,10 @@ jobs:
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           labels: ${{ steps.meta.outputs.labels }}
+          # The manual attestation workflow signs release images. Buildx's
+          # default provenance sidecars show up in GHCR as unknown/unknown
+          # architectures on the package page.
+          provenance: false
           outputs: type=image,"name=snapotter/snapotter,ghcr.io/snapotter-hq/snapotter",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }}
           cache-to: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }},mode=max
