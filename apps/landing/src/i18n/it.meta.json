@@ -1056,9 +1056,9 @@
     "stale": false
   },
   "faq.metaDescription": {
-    "sourceHash": "02ba41f7b5b8",
+    "sourceHash": "bceab6cf5e55",
     "provenance": "machine",
-    "outputHash": "cdccdbc6f172",
+    "outputHash": "4e96b09a7a20",
     "stale": false
   },
   "faq.metaTitle": {
@@ -1890,15 +1890,15 @@
     "stale": false
   },
   "home.hero.subtitle": {
-    "sourceHash": "4f4aee6cd176",
+    "sourceHash": "dfe178b3af59",
     "provenance": "machine",
-    "outputHash": "f10d4b2052cd",
+    "outputHash": "2b415ae32dc3",
     "stale": false
   },
   "home.hero.title": {
-    "sourceHash": "4b17aa5ddd52",
+    "sourceHash": "b8c7a261cd14",
     "provenance": "machine",
-    "outputHash": "a7c8e251a019",
+    "outputHash": "953eb3d51c16",
     "stale": false
   },
   "home.openSource.discord": {
@@ -2052,9 +2052,9 @@
     "stale": false
   },
   "home.pricing.oss.feature.allTools": {
-    "sourceHash": "29ec897d1d63",
+    "sourceHash": "d7502ba9410f",
     "provenance": "machine",
-    "outputHash": "f1506d979508",
+    "outputHash": "eaa57ab12fd5",
     "stale": false
   },
   "home.pricing.oss.feature.api": {
@@ -2412,9 +2412,9 @@
     "stale": false
   },
   "home.toolGrid.subtitle": {
-    "sourceHash": "87f948f44ef0",
+    "sourceHash": "1e1594a793df",
     "provenance": "machine",
-    "outputHash": "187de33349c4",
+    "outputHash": "fed7626f13e5",
     "stale": false
   },
   "home.toolGrid.suggested": {
@@ -2583,6 +2583,48 @@
     "sourceHash": "dfe95783edfe",
     "provenance": "machine",
     "outputHash": "06b2a01a8efc",
+    "stale": false
+  },
+  "nav.product": {
+    "sourceHash": "fb9ef894175c",
+    "provenance": "machine",
+    "outputHash": "6574c8b068ed",
+    "stale": false
+  },
+  "nav.product.alternatives.desc": {
+    "sourceHash": "5beb772eb3e6",
+    "provenance": "machine",
+    "outputHash": "5beb772eb3e6",
+    "stale": false
+  },
+  "nav.product.alternatives.label": {
+    "sourceHash": "41055f72edad",
+    "provenance": "machine",
+    "outputHash": "b59b72be37f3",
+    "stale": false
+  },
+  "nav.product.developers.desc": {
+    "sourceHash": "bd7f734e8595",
+    "provenance": "machine",
+    "outputHash": "f6f7fa619970",
+    "stale": false
+  },
+  "nav.product.developers.label": {
+    "sourceHash": "fc799da2088d",
+    "provenance": "machine",
+    "outputHash": "655e334b3f02",
+    "stale": false
+  },
+  "nav.product.selfHosted.desc": {
+    "sourceHash": "e84d1d907043",
+    "provenance": "machine",
+    "outputHash": "7403fb593886",
+    "stale": false
+  },
+  "nav.product.selfHosted.label": {
+    "sourceHash": "a5380132091d",
+    "provenance": "machine",
+    "outputHash": "f7d6edc2c1bf",
     "stale": false
   },
   "nav.talkToHuman": {
