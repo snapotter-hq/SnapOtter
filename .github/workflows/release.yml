@@ -37,7 +37,12 @@ jobs:
 
       - name: Run semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RELEASE_TOKEN is a fine-grained PAT (repo Contents/Issues/PRs: write)
+          # owned by an admin, so semantic-release's push of the chore(release)
+          # commit + tag clears branch protection (enforce_admins is off). Falls
+          # back to the default token if the secret is unset, so behaviour is
+          # unchanged until the secret exists.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: npx semantic-release
 
       - name: Check for new release
@@ -72,7 +77,7 @@ jobs:
       - name: Update docs changelog
         if: steps.notes.outputs.has_notes == 'true' && steps.check.outputs.version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.check.outputs.version }}
         run: |
           CHANGELOG="apps/docs/changelog.md"
@@ -100,8 +105,12 @@ jobs:
           git config user.name "SnapOtter"
           git config user.email "snapotter.hq@gmail.com"
           git add "$CHANGELOG"
-          git commit -m "docs: update changelog for v${VERSION}" || true
-          git push origin HEAD:main || true
+          git commit -m "docs: update changelog for v${VERSION} [skip ci]" || true
+          # Authenticate this direct push explicitly: the job's checkout uses
+          # persist-credentials: false, so there is no ambient credential. The
+          # PAT's admin identity bypasses branch protection; if the secret is
+          # unset this no-ops (|| true) exactly as before.
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main || true
           echo "Docs changelog updated for v${VERSION}."
 
   prebuilt:

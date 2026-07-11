@@ -15,6 +15,24 @@ SnapOtter ships a multi-arch container image to Docker Hub (`snapotter/snapotter
 
 The `manifest` job targets the `publish-images` GitHub Environment, which requires a maintainer to approve the run before it proceeds. If Trivy fails at step 4, `manifest` never runs and no tags are published.
 
+## One-time setup: `RELEASE_TOKEN`
+
+Step 1 (`release`) pushes a version-bump commit and tag to `main`, which is protected. The default GitHub Actions token cannot push past the required status checks, so the workflow authenticates that push with `RELEASE_TOKEN`: a fine-grained PAT owned by an admin. Because `enforce_admins` is off on `main`, an admin identity bypasses the checks.
+
+Create it once, and rotate it when it expires:
+
+1. GitHub → **Settings → Developer settings → Fine-grained personal access tokens → Generate new token**.
+2. Resource owner: `snapotter-hq`. Repository access: **Only select repositories → `snapotter-hq/SnapOtter`**.
+3. Repository permissions: **Contents** read+write, **Issues** read+write, **Pull requests** read+write. semantic-release commits and tags (Contents) and comments on released issues/PRs (Issues, Pull requests). Metadata read is added automatically.
+4. Expiration: your call, up to a year. Set a reminder to rotate before it lapses.
+5. Store it as a repo secret:
+   ```bash
+   gh secret set RELEASE_TOKEN --repo snapotter-hq/SnapOtter
+   ```
+   Paste the token when prompted.
+
+If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the push to `main` is rejected by branch protection, and the `release` job fails at the semantic-release step. So set the secret before cutting a release. A classic PAT with the `repo` scope also works and is simpler to configure, but it can reach every repo you have access to, so the fine-grained token is preferred.
+
 ## Cut a release
 
 1. Make sure `main` is green and everything you want in the release is merged.
