@@ -1,4 +1,10 @@
-import { connectivityClass, isClientAbort, rebuildErrorValue, SafeError } from "@snapotter/shared";
+import {
+  connectivityClass,
+  extractErrorCode,
+  isClientAbort,
+  rebuildErrorValue,
+  SafeError,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 const sysErr = (code: string, syscall?: string) =>
@@ -76,6 +82,45 @@ describe("rebuildErrorValue", () => {
     const err = new Error("loop") as Error & { cause?: unknown };
     err.cause = err;
     expect(rebuildErrorValue(err)).toBeNull();
+  });
+});
+
+describe("extractErrorCode", () => {
+  it("finds a pg SQLSTATE through a drizzle-style cause chain", () => {
+    const pg = Object.assign(new Error("password authentication failed"), {
+      code: "28P01",
+      severity: "FATAL",
+    });
+    const wrapped = Object.assign(new Error("Failed query: select 1"), { cause: pg });
+    expect(extractErrorCode(wrapped)).toBe("28P01");
+  });
+  it("finds a node syscall code nested in the chain", () => {
+    const net = Object.assign(new Error("getaddrinfo ENOTFOUND db"), { code: "ENOTFOUND" });
+    const wrapped = Object.assign(new Error("connect failed"), { cause: net });
+    expect(extractErrorCode(wrapped)).toBe("ENOTFOUND");
+  });
+  it("prefers a pg SQLSTATE over an earlier non-standard code", () => {
+    const pg = Object.assign(new Error("deadlock detected"), { code: "40P01" });
+    const wrapped = Object.assign(new Error("wrap"), { code: "generic", cause: pg });
+    expect(extractErrorCode(wrapped)).toBe("40P01");
+  });
+  it("falls back to a SafeError's authored code when no pg/node code is present", () => {
+    const err = new SafeError("Python script timed out", { kind: "operational", code: "timeout" });
+    expect(extractErrorCode(err)).toBe("timeout");
+  });
+  it("returns null when no code exists anywhere in the chain", () => {
+    expect(extractErrorCode(new Error("plain boom"))).toBeNull();
+    expect(extractErrorCode("string")).toBeNull();
+    expect(extractErrorCode(null)).toBeNull();
+  });
+  it("returns null when a cause getter throws (hostile)", () => {
+    const hostile = new Error("boom");
+    Object.defineProperty(hostile, "cause", {
+      get() {
+        throw new Error("gotcha");
+      },
+    });
+    expect(extractErrorCode(hostile)).toBeNull();
   });
 });
 

@@ -102,6 +102,30 @@ export function rebuildErrorValue(err: unknown): string | null {
   }
 }
 
+/**
+ * The most specific, non-sensitive error code in the cause chain, for the
+ * Sentry `error_code` tag. Prefers a pg SQLSTATE, then a node E-code, else the
+ * first short string code found (e.g. a SafeError's authored code). Returns
+ * null when none is present. reportError used to read only the top-level
+ * `.code`, but pg/undici bury the real code under a drizzle/wrapper Error whose
+ * own `.code` is undefined, so the tag was always empty on those events.
+ */
+export function extractErrorCode(err: unknown): string | null {
+  try {
+    let fallback: string | null = null;
+    for (const l of chain(err)) {
+      const code = l.code;
+      if (typeof code !== "string" || code.length === 0 || code.length > 40) continue;
+      if (SQLSTATE.test(code) && !NODE_CODE.test(code)) return code;
+      if (NODE_CODE.test(code)) return code;
+      if (fallback === null) fallback = code;
+    }
+    return fallback;
+  } catch {
+    return null;
+  }
+}
+
 export type ConnectivityClass = "pg-unavailable" | "redis-unavailable" | "net-unavailable";
 
 /** Infra-connectivity classification used for fingerprinting + throttling. */

@@ -50,6 +50,17 @@ describe("classifyError", () => {
     expect(classifyError(reset, "worker")).toBe("operational");
     expect(classifyError(reset, "http")).toBe("expected");
   });
+  it("InputValidationError is a user 400 wherever it surfaces, not only on http", () => {
+    // Tools throw InputValidationError from processV2 in the worker (e.g.
+    // sprite-sheet "Provide at least two images"); it must not be logged as a bug.
+    const e = Object.assign(new Error("Provide at least two images"), {
+      name: "InputValidationError",
+    });
+    expect(classifyError(e, "worker")).toBe("expected");
+    expect(classifyError(e, "cron")).toBe("expected");
+    expect(classifyError(e, "http")).toBe("expected");
+    expect(classifyError(e)).toBe("expected");
+  });
 });
 
 describe("throttle", () => {

@@ -46,6 +46,21 @@ describe("capture path", () => {
     expect(h.scope.setTag).toHaveBeenCalledWith("pool", "image");
   });
 
+  it("tags error_code from a code nested in the cause chain, not just the top level", async () => {
+    // pg/undici bury the real code under a drizzle/wrapper Error whose own
+    // .code is undefined; reading only the top level left error_code empty.
+    const pg = Object.assign(new Error("password authentication failed"), {
+      code: "28P01",
+      severity: "FATAL",
+    });
+    const wrapped = Object.assign(new Error("Failed query: select 1"), { cause: pg });
+
+    await reportError(wrapped, { source: "worker", pool: "docs" });
+
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "28P01");
+  });
+
   it("captures once per distinct signature; operational repeats are throttled", async () => {
     const full = Object.assign(new Error("disk full"), { code: "ENOSPC" });
     await reportError(full, { source: "worker", pool: "image" });

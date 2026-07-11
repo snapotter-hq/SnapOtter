@@ -429,7 +429,9 @@ export class PythonDispatcher {
         if (this.child && !this.child.killed) {
           this.child.kill("SIGTERM");
         }
-        rejectPromise(new Error("Python script timed out"));
+        rejectPromise(
+          new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
+        );
       }, timeout);
 
       const wrappedResolve = (result: { stdout: string; stderr: string }) => {
@@ -557,7 +559,9 @@ export class PythonDispatcher {
           }
 
           if (timedOut) {
-            rejectPromise(new Error("Python script timed out"));
+            rejectPromise(
+              new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
+            );
             return;
           }
 

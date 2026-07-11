@@ -13,6 +13,7 @@
  */
 import {
   connectivityClass,
+  extractErrorCode,
   isClientAbort,
   isSafeMessageError,
   isToolInputError,
@@ -38,6 +39,10 @@ export interface ReportContext {
 export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
   if (isToolInputError(err)) return "expected";
   const e = err as { name?: string; message?: string; code?: string } | null;
+  // InputValidationError (apps/api/src/modality/contract.ts) is a 400 the user
+  // caused with a bad file/args. Tools throw it from processV2 inside the worker
+  // (e.g. sprite-sheet), so it is expected wherever it surfaces, not only http.
+  if (e?.name === "InputValidationError") return "expected";
   if (e && typeof e.message === "string" && /^(Canceled$|Timed out after )/.test(e.message)) {
     return "expected";
   }
@@ -48,9 +53,9 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
   // worker-side parse failure is our bug.
   if (source === "http" || source === undefined) {
     if (isClientAbort(err)) return "expected";
-    // ZodError = settings validation; InputValidationError = upload validation
-    // (apps/api/src/modality/contract.ts). Both are user-input problems.
-    if (e?.name === "ZodError" || e?.name === "InputValidationError") return "expected";
+    // ZodError = settings validation. Settings are validated at the boundary, so
+    // a worker-side ZodError is schema drift (our bug); only expected on http.
+    if (e?.name === "ZodError") return "expected";
   }
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
@@ -106,7 +111,7 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
       scope.setLevel(cls === "operational" ? "warning" : "error");
       scope.setTag("source", ctx.source);
       scope.setTag("error_class", cls);
-      const code = (err as { code?: string } | null)?.code;
+      const code = extractErrorCode(err);
       if (code) scope.setTag("error_code", code);
       if (ctx.toolId) scope.setTag("tool_id", ctx.toolId);
       if (ctx.pool) scope.setTag("pool", ctx.pool);

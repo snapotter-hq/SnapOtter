@@ -271,6 +271,30 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     vi.useRealTimers();
   });
 
+  it("rejects a per-request timeout as an operational SafeError with a 'timeout' code", async () => {
+    // A timeout is environmental (huge input / slow box), not our bug. Sentry
+    // must see it as an operational SafeError, not a message-less "Error: Error".
+    vi.useFakeTimers();
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("slow.py", [], { timeout: 1000 });
+    const settled = promise.catch((e: unknown) => e); // attach before firing the timer
+    vi.advanceTimersByTime(1500);
+    mock.emitEvent("close", null, "SIGTERM");
+
+    const err = (await settled) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err.message).toBe("Python script timed out");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("timeout");
+    vi.useRealTimers();
+  });
+
   it("invokes onProgress callback for JSON progress lines on stderr", async () => {
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);
@@ -1388,6 +1412,36 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
 
     const result = await promise;
     expect(result.stdout).toBe('{"success": true}');
+  });
+
+  it("rejects a dispatcher-path timeout as an operational SafeError (NODE-26 regression)", async () => {
+    // NODE-26: the dispatcher request() timeout rejected with a bare
+    // new Error("Python script timed out"), which the Sentry sanitizer scrubbed
+    // to a message-less "Error: Error" bug. It must be an operational SafeError.
+    vi.useFakeTimers();
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const initPromise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await vi.advanceTimersByTimeAsync(60); // init() polls childReady every 50ms
+    await initPromise;
+
+    const promise = runPythonWithProgress("slow.py", [], { timeout: 1000 });
+    const settled = promise.catch((e: unknown) => e); // attach before firing the timer
+    await vi.advanceTimersByTimeAsync(0); // flush the request's stdin write
+    await vi.advanceTimersByTimeAsync(1100); // fire the dispatcher request timeout
+
+    const err = (await settled) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      code?: string;
+    };
+    expect(err.message).toBe("Python script timed out");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("timeout");
+    vi.useRealTimers();
   });
 
   it("strips .py extension from script name in dispatcher request", async () => {
