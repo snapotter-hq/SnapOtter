@@ -62,6 +62,7 @@ export const fixtures = {
     animated: {
       gif: p("image/valid/animated.gif"),
       webp: p("image/valid/animated.webp"),
+      apng: p("image/valid/animated.apng"),
       real: p("image/valid/animated-simpsons.gif"),
     },
     ocr: {

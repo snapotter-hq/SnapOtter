@@ -330,6 +330,17 @@ async function main() {
     "animated-simpsons.gif",
   );
 
+  // ── Animated APNG (multi-frame, full alpha) for remove-gif-background ──
+  // The committed file is a 4-frame RGBA APNG. This regenerates a small animated
+  // APNG only if the fixture is missing (bytes will differ from the committed one).
+  console.log("Animated APNG (for remove-gif-background):");
+  const apngOut = join(IMAGE_VALID, "animated.apng");
+  ffIfMissing(
+    apngOut,
+    `-f lavfi -i "testsrc=duration=1:size=48x48:rate=4" -pix_fmt rgba -plays 0 -f apng -y "${apngOut}"`,
+    "animated.apng",
+  );
+
   // ── Synthetic audio/video (A) ──
   // NOTE: media-30s.mp4 and media-30s.wav are no longer generated here.
   // media-30s.mp4 is now a real Big Buck Bunny CC-BY hero clip (committed).
