@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    API REST per SnapOtter, una suite di elaborazione file self-hosted con oltre 200 strumenti per immagini, video, audio, PDF e file.
+    REST API di SnapOtter, un'infrastruttura self-hosted per l'elaborazione dei file con 200+ strumenti per image, video, audio, PDF e documenti.
 
     ## Autenticazione
 
@@ -11,9 +11,9 @@ info:
 
     1. **Cookie di sessione** - Chiama `POST /api/auth/login` con nome utente e password. La risposta include un campo `token`. Passalo come `Authorization: Bearer <token>` nelle richieste successive.
 
-    2. **API key** - Genera una chiave tramite l'interfaccia Impostazioni o `POST /api/v1/api-keys`. Le chiavi hanno il prefisso `si_`. Passala come `Authorization: Bearer si_...`.
+    2. **Chiave API** - Genera una chiave dall'interfaccia delle Impostazioni o da `POST /api/v1/api-keys`. Le chiavi hanno il prefisso `si_`. Passala come `Authorization: Bearer si_...`.
 
-    Gli endpoint contrassegnati con l'icona di un lucchetto richiedono l'autenticazione. Gli endpoint riservati agli amministratori sono indicati nella loro descrizione.
+    Gli endpoint contrassegnati da un'icona a forma di lucchetto richiedono l'autenticazione. Gli endpoint riservati agli amministratori sono indicati nella loro descrizione.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: c5ca17e778b5
+      outputHash: ee34ec57345d
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

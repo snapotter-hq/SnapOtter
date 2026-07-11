@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter の REST API。画像、動画、音声、PDF、ファイルにまたがる 200 以上のツールを備えたセルフホスト型のファイル処理スイートです。
+    SnapOtter の REST API。image、video、audio、PDF、ドキュメントにわたる 200+ のツールを備えた、セルフホスト型のファイル処理基盤です。
 
     ## 認証
 
-    ほとんどのエンドポイントは、次の 2 つの方法のいずれかによる認証を必要とします。
+    ほとんどのエンドポイントでは、次の2つのいずれかの方法による認証が必要です。
 
-    1. **セッション Cookie** - `POST /api/auth/login` をユーザー名とパスワードで呼び出します。レスポンスには `token` フィールドが含まれます。以降のリクエストでは `Authorization: Bearer <token>` として渡してください。
+    1. **セッションクッキー** - ユーザー名とパスワードで `POST /api/auth/login` を呼び出します。レスポンスには `token` フィールドが含まれます。以降のリクエストでは、それを `Authorization: Bearer <token>` として渡してください。
 
-    2. **API キー** - Settings UI または `POST /api/v1/api-keys` でキーを生成します。キーには `si_` のプレフィックスが付きます。`Authorization: Bearer si_...` として渡してください。
+    2. **API キー** - 設定 UI または `POST /api/v1/api-keys` からキーを生成します。キーには `si_` という接頭辞が付きます。`Authorization: Bearer si_...` として渡してください。
 
-    鍵アイコンが付いたエンドポイントは認証が必要です。管理者専用のエンドポイントはその説明に記載されています。
+    鍵アイコンが付いたエンドポイントには認証が必要です。管理者専用のエンドポイントは、その説明に明記されています。
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6495,7 +6495,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18389,9 +18391,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 365747112ca4
+      outputHash: 37d81c2053a1
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

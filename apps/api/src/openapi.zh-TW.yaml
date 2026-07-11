@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter 的 REST API，一套自架的檔案處理工具集，涵蓋圖片、影片、音訊、PDF 與檔案，共 200+ 種工具。
+    SnapOtter 的 REST API，一套自架的檔案處理基礎架構，提供 200+ 工具，涵蓋 image、video、audio、PDF 和文件。
 
-    ## Authentication
+    ## 驗證
 
-    多數端點需透過以下兩種方式之一進行驗證：
+    大多數端點需要透過以下兩種方式之一進行驗證：
 
-    1. **Session cookie** - 呼叫 `POST /api/auth/login` 並帶上使用者名稱與密碼。回應中包含 `token` 欄位。後續請求時將其作為 `Authorization: Bearer <token>` 傳送。
+    1. **工作階段 Cookie** - 使用使用者名稱和密碼呼叫 `POST /api/auth/login`。回應中包含 `token` 欄位。在後續請求中將其作為 `Authorization: Bearer <token>` 傳遞。
 
-    2. **API key** - 透過設定 UI 或 `POST /api/v1/api-keys` 產生金鑰。金鑰以 `si_` 為前綴。作為 `Authorization: Bearer si_...` 傳送。
+    2. **API 金鑰** - 透過設定介面或 `POST /api/v1/api-keys` 產生金鑰。金鑰以 `si_` 為前綴。作為 `Authorization: Bearer si_...` 傳遞。
 
-    標有鎖頭圖示的端點需要驗證。僅限管理員的端點會在其說明中註明。
+    帶鎖形圖示的端點需要驗證。僅限管理員的端點會在其說明中註明。
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6495,7 +6495,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18388,9 +18390,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 48566804aff1
+      outputHash: 97f9bece25ca
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

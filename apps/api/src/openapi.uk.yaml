@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API для SnapOtter, самохостованого набору для обробки файлів із понад 200 інструментами для image, video, audio, PDF і files.
+    REST API для SnapOtter, самостійно розгорнутої інфраструктури обробки файлів із 200+ інструментами для image, video, audio, PDF та документів.
 
-    ## Authentication
+    ## Автентифікація
 
-    Більшість ендпоінтів потребують автентифікації одним із двох способів:
+    Більшість кінцевих точок вимагають автентифікації одним із двох способів:
 
-    1. **Session cookie** - Викличте `POST /api/auth/login` з іменем користувача та паролем. Відповідь містить поле `token`. Передавайте його як `Authorization: Bearer <token>` у наступних запитах.
+    1. **Сесійний cookie** - Викличте `POST /api/auth/login` з ім'ям користувача та паролем. Відповідь містить поле `token`. Передавайте його як `Authorization: Bearer <token>` у подальших запитах.
 
-    2. **API key** - Згенеруйте ключ через Settings UI або `POST /api/v1/api-keys`. Ключі мають префікс `si_`. Передавайте як `Authorization: Bearer si_...`.
+    2. **Ключ API** - Згенеруйте ключ через інтерфейс налаштувань або `POST /api/v1/api-keys`. Ключі мають префікс `si_`. Передавайте його як `Authorization: Bearer si_...`.
 
-    Ендпоінти, позначені іконкою замка, потребують автентифікації. Ендпоінти лише для адміністраторів зазначені в їхньому описі.
+    Кінцеві точки, позначені піктограмою замка, вимагають автентифікації. Кінцеві точки, доступні лише адміністраторам, зазначені в їхньому описі.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: afc8c4650ea8
+      outputHash: 151fe56cb74f
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

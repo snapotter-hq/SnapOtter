@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter용 REST API. 이미지, 비디오, 오디오, PDF, 파일 전반에 걸쳐 200개 이상의 도구를 제공하는 자체 호스팅 파일 처리 제품군입니다.
+    SnapOtter의 REST API로, image, video, audio, PDF, 문서 전반에 걸쳐 200+ 도구를 제공하는 자체 호스팅 파일 처리 인프라입니다.
 
     ## 인증
 
     대부분의 엔드포인트는 다음 두 가지 방법 중 하나로 인증해야 합니다.
 
-    1. **세션 쿠키** - 사용자 이름과 비밀번호로 `POST /api/auth/login`을(를) 호출합니다. 응답에는 `token` 필드가 포함됩니다. 이후 요청에서 `Authorization: Bearer <token>`(으)로 전달합니다.
+    1. **세션 쿠키** - 사용자 이름과 비밀번호로 `POST /api/auth/login`를 호출합니다. 응답에는 `token` 필드가 포함됩니다. 이후 요청에서 이를 `Authorization: Bearer <token>`로 전달하세요.
 
-    2. **API 키** - Settings UI 또는 `POST /api/v1/api-keys`을(를) 통해 키를 생성합니다. 키에는 `si_` 접두사가 붙습니다. `Authorization: Bearer si_...`(으)로 전달합니다.
+    2. **API 키** - 설정 UI 또는 `POST /api/v1/api-keys`를 통해 키를 생성합니다. 키에는 `si_` 접두사가 붙습니다. `Authorization: Bearer si_...`로 전달하세요.
 
-    자물쇠 아이콘이 표시된 엔드포인트는 인증이 필요합니다. 관리자 전용 엔드포인트는 설명에 명시되어 있습니다.
+    자물쇠 아이콘이 표시된 엔드포인트는 인증이 필요합니다. 관리자 전용 엔드포인트는 해당 설명에 명시되어 있습니다.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6532,7 +6532,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18470,9 +18472,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: cae565bbad21
+      outputHash: 80d901e1b23f
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

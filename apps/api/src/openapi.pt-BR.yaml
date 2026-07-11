@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API do SnapOtter, uma suíte de processamento de arquivos auto-hospedada com mais de 200 ferramentas para imagem, vídeo, áudio, PDF e arquivos.
+    REST API do SnapOtter, uma infraestrutura auto-hospedada de processamento de arquivos com 200+ ferramentas para image, video, audio, PDF e documentos.
 
     ## Autenticação
 
     A maioria dos endpoints exige autenticação por um de dois métodos:
 
-    1. **Cookie de sessão** - Chame `POST /api/auth/login` com nome de usuário e senha. A resposta inclui um campo `token`. Passe-o como `Authorization: Bearer <token>` nas requisições seguintes.
+    1. **Cookie de sessão** - Chame `POST /api/auth/login` com nome de usuário e senha. A resposta inclui um campo `token`. Passe-o como `Authorization: Bearer <token>` nas solicitações seguintes.
 
-    2. **API key** - Gere uma key pela interface de Settings ou por `POST /api/v1/api-keys`. As keys têm o prefixo `si_`. Passe como `Authorization: Bearer si_...`.
+    2. **Chave de API** - Gere uma chave pela interface de Configurações ou por `POST /api/v1/api-keys`. As chaves têm o prefixo `si_`. Passe-a como `Authorization: Bearer si_...`.
 
-    Endpoints marcados com um ícone de cadeado exigem autenticação. Endpoints exclusivos de admin são indicados em sua descrição.
+    Endpoints marcados com um ícone de cadeado exigem autenticação. Endpoints exclusivos para administradores são indicados em sua descrição.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 6e4417409f4a
+      outputHash: f46e3bc4204b
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

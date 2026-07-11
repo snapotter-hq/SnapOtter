@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API لـ SnapOtter، وهي مجموعة معالجة ملفات ذاتية الاستضافة تضم أكثر من 200 أداة عبر الصور والفيديو والصوت وPDF والملفات.
+    REST API لـ SnapOtter، بنية تحتية ذاتية الاستضافة لمعالجة الملفات تضم 200+ أداة عبر image وvideo وaudio وPDF والمستندات.
 
     ## المصادقة
 
     تتطلب معظم نقاط النهاية المصادقة عبر إحدى طريقتين:
 
-    1. **ملف تعريف ارتباط الجلسة** - استدعِ `POST /api/auth/login` باسم المستخدم وكلمة المرور. تتضمن الاستجابة حقل `token`. مرّره كـ `Authorization: Bearer <token>` في الطلبات اللاحقة.
+    1. **ملف تعريف ارتباط الجلسة** - استدعِ `POST /api/auth/login` باسم المستخدم وكلمة المرور. تتضمن الاستجابة حقل `token`. مرّره بوصفه `Authorization: Bearer <token>` في الطلبات اللاحقة.
 
-    2. **مفتاح API** - أنشئ مفتاحًا عبر واجهة Settings أو `POST /api/v1/api-keys`. تُسبَق المفاتيح بـ `si_`. مرّره كـ `Authorization: Bearer si_...`.
+    2. **مفتاح API** - أنشئ مفتاحًا عبر واجهة الإعدادات أو `POST /api/v1/api-keys`. تبدأ المفاتيح بالبادئة `si_`. مرّره بوصفه `Authorization: Bearer si_...`.
 
-    تتطلب نقاط النهاية المميزة بأيقونة قفل المصادقة. نقاط النهاية المخصصة للمسؤولين فقط مذكورة في وصفها.
+    تتطلب نقاط النهاية المميزة برمز القفل المصادقة. تُذكر نقاط النهاية المخصصة للمسؤولين فقط في وصفها.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6533,7 +6533,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18471,9 +18473,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 3403ac5502b4
+      outputHash: ce8d52e7503c
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

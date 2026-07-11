@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    API REST pour SnapOtter, une suite de traitement de fichiers auto-hébergeable avec plus de 200 outils couvrant image, vidéo, audio, PDF et fichiers.
+    REST API de SnapOtter, une infrastructure auto-hébergée de traitement de fichiers dotée de 200+ outils couvrant image, video, audio, PDF et documents.
 
     ## Authentification
 
-    La plupart des endpoints requièrent une authentification via l'une des deux méthodes :
+    La plupart des points de terminaison nécessitent une authentification via l'une des deux méthodes suivantes :
 
-    1. **Cookie de session** - Appelez `POST /api/auth/login` avec un nom d'utilisateur et un mot de passe. La réponse inclut un champ `token`. Transmettez-le en tant que `Authorization: Bearer <token>` dans les requêtes suivantes.
+    1. **Cookie de session** - Appelez `POST /api/auth/login` avec un nom d'utilisateur et un mot de passe. La réponse contient un champ `token`. Transmettez-le comme `Authorization: Bearer <token>` dans les requêtes suivantes.
 
-    2. **Clé API** - Générez une clé via l'interface Settings ou `POST /api/v1/api-keys`. Les clés sont préfixées par `si_`. Transmettez-la en tant que `Authorization: Bearer si_...`.
+    2. **Clé d'API** - Générez une clé via l'interface des Paramètres ou `POST /api/v1/api-keys`. Les clés sont préfixées par `si_`. Transmettez-la comme `Authorization: Bearer si_...`.
 
-    Les endpoints marqués d'une icône de cadenas requièrent une authentification. Les endpoints réservés aux administrateurs sont indiqués dans leur description.
+    Les points de terminaison marqués d'une icône de cadenas nécessitent une authentification. Les points de terminaison réservés aux administrateurs sont signalés dans leur description.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: ad2bc9e426cf
+      outputHash: b18a483ee1c6
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

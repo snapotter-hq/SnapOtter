@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API untuk SnapOtter, suite pemrosesan file self-hosted dengan 200+ tools untuk image, video, audio, PDF, dan files.
+    REST API untuk SnapOtter, infrastruktur pemrosesan berkas swa-inang dengan 200+ alat untuk image, video, audio, PDF, dan dokumen.
 
-    ## Authentication
+    ## Autentikasi
 
     Sebagian besar endpoint memerlukan autentikasi melalui salah satu dari dua metode:
 
-    1. **Session cookie** - Panggil `POST /api/auth/login` dengan username dan password. Respons menyertakan field `token`. Kirimkan sebagai `Authorization: Bearer <token>` pada permintaan berikutnya.
+    1. **Cookie sesi** - Panggil `POST /api/auth/login` dengan nama pengguna dan kata sandi. Respons menyertakan bidang `token`. Teruskan sebagai `Authorization: Bearer <token>` pada permintaan berikutnya.
 
-    2. **API key** - Buat key melalui UI Settings atau `POST /api/v1/api-keys`. Key diawali dengan `si_`. Kirimkan sebagai `Authorization: Bearer si_...`.
+    2. **Kunci API** - Buat kunci melalui antarmuka Pengaturan atau `POST /api/v1/api-keys`. Kunci diawali dengan `si_`. Teruskan sebagai `Authorization: Bearer si_...`.
 
-    Endpoint yang ditandai dengan ikon gembok memerlukan autentikasi. Endpoint khusus admin dicatat pada deskripsinya.
+    Endpoint yang ditandai dengan ikon gembok memerlukan autentikasi. Endpoint khusus admin dicatat dalam deskripsinya.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: b7dac2bf040b
+      outputHash: 1c8b03f27fe3
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

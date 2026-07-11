@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter के लिए REST API, एक सेल्फ-होस्टेड फ़ाइल प्रोसेसिंग सुइट जिसमें image, video, audio, PDF, और files में 200+ tools हैं।
+    SnapOtter के लिए REST API, एक सेल्फ-होस्टेड फ़ाइल-प्रोसेसिंग इन्फ़्रास्ट्रक्चर जिसमें image, video, audio, PDF और दस्तावेज़ों के लिए 200+ टूल हैं।
 
-    ## Authentication
+    ## प्रमाणीकरण
 
-    अधिकांश endpoints को दो तरीकों में से किसी एक के जरिए authentication की आवश्यकता होती है:
+    अधिकांश एंडपॉइंट को दो में से किसी एक तरीके से प्रमाणीकरण की आवश्यकता होती है:
 
-    1. **Session cookie** - username और password के साथ `POST /api/auth/login` कॉल करें। response में एक `token` field शामिल होता है। इसे बाद के requests पर `Authorization: Bearer <token>` के रूप में भेजें।
+    1. **सेशन कुकी** - उपयोगकर्ता नाम और पासवर्ड के साथ `POST /api/auth/login` को कॉल करें। प्रतिक्रिया में एक `token` फ़ील्ड शामिल होती है। बाद के अनुरोधों में इसे `Authorization: Bearer <token>` के रूप में पास करें।
 
-    2. **API key** - Settings UI या `POST /api/v1/api-keys` के जरिए एक key जनरेट करें। Keys के आगे `si_` लगा होता है। `Authorization: Bearer si_...` के रूप में भेजें।
+    2. **API कुंजी** - सेटिंग्स UI या `POST /api/v1/api-keys` के माध्यम से एक कुंजी जनरेट करें। कुंजियों में `si_` उपसर्ग लगा होता है। इसे `Authorization: Bearer si_...` के रूप में पास करें।
 
-    लॉक आइकन से चिह्नित endpoints को authentication की आवश्यकता होती है। केवल-admin endpoints उनके description में नोट किए गए हैं।
+    ताला आइकन से चिह्नित एंडपॉइंट को प्रमाणीकरण की आवश्यकता होती है। केवल व्यवस्थापक वाले एंडपॉइंट उनके विवरण में नोट किए गए हैं।
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6533,7 +6533,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18469,9 +18471,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 0ba4a4eb7fcb
+      outputHash: 7932bff8e4ea
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

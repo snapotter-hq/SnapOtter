@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API voor SnapOtter, een zelf-gehoste bestandsverwerkingssuite met 200+ tools voor image, video, audio, PDF en files.
+    REST API voor SnapOtter, een zelf-gehoste infrastructuur voor bestandsverwerking met 200+ tools voor image, video, audio, PDF en documenten.
 
-    ## Authentication
+    ## Authenticatie
 
     De meeste endpoints vereisen authenticatie via een van twee methoden:
 
-    1. **Sessiecookie** - Roep `POST /api/auth/login` aan met gebruikersnaam en wachtwoord. Het antwoord bevat een `token`-veld. Geef dit mee als `Authorization: Bearer <token>` bij volgende verzoeken.
+    1. **Sessiecookie** - Roep `POST /api/auth/login` aan met gebruikersnaam en wachtwoord. Het antwoord bevat een `token`-veld. Geef dit door als `Authorization: Bearer <token>` bij volgende verzoeken.
 
-    2. **API key** - Genereer een key via de Settings-UI of `POST /api/v1/api-keys`. Keys hebben het voorvoegsel `si_`. Geef mee als `Authorization: Bearer si_...`.
+    2. **API-sleutel** - Genereer een sleutel via de Instellingen-UI of `POST /api/v1/api-keys`. Sleutels hebben het voorvoegsel `si_`. Geef deze door als `Authorization: Bearer si_...`.
 
-    Endpoints met een slotpictogram vereisen authenticatie. Endpoints die alleen voor admins zijn, worden in hun beschrijving vermeld.
+    Endpoints met een slotpictogram vereisen authenticatie. Endpoints die alleen voor beheerders zijn, worden in hun beschrijving vermeld.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6495,7 +6495,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18388,9 +18390,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 957a8a2c7703
+      outputHash: fd18d8aa1479
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

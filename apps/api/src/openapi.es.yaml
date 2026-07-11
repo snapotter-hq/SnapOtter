@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    API REST de SnapOtter, un conjunto de herramientas autoalojado de procesamiento de archivos con más de 200 herramientas para imagen, vídeo, audio, PDF y archivos.
+    REST API de SnapOtter, una infraestructura autoalojada de procesamiento de archivos con 200+ herramientas para image, video, audio, PDF y documentos.
 
     ## Autenticación
 
     La mayoría de los endpoints requieren autenticación mediante uno de dos métodos:
 
-    1. **Cookie de sesión**: llama a `POST /api/auth/login` con nombre de usuario y contraseña. La respuesta incluye un campo `token`. Pásalo como `Authorization: Bearer <token>` en las solicitudes siguientes.
+    1. **Cookie de sesión** - Llama a `POST /api/auth/login` con nombre de usuario y contraseña. La respuesta incluye un campo `token`. Pásalo como `Authorization: Bearer <token>` en las solicitudes posteriores.
 
-    2. **API key**: genera una clave desde la interfaz de Settings o `POST /api/v1/api-keys`. Las claves llevan el prefijo `si_`. Pásala como `Authorization: Bearer si_...`.
+    2. **Clave de API** - Genera una clave desde la interfaz de Configuración o `POST /api/v1/api-keys`. Las claves llevan el prefijo `si_`. Pásala como `Authorization: Bearer si_...`.
 
-    Los endpoints marcados con un icono de candado requieren autenticación. Los endpoints exclusivos de administrador se indican en su descripción.
+    Los endpoints marcados con un icono de candado requieren autenticación. Los endpoints exclusivos para administradores se indican en su descripción.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18473,9 +18475,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 67a91dd2ac0d
+      outputHash: f2e5fa4d8fce
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine

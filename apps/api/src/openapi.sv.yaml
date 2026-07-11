@@ -3,17 +3,17 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API for SnapOtter, en sjalvhostad filbearbetningssvit med 200+ verktyg for bild, video, ljud, PDF och filer.
+    REST API för SnapOtter, en självhostad infrastruktur för filbehandling med 200+ verktyg för image, video, audio, PDF och dokument.
 
     ## Autentisering
 
-    De flesta endpoints kraver autentisering via en av tva metoder:
+    De flesta endpoints kräver autentisering via en av två metoder:
 
-    1. **Sessionscookie** - Anropa `POST /api/auth/login` med anvandarnamn och losenord. Svaret inkluderar ett `token`-falt. Skicka det som `Authorization: Bearer <token>` i efterfoljande forfragningar.
+    1. **Sessionscookie** - Anropa `POST /api/auth/login` med användarnamn och lösenord. Svaret innehåller ett `token`-fält. Skicka med det som `Authorization: Bearer <token>` i efterföljande förfrågningar.
 
-    2. **API-nyckel** - Generera en nyckel via installningsgranssnittet eller `POST /api/v1/api-keys`. Nycklar har prefixet `si_`. Skicka som `Authorization: Bearer si_...`.
+    2. **API-nyckel** - Skapa en nyckel via inställningsgränssnittet eller `POST /api/v1/api-keys`. Nycklar har prefixet `si_`. Skicka med den som `Authorization: Bearer si_...`.
 
-    Endpoints markerade med en laasikon kraver autentisering. Endast-admin-endpoints anges i sin beskrivning.
+    Endpoints markerade med en låsikon kräver autentisering. Endpoints som endast är för administratörer anges i sin beskrivning.
   license:
     name: AGPL-3.0
     url: https://github.com/snapotter-hq/snapotter/blob/main/LICENSE
@@ -6534,7 +6534,9 @@ paths:
                     type: string
                   sentryDsn:
                     type: string
-                  sampleRate:
+                  sentryDsnWeb:
+                    type: string
+                  posthogSampleRate:
                     type: number
                   instanceId:
                     type: string
@@ -18472,9 +18474,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 7960d122934d
+      sourceHash: 0a7d56a602a9
       provenance: machine
-      outputHash: 3abb370e252c
+      outputHash: 9a2e40e6abf4
     tags.Tools.description:
       sourceHash: 9c71553d06df
       provenance: machine
