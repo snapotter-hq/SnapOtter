@@ -18,11 +18,11 @@ const entLinks = [
   { label: "Compliance & SBOM", href: "/guide/security#compliance-artifacts" },
 ];
 const modalities = [
-  { label: "Image", count: 64, href: "/tools/resize" },
-  { label: "Video", count: 29, href: "/tools/convert-video" },
-  { label: "Audio", count: 17, href: "/tools/convert-audio" },
-  { label: "PDF", count: 37, href: "/tools/merge-pdf" },
-  { label: "Files", count: 10, href: "/tools/chart-maker" },
+  { label: "Image", count: 64, href: "/tools/image/resize" },
+  { label: "Video", count: 29, href: "/tools/video/convert-video" },
+  { label: "Audio", count: 17, href: "/tools/audio/convert-audio" },
+  { label: "PDF", count: 37, href: "/tools/pdf/merge-pdf" },
+  { label: "Files", count: 10, href: "/tools/files/chart-maker" },
 ];
 const shared = [
   { label: "REST API", sub: "Keys, endpoints & OpenAPI", href: "/api/rest" },

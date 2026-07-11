@@ -43,6 +43,24 @@ test.describe("docs homepage (Two Doors)", () => {
     await expect(page.getByRole("link", { name: /Image/ })).toBeVisible();
   });
 
+  test("modality chips navigate to live tool pages client-side", async ({ page }) => {
+    const chips = [
+      { label: /^Image/, href: "/tools/image/resize" },
+      { label: /^Video/, href: "/tools/video/convert-video" },
+      { label: /^Audio/, href: "/tools/audio/convert-audio" },
+      { label: /^PDF/, href: "/tools/pdf/merge-pdf" },
+      { label: /^Files/, href: "/tools/files/chart-maker" },
+    ];
+    for (const chip of chips) {
+      await expect(page.getByRole("link", { name: chip.label })).toHaveAttribute("href", chip.href);
+    }
+    // Click through one chip: SPA navigation bypasses the _redirects shim,
+    // so a stale href 404s here even though a full page load would redirect.
+    await page.getByRole("link", { name: /^Image/ }).click();
+    await expect(page).toHaveURL(/\/tools\/image\/resize/);
+    await expect(page.getByRole("heading", { level: 1, name: "Resize" })).toBeVisible();
+  });
+
   test("nav links work", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Guide" }).first()).toBeVisible();
     await page.getByRole("link", { name: "Guide" }).first().click();
