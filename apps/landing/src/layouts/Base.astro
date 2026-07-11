@@ -4,7 +4,7 @@ import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import LaunchBanner from "@/components/LaunchBanner.astro";
 import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
-import { t } from "@/i18n";
+import { LANDING_LOCALES, t } from "@/i18n";
 import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
 
 interface Props {
@@ -42,6 +42,33 @@ const htmlDir = dirFor(locale);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Locale recall: send a returning visitor to the language they explicitly picked
+         (stored on switch in LanguageSwitcher). Render-blocking so there is no flash.
+         Crawler-safe: bots have no localStorage. Only acts on the default English pages,
+         and never on the English-only tool-detail pages (which have no localized version),
+         so it can never redirect to a URL that does not exist. -->
+    <script
+      is:inline
+      define:vars={{
+        recallCurrent: locale,
+        recallPath: path,
+        recallLocales: LANDING_LOCALES.filter((c) => c !== "en"),
+      }}
+    >
+      (function () {
+        try {
+          if (recallCurrent !== "en") return;
+          var stored = localStorage.getItem("snapotter:locale");
+          if (!stored || recallLocales.indexOf(stored) === -1) return;
+          var segs = recallPath.split("/").filter(Boolean);
+          if (segs[0] === "tools" && segs.length === 3) return;
+          var target = "/" + stored + (recallPath === "/" ? "/" : recallPath);
+          if (target.charAt(target.length - 1) !== "/") target += "/";
+          location.replace(target + location.search + location.hash);
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- TEMP: 2.0 launch banner dismissal. Render-blocking so a returning visitor
          who closed the banner never sees it flash. Remove with the banner. -->
