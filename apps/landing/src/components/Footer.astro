@@ -113,9 +113,6 @@ const columns = [
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </a>
       </div>
-      <div class="mt-4">
-        <LanguageSwitcher locale={locale} path={path} />
-      </div>
     </div>
 
     <!-- Link columns -->
@@ -139,32 +136,27 @@ const columns = [
     ))}
   </div>
 
-  <!-- Bottom bar -->
+  <!-- Featured-on badges -->
   <div class="section-divider mx-auto mt-12 max-w-6xl"></div>
-  <div class="mx-auto mt-6 flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-5 pt-8">
+    <a href="https://twelve.tools" target="_blank" rel="noopener noreferrer" aria-label="Featured on Twelve Tools">
+      <img src="/badges/twelve-tools.svg" alt="Featured on Twelve Tools" width="200" height="54" class="h-9 w-auto" />
+    </a>
+    <a href="https://wired.business" target="_blank" rel="noopener noreferrer" aria-label="Featured on Wired Business">
+      <img src="/badges/wired-business.svg" alt="Featured on Wired Business" width="200" height="54" class="h-9 w-auto" />
+    </a>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="mx-auto mt-8 flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
     <p class="text-xs text-muted">
       {t(locale, "footer.copyright", { year })}
     </p>
-    <div class="flex items-center gap-3">
-      <a
-        href="https://twelve.tools"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Featured on Twelve Tools"
-      >
-        <img src="/badges/twelve-tools.svg" alt="Featured on Twelve Tools" width="200" height="54" class="h-[27px] w-auto" />
-      </a>
-      <a
-        href="https://wired.business"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Featured on Wired Business"
-      >
-        <img src="/badges/wired-business.svg" alt="Featured on Wired Business" width="200" height="54" class="h-[27px] w-auto" />
-      </a>
+    <div class="flex items-center gap-4">
+      <p class="text-xs text-muted">
+        contact@snapotter.com
+      </p>
+      <LanguageSwitcher locale={locale} path={path} />
     </div>
-    <p class="text-xs text-muted">
-      contact@snapotter.com
-    </p>
   </div>
 </footer>
