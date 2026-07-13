@@ -96,7 +96,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
     <JsonLd data={allJsonLd} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main">
     <!-- Breadcrumb -->
@@ -336,5 +336,5 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
     <EnterpriseCtaBand />
   </main>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>

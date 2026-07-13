@@ -1,12 +1,15 @@
 ---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import LanguageSwitcher from "@/components/LanguageSwitcher.astro";
 import { t } from "@/i18n";
 import { localizeHref } from "@/lib/i18n-page";
 
 interface Props {
   locale?: string;
+  path?: string;
 }
-const { locale = "en" } = Astro.props;
+const { locale = "en", path = "/" } = Astro.props;
 
 const year = new Date().getFullYear();
 
@@ -109,6 +112,9 @@ const columns = [
         >
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </a>
+      </div>
+      <div class="mt-4">
+        <LanguageSwitcher locale={locale} path={path} />
       </div>
     </div>
 

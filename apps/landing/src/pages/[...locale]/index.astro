@@ -126,7 +126,7 @@ const navSchema = {
     <JsonLd data={[websiteSchema, softwareSchema, navSchema]} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main">
     <Hero locale={locale} />
@@ -137,5 +137,5 @@ const navSchema = {
     <OpenSource locale={locale} />
   </main>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>

@@ -65,7 +65,7 @@ const breadcrumbJsonLd = {
     <JsonLd data={[faqJsonLd, breadcrumbJsonLd]} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main" class="px-6 pt-32 pb-20 md:pt-40 md:pb-28">
     <div class="mx-auto max-w-3xl">
@@ -109,5 +109,5 @@ const breadcrumbJsonLd = {
     </div>
   </main>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>
