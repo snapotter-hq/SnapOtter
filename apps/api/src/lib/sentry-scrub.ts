@@ -5,7 +5,10 @@
  */
 import { rebuildErrorValue } from "@snapotter/shared";
 
-const CEILING_PER_HOUR = 20;
+// Per-process runaway guard, not a quota lever: under the sponsored plan we want
+// real errors, but a single instance stuck in an error loop must not spam. Sentry
+// de-dupes by fingerprint server-side, so 500 distinct events/hour is ample.
+const CEILING_PER_HOUR = 500;
 const HOUR_MS = 3600_000;
 
 const TAG_ALLOWLIST = new Set([
@@ -21,9 +24,15 @@ const TAG_ALLOWLIST = new Set([
   "status_code",
 ]);
 
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
+const URL_RE = /https?:\/\/[^\s"')]+/g;
+const BLOB_RE = /blob:[^\s"')]+/g;
+// Absolute paths under roots that can hold user files (uploads live in /data,
+// /tmp) or dev machines (/Users, /home). Over-redaction of a benign path is fine.
+const PATH_RE = /(?:\/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s"')]*/g;
+
+/** Redact urls, blob refs, and absolute paths from free text (breadcrumb messages). */
+function scrubText(s: string): string {
+  return s.replace(BLOB_RE, "<blob>").replace(URL_RE, "<url>").replace(PATH_RE, "<path>");
 }
 
 // Sentry event/hint are typed loosely on purpose: this module must not import
@@ -36,6 +45,30 @@ function asObj(value: unknown): AnyEvent | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as AnyEvent)
     : null;
+}
+
+// Keep the breadcrumb trail (the sequence of operations before the error) but
+// strip content that can carry user data: redact urls/paths from the message and
+// drop the structured `data` payload (http urls, query params) entirely.
+function scrubBreadcrumb(entry: unknown): AnyEvent | null {
+  const b = asObj(entry);
+  if (!b) return null;
+  const out: AnyEvent = {};
+  for (const k of ["type", "category", "level", "timestamp"]) {
+    if (b[k] !== undefined) out[k] = b[k];
+  }
+  if (typeof b.message === "string") out.message = scrubText(b.message);
+  return out;
+}
+
+/** Sanitize the breadcrumb list, tolerating both the array and {values} shapes. */
+function scrubBreadcrumbs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrubBreadcrumb).filter(Boolean);
+  const wrapped = asObj(value);
+  if (Array.isArray(wrapped?.values)) {
+    return { values: wrapped.values.map(scrubBreadcrumb).filter(Boolean) };
+  }
+  return undefined;
 }
 
 export function buildBeforeSend(isActive: () => boolean) {
@@ -52,13 +85,15 @@ export function buildBeforeSend(isActive: () => boolean) {
     }
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
+    // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;
     event.logentry = undefined;
     event.server_name = undefined;
     event.request = undefined;
     event.extra = undefined;
-    event.breadcrumbs = undefined;
     event.user = undefined;
+    // Kept, sanitized: the operation trail leading up to the error.
+    event.breadcrumbs = scrubBreadcrumbs(event.breadcrumbs);
 
     const ctx = asObj(event.contexts);
     const keep: AnyEvent = {};
@@ -88,8 +123,8 @@ export function buildBeforeSend(isActive: () => boolean) {
           for (const entry of frames) {
             const frame = asObj(entry);
             if (!frame) continue;
-            if (typeof frame.filename === "string") frame.filename = basename(frame.filename);
-            frame.abs_path = undefined;
+            // Keep filename + abs_path (open-source code paths, not user data);
+            // drop only vars, which can hold user file contents or secrets.
             frame.vars = undefined;
           }
         }

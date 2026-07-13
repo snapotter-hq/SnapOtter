@@ -84,10 +84,14 @@ export async function trackEvent(
   event: string,
   properties: Record<string, unknown>,
   distinctId?: string,
+  // ignoreSampleRate bypasses the volume sample for low-frequency, high-value
+  // events (e.g. the once-per-boot instance_started census). It does NOT bypass
+  // the opt-out gate or the property allowlist below.
+  options?: { ignoreSampleRate?: boolean },
 ): Promise<void> {
   try {
     if (!analyticsEnabled() || !posthogClient) return;
-    if (ANALYTICS_BAKED.posthogSampleRate < 1.0) {
+    if (!options?.ignoreSampleRate && ANALYTICS_BAKED.posthogSampleRate < 1.0) {
       if (
         ANALYTICS_BAKED.posthogSampleRate <= 0.0 ||
         Math.random() >= ANALYTICS_BAKED.posthogSampleRate

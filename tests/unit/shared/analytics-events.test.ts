@@ -2,8 +2,8 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 14 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(14);
+  it("has exactly 15 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(15);
   });
 
   it("contains the expected keys", () => {
@@ -21,6 +21,7 @@ describe("ANALYTICS_EVENTS", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("BATCH_PROCESSED");
     expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_SUBMITTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("SPONSOR_CLICKED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("INSTANCE_STARTED");
   });
 
   it("all event values are strings", () => {
@@ -47,6 +48,10 @@ describe("ANALYTICS_EVENTS", () => {
 
   it("FEEDBACK_SUBMITTED has the correct snake_case value", () => {
     expect(ANALYTICS_EVENTS.FEEDBACK_SUBMITTED).toBe("feedback_submitted");
+  });
+
+  it("INSTANCE_STARTED has the correct snake_case value", () => {
+    expect(ANALYTICS_EVENTS.INSTANCE_STARTED).toBe("instance_started");
   });
 
   it("all values follow snake_case convention", () => {

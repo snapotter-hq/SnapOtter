@@ -40,21 +40,39 @@ describe("buildBeforeSend (api)", () => {
   it("returns null when the gate is off", () => {
     expect(buildBeforeSend(() => false)(evt(), {})).toBeNull();
   });
-  it("strips PII surfaces and rebuilds the value from the hint error", () => {
+  it("strips high-risk surfaces but keeps full stack paths for debugging", () => {
     const hint = {
       originalException: Object.assign(new Error("x"), { code: "EACCES", syscall: "mkdir" }),
     };
     const out = send(evt(), hint)!;
+    // Still dropped: these can carry user data / PII.
     expect(out.message).toBeUndefined();
     expect(out.server_name).toBeUndefined();
     expect(out.request).toBeUndefined();
     expect(out.extra).toBeUndefined();
-    expect(out.breadcrumbs).toBeUndefined();
     expect(out.user).toBeUndefined();
     expect(out.exception.values[0].value).toBe("EACCES mkdir");
-    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("cleanup.ts");
-    expect(out.exception.values[0].stacktrace.frames[0].abs_path).toBeUndefined();
     expect(out.exception.values[0].stacktrace.frames[0].vars).toBeUndefined();
+    // Restored for debugging: full source path (open-source code, not user data).
+    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe(
+      "/app/apps/api/src/lib/cleanup.ts",
+    );
+    expect(out.exception.values[0].stacktrace.frames[0].abs_path).toBe("/app/x");
+  });
+  it("keeps the breadcrumb trail, redacting paths/urls and dropping data payloads", () => {
+    const out = send(
+      evt({
+        breadcrumbs: [
+          { message: "GET https://host/u/photo.jpg 200", category: "http", data: { url: "x" } },
+          { message: "reading /Users/me/secret.txt", category: "console", level: "info" },
+        ],
+      }),
+      {},
+    )!;
+    expect(out.breadcrumbs).toEqual([
+      { message: "GET <url> 200", category: "http" },
+      { message: "reading <path>", category: "console", level: "info" },
+    ]);
   });
   it("falls back to type-only for unknown errors", () => {
     const out = send(evt(), { originalException: new Error("user path /tmp/z") })!;
@@ -87,8 +105,8 @@ describe("buildBeforeSend (api)", () => {
     const out = send(evt({ contexts: { device: { hostname: "leak" } } }), {})!;
     expect(out.contexts).toBeUndefined();
   });
-  it("enforces the 20-events-per-hour ceiling", () => {
-    for (let i = 0; i < 20; i++) expect(send(evt(), {})).not.toBeNull();
+  it("enforces the 500-events-per-hour ceiling", () => {
+    for (let i = 0; i < 500; i++) expect(send(evt(), {})).not.toBeNull();
     expect(send(evt(), {})).toBeNull();
   });
   it("never throws on malformed events (fail-closed to a scrubbed event)", () => {

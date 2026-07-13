@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
-import { APP_VERSION, SafeError } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
@@ -17,7 +17,7 @@ import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enq
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
-import { initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
+import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { reportError } from "./lib/error-report.js";
@@ -27,6 +27,7 @@ import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
+import { gatherSystemProperties } from "./lib/system-info.js";
 import { requirePermission } from "./permissions.js";
 import {
   authMiddleware,
@@ -183,6 +184,11 @@ if (!env.COOKIE_SECRET) {
 await initAnalytics();
 const { primeAnalyticsGate } = await import("./lib/analytics-gate.js");
 await primeAnalyticsGate();
+// ignoreSampleRate: this once-per-boot census must not be thinned by the
+// volume sample rate that exists to throttle high-frequency usage events.
+await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, { ...gatherSystemProperties() }, undefined, {
+  ignoreSampleRate: true,
+});
 
 // Enterprise features (license-gated)
 let enterpriseLicense: { org: string; plan: string } | null = null;

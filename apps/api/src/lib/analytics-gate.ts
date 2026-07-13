@@ -25,10 +25,17 @@ async function defaultReader(): Promise<boolean | undefined> {
   return rows[0].value !== "false";
 }
 
-/** Runtime kill switch honored in ALL builds: SNAPOTTER_TELEMETRY=0|false|off. */
+/**
+ * Runtime kill switch honored in ALL builds: SNAPOTTER_TELEMETRY=0|false|off.
+ *
+ * ANALYTICS_ENABLED=false|0|off is honored as an alias. It is the opt-out
+ * variable historically documented on the Docker Hub README but never wired in
+ * 2.x, so a user who set it was still tracked. Treating it as a kill signal
+ * makes that documented opt-out genuinely stop egress.
+ */
 export function telemetryEnvKilled(): boolean {
-  const v = process.env.SNAPOTTER_TELEMETRY;
-  return v === "0" || v === "false" || v === "off";
+  const off = (v: string | undefined) => v === "0" || v === "false" || v === "off";
+  return off(process.env.SNAPOTTER_TELEMETRY) || off(process.env.ANALYTICS_ENABLED);
 }
 
 /** Compile-time bake, with a NON-PRODUCTION-only override so tests can force it on. */
