@@ -33,14 +33,14 @@ jobs:
       contents: read
     steps:
       - name: Attest GHCR image
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: ghcr.io/snapotter-hq/snapotter
           subject-digest: ${{ inputs.image_digest }}
           push-to-registry: false
 
       - name: Attest Docker Hub image
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: docker.io/snapotter/snapotter
           subject-digest: ${{ inputs.image_digest }}
@@ -64,6 +64,6 @@ jobs:
           ls -l snapotter-v*-linux-*.tar.gz
 
       - name: Attest archives
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: "snapotter-v*-linux-*.tar.gz"
