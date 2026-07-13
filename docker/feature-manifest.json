@@ -4,7 +4,7 @@
   "pythonVersion": { "amd64": "3.12", "arm64": "3.11" },
   "basePackages": [
     "numpy==1.26.4",
-    "Pillow==12.2.0",
+    "Pillow==12.3.0",
     "opencv-python-headless==4.10.0.84",
     "huggingface-hub[hf_xet,hf_transfer]==0.36.2"
   ],

@@ -365,7 +365,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install --upgrade "pip==26.1.2" && \
     /opt/venv/bin/pip install --upgrade "wheel==0.47.0" "setuptools==78.1.1" "jaraco.context==6.1.0" && \
     /opt/venv/bin/pip install \
-        Pillow==12.2.0 \
+        Pillow==12.3.0 \
         numpy==1.26.4 \
         opencv-python-headless==4.10.0.84 \
         "huggingface-hub[hf_xet,hf_transfer]==0.36.2" \
