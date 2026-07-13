@@ -5,10 +5,18 @@ import { isRtl, LANDING_LOCALES } from "@/i18n";
 /** Absolute site origin used for canonical + hreflang hrefs. */
 export const SITE = "https://snapotter.com";
 
-/** Prefix a path for a locale ("/faq" -> "/de/faq" for de, "/faq" for en). */
+/**
+ * Prefix a path for a locale ("/faq" -> "/de/faq" for de, "/faq" for en).
+ * A trailing "#hash" is split off first and reattached untouched, since
+ * Astro's URL builder would otherwise treat it as part of the path and
+ * mangle it with a trailing slash (e.g. "/#pricing" -> "/#pricing/").
+ */
 export function localizeHref(locale: string, path: string): string {
-  const clean = path.startsWith("/") ? path.slice(1) : path;
-  return getRelativeLocaleUrl(locale, clean);
+  const hashIndex = path.indexOf("#");
+  const pathname = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
+  const clean = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+  return `${getRelativeLocaleUrl(locale, clean)}${hash}`;
 }
 
 /** Direction attribute for the current locale. */
