@@ -92,8 +92,8 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         integrations: (defaults) => defaults.filter((i) => i.name !== "BrowserSession"),
         ignoreErrors: IGNORE_ERRORS,
         denyUrls: DENY_URLS,
-        maxBreadcrumbs: 0,
-        beforeBreadcrumb: () => null,
+        // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
+        // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
         beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
       });
     }

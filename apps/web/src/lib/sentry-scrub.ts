@@ -34,7 +34,9 @@ const NATIVE_ERRORS = new Set([
   "AbortError",
 ]);
 
-const CEILING_PER_HOUR = 20;
+// Per-session runaway guard (Sentry de-dupes by fingerprint server-side, so 500
+// distinct events/hour is ample), not a quota lever under the sponsored plan.
+const CEILING_PER_HOUR = 500;
 const HOUR_MS = 3600_000;
 
 // BLOB_RE must be applied before URL_RE: "blob:http://..." would otherwise
@@ -43,10 +45,15 @@ const URL_RE = /https?:\/\/[^\s"')]+/g;
 const BLOB_RE = /blob:[^\s"')]+/g;
 const PATH_RE = /(?:\/Users|\/home|[A-Za-z]:\\)[^\s"')]*/g;
 
+/** Redact urls, blob refs, and absolute paths from free text. */
+function scrubText(s: string): string {
+  return s.replace(BLOB_RE, "<blob>").replace(URL_RE, "<url>").replace(PATH_RE, "<path>");
+}
+
 /** Redacted native-error message, or null when the name is not allowlisted. */
 export function scrubBrowserMessage(name: string, message: string): string | null {
   if (!NATIVE_ERRORS.has(name)) return null;
-  return message.replace(BLOB_RE, "<blob>").replace(URL_RE, "<url>").replace(PATH_RE, "<path>");
+  return scrubText(message);
 }
 
 const TAG_ALLOWLIST = new Set(["route", "tool_id", "locale", "error_class"]);
@@ -63,6 +70,30 @@ function asObj(value: unknown): AnyEvent | null {
     : null;
 }
 
+// Keep the breadcrumb trail (the sequence of user actions / requests before the
+// error) but strip content that can carry user data: redact urls/paths from the
+// message and drop the structured `data` payload entirely.
+function scrubBreadcrumb(entry: unknown): AnyEvent | null {
+  const b = asObj(entry);
+  if (!b) return null;
+  const out: AnyEvent = {};
+  for (const k of ["type", "category", "level", "timestamp"]) {
+    if (b[k] !== undefined) out[k] = b[k];
+  }
+  if (typeof b.message === "string") out.message = scrubText(b.message);
+  return out;
+}
+
+/** Sanitize the breadcrumb list, tolerating both the array and {values} shapes. */
+function scrubBreadcrumbs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrubBreadcrumb).filter(Boolean);
+  const wrapped = asObj(value);
+  if (Array.isArray(wrapped?.values)) {
+    return { values: wrapped.values.map(scrubBreadcrumb).filter(Boolean) };
+  }
+  return undefined;
+}
+
 export function buildWebBeforeSend(isActive: () => boolean) {
   let windowStart = 0;
   let sentInWindow = 0;
@@ -77,12 +108,14 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     }
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
+    // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;
     event.logentry = undefined;
     event.request = undefined;
     event.extra = undefined;
-    event.breadcrumbs = undefined;
     event.user = undefined;
+    // Kept, sanitized: the trail of user actions / requests before the error.
+    event.breadcrumbs = scrubBreadcrumbs(event.breadcrumbs);
 
     // React's componentStack is component names only; every other context goes.
     const react = asObj(event.contexts)?.react;

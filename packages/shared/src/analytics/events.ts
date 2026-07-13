@@ -13,6 +13,7 @@ export const ANALYTICS_EVENTS = {
   BATCH_PROCESSED: "batch_processed",
   FEEDBACK_SUBMITTED: "feedback_submitted",
   SPONSOR_CLICKED: "sponsor_clicked",
+  INSTANCE_STARTED: "instance_started",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
@@ -46,4 +47,11 @@ export interface AiBundleActionProperties {
   bundle_id: string;
   action: "installed" | "uninstalled";
   duration_ms: number;
+}
+
+export interface InstanceStartedProperties {
+  arch: "arm64" | "amd64";
+  os_platform: string;
+  deploy_mode: "embedded" | "external" | "native";
+  gpu_present: boolean;
 }

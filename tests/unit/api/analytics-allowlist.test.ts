@@ -36,4 +36,21 @@ describe("sanitizeEventProperties", () => {
     const out = sanitizeEventProperties("totally_new_event", { anything: "x" });
     expect(out).toEqual({});
   });
+
+  it("keeps only allow-listed keys for instance_started", () => {
+    const out = sanitizeEventProperties("instance_started", {
+      arch: "arm64",
+      os_platform: "linux",
+      deploy_mode: "embedded",
+      gpu_present: false,
+      hostname: "leaked-hostname",
+    });
+    expect(out).toEqual({
+      arch: "arm64",
+      os_platform: "linux",
+      deploy_mode: "embedded",
+      gpu_present: false,
+    });
+    expect(out).not.toHaveProperty("hostname");
+  });
 });

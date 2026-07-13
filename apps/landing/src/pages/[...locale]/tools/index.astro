@@ -127,7 +127,7 @@ const collectionJsonLd = {
     <JsonLd data={[breadcrumbJsonLd, collectionJsonLd]} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main">
     <!-- Breadcrumb -->
@@ -382,5 +382,5 @@ const collectionJsonLd = {
     }
   </script>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>

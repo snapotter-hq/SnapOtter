@@ -127,4 +127,24 @@ test.describe("Cross-Page Navigation", () => {
     const enterpriseCta = page.getByRole("link", { name: /Let.s talk/ }).first();
     await expect(enterpriseCta).toHaveAttribute("href", "/contact");
   });
+
+  test("navbar Pricing link scrolls to the pricing section", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const pricingLink = page.locator("nav").getByRole("link", { name: "Pricing" });
+    await expect(pricingLink).toHaveAttribute("href", "/#pricing");
+    await pricingLink.click();
+    await expect(page).toHaveURL(/\/#pricing$/);
+    await expect(page.locator("#pricing")).toBeInViewport();
+  });
+
+  test("navbar Enterprise link scrolls to the enterprise section", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const enterpriseLink = page.locator("nav").getByRole("link", { name: "Enterprise" });
+    await expect(enterpriseLink).toHaveAttribute("href", "/#enterprise");
+    await enterpriseLink.click();
+    await expect(page).toHaveURL(/\/#enterprise$/);
+    await expect(page.locator("#enterprise")).toBeInViewport();
+  });
 });

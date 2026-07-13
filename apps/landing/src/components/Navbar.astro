@@ -1,15 +1,13 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
-import LanguageSwitcher from "@/components/LanguageSwitcher.astro";
 import { t } from "@/i18n";
 import { localizeHref } from "@/lib/i18n-page";
 import { formatCompact, getStarCount } from "@/lib/stats";
 
 interface Props {
   locale?: string;
-  path?: string;
 }
-const { locale = "en", path = "/" } = Astro.props;
+const { locale = "en" } = Astro.props;
 
 // Fetched at build time; refreshed by the scheduled landing rebuild.
 const starCount = formatCompact(await getStarCount());
@@ -87,7 +85,6 @@ const links: NavItem[] = [
 
     <!-- Desktop CTAs -->
     <div class="hidden shrink-0 items-center gap-3 md:flex">
-      <LanguageSwitcher locale={locale} path={path} />
       <a
         href="https://github.com/snapotter-hq/snapotter"
         target="_blank"

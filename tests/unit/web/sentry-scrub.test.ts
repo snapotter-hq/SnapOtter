@@ -39,7 +39,7 @@ describe("static filter lists", () => {
 });
 
 describe("buildWebBeforeSend", () => {
-  const baseEvent = (): Record<string, any> => ({
+  const baseEvent = (over: Record<string, any> = {}): Record<string, any> => ({
     request: { url: "http://192.168.0.4:1349/image/resize" },
     breadcrumbs: [{}],
     user: { id: "x" },
@@ -54,13 +54,13 @@ describe("buildWebBeforeSend", () => {
       ],
     },
     tags: { tool_id: "resize", drop_me: "x" },
+    ...over,
   });
 
   it("gates, strips, keeps react componentStack, redacts values", () => {
     const send = buildWebBeforeSend(() => true);
     const out = send(baseEvent(), { originalException: new TypeError("boom /Users/a/b") })!;
     expect(out.request).toBeUndefined();
-    expect(out.breadcrumbs).toBeUndefined();
     expect(out.user).toBeUndefined();
     expect(out.contexts.react.componentStack).toBe("at ToolPage");
     expect(out.contexts.device).toBeUndefined();
@@ -71,6 +71,23 @@ describe("buildWebBeforeSend", () => {
     expect(buildWebBeforeSend(() => false)(baseEvent(), {})).toBeNull();
   });
 
+  it("keeps the breadcrumb trail, redacting paths/urls and dropping data payloads", () => {
+    const send = buildWebBeforeSend(() => true);
+    const out = send(
+      baseEvent({
+        breadcrumbs: [
+          { message: "fetch https://host/user.png", category: "fetch", data: { url: "x" } },
+          { message: "open /Users/a/secret.pdf", category: "console", level: "warning" },
+        ],
+      }),
+      {},
+    )!;
+    expect(out.breadcrumbs).toEqual([
+      { message: "fetch <url>", category: "fetch" },
+      { message: "open <path>", category: "console", level: "warning" },
+    ]);
+  });
+
   it("falls back to type-only for non-native exceptions without a rebuild", () => {
     const send = buildWebBeforeSend(() => true);
     const custom = Object.assign(new Error("user secret"), { name: "WeirdLibError" });
@@ -78,9 +95,9 @@ describe("buildWebBeforeSend", () => {
     expect(out.exception.values[0].value).toBe("TypeError");
   });
 
-  it("enforces the 20-per-hour ceiling", () => {
+  it("enforces the 500-per-hour ceiling", () => {
     const send = buildWebBeforeSend(() => true);
-    for (let i = 0; i < 20; i++) expect(send(baseEvent(), {})).not.toBeNull();
+    for (let i = 0; i < 500; i++) expect(send(baseEvent(), {})).not.toBeNull();
     expect(send(baseEvent(), {})).toBeNull();
   });
 

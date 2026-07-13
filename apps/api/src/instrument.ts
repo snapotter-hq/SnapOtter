@@ -1,23 +1,12 @@
-import { existsSync } from "node:fs";
 import { ANALYTICS_BAKED } from "@snapotter/shared";
 import { analyticsEnabled, gatePrimed, telemetryEnvKilled } from "./lib/analytics-gate.js";
+import { deployMode } from "./lib/deploy-mode.js";
 import { buildBeforeSend } from "./lib/sentry-scrub.js";
 
 // Sentry inits at process load, before the gate cache is primed. Until the
 // first successful read, stay silent rather than emit on the default-ON cache,
 // so an opted-out instance never reports even a boot-window crash.
 const sentryActive = () => gatePrimed() && analyticsEnabled();
-
-// All-in-one detection: docker/entrypoint.sh exports EMBEDDED_MODE=1 before
-// exec'ing s6-overlay, and the snapotter service run script is with-contenv,
-// so the marker reaches this process. URL absence is not a usable signal:
-// embedded mode sets loopback DATABASE_URL/REDIS_URL before boot, and native
-// dev commonly leaves DATABASE_URL unset (config.ts defaults it).
-function deployMode(): string {
-  if (process.env.EMBEDDED_MODE) return "embedded";
-  if (existsSync("/.dockerenv")) return "external";
-  return "native";
-}
 
 if (ANALYTICS_BAKED.sentryDsn && !telemetryEnvKilled()) {
   try {
@@ -41,8 +30,8 @@ if (ANALYTICS_BAKED.sentryDsn && !telemetryEnvKilled()) {
       // again (the July 2026 quota incident).
       integrations: [Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false })],
       sendClientReports: false,
-      maxBreadcrumbs: 0,
-      beforeBreadcrumb: () => null,
+      // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
+      // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
       initialScope: { tags: { deploy_mode: deployMode() } },
       beforeSend: buildBeforeSend(sentryActive) as unknown as SentryOptions["beforeSend"],
     });

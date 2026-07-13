@@ -186,6 +186,22 @@ describe("trackEvent", () => {
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
+  it("captures despite sampleRate 0 when ignoreSampleRate is set (once-per-boot census)", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    bakedConfig.posthogSampleRate = 0;
+    await mod.initAnalytics();
+
+    await mod.trackEvent("instance_started", { arch: "arm64" }, "did-boot", {
+      ignoreSampleRate: true,
+    });
+    expect(mockCapture).toHaveBeenCalledWith({
+      distinctId: "did-boot",
+      event: "instance_started",
+      properties: { arch: "arm64" },
+    });
+  });
+
   it("captures event with only allow-listed properties when enabled", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";

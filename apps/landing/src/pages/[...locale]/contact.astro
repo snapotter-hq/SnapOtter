@@ -64,7 +64,7 @@ const subjects = [
     <JsonLd data={breadcrumbJsonLd} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main" class="px-6 pt-32 pb-20 md:pt-40 md:pb-28">
     <div class="mx-auto grid max-w-5xl gap-16 md:grid-cols-2">
@@ -139,5 +139,5 @@ const subjects = [
     </div>
   </main>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>

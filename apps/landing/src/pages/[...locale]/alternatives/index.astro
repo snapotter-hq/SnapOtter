@@ -68,7 +68,7 @@ const formatReviewDate = (date: string) =>
     <JsonLd data={allJsonLd} />
   </Fragment>
 
-  <Navbar locale={locale} path={PATH} />
+  <Navbar locale={locale} />
 
   <main id="main">
     <!-- Hero -->
@@ -216,5 +216,5 @@ const formatReviewDate = (date: string) =>
     </section>
   </main>
 
-  <Footer locale={locale} />
+  <Footer locale={locale} path={PATH} />
 </Base>

@@ -11,12 +11,14 @@ import {
 const origEnv = process.env.NODE_ENV;
 const origOverride = process.env.ANALYTICS_BAKED_OVERRIDE;
 const origTelemetry = process.env.SNAPOTTER_TELEMETRY;
+const origAnalyticsEnabled = process.env.ANALYTICS_ENABLED;
 
 beforeEach(() => {
   __resetGateForTests();
   process.env.NODE_ENV = "test";
   process.env.ANALYTICS_BAKED_OVERRIDE = "on"; // force bake on for these unit tests
   delete process.env.SNAPOTTER_TELEMETRY; // ambient kill switch would poison the suite
+  delete process.env.ANALYTICS_ENABLED; // same: an ambient opt-out alias would poison the suite
 });
 
 afterEach(() => {
@@ -25,6 +27,8 @@ afterEach(() => {
   else process.env.ANALYTICS_BAKED_OVERRIDE = origOverride;
   if (origTelemetry === undefined) delete process.env.SNAPOTTER_TELEMETRY;
   else process.env.SNAPOTTER_TELEMETRY = origTelemetry;
+  if (origAnalyticsEnabled === undefined) delete process.env.ANALYTICS_ENABLED;
+  else process.env.ANALYTICS_ENABLED = origAnalyticsEnabled;
   __setReaderForTests(null);
 });
 
@@ -84,6 +88,36 @@ describe("SNAPOTTER_TELEMETRY runtime kill switch", () => {
     process.env.SNAPOTTER_TELEMETRY = "0";
     expect(bakedEnabled()).toBe(false);
     expect(telemetryEnvKilled()).toBe(true);
+  });
+});
+
+// ANALYTICS_ENABLED is the env var historically documented on the Docker Hub
+// README as the analytics opt-out. It was never wired in 2.x, so a user who set
+// ANALYTICS_ENABLED=false was still tracked. Honor it as an alias of the kill
+// switch so the documented opt-out genuinely stops egress.
+describe("ANALYTICS_ENABLED opt-out alias", () => {
+  it("ANALYTICS_ENABLED=false kills telemetry like SNAPOTTER_TELEMETRY=0", () => {
+    process.env.ANALYTICS_ENABLED = "false";
+    expect(telemetryEnvKilled()).toBe(true);
+    expect(bakedEnabled()).toBe(false);
+  });
+  it("matches 0, false, off and nothing else", () => {
+    for (const v of ["0", "false", "off"]) {
+      process.env.ANALYTICS_ENABLED = v;
+      expect(telemetryEnvKilled()).toBe(true);
+    }
+    process.env.ANALYTICS_ENABLED = "true";
+    expect(telemetryEnvKilled()).toBe(false);
+    process.env.ANALYTICS_ENABLED = "1";
+    expect(telemetryEnvKilled()).toBe(false);
+    delete process.env.ANALYTICS_ENABLED;
+    expect(telemetryEnvKilled()).toBe(false);
+  });
+  it("is honored in production builds", () => {
+    process.env.NODE_ENV = "production";
+    process.env.ANALYTICS_ENABLED = "false";
+    expect(telemetryEnvKilled()).toBe(true);
+    expect(bakedEnabled()).toBe(false);
   });
 });
 

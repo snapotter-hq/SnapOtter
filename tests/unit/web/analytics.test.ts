@@ -219,7 +219,8 @@ describe("analytics lib (baked model)", () => {
       expect(result.user).toBeUndefined();
       expect(result.message).toBeUndefined();
       expect(result.request).toBeUndefined();
-      expect(result.breadcrumbs).toBeUndefined();
+      // Breadcrumbs are kept for debugging but sanitized (paths/urls redacted).
+      expect(result.breadcrumbs).toEqual([{ message: "<path>" }]);
       // The exception message is replaced by its type so no free text leaves.
       expect(result.exception.values[0].value).toBe("TypeError");
       // Filesystem paths collapse to the basename (directory and any username
@@ -246,66 +247,6 @@ describe("analytics lib (baked model)", () => {
       const result = beforeSend(event);
       expect(result).toBeDefined();
       expect(result.exception.values[0].value).toBe("RangeError");
-    });
-  });
-
-  describe("Sentry beforeBreadcrumb callback", () => {
-    async function getBeforeBreadcrumb() {
-      mockSentryInit.mockClear();
-      await mod.initAnalytics(enabledConfig);
-      const sentryCall = mockSentryInit.mock.calls.find(
-        (call: unknown[]) => call[0]?.beforeBreadcrumb,
-      );
-      return sentryCall ? sentryCall[0].beforeBreadcrumb : null;
-    }
-
-    it("returns null for ui.click breadcrumbs", async () => {
-      const beforeBreadcrumb = await getBeforeBreadcrumb();
-      if (!beforeBreadcrumb) return;
-
-      const result = beforeBreadcrumb({ category: "ui.click" });
-      expect(result).toBeNull();
-    });
-
-    it("returns null for fetch breadcrumbs with file extension URLs", async () => {
-      const beforeBreadcrumb = await getBeforeBreadcrumb();
-      if (!beforeBreadcrumb) return;
-
-      const result = beforeBreadcrumb({
-        category: "fetch",
-        data: { url: "https://example.com/uploads/photo.png" },
-      });
-      expect(result).toBeNull();
-    });
-
-    it("drops console breadcrumbs even with file paths", async () => {
-      const beforeBreadcrumb = await getBeforeBreadcrumb();
-      if (!beforeBreadcrumb) return;
-
-      const result = beforeBreadcrumb({
-        category: "console",
-        message: "Error loading /tmp/workspace/file.jpg",
-      });
-      expect(result).toBeNull();
-    });
-
-    it("drops fetch breadcrumbs to non-file URLs too", async () => {
-      const beforeBreadcrumb = await getBeforeBreadcrumb();
-      if (!beforeBreadcrumb) return;
-
-      const result = beforeBreadcrumb({
-        category: "fetch",
-        data: { url: "https://example.com/api/v1/health" },
-      });
-      expect(result).toBeNull();
-    });
-
-    it("drops navigation breadcrumbs without a message", async () => {
-      const beforeBreadcrumb = await getBeforeBreadcrumb();
-      if (!beforeBreadcrumb) return;
-
-      const result = beforeBreadcrumb({ category: "navigation" });
-      expect(result).toBeNull();
     });
   });
 });
