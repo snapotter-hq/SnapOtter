@@ -1,5 +1,8 @@
 // tests/integration/platform/docs-i18n.test.ts
+import rateLimit from "@fastify/rate-limit";
+import Fastify from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { docsRoutes } from "../../../apps/api/src/routes/docs.js";
 import { buildTestApp, type TestApp } from "../test-server";
 
 describe("API docs i18n serving", () => {
@@ -52,5 +55,31 @@ describe("API docs i18n serving", () => {
     // Tool lines come from shared i18n; the Resize tool id is present with a mode.
     expect(res.body).toContain("Größe ändern - Größe nach Pixeln");
     expect(res.body).toContain("(resize, sync)");
+  });
+
+  it("rate-limits request-time localized docs work even when global limiting is disabled", async () => {
+    const app = Fastify();
+    await app.register(rateLimit, {
+      max: 50_000,
+      timeWindow: "1 minute",
+      allowList: (request) => !request.url.startsWith("/api/"),
+    });
+    await docsRoutes(app);
+    await app.ready();
+
+    try {
+      for (const url of ["/api/v1/openapi.yaml?lang=de", "/llms.de.txt"]) {
+        for (let request = 0; request < 60; request++) {
+          const response = await app.inject({ method: "GET", url });
+          expect(response.statusCode).toBe(200);
+          expect(response.headers["x-ratelimit-limit"]).toBe("60");
+        }
+
+        const limited = await app.inject({ method: "GET", url });
+        expect(limited.statusCode).toBe(429);
+      }
+    } finally {
+      await app.close();
+    }
   });
 });

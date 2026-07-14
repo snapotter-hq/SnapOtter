@@ -42,6 +42,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjxl-tools \
     ghostscript \
     qpdf \
+    && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
+         apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
+       elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
+         apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
+       fi \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \

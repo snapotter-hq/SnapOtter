@@ -104,7 +104,14 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install system dependencies (HEIC + ExifTool + ImageMagick + exotic format tools)
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
+          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+          fi
 
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
@@ -144,6 +151,12 @@ jobs:
             tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu \
             tesseract-ocr-fra tesseract-ocr-spa \
             tesseract-ocr-chi-sim tesseract-ocr-jpn
+
+          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+          fi
 
           sudo rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
           test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata

@@ -391,35 +391,42 @@ async function findMagickCmd(options: DecodeSafetyOptions = {}): Promise<string>
   throw new Error("No ImageMagick found. Install imagemagick (provides convert/magick).");
 }
 
-function magickArgs(cmd: string, args: string[], options: DecodeSafetyOptions = {}): string[] {
+/** Build resource limits with syntax shared by ImageMagick 6 and 7. */
+export function buildImageMagickResourceLimitArgs(options: DecodeSafetyOptions = {}): string[] {
   // Defense in depth for the conversion subprocess. ImageMagick's `area`
   // limit is a cache/spill threshold, not the strict pixel-product check;
   // preflightEncodedDimensions and assertDecodedWithinLimit provide that.
   const pixelCacheBytes = options.maxPixels === undefined ? undefined : options.maxPixels * 16;
   const sideLimit = options.maxDimension ?? options.maxPixels;
-  const limits =
-    sideLimit === undefined || pixelCacheBytes === undefined
-      ? []
-      : [
-          "-limit",
-          "width",
-          `${sideLimit}P`,
-          "-limit",
-          "height",
-          `${sideLimit}P`,
-          "-limit",
-          "area",
-          `${pixelCacheBytes}B`,
-          "-limit",
-          "memory",
-          `${pixelCacheBytes}B`,
-          "-limit",
-          "map",
-          `${pixelCacheBytes}B`,
-          "-limit",
-          "disk",
-          `${pixelCacheBytes * 2}B`,
-        ];
+  if (sideLimit === undefined || pixelCacheBytes === undefined) return [];
+
+  // Width and height are pixel counts when unitless. A trailing `P` is not a
+  // pixel unit: ImageMagick 6 treats it as an overflowing SI prefix and
+  // resolves the limit to zero, while ImageMagick 7 clamps it near infinity.
+  return [
+    "-limit",
+    "width",
+    String(sideLimit),
+    "-limit",
+    "height",
+    String(sideLimit),
+    "-limit",
+    "area",
+    `${pixelCacheBytes}B`,
+    "-limit",
+    "memory",
+    `${pixelCacheBytes}B`,
+    "-limit",
+    "map",
+    `${pixelCacheBytes}B`,
+    "-limit",
+    "disk",
+    `${pixelCacheBytes * 2}B`,
+  ];
+}
+
+function magickArgs(cmd: string, args: string[], options: DecodeSafetyOptions = {}): string[] {
+  const limits = buildImageMagickResourceLimitArgs(options);
   const convertArgs = [...limits, ...args];
   return cmd === "magick" ? ["convert", ...convertArgs] : convertArgs;
 }

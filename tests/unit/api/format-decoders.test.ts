@@ -2,7 +2,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { decodeToSharpCompat, needsCliDecode } from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  buildImageMagickResourceLimitArgs,
+  decodeToSharpCompat,
+  needsCliDecode,
+} from "../../../apps/api/src/lib/format-decoders.js";
 import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -144,6 +148,36 @@ describe("needsCliDecode", () => {
   });
   it("returns true for pbm format", () => {
     expect(needsCliDecode("pbm")).toBe(true);
+  });
+});
+
+describe("buildImageMagickResourceLimitArgs", () => {
+  it("uses unitless width and height values that work in ImageMagick 6 and 7", () => {
+    expect(
+      buildImageMagickResourceLimitArgs({
+        maxDimension: 40_000,
+        maxPixels: 40_000_000,
+      }),
+    ).toEqual([
+      "-limit",
+      "width",
+      "40000",
+      "-limit",
+      "height",
+      "40000",
+      "-limit",
+      "area",
+      "640000000B",
+      "-limit",
+      "memory",
+      "640000000B",
+      "-limit",
+      "map",
+      "640000000B",
+      "-limit",
+      "disk",
+      "1280000000B",
+    ]);
   });
 });
 
