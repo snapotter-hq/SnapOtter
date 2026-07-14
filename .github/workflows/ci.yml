@@ -111,7 +111,11 @@ jobs:
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+          else
+            echo "No supported ImageMagick EXR coder package found" >&2
+            exit 1
           fi
+          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
 
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
@@ -156,7 +160,11 @@ jobs:
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+          else
+            echo "No supported ImageMagick EXR coder package found" >&2
+            exit 1
           fi
+          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
 
           sudo rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
           test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata

@@ -11,17 +11,22 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
+import { env } from "../config.js";
 import { generateLocaleLlmsTxt, resolveSpecFile } from "./openapi-i18n.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const LOCALIZED_DOCS_RATE_LIMIT = {
-  max: 60,
-  timeWindow: "1 minute",
-  // The global allow-list exempts non-/api routes. Override it so localized
-  // llms endpoints cannot bypass this route-specific availability control.
-  allowList: [] as string[],
-};
+function localizedDocsRateLimit() {
+  return {
+    // A route-local limit replaces the global one in @fastify/rate-limit.
+    // Keep the mandatory ceiling without loosening a stricter operator limit.
+    max: env.RATE_LIMIT_PER_MIN > 0 ? Math.min(60, env.RATE_LIMIT_PER_MIN) : 60,
+    timeWindow: "1 minute",
+    // The global allow-list exempts non-/api routes. Override it so localized
+    // llms endpoints cannot bypass this route-specific availability control.
+    allowList: [] as string[],
+  };
+}
 
 interface PathOperation {
   tags?: string[];
@@ -250,7 +255,10 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Querystring: { lang?: string } }>(
     "/api/v1/openapi.yaml",
-    { config: { rateLimit: LOCALIZED_DOCS_RATE_LIMIT } },
+    {
+      exposeHeadRoute: false,
+      config: { rateLimit: localizedDocsRateLimit() },
+    },
     async (request, reply) => {
       const file = resolveSpecFile(specDir, request.query.lang);
       // English default is byte-identical to the file read at startup, preserving
@@ -274,7 +282,10 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     const code = localeInfo.code;
     app.get(
       `/llms.${code}.txt`,
-      { config: { rateLimit: LOCALIZED_DOCS_RATE_LIMIT } },
+      {
+        exposeHeadRoute: false,
+        config: { rateLimit: localizedDocsRateLimit() },
+      },
       async (_request, reply) => {
         const file = resolveSpecFile(specDir, code);
         const localeSpec =

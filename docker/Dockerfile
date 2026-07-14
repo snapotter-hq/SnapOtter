@@ -278,7 +278,10 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
          apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra; \
+       else \
+         echo "No supported ImageMagick EXR coder package found" >&2; exit 1; \
        fi \
+    && convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)' \
     && if apt-cache show libx265-199 >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libx265-199; \
        elif apt-cache show libx265-209 >/dev/null 2>&1; then \

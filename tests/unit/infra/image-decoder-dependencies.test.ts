@@ -19,6 +19,8 @@ function workflowJob(workflow: string, name: string, nextName: string): string {
 function expectImageMagickExtraCoders(source: string): void {
   expect(source).toContain("libmagickcore-6.q16-7-extra");
   expect(source).toContain("libmagickcore-6.q16-6-extra");
+  expect(source).toContain("No supported ImageMagick EXR coder package found");
+  expect(source).toContain("convert -list format");
 }
 
 describe("cross-platform image decoder dependencies", () => {

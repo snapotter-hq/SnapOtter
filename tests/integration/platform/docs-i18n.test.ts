@@ -2,6 +2,7 @@
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { docsRoutes } from "../../../apps/api/src/routes/docs.js";
 import { buildTestApp, type TestApp } from "../test-server";
 
@@ -77,8 +78,41 @@ describe("API docs i18n serving", () => {
 
         const limited = await app.inject({ method: "GET", url });
         expect(limited.statusCode).toBe(429);
+
+        const head = await app.inject({ method: "HEAD", url });
+        expect(head.statusCode).toBe(404);
       }
     } finally {
+      await app.close();
+    }
+  });
+
+  it("does not loosen a stricter operator rate limit", async () => {
+    const previousLimit = env.RATE_LIMIT_PER_MIN;
+    env.RATE_LIMIT_PER_MIN = 2;
+    const app = Fastify();
+
+    try {
+      await app.register(rateLimit, {
+        max: env.RATE_LIMIT_PER_MIN,
+        timeWindow: "1 minute",
+        allowList: (request) => !request.url.startsWith("/api/"),
+      });
+      await docsRoutes(app);
+      await app.ready();
+
+      for (const url of ["/api/v1/openapi.yaml?lang=de", "/llms.de.txt"]) {
+        for (let request = 0; request < 2; request++) {
+          const response = await app.inject({ method: "GET", url });
+          expect(response.statusCode).toBe(200);
+          expect(response.headers["x-ratelimit-limit"]).toBe("2");
+        }
+
+        const limited = await app.inject({ method: "GET", url });
+        expect(limited.statusCode).toBe(429);
+      }
+    } finally {
+      env.RATE_LIMIT_PER_MIN = previousLimit;
       await app.close();
     }
   });

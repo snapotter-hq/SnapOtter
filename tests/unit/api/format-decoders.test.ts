@@ -224,10 +224,13 @@ describe("decodeToSharpCompat", () => {
     expect(result).toBe(buf);
   });
 
-  it("decodes BMP to valid PNG", async () => {
+  it("decodes BMP to valid PNG with bounded ImageMagick 6/7 limits", async () => {
     try {
       const input = readFixture(fixtures.image.formats("bmp"));
-      const result = await decodeToSharpCompat(input, "bmp");
+      const result = await decodeToSharpCompat(input, "bmp", undefined, {
+        maxDimension: 40_000,
+        maxPixels: 40_000_000,
+      });
       expect(isPng(result)).toBe(true);
       await assertValidImage(result);
     } catch (err) {
