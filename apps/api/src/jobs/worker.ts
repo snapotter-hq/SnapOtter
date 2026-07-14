@@ -482,7 +482,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? `Timed out after ${Math.round(timeoutMs / 1000)}s`
+          ? `Timed out after ${Math.round(timeoutMs / 1000)}s. On the first run the background-removal model may still be downloading; the image may be too large for CPU inference; or the worker may be busy or unavailable. Retry once the model has downloaded, or try a smaller image.`
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see

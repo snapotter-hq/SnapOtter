@@ -116,6 +116,10 @@ describe("Worker timeout classification", () => {
     // Error message must mention timeout
     const error = finalRow?.error as { message: string };
     expect(error.message).toMatch(/timed out after 1s/i);
+    // Fail-fast message must include actionable guidance (issue #494)
+    expect(error.message).toMatch(
+      /model may still be downloading|too large for CPU|worker may be busy/i,
+    );
 
     // Both attempts ran (attempts column is set at the start of each attempt)
     expect(finalRow?.attempts).toBe(2);
