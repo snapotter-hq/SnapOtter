@@ -1169,7 +1169,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   // POST /api/v1/admin/features/import - Import an offline bundle archive
   app.post(
     "/api/v1/admin/features/import",
-    { bodyLimit: OFFLINE_LEGACY_ARCHIVE_MAX_BYTES + 32 * 1024 * 1024 },
+    {
+      bodyLimit: OFFLINE_LEGACY_ARCHIVE_MAX_BYTES + 32 * 1024 * 1024,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
       if (!admin) return;

@@ -10,6 +10,7 @@ const buildScript = readFileSync(join(root, "docker/build-ocr-runtime.sh"), "utf
 const verifierScript = readFileSync(join(root, "docker/verify-ocr-runtime.sh"), "utf8");
 const legacyBuildScript = readFileSync(join(root, "docker/build-bundle.sh"), "utf8");
 const dockerfile = readFileSync(join(root, "docker/Dockerfile"), "utf8");
+const ciWorkflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
 const deploymentGuide = readFileSync(join(root, "apps/docs/guide/deployment.md"), "utf8");
 const pdfOcrGuide = readFileSync(join(root, "apps/docs/tools/pdf/ocr-pdf.md"), "utf8");
 const openApi = readFileSync(join(root, "apps/api/src/openapi.yaml"), "utf8");
@@ -119,6 +120,67 @@ describe("OCR v3 runtime artifact contract", () => {
     expect(tesseractSource.match(/pageSegmentationMode\?: ([^;]+);/)?.[1]).toBe("6 | 11");
     for (const mode of [0, 1, 12]) {
       expect(tesseractSource).not.toMatch(new RegExp(`pageSegmentationMode:\\s*${mode}(?!\\d)`));
+    }
+  });
+
+  it("keeps integration CI aligned with the exact Fast OCR base payload", () => {
+    const integrationJob = ciWorkflow.match(
+      /^ {2}test-integration:\n[\s\S]*?(?=^ {2}test-e2e-smoke:)/m,
+    )?.[0];
+    expect(integrationJob).toBeDefined();
+    const systemDependencyRunBlock = integrationJob?.match(
+      /^ {6}- name: Install system dependencies[^\n]*\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
+    )?.groups?.run;
+    expect(systemDependencyRunBlock).toBeDefined();
+
+    const expectedPackages = [
+      "tesseract-ocr",
+      "tesseract-ocr-eng",
+      "tesseract-ocr-deu",
+      "tesseract-ocr-fra",
+      "tesseract-ocr-spa",
+      "tesseract-ocr-chi-sim",
+      "tesseract-ocr-jpn",
+    ];
+    const systemDependencyLines = systemDependencyRunBlock?.split("\n") ?? [];
+    const installStart = systemDependencyLines.findIndex((line) =>
+      line.includes("sudo apt-get install -y --no-install-recommends"),
+    );
+    expect(installStart).toBeGreaterThanOrEqual(0);
+    const installCommand: string[] = [];
+    for (let index = installStart; index < systemDependencyLines.length; index++) {
+      const line = systemDependencyLines[index];
+      installCommand.push(line);
+      if (!line.trimEnd().endsWith("\\")) break;
+    }
+    const installedPackages =
+      installCommand.join("\n").match(/\btesseract-ocr(?:-[a-z0-9-]+)?\b/g) ?? [];
+    expect([...new Set(installedPackages)].sort()).toEqual([...expectedPackages].sort());
+
+    const osdPath = "/usr/share/tesseract-ocr/5/tessdata/osd.traineddata";
+    const orderedCommands: Array<[string, (line: string) => boolean]> = [
+      ["OSD removal", (line) => line.trim() === `sudo rm -f ${osdPath}`],
+      ["OSD absence assertion", (line) => line.trim() === `test ! -e ${osdPath}`],
+      ["expected inventory", (line) => line.trim() === "expected=(chi_sim deu eng fra jpn spa)"],
+      [
+        "sorted Tesseract inventory",
+        (line) =>
+          line.trim() ===
+          "mapfile -t actual < <(tesseract --list-langs 2>/dev/null | tail -n +2 | LC_ALL=C sort)",
+      ],
+      [
+        "exact inventory assertion",
+        (line) =>
+          /\[\[ "\$\{actual\[\*\]\}" == "\$\{expected\[\*\]\}" \]\] \|\| \{/.test(line.trim()),
+      ],
+    ];
+    let previousCommand = installStart + installCommand.length - 1;
+    for (const [label, matches] of orderedCommands) {
+      const command = systemDependencyLines.findIndex(matches);
+      expect(command, `${label} must follow the integration apt install command`).toBeGreaterThan(
+        previousCommand,
+      );
+      previousCommand = command;
     }
   });
 

@@ -427,6 +427,7 @@ describe("POST /api/v1/admin/features/import", () => {
     : never;
   let token: string;
   let responseLockObservedHeld: boolean | null = null;
+  let importRouteRateLimit: unknown;
 
   beforeAll(async () => {
     const Fastify = (await import("fastify")).default;
@@ -465,6 +466,12 @@ describe("POST /api/v1/admin/features/import", () => {
       .set({ mustChangePassword: false })
       .where(eq(schema.users.username, "admin"));
 
+    app.addHook("onRoute", (routeOptions) => {
+      if (routeOptions.method === "POST" && routeOptions.url === "/api/v1/admin/features/import") {
+        importRouteRateLimit = routeOptions.config?.rateLimit;
+      }
+    });
+
     const { registerFeatureRoutes } = await import("../../../apps/api/src/routes/features.js");
     await registerFeatureRoutes(app);
 
@@ -475,6 +482,10 @@ describe("POST /api/v1/admin/features/import", () => {
 
   afterAll(async () => {
     if (app) await app.close();
+  });
+
+  it("registers a static rate limit for offline imports", () => {
+    expect(importRouteRateLimit).toEqual({ max: 10, timeWindow: "1 minute" });
   });
 
   it("imports a valid bundle via multipart POST", async () => {
