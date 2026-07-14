@@ -1,8 +1,8 @@
 ---
 description: "Struttura del monorepo, architettura di app e pacchetti, ciclo di vita di una richiesta e impronta sulle risorse di SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: 5a4f11a25575
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Architettura {#architecture}
@@ -36,13 +36,13 @@ Questo pacchetto non ha dipendenze di rete e gira interamente in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Uno strato bridge che chiama gli script Python per le operazioni ML. Al primo uso, il bridge avvia un processo dispatcher Python persistente che pre-importa le librerie pesanti (PIL, NumPy, MediaPipe, rembg) così che le chiamate AI successive saltino l'overhead di importazione. Se il dispatcher non è ancora pronto, il bridge ripiega sull'avvio di un nuovo sottoprocesso Python per ogni richiesta.
+Un livello bridge che chiama runtime nativi e Python ML. La maggior parte degli strumenti Python utilizzano un dispatcher persistente che preimporta librerie pesanti (PIL, NumPy, MediaPipe, rembg) in modo che le chiamate successive saltino il sovraccarico dell'importazione. OCR è isolato da quell'ambiente condiviso mutevole: `fast` richiama Tesseract nativo, mentre `balanced` e `best` utilizzano un JSONL dispatcher persistente dedicato aggiunto alla generazione attiva immutabile RapidOCR/ONNX. Ogni richiesta contiene un generation lease. L'attivazione esegue prima un smoke test su un candidato, quindi passa atomicamente al suo dispatcher. Il precedente dispatcher viene scaricato prima che la sua generazione venga sottoposta a garbage collection.
 
 **I modelli non sono precaricati.** Ogni script dello strumento carica i pesi del proprio modello dal disco al momento della richiesta e li scarta quando la richiesta termina. Consulta [Impronta sulle risorse](#resource-footprint) per il profilo di memoria completo.
 
-Operazioni supportate: rimozione dello sfondo (rembg/BiRefNet), upscaling (RealESRGAN), sfocatura dei volti (MediaPipe), miglioramento dei volti (GFPGAN/CodeFormer), cancellazione di oggetti (LaMa ONNX), OCR (PaddleOCR/Tesseract), colorazione (DDColor), rimozione del rumore, rimozione degli occhi rossi, restauro fotografico, generazione di foto tessera, correzione della trasparenza (matting HR di BiRefNet) e ridimensionamento content-aware (binario Go caire).
+Operazioni supportate: rimozione dello sfondo (rembg/BiRefNet), upscaling (RealESRGAN), sfocatura del volto (MediaPipe), miglioramento del volto (GFPGAN/CodeFormer), cancellazione degli oggetti (LaMa ONNX), OCR (Tesseract e RapidOCR con modelli PP-OCR ONNX), colorazione (DDColor), rimozione del rumore, rimozione degli occhi rossi, restauro di foto, foto tessera generazione, correzione della trasparenza (BiRefNet HR-matting) e ridimensionamento in base al contenuto (Go caire binario).
 
-Gli script Python risiedono in `packages/ai/python/`. L'immagine Docker pre-scarica tutti i pesi dei modelli durante la build così che il container funzioni completamente offline.
+Gli script Python risiedono in `packages/ai/python/`. I pacchetti di modelli opzionali di grandi dimensioni vengono installati su richiesta nel volume `/data/ai` persistente. OCR accurato utilizza artefatti firmati specifici della piattaforma; il livello Tesseract integrato non richiede il download del pacchetto di modelli.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Questo sito VitePress. Distribuito su Cloudflare Pages automaticamente al push s
 2. Il frontend invia un POST multipart a `/api/v1/tools/:section/:toolId` con il file e le impostazioni.
 3. La route API valida l'input con Zod, poi avvia l'elaborazione.
 4. Per gli strumenti standard, il lavoro viene accodato al pool BullMQ appropriato (image, media o docs in base alla modalità). Il worker BullMQ in-process orienta automaticamente l'immagine in base ai metadati EXIF, esegue la funzione di elaborazione dello strumento e restituisce il risultato.
-5. Per gli strumenti AI, il bridge TypeScript invia una richiesta al dispatcher Python persistente (o avvia un nuovo sottoprocesso come fallback), attende che finisca e legge il file di output.
+5. Per la maggior parte degli strumenti IA, il bridge TypeScript invia una richiesta al persistente Python dispatcher. OCR veloce richiama invece Tesseract e OCR accurato avvia l'eseguibile bloccato dalla generazione OCR immutabile attiva. Il livello OCR richiesto è fisso in ingresso e non viene mai modificato automaticamente durante l'esecuzione.
 6. L'avanzamento del lavoro viene persistito nella tabella `jobs` in PostgreSQL così che lo stato sopravviva ai riavvii del container. Gli aggiornamenti in tempo reale vengono consegnati via SSE su `/api/v1/jobs/:jobId/progress`.
 7. L'API restituisce un `jobId` e un `downloadUrl`. L'utente scarica il file elaborato da `/api/v1/download/:jobId/:filename`.
 

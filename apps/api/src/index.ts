@@ -22,9 +22,19 @@ import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { reportError } from "./lib/error-report.js";
 import { stripInternalPaths } from "./lib/errors.js";
-import { ensureAiDirs, recoverInterruptedInstalls } from "./lib/feature-status.js";
+import {
+  acquireInstallLock,
+  ensureAiDirs,
+  getAiDir,
+  getInstallLockFdForChild,
+  isFeatureInstalled,
+  releaseInstallLock,
+  startInterruptedInstallRecovery,
+  stopInterruptedInstallRecovery,
+} from "./lib/feature-status.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
+import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
@@ -236,13 +246,32 @@ await startAnalyticsGateListener();
 // malformed installed.json or unreadable models dir degrades to a warning rather
 // than a fatal startup crash (Sentry NODE-12).
 ensureAiDirs();
-try {
-  recoverInterruptedInstalls();
-} catch (err) {
-  console.warn(
-    `[feature-status] Interrupted-install recovery failed (continuing): ${(err as Error).message}`,
-  );
-}
+let initialOcrRuntimeReconciliation: Promise<boolean> | undefined;
+startInterruptedInstallRecovery({
+  onRecovered: () => {
+    if (!acquireInstallLock("__startup_ocr_reconcile__")) return false;
+    const installLockFd = getInstallLockFdForChild();
+    const reconciliation = (async () => {
+      try {
+        await runOcrRuntimeMaintenance("reconcile", { aiDataDir: getAiDir(), installLockFd });
+        if (isFeatureInstalled("ocr")) {
+          await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
+        }
+        return true;
+      } catch (error) {
+        console.warn(
+          `[ocr-runtime] Startup reconciliation failed; retrying: ${(error as Error).message}`,
+        );
+        return false;
+      } finally {
+        releaseInstallLock();
+      }
+    })();
+    initialOcrRuntimeReconciliation ??= reconciliation;
+    return reconciliation;
+  },
+});
+if (initialOcrRuntimeReconciliation) await initialOcrRuntimeReconciliation;
 
 function parseTrustProxy(value: string): boolean | number | string {
   if (value === "true") return true;
@@ -733,6 +762,7 @@ let shuttingDown = false;
 async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopInterruptedInstallRecovery();
   console.log(`\n${signal} received, shutting down gracefully...`);
 
   const forceExit = setTimeout(() => {
@@ -748,10 +778,20 @@ async function shutdown(signal: string) {
     console.error("Error closing HTTP server:", err);
   }
 
+  // Stop accepting queued work and let active jobs finish before tearing down
+  // any service those jobs may still be using.
   try {
-    const { shutdownDispatcher, shutdownDocsDispatcher } = await import("@snapotter/ai");
+    await closeWorkers();
+  } catch (err) {
+    console.error("Error closing workers:", err);
+  }
+
+  try {
+    const { shutdownDispatcher, shutdownDocsDispatcher, shutdownOcrDispatcher } = await import(
+      "@snapotter/ai"
+    );
     shutdownDispatcher();
-    await shutdownDocsDispatcher();
+    await Promise.all([shutdownDocsDispatcher(), shutdownOcrDispatcher()]);
     console.log("Python dispatchers shut down");
   } catch {
     // AI package may not be available
@@ -770,13 +810,6 @@ async function shutdown(signal: string) {
     console.log("Analytics flushed");
   } catch {
     // analytics shutdown is best-effort
-  }
-
-  // Close BullMQ resources before database (workers first so no new jobs start)
-  try {
-    await closeWorkers();
-  } catch (err) {
-    console.error("Error closing workers:", err);
   }
 
   try {

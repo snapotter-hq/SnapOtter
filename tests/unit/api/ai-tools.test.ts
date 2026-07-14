@@ -20,6 +20,8 @@ const {
   mockUnlink,
   mockRm,
   mockExecFile,
+  mockRunOcrRuntime,
+  mockRunTesseract,
 } = vi.hoisted(() => {
   const mockRunPythonWithProgress = vi.fn();
   const mockParseStdoutJson = vi.fn();
@@ -31,6 +33,7 @@ const {
     chain.jpeg = vi.fn().mockReturnValue(chain);
     chain.resize = vi.fn().mockReturnValue(chain);
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png"));
+    chain.toFile = vi.fn().mockResolvedValue({});
     chain.metadata = vi.fn().mockResolvedValue({
       width: 800,
       height: 600,
@@ -54,6 +57,8 @@ const {
     mockUnlink: vi.fn().mockResolvedValue(undefined),
     mockRm: vi.fn().mockResolvedValue(undefined),
     mockExecFile: vi.fn(),
+    mockRunOcrRuntime: vi.fn(),
+    mockRunTesseract: vi.fn(),
   };
 });
 
@@ -62,6 +67,19 @@ vi.mock("../../../packages/ai/src/bridge.js", () => ({
   parseStdoutJson: mockParseStdoutJson,
   isGpuAvailable: mockIsGpuAvailable,
 }));
+
+vi.mock("../../../packages/ai/src/ocr-runtime-dispatcher.js", () => ({
+  runOcrRuntime: mockRunOcrRuntime,
+}));
+
+vi.mock("../../../packages/ai/src/tesseract.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../packages/ai/src/tesseract.js")>();
+  return {
+    ...actual,
+    runAdaptiveTesseract: mockRunTesseract,
+    runTesseract: mockRunTesseract,
+  };
+});
 
 vi.mock("sharp", () => ({ default: mockSharp }));
 
@@ -118,6 +136,33 @@ beforeEach(() => {
   mockReadFile.mockResolvedValue(Buffer.from("output-buffer"));
   mockWriteFile.mockResolvedValue(undefined);
   mockRunPythonWithProgress.mockResolvedValue({ stdout: "", stderr: "" });
+  mockRunTesseract.mockResolvedValue({
+    text: "Sample OCR text",
+    engine: "tesseract",
+    device: "cpu",
+    provider: "native",
+  });
+  mockRunOcrRuntime.mockResolvedValue({
+    result: {
+      success: true,
+      text: "Accurate OCR text",
+      engine: "rapidocr-onnx",
+      requestedQuality: "best",
+      actualQuality: "best",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+    },
+    stderr: "",
+    runtime: {
+      generation: "test",
+      artifactVersion: "2.1.0",
+      target: "linux-amd64-cpu-py312",
+      providers: ["CPUExecutionProvider"],
+      models: {},
+    },
+  });
   mockParseStdoutJson.mockReturnValue({ success: true });
   mockIsGpuAvailable.mockReturnValue(false);
 });
@@ -817,74 +862,72 @@ describe("noiseRemoval", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("extractText (OCR)", () => {
-  it("calls ocr.py", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: true, text: "hello" });
-
+  it("uses built-in Tesseract for the default Fast tier", async () => {
     await extractText(INPUT_BUFFER, OUTPUT_DIR);
 
-    const [script] = mockRunPythonWithProgress.mock.calls[0];
-    expect(script).toBe("ocr.py");
+    expect(mockRunTesseract).toHaveBeenCalledWith(
+      expect.stringContaining("input_ocr.png"),
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
+    );
+    expect(mockRunPythonWithProgress).not.toHaveBeenCalled();
   });
 
-  it("passes options as JSON", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: true, text: "" });
-
+  it("passes accurate options to the isolated runtime", async () => {
     await extractText(INPUT_BUFFER, OUTPUT_DIR, { quality: "best", language: "en" });
 
-    const [, args] = mockRunPythonWithProgress.mock.calls[0];
+    const [, args] = mockRunOcrRuntime.mock.calls[0];
     const optsArg = JSON.parse(args[1]);
     expect(optsArg.quality).toBe("best");
     expect(optsArg.language).toBe("en");
   });
 
-  it("returns text and engine", async () => {
-    mockParseStdoutJson.mockReturnValue({
-      success: true,
-      text: "Sample OCR text",
-      engine: "paddleocr",
-    });
-
+  it("returns text and truthful engine metadata", async () => {
     const result = await extractText(INPUT_BUFFER, OUTPUT_DIR);
 
     expect(result.text).toBe("Sample OCR text");
-    expect(result.engine).toBe("paddleocr");
+    expect(result.engine).toBe("tesseract");
+    expect(result.actualQuality).toBe("fast");
   });
 
-  it("resizes image to max 2048px", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: true, text: "" });
-
+  it("preserves source resolution", async () => {
     const chain = createSharpChain();
     mockSharp.mockReturnValue(chain);
 
     await extractText(INPUT_BUFFER, OUTPUT_DIR);
 
-    expect(chain.resize).toHaveBeenCalledWith({
-      width: 2048,
-      height: 2048,
-      fit: "inside",
-      withoutEnlargement: true,
+    expect(chain.resize).not.toHaveBeenCalled();
+  });
+
+  it("throws on Fast failure", async () => {
+    mockRunTesseract.mockRejectedValueOnce(new Error("Tesseract failed"));
+
+    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("Tesseract failed");
+  });
+
+  it("rejects incomplete accurate metadata without falling back", async () => {
+    mockRunOcrRuntime.mockResolvedValueOnce({
+      result: { success: true, text: "incomplete" },
+      stderr: "",
+      runtime: {
+        generation: "test",
+        artifactVersion: "2.1.0",
+        target: "linux-amd64-cpu-py312",
+        providers: ["CPUExecutionProvider"],
+        models: {},
+      },
     });
-  });
 
-  it("throws on failure", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: false, error: "PaddleOCR init failed" });
-
-    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("PaddleOCR init failed");
-  });
-
-  it("provides fallback error message", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: false });
-
-    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("OCR failed");
+    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR, { quality: "best" })).rejects.toThrow(
+      "invalid metadata",
+    );
+    expect(mockRunTesseract).not.toHaveBeenCalled();
   });
 
   it("calculates timeout based on megapixels", async () => {
-    mockParseStdoutJson.mockReturnValue({ success: true, text: "" });
-
     await extractText(INPUT_BUFFER, OUTPUT_DIR);
 
-    const [, , opts] = mockRunPythonWithProgress.mock.calls[0];
-    expect(opts.timeout).toBeGreaterThanOrEqual(600_000);
+    const [, opts] = mockRunTesseract.mock.calls[0];
+    expect(opts.timeoutMs).toBeGreaterThanOrEqual(600_000);
   });
 });
 
@@ -1382,7 +1425,11 @@ describe("cross-cutting tool patterns", () => {
     await expect(removeRedEye(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("timed out");
     await expect(restorePhoto(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("timed out");
     await expect(upscale(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("timed out");
-    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR)).rejects.toThrow("timed out");
+
+    mockRunOcrRuntime.mockRejectedValueOnce(new Error("OCR runtime timed out"));
+    await expect(extractText(INPUT_BUFFER, OUTPUT_DIR, { quality: "balanced" })).rejects.toThrow(
+      "timed out",
+    );
   });
 
   it("all Python tools convert input to PNG via sharp", async () => {

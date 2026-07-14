@@ -1,8 +1,8 @@
 ---
 description: "Wdroż SnapOtter na produkcję za pomocą Dockera. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: 66fcd709fc00
+i18n_output_hash: 20b2807dca9c
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Wdrożenie {#deployment}
@@ -11,6 +11,12 @@ SnapOtter wdraża się jako 3-kontenerowy stos Docker Compose: obraz aplikacji S
 
 Zobacz [Obraz Docker](./docker-tags) po konfigurację GPU, przykłady Docker Compose i przypinanie wersji.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Zgodność OCR dla języka koreańskiego
+Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie język koreański (`ko`). Koreański wymaga dokładnego pakietu OCR i `balanced` lub `best`. Pakiet działa w oficjalnych kontenerach Linux amd64 i arm64, także na hostach NVIDIA, gdzie OCR nadal używa CPU. Nieobsługiwany system otrzymuje jawny błąd zgodności i nigdy po cichu nie przechodzi na `fast`. Koreański z `fast` lub starszym aliasem `tesseract` jest odrzucany przed zakolejkowaniem z `FEATURE_INCOMPATIBLE` i `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Szybki start (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ Aplikacja jest wtedy dostępna pod adresem `http://localhost:1349`.
 
 ## Szybki start (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Dla przyspieszania NVIDIA CUDA w narzędziach AI (usuwanie tła, skalowanie w górę, poprawianie twarzy, OCR):
+W przypadku akceleracji NVIDIA CUDA na obsługiwanych narzędziach AI (usuwanie tła, skalowanie w górę, ulepszanie twarzy):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 rdzenie |
 | RAM | 4 GB |
-| Dysk | 3 GB (obraz) + 24 GB (modele AI) + przestrzeń robocza |
+| Disk | 3 GB (obraz) + około 20 GB (wszystkie opcjonalne pakiety AI) + przestrzeń robocza |
 | GPU | Niewymagane (rezerwowo CPU) |
 
-**Instalacja pakietów AI jest tym, co podnosi RAM do 4 GB.** Bez zainstalowanego AI aplikacja w spoczynku zajmuje około 360 MB; ze wszystkimi siedmioma zainstalowanymi pakietami utrzymuje ~2,6 GB rezydentnie, ponieważ pomocniczy proces AI w Pythonie wczytuje swoje modele (usuwanie tła, skalowanie w górę, OCR, transkrypcja, wykrywanie twarzy, restauracja) przy uruchamianiu. Instalacje bez AI pozostają lekkie; instalacje AI potrzebują ≥4 GB.
+**Instalacja i uruchomienie większych pakietów AI powoduje, że zalecana wielkość RAM wynosi 4 GB.** Bez zainstalowanych opcjonalnych pakietów aplikacja w stanie bezczynności zajmuje około 360 MB. Starsze narzędzia Python współdzielą sidecar, podczas gdy dokładne OCR wykorzystuje dedykowany, długotrwały dispatcher podłączony do aktywnej, niezmiennej generacji. Przed aktywacją instalator uruchamia smoke test na kandydacie. Następnie atomowo przełącza się na nowy dispatcher i opróżnia poprzedni dispatcher przed garbage collection. Każdy oficjalny artefakt OCR musi przejść najgorszy przypadek release suite w 4 GiB cgroup, podczas gdy rekomendacja hosta o pojemności 4 GB pozostawia miejsce na aplikacje Node.js, Postgres, Redis, kolejki i pracę współbieżną.
 
 Większość narzędzi AI jest doskonale użyteczna na CPU; kilka naprawdę wymaga GPU. Zmierzone na nowoczesnym 4-rdzeniowym CPU:
 
@@ -271,7 +277,7 @@ SnapOtter celowo nie wpieka tych pobrań modeli do obrazu Docker. Pakiety AI są
 
 Niektóre narzędzia zależą od więcej niż jednego współdzielonego pakietu. Na przykład Zdjęcie paszportowe potrzebuje zarówno `background-removal`, jak i `face-detection`; jeśli `background-removal` jest już zainstalowany, włączenie Zdjęcia paszportowego pobiera tylko brakujący pakiet `face-detection`. To samo ponowne wykorzystanie dotyczy wszystkich narzędzi AI.
 
-Rozmiary pobrań modeli AI:
+Opcjonalne szacunki dotyczące przechowywania pakietów AI:
 
 | Pakiet | Rozmiar na dysku |
 |---|---|
@@ -279,9 +285,16 @@ Rozmiary pobrań modeli AI:
 | Skalowanie w górę + Poprawianie twarzy + Usuwanie szumów | 5-6 GB |
 | Wykrywanie twarzy | 200-300 MB |
 | Wymazywanie obiektów + Koloryzacja | 1-2 GB |
-| OCR | 5-6 GB |
+| Dokładne OCR (`balanced`/`best`) | ~208-234 MiB pobierz / ~409-488 MiB zainstalowany |
 | Restauracja zdjęć | 4-5 GB |
-| **Wszystkie pakiety** | **~24 GB** |
+| Transkrypcja | ~600 MB |
+| **Wszystkie pakiety** | **~20 GB zainstalowanych** |
+
+Szybki OCR jest wbudowany w obraz poprzez Tesseract, dodaje około 25 MiB i nie wymaga opcjonalnego pakietu OCR ani wymagań dotyczących 4 pamięci GiB. Dokładny pakiet jest dostępny w oficjalnych kontenerach Linux amd64 i arm64 i działa ONNX Runtime na CPU. Hosty NVIDIA używają tego samego środowiska wykonawczego CPU OCR, więc OCR nie zależy od wersji CUDA ani architektury GPU. Dokładny czas działania wymaga co najmniej 4 GiB efektywnej pamięci: skonfigurowany limit kontenera cgroup, w przeciwnym razie pamięć hosta. SnapOtter odrzuca systemy poniżej podpisanego minimum zgodności przed pobraniem pakietu. Dokładna instalacja pakietu jest również odrzucana w przypadku bare-metal/wstępnie skompilowanych archiwów, których libc i Python ABI nie można zagwarantować.
+
+Repliki współużytkujące ten sam `DATA_DIR` muszą korzystać z tej samej architektury procesora; przypnij wdrożenia z wieloma replikami do zgodnych węzłów za pomocą koligacji węzłów. Mieszane repliki amd64/arm64 wymagają oddzielnych woluminów danych i niezależnych wdrożeń SnapOtter.
+
+Dokładne środowisko wykonawcze utrzymuje jedną aktywną generację i czyści pamięć podręczną pobierania po aktywacji. W przypadku tej wersji pierwsza instalacja wymaga tymczasowo około 620-720 MiB na archiwum i przemieszczanie, a aktualizacja może osiągnąć szczyt w pobliżu 1.2 GiB, podczas gdy stara generacja pozostaje aktywna. Instalator oblicza dokładne wymagania na podstawie podpisanego indeksu i bieżących generacji przed pobraniem lub wyodrębnieniem i przed pobraniem lub rozpakowaniem kończy się niepowodzeniem, jeśli ilość danych jest zbyt mała.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Zobacz [pełną listę formatów](/pl/guide/supported-formats) po szczegóły do
 
 - **Zmiana rozmiaru z uwzględnieniem treści** ulega awarii na dużych obrazach (>5 MP) z powodu ograniczenia w pliku binarnym caire. Działa dobrze z mniejszymi obrazami.
 - **Dekodowanie HEIF** zajmuje 13-23 sekundy. HEIC (wariant Apple) jest znacznie szybszy, 0,3-0,9 sekundy.
-- **OCR japoński** zawodzi na CPU z powodu błędu MKLDNN w PaddlePaddle. Działa na GPU.
 - **Skalowanie w górę** przekracza limit czasu na CPU dla czegokolwiek poza małymi obrazami. GPU wymagane do praktycznego użytku.
 - Poprawianie twarzy **CodeFormer** jest znacznie wolniejsze niż GFPGAN (53 s zamiast 2 s na GPU). GFPGAN jest zalecany dla większości zastosowań.
 
@@ -433,6 +445,26 @@ Błąd przy uruchamianiu nazywa dokładny UID do użycia, więc najszybszą drog
 | `CONCURRENT_JOBS` | `0` (auto) | Maksymalna liczba równoległych zadań przetwarzania AI |
 | `SESSION_DURATION_HOURS` | `168` | Czas życia sesji logowania (7 dni) |
 | `CORS_ORIGIN` | (puste) | Dozwolone źródła oddzielone przecinkami lub puste dla tego samego źródła |
+
+### Wychodzący serwer proxy i prywatny urząd certyfikacji {#outbound-proxy-and-private-ca}
+
+Oficjalny kontener umożliwia obsługę proxy środowiska Node. Jeśli SnapOtter musi łączyć się z repozytorium wykonawczym OCR lub innymi usługami HTTPS za pośrednictwem korporacyjnego serwera proxy, ustaw `HTTPS_PROXY` (oraz `HTTP_PROXY`, jeśli to konieczne). Ustaw `NO_PROXY` na rozdzieloną przecinkami listę hostów, do których należy uzyskać bezpośredni dostęp, np. Postgres, Redis i wewnętrzną pamięć obiektową.
+
+Jeśli serwer proxy lub usługa wewnętrzna jest podpisana przez prywatny urząd certyfikacji, zamontuj certyfikat urzędu certyfikacji w trybie tylko do odczytu i wskaż na niego `NODE_EXTRA_CA_CERTS`. Plik musi istnieć w momencie rozpoczęcia procesu Node:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Przechowuj dane uwierzytelniające proxy poza plikiem Compose (na przykład w chronionym pliku `.env` lub w tajemnicy). Nie wyłączaj weryfikacji TLS: podpisany indeks OCR uwierzytelnia metadane wersji, podczas gdy normalna walidacja TLS nadal chroni transport i każde inne żądanie wychodzące.
 
 ## Kontrola stanu {#health-check}
 

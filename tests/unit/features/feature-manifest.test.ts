@@ -70,13 +70,11 @@ describe("Feature manifest structure", () => {
   });
 });
 
-describe("Feature manifest: numpy-2.x-ABI closure lock (regression for OCR bundle strand)", () => {
-  // paddleocr[doc-parser] (OCR bundle) drags numpy 1.26.4 -> 2.5.1 and pulls
-  // scipy/scikit-learn/pandas wheels built against the numpy 2.x ABI. Re-pinning
-  // numpy alone leaves those stranded on the numpy==1.26.4 base, which the bundle
-  // diff ships, breaking rembg's scipy import (a dispatcher-wide AI outage) after
-  // a last-writer-wins merge. build-bundle.sh applies `constraints` to every pip
-  // install to keep the whole closure on numpy-1.x-ABI versions.
+describe("Feature manifest: shared-venv numpy-1.x ABI closure lock", () => {
+  // Legacy feature bundles still share one venv. A package that upgrades numpy
+  // can strand scipy/scikit-learn/pandas wheels on the wrong ABI and break every
+  // legacy sidecar tool. The v3 OCR runtime is isolated from this closure, but
+  // build-bundle.sh must keep applying these constraints to legacy bundles.
   const constraints = (manifest.constraints ?? []) as string[];
 
   it("manifest declares a non-empty constraints array", () => {
@@ -152,7 +150,9 @@ describe("Feature manifest: bundle dependency completeness", () => {
     },
     ocr: {
       bundle: "ocr",
-      requires: ["paddleocr"],
+      // PDF rasterization happens in the lean base image via Ghostscript. The
+      // optional accurate runtime contains recognition dependencies only.
+      requires: ["rapidocr", "onnxruntime"],
     },
     colorize: {
       bundle: "object-eraser-colorize",
@@ -248,6 +248,26 @@ describe("Feature manifest: enablesTools consistency with shared features", () =
   });
 });
 
+describe("OCR optional capability mapping", () => {
+  it("keeps OCR tools available while associating them with the optional accurate pack", async () => {
+    const {
+      TOOL_BUNDLE_MAP,
+      TOOL_OPTIONAL_BUNDLE_MAP,
+      getBundleForTool,
+      getOptionalBundleForTool,
+      getRequiredBundlesForTool,
+    } = await import("@snapotter/shared");
+
+    for (const toolId of ["ocr", "ocr-pdf"]) {
+      expect(TOOL_BUNDLE_MAP[toolId]).toBeUndefined();
+      expect(TOOL_OPTIONAL_BUNDLE_MAP[toolId]).toBe("ocr");
+      expect(getRequiredBundlesForTool(toolId)).toEqual([]);
+      expect(getBundleForTool(toolId)).toBeNull();
+      expect(getOptionalBundleForTool(toolId)?.id).toBe("ocr");
+    }
+  });
+});
+
 describe("Manifest v2 archive fields", () => {
   const ARCH_VARIANTS = ["amd64-gpu", "arm64-cpu"] as const;
 
@@ -261,8 +281,9 @@ describe("Manifest v2 archive fields", () => {
     expect(manifest.bundleRepo).toBe("deepsafe/feature-bundles");
   });
 
-  it("every bundle has archives with both arch variants", () => {
+  it("every legacy v2 bundle has archives with both arch variants", () => {
     for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      if (bundle.runtimeFormatVersion === 3) continue;
       const archives = bundle.archives as Record<string, unknown>;
       expect(archives, `${id} missing archives`).toBeDefined();
       for (const arch of ARCH_VARIANTS) {
@@ -271,8 +292,9 @@ describe("Manifest v2 archive fields", () => {
     }
   });
 
-  it("each archive entry has file, sha256, compressedSize, extractedSize", () => {
+  it("each legacy v2 archive entry has file, sha256, compressedSize, extractedSize", () => {
     for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      if (bundle.runtimeFormatVersion === 3) continue;
       const archives = bundle.archives as Record<string, Record<string, unknown>>;
       for (const arch of ARCH_VARIANTS) {
         const entry = archives[arch];
@@ -309,6 +331,7 @@ describe("Manifest v2 archive fields", () => {
   it("archive file paths include version prefix", () => {
     const version = manifest.imageVersion;
     for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      if (bundle.runtimeFormatVersion === 3) continue;
       const archives = bundle.archives as Record<string, Record<string, unknown>>;
       for (const arch of ARCH_VARIANTS) {
         expect(

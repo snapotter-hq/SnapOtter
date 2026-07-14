@@ -27,6 +27,40 @@ async function main() {
   const imageBuffer = readFileSync(TEST_IMAGE);
   const imageBlob = new Blob([imageBuffer], { type: "image/webp" });
 
+  const featuresRes = await fetch(`${BASE}/api/v1/features`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!featuresRes.ok) {
+    throw new Error(`Could not read feature capabilities: HTTP ${featuresRes.status}`);
+  }
+  const features = await featuresRes.json();
+  const ocrFeature = features.bundles?.find((bundle) => bundle.id === "ocr");
+  if (!ocrFeature?.availableQualities?.includes("fast")) {
+    throw new Error("OCR feature state does not advertise the built-in Fast tier");
+  }
+
+  const accurateOcrTools = [];
+  for (const quality of ["balanced", "best"]) {
+    if (!ocrFeature.availableQualities.includes(quality)) {
+      log(`OCR (${quality})`, "SKIP", `signed accurate runtime unavailable (${ocrFeature.status})`);
+      continue;
+    }
+    accurateOcrTools.push({
+      name: `OCR (${quality})`,
+      path: "ocr",
+      settings: { quality },
+      resultKey: "engine",
+      expected: {
+        engine: "rapidocr-onnx",
+        provider: "CPUExecutionProvider",
+        device: "cpu",
+        requestedQuality: quality,
+        actualQuality: quality,
+        degraded: false,
+      },
+    });
+  }
+
   const tools = [
     {
       name: "Remove Background",
@@ -89,17 +123,20 @@ async function main() {
       resultKey: "facesDetected",
     },
     {
-      name: "OCR (tesseract)",
+      name: "OCR (Fast built-in)",
       path: "ocr",
-      settings: { engine: "tesseract" },
+      settings: { quality: "fast" },
       resultKey: "engine",
+      expected: {
+        engine: "tesseract",
+        provider: "native",
+        device: "cpu",
+        requestedQuality: "fast",
+        actualQuality: "fast",
+        degraded: false,
+      },
     },
-    {
-      name: "OCR (paddleocr)",
-      path: "ocr",
-      settings: { engine: "paddleocr" },
-      resultKey: "engine",
-    },
+    ...accurateOcrTools,
   ];
 
   for (const tool of tools) {
@@ -119,6 +156,14 @@ async function main() {
       const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
       if (res.ok && !body.error) {
+        const mismatch = Object.entries(tool.expected ?? {}).find(
+          ([key, expected]) => body[key] !== expected,
+        );
+        if (mismatch) {
+          const [key, expected] = mismatch;
+          log(tool.name, "FAIL", `expected ${key}=${expected}, got ${body[key]}`);
+          continue;
+        }
         const val = tool.resultKey ? body[tool.resultKey] : "ok";
         const detail = Array.isArray(val)
           ? JSON.stringify(val)

@@ -1,0 +1,5 @@
+# Credentialed HuggingFace release tooling. Compile for CPython 3.11/Linux with:
+# uv pip compile docker/hf-release-requirements.in \
+#   --python-version 3.11 --python-platform x86_64-manylinux_2_17 \
+#   --generate-hashes --output-file docker/hf-release-requirements.txt
+huggingface_hub[hf_xet]==0.36.2

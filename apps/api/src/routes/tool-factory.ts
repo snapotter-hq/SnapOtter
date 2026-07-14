@@ -319,7 +319,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
-        updateSingleFileProgress({
+        void updateSingleFileProgress({
           jobId: clientJobId,
           phase: "processing",
           percent,

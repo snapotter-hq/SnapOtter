@@ -1,8 +1,8 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 9fa4a9a91996
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST API 參考 {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | 移除背景 | rembg（BiRefNet / U2-Net） | `model`、`backgroundType`（transparent/color/gradient/blur/image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurEnabled`、`blurIntensity`、`shadowEnabled`、`shadowOpacity` |
 | `upscale` | 影像放大 | RealESRGAN | `scale`（2/4）、`model`、`faceEnhance`、`denoise`、`format`、`quality` |
 | `erase-object` | 物件消除 | LaMa（ONNX） | 遮罩以第二個檔案部分傳送（欄位名 `mask`）、`format`、`quality` |
-| `ocr` | OCR／文字擷取 | PaddleOCR / Tesseract | `quality`（fast/balanced/best）、`language`、`enhance` |
+| `ocr` | OCR / 文字擷取 | Tesseract（快速）；RapidOCR + PP-OCR ONNX（平衡/最佳） | `quality`（快速/平衡/最佳）、`language`、`enhance` |
 | `blur-faces` | 臉部／PII 模糊 | MediaPipe | `blurRadius`、`sensitivity` |
 | `smart-crop` | 智慧裁切 | MediaPipe + Sharp | `mode`（subject/face/trim）、`strategy`（attention/entropy）、`width`、`height`、`padding`、`facePreset`（closeup/head-shoulders/upper-body/half-body）、`sensitivity`、`threshold`、`padToSquare`、`padColor`、`targetSize`、`quality` |
 | `image-enhancement` | 影像強化 | 以分析為基礎 | `mode`（auto/exposure/contrast/color/sharpness）、`strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## 批次處理 {#batch-processing}
 
-一次將支援批次的通用工具套用到多個檔案。回傳 ZIP 封存。自訂的多檔案或多步驟路由（例如 PDF 簽署、PDF OCR，以及 PDF 轉圖片預設路由）會使用各自的端點合約，而非通用的 `/batch` 路由。
+一次將支援批次的通用工具套用到多個檔案。回傳 ZIP 封存。自訂的多檔案或多步驟路由（例如 PDF 簽署以及 PDF 轉圖片預設路由）會使用各自的端點合約，而非通用的 `/batch` 路由。
+
+`ocr-pdf` 工具支援此通用 `/batch` 路由。
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 管理 AI 功能 bundle（在 Docker 環境中安裝／解除安裝 AI 模型套件）。從自訂自動化流程啟用工具時，建議使用工具層級的安裝端點：某些 AI 工具需要一個以上的共用 bundle，而此端點會略過已安裝的 bundle，只將缺少的排入佇列。
 
+OCR 是可選增強功能而不是硬依賴項。 其 `fast` Tesseract 層無需包裝即可運作； `POST /api/v1/admin/features/ocr/install` 安裝簽名的 RapidOCR 打包 `balanced` 和 `best` 在 Linux  amd64 或者 arm64。 準確的 OCR 運行時在僅 CPU 和 NVIDIA 主機上使用 CPU，並且需要至少 4 GiB 的有效記憶體（配置的容器 cgroup 限制，否則主機記憶體）。 SnapOtter 報告 `requiredMemoryBytes`、`effectiveMemoryBytes` 和 `insufficient-memory` 相容性原因，並在下載前拒絕不相容的安裝。 此記憶體需求不適用於 `fast`。 該包大約需要下載 208-234 MiB 和安裝 409-488 MiB，具體取決於目標； 簽章索引綁定安裝期間強制執行的確切大小。
+
 | Method | Path | 存取權限 | 說明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | 列出所有功能 bundle 及其安裝狀態 |
@@ -601,7 +605,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin（`features:manage`） | 安裝某工具所需的每個 bundle；回傳各 bundle 的已排入佇列／已略過狀態 |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin（`features:manage`） | 解除安裝功能 bundle 並清除模型檔案 |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin（`features:manage`） | 取得 AI 模型的總磁碟使用量 |
-| `POST` | `/api/v1/admin/features/import` | Admin（`features:manage`） | 匯入離線 AI bundle 封存 |
+| `POST` | `/api/v1/admin/features/import` | 管理員 (`features:manage`) | 匯入舊版 AI 套裝 (`file`) 或已簽署的離線 OCR 版本（`index` 加 `archive`） |
+
+氣隙 OCR 導入必須包含版本的簽章 `ocr-runtime-index.json` 和相符的平台存檔。 SnapOtter 應用與線上安裝相同的 Ed25519 簽章、工件雜湊、相容性、擷取和冒煙測試檢查：
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+在 arm64 上使用 `linux-arm64-cpu-py311` 檔案。另一個目標的簽名工件被拒絕而不是安裝。
 
 ## 管理操作 {#admin-operations}
 

@@ -1585,7 +1585,9 @@ export const id: TranslationKeys = {
       quality: "Kualitas",
       enhanceBeforeScanning: "Tingkatkan sebelum pemindaian",
       enhanceHint:
-        "Secara otomatis meluruskan, meningkatkan kontras, menghapus noise, dan memperbesar gambar sebelum pemindaian untuk akurasi yang lebih baik.",
+        "Memperbaiki kontras lokal sebelum pengenalan. Cepat menerapkannya langsung; Seimbang dan Terbaik hanya mempertahankannya jika skor terkalibrasi memperbaiki hasil.",
+      fastKoreanUnsupported:
+        "OCR Cepat tidak mendukung bahasa Korea. Instal paket OCR Akurat lalu pilih Seimbang atau Terbaik.",
       language: "Bahasa",
       autoDetect: "Deteksi otomatis",
       extractedText: "Teks yang Diekstrak",
@@ -3561,11 +3563,18 @@ export const id: TranslationKeys = {
       uninstall: "Hapus",
       installing: "Menginstal...",
       importBundle: "Impor Bundel",
-      importDescription: "Unggah arsip bundel .tar.gz yang diekspor dari instalasi lain.",
+      importDescription:
+        "Impor runtime OCR bertanda tangan atau bundel AI lama untuk penggunaan luring.",
       importButton: "Impor dari file",
       importing: "Mengimpor...",
       importSuccess: "Bundel berhasil diimpor.",
       importError: "Impor bundel gagal: {error}",
+      importType: "Jenis bundel",
+      importOcr: "Paket OCR akurat",
+      importLegacy: "Bundel AI lama",
+      importOcrIndex: "Indeks OCR bertanda tangan (.json)",
+      importOcrArchive: "Arsip runtime OCR (.tar.gz)",
+      importLegacyArchive: "Arsip bundel lama (.tar.gz)",
       resetTitle: "Reset Lingkungan AI",
       resetDescription:
         "Menghapus semua fitur AI yang terinstal dan model yang telah diunduh, lalu memulai dari awal. Gunakan ini jika alat AI berperilaku tidak semestinya setelah pembaruan dan menginstal ulang bundel tidak menyelesaikan masalah.",

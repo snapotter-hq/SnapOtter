@@ -29,7 +29,7 @@ For details about what is collected, see [What SnapOtter collects](/guide/teleme
 :::
 
 ::: tip NVIDIA CUDA acceleration
-Add `--gpus all` for NVIDIA CUDA-accelerated background removal, upscaling, OCR, face enhancement, and restoration:
+Add `--gpus all` for NVIDIA CUDA-accelerated background removal, upscaling, face enhancement, and restoration. OCR remains CPU-based and works in the same image with or without GPU access:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest

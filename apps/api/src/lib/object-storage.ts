@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync } from "node:fs";
-import { mkdir, readdir, rm, stat, statfs, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, stat, statfs, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -116,34 +117,55 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
 export async function putObjectStream(
   key: string,
   source: Readable,
-  opts: { maxBytes?: number } = {},
+  opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<number> {
   assertValidKey(key);
+  opts.signal?.throwIfAborted();
+  const abortSource = () => {
+    const reason =
+      opts.signal?.reason instanceof Error
+        ? opts.signal.reason
+        : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    source.destroy(reason);
+  };
+  opts.signal?.addEventListener("abort", abortSource, { once: true });
   let written = 0;
   const counter = async function* (src: AsyncIterable<Buffer>) {
     for await (const chunk of src) {
+      opts.signal?.throwIfAborted();
       written += chunk.length;
-      if (opts.maxBytes && written > opts.maxBytes) {
-        throw new Error(`Upload exceeds the maximum allowed size (${opts.maxBytes} bytes)`);
+      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+        throw objectSizeLimitError(opts.maxBytes);
       }
       yield chunk;
     }
   };
-  if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putGenericObjectStream(key, counter(source));
-    return written;
-  }
-  await assertLocalCapacity();
-  const p = localPath(key);
-  await mkdir(dirname(p), { recursive: true });
   try {
-    await pipeline(counter(source), createWriteStream(p));
-  } catch (err) {
-    await unlink(p).catch(() => {});
-    throw err;
+    if (isS3Enabled()) {
+      const s3 = await getS3();
+      try {
+        await s3.putGenericObjectStream(key, counter(source), opts.signal);
+        opts.signal?.throwIfAborted();
+        return written;
+      } catch (error) {
+        await s3.deleteGenericObject(key).catch(() => {});
+        throw error;
+      }
+    }
+    const p = localPath(key);
+    try {
+      await assertLocalCapacity();
+      await mkdir(dirname(p), { recursive: true });
+      await pipeline(counter(source), createWriteStream(p), { signal: opts.signal });
+      opts.signal?.throwIfAborted();
+    } catch (err) {
+      await unlink(p).catch(() => {});
+      throw normalizeOperationalWriteError(err);
+    }
+    return written;
+  } finally {
+    opts.signal?.removeEventListener("abort", abortSource);
   }
-  return written;
 }
 
 export async function getObjectStream(
@@ -162,6 +184,100 @@ export async function getObjectBuffer(key: string): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const c of await getObjectStream(key)) chunks.push(c as Buffer);
   return Buffer.concat(chunks);
+}
+
+export interface CopyObjectToFileOptions {
+  /** Hard ceiling enforced both from object metadata and while streaming. */
+  maxBytes: number;
+  signal?: AbortSignal;
+}
+
+export interface CopyReadableToFileOptions {
+  maxBytes?: number;
+  signal?: AbortSignal;
+}
+
+function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413 } {
+  return Object.assign(new Error(`Object exceeds the maximum allowed size (${maxBytes} bytes)`), {
+    statusCode: 413 as const,
+  });
+}
+
+function normalizeOperationalWriteError(error: unknown): unknown {
+  const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
+  if (error instanceof Error && code && ["EACCES", "EDQUOT", "ENOSPC", "EROFS"].includes(code)) {
+    return Object.assign(error, { statusCode: 503 });
+  }
+  return error;
+}
+
+/**
+ * Copy one object into scratch storage without materializing it as a Buffer.
+ *
+ * The metadata check avoids downloading a known-oversized S3 object, while
+ * the streaming counter remains authoritative if the object changes between
+ * the size lookup and read. Partial destinations are always removed.
+ */
+export async function copyObjectToFile(
+  key: string,
+  destination: string,
+  opts: CopyObjectToFileOptions,
+): Promise<number> {
+  if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0) {
+    throw new Error("maxBytes must be a non-negative safe integer");
+  }
+  opts.signal?.throwIfAborted();
+
+  const declaredSize = await getObjectSize(key);
+  opts.signal?.throwIfAborted();
+  if (declaredSize > opts.maxBytes) throw objectSizeLimitError(opts.maxBytes);
+
+  const source = await getObjectStream(key);
+  return copyReadableToFile(source, destination, opts);
+}
+
+/** Atomically spool a readable to scratch with bounded memory and cleanup. */
+export async function copyReadableToFile(
+  source: Readable,
+  destination: string,
+  opts: CopyReadableToFileOptions = {},
+): Promise<number> {
+  if (opts.maxBytes !== undefined && (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0)) {
+    throw new Error("maxBytes must be a non-negative safe integer");
+  }
+  opts.signal?.throwIfAborted();
+  const stagingPath = `${destination}.${randomUUID()}.partial`;
+  let written = 0;
+  const countAndLimit = async function* (chunks: AsyncIterable<Buffer | Uint8Array | string>) {
+    for await (const chunk of chunks) {
+      opts.signal?.throwIfAborted();
+      const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
+      written += bytes;
+      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+        throw objectSizeLimitError(opts.maxBytes);
+      }
+      yield chunk;
+    }
+  };
+
+  try {
+    await mkdir(dirname(destination), { recursive: true });
+    // Create the staging inode before constructing the stream. A write stream
+    // opened with `wx` may fail the pipeline before its asynchronous open has
+    // completed; cleanup can then observe ENOENT and the delayed open can leave
+    // an orphan behind. Opening the already-created file with `r+` cannot
+    // recreate it after cleanup.
+    await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
+    await pipeline(countAndLimit(source), createWriteStream(stagingPath, { flags: "r+" }), {
+      signal: opts.signal,
+    });
+    opts.signal?.throwIfAborted();
+    await rename(stagingPath, destination);
+    return written;
+  } catch (error) {
+    await unlink(stagingPath).catch(() => {});
+    throw normalizeOperationalWriteError(error);
+  }
 }
 
 export async function getObjectSize(key: string): Promise<number> {

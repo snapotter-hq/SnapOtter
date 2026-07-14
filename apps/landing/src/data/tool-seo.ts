@@ -3122,7 +3122,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   ocr: {
     searchTitle: "OCR - Extract Text from Image Online",
     longDescription:
-      "Extract text from images using PaddleOCR, supporting 80+ languages including CJK characters, Arabic, and Hindi. Handles printed text, handwriting, and scene text in photographs. Outputs plain text with bounding box coordinates for each detected region.",
+      "Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Choose automatic recognition or an English, German, French, Spanish, Chinese, Japanese, or Korean language hint. The image and extracted text stay on your self-hosted server.",
     useCases: [
       "Digitize text from scanned documents and receipts",
       "Extract data from screenshots and whiteboard photos",
@@ -3130,20 +3130,21 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Automate data entry from printed forms and invoices",
     ],
     features: [
-      "PaddleOCR engine with 80+ language support",
-      "Handles printed text, handwriting, and scene text",
-      "Returns text with bounding box coordinates",
-      "CJK, Arabic, Hindi, Cyrillic, and Latin script support",
+      "Built-in Fast tier powered by Tesseract",
+      "Optional Balanced and Best tiers powered by RapidOCR and PP-OCRv6 ONNX models",
+      "Printed document and scene-text recognition with orientation handling",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean language modes",
+      "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
       "Batch OCR across multiple images",
     ],
     faqs: [
       {
         q: "What languages does the OCR support?",
-        a: "Over 80 languages including English, Chinese, Japanese, Korean, Arabic, Hindi, Russian, and all major European languages. The PaddleOCR engine handles multiple scripts in a single image.",
+        a: "SnapOtter exposes automatic recognition plus explicit English, German, French, Spanish, Chinese, Japanese, and Korean modes. Automatic, English, German, French, Spanish, Chinese, and Japanese work with every tier. Korean requires the Balanced or Best tier and the optional accurate runtime; Fast returns an incompatibility error for Korean instead of silently using another language or tier.",
       },
       {
         q: "Can OCR read handwritten text?",
-        a: "PaddleOCR handles clearly written handwriting reasonably well, though accuracy is lower than with printed text. Best results come from high-contrast handwriting on clean backgrounds.",
+        a: "The OCR models are optimized for printed document and scene text. Neat, high-contrast handwriting may be recognized, but handwriting accuracy is less predictable than printed text and is not a dedicated handwriting-recognition mode.",
       },
       {
         q: "Does the OCR work on photos of signs and documents?",
@@ -4247,7 +4248,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "ocr-pdf": {
     searchTitle: "Extract Text From Scanned PDFs",
     longDescription:
-      "Extract searchable text from scanned PDF documents using AI-powered optical character recognition. Handles multi-page documents, mixed layouts, and handwritten content with high accuracy. All OCR processing runs locally on your server, so sensitive documents never leave your network.",
+      "Extract plain text from scanned PDF documents with built-in Tesseract or the optional high-accuracy RapidOCR runtime and pinned PP-OCR ONNX models. Select up to 50 pages per request, choose a language hint, and keep the PDF and extracted text on your self-hosted server.",
     useCases: [
       "Digitizing archived paper contracts for full-text search in a document management system",
       "Extracting invoice line items from scanned supplier PDFs for bookkeeping import",
@@ -4255,11 +4256,12 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Converting scanned government forms into selectable text for accessibility compliance",
     ],
     features: [
-      "AI-powered text recognition with support for printed and handwritten content",
-      "Multi-page PDF processing with preserved page structure and reading order",
-      "Automatic language detection across dozens of supported languages",
-      "Outputs searchable PDF with an invisible text layer overlaid on the original",
-      "Handles skewed scans, low-resolution images, and mixed text-photo layouts",
+      "Built-in Fast Tesseract tier plus optional RapidOCR Balanced and Best tiers",
+      "Page-range selection for up to 50 pages per request",
+      "Automatic, English, German, French, Spanish, Chinese, Japanese, and Korean modes",
+      "Plain-text output with page boundaries",
+      "Portable Linux amd64/arm64 accurate runtime that also works on NVIDIA hosts",
+      "Local processing without a third-party OCR API",
     ],
     faqs: [
       {
@@ -4268,11 +4270,11 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Does it support non-English documents?",
-        a: "Yes, the OCR engine supports dozens of languages and can auto-detect the language in each page. Processing happens entirely on your server, making it safe for documents in any language without external API calls.",
+        a: "Yes. Choose automatic recognition or an explicit English, German, French, Spanish, Chinese, Japanese, or Korean hint. Processing happens on your server without an external OCR API.",
       },
       {
         q: "Can I process confidential legal or medical PDFs?",
-        a: "Absolutely. Because SnapOtter is self-hosted, your PDFs never leave your network. No data is sent to external servers, making it suitable for HIPAA, GDPR, or any privacy-sensitive workflow.",
+        a: "OCR processing is local, so SnapOtter does not send the PDF or extracted text to an OCR service. This can support data-residency and privacy requirements, while deployment security and regulatory compliance remain the operator's responsibility.",
       },
     ],
   },

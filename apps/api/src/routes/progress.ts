@@ -42,6 +42,79 @@ export interface SingleFileProgress {
   result?: Record<string, unknown>;
 }
 
+export interface PersistedSingleFileProgress {
+  percent: number;
+  stage?: string;
+  result?: Record<string, unknown>;
+}
+
+interface SingleFileReplayRow {
+  jobId: string;
+  status: string;
+  progress: unknown;
+  error: unknown;
+}
+
+const MISSING_DURABLE_RESULT_ERROR = "Completed result is no longer available. Run the job again.";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function buildPersistedSingleFileProgress(
+  progress: Omit<SingleFileProgress, "type">,
+): PersistedSingleFileProgress {
+  return {
+    percent: progress.percent,
+    ...(progress.stage ? { stage: progress.stage } : {}),
+    ...(progress.result ? { result: progress.result } : {}),
+  };
+}
+
+/** Reconstruct the terminal frame after Redis's short-lived replay key expires. */
+export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFileProgress {
+  const progress = isRecord(row.progress) ? row.progress : {};
+  const storedPercent = progress.percent;
+  const percent =
+    typeof storedPercent === "number" && Number.isFinite(storedPercent) ? storedPercent : 0;
+
+  if (row.status === "completed") {
+    const result = isRecord(progress.result) ? progress.result : undefined;
+    if (!result) {
+      return {
+        jobId: row.jobId,
+        type: "single",
+        phase: "failed",
+        percent: 100,
+        error: MISSING_DURABLE_RESULT_ERROR,
+      };
+    }
+    const stage = typeof progress.stage === "string" ? progress.stage : undefined;
+    return {
+      jobId: row.jobId,
+      type: "single",
+      phase: "complete",
+      percent: 100,
+      ...(stage ? { stage } : {}),
+      result,
+    };
+  }
+
+  const error =
+    isRecord(row.error) && typeof row.error.message === "string"
+      ? row.error.message
+      : row.status === "canceled"
+        ? "Canceled"
+        : "Processing failed";
+  return {
+    jobId: row.jobId,
+    type: "single",
+    phase: "failed",
+    percent,
+    error,
+  };
+}
+
 // ── Redis channels / keys ──────────────────────────────────────
 
 const progressChannel = () => `${bullPrefix()}:progress`;
@@ -57,14 +130,16 @@ const TERMINAL_TTL_S = 600;
  */
 const persistQueues = new Map<string, Promise<void>>();
 
-function enqueuePersist(jobId: string, fn: () => Promise<void>): void {
+function enqueuePersist(jobId: string, fn: () => Promise<void>): Promise<void> {
   const prev = persistQueues.get(jobId) ?? Promise.resolve();
   const next = prev.then(fn, fn); // run even if prior rejected
   persistQueues.set(jobId, next);
   // Clean up the map entry once the queue drains
-  next.then(() => {
+  const cleanup = () => {
     if (persistQueues.get(jobId) === next) persistQueues.delete(jobId);
-  });
+  };
+  void next.then(cleanup, cleanup);
+  return next;
 }
 
 async function persistJobProgress(progress: JobProgress): Promise<void> {
@@ -112,43 +187,39 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
 
 async function persistSingleFileProgress(
   progress: Omit<SingleFileProgress, "type">,
+  executor: Pick<typeof db, "select" | "insert" | "update"> = db,
 ): Promise<void> {
-  try {
-    const status =
-      progress.phase === "complete"
-        ? "completed"
-        : progress.phase === "failed"
-          ? "failed"
-          : "processing";
-    const progressJsonb: { percent: number; stage?: string } = { percent: progress.percent };
-    if (progress.stage) progressJsonb.stage = progress.stage;
-    const [existing] = await db
-      .select({ id: schema.jobs.id })
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, progress.jobId));
+  const status =
+    progress.phase === "complete"
+      ? "completed"
+      : progress.phase === "failed"
+        ? "failed"
+        : "processing";
+  const progressJsonb = buildPersistedSingleFileProgress(progress);
+  const [existing] = await executor
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, progress.jobId));
 
-    if (existing) {
-      await db
-        .update(schema.jobs)
-        .set({
-          status,
-          progress: progressJsonb,
-          error: progress.error ? { message: progress.error } : null,
-          completedAt: status === "completed" || status === "failed" ? new Date() : null,
-        })
-        .where(eq(schema.jobs.id, progress.jobId));
-    } else {
-      await db.insert(schema.jobs).values({
-        id: progress.jobId,
-        type: "single",
+  if (existing) {
+    await executor
+      .update(schema.jobs)
+      .set({
         status,
         progress: progressJsonb,
-        inputRefs: [],
         error: progress.error ? { message: progress.error } : null,
-      });
-    }
-  } catch {
-    // Best-effort
+        completedAt: status === "completed" || status === "failed" ? new Date() : null,
+      })
+      .where(eq(schema.jobs.id, progress.jobId));
+  } else {
+    await executor.insert(schema.jobs).values({
+      id: progress.jobId,
+      type: "single",
+      status,
+      progress: progressJsonb,
+      inputRefs: [],
+      error: progress.error ? { message: progress.error } : null,
+    });
   }
 }
 
@@ -165,7 +236,7 @@ async function persistDurable(
 
 // ── Publish (Redis pub/sub + terminal cache + durable persist) ──
 
-function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
+function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
   const json = JSON.stringify(payload);
   const isTerminal =
     payload.type === "single"
@@ -174,15 +245,24 @@ function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress
 
   // Terminal events write the replay cache BEFORE publishing, so a client
   // connecting right after the live event always finds the terminal key.
-  const announce = isTerminal
+  const publishPromise = isTerminal
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
         .catch(() => {})
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
-  void Promise.resolve(announce).catch(() => {});
+  void Promise.resolve(publishPromise).catch(() => {});
+}
 
-  enqueuePersist(payload.jobId, () => persistDurable(payload));
+function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): Promise<void> {
+  announce(payload);
+
+  const durable = enqueuePersist(payload.jobId, () => persistDurable(payload));
+  // Nonterminal producers intentionally ignore best-effort persistence. Attach
+  // a rejection observer so those calls never become unhandled; terminal
+  // producers can still await the original promise and fail closed.
+  void durable.catch(() => {});
+  return durable;
 }
 
 // ── Public API (unchanged signatures) ──────────────────────────
@@ -192,12 +272,38 @@ function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress
  */
 export function updateJobProgress(progress: JobProgress): void {
   const event = { ...progress, type: "batch" } as JobProgress & { type: "batch" };
-  publish(event);
+  void publish(event);
 }
 
-export function updateSingleFileProgress(progress: Omit<SingleFileProgress, "type">): void {
+/** Publish progress and resolve after its best-effort durable DB write settles. */
+export function updateSingleFileProgress(
+  progress: Omit<SingleFileProgress, "type">,
+): Promise<void> {
   const event: SingleFileProgress = { ...progress, type: "single" };
-  publish(event);
+  return publish(event);
+}
+
+type ProgressTransaction = Pick<typeof db, "select" | "insert" | "update">;
+
+/**
+ * Atomically commit an authoritative job mutation and its client-facing replay
+ * row before announcing terminal success. The per-job queue also waits for all
+ * earlier nonterminal writes, so late progress cannot overwrite completion.
+ */
+export async function updateSingleFileProgressAtomically(
+  progress: Omit<SingleFileProgress, "type">,
+  mutateAuthoritative: (tx: ProgressTransaction) => Promise<void>,
+): Promise<void> {
+  const event: SingleFileProgress = { ...progress, type: "single" };
+  const { type: _, ...persisted } = event;
+  await enqueuePersist(progress.jobId, () =>
+    db.transaction(async (tx) => {
+      const executor = tx as unknown as ProgressTransaction;
+      await mutateAuthoritative(executor);
+      await persistSingleFileProgress(persisted, executor);
+    }),
+  );
+  announce(event);
 }
 
 /**
@@ -291,69 +397,20 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         reply.raw.write(`data: ${json}\n\n`);
       };
 
-      // Keepalive comments every 20s
+      // Send a data heartbeat rather than an SSE comment. EventSource does not
+      // expose comments to clients, so queued jobs would otherwise look idle
+      // and trip the browser's five-minute no-progress timeout.
       const keepaliveInterval = setInterval(() => {
         try {
-          reply.raw.write(": keepalive\n\n");
+          sendFrame(JSON.stringify({ type: "heartbeat" }));
         } catch {
           clearInterval(keepaliveInterval);
         }
       }, 20_000);
 
-      // ── Replay on connect ────────────────────────────────────
-      // 1. Check the terminal cache in Redis
-      try {
-        const cached = await sharedRedis().get(terminalKey(jobId));
-        if (cached) {
-          sendFrame(cached);
-          clearInterval(keepaliveInterval);
-          reply.raw.end();
-          return;
-        }
-      } catch {
-        // Redis may be unavailable; fall through to DB
-      }
-
-      // 2. Check the durable DB row for terminal state
-      try {
-        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-        if (
-          row &&
-          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
-        ) {
-          // Synthesize a legacy event from the DB row
-          let syntheticJson: string;
-          if (row.type === "single") {
-            const phase = row.status === "completed" ? "complete" : "failed";
-            const errorMsg = (row.error as { message?: string } | null)?.message;
-            syntheticJson = JSON.stringify({
-              jobId,
-              type: "single",
-              phase,
-              percent: phase === "complete" ? 100 : 0,
-              ...(errorMsg ? { error: errorMsg } : {}),
-            });
-          } else {
-            syntheticJson = JSON.stringify({
-              jobId,
-              type: "batch",
-              status: row.status === "canceled" ? "failed" : row.status,
-              totalFiles: 0,
-              completedFiles: 0,
-              failedFiles: 0,
-              errors: [],
-            });
-          }
-          sendFrame(syntheticJson);
-          clearInterval(keepaliveInterval);
-          reply.raw.end();
-          return;
-        }
-      } catch {
-        // DB unavailable; fall through to live stream
-      }
-
-      // 3. Live-stream: subscribe to updates for this jobId
+      // Subscribe before replaying Redis/DB state. Otherwise a terminal event
+      // published after the cache read but before listener registration can be
+      // missed forever even though both transport layers behaved correctly.
       let ended = false;
 
       const callback: FrameCallback = (json: string) => {
@@ -375,17 +432,21 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
           if (isTerminal) {
             ended = true;
             clearInterval(keepaliveInterval);
-            const subs = sseListeners.get(jobId);
-            if (subs) {
-              subs.delete(callback);
-              if (subs.size === 0) sseListeners.delete(jobId);
-            }
+            removeListener();
             reply.raw.end();
           }
         } catch {
           // Parse failure; keep streaming
         }
       };
+
+      function removeListener() {
+        const subs = sseListeners.get(jobId);
+        if (subs) {
+          subs.delete(callback);
+          if (subs.size === 0) sseListeners.delete(jobId);
+        }
+      }
 
       if (!sseListeners.has(jobId)) {
         sseListeners.set(jobId, new Set());
@@ -396,12 +457,58 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       request.raw.on("close", () => {
         ended = true;
         clearInterval(keepaliveInterval);
-        const subs = sseListeners.get(jobId);
-        if (subs) {
-          subs.delete(callback);
-          if (subs.size === 0) sseListeners.delete(jobId);
-        }
+        removeListener();
       });
+
+      // ── Replay on connect ────────────────────────────────────
+      // 1. Check the terminal cache in Redis. A concurrent live event may
+      // settle the response while this await is in flight, so re-check ended.
+      try {
+        const cached = await sharedRedis().get(terminalKey(jobId));
+        if (ended) return;
+        if (cached) {
+          callback(cached);
+          if (ended) return;
+        }
+      } catch {
+        // Redis may be unavailable; fall through to DB/live updates.
+      }
+
+      // 2. Check the durable DB row for terminal state. The listener remains
+      // active throughout, closing both replay/live race windows.
+      try {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        if (ended) return;
+        if (
+          row &&
+          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
+        ) {
+          let syntheticJson: string;
+          if (row.type !== "batch") {
+            syntheticJson = JSON.stringify(
+              buildSingleFileReplayEvent({
+                jobId,
+                status: row.status,
+                progress: row.progress,
+                error: row.error,
+              }),
+            );
+          } else {
+            syntheticJson = JSON.stringify({
+              jobId,
+              type: "batch",
+              status: row.status === "canceled" ? "failed" : row.status,
+              totalFiles: 0,
+              completedFiles: 0,
+              failedFiles: 0,
+              errors: [],
+            });
+          }
+          callback(syntheticJson);
+        }
+      } catch {
+        // DB unavailable; the listener continues with live updates.
+      }
     },
   );
 }

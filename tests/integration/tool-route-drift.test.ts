@@ -32,8 +32,6 @@ const REGISTRY_EXEMPT = new Set([
   "image-to-base64",
   "image-to-pdf",
   "info",
-  "ocr",
-  "ocr-pdf",
   "pdf-to-image",
   "qr-generate",
   "sign-pdf",

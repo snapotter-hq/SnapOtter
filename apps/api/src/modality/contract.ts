@@ -37,6 +37,14 @@ export interface InputHandler {
        * damaged inputs (e.g. repair-pdf).
        */
       lenient?: boolean;
+      /** Reject encrypted PDFs when the consuming tool has no password input. */
+      rejectPasswordProtected?: boolean;
+      /** Reject images whose decoded dimensions exceed this pixel count. */
+      maxPixels?: number;
+      /** Reject images whose decoded width or height exceeds this side length. */
+      maxDimension?: number;
+      /** Abort validation, external decoders, and normalization with the job. */
+      signal?: AbortSignal;
     },
   ): Promise<PreparedInput>;
 }

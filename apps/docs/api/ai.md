@@ -4,7 +4,9 @@ description: AI engine reference with all local ML tools. Background removal, up
 
 # AI Engine Reference {#ai-engine-reference}
 
-The `@snapotter/ai` package bridges Node.js to a **persistent Python sidecar** for all ML operations. The dispatcher process stays alive between requests for fast warm-start performance. NVIDIA CUDA is auto-detected at startup and used when available; otherwise AI tools run on CPU.
+The `@snapotter/ai` package coordinates native tools and Python runtimes for local ML operations. Most ML tools use a persistent Python sidecar for fast warm starts. OCR is intentionally separate: `fast` invokes the native Tesseract binary, while `balanced` and `best` use a dedicated persistent JSONL dispatcher pinned to the active immutable RapidOCR generation under `/data/ai/v3`. Each request holds a generation lease. During an upgrade, SnapOtter runs a smoke test on the candidate before activation, atomically switches to the new dispatcher, then drains the old generation before garbage collection.
+
+NVIDIA CUDA is auto-detected and used by runtimes that support it. OCR uses CPU on every host, including systems with NVIDIA GPUs, avoiding CUDA and driver coupling for this tool.
 
 Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. Mapping `/dev/dri` into a container does not accelerate these Python sidecar tools unless a CUDA-capable NVIDIA GPU is available.
 
@@ -19,15 +21,17 @@ Node.js Tool Route
  @snapotter/ai bridge.ts
       | (stdin/stdout JSON + stderr progress events)
       v
- Python dispatcher (persistent process, "ai" profile)
+ +-- Native Tesseract + Ghostscript (fast image/PDF OCR)
+ |
+ +-- Isolated OCR runtime (persistent JSONL dispatcher)
+ |     `-- RapidOCR + ONNX Runtime CPU + pinned PP-OCR models
+ |
+ `-- Python dispatcher (persistent process, "ai" profile)
       |
       |-- remove_bg.py        (rembg / BiRefNet)
       |-- upscale.py          (RealESRGAN)
       |-- inpaint.py          (LaMa ONNX)
       |-- outpaint.py         (LaMa canvas expansion)
-      |-- ocr.py              (PaddleOCR / Tesseract)
-      |-- ocr_pdf.py          (page-by-page document OCR)
-      |-- ocr_preprocess.py   (image enhancement for OCR)
       |-- detect_faces.py     (MediaPipe)
       |-- face_landmarks.py   (MediaPipe landmarks)
       |-- enhance_faces.py    (GFPGAN / CodeFormer)
@@ -49,7 +53,7 @@ AI models are packaged by shared dependency stack, not one archive per tool. A f
 
 The Docker image ships the application plus the common runtime. Large model archives are downloaded on demand into the persistent `/data/ai` volume, then reused by every tool that needs them. If a bundle is already installed because another tool needed it, enabling a new dependent tool does not download that bundle again.
 
-Each AI tool requires one or more feature bundles before it can run. The admin UI installs by tool through `POST /api/v1/admin/tools/:toolId/features/install`, which resolves the full bundle list, skips bundles that are already installed, and queues only the missing downloads. For example, enabling Passport Photo on a fresh instance queues `background-removal` and `face-detection`; enabling it after Background Removal is already installed queues only `face-detection`.
+Most AI tools require one or more feature bundles before they can run. The admin UI installs those by tool through `POST /api/v1/admin/tools/:toolId/features/install`, which resolves the full bundle list, skips bundles that are already installed, and queues only the missing downloads. For example, enabling Passport Photo on a fresh instance queues `background-removal` and `face-detection`; enabling it after Background Removal is already installed queues only `face-detection`. OCR is the exception because `fast` needs no pack; install its optional accurate runtime through the UI or `POST /api/v1/admin/features/ocr/install`.
 
 | Bundle | Size | Shared dependency group | Tools that use it |
 |--------|------|-------------------------|-------------------|
@@ -58,7 +62,7 @@ Each AI tool requires one or more feature bundles before it can run. The admin U
 | `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
 | `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | scratch repair and restoration pipeline | restore-photo |
-| `ocr` | 5-6 GB | PaddleOCR / Tesseract OCR stack | ocr, ocr-pdf |
+| `ocr` | ~208-234 MiB download / ~409-488 MiB installed | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
 | `transcription` | ~600 MB | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
 
 Tools with cross-bundle dependencies:
@@ -68,13 +72,23 @@ Tools with cross-bundle dependencies:
 | `passport-photo` | `background-removal`, `face-detection` | Removes the background, then uses face landmarks to frame the crop to passport and ID photo rules. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Detects faces before running GFPGAN or CodeFormer enhancement on the selected face regions. |
 
-A tool is available only when all of its required bundles are installed. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
+A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
+
+### Accurate OCR runtime installation {#accurate-ocr-runtime-installation}
+
+The accurate OCR pack is a platform-specific runtime for the official Linux amd64 or Linux arm64 container. The amd64 build uses Python 3.12; the arm64 build uses Python 3.11. Both builds run RapidOCR through ONNX Runtime's `CPUExecutionProvider`, so the same pack works on CPU-only and NVIDIA Docker hosts. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. A system below that signed compatibility minimum is rejected before download. This requirement does not apply to built-in Fast OCR. Bare-metal builds are rejected because their libc and Python ABI cannot be inferred safely; Fast OCR remains available when the host provides Tesseract and Ghostscript. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`). Korean therefore requires a supported accurate runtime and a `balanced` or `best` tier; unsupported hosts receive an explicit incompatibility response rather than a silent Fast fallback.
+
+The optional artifact is about 208-234 MiB compressed and 409-488 MiB extracted, depending on architecture. The signed index binds the exact compressed and extracted byte counts enforced by the installer. Built-in Tesseract adds about 25 MiB to the official image and needs no files in `/data/ai`.
+
+Online installation fetches a signed release index and the exact content-addressed artifact for the current platform. SnapOtter verifies the Ed25519 index signature, artifact size, SHA-256 digest, model digests, paths, file modes, and staged smoke test before atomically activating the new generation. A failed install leaves the prior healthy generation active.
+
+For air-gapped installation, upload both the release's `ocr-runtime-index.json` and matching OCR runtime archive to `POST /api/v1/admin/features/import` using multipart fields named `index` and `archive`. Offline import applies the same signature, hash, extraction, compatibility, and smoke-test checks as online installation; an archive without its trusted signed index is rejected.
 
 ---
 
 ## Background Removal {#background-removal}
 
-**Tool route:** `remove-background`  
+**Tool route:** `remove-background`
 **Model:** rembg with BiRefNet (default) or U2-Net variants
 
 | Parameter | Type | Default | Description |
@@ -95,7 +109,7 @@ A tool is available only when all of its required bundles are installed. Partial
 
 ## Background Replace {#background-replace}
 
-**Tool route:** `background-replace`  
+**Tool route:** `background-replace`
 **Model:** rembg / BiRefNet (shared with remove-background)
 
 Removes the background and replaces it with a solid color or gradient.
@@ -112,7 +126,7 @@ Removes the background and replaces it with a solid color or gradient.
 
 ## Blur Background {#blur-background}
 
-**Tool route:** `blur-background`  
+**Tool route:** `blur-background`
 **Model:** rembg / BiRefNet (shared with remove-background)
 
 Blurs the background while keeping the subject sharp.
@@ -125,7 +139,7 @@ Blurs the background while keeping the subject sharp.
 
 ## Image Upscaling {#image-upscaling}
 
-**Tool route:** `upscale`  
+**Tool route:** `upscale`
 **Model:** RealESRGAN (with Lanczos fallback when unavailable)
 
 | Parameter | Type | Default | Description |
@@ -139,34 +153,38 @@ Blurs the background while keeping the subject sharp.
 
 ## OCR / Text Extraction {#ocr-text-extraction}
 
-**Tool route:** `ocr`  
-**Models:** Tesseract (fast), PaddleOCR PP-OCRv5 (balanced), PaddleOCR-VL 1.5 (best)
+**Tool route:** `ocr`
+**Models:** Tesseract (`fast`); RapidOCR with PP-OCRv6 small models (`balanced`); PP-OCRv6 medium models with calibrated variant scoring (`best`)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Processing tier |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | boolean | `true` | Pre-process image to improve OCR accuracy |
-| `engine` | string | - | Deprecated. Maps `tesseract` to `fast`, `paddleocr` to `balanced` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
+| `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
+| `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
-Returns structured results with bounding boxes, confidence scores, and extracted text blocks.
+Returns extracted text plus provenance metadata: engine, requested and actual quality, device, provider, degradation state, warnings, and accurate-runtime/model versions when applicable. Explicit quality requests never fall back to another tier. If `balanced` or `best` is unavailable, the API returns `FEATURE_NOT_INSTALLED` or `FEATURE_INCOMPATIBLE` instead of silently running `fast`. Explicit Fast or legacy `tesseract` with Korean returns `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, and accurate-pack guidance before a job is queued.
 
 ## PDF OCR {#pdf-ocr}
 
-**Tool route:** `ocr-pdf`  
+**Tool route:** `ocr-pdf`
 **Models:** Same tier system as image OCR
 
 Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Processing tier |
-| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamic | Processing tier. Omitted quality selects the highest available tier in this order: `best`, `balanced`, `fast`. Korean never selects `fast`; without an accurate tier it returns the accurate-runtime install or compatibility error |
+| `language` | string | `"auto"` | Language: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`. Fast does not support `ko` |
 | `pages` | string | `"all"` | Page selection: `"all"`, `"1-3"`, `"1,3,5"` |
+| `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
+| `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
+
+The same no-downgrade and Korean compatibility rules apply to PDF OCR. PDF pages are rasterized before recognition, and one request can select at most 50 pages.
 
 ## Face / PII Blur {#face-pii-blur}
 
-**Tool route:** `blur-faces`  
+**Tool route:** `blur-faces`
 **Model:** MediaPipe face detection
 
 | Parameter | Type | Default | Description |
@@ -176,7 +194,7 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 
 ## Face Enhancement {#face-enhancement}
 
-**Tool route:** `enhance-faces`  
+**Tool route:** `enhance-faces`
 **Models:** GFPGAN, CodeFormer
 
 | Parameter | Type | Default | Description |
@@ -188,7 +206,7 @@ Extracts text from scanned PDF documents using AI-powered OCR, page by page.
 
 ## AI Colorization {#ai-colorization}
 
-**Tool route:** `colorize`  
+**Tool route:** `colorize`
 **Model:** DDColor (with OpenCV DNN fallback)
 
 Converts black-and-white or grayscale photos to full color.
@@ -200,7 +218,7 @@ Converts black-and-white or grayscale photos to full color.
 
 ## Noise Removal {#noise-removal}
 
-**Tool route:** `noise-removal`  
+**Tool route:** `noise-removal`
 **Model:** SCUNet (tiered denoising pipeline)
 
 | Parameter | Type | Default | Description |
@@ -243,7 +261,7 @@ Multi-step pipeline for old or damaged photos: scratch/tear detection and repair
 
 ## Passport Photo {#passport-photo}
 
-**Tool route:** `passport-photo`  
+**Tool route:** `passport-photo`
 **Models:** MediaPipe face landmarks + BiRefNet background removal
 
 Two-phase workflow: analyze (detect face + remove background) then generate (crop, resize, tile). Supports 37+ countries across 6 regions.
@@ -281,7 +299,7 @@ Accepts a JSON body with the Phase 1 results plus generation settings:
 
 ## Object Erasing (Inpainting) {#object-erasing-inpainting}
 
-**Tool route:** `erase-object`  
+**Tool route:** `erase-object`
 **Model:** LaMa via ONNX Runtime
 
 The mask is sent as a **second file part** (fieldname `mask`), not as base64. White pixels in the mask indicate areas to erase. The `format` and `quality` settings are sent as top-level form fields.
@@ -297,7 +315,7 @@ CUDA-accelerated when an NVIDIA GPU is available.
 
 ## AI Canvas Expand {#ai-canvas-expand}
 
-**Tool route:** `ai-canvas-expand`  
+**Tool route:** `ai-canvas-expand`
 **Model:** LaMa-based outpainting
 
 Expands the canvas of an image in any direction and fills new areas with AI-generated content that matches the existing image.
@@ -316,7 +334,7 @@ At least one extend direction must be greater than 0.
 
 ## Smart Crop {#smart-crop}
 
-**Tool route:** `smart-crop`  
+**Tool route:** `smart-crop`
 **Model:** MediaPipe face detection (face mode only)
 
 | Parameter | Type | Default | Description |
@@ -347,7 +365,7 @@ Legacy `mode` values `attention` and `content` are accepted and mapped to `subje
 
 ## Transcribe Audio {#transcribe-audio}
 
-**Tool route:** `transcribe-audio`  
+**Tool route:** `transcribe-audio`
 **Model:** faster-whisper
 
 Converts speech to text. Supports plain text, SRT, and VTT output formats.
@@ -359,7 +377,7 @@ Converts speech to text. Supports plain text, SRT, and VTT output formats.
 
 ## Auto Subtitles {#auto-subtitles}
 
-**Tool route:** `auto-subtitles`  
+**Tool route:** `auto-subtitles`
 **Model:** faster-whisper (extracts audio from video, then transcribes)
 
 Generates subtitle files from a video's audio track.
@@ -371,7 +389,7 @@ Generates subtitle files from a video's audio track.
 
 ## PNG Transparency Fixer {#png-transparency-fixer}
 
-**Tool route:** `transparency-fixer`  
+**Tool route:** `transparency-fixer`
 **Model:** BiRefNet HR-matting (2048x2048 resolution)
 
 Fixes "fake transparent" PNGs where the background was removed but left behind fringing, halos, or semi-transparent artifacts. Uses BiRefNet's high-resolution matting model to produce a clean alpha channel, then applies configurable defringe processing to remove color contamination along edges.
@@ -399,7 +417,7 @@ The following tools are not Python sidecar tools but use AI features when certai
 
 ### Image Enhancement {#image-enhancement}
 
-**Tool route:** `image-enhancement`  
+**Tool route:** `image-enhancement`
 **Engine:** Analysis-based (Sharp histogram and statistics)
 
 Analyzes the image and applies automatic corrections for exposure, contrast, white balance, saturation, sharpness, and noise. Supports scene-specific modes.
@@ -420,7 +438,7 @@ An additional analysis endpoint is available at `POST /api/v1/tools/image/image-
 
 ### Content-Aware Resize (Seam Carving) {#content-aware-resize-seam-carving}
 
-**Tool route:** `content-aware-resize`  
+**Tool route:** `content-aware-resize`
 **Engine:** Go `caire` binary (not Python - no GPU benefit)
 
 Intelligently resizes images by removing low-energy seams, preserving important content.

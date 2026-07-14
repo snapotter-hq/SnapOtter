@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage: verify-bundle.sh <bundleId> <arch>
 #
 #   bundleId  - One of: background-removal, face-detection, object-eraser-colorize,
-#               upscale-enhance, photo-restoration, ocr, transcription
+#               upscale-enhance, photo-restoration, transcription
 #   arch      - Architecture variant: amd64-gpu or arm64-cpu
 #
 # Expects:
@@ -30,7 +30,7 @@ STAGING="/tmp/verify-staging"
 
 VENV="/opt/venv"
 PYTHON="${VENV}/bin/python3"
-SITE_PACKAGES="${VENV}/lib/python3.11/site-packages"
+SITE_PACKAGES="$("${PYTHON}" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 
 export MODELS_PATH="${MODELS_PATH:-/tmp/verify-models}"
 export U2NET_HOME="${MODELS_PATH}/rembg"
@@ -171,11 +171,7 @@ case "${BUNDLE_ID}" in
     check_imports "torch onnxruntime mediapipe"
     ;;
   ocr)
-    # scipy/scikit-learn ship inside this bundle via paddleocr's dependency
-    # closure. Importing them here (not just paddleocr) catches a numpy-2.x-ABI
-    # strand on the numpy==1.26.4 base; the "numpy.dtype size changed" class
-    # that a paddleocr-only import misses because paddle lazy-loads them.
-    check_imports "paddleocr paddle scipy sklearn"
+    fail "OCR v3 runtimes must use verify-ocr-runtime.sh" 2
     ;;
   transcription)
     check_imports "faster_whisper"
@@ -194,10 +190,10 @@ log "Phase 4: Functional Smoke Tests"
 AI_SCRIPTS="/app/packages/ai/python"
 
 smoke_background_removal() {
-  local input="/fixtures/test-200x150.png"
+  local input="/fixtures/image/valid/test-200x150.png"
   [[ -f "$input" ]] || fail "Fixture missing: $input" 3
   local output="/tmp/verify-smoke-rembg.png"
-  timeout 300 run_python "${AI_SCRIPTS}/remove_bg.py" "${input}" "${output}" 2>/dev/null || true
+  timeout 300 "${PYTHON}" "${AI_SCRIPTS}/remove_bg.py" "${input}" "${output}" 2>/dev/null || true
   [[ -f "${output}" && -s "${output}" ]] || fail "remove_bg output missing or empty" 3
   # Verify it's a valid PNG (check magic bytes)
   run_python -c "
@@ -211,10 +207,10 @@ if magic[:4] != b'\\x89PNG':
 }
 
 smoke_face_detection() {
-  local input="/fixtures/sample-photo.jpg"
+  local input="/fixtures/image/valid/sample-photo.jpg"
   [[ -f "$input" ]] || fail "Fixture missing: $input" 3
   local output="/tmp/verify-smoke-faces.png"
-  timeout 300 run_python "${AI_SCRIPTS}/detect_faces.py" "${input}" "${output}" 2>/dev/null || true
+  timeout 300 "${PYTHON}" "${AI_SCRIPTS}/detect_faces.py" "${input}" "${output}" 2>/dev/null || true
   [[ -f "${output}" ]] || fail "detect_faces output missing" 3
   pass "detect_faces produced output"
 }
@@ -228,16 +224,16 @@ from PIL import Image
 img = Image.new('L', (64, 64), 128)
 img.save('${input}')
 " 2>/dev/null
-  timeout 300 run_python "${AI_SCRIPTS}/colorize.py" "${input}" "${output}" '{"model":"ddcolor"}' 2>/dev/null || true
+  timeout 300 "${PYTHON}" "${AI_SCRIPTS}/colorize.py" "${input}" "${output}" '{"model":"ddcolor"}' 2>/dev/null || true
   [[ -f "${output}" && -s "${output}" ]] || fail "colorize output missing or empty" 3
   pass "colorize produced output"
 }
 
 smoke_upscale_enhance() {
-  local input="/fixtures/test-100x100.jpg"
+  local input="/fixtures/image/valid/test-100x100.jpg"
   [[ -f "$input" ]] || fail "Fixture missing: $input" 3
   local output="/tmp/verify-smoke-upscale.png"
-  timeout 300 run_python "${AI_SCRIPTS}/upscale.py" "${input}" "${output}" '{"scale":2}' 2>/dev/null || true
+  timeout 300 "${PYTHON}" "${AI_SCRIPTS}/upscale.py" "${input}" "${output}" '{"scale":2}' 2>/dev/null || true
   [[ -f "${output}" && -s "${output}" ]] || fail "upscale output missing or empty" 3
   run_python -c "
 from PIL import Image
@@ -252,51 +248,19 @@ print(f'  Upscale: {inp.size} -> {out.size}')
 }
 
 smoke_photo_restoration() {
-  local input="/fixtures/test-100x100.jpg"
+  local input="/fixtures/image/valid/test-100x100.jpg"
   [[ -f "$input" ]] || fail "Fixture missing: $input" 3
   local output="/tmp/verify-smoke-restore.png"
-  timeout 300 run_python "${AI_SCRIPTS}/restore.py" "${input}" "${output}" 2>/dev/null || true
+  timeout 300 "${PYTHON}" "${AI_SCRIPTS}/restore.py" "${input}" "${output}" 2>/dev/null || true
   [[ -f "${output}" && -s "${output}" ]] || fail "restore output missing or empty" 3
   pass "restore produced output"
 }
 
-smoke_ocr() {
-  local input="/tmp/verify-smoke-ocr.png"
-  # Generate a 400x100 image with large, clear text for reliable OCR
-  run_python -c "
-from PIL import Image, ImageDraw, ImageFont
-img = Image.new('RGB', (400, 100), 'white')
-draw = ImageDraw.Draw(img)
-try:
-    font = ImageFont.load_default(size=40)
-except TypeError:
-    font = ImageFont.load_default()
-draw.text((20, 20), 'Hello SnapOtter', fill='black', font=font)
-img.save('${input}')
-" 2>/dev/null
-  local result
-  result="$(timeout 300 run_python "${AI_SCRIPTS}/ocr.py" "${input}" '{"quality":"balanced","enhance":false}' 2>/dev/null)" || result=""
-  # Check stdout JSON has success=true and non-empty text
-  echo "${result}" | run_python -c "
-import json, sys
-data = json.load(sys.stdin)
-if not data.get('success'):
-    print('OCR did not return success=true', file=sys.stderr)
-    sys.exit(1)
-text = data.get('text', '')
-if not text.strip():
-    print('OCR returned empty text', file=sys.stderr)
-    sys.exit(1)
-print(f'  OCR text: {text[:80]}')
-" || fail "OCR smoke test assertion failed" 3
-  pass "ocr returned valid result"
-}
-
 smoke_transcription() {
-  local input="/fixtures/content/speech-10s.wav"
+  local input="/fixtures/audio/valid/speech-10s.wav"
   [[ -f "$input" ]] || fail "Fixture missing: $input" 3
   local result
-  result="$(timeout 300 run_python "${AI_SCRIPTS}/transcribe.py" "${input}" 2>/dev/null)" || result=""
+  result="$(timeout 300 "${PYTHON}" "${AI_SCRIPTS}/transcribe.py" "${input}" 2>/dev/null)" || result=""
   # Check stdout JSON has success=true and non-empty segments
   echo "${result}" | run_python -c "
 import json, sys
@@ -319,7 +283,7 @@ case "${BUNDLE_ID}" in
   object-eraser-colorize) smoke_object_eraser_colorize ;;
   upscale-enhance)       smoke_upscale_enhance ;;
   photo-restoration)     smoke_photo_restoration ;;
-  ocr)                   smoke_ocr ;;
+  ocr)                   fail "OCR v3 runtimes must use verify-ocr-runtime.sh" 2 ;;
   transcription)         smoke_transcription ;;
 esac
 

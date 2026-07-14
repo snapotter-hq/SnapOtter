@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   qpdfAvailable,
@@ -12,6 +12,63 @@ import { type InputHandler, InputValidationError, type PreparedInput } from "./c
 
 const ZIP_MAGIC = Buffer.from("PK");
 
+export interface PdfPathValidationOptions {
+  lenient?: boolean;
+  rejectPasswordProtected?: boolean;
+  signal?: AbortSignal;
+}
+
+/** Validate a PDF in place so large callers never need a Node.js Buffer. */
+export async function validatePdfPath(
+  filePath: string,
+  opts: PdfPathValidationOptions = {},
+): Promise<void> {
+  opts.signal?.throwIfAborted();
+  const handle = await open(filePath, "r");
+  try {
+    const header = Buffer.alloc(5);
+    const { bytesRead } = await handle.read(header, 0, header.length, 0);
+    if (bytesRead === 0) throw new InputValidationError("Empty file");
+    if (bytesRead < header.length || header.toString() !== "%PDF-") {
+      throw new InputValidationError("File does not start with a PDF header");
+    }
+  } finally {
+    await handle.close();
+  }
+
+  opts.signal?.throwIfAborted();
+  if (opts.lenient || !qpdfAvailable()) return;
+
+  const passwordProtected = await qpdfRequiresPassword(filePath);
+  opts.signal?.throwIfAborted();
+  if (passwordProtected) {
+    if (opts.rejectPasswordProtected) {
+      throw new InputValidationError("Password-protected PDFs cannot be processed by this tool");
+    }
+    // Without a password qpdf cannot safely inspect the structure or pages.
+    return;
+  }
+
+  try {
+    await qpdfCheck(filePath);
+  } catch (err) {
+    throw new InputValidationError(
+      `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
+    );
+  }
+  opts.signal?.throwIfAborted();
+
+  if (env.MAX_PDF_PAGES > 0) {
+    const pages = await qpdfPageCount(filePath);
+    opts.signal?.throwIfAborted();
+    if (pages > env.MAX_PDF_PAGES) {
+      throw new InputValidationError(
+        `PDF has ${pages} pages, exceeding the maximum of ${env.MAX_PDF_PAGES}`,
+      );
+    }
+  }
+}
+
 /**
  * Documents: header magic + qpdf structural check + page caps for PDFs
  * (spec 4.5/4.7). Office/EPUB containers get a zip-magic sanity check in
@@ -22,11 +79,18 @@ export class DocumentInputHandler implements InputHandler {
   async prepare(
     raw: Buffer,
     filename: string,
-    opts: { scratchDir: string; lenient?: boolean },
+    opts: {
+      scratchDir: string;
+      lenient?: boolean;
+      rejectPasswordProtected?: boolean;
+      signal?: AbortSignal;
+    },
   ): Promise<PreparedInput> {
     if (raw.length === 0) throw new InputValidationError("Empty file");
     const lower = filename.toLowerCase();
-    if (lower.endsWith(".pdf")) {
+    // PDF-only consumers set rejectPasswordProtected. Do not let a misleading
+    // client filename bypass their PDF magic and structural validation.
+    if (opts.rejectPasswordProtected || lower.endsWith(".pdf")) {
       if (raw.subarray(0, 5).toString() !== "%PDF-") {
         throw new InputValidationError("File does not start with a PDF header");
       }
@@ -38,27 +102,7 @@ export class DocumentInputHandler implements InputHandler {
         const p = join(dir, "input.pdf");
         try {
           await writeFile(p, raw);
-          if (await qpdfRequiresPassword(p)) {
-            // Password-protected PDFs are structurally unverifiable without the
-            // password and are legitimate inputs (unlock-pdf). Page caps cannot be
-            // read either; the consuming tool enforces its own limits.
-          } else {
-            try {
-              await qpdfCheck(p);
-            } catch (err) {
-              throw new InputValidationError(
-                `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-              );
-            }
-            if (env.MAX_PDF_PAGES > 0) {
-              const pages = await qpdfPageCount(p);
-              if (pages > env.MAX_PDF_PAGES) {
-                throw new InputValidationError(
-                  `PDF has ${pages} pages, exceeding the maximum of ${env.MAX_PDF_PAGES}`,
-                );
-              }
-            }
-          }
+          await validatePdfPath(p, opts);
         } finally {
           await rm(dir, { recursive: true, force: true }).catch(() => {});
         }

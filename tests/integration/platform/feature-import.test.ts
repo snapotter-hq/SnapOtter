@@ -5,6 +5,7 @@
  * reads it at module load time), then exercises the importBundleArchive
  * helper and the POST /api/v1/admin/features/import endpoint.
  */
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   createReadStream,
@@ -43,6 +44,8 @@ writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
 const {
   importBundleArchive,
   acquireInstallLock,
+  getInstallLockFdForChild,
+  recoverInterruptedInstalls,
   releaseInstallLock,
   invalidateCache,
   ImportLockError,
@@ -188,6 +191,41 @@ function resetState(): void {
   }
 }
 
+async function holdInstallKernelLock(): Promise<() => Promise<void>> {
+  const child = spawn(
+    process.env.PYTHON || "python3",
+    [
+      "-c",
+      [
+        "import fcntl, sys",
+        "handle = open(sys.argv[1], 'a+b')",
+        "fcntl.flock(handle.fileno(), fcntl.LOCK_EX)",
+        "print('ready', flush=True)",
+        "sys.stdin.buffer.read()",
+      ].join("\n"),
+      join(aiDir, "install.flock"),
+    ],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
+  await new Promise<void>((resolve, reject) => {
+    child.stdout?.once("data", () => resolve());
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code !== null) reject(new Error(`Install-lock helper exited early with code ${code}`));
+    });
+  });
+  return async () => {
+    child.stdin?.end();
+    await new Promise<void>((resolve, reject) => {
+      child.once("exit", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Install-lock helper exited with code ${code}`));
+      });
+      child.once("error", reject);
+    });
+  };
+}
+
 // ── Tests ────────────────────────────────────────────────────────
 
 describe("importBundleArchive", () => {
@@ -243,6 +281,18 @@ describe("importBundleArchive", () => {
     await expect(importBundleArchive(stream)).rejects.toThrow(/Unknown bundleId/);
   });
 
+  it("rejects legacy Paddle OCR archives with an actionable v3 migration message", async () => {
+    const archivePath = await buildArchive(
+      { bundleId: "ocr", version: "2.0.0", models: ["legacy-paddle-model"] },
+      [{ path: "legacy-paddle-model", content: Buffer.from("legacy") }],
+    );
+
+    await expect(importBundleArchive(createReadStream(archivePath))).rejects.toThrow(
+      /Legacy OCR.*signed OCR v3/i,
+    );
+    expect(existsSync(join(modelsDir, "legacy-paddle-model"))).toBe(false);
+  });
+
   it("rejects archive without bundle.json", async () => {
     const stagingDir = join(tmpdir(), `snapotter-no-bundle-${randomUUID()}`);
     mkdirSync(stagingDir, { recursive: true });
@@ -270,6 +320,34 @@ describe("importBundleArchive", () => {
     } finally {
       releaseInstallLock();
     }
+  });
+
+  it("uses an explicit inherited lock descriptor without nested acquisition or release", async () => {
+    expect(acquireInstallLock("offline-route-owner")).toBe(true);
+    const installLockFd = getInstallLockFdForChild();
+    const archivePath = await buildArchive(
+      { bundleId: testBundleId, version: testVersion, models: [] },
+      [],
+    );
+
+    try {
+      const result = await importBundleArchive(createReadStream(archivePath), { installLockFd });
+      expect(result).toMatchObject({ bundleId: testBundleId, version: testVersion });
+      expect(acquireInstallLock("must-still-be-owned-by-route")).toBe(false);
+    } finally {
+      releaseInstallLock();
+    }
+  });
+
+  it("rejects an invalid inherited lock descriptor", async () => {
+    const archivePath = await buildArchive(
+      { bundleId: testBundleId, version: testVersion, models: [] },
+      [],
+    );
+
+    await expect(
+      importBundleArchive(createReadStream(archivePath), { installLockFd: -1 }),
+    ).rejects.toThrow(ImportLockError);
   });
 
   it("rejects archive containing a SymbolicLink entry", async () => {
@@ -348,6 +426,7 @@ describe("POST /api/v1/admin/features/import", () => {
     ? R
     : never;
   let token: string;
+  let responseLockObservedHeld: boolean | null = null;
 
   beforeAll(async () => {
     const Fastify = (await import("fastify")).default;
@@ -362,6 +441,13 @@ describe("POST /api/v1/admin/features/import", () => {
       limits: { fileSize: 100 * 1024 * 1024 },
     });
     await app.register(cookie, { secret: "test-cookie-secret", hook: "onRequest" });
+    app.addHook("onSend", async (request, _reply, payload) => {
+      if (request.headers["x-test-probe-install-lock"] !== "1") return payload;
+      const acquired = acquireInstallLock("__response_probe__");
+      responseLockObservedHeld = !acquired;
+      if (acquired) releaseInstallLock();
+      return payload;
+    });
 
     const { authMiddleware, authRoutes, ensureBuiltinRoles, ensureDefaultAdmin } = await import(
       "../../../apps/api/src/plugins/auth.js"
@@ -435,6 +521,114 @@ describe("POST /api/v1/admin/features/import", () => {
     expect(existsSync(join(modelsDir, "fake-endpoint.bin"))).toBe(true);
   });
 
+  it("does not mutate installed state until every multipart part is validated", async () => {
+    const modelName = `no-early-mutation-${randomUUID()}.bin`;
+    const archivePath = await buildArchive(
+      {
+        bundleId: testBundleId,
+        version: testVersion,
+        models: [modelName],
+      },
+      [{ path: modelName, content: Buffer.from("must-not-be-installed") }],
+    );
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "valid-legacy-bundle.tar.gz",
+        contentType: "application/gzip",
+        content: readFileSync(archivePath),
+      },
+      {
+        name: "index",
+        filename: "unexpected-ocr-runtime-index.json",
+        contentType: "application/json",
+        content: Buffer.from("{}"),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/import",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${token}`,
+      },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/Duplicate or mixed OCR runtime index upload/i);
+    expect(JSON.parse(readFileSync(installedPath, "utf-8")).bundles[testBundleId]).toBeUndefined();
+    expect(existsSync(join(modelsDir, modelName))).toBe(false);
+  });
+
+  it("authenticates the signed index before accepting any OCR archive bytes", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "index",
+        filename: "ocr-runtime-index.json",
+        contentType: "application/json",
+        content: Buffer.from("{}"),
+      },
+      {
+        name: "archive",
+        filename: "ocr-runtime.tar.gz",
+        contentType: "application/gzip",
+        content: Buffer.from("archive"),
+      },
+      {
+        name: "extra",
+        filename: "extra.bin",
+        contentType: "application/octet-stream",
+        content: Buffer.from("extra"),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/import",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${token}`,
+      },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/canonical|signed|index|not supported/i);
+    expect(JSON.parse(readFileSync(installedPath, "utf-8")).bundles).toEqual({});
+  });
+
+  it("requires the signed OCR index before the archive multipart field", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "archive",
+        filename: "ocr-runtime.tar.gz",
+        contentType: "application/gzip",
+        content: Buffer.from("archive bytes must not be staged yet"),
+      },
+      {
+        name: "index",
+        filename: "ocr-runtime-index.json",
+        contentType: "application/json",
+        content: Buffer.from("{}"),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/import",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${token}`,
+      },
+      payload: body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/index must be uploaded before.*archive/i);
+  });
+
   it("returns 400 for invalid archive", async () => {
     const { body, contentType } = createMultipartPayload([
       {
@@ -459,6 +653,7 @@ describe("POST /api/v1/admin/features/import", () => {
   });
 
   it("rejects a non-archive upload with 400, not a crash", async () => {
+    responseLockObservedHeld = null;
     const { body, contentType } = createMultipartPayload([
       {
         name: "file",
@@ -474,31 +669,29 @@ describe("POST /api/v1/admin/features/import", () => {
       headers: {
         "content-type": contentType,
         authorization: `Bearer ${token}`,
+        "x-test-probe-install-lock": "1",
       },
       payload: body,
     });
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/not a valid bundle archive/i);
+    expect(responseLockObservedHeld).toBe(false);
   });
 
   it("returns 409 when lock is held", async () => {
-    const locked = acquireInstallLock("blocking-bundle");
-    expect(locked).toBe(true);
+    const releaseExternalLock = await holdInstallKernelLock();
+    const existingUpload = join(aiDir, ".offline-import-v2-live-owner");
+    mkdirSync(existingUpload, { recursive: true });
+    writeFileSync(join(existingUpload, "payload"), "must remain while another owner is live");
 
     try {
-      const archivePath = await buildArchive(
-        { bundleId: testBundleId, version: testVersion, models: [] },
-        [],
-      );
-
-      const archiveBuffer = readFileSync(archivePath);
       const { body, contentType } = createMultipartPayload([
         {
-          name: "file",
-          filename: "locked.tar.gz",
-          contentType: "application/gzip",
-          content: archiveBuffer,
+          name: "index",
+          filename: "invalid-but-must-not-be-parsed.json",
+          contentType: "application/json",
+          content: Buffer.from("not a signed index"),
         },
       ]);
 
@@ -513,8 +706,11 @@ describe("POST /api/v1/admin/features/import", () => {
       });
 
       expect(res.statusCode).toBe(409);
+      expect(existsSync(existingUpload)).toBe(true);
     } finally {
-      releaseInstallLock();
+      await releaseExternalLock();
     }
+    expect(recoverInterruptedInstalls()).toBe(true);
+    expect(existsSync(existingUpload)).toBe(false);
   });
 });

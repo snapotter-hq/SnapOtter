@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter Docker imaj etiketleri, GPU karşılaştırmaları, sürüm sabitleme ve AMD64 ile ARM64 için çoklu platform desteği."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: ad7046cd45ce
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker İmajı {#docker-image}
@@ -41,7 +41,6 @@ Intel/AMD iGPU hızlandırması, VA-API, Quick Sync veya OpenCL aracılığıyla
 | Arka plan kaldırma (isnet) | 2.457ms | 1.137ms | 2,2x |
 | 2x büyütme | 350ms | 309ms | 1,1x |
 | 4x büyütme | 910ms | 310ms | 2,9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1,5x |
 | Yüz bulanıklaştırma | 139ms | 122ms | 1,1x |
 
 #### Soğuk başlangıç (konteyner başlangıcından sonraki ilk istek) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ Intel/AMD iGPU hızlandırması, VA-API, Quick Sync veya OpenCL aracılığıyla
 |------|-----|-----|---------|
 | Arka plan kaldırma | 22.286ms | 4.792ms | 4,7x |
 | 2x büyütme | 3.957ms | 2.318ms | 1,7x |
-| OCR (PaddleOCR) | 1.469ms | 1.090ms | 1,3x |
+
+OCR, CUDA karşılaştırmasına dahil değildir. Hem yerleşik Tesseract katmanı hem de isteğe bağlı RapidOCR/ONNX katmanları, konteynerin NVIDIA GPU erişimine sahip olduğu durumlar da dahil olmak üzere CPU kullanır.
 
 ### CUDA sağlık kontrolü {#cuda-health-check}
 

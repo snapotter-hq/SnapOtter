@@ -9,7 +9,7 @@ export interface MultipartFilePart {
   filename: string;
   encoding: string;
   mimetype: string;
-  file: Readable;
+  file: Readable & { truncated?: boolean };
 }
 
 export interface MultipartFieldPart {
@@ -38,13 +38,18 @@ const DONE = Symbol("multipart-done");
  * signal (a client abort surfaces as an "error" on the stream and as a
  * truncated-part error from busboy).
  */
-export async function* multipartParts(request: FastifyRequest): AsyncGenerator<MultipartPart> {
+export async function* multipartParts(
+  request: FastifyRequest,
+  limits: { fileSize?: number; files?: number } = {},
+): AsyncGenerator<MultipartPart> {
   const raw = request.raw;
   const bb = new Busboy({
     headers: raw.headers as BusboyHeaders,
     limits: {
-      fileSize: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
-      files: env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined,
+      fileSize:
+        limits.fileSize ??
+        (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined),
+      files: limits.files ?? (env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined),
     },
   });
 

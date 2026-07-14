@@ -1,8 +1,8 @@
 ---
 description: "Теги Docker-образа SnapOtter, тесты производительности GPU, закрепление версий и поддержка нескольких платформ для AMD64 и ARM64."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 4aa9a90eb109
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker-образ {#docker-image}
@@ -41,7 +41,6 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 | Удаление фона (isnet) | 2 457 мс | 1 137 мс | 2.2x |
 | Увеличение 2x | 350 мс | 309 мс | 1.1x |
 | Увеличение 4x | 910 мс | 310 мс | 2.9x |
-| OCR (PaddleOCR) | 137 мс | 94 мс | 1.5x |
 | Размытие лиц | 139 мс | 122 мс | 1.1x |
 
 #### Холодный старт (первый запрос после запуска контейнера) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 |------|-----|-----|---------|
 | Удаление фона | 22 286 мс | 4 792 мс | 4.7x |
 | Увеличение 2x | 3 957 мс | 2 318 мс | 1.7x |
-| OCR (PaddleOCR) | 1 469 мс | 1 090 мс | 1.3x |
+
+OCR не включен в сравнение CUDA. Как встроенный уровень Tesseract, так и дополнительные уровни RapidOCR/ONNX используют CPU, в том числе, когда контейнер имеет доступ NVIDIA GPU.
 
 ### Проверка состояния CUDA {#cuda-health-check}
 

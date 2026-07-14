@@ -7,8 +7,6 @@
  * path traversal, missing auth, type confusion, and boundary conditions.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -2756,6 +2754,7 @@ describe("Pipeline", () => {
       expect(toolIds).toContain("upscale");
       expect(toolIds).toContain("blur-faces");
       expect(toolIds).toContain("noise-removal");
+      expect(toolIds).toContain("ocr");
     });
 
     it("excludes tools that are not pipeline-compatible", async () => {
@@ -2765,7 +2764,6 @@ describe("Pipeline", () => {
         headers: { authorization: `Bearer ${adminToken}` },
       });
       const { toolIds } = JSON.parse(res.body);
-      expect(toolIds).not.toContain("ocr");
       expect(toolIds).not.toContain("erase-object");
       expect(toolIds).not.toContain("info");
       expect(toolIds).not.toContain("collage");
@@ -2773,31 +2771,59 @@ describe("Pipeline", () => {
     });
   });
 
-  describe("Pipeline rejects incompatible tools", () => {
-    const customRouteTools = ["ocr", "erase-object"];
+  describe("Custom-route pipeline compatibility", () => {
+    it("runs bundle-independent Fast OCR as a terminal pipeline step", async () => {
+      const pipeline = {
+        steps: [{ toolId: "ocr", settings: { quality: "fast", language: "en" } }],
+      };
 
-    for (const toolId of customRouteTools) {
-      it(`returns 400 when pipeline uses "${toolId}" (custom-route tool)`, async () => {
-        const pipeline = { steps: [{ toolId, settings: {} }] };
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "ocr.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "pipeline", content: JSON.stringify(pipeline) },
+      ]);
 
-        const { body: payload, contentType } = createMultipartPayload([
-          { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
-          { name: "pipeline", content: JSON.stringify(pipeline) },
-        ]);
-
-        const res = await app.inject({
-          method: "POST",
-          url: "/api/v1/pipeline/execute",
-          headers: {
-            authorization: `Bearer ${adminToken}`,
-            "content-type": contentType,
-          },
-          payload,
-        });
-        expect(res.statusCode).toBe(400);
-        expect(JSON.parse(res.body).error).toContain("not found");
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/execute",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
       });
-    }
+      // Native contributors without Tesseract get an actionable execution
+      // error, but Fast must be registered and must never return the optional
+      // accurate-pack 400/501 gate.
+      expect([200, 422]).toContain(res.statusCode);
+      if (res.statusCode === 200) {
+        const body = JSON.parse(res.body);
+        expect(body.stepsCompleted).toBe(1);
+        expect(body.downloadUrl).toContain("_ocr.txt");
+      } else {
+        expect(JSON.parse(res.body).error).toMatch(/Tesseract/i);
+      }
+    });
+
+    it('returns 400 when pipeline uses "erase-object" (custom-route tool)', async () => {
+      const pipeline = { steps: [{ toolId: "erase-object", settings: {} }] };
+
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "pipeline", content: JSON.stringify(pipeline) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/execute",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toContain("not found");
+    });
   });
 });
 
@@ -2806,10 +2832,10 @@ describe("Pipeline", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("OCR API", () => {
   describe("POST /api/v1/tools/image/ocr", () => {
-    it("accepts quality param and returns text without engine field", async () => {
+    it("accepts Fast quality and returns truthful execution metadata on success", async () => {
       const { body: payload, contentType } = createMultipartPayload([
         { name: "file", filename: "ocr-test.png", contentType: "image/png", content: PNG_200x150 },
-        { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
       ]);
 
       const res = await app.inject({
@@ -2822,15 +2848,24 @@ describe("OCR API", () => {
         payload,
       });
 
-      // OCR may fail with 422 if Python sidecar/engines are not installed (CI),
-      // or 501 if the OCR feature bundle is not installed
+      // Fast OCR is bundle-independent. A native environment may still return
+      // 422 when its Tesseract executable/language pack is unavailable, but it
+      // must never be gated on the optional accurate-OCR pack.
       if (res.statusCode === 200) {
         const body = JSON.parse(res.body);
         expect(body.text).toBeDefined();
         expect(body.jobId).toBeDefined();
-        expect(body).not.toHaveProperty("engine");
+        expect(body).toMatchObject({
+          engine: "tesseract",
+          provider: "native",
+          requestedQuality: "fast",
+          actualQuality: "fast",
+        });
       } else {
-        expect([422, 501]).toContain(res.statusCode);
+        expect(res.statusCode).toBe(422);
+        const body = JSON.parse(res.body);
+        expect(body.error).toBe("OCR failed");
+        expect(body.details).toMatch(/Tesseract|traineddata|language pack/i);
       }
     });
 
@@ -2857,8 +2892,13 @@ describe("OCR API", () => {
 
       // Should not be a 400 — engine param must still be accepted
       expect(res.statusCode).not.toBe(400);
-      // Either succeeds (200), OCR engine unavailable (422), or feature not installed (501)
-      expect([200, 422, 501]).toContain(res.statusCode);
+      // The legacy Tesseract spelling still selects bundle-independent Fast.
+      expect([200, 422]).toContain(res.statusCode);
+      if (res.statusCode === 422) {
+        const body = JSON.parse(res.body);
+        expect(body.error).toBe("OCR failed");
+        expect(body.details).toMatch(/Tesseract|traineddata|language pack/i);
+      }
     });
 
     it("accepts language auto and enhance params", async () => {
@@ -2900,8 +2940,7 @@ describe("OCR API", () => {
         },
         payload,
       });
-      // 400 when feature is installed, 501 when feature bundle is missing
-      expect([400, 501]).toContain(res.statusCode);
+      expect(res.statusCode).toBe(400);
     });
 
     it("returns 400 when no file is provided", async () => {
@@ -2918,8 +2957,7 @@ describe("OCR API", () => {
         },
         payload,
       });
-      // 400 when feature is installed, 501 when feature bundle is missing
-      expect([400, 501]).toContain(res.statusCode);
+      expect(res.statusCode).toBe(400);
     });
   });
 });
@@ -3260,29 +3298,53 @@ describe("Batch processing", () => {
     });
   });
 
-  describe("Batch rejects incompatible tools", () => {
-    const customRouteTools = ["ocr", "erase-object"];
+  describe("Custom-route batch compatibility", () => {
+    it("runs bundle-independent Fast OCR in a batch", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+      ]);
 
-    for (const toolId of customRouteTools) {
-      it(`returns 404 for batch "${toolId}" (custom-route tool)`, async () => {
-        const { body: payload, contentType } = createMultipartPayload([
-          { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
-          { name: "settings", content: JSON.stringify({}) },
-        ]);
-
-        const res = await app.inject({
-          method: "POST",
-          url: `${apiToolPath(toolId)}/batch`,
-          headers: {
-            authorization: `Bearer ${adminToken}`,
-            "content-type": contentType,
-          },
-          payload,
-        });
-        expect(res.statusCode).toBe(404);
-        expect(JSON.parse(res.body).error).toContain("not found");
+      const res = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("ocr")}/batch`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
       });
-    }
+      expect([200, 422]).toContain(res.statusCode);
+      if (res.statusCode === 200) {
+        expect(res.headers["content-type"]).toBe("application/zip");
+        expect(res.headers["content-disposition"]).toContain("batch-ocr");
+        const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+        expect(fileResults["0"]).toContain("_ocr.txt");
+      } else {
+        const body = JSON.parse(res.body);
+        expect(body.error).toBe("All files failed processing");
+        expect(body.errors?.[0]?.error).toMatch(/Tesseract/i);
+      }
+    });
+
+    it('returns 404 for batch "erase-object" (custom-route tool)', async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("erase-object")}/batch`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body).error).toContain("not found");
+    });
   });
 });
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ve Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: 9e1d14eff40e
+i18n_output_hash: 4fadf7841bd7
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Dağıtım {#deployment}
@@ -11,6 +11,12 @@ SnapOtter, 3 konteynerli bir Docker Compose yığını olarak dağıtılır: Sna
 
 GPU kurulumu, Docker Compose örnekleri ve sürüm sabitleme için [Docker İmajı](./docker-tags) sayfasına bakın.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Korece OCR uyumluluğu
+Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) desteklemez. Korece için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
+:::
+<!-- korean-ocr-contract:end -->
 ## Hızlı Başlangıç (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ Uygulama daha sonra `http://localhost:1349` adresinde kullanılabilir olur.
 
 ## Hızlı Başlangıç (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-AI araçlarında (arka plan kaldırma, ölçek büyütme, yüz iyileştirme, OCR) NVIDIA CUDA hızlandırması için:
+Desteklenen AI araçlarında NVIDIA CUDA hızlandırma için (arka planı kaldırma, yükseltme, yüz geliştirme):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 çekirdek |
 | RAM | 4 GB |
-| Disk | 3 GB (imaj) + 24 GB (AI modelleri) + çalışma alanı |
+| Disk | 3 GB (görüntü) + yaklaşık 20 GB (tüm isteğe bağlı AI paketleri) + çalışma alanı |
 | GPU | Gerekli değil (CPU yedeği) |
 
-**RAM'i 4 GB'a çıkaran şey AI paketlerini kurmaktır.** Hiç AI kurulu değilken uygulama yaklaşık 360 MB'de boşta durur; yedi paketin tamamı kuruluyken ~2,6 GB yerleşik tutar, çünkü Python AI yardımcı işlemi modellerini (arka plan kaldırma, ölçek büyütme, OCR, transkripsiyon, yüz algılama, restorasyon) başlangıçta önceden yükler. AI olmayan kurulumlar hafif kalır; AI kurulumları ≥4 GB gerektirir.
+**Daha büyük AI paketlerini yüklemek ve çalıştırmak, öneriyi 4 GB RAM'ye iten şeydir.** Hiçbir isteğe bağlı paket yüklenmediğinde uygulama 360 MB civarında boşta kalır. Eski Python araçları bir sidecar'yi paylaşırken, doğru OCR, aktif değişmez nesle sabitlenmiş özel, uzun ömürlü bir dispatcher kullanır. Etkinleştirmeden önce yükleyici aday üzerinde bir smoke test çalıştırır. Daha sonra atomik olarak yeni dispatcher'ye geçer ve garbage collection'den önce önceki dispatcher'yi boşaltır. Her resmi doğru OCR yapıtı, en kötü durum release suite'yi 4 GiB cgroup içinde geçmelidir; 4 GB ana bilgisayar önerisi ise Node.js uygulaması, Postgres, Redis, kuyruklar ve eşzamanlı çalışma için boşluk bırakır.
 
 Çoğu AI aracı CPU'da gayet kullanılabilir; birkaçı gerçekten bir GPU ister. Modern bir 4 çekirdekli CPU üzerinde ölçülmüştür:
 
@@ -271,7 +277,7 @@ SnapOtter bu model indirmelerini kasıtlı olarak Docker imajına gömmez. AI pa
 
 Bazı araçlar birden fazla paylaşılan pakete bağımlıdır. Örneğin, Pasaport Fotoğrafı hem `background-removal` hem de `face-detection` gerektirir; `background-removal` zaten kuruluysa, Pasaport Fotoğrafı'nı etkinleştirmek yalnızca eksik `face-detection` paketini indirir. Aynı yeniden kullanım tüm AI araçlarında geçerlidir.
 
-AI model indirme boyutları:
+İsteğe bağlı AI paketi depolama tahminleri:
 
 | Paket | Disk Boyutu |
 |---|---|
@@ -279,9 +285,16 @@ AI model indirme boyutları:
 | Ölçek büyütme + Yüz iyileştirme + Gürültü giderme | 5-6 GB |
 | Yüz algılama | 200-300 MB |
 | Nesne silici + Renklendirme | 1-2 GB |
-| OCR | 5-6 GB |
+| Doğru OCR (`balanced`/`best`) | ~208-234 MiB indir / ~409-488 MiB kuruldu |
 | Fotoğraf restorasyonu | 4-5 GB |
-| **Tüm paketler** | **~24 GB** |
+| Transkripsiyon | ~600MB |
+| **Tüm paketler** | **~20 GB yüklü** |
+
+Hızlı OCR, Tesseract aracılığıyla görüntüye yerleşiktir, yaklaşık 25 MiB ekler ve isteğe bağlı OCR paketini veya 4 GiB bellek gereksinimini gerektirmez. Doğru paket, resmi Linux amd64 ve arm64 kaplarında mevcuttur ve CPU üzerinde ONNX Runtime'yi çalıştırır. NVIDIA ana bilgisayarları aynı CPU OCR çalışma zamanını kullanır, bu nedenle OCR, CUDA sürümüne veya GPU mimarisine bağlı değildir. Doğru çalışma zamanı en az 4 GiB etkili bellek gerektirir: yapılandırılmış kapsayıcı cgroup sınırı, aksi takdirde ana bilgisayar belleği. SnapOtter, paketi indirmeden önce minimum imzalı uyumluluk altındaki sistemleri reddeder. libc ve Python ABI garanti edilemeyen bare-metal/önceden oluşturulmuş arşivlerde de doğru paket kurulumu reddedilir.
+
+Aynı `DATA_DIR` dizinini paylaşan replikalar aynı CPU mimarisini kullanmalıdır; çok replikalı dağıtımları düğüm benzeşimiyle uyumlu düğümlere sabitleyin. Karma amd64/arm64 replikaları için ayrı veri depolama birimleri ve bağımsız SnapOtter dağıtımları gerekir.
+
+Doğru çalışma zamanı, bir aktif nesli tutar ve etkinleştirmeden sonra indirme önbelleğini temizler. Bu sürüm için, ilk kurulumda arşiv artı hazırlama için geçici olarak yaklaşık 620-720 MiB gerekir ve eski nesil aktif kalırken yükseltme 1,2 GiB civarında zirve yapabilir. Yükleyici, indirmeden veya çıkarmadan önce imzalı dizinden ve mevcut nesillerden tam gereksinimi hesaplar ve veri hacmi çok küçükse erken başarısız olur.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Desteklenen her format, kullanılan kod çözücü ve mevcut kalite kontrolleri 
 
 - **İçeriğe duyarlı yeniden boyutlandırma**, caire ikili dosyasındaki bir sınırlama nedeniyle büyük görsellerde (>5 MP) çöker. Daha küçük görsellerle sorunsuz çalışır.
 - **HEIF kod çözme** 13-23 saniye sürer. HEIC (Apple'ın çeşidi) 0,3-0,9 saniye ile çok daha hızlıdır.
-- **OCR Japonca**, bir PaddlePaddle MKLDNN hatası nedeniyle CPU'da başarısız olur. GPU'da çalışır.
 - **Ölçek büyütme**, küçük görseller dışındaki her şey için CPU'da zaman aşımına uğrar. Pratik kullanım için GPU gereklidir.
 - **CodeFormer** yüz iyileştirme, GFPGAN'dan önemli ölçüde daha yavaştır (GPU'da 53sn'ye karşı 2sn). Çoğu kullanım senaryosu için GFPGAN önerilir.
 
@@ -433,6 +445,26 @@ Başlangıç hatası kullanılacak tam UID'yi belirtir, bu nedenle en hızlı yo
 | `CONCURRENT_JOBS` | `0` (otomatik) | Maksimum paralel AI işleme işi |
 | `SESSION_DURATION_HOURS` | `168` | Oturum açma oturumu ömrü (7 gün) |
 | `CORS_ORIGIN` | (boş) | Virgülle ayrılmış izin verilen kaynaklar veya aynı kaynak için boş |
+
+### Giden proxy ve özel CA {#outbound-proxy-and-private-ca}
+
+Resmi kapsayıcı, Node'un ortam proxy desteğini etkinleştirir. SnapOtter'nin OCR çalışma zamanı deposuna veya diğer HTTPS hizmetlerine kurumsal bir proxy aracılığıyla ulaşması gerekiyorsa, `HTTPS_PROXY`'yi (ve gerektiğinde `HTTP_PROXY`) ayarlayın. `NO_PROXY`'yi, Postgres, Redis ve dahili nesne depolama gibi doğrudan ulaşılması gereken ana bilgisayarların virgülle ayrılmış bir listesine ayarlayın.
+
+Proxy veya dahili hizmet özel bir sertifika yetkilisi tarafından imzalanmışsa CA sertifikasını salt okunur olarak bağlayın ve `NODE_EXTRA_CA_CERTS`'yi ona yönlendirin. Düğüm işlemi başladığında dosyanın mevcut olması gerekir:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Proxy kimlik bilgilerini Compose dosyasının dışında tutun (örneğin, korumalı bir `.env` dosyasında veya gizli dosyada). TLS doğrulamasını devre dışı bırakmayın: İmzalı OCR dizini yayın meta verilerinin kimliğini doğrularken, normal TLS doğrulaması hâlâ taşımayı ve diğer tüm giden istekleri korur.
 
 ## Sağlık Kontrolü {#health-check}
 

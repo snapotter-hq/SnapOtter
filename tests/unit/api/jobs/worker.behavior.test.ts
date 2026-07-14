@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const objectStorageMocks = vi.hoisted(() => ({
+  copyObjectToFile: vi.fn(),
+  getObjectBuffer: vi.fn(),
+  getObjectSize: vi.fn(),
+  putObject: vi.fn(),
+}));
+
 async function loadWorker() {
   vi.resetModules();
 
@@ -13,6 +20,7 @@ async function loadWorker() {
     ANALYTICS_EVENTS: {},
     TOOLS: [],
     getBundleForTool: vi.fn(() => null),
+    getOptionalBundleForTool: vi.fn(() => null),
   }));
 
   vi.doMock("bullmq", () => ({
@@ -70,13 +78,13 @@ async function loadWorker() {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
-    getObjectBuffer: vi.fn(),
-    putObject: vi.fn(),
+    ...objectStorageMocks,
   }));
 
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),
+    updateSingleFileProgressAtomically: vi.fn(),
   }));
 
   vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
@@ -116,7 +124,82 @@ async function loadWorker() {
 
 describe("worker result payload behavior", () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.restoreAllMocks();
+  });
+
+  it("rejects an oversized OCR image object before buffering it", async () => {
+    objectStorageMocks.getObjectSize.mockResolvedValueOnce(512 * 1024 * 1024 + 1);
+    const { loadToolInputBuffer } = await loadWorker();
+
+    await expect(loadToolInputBuffer("ocr", "uploads/job-1/input.bin")).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 413,
+    });
+    expect(objectStorageMocks.getObjectBuffer).not.toHaveBeenCalled();
+  });
+
+  it("maps an oversized streamed OCR PDF object to the OCR input limit", async () => {
+    objectStorageMocks.copyObjectToFile.mockRejectedValueOnce(
+      Object.assign(new Error("too large"), { statusCode: 413 }),
+    );
+    const { loadToolInputs } = await loadWorker();
+
+    await expect(
+      loadToolInputs(
+        "ocr-pdf",
+        ["uploads/job-1/scan.pdf"],
+        "scan.pdf",
+        "/tmp/job-1",
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ name: "InputValidationError", statusCode: 413 });
+    expect(objectStorageMocks.getObjectBuffer).not.toHaveBeenCalled();
+  });
+
+  it("loads OCR PDF input as a bounded scratch path without buffering it", async () => {
+    objectStorageMocks.copyObjectToFile.mockResolvedValueOnce(42);
+    const controller = new AbortController();
+    const { loadToolInputs } = await loadWorker();
+
+    await expect(
+      loadToolInputs(
+        "ocr-pdf",
+        ["uploads/job-1/scan.pdf"],
+        "scan.pdf",
+        "/tmp/job-1",
+        controller.signal,
+      ),
+    ).resolves.toEqual({
+      inputs: [],
+      pathInput: { path: "/tmp/job-1/input.pdf", size: 42 },
+      originalSize: 42,
+    });
+
+    expect(objectStorageMocks.copyObjectToFile).toHaveBeenCalledWith(
+      "uploads/job-1/scan.pdf",
+      "/tmp/job-1/input.pdf",
+      {
+        maxBytes: 512 * 1024 * 1024,
+        signal: controller.signal,
+      },
+    );
+    expect(objectStorageMocks.getObjectBuffer).not.toHaveBeenCalled();
+  });
+
+  it("loads OCR objects at the encoded-size boundary and leaves other tools unchanged", async () => {
+    objectStorageMocks.getObjectSize.mockResolvedValueOnce(512 * 1024 * 1024);
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("ocr"));
+    const { loadToolInputBuffer } = await loadWorker();
+
+    await expect(loadToolInputBuffer("ocr", "uploads/job-1/scan.tiff")).resolves.toEqual(
+      Buffer.from("ocr"),
+    );
+    await expect(loadToolInputBuffer("compress", "uploads/job-2/photo.png")).resolves.toEqual(
+      Buffer.from("ocr"),
+    );
+    expect(objectStorageMocks.getObjectSize).toHaveBeenCalledTimes(1);
+    expect(objectStorageMocks.getObjectBuffer).toHaveBeenCalledTimes(2);
   });
 
   it("builds legacy download, preview, saved-file, and tool payload fields", async () => {

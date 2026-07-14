@@ -1,8 +1,8 @@
 ---
 description: "Monorepo-structuur, app- en package-architectuur, request-levenscyclus en resourcegebruik van SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: 5122b85d1d84
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Architectuur {#architecture}
@@ -36,13 +36,13 @@ Dit package heeft geen netwerkafhankelijkheden en draait volledig in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Een brugjlaag die Python-scripts aanroept voor ML-bewerkingen. Bij het eerste gebruik start de brug een persistent Python-dispatcherproces dat zware bibliotheken (PIL, NumPy, MediaPipe, rembg) vooraf importeert, zodat latere AI-aanroepen de importoverhead overslaan. Als de dispatcher nog niet klaar is, valt de brug terug op het opstarten van een verse Python-subprocess per verzoek.
+Een bruglaag die native en Python ML runtimes aanroept. De meeste Python-tools gebruiken een persistente dispatcher die zware bibliotheken (PIL, NumPy, MediaPipe, rembg) vooraf importeert, zodat daaropvolgende oproepen de importoverhead overslaan. OCR is geïsoleerd van die veranderlijke gedeelde omgeving: `fast` roept native Tesseract op, terwijl `balanced` en `best` een speciale persistente JSONL dispatcher gebruiken die is vastgemaakt aan de actieve onveranderlijke RapidOCR/ONNX-generatie. Elk verzoek bevat een generation lease. Bij activering wordt eerst een smoke test op een kandidaat uitgevoerd en vervolgens atomair overgeschakeld naar de dispatcher. De eerdere dispatcher loopt leeg voordat het afval wordt opgehaald.
 
 **Modellen worden niet vooraf geladen.** Elk toolscript laadt zijn modelgewichten bij het verzoek van schijf en verwijdert ze zodra het verzoek klaar is. Zie [Resourcegebruik](#resource-footprint) voor het volledige geheugenprofiel.
 
-Ondersteunde bewerkingen: achtergrondverwijdering (rembg/BiRefNet), upscaling (RealESRGAN), gezichtsvervaging (MediaPipe), gezichtsverbetering (GFPGAN/CodeFormer), objecten wissen (LaMa ONNX), OCR (PaddleOCR/Tesseract), inkleuren (DDColor), ruisverwijdering, rode-ogenverwijdering, fotorestauratie, generatie van pasfoto's, transparantie herstellen (BiRefNet HR-matting) en contentbewust vergroten/verkleinen (Go caire-binary).
+Ondersteunde bewerkingen: achtergrondverwijdering (rembg/BiRefNet), opschaling (RealESRGAN), gezichtsvervaging (MediaPipe), gezichtsverbetering (GFPGAN/CodeFormer), object wissen (LaMa ONNX), OCR (Tesseract en RapidOCR met PP-OCR ONNX-modellen), inkleuring (DDColor), ruisverwijdering, verwijdering van rode ogen, fotoherstel, pasfoto generatie, transparantiefixatie (BiRefNet HR-matting) en inhoudsbewust formaat wijzigen (Go caire binary).
 
-De Python-scripts staan in `packages/ai/python/`. De Docker-image downloadt alle modelgewichten vooraf tijdens de build, zodat de container volledig offline werkt.
+Python-scripts zijn live in `packages/ai/python/`. Grote optionele modelpakketten worden op aanvraag geïnstalleerd in het permanente `/data/ai`-volume. Nauwkeurige OCR maakt gebruik van ondertekende, platformspecifieke artefacten; Voor de ingebouwde Tesseract-laag is geen download van een modelpakket vereist.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Deze VitePress-site. Wordt automatisch uitgerold naar Cloudflare Pages bij een p
 2. De frontend stuurt een multipart POST naar `/api/v1/tools/:section/:toolId` met het bestand en de instellingen.
 3. De API-route valideert de invoer met Zod en start vervolgens de verwerking.
 4. Voor standaardtools wordt de taak in de juiste BullMQ-pool geplaatst (image, media of docs op basis van modaliteit). De in-process BullMQ-worker oriënteert de afbeelding automatisch op basis van EXIF-metadata, voert de procesfunctie van de tool uit en geeft het resultaat terug.
-5. Voor AI-tools stuurt de TypeScript-brug een verzoek naar de persistent Python-dispatcher (of start een verse subprocess als fallback), wacht tot deze klaar is en leest het uitvoerbestand.
+5. Voor de meeste AI-tools stuurt de TypeScript-bridge een verzoek naar de persistente Python dispatcher. Snelle OCR roept in plaats daarvan Tesseract aan, en nauwkeurige OCR start het vastgezette uitvoerbare bestand vanaf de actieve onveranderlijke OCR-generatie. De aangevraagde OCR-laag wordt vastgesteld bij binnenkomst en wordt tijdens de uitvoering nooit stilzwijgend gewijzigd.
 6. Taakvoortgang wordt vastgelegd in de `jobs`-tabel in PostgreSQL, zodat de state herstarts van de container overleeft. Realtime-updates worden geleverd via SSE op `/api/v1/jobs/:jobId/progress`.
 7. De API retourneert een `jobId` en `downloadUrl`. De gebruiker downloadt het verwerkte bestand vanaf `/api/v1/download/:jobId/:filename`.
 

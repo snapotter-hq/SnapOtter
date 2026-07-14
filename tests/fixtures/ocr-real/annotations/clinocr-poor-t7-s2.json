@@ -1,0 +1,21 @@
+{
+  "exactGroundTruth": "HOSPITAL\nOakwood Community Clinic\n450 North Main Street\nMadison, WI 53703\n(608) 555-0102\nPatient Name: Isabella Garcia \nMRN: 9884021 \nDOB: 11/05/1998 \nGender: Female \nAge: 26\nMRN: 9884021 \nAccession: B11269-25 \nDate: 06/20/2025\nThe patient is a 26-year-old female with a history of persistent asthma since childhood. She reports seasonal exacerbations, typically in the spring and fall. Current medications include a daily inhaled corticosteroid and an albuterol inhaler for rescue use, which she reports using 3-4 times per week recently. She has a known allergy to dust mites and pollen. No history of smoking.\nPROCEDURES:\nSpirometry (pre- and post-bronchodilator): Demonstrated a reversible obstructive pattern, consistent with asthma. FEV1 increased by 15% after albuterol administration. \nAllergy Skin Testing: Positive reaction to tree pollen and dust mites. \nChest X-ray (PA and Lateral): Lungs are clear. No acute infiltrate or edema.\nIMPRESSION:\nModerate persistent asthma, sub-optimally controlled based on recent increase in rescue inhaler use.\nAllergic rhinitis.\nPatient Name: Johnathan Smith MRN: 8675309 Age: 67\nElectronically Signed By: Dr. David Chen, M.D. \nDate: 06/23/2025 Time: 08:56",
+  "record": {
+    "doc_id": "poor_t7_s2",
+    "ground_truth": "HOSPITAL\nOakwood Community Clinic\n450 North Main Street\nMadison, WI 53703\n(608) 555-0102\nPatient Name: Isabella Garcia \nMRN: 9884021 \nDOB: 11/05/1998 \nGender: Female \nAge: 26\nMRN: 9884021 \nAccession: B11269-25 \nDate: 06/20/2025\nThe patient is a 26-year-old female with a history of persistent asthma since childhood. She reports seasonal exacerbations, typically in the spring and fall. Current medications include a daily inhaled corticosteroid and an albuterol inhaler for rescue use, which she reports using 3-4 times per week recently. She has a known allergy to dust mites and pollen. No history of smoking.\nPROCEDURES:\nSpirometry (pre- and post-bronchodilator): Demonstrated a reversible obstructive pattern, consistent with asthma. FEV1 increased by 15% after albuterol administration. \nAllergy Skin Testing: Positive reaction to tree pollen and dust mites. \nChest X-ray (PA and Lateral): Lungs are clear. No acute infiltrate or edema.\nIMPRESSION:\nModerate persistent asthma, sub-optimally controlled based on recent increase in rescue inhaler use.\nAllergic rhinitis.\nPatient Name: Johnathan Smith MRN: 8675309 Age: 67\nElectronically Signed By: Dr. David Chen, M.D. \nDate: 06/23/2025 Time: 08:56",
+    "hetero_id": "poor_t8_s1",
+    "homo_id": "poor_t7_s1",
+    "sample": 2,
+    "subset": "poor",
+    "template": 7
+  },
+  "source": {
+    "dataset": "ClinOCR-Bench/ClinOCR-Bench",
+    "globalRowIndex": 42,
+    "repositoryRevision": "cb7c0c48a4f3d1c9054fb6548ccef84768983472",
+    "rowGroup": 0,
+    "rowIndex": 42,
+    "split": "test",
+    "upstreamId": "poor_t7_s2"
+  }
+}

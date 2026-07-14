@@ -58,6 +58,7 @@
       "!**/coverage/",
       "!**/.turbo/",
       "!**/data/",
+      "!**/tests/fixtures/ocr-real/annotations/*.json",
       "!**/tmp/",
       "!**/apps/api/drizzle/",
       "!**/playwright-report/",

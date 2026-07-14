@@ -1584,7 +1584,9 @@ export const sv: TranslationKeys = {
       quality: "Kvalitet",
       enhanceBeforeScanning: "Förstärkt före skanning",
       enhanceHint:
-        "Korrigerar automatiskt skevhet, förstärker kontrast, tar bort brus och uppskalar bilden före skanning för bättre precision.",
+        "Förbättrar lokal kontrast före igenkänning. Snabb använder den direkt; Balanserad och Bäst behåller varianten bara när den kalibrerade poängen förbättrar resultatet.",
+      fastKoreanUnsupported:
+        "Snabb OCR stöder inte koreanska. Installera paketet för exakt OCR och välj Balanserad eller Bäst.",
       language: "Språk",
       autoDetect: "Automatisk detektion",
       extractedText: "Extraherad text",
@@ -3559,11 +3561,18 @@ export const sv: TranslationKeys = {
       uninstall: "Avinstallera",
       installing: "Installerar...",
       importBundle: "Importera paket",
-      importDescription: "Ladda upp ett .tar.gz-paketarkiv exporterat från en annan installation.",
+      importDescription:
+        "Importera en signerad OCR-körning eller ett äldre AI-paket för offlinebruk.",
       importButton: "Importera från fil",
       importing: "Importerar...",
       importSuccess: "Paket importerat.",
       importError: "Paketimport misslyckades: {error}",
+      importType: "Pakettyp",
+      importOcr: "Exakt OCR-paket",
+      importLegacy: "Äldre AI-paket",
+      importOcrIndex: "Signerat OCR-index (.json)",
+      importOcrArchive: "OCR-körningsarkiv (.tar.gz)",
+      importLegacyArchive: "Arkiv för äldre paket (.tar.gz)",
       resetTitle: "Återställ AI-miljö",
       resetDescription:
         "Tar bort alla installerade AI-funktioner och nedladdade modeller, och börjar sedan om från grunden. Använd det här om AI-verktyg beter sig oväntat efter en uppdatering och det inte hjälper att installera om ett paket.",

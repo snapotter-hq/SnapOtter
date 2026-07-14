@@ -1,8 +1,8 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: a4289adc1b56
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST API 레퍼런스 {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | `model`, `backgroundType`(transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | 이미지 업스케일 | RealESRGAN | `scale`(2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | 오브젝트 지우개 | LaMa(ONNX) | 마스크는 두 번째 파일 파트로 전송(필드명 `mask`), `format`, `quality` |
-| `ocr` | OCR / 텍스트 추출 | PaddleOCR / Tesseract | `quality`(fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / 텍스트 추출 | Tesseract(빠름); RapidOCR + PP-OCR ONNX(균형 잡힌/최고) | `quality`(빠름/균형/최고), `language`, `enhance` |
 | `blur-faces` | 얼굴 / PII 블러 | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | 스마트 자르기 | MediaPipe + Sharp | `mode`(subject/face/trim), `strategy`(attention/entropy), `width`, `height`, `padding`, `facePreset`(closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | 이미지 향상 | 분석 기반 | `mode`(auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## 배치 처리 {#batch-processing}
 
-제네릭 배치 지원 도구를 여러 파일에 한 번에 적용합니다. ZIP 아카이브를 반환합니다. PDF 서명, PDF OCR, PDF를 이미지로 변환하는 프리셋 경로와 같은 커스텀 다중 파일 또는 다단계 경로는 제네릭 `/batch` 경로 대신 자체 엔드포인트 계약을 사용합니다.
+제네릭 배치 지원 도구를 여러 파일에 한 번에 적용합니다. ZIP 아카이브를 반환합니다. PDF 서명 및 PDF를 이미지로 변환하는 프리셋 경로와 같은 커스텀 다중 파일 또는 다단계 경로는 제네릭 `/batch` 경로 대신 자체 엔드포인트 계약을 사용합니다.
+
+`ocr-pdf` 도구는 이 제네릭 `/batch` 경로를 지원합니다.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 AI 기능 번들 관리(Docker 환경에서 AI 모델 패키지 설치/제거). 커스텀 자동화에서 도구를 활성화할 때는 도구 수준 설치 엔드포인트를 선호하세요: 일부 AI 도구는 둘 이상의 공유 번들이 필요하며, 이 엔드포인트는 이미 설치된 번들을 건너뛰고 누락된 번들만 큐에 넣습니다.
 
+OCR 는 하드 종속성이 아닌 선택적 향상 기능입니다. `fast` Tesseract 계층은 팩 없이 작동합니다. `POST /api/v1/admin/features/ocr/install`는 `balanced` 및 `best`에 대해 서명된 RapidOCR 팩을 Linux amd64 또는 arm64 에 설치합니다. 정확한 OCR 런타임은 CPU 전용 및 NVIDIA 호스트에서 CPU 를 사용하며 최소 4 GiB 의 유효 메모리(구성된 컨테이너 cgroup 제한, 그렇지 않으면 호스트 메모리)가 필요합니다. SnapOtter 는 `requiredMemoryBytes`, `effectiveMemoryBytes` 및 `insufficient-memory` 호환성 이유를 보고하고 다운로드하기 전에 호환되지 않는 설치를 거부합니다. 이 메모리 요구 사항은 `fast`에는 적용되지 않습니다. 팩은 대상에 따라 약 208-234 MiB 를 다운로드하고 409-488 MiB 를 설치합니다. 서명된 인덱스는 설치 중에 적용된 정확한 크기를 바인딩합니다.
+
 | 메서드 | 경로 | 접근 권한 | 설명 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | 인증 | 모든 기능 번들과 설치 상태 목록 |
@@ -601,7 +605,18 @@ AI 기능 번들 관리(Docker 환경에서 AI 모델 패키지 설치/제거). 
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | 관리자(`features:manage`) | 도구에 필요한 모든 번들 설치; 번들별 큐잉/건너뜀 상태 반환 |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | 관리자(`features:manage`) | 기능 번들 제거 및 모델 파일 정리 |
 | `GET` | `/api/v1/admin/features/disk-usage` | 관리자(`features:manage`) | AI 모델의 총 디스크 사용량 획득 |
-| `POST` | `/api/v1/admin/features/import` | 관리자(`features:manage`) | 오프라인 AI 번들 아카이브 가져오기 |
+| `POST` | `/api/v1/admin/features/import` | 관리자(`features:manage`) | 레거시 AI 번들(`file`) 또는 서명된 오프라인 OCR 릴리스(`index` + `archive`) 가져오기 |
+
+에어 갭 OCR 가져오기에는 릴리스의 서명이 포함되어야 합니다. `ocr-runtime-index.json` 그리고 일치하는 플랫폼 아카이브. SnapOtter 동일하게 적용됩니다 Ed25519 서명, 아티팩트 해시, 호환성, 추출, 온라인 설치에 사용되는 연기 테스트 검사:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+사용 `linux-arm64-cpu-py311` 에 보관 arm64. 다른 대상에 대해 서명된 아티팩트는 설치되지 않고 거부됩니다.
 
 ## 관리 작업 {#admin-operations}
 

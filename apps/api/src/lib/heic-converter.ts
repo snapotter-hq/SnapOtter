@@ -5,8 +5,58 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import sharp from "sharp";
 
 const execFileAsync = promisify(execFile);
+
+export interface HeicDecodeOptions {
+  maxDimension?: number;
+  maxPixels?: number;
+  signal?: AbortSignal;
+}
+
+function assertImageLimits(
+  width: number | undefined,
+  height: number | undefined,
+  maxPixels: number | undefined,
+  maxDimension: number | undefined,
+): void {
+  if (width === undefined || height === undefined || width <= 0 || height <= 0) {
+    return;
+  }
+  if (maxDimension !== undefined && (width > maxDimension || height > maxDimension)) {
+    throw new Error(
+      `Decoded image exceeds the ${maxDimension.toLocaleString("en-US")} pixel dimension safety limit (${width.toLocaleString("en-US")}x${height.toLocaleString("en-US")})`,
+    );
+  }
+  if (maxPixels !== undefined && width * height > maxPixels) {
+    throw new Error(
+      `Decoded image exceeds the ${maxPixels.toLocaleString("en-US")} pixel safety limit (${width}x${height})`,
+    );
+  }
+}
+
+function readIspeDimensions(buffer: Buffer): Array<{ width: number; height: number }> {
+  // HEIF stores the display dimensions in an Image Spatial Extents (`ispe`)
+  // full box. Reading it avoids invoking a pixel decoder merely to enforce a
+  // pre-decode allocation bound.
+  let offset = 0;
+  const dimensions: Array<{ width: number; height: number }> = [];
+  while (offset + 20 <= buffer.length) {
+    const index = buffer.indexOf("ispe", offset, "ascii");
+    if (index < 0 || index + 16 > buffer.length) break;
+    const boxStart = index - 4;
+    const boxSize = boxStart >= 0 ? buffer.readUInt32BE(boxStart) : 0;
+    if (boxSize >= 20 && boxStart + boxSize <= buffer.length) {
+      dimensions.push({
+        width: buffer.readUInt32BE(index + 8),
+        height: buffer.readUInt32BE(index + 12),
+      });
+    }
+    offset = index + 4;
+  }
+  return dimensions;
+}
 
 /**
  * Write a buffer to a temp file exclusively (O_CREAT | O_EXCL | O_WRONLY).
@@ -27,14 +77,19 @@ async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<voi
  */
 let cachedDecodeCmd: string | null = null;
 
-async function findDecodeCmd(): Promise<string> {
+async function findDecodeCmd(options: HeicDecodeOptions = {}): Promise<string> {
+  options.signal?.throwIfAborted();
   if (cachedDecodeCmd) return cachedDecodeCmd;
   for (const cmd of ["heif-convert", "heif-dec"]) {
     try {
-      await execFileAsync(cmd, ["--version"], { timeout: 5_000 });
+      await execFileAsync(cmd, ["--version"], {
+        timeout: 5_000,
+        signal: options.signal,
+      });
       cachedDecodeCmd = cmd;
       return cmd;
     } catch {
+      options.signal?.throwIfAborted();
       // try next
     }
   }
@@ -50,8 +105,44 @@ async function findDecodeCmd(): Promise<string> {
  * to add numeric suffixes (-1, -2, ...) to the output filename. We try the
  * exact path first, then fall back to the -1 suffixed path.
  */
-export async function decodeHeic(buffer: Buffer): Promise<Buffer> {
-  const cmd = await findDecodeCmd();
+export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}): Promise<Buffer> {
+  options.signal?.throwIfAborted();
+  const encodedDimensions = readIspeDimensions(buffer);
+  for (const dimensions of encodedDimensions) {
+    assertImageLimits(dimensions.width, dimensions.height, options.maxPixels, options.maxDimension);
+  }
+
+  if (
+    (options.maxPixels !== undefined || options.maxDimension !== undefined) &&
+    encodedDimensions.length === 0
+  ) {
+    let dimensionsVerified = false;
+    try {
+      const metadata = await sharp(buffer, {
+        limitInputPixels: options.maxPixels ?? false,
+      }).metadata();
+      assertImageLimits(metadata.width, metadata.height, options.maxPixels, options.maxDimension);
+      dimensionsVerified =
+        metadata.width !== undefined &&
+        metadata.height !== undefined &&
+        metadata.width > 0 &&
+        metadata.height > 0;
+    } catch (error) {
+      // Sharp often has enough libheif support for metadata but not HEVC pixel
+      // decode. Only turn a proven size-limit failure into a rejection.
+      if (
+        error instanceof Error &&
+        /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(error.message)
+      ) {
+        throw error;
+      }
+    }
+    if (!dimensionsVerified) {
+      throw new Error("Cannot safely decode HEIF: encoded dimensions are unavailable");
+    }
+  }
+
+  const cmd = await findDecodeCmd(options);
   // Include the PID so concurrent processes (and test workers) write to
   // distinct, attributable temp paths in the shared tmpdir.
   const id = `${process.pid}-${randomUUID()}`;
@@ -61,14 +152,41 @@ export async function decodeHeic(buffer: Buffer): Promise<Buffer> {
 
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync(cmd, [inputPath, outputPath], { timeout: 120_000 });
+    await execFileAsync(cmd, [inputPath, outputPath], {
+      timeout: 120_000,
+      signal: options.signal,
+    });
+    options.signal?.throwIfAborted();
 
     // Single-image HEIF: exact filename. Multi-image: -1 suffix on first image.
+    let decoded: Buffer;
     try {
-      return await readFile(outputPath);
+      decoded = await readFile(outputPath);
     } catch {
-      return await readFile(suffixedPath);
+      decoded = await readFile(suffixedPath);
     }
+    if (options.maxPixels !== undefined || options.maxDimension !== undefined) {
+      try {
+        const metadata = await sharp(decoded, {
+          limitInputPixels: options.maxPixels ?? false,
+        }).metadata();
+        assertImageLimits(metadata.width, metadata.height, options.maxPixels, options.maxDimension);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(
+            error.message,
+          )
+        ) {
+          throw error;
+        }
+        throw new Error("Decoded image exceeds the configured image safety limits", {
+          cause: error,
+        });
+      }
+    }
+    options.signal?.throwIfAborted();
+    return decoded;
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});
@@ -95,10 +213,14 @@ function isHeifBuffer(buffer: Buffer): boolean {
  * Ensure a buffer is decodable by Sharp. HEIC/HEIF buffers are decoded to
  * PNG via the system decoder; all other formats pass through unchanged.
  */
-export async function ensureSharpCompat(buffer: Buffer): Promise<Buffer> {
+export async function ensureSharpCompat(
+  buffer: Buffer,
+  options: HeicDecodeOptions = {},
+): Promise<Buffer> {
   if (isHeifBuffer(buffer)) {
-    return decodeHeic(buffer);
+    return decodeHeic(buffer, options);
   }
+  options.signal?.throwIfAborted();
   return buffer;
 }
 

@@ -1,8 +1,8 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 34c52fe6305e
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # เอกสารอ้างอิง REST API {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | ลบพื้นหลัง | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | ขยายภาพ | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ลบวัตถุ | LaMa (ONNX) | ส่ง Mask เป็นส่วนไฟล์ที่สอง (fieldname `mask`), `format`, `quality` |
-| `ocr` | OCR / สกัดข้อความ | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / การแยกข้อความ | Tesseract (เร็ว); RapidOCR + PP-OCR ONNX (สมดุล/ดีที่สุด) | `quality` (เร็ว/สมดุล/ดีที่สุด), `language`, `enhance` |
 | `blur-faces` | เบลอใบหน้า / PII | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | ครอปอัจฉริยะ | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | เพิ่มคุณภาพภาพ | อิงจากการวิเคราะห์ | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## การประมวลผลแบบแบตช์ {#batch-processing}
 
-ใช้เครื่องมือที่รองรับแบตช์ทั่วไปกับหลายไฟล์พร้อมกัน คืนค่าไฟล์บีบอัด ZIP เส้นทางที่มีหลายไฟล์หรือหลายขั้นตอนกำหนดเอง เช่น การลงนาม PDF, PDF OCR และเส้นทางพรีเซ็ต PDF-เป็น-รูปภาพ ใช้สัญญาเอนด์พอยต์ของตนเองแทนเส้นทาง `/batch` ทั่วไป
+ใช้เครื่องมือที่รองรับแบตช์ทั่วไปกับหลายไฟล์พร้อมกัน คืนค่าไฟล์บีบอัด ZIP เส้นทางที่มีหลายไฟล์หรือหลายขั้นตอนกำหนดเอง เช่น การลงนาม PDF และเส้นทางพรีเซ็ต PDF-เป็น-รูปภาพ ใช้สัญญาเอนด์พอยต์ของตนเองแทนเส้นทาง `/batch` ทั่วไป
+
+เครื่องมือ `ocr-pdf` รองรับเส้นทาง `/batch` ทั่วไปนี้
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 จัดการ AI feature bundles (ติดตั้ง/ถอนการติดตั้งแพ็กเกจโมเดล AI ในสภาพแวดล้อม Docker) ควรใช้เอนด์พอยต์การติดตั้งระดับเครื่องมือเมื่อเปิดใช้งานเครื่องมือจากระบบอัตโนมัติกำหนดเอง: เครื่องมือ AI บางตัวต้องการ shared bundle มากกว่าหนึ่งรายการ และเอนด์พอยต์นี้จะข้าม bundle ที่ติดตั้งแล้วโดยเข้าคิวเฉพาะที่ขาดหายไป
 
+OCR เป็นการปรับปรุงทางเลือกมากกว่าการพึ่งพาอย่างหนัก ระดับ `fast` Tesseract ทำงานได้โดยไม่ต้องแพ็ค `POST /api/v1/admin/features/ocr/install` ติดตั้งชุด RapidOCR ที่ลงนามแล้วสำหรับ `balanced` และ `best` บน Linux amd64 หรือ arm64 รันไทม์ OCR ที่แม่นยำใช้ CPU บนโฮสต์ CPU เท่านั้นและ NVIDIA และต้องการหน่วยความจำที่มีประสิทธิภาพอย่างน้อย 4 GiB (ขีดจำกัดคอนเทนเนอร์ cgroup ที่กำหนดค่าไว้ มิฉะนั้น หน่วยความจำโฮสต์) SnapOtter รายงาน `requiredMemoryBytes`, `effectiveMemoryBytes` และเหตุผลด้านความเข้ากันได้ของ `insufficient-memory` และปฏิเสธการติดตั้งที่เข้ากันไม่ได้ก่อนที่จะดาวน์โหลด ข้อกำหนดหน่วยความจำนี้ใช้ไม่ได้กับ `fast` ชุดนี้มีขนาดประมาณ 208-234 MiB สำหรับดาวน์โหลดและติดตั้ง 409-488 MiB ขึ้นอยู่กับเป้าหมาย ดัชนีที่ลงนามจะผูกขนาดที่แน่นอนที่บังคับใช้ระหว่างการติดตั้ง
+
 | Method | Path | สิทธิ์เข้าถึง | คำอธิบาย |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | ยืนยันตัวตน | แสดงรายการ feature bundle ทั้งหมดและสถานะการติดตั้ง |
@@ -601,7 +605,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | ผู้ดูแลระบบ (`features:manage`) | ติดตั้งทุก bundle ที่เครื่องมือต้องการ; คืนค่าสถานะเข้าคิว/ข้ามต่อ bundle |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | ผู้ดูแลระบบ (`features:manage`) | ถอนการติดตั้ง feature bundle และล้างไฟล์โมเดล |
 | `GET` | `/api/v1/admin/features/disk-usage` | ผู้ดูแลระบบ (`features:manage`) | รับการใช้พื้นที่ดิสก์รวมของโมเดล AI |
-| `POST` | `/api/v1/admin/features/import` | ผู้ดูแลระบบ (`features:manage`) | นำเข้าไฟล์บีบอัด AI bundle แบบออฟไลน์ |
+| `POST` | `/api/v1/admin/features/import` | ผู้ดูแลระบบ (`features:manage`) | นำเข้าชุด AI เดิม (`file`) หรือรุ่น OCR ออฟไลน์ที่ลงนามแล้ว (`index` บวก `archive`) |
+
+การนำเข้า OCR แบบมีช่องว่างอากาศจะต้องรวม `ocr-runtime-index.json` ที่ลงนามแล้วของรุ่นและไฟล์เก็บถาวรของแพลตฟอร์มที่ตรงกัน SnapOtter ใช้ลายเซ็น Ed25519 แฮชอาร์ติแฟกต์ ความเข้ากันได้ การแยก และการทดสอบควันที่ใช้โดยการติดตั้งออนไลน์:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+ใช้ไฟล์เก็บถาวร `linux-arm64-cpu-py311` บน arm64 อาร์ติแฟกต์ที่ลงนามสำหรับเป้าหมายอื่นถูกปฏิเสธแทนที่จะติดตั้ง
 
 ## การดำเนินงานของผู้ดูแลระบบ {#admin-operations}
 

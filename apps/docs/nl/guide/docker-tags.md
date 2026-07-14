@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter Docker-image-tags, GPU-benchmarks, versievastzetting en multiplatformondersteuning voor AMD64 en ARM64."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: ae5482dbdd3c
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker-image {#docker-image}
@@ -41,7 +41,6 @@ Getest op een NVIDIA RTX 4070 (12 GB VRAM) met een 572x1024 JPEG-portret.
 | Achtergrond verwijderen (isnet) | 2.457ms | 1.137ms | 2,2x |
 | Upscalen 2x | 350ms | 309ms | 1,1x |
 | Upscalen 4x | 910ms | 310ms | 2,9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1,5x |
 | Gezicht vervagen | 139ms | 122ms | 1,1x |
 
 #### Koude start (eerste verzoek na containerstart) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ Getest op een NVIDIA RTX 4070 (12 GB VRAM) met een 572x1024 JPEG-portret.
 |------|-----|-----|---------|
 | Achtergrond verwijderen | 22.286ms | 4.792ms | 4,7x |
 | Upscalen 2x | 3.957ms | 2.318ms | 1,7x |
-| OCR (PaddleOCR) | 1.469ms | 1.090ms | 1,3x |
+
+OCR is niet opgenomen in de CUDA-vergelijking. Zowel de ingebouwde Tesseract-laag als de optionele RapidOCR/ONNX-lagen gebruiken CPU, ook wanneer de container NVIDIA GPU-toegang heeft.
 
 ### CUDA-gezondheidscontrole {#cuda-health-check}
 

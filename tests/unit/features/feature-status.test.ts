@@ -1,7 +1,111 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const ocrRuntime = vi.hoisted(() => ({
+  getCapability: vi.fn(),
+  getEffectiveMemory: vi.fn(),
+  selectTarget: vi.fn(),
+}));
+
+const fsFaults = vi.hoisted(() => ({
+  denyOwnerOnlyMutationPath: null as string | null,
+  denyRecursiveRemovePath: null as string | null,
+  forceNonDocker: false,
+  pretendBaseVenvExists: false,
+}));
+
+const childProcessFaults = vi.hoisted(() => ({
+  nextKernelLockFailure: null as string | null,
+  reseedOutcomes: [] as Array<"fail" | "success">,
+}));
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    execFileSync: (...args: Parameters<typeof actual.execFileSync>) => {
+      if (args[0] === "/usr/local/bin/reseed-ai-venv.sh") {
+        const outcome = childProcessFaults.reseedOutcomes.shift();
+        if (outcome === "fail") throw new Error("simulated reseed failure");
+        if (outcome === "success") return Buffer.alloc(0);
+      }
+      return actual.execFileSync(...args);
+    },
+    spawnSync: (...args: Parameters<typeof actual.spawnSync>) => {
+      if (childProcessFaults.nextKernelLockFailure !== null) {
+        const detail = childProcessFaults.nextKernelLockFailure;
+        childProcessFaults.nextKernelLockFailure = null;
+        return {
+          error: undefined,
+          output: [null, Buffer.alloc(0), Buffer.from(detail)],
+          pid: 42,
+          signal: null,
+          status: 1,
+          stderr: Buffer.from(detail),
+          stdout: Buffer.alloc(0),
+        };
+      }
+      return actual.spawnSync(...args);
+    },
+  };
+});
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  const permissionError = () =>
+    Object.assign(new Error("operation not permitted for non-owner"), { code: "EPERM" });
+  return {
+    ...actual,
+    existsSync: (...args: Parameters<typeof actual.existsSync>) => {
+      if (args[0] === "/.dockerenv" && fsFaults.forceNonDocker) return false;
+      if (args[0] === "/opt/venv" && fsFaults.pretendBaseVenvExists) return true;
+      return actual.existsSync(...args);
+    },
+    fchmodSync: (...args: Parameters<typeof actual.fchmodSync>) => {
+      if (fsFaults.denyOwnerOnlyMutationPath !== null) {
+        try {
+          const fdInfo = actual.fstatSync(args[0]);
+          const pathInfo = actual.statSync(fsFaults.denyOwnerOnlyMutationPath);
+          if (fdInfo.dev === pathInfo.dev && fdInfo.ino === pathInfo.ino) throw permissionError();
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "EPERM") throw error;
+        }
+      }
+      return actual.fchmodSync(...args);
+    },
+    futimesSync: (...args: Parameters<typeof actual.futimesSync>) => {
+      return actual.futimesSync(...args);
+    },
+    rmSync: (...args: Parameters<typeof actual.rmSync>) => {
+      if (args[0] === fsFaults.denyRecursiveRemovePath) throw permissionError();
+      return actual.rmSync(...args);
+    },
+  };
+});
+
+vi.mock("@snapotter/ai", () => ({
+  getOcrRuntimeEffectiveMemoryBytes: ocrRuntime.getEffectiveMemory,
+  getOcrRuntimeCapability: ocrRuntime.getCapability,
+  selectOcrRuntimeTarget: ocrRuntime.selectTarget,
+}));
 
 let mod: typeof import("../../../apps/api/src/lib/feature-status.js");
 let tempDir: string;
@@ -9,14 +113,38 @@ let aiDir: string;
 let modelsDir: string;
 let installedPath: string;
 let lockPath: string;
+let kernelLockPath: string;
+let mutationEpochPath: string;
 
 beforeEach(async () => {
   vi.resetModules();
+  fsFaults.denyOwnerOnlyMutationPath = null;
+  fsFaults.denyRecursiveRemovePath = null;
+  fsFaults.forceNonDocker = false;
+  fsFaults.pretendBaseVenvExists = false;
+  childProcessFaults.nextKernelLockFailure = null;
+  childProcessFaults.reseedOutcomes.length = 0;
+  ocrRuntime.getCapability.mockReset();
+  ocrRuntime.getEffectiveMemory.mockReset();
+  ocrRuntime.selectTarget.mockReset();
+  ocrRuntime.getCapability.mockReturnValue({
+    available: false,
+    status: "missing",
+    reason: "descriptor-missing",
+    qualities: [],
+    providers: [],
+  });
+  ocrRuntime.selectTarget.mockReturnValue(
+    process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312",
+  );
+  ocrRuntime.getEffectiveMemory.mockReturnValue(8 * 1024 ** 3);
   tempDir = mkdtempSync(join(tmpdir(), "snapotter-test-"));
   aiDir = join(tempDir, "ai");
   modelsDir = join(aiDir, "models");
   installedPath = join(aiDir, "installed.json");
   lockPath = join(aiDir, "install.lock");
+  kernelLockPath = join(aiDir, "install.flock");
+  mutationEpochPath = join(aiDir, "install-mutation.epoch");
   mkdirSync(modelsDir, { recursive: true });
 
   process.env.DATA_DIR = tempDir;
@@ -26,7 +154,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  mod.stopInterruptedInstallRecovery?.();
+  mod.releaseInstallLock();
   delete process.env.DATA_DIR;
+  delete process.env.AI_DATA_DIR;
   delete process.env.FEATURE_MANIFEST_PATH;
   rmSync(tempDir, { recursive: true, force: true });
 });
@@ -36,6 +167,19 @@ function writeTestManifest(
 ) {
   const manifestPath = process.env.FEATURE_MANIFEST_PATH ?? "";
   writeFileSync(manifestPath, JSON.stringify({ bundles }));
+}
+
+function acquireKernelFlock(fd: number): void {
+  const result = existsSync("/usr/bin/flock")
+    ? spawnSync("/usr/bin/flock", ["--nonblock", "3"], {
+        stdio: ["ignore", "ignore", "pipe", fd],
+      })
+    : spawnSync(
+        "/usr/bin/python3",
+        ["-c", "import fcntl; fcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)"],
+        { stdio: ["ignore", "ignore", "pipe", fd] },
+      );
+  expect(result.status, result.stderr?.toString()).toBe(0);
 }
 
 describe("installed.json management", () => {
@@ -167,28 +311,34 @@ describe("malformed installed.json shape (NODE-12 regression)", () => {
     writeFileSync(
       installedPath,
       JSON.stringify({
-        bundles: { ocr: { version: "1.0.0", installedAt: "2026-01-01T00:00:00.000Z", models: [] } },
+        bundles: {
+          "background-removal": {
+            version: "1.0.0",
+            installedAt: "2026-01-01T00:00:00.000Z",
+            models: [],
+          },
+        },
       }),
     );
     mod.invalidateCache();
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
   });
 });
 
 describe("Cache behavior", () => {
   it("isFeatureInstalled reads from cache on second call", () => {
-    mod.markInstalled("ocr", "1.0.0", []);
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    mod.markInstalled("background-removal", "1.0.0", []);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
     writeFileSync(installedPath, JSON.stringify({ bundles: {} }));
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
   });
 
   it("invalidateCache forces re-read", () => {
-    mod.markInstalled("ocr", "1.0.0", []);
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    mod.markInstalled("background-removal", "1.0.0", []);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
     writeFileSync(installedPath, JSON.stringify({ bundles: {} }));
     mod.invalidateCache();
-    expect(mod.isFeatureInstalled("ocr")).toBe(false);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(false);
   });
 
   it("markInstalled invalidates cache", () => {
@@ -231,9 +381,141 @@ describe("Install lock", () => {
     expect(mod.acquireInstallLock("ocr")).toBe(true);
   });
 
+  it("reuses a group-shared kernel inode without requiring ownership", () => {
+    writeFileSync(kernelLockPath, "", { mode: 0o660 });
+    chmodSync(kernelLockPath, 0o660);
+    fsFaults.denyOwnerOnlyMutationPath = kernelLockPath;
+
+    expect(mod.acquireInstallLock("ocr")).toBe(true);
+    expect(JSON.parse(readFileSync(lockPath, "utf-8")).bundleId).toBe("ocr");
+  });
+
+  it("heartbeats an owned lease so a long install cannot be stolen", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now());
+    try {
+      expect(mod.acquireInstallLock("ocr")).toBe(true);
+      const before = JSON.parse(readFileSync(lockPath, "utf-8"));
+      const beforeMtime = statSync(lockPath).mtimeMs;
+      await vi.advanceTimersByTimeAsync(30_000);
+      const after = JSON.parse(readFileSync(lockPath, "utf-8"));
+
+      expect(after.ownerToken).toBe(before.ownerToken);
+      expect(statSync(lockPath).mtimeMs).toBeGreaterThan(beforeMtime);
+      expect(mod.getInstallingBundle()?.bundleId).toBe("ocr");
+    } finally {
+      mod.releaseInstallLock();
+      vi.useRealTimers();
+    }
+  });
+
   it("acquireInstallLock returns false when lock already exists", () => {
     mod.acquireInstallLock("ocr");
     expect(mod.acquireInstallLock("face-detection")).toBe(false);
+  });
+
+  it("honors a fresh install.lock created by an old replica", () => {
+    const oldHolderFd = openSync(
+      lockPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o660,
+    );
+    writeFileSync(
+      oldHolderFd,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+
+    try {
+      expect(mod.acquireInstallLock("face-detection")).toBe(false);
+      expect(JSON.parse(readFileSync(lockPath, "utf-8")).bundleId).toBe("ocr");
+    } finally {
+      closeSync(oldHolderFd);
+      unlinkSync(lockPath);
+    }
+  });
+
+  it("keeps install.lock present so an old O_EXCL acquirer cannot overlap", () => {
+    expect(mod.acquireInstallLock("ocr")).toBe(true);
+
+    expect(() =>
+      openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o660),
+    ).toThrow(expect.objectContaining({ code: "EEXIST" }));
+  });
+
+  it("surfaces an install-lock helper failure instead of silently treating it as contention", () => {
+    childProcessFaults.nextKernelLockFailure = "locking is unsupported on this filesystem";
+
+    expect(() => mod.acquireInstallLock("ocr")).toThrow(/helper failed.*unsupported/i);
+  });
+
+  it("keeps the lease until an inherited mutator descriptor closes", async () => {
+    const getChildFd = (mod as typeof mod & { getInstallLockFdForChild?: () => number })
+      .getInstallLockFdForChild;
+    expect(getChildFd).toBeTypeOf("function");
+    expect(mod.acquireInstallLock("ocr")).toBe(true);
+
+    const child = spawn("/bin/sleep", ["30"], {
+      stdio: ["ignore", "ignore", "ignore", getChildFd?.()],
+    });
+    await once(child, "spawn");
+    mod.releaseInstallLock();
+
+    const contenderFd = openSync(kernelLockPath, constants.O_RDWR);
+    try {
+      const blocked = existsSync("/usr/bin/flock")
+        ? spawnSync("/usr/bin/flock", ["--nonblock", "3"], {
+            stdio: ["ignore", "ignore", "pipe", contenderFd],
+          })
+        : spawnSync(
+            "/usr/bin/python3",
+            ["-c", "import fcntl; fcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)"],
+            { stdio: ["ignore", "ignore", "pipe", contenderFd] },
+          );
+      expect(blocked.status).toBe(1);
+
+      child.kill("SIGTERM");
+      await once(child, "close");
+      acquireKernelFlock(contenderFd);
+    } finally {
+      if (child.exitCode === null) child.kill("SIGKILL");
+      closeSync(contenderFd);
+    }
+  });
+
+  it("never steals a kernel-owned lease even when its status metadata looks stale", () => {
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o600);
+    acquireKernelFlock(externalFd);
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        ownerToken: "other-replica",
+        pid: 1,
+      }),
+    );
+    const stale = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    utimesSync(lockPath, stale, stale);
+
+    try {
+      expect(mod.acquireInstallLock("face-detection")).toBe(false);
+      expect(JSON.parse(readFileSync(lockPath, "utf-8")).ownerToken).toBe("other-replica");
+    } finally {
+      closeSync(externalFd);
+    }
+
+    expect(mod.acquireInstallLock("face-detection")).toBe(true);
+  });
+
+  it("keeps one permanent flock inode and removes the legacy marker on release", () => {
+    expect(mod.acquireInstallLock("ocr")).toBe(true);
+    const inode = statSync(kernelLockPath).ino;
+
+    mod.releaseInstallLock();
+
+    expect(existsSync(kernelLockPath)).toBe(true);
+    expect(statSync(kernelLockPath).ino).toBe(inode);
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it("lock file contains valid JSON with bundleId and startedAt fields", () => {
@@ -241,20 +523,34 @@ describe("Install lock", () => {
     const data = JSON.parse(readFileSync(lockPath, "utf-8"));
     expect(data).toHaveProperty("bundleId", "background-removal");
     expect(data).toHaveProperty("startedAt");
+    expect(data).toHaveProperty("pid", process.pid);
+    expect(data.ownerToken).toMatch(/^[0-9a-f-]{36}$/i);
     expect(new Date(data.startedAt).toISOString()).toBe(data.startedAt);
   });
 
-  it("releaseInstallLock deletes lock file", () => {
+  it("releaseInstallLock removes the legacy marker but keeps the flock inode", () => {
     mod.acquireInstallLock("ocr");
     expect(existsSync(lockPath)).toBe(true);
     mod.releaseInstallLock();
     expect(existsSync(lockPath)).toBe(false);
+    expect(existsSync(kernelLockPath)).toBe(true);
   });
 
   it("releaseInstallLock is idempotent", () => {
     mod.releaseInstallLock();
     mod.releaseInstallLock();
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("does not remove a marker whose ownership token was replaced", () => {
+    mod.acquireInstallLock("ocr");
+    const lock = JSON.parse(readFileSync(lockPath, "utf-8"));
+    writeFileSync(lockPath, JSON.stringify({ ...lock, ownerToken: "replacement-owner" }));
+
+    mod.releaseInstallLock();
+
+    expect(existsSync(lockPath)).toBe(true);
+    expect(JSON.parse(readFileSync(lockPath, "utf-8")).ownerToken).toBe("replacement-owner");
   });
 
   it("getInstallingBundle returns null when no lock", () => {
@@ -269,10 +565,34 @@ describe("Install lock", () => {
     expect(typeof result?.startedAt).toBe("string");
   });
 
-  it("getInstallingBundle deletes corrupt lock and returns null", () => {
-    writeFileSync(lockPath, "not-valid-json{{{{");
+  it("clears abandoned status metadata when no kernel lease remains", () => {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        ownerToken: "crashed-replica",
+      }),
+    );
+
     expect(mod.getInstallingBundle()).toBeNull();
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("preserves partial legacy metadata until its compatibility timeout", () => {
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o660);
+    acquireKernelFlock(externalFd);
+    writeFileSync(lockPath, "not-valid-json{{{{");
+    try {
+      expect(mod.getInstallingBundle()).toMatchObject({ bundleId: "unknown" });
+      expect(existsSync(lockPath)).toBe(true);
+    } finally {
+      closeSync(externalFd);
+    }
+    expect(mod.getInstallingBundle()).toMatchObject({ bundleId: "unknown" });
+    const stale = new Date(Date.now() - 46 * 60 * 1000);
+    utimesSync(lockPath, stale, stale);
+    expect(mod.getInstallingBundle()).toBeNull();
   });
 });
 
@@ -304,7 +624,7 @@ describe("resetAiEnvironment", () => {
     markDockerEnvironment();
     mod.markInstalled("ocr", "2.0.0", ["paddleocr-server-det"]);
     mod.markInstalled("background-removal", "2.0.0", ["rembg-u2net"]);
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
 
     mod.resetAiEnvironment();
 
@@ -312,6 +632,17 @@ describe("resetAiEnvironment", () => {
     expect(data.bundles).toEqual({});
     expect(mod.isFeatureInstalled("ocr")).toBe(false);
     expect(mod.isFeatureInstalled("background-removal")).toBe(false);
+  });
+
+  it("advances the shared mutation epoch so older queued work is invalidated", () => {
+    markDockerEnvironment();
+    const before = mod.getAiMutationEpoch();
+
+    mod.resetAiEnvironment();
+
+    const after = mod.getAiMutationEpoch();
+    expect(after).not.toBe(before);
+    expect(readFileSync(mutationEpochPath, "utf-8").trim()).toBe(after);
   });
 
   it("recreates an empty directory skeleton so a fresh install has somewhere to write", () => {
@@ -337,6 +668,30 @@ describe("resetAiEnvironment", () => {
     markDockerEnvironment();
     mod.resetAiEnvironment();
     expect(existsSync(lockPath)).toBe(false);
+    expect(existsSync(kernelLockPath)).toBe(true);
+    expect(mod.acquireInstallLock("ocr")).toBe(true);
+  });
+});
+
+describe("AI mutation epoch", () => {
+  it("uses a stable baseline before the first destructive mutation", () => {
+    expect(mod.getAiMutationEpoch()).toBe("initial");
+    expect(mod.getAiMutationEpoch()).toBe("initial");
+  });
+
+  it("can only be advanced while this process owns the install lease", () => {
+    expect(() => mod.advanceAiMutationEpoch()).toThrow(/install lock.*held/i);
+    expect(existsSync(mutationEpochPath)).toBe(false);
+  });
+
+  it("atomically publishes and persists a new epoch", () => {
+    expect(mod.acquireInstallLock("__uninstall__")).toBe(true);
+    const next = mod.advanceAiMutationEpoch();
+    mod.releaseInstallLock();
+
+    expect(next).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(mod.getAiMutationEpoch()).toBe(next);
+    expect(readFileSync(mutationEpochPath, "utf-8").trim()).toBe(next);
   });
 });
 
@@ -560,16 +915,147 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     expect(existsSync(bootstrapping)).toBe(false);
   });
 
-  it("removes stale install lock", () => {
+  it("recovers stale-looking metadata when no kernel lease remains", () => {
     writeFileSync(
       lockPath,
       JSON.stringify({ bundleId: "ocr", startedAt: "2026-01-01T00:00:00.000Z" }),
     );
-    mod.recoverInterruptedInstalls();
+    const stale = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    utimesSync(lockPath, stale, stale);
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(lockPath)).toBe(false);
+    expect(existsSync(kernelLockPath)).toBe(true);
   });
 
-  it("consumes a surviving venv.writing breadcrumb (interrupted venv write)", () => {
+  it("defers recovery while a kernel-owned lease is held even if metadata is stale", () => {
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o600);
+    acquireKernelFlock(externalFd);
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        ownerToken: "other-replica",
+        pid: 1,
+      }),
+    );
+    const stale = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    utimesSync(lockPath, stale, stale);
+    const partial = join(modelsDir, "model.downloading");
+    writeFileSync(partial, "live partial");
+
+    try {
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      expect(existsSync(partial)).toBe(true);
+      expect(JSON.parse(readFileSync(lockPath, "utf-8")).ownerToken).toBe("other-replica");
+    } finally {
+      closeSync(externalFd);
+    }
+  });
+
+  it("retries deferred startup recovery after the owning replica exits", async () => {
+    vi.useFakeTimers();
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o660);
+    acquireKernelFlock(externalFd);
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: new Date().toISOString(),
+        ownerToken: "other-replica",
+      }),
+    );
+    const partial = join(modelsDir, "model.downloading");
+    writeFileSync(partial, "live partial");
+    const recovered = vi.fn();
+
+    const startRecovery = (
+      mod as typeof mod & {
+        startInterruptedInstallRecovery?: (options: {
+          retryMs: number;
+          onRecovered: () => void;
+        }) => void;
+      }
+    ).startInterruptedInstallRecovery;
+    expect(startRecovery).toBeTypeOf("function");
+    startRecovery?.({ retryMs: 25, onRecovered: recovered });
+    expect(existsSync(partial)).toBe(true);
+    expect(recovered).not.toHaveBeenCalled();
+
+    closeSync(externalFd);
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(existsSync(partial)).toBe(false);
+    expect(recovered).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("retries when post-recovery cleanup loses the lease handoff race", async () => {
+    vi.useFakeTimers();
+    try {
+      const recovered = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+      await vi.runAllTicks();
+      expect(recovered).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(25);
+      expect(recovered).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retains venv.writing and reports incomplete recovery when Docker reseed fails", () => {
+    writeTestManifest({});
+    fsFaults.pretendBaseVenvExists = true;
+    childProcessFaults.reseedOutcomes.push("fail");
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "transcription", startedAt: new Date().toISOString() }),
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(false);
+    expect(existsSync(marker)).toBe(true);
+    expect(error.mock.calls.flat().join(" ")).toMatch(/reseed|interrupted/i);
+
+    error.mockRestore();
+  });
+
+  it("retries a failed Docker reseed and clears the breadcrumb only after success", async () => {
+    vi.useFakeTimers();
+    try {
+      writeTestManifest({ "background-removal": { models: [] } });
+      mod.markInstalled("background-removal", "2.1.0", []);
+      fsFaults.pretendBaseVenvExists = true;
+      childProcessFaults.reseedOutcomes.push("fail", "success");
+      const marker = join(aiDir, "venv.writing");
+      writeFileSync(
+        marker,
+        JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
+      );
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const recovered = vi.fn();
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+      expect(existsSync(marker)).toBe(true);
+      expect(recovered).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(existsSync(marker)).toBe(false);
+      expect(recovered).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(readFileSync(installedPath, "utf-8")).bundles).toEqual({});
+      error.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("warns and consumes an unmanaged non-Docker venv.writing breadcrumb", () => {
+    fsFaults.forceNonDocker = true;
     const marker = join(aiDir, "venv.writing");
     writeFileSync(
       marker,
@@ -610,12 +1096,12 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
   });
 
   it("invalidates cache after recovery", () => {
-    mod.markInstalled("ocr", "1.0.0", []);
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    mod.markInstalled("background-removal", "1.0.0", []);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
     writeFileSync(installedPath, JSON.stringify({ bundles: {} }));
-    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
     mod.recoverInterruptedInstalls();
-    expect(mod.isFeatureInstalled("ocr")).toBe(false);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(false);
   });
 
   it("deletes staging-{bundleId}/ directories", () => {
@@ -632,6 +1118,48 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     mod.recoverInterruptedInstalls();
     expect(existsSync(join(aiDir, "staging-ocr"))).toBe(false);
     expect(existsSync(join(aiDir, "staging-upscale-enhance"))).toBe(false);
+  });
+
+  it("deletes crash-stranded lock-owned import staging", () => {
+    const offlineUpload = join(aiDir, ".offline-import-v2-abandoned");
+    const legacyExtraction = join(aiDir, "import-abandoned");
+    for (const directory of [offlineUpload, legacyExtraction]) {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "payload"), "data");
+    }
+
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+
+    expect(existsSync(offlineUpload)).toBe(false);
+    expect(existsSync(legacyExtraction)).toBe(false);
+  });
+
+  it("age-gates pre-lock offline staging from older rolling replicas", () => {
+    const legacyUpload = join(aiDir, ".offline-import-legacy-replica");
+    mkdirSync(legacyUpload, { recursive: true });
+    writeFileSync(join(legacyUpload, "payload"), "data");
+
+    mod.recoverInterruptedInstalls();
+    expect(existsSync(legacyUpload)).toBe(true);
+
+    const stale = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    utimesSync(legacyUpload, stale, stale);
+    mod.recoverInterruptedInstalls();
+    expect(existsSync(legacyUpload)).toBe(false);
+  });
+
+  it("keeps recovery pending until orphaned import staging can be removed", () => {
+    const offlineUpload = join(aiDir, ".offline-import-v2-permission-retry");
+    mkdirSync(offlineUpload, { recursive: true });
+    writeFileSync(join(offlineUpload, "payload"), "data");
+    fsFaults.denyRecursiveRemovePath = offlineUpload;
+
+    expect(mod.recoverInterruptedInstalls()).toBe(false);
+    expect(existsSync(offlineUpload)).toBe(true);
+
+    fsFaults.denyRecursiveRemovePath = null;
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+    expect(existsSync(offlineUpload)).toBe(false);
   });
 
   it("does NOT delete non-staging directories", () => {
@@ -662,6 +1190,18 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 });
 
 describe("Composite state - getFeatureStates", () => {
+  it("keeps DATA_DIR authoritative when AI_DATA_DIR is also present", async () => {
+    const customAiDir = join(tempDir, "custom-ai");
+    process.env.AI_DATA_DIR = customAiDir;
+    vi.resetModules();
+    const customRootMod = await import("../../../apps/api/src/lib/feature-status.js");
+
+    ocrRuntime.getCapability.mockClear();
+    expect(customRootMod.getAiDir()).toBe(aiDir);
+    expect(customRootMod.isFeatureInstalled("ocr")).toBe(false);
+    expect(ocrRuntime.getCapability).toHaveBeenLastCalledWith({ aiDataDir: aiDir });
+  });
+
   it("all bundles not_installed when installed.json is empty", () => {
     const states = mod.getFeatureStates();
     for (const state of states) {
@@ -671,16 +1211,256 @@ describe("Composite state - getFeatureStates", () => {
   });
 
   it("installed bundle with valid models returns installed with version", () => {
-    mod.markInstalled("ocr", "3.5.0", ["ppocr.onnx"]);
+    mod.markInstalled("background-removal", "3.5.0", ["u2net.onnx"]);
     writeTestManifest({
-      ocr: { models: [{ id: "ppocr", path: "ppocr.onnx" }] },
+      "background-removal": { models: [{ id: "u2net", path: "u2net.onnx" }] },
     });
-    writeFileSync(join(modelsDir, "ppocr.onnx"), Buffer.alloc(100));
+    writeFileSync(join(modelsDir, "u2net.onnx"), Buffer.alloc(100));
     mod.invalidateCache();
     const states = mod.getFeatureStates();
-    const ocr = states.find((s) => s.id === "ocr");
-    expect(ocr?.status).toBe("installed");
-    expect(ocr?.installedVersion).toBe("3.5.0");
+    const backgroundRemoval = states.find((s) => s.id === "background-removal");
+    expect(backgroundRemoval?.status).toBe("installed");
+    expect(backgroundRemoval?.installedVersion).toBe("3.5.0");
+  });
+
+  it("does not treat a legacy OCR ledger entry as a healthy accurate runtime", () => {
+    mod.markInstalled("ocr", "2.1.0", ["legacy-paddle-model"]);
+
+    expect(mod.isFeatureInstalled("ocr")).toBe(false);
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "not_installed",
+      installedVersion: null,
+      compatibility: "compatible",
+      compatibilityReason: "descriptor-missing",
+      healthyGeneration: null,
+      availableQualities: ["fast"],
+    });
+  });
+
+  it("derives installed OCR state and accurate qualities from the healthy v3 descriptor", () => {
+    ocrRuntime.getCapability.mockReturnValue({
+      available: true,
+      status: "ready",
+      qualities: ["balanced", "best"],
+      providers: ["CPUExecutionProvider"],
+      descriptor: {
+        generation: "ocr-3.0.0-cpu",
+        artifact: {
+          version: "3.0.0",
+          target: process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312",
+        },
+      },
+    });
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            archives: {
+              [process.arch === "arm64" ? "arm64-cpu" : "amd64-gpu"]: {
+                compressedSize: 293_000_000,
+                extractedSize: 626_000_000,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    expect(mod.isFeatureInstalled("ocr")).toBe(true);
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "installed",
+      installedVersion: "3.0.0",
+      compatibility: "compatible",
+      compatibilityReason: null,
+      selectedTarget: process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312",
+      missingDownloadBytes: 0,
+      installedBytes: 626_000_000,
+      healthyGeneration: "ocr-3.0.0-cpu",
+      availableQualities: ["fast", "balanced", "best"],
+    });
+  });
+
+  it("surfaces a corrupt v3 descriptor as an OCR health error", () => {
+    ocrRuntime.getCapability.mockReturnValue({
+      available: false,
+      status: "invalid",
+      reason: "descriptor-invalid",
+      qualities: [],
+      providers: [],
+    });
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "error",
+      compatibility: "invalid",
+      compatibilityReason: "descriptor-invalid",
+      healthyGeneration: null,
+      availableQualities: ["fast"],
+    });
+    expect(ocr?.error).toMatch(/descriptor.*invalid/i);
+  });
+
+  it("keeps a stale incompatible artifact repairable on a supported host", () => {
+    const target = process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312";
+    ocrRuntime.getCapability.mockReturnValue({
+      available: false,
+      status: "incompatible",
+      reason: "artifact-incompatible",
+      qualities: [],
+      providers: [],
+    });
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            targets: {
+              [target]: {
+                compressedSizeEstimate: 293_502_277,
+                extractedSizeEstimate: 656_408_576,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "error",
+      compatibility: "compatible",
+      compatibilityReason: "artifact-incompatible",
+      selectedTarget: target,
+      missingDownloadBytes: 293_502_277,
+      availableQualities: ["fast"],
+    });
+  });
+
+  it("reports unsupported OCR hosts without inventing a selected target", () => {
+    ocrRuntime.selectTarget.mockReturnValue(null);
+    ocrRuntime.getCapability.mockReturnValue({
+      available: false,
+      status: "incompatible",
+      reason: "unsupported-host",
+      qualities: [],
+      providers: [],
+    });
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "error",
+      compatibility: "incompatible",
+      compatibilityReason: "unsupported-host",
+      selectedTarget: null,
+      missingDownloadBytes: null,
+      availableQualities: ["fast"],
+    });
+  });
+
+  it("reports signed-manifest memory incompatibility before an accurate runtime download", () => {
+    const target = process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312";
+    ocrRuntime.getEffectiveMemory.mockReturnValue(3 * 1024 ** 3);
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            targets: {
+              [target]: {
+                compressedSizeEstimate: 217_000_000,
+                extractedSizeEstimate: 429_000_000,
+                minimumMemoryBytes: 4 * 1024 ** 3,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "not_installed",
+      compatibility: "incompatible",
+      compatibilityReason: "insufficient-memory",
+      selectedTarget: target,
+      missingDownloadBytes: null,
+      requiredMemoryBytes: 4 * 1024 ** 3,
+      effectiveMemoryBytes: 3 * 1024 ** 3,
+      availableQualities: ["fast"],
+    });
+    expect(ocr?.error).toMatch(/4 GiB.*3 GiB.*Fast OCR remains available/i);
+  });
+
+  it("reports configured memory when an installed OCR runtime becomes incompatible", () => {
+    const target = process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312";
+    ocrRuntime.getCapability.mockReturnValue({
+      available: false,
+      status: "incompatible",
+      reason: "insufficient-memory",
+      qualities: [],
+      providers: [],
+    });
+    ocrRuntime.getEffectiveMemory.mockReturnValue(3 * 1024 ** 3);
+    writeFileSync(
+      join(tempDir, "feature-manifest.json"),
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            targets: {
+              [target]: {
+                compressedSizeEstimate: 217_000_000,
+                extractedSizeEstimate: 429_000_000,
+                minimumMemoryBytes: 4 * 1024 ** 3,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "error",
+      compatibility: "incompatible",
+      compatibilityReason: "insufficient-memory",
+      selectedTarget: target,
+      requiredMemoryBytes: 4 * 1024 ** 3,
+      effectiveMemoryBytes: 3 * 1024 ** 3,
+      availableQualities: ["fast"],
+    });
+    expect(ocr?.error).toMatch(/4 GiB.*3 GiB.*Fast OCR remains available/i);
+  });
+
+  it("keeps Fast available when the container memory controller cannot be inspected", () => {
+    ocrRuntime.getEffectiveMemory.mockImplementation(() => {
+      throw new Error("unable to read the process cgroup memory capacity");
+    });
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      status: "not_installed",
+      compatibility: "incompatible",
+      compatibilityReason: "memory-capacity-unknown",
+      effectiveMemoryBytes: null,
+      missingDownloadBytes: null,
+      availableQualities: ["fast"],
+    });
+    expect(ocr?.error).toMatch(/cannot safely determine.*memory.*Fast OCR remains available/i);
   });
 
   it("lock held for bundle returns installing", () => {
@@ -709,15 +1489,15 @@ describe("Composite state - getFeatureStates", () => {
   });
 
   it("installed bundle + missing model returns error with model error", () => {
-    mod.markInstalled("ocr", "1.0.0", ["ppocr.onnx"]);
+    mod.markInstalled("background-removal", "1.0.0", ["u2net.onnx"]);
     writeTestManifest({
-      ocr: { models: [{ id: "ppocr", path: "ppocr.onnx" }] },
+      "background-removal": { models: [{ id: "u2net", path: "u2net.onnx" }] },
     });
     mod.invalidateCache();
     const states = mod.getFeatureStates();
-    const ocr = states.find((s) => s.id === "ocr");
-    expect(ocr?.status).toBe("error");
-    expect(ocr?.error).toContain("ppocr.onnx");
+    const backgroundRemoval = states.find((s) => s.id === "background-removal");
+    expect(backgroundRemoval?.status).toBe("error");
+    expect(backgroundRemoval?.error).toContain("u2net.onnx");
   });
 
   it("not installed + stale error progress returns error", () => {
@@ -732,7 +1512,7 @@ describe("Composite state - getFeatureStates", () => {
     // The queue is a leaf module feature-status imports FROM; enqueue via the
     // same (freshly reset) instance so getFeatureStates sees it.
     const queue = await import("../../../apps/api/src/lib/feature-install-queue.js");
-    queue.enqueue({ bundleId: "ocr", jobId: "job-queued" });
+    queue.enqueue({ bundleId: "ocr", jobId: "job-queued", mutationEpoch: "initial" });
     try {
       const states = mod.getFeatureStates();
       const ocr = states.find((s) => s.id === "ocr");
@@ -749,7 +1529,7 @@ describe("Composite state - getFeatureStates", () => {
     const queue = await import("../../../apps/api/src/lib/feature-install-queue.js");
     // ocr holds the lock (active install); face-detection is queued behind it.
     mod.acquireInstallLock("ocr");
-    queue.enqueue({ bundleId: "face-detection", jobId: "job-2" });
+    queue.enqueue({ bundleId: "face-detection", jobId: "job-2", mutationEpoch: "initial" });
     try {
       const states = mod.getFeatureStates();
       expect(states.find((s) => s.id === "ocr")?.status).toBe("installing");
@@ -775,6 +1555,18 @@ describe("Composite state - getFeatureStates", () => {
       expect(state).toHaveProperty("error");
       expect(Array.isArray(state.enablesTools)).toBe(true);
     }
+
+    const ocr = states.find((state) => state.id === "ocr");
+    expect(ocr).toHaveProperty("compatibility");
+    expect(ocr).toHaveProperty("compatibilityReason");
+    expect(ocr).toHaveProperty("selectedTarget");
+    expect(ocr).toHaveProperty("missingDownloadBytes");
+    expect(ocr).toHaveProperty("healthyGeneration");
+    expect(ocr).toHaveProperty("availableQualities");
+
+    const faceDetection = states.find((state) => state.id === "face-detection");
+    expect(faceDetection).not.toHaveProperty("compatibility");
+    expect(faceDetection).not.toHaveProperty("availableQualities");
   });
 
   it("surfaces real per-arch download/on-disk sizes from the manifest", () => {
@@ -812,6 +1604,35 @@ describe("Composite state - getFeatureStates", () => {
     const transcription = states.find((s) => s.id === "transcription");
     expect(transcription?.downloadBytes).toBeNull();
     expect(transcription?.installedBytes).toBeNull();
+  });
+
+  it("surfaces v3 OCR target estimates before release archive metadata exists", () => {
+    const target = process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312";
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          ocr: {
+            models: [],
+            targets: {
+              [target]: {
+                compressedSizeEstimate: 293_502_277,
+                extractedSizeEstimate: 656_408_576,
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const ocr = mod.getFeatureStates().find((state) => state.id === "ocr");
+
+    expect(ocr).toMatchObject({
+      selectedTarget: target,
+      downloadBytes: 293_502_277,
+      installedBytes: 656_408_576,
+      missingDownloadBytes: 293_502_277,
+    });
   });
 });
 

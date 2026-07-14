@@ -54,7 +54,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
   - **PDF (29):** merge, split, compress, convert, protect/unlock, redact, sign, watermark, page numbers, OCR, plus PDF to JPG/PNG/TIFF
   - **Files (23):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, ZIP create/extract
 - **Image editor:** Free layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser and processes on your hardware
-- **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required
+- **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required. Built-in Fast OCR adds about 25 MiB to the official image; the optional accuracy pack installs on demand
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
 - **21 languages:** English, Arabic, Chinese (Simplified & Traditional), Dutch, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese. RTL support for Arabic
 - **Pipelines:** Chain tools into reusable workflows with 20 steps by default. Import/export as JSON. Batch process up to 100 files by default
@@ -107,7 +107,7 @@ docker compose up -d
 <summary><sub>Have an NVIDIA GPU? Click here for CUDA acceleration.</sub></summary>
 <br>
 
-Use the GPU Compose file for NVIDIA CUDA-accelerated background removal, upscaling, transcription, and OCR. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today; those systems run AI tools on CPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
+Use the GPU Compose file for NVIDIA CUDA-accelerated background removal, upscaling, and transcription. OCR deliberately uses the same portable CPU runtime on CPU-only and NVIDIA hosts. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today; those systems run AI tools on CPU. See [Docker Tags](https://docs.snapotter.com/guide/docker-tags) for the GPU Compose example and benchmarks.
 
 </details>
 

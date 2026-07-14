@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ın monorepo yapısı, uygulama ve paket mimarisi, istek yaşam döngüsü ve kaynak ayak izi."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: b03ab6eecf2d
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Mimari {#architecture}
@@ -36,13 +36,13 @@ Bu paketin ağ bağımlılığı yoktur ve tamamen işlem içinde çalışır.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-ML işlemleri için Python betiklerini çağıran bir köprü katmanı. İlk kullanımda köprü, sonraki AI çağrılarının içe aktarma yükünü atlaması için ağır kütüphaneleri (PIL, NumPy, MediaPipe, rembg) önceden içe aktaran kalıcı bir Python dağıtıcı işlemi başlatır. Dağıtıcı henüz hazır değilse, köprü istek başına yeni bir Python alt işlemi oluşturmaya geri döner.
+Yerel ve Python ML çalışma zamanlarını çağıran bir köprü katmanı. Çoğu Python aracı, ağır kitaplıkları (PIL, NumPy, MediaPipe, rembg) önceden içe aktaran kalıcı bir dispatcher kullanır, böylece sonraki çağrılar içe aktarma yükünü atlar. OCR, bu değiştirilebilir paylaşılan ortamdan yalıtılmıştır: `fast`, yerel Tesseract'yi çağırırken, `balanced` ve `best`, aktif değişmez RapidOCR/ONNX nesline sabitlenmiş özel bir kalıcı JSONL dispatcher kullanır. Her istek bir generation lease içerir. Etkinleştirme önce bir aday üzerinde smoke test çalıştırır, ardından atomik olarak dispatcher'ye geçiş yapar. Önceki dispatcher, oluşturulmadan önce çöp toplama işlemine tabi tutuluyor.
 
 **Modeller önceden yüklenmez.** Her araç betiği, model ağırlıklarını istek zamanında diskten yükler ve istek bittiğinde bunları atar. Tam bellek profili için [Kaynak ayak izi](#resource-footprint) bölümüne bakın.
 
-Desteklenen işlemler: arka plan kaldırma (rembg/BiRefNet), büyütme (RealESRGAN), yüz bulanıklaştırma (MediaPipe), yüz iyileştirme (GFPGAN/CodeFormer), nesne silme (LaMa ONNX), OCR (PaddleOCR/Tesseract), renklendirme (DDColor), gürültü kaldırma, kırmızı göz kaldırma, fotoğraf restorasyonu, pasaport fotoğrafı oluşturma, şeffaflık düzeltme (BiRefNet HR-matting) ve içerik farkında yeniden boyutlandırma (Go caire ikili dosyası).
+Desteklenen işlemler: arka plan kaldırma (rembg/BiRefNet), ölçeklendirme (RealESRGAN), yüz bulanıklaştırma (MediaPipe), yüz geliştirme (GFPGAN/CodeFormer), nesne silme (LaMa ONNX), OCR (PP-OCR ONNX modelleriyle Tesseract ve RapidOCR), renklendirme (DDColor), gürültü giderme, kırmızı göz giderme, fotoğraf restorasyon, vesikalık fotoğraf oluşturma, şeffaflık sabitleme (BiRefNet HR matlaştırma) ve içeriğe duyarlı yeniden boyutlandırma (Go caire ikili programı).
 
-Python betikleri `packages/ai/python/` içinde bulunur. Docker imajı, konteynerin tamamen çevrimdışı çalışması için tüm model ağırlıklarını derleme sırasında önceden indirir.
+Python komut dosyaları `packages/ai/python/`'de bulunur. Büyük isteğe bağlı model paketleri, isteğe bağlı olarak kalıcı `/data/ai` birimine yüklenir. Doğru OCR imzalı, platforma özel yapıtlar kullanır; yerleşik Tesseract katmanı, model paketinin indirilmesini gerektirmez.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Bu VitePress sitesi. `main` üzerine push edildiğinde Cloudflare Pages'e otomat
 2. Ön uç, dosya ve ayarlarla birlikte `/api/v1/tools/:section/:toolId` adresine bir multipart POST gönderir.
 3. API rotası girdiyi Zod ile doğrular, ardından işlemeyi yönlendirir.
 4. Standart araçlar için iş, uygun BullMQ havuzuna (modaliteye göre image, media veya docs) eklenir. İşlem içi BullMQ işçisi, görüntüyü EXIF meta verilerine göre otomatik yönlendirir, aracın işlem fonksiyonunu çalıştırır ve sonucu döndürür.
-5. AI araçları için TypeScript köprüsü, kalıcı Python dağıtıcısına bir istek gönderir (veya yedek olarak yeni bir alt işlem oluşturur), bitmesini bekler ve çıktı dosyasını okur.
+5. Çoğu yapay zeka aracı için TypeScript köprüsü, kalıcı Python dispatcher'ye bir istek gönderir. Hızlı OCR bunun yerine Tesseract'yi çağırır ve doğru OCR, sabitlenmiş yürütülebilir dosyayı aktif değişmez OCR neslinden başlatır. İstenen OCR katmanı girişte sabitlenir ve yürütme sırasında hiçbir zaman sessizce değiştirilmez.
 6. İş ilerlemesi, durumun konteyner yeniden başlatmalarında hayatta kalması için PostgreSQL'deki `jobs` tablosuna kaydedilir. Gerçek zamanlı güncellemeler `/api/v1/jobs/:jobId/progress` adresinde SSE aracılığıyla iletilir.
 7. API bir `jobId` ve `downloadUrl` döndürür. Kullanıcı işlenmiş dosyayı `/api/v1/download/:jobId/:filename` adresinden indirir.
 

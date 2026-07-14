@@ -128,4 +128,18 @@ describe("multipartParts", () => {
 
     await generator.return(undefined);
   });
+
+  it("honors a route-specific two-file limit", async () => {
+    const body = multipartBody([
+      { name: "index", filename: "ocr-runtime-index.json", content: "index" },
+      { name: "archive", filename: "ocr-runtime.tar.gz", content: "archive" },
+      { name: "extra", filename: "extra.bin", content: "unexpected" },
+    ]);
+
+    await expect(async () => {
+      for await (const part of multipartParts(fakeRequest(body), { files: 2 })) {
+        if (part.type === "file") await drain(part.file);
+      }
+    }).rejects.toThrow("files limit");
+  });
 });

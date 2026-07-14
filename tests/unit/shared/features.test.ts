@@ -1,6 +1,7 @@
 import {
   FEATURE_BUNDLES,
   getBundleForTool,
+  getOptionalBundleForTool,
   getRequiredBundlesForTool,
   getToolsForBundle,
   PYTHON_SIDECAR_TOOLS,
@@ -10,9 +11,9 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("Feature bundles", () => {
-  it("every PYTHON_SIDECAR_TOOL maps to exactly one bundle", () => {
+  it("every PYTHON_SIDECAR_TOOL maps to one mandatory or optional bundle", () => {
     for (const toolId of PYTHON_SIDECAR_TOOLS) {
-      const bundle = getBundleForTool(toolId);
+      const bundle = getBundleForTool(toolId) ?? getOptionalBundleForTool(toolId);
       expect(bundle, `${toolId} has no bundle`).toBeDefined();
     }
   });
@@ -40,10 +41,17 @@ describe("Feature bundles", () => {
     expect(FEATURE_BUNDLES.transcription).toBeDefined();
   });
 
-  it("TOOL_BUNDLE_MAP covers all sidecar tools", () => {
+  it("TOOL_BUNDLE_MAP covers sidecar tools without an optional capability pack", () => {
     const mappedTools = Object.keys(TOOL_BUNDLE_MAP);
     for (const toolId of PYTHON_SIDECAR_TOOLS) {
-      expect(mappedTools, `${toolId} missing from TOOL_BUNDLE_MAP`).toContain(toolId);
+      if (getOptionalBundleForTool(toolId)) {
+        expect(
+          mappedTools,
+          `${toolId} must remain available without its optional pack`,
+        ).not.toContain(toolId);
+      } else {
+        expect(mappedTools, `${toolId} missing from TOOL_BUNDLE_MAP`).toContain(toolId);
+      }
     }
   });
 });

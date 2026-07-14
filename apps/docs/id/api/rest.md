@@ -1,8 +1,8 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 7793faea1aad
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # Referensi REST API {#rest-api-reference}
@@ -178,7 +178,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask dikirim sebagai bagian file kedua (fieldname `mask`), `format`, `quality` |
-| `ocr` | OCR / Ekstraksi Teks | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Ekstraksi Teks | Tesseract (cepat); RapidOCR + PP-OCR ONNX (seimbang/terbaik) | `quality` (cepat/seimbang/terbaik), `language`, `enhance` |
 | `blur-faces` | Face / PII Blur | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Smart Crop | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Image Enhancement | Berbasis analisis | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Beberapa tool mengekspos endpoint tambahan di luar `POST /api/v1/tools/<section>
 
 ## Pemrosesan Batch {#batch-processing}
 
-Terapkan tool generik yang mendukung batch ke beberapa file sekaligus. Mengembalikan arsip ZIP. Rute multi-file atau multi-langkah kustom, seperti penandatanganan PDF, OCR PDF, dan rute preset PDF-ke-gambar, menggunakan kontrak endpoint sendiri alih-alih rute `/batch` generik.
+Terapkan tool generik yang mendukung batch ke beberapa file sekaligus. Mengembalikan arsip ZIP. Rute multi-file atau multi-langkah kustom, seperti penandatanganan PDF dan rute preset PDF-ke-gambar, menggunakan kontrak endpoint sendiri alih-alih rute `/batch` generik.
+
+Tool `ocr-pdf` mendukung rute `/batch` generik ini.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Parameter query:
 
 Kelola bundle fitur AI (pasang/hapus paket model AI di lingkungan Docker). Utamakan endpoint pemasangan tingkat tool ketika mengaktifkan sebuah tool dari otomasi kustom: beberapa tool AI memerlukan lebih dari satu bundle bersama, dan endpoint ini melewati bundle yang sudah terpasang sambil hanya mengantrekan yang belum ada.
 
+OCR adalah peningkatan opsional dan bukan ketergantungan yang sulit. Tingkat `fast` Tesseract berfungsi tanpa paket; `POST /api/v1/admin/features/ocr/install` menginstal paket RapidOCR yang ditandatangani untuk `balanced` dan `best` di Linux amd64 atau arm64. Waktu proses OCR yang akurat menggunakan CPU hanya pada CPU dan host NVIDIA serta memerlukan setidaknya 4 GiB memori efektif (batas kontainer yang dikonfigurasi cgroup, jika tidak, memori host). SnapOtter melaporkan `requiredMemoryBytes`, `effectiveMemoryBytes`, dan alasan kompatibilitas `insufficient-memory`, dan menolak pemasangan yang tidak kompatibel sebelum mengunduh. Persyaratan memori ini tidak berlaku untuk `fast`. Paketnya sekitar 208-234 MiB untuk diunduh dan 409-488 MiB diinstal, tergantung pada targetnya; indeks yang ditandatangani mengikat ukuran persis yang diterapkan selama instalasi.
+
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Daftar semua bundle fitur dan status pemasangannya |
@@ -601,7 +605,18 @@ Kelola bundle fitur AI (pasang/hapus paket model AI di lingkungan Docker). Utama
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Pasang setiap bundle yang dibutuhkan sebuah tool; mengembalikan status queued/skipped per bundle |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Hapus bundle fitur dan bersihkan file model |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Dapatkan total penggunaan disk oleh model AI |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Impor arsip bundle AI offline |
+| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Impor paket AI lama (`file`) atau rilis offline OCR (`index` plus `archive`) |
+
+Impor OCR dengan celah udara harus menyertakan `ocr-runtime-index.json` rilis yang ditandatangani dan arsip platform yang cocok. SnapOtter menerapkan tanda tangan Ed25519, hash artefak, kompatibilitas, ekstraksi, dan pemeriksaan uji asap yang sama dengan yang digunakan oleh instalasi online:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Gunakan arsip `linux-arm64-cpu-py311` di arm64. Artefak yang ditandatangani untuk target lain ditolak, bukan dipasang.
 
 ## Operasi Admin {#admin-operations}
 

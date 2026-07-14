@@ -37,13 +37,16 @@ interface ProgressHandlers {
  * flaky network, proxy buffering) the UI hung forever at the last percent
  * (~25%) even though the backend job had finished and saved its result.
  *
- * This reconnects on tab refocus -- the progress endpoint replays the
- * terminal frame from its 10-minute Redis cache, so a job that completed
- * while SSE was dead still resolves -- and arms a stall timeout that fails
- * gracefully instead of hanging. Returns a cleanup the caller must invoke on
- * sync completion, error, or unmount.
+ * This reconnects on tab refocus -- the progress endpoint replays the terminal
+ * frame from Redis and, after that cache expires, from the durable job record,
+ * so a job that completed while SSE was dead still resolves -- and arms a stall
+ * timeout that fails gracefully instead of hanging. Returns a cleanup the
+ * caller must invoke on sync completion, error, or unmount.
  */
-function subscribeJobProgress(clientJobId: string, handlers: ProgressHandlers): () => void {
+export function subscribeEraseObjectJobProgress(
+  clientJobId: string,
+  handlers: ProgressHandlers,
+): () => void {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
   let done = false;
@@ -84,6 +87,10 @@ function subscribeJobProgress(clientJobId: string, handlers: ProgressHandlers): 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.type === "heartbeat") {
+          resetStall();
+          return;
+        }
         if (data.type !== "single") return;
         resetStall();
         if (data.phase === "complete" && data.result) {
@@ -174,7 +181,7 @@ export function EraseObjectSettings({
         });
       };
 
-      const stopProgress = subscribeJobProgress(clientJobId, {
+      const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
         onProgress,
         onComplete: (r) => {
           applyResult(r);
@@ -283,7 +290,7 @@ export function EraseObjectSettings({
       setProgressStage(null);
     };
 
-    const stopProgress = subscribeJobProgress(clientJobId, {
+    const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
@@ -329,7 +336,7 @@ export function EraseObjectSettings({
       setProgressPercent(15);
     };
     xhr.onload = () => {
-      // 202 = async: subscribeJobProgress drives completion via SSE.
+      // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) return;
 
       stopProgress();

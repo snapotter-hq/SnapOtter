@@ -304,6 +304,27 @@ describe("useFeaturesStore", () => {
       await promise;
     });
 
+    it("ignores SSE heartbeats without mutating install progress", async () => {
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-heartbeat" });
+
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+
+      const es = FakeEventSource.instances[0];
+      es.onmessage?.({ data: JSON.stringify({ type: "heartbeat" }) });
+
+      expect(useFeaturesStore.getState().installing["test-bundle"]).toEqual({
+        percent: 5,
+        stage: "Starting...",
+      });
+
+      es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await promise;
+    });
+
     it("on API failure: sets error and clears installing", async () => {
       apiPostMock.mockRejectedValueOnce(new Error("Server error"));
 
@@ -484,6 +505,37 @@ describe("useFeaturesStore", () => {
       });
       expect(useFeaturesStore.getState().queued).toEqual([]);
     }, 15000);
+
+    it("skips bundles that are incompatible with the current host", async () => {
+      const bundles = [
+        makeBundleState({
+          id: "unsupported-ocr",
+          status: "error",
+          compatibility: "incompatible",
+          compatibilityReason: "unsupported-host",
+        }),
+        makeBundleState({
+          id: "low-memory-ocr",
+          status: "not_installed",
+          compatibility: "incompatible",
+          compatibilityReason: "insufficient-memory",
+        }),
+        makeBundleState({ id: "supported-bundle", status: "not_installed" }),
+      ];
+      useFeaturesStore.setState({ bundles, loaded: true });
+      apiPostMock.mockResolvedValue({ jobId: "supported-job" });
+
+      await useFeaturesStore.getState().installAll();
+
+      await vi.waitFor(() => {
+        expect(apiPostMock).toHaveBeenCalledWith("/v1/admin/features/supported-bundle/install", {});
+      });
+      expect(apiPostMock).not.toHaveBeenCalledWith(
+        "/v1/admin/features/unsupported-ocr/install",
+        {},
+      );
+      expect(apiPostMock).not.toHaveBeenCalledWith("/v1/admin/features/low-memory-ocr/install", {});
+    });
 
     it("reflects server-queued bundles in the queued pill during Install All", async () => {
       const bundles = [

@@ -20,6 +20,36 @@ export BUNDLE_ID="${1:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
 export ARCH="${2:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
 OUTPUT_DIR="${3:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
 
+# OCR uses the v3 complete-runtime format. Keep legacy aliases at this boundary
+# until every release caller has moved to explicit capability target names.
+if [[ "${BUNDLE_ID}" == "ocr" ]]; then
+  case "${ARCH}" in
+    amd64-gpu | amd64-cpu | linux-amd64-cpu-py312)
+      OCR_TARGET="linux-amd64-cpu-py312"
+      ;;
+    arm64-cpu | linux-arm64-cpu-py311)
+      OCR_TARGET="linux-arm64-cpu-py311"
+      ;;
+    *)
+      echo "ERROR: Unsupported OCR runtime target alias: ${ARCH}" >&2
+      exit 2
+      ;;
+  esac
+  SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  OCR_BUILDER="${OCR_RUNTIME_BUILDER:-${SCRIPT_DIR}/build-ocr-runtime.sh}"
+  if [[ ! -x "${OCR_BUILDER}" ]]; then
+    echo "ERROR: OCR runtime builder is missing or not executable: ${OCR_BUILDER}" >&2
+    exit 2
+  fi
+  exec "${OCR_BUILDER}" "${OCR_TARGET}" "${OUTPUT_DIR}"
+fi
+
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
+if [[ ! "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: SOURCE_DATE_EPOCH must be a non-negative integer" >&2
+  exit 2
+fi
+
 MANIFEST="/app/docker/feature-manifest.json"
 VENV_PATH="${PYTHON_VENV_PATH:-/opt/venv}"
 export MODELS_DIR="/tmp/bundle-models"
@@ -68,8 +98,9 @@ if '${BUNDLE_ID}' not in m['bundles']:
 # ── Step 0: Write pip constraints (numpy-1.x-ABI closure lock) ────────────
 # Bundle installs below can otherwise pull the latest transitive scientific
 # stack: numpy 2.x plus scipy/scikit-learn/scikit-image/pandas wheels built
-# against the numpy 2.x ABI (e.g. paddleocr[doc-parser] drags numpy 1.26.4 ->
-# 2.5.1 + scipy 1.18). The Step 4 re-pin snaps numpy back to 1.26.4 but leaves
+# against the numpy 2.x ABI. A legacy bundle's transitive dependency can drag
+# numpy 1.26.4 to 2.x plus a newer scipy. The Step 4 re-pin snaps numpy back to
+# 1.26.4 but leaves
 # those numpy-2.x wheels behind; the Step 6 diff (by dir name, not version)
 # then ships them, and once installed they strand on the numpy==1.26.4 base and
 # raise "numpy.dtype size changed" on import, crashing the dispatcher for
@@ -419,7 +450,23 @@ echo "=== Creating archive ==="
 ARCHIVE_NAME="${BUNDLE_ID}-${ARCH}.tar.gz"
 ARCHIVE_PATH="${OUTPUT_DIR}/${ARCHIVE_NAME}"
 
-tar -czf "${ARCHIVE_PATH}" -C "${BUILD_DIR}" .
+find "${BUILD_DIR}" -mindepth 1 -printf '%P\0' \
+  | LC_ALL=C sort -z \
+  | tar \
+      --create \
+      --file=- \
+      --directory="${BUILD_DIR}" \
+      --sort=name \
+      --mtime="@${SOURCE_DATE_EPOCH}" \
+      --owner=0 \
+      --group=0 \
+      --numeric-owner \
+      --format=gnu \
+      --no-recursion \
+      --null \
+      --verbatim-files-from \
+      --files-from=- \
+  | gzip -n > "${ARCHIVE_PATH}"
 
 sha256sum "${ARCHIVE_PATH}" | awk '{print $1}' > "${ARCHIVE_PATH}.sha256"
 

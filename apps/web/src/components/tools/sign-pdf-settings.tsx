@@ -27,12 +27,16 @@ interface ProgressHandlers {
 /**
  * Subscribe to async (202) job progress with the same mobile-resilient recovery
  * as the standard tool processor (PRs #203/#204). Reconnects on tab refocus (the
- * progress endpoint replays the terminal frame from its Redis cache, so a job
- * that finished while SSE was dead still resolves) and arms a stall timeout that
- * fails gracefully instead of hanging at the last percent. Returns a cleanup the
- * caller must invoke on sync completion, error, or unmount.
+ * progress endpoint replays the terminal frame from Redis and, after that cache
+ * expires, from the durable job record, so a job that finished while SSE was dead
+ * still resolves) and arms a stall timeout that fails gracefully instead of
+ * hanging at the last percent. Returns a cleanup the caller must invoke on sync
+ * completion, error, or unmount.
  */
-function subscribeJobProgress(clientJobId: string, handlers: ProgressHandlers): () => void {
+export function subscribeSignPdfJobProgress(
+  clientJobId: string,
+  handlers: ProgressHandlers,
+): () => void {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
   let done = false;
@@ -73,6 +77,10 @@ function subscribeJobProgress(clientJobId: string, handlers: ProgressHandlers): 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.type === "heartbeat") {
+          resetStall();
+          return;
+        }
         if (data.type !== "single") return;
         resetStall();
         if (data.phase === "complete" && data.result) {
@@ -154,7 +162,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       setProcessing(false);
     };
 
-    const stopProgress = subscribeJobProgress(clientJobId, {
+    const stopProgress = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => setProgress(percent),
       onComplete: (r) => {
         setDownloadUrl(r.downloadUrl as string);
@@ -187,7 +195,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const xhr = new XMLHttpRequest();
     xhr.timeout = 600_000;
     xhr.onload = () => {
-      // 202 = async: subscribeJobProgress drives completion via SSE.
+      // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) return;
       stopProgress();
       progressCleanupRef.current = null;

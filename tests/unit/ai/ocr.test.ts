@@ -1,383 +1,479 @@
-import { writeFile } from "node:fs/promises";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("sharp", () => {
-  const mockSharp = vi.fn(() => ({
-    resize: vi.fn().mockReturnThis(),
+vi.mock("sharp", () => ({
+  default: vi.fn(() => ({
     png: vi.fn().mockReturnThis(),
-    toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+    toFile: vi.fn().mockResolvedValue({ size: 3 }),
     metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-  }));
-  return { default: mockSharp };
-});
-
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
-  runPythonWithProgress: vi.fn(),
-  parseStdoutJson: vi.fn(),
+vi.mock("../../../packages/ai/src/ocr-runtime-dispatcher.js", () => ({
+  runOcrRuntime: vi.fn(),
+}));
+
+vi.mock("../../../packages/ai/src/tesseract.js", () => ({
+  runAdaptiveTesseract: vi.fn(),
+  runTesseract: vi.fn(),
 }));
 
 import sharp from "sharp";
-import { parseStdoutJson, runPythonWithProgress } from "../../../packages/ai/src/bridge.js";
 import { extractText } from "../../../packages/ai/src/ocr.js";
+import { runOcrRuntime } from "../../../packages/ai/src/ocr-runtime-dispatcher.js";
+import { runAdaptiveTesseract } from "../../../packages/ai/src/tesseract.js";
 
-const FAKE_INPUT = Buffer.from("fake-image-data");
-const FAKE_OUTPUT_DIR = "/tmp/test-ocr";
+const INPUT = Buffer.from("image");
+
+function runtimeResponse(result: unknown) {
+  return {
+    result,
+    stderr: "",
+    runtime: {
+      generation: "ocr-runtime-1",
+      artifactVersion: "1.0.0",
+      target: "linux-amd64-cpu-py312" as const,
+      providers: ["CPUExecutionProvider"],
+      models: { detection: "sha256:detection" },
+    },
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(writeFile).mockResolvedValue(undefined);
-  vi.mocked(runPythonWithProgress).mockResolvedValue({
-    stdout: '{"success": true, "text": "Hello World", "engine": "paddleocr"}',
-    stderr: "",
-  });
-  vi.mocked(parseStdoutJson).mockReturnValue({
-    success: true,
-    text: "Hello World",
-    engine: "paddleocr",
-  });
   vi.mocked(sharp).mockImplementation(
     () =>
       ({
-        resize: vi.fn().mockReturnThis(),
         png: vi.fn().mockReturnThis(),
-        toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+        toFile: vi.fn().mockResolvedValue({ size: 3 }),
         metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
       }) as unknown as ReturnType<typeof sharp>,
   );
+  vi.mocked(runAdaptiveTesseract).mockResolvedValue({
+    text: "text",
+    engine: "tesseract",
+    provider: "native",
+    device: "cpu",
+  });
+  vi.mocked(runOcrRuntime).mockResolvedValue(
+    runtimeResponse({
+      success: true,
+      text: "text",
+      engine: "rapidocr-onnx",
+      requestedQuality: "balanced",
+      actualQuality: "balanced",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+    }),
+  );
 });
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+describe("extractText error and progress behavior", () => {
+  it("forwards progress and the AbortSignal to Tesseract", async () => {
+    const onProgress = vi.fn();
+    const controller = new AbortController();
 
-describe("extractText", () => {
-  describe("request serialization", () => {
-    it("calls ocr.py with input path and options JSON", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    await extractText(
+      INPUT,
+      "/tmp/ocr",
+      { quality: "fast", language: "ja", signal: controller.signal },
+      onProgress,
+    );
 
-      expect(runPythonWithProgress).toHaveBeenCalledWith(
-        "ocr.py",
-        [`${FAKE_OUTPUT_DIR}/input_ocr.png`, "{}"],
-        expect.objectContaining({ timeout: expect.any(Number) }),
-      );
-    });
-
-    it("serializes quality option", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { quality: "best" });
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({ quality: "best" });
-    });
-
-    it("serializes language option", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { language: "ja" });
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({ language: "ja" });
-    });
-
-    it("serializes enhance option", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { enhance: true });
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({ enhance: true });
-    });
-
-    it("serializes deprecated engine option for backward compatibility", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { engine: "tesseract" });
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({ engine: "tesseract" });
-    });
-
-    it("serializes all options together", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, {
-        quality: "fast",
-        language: "en",
-        enhance: false,
-      });
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({
-        quality: "fast",
-        language: "en",
-        enhance: false,
-      });
-    });
-
-    it("resizes input to max 2048px before writing", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      // Sharp is called with the input, then resize is called
-      expect(sharp).toHaveBeenCalledWith(FAKE_INPUT);
-    });
-
-    it("writes resized PNG to outputDir", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      expect(writeFile).toHaveBeenCalledWith(
-        `${FAKE_OUTPUT_DIR}/input_ocr.png`,
-        Buffer.from("mock-png-data"),
-      );
-    });
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      "/tmp/ocr/input_ocr.png",
+      expect.objectContaining({
+        language: "ja",
+        signal: controller.signal,
+        timeoutMs: 600_000,
+        maxStdoutBytes: 1_000_000,
+        onProgress: expect.any(Function),
+      }),
+    );
+    const relayedProgress = vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].onProgress;
+    relayedProgress?.(42, "Recognizing text");
+    expect(onProgress).toHaveBeenCalledWith(42, "Recognizing text");
   });
 
-  describe("response parsing", () => {
-    it("returns OcrResult with text and engine", async () => {
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+  it("rejects explicit Korean Fast OCR before image processing or Tesseract dispatch", async () => {
+    await expect(
+      extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ko" }),
+    ).rejects.toThrow(
+      "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.",
+    );
 
-      expect(result).toEqual({
-        text: "Hello World",
-        engine: "paddleocr",
-      });
-    });
-
-    it("returns text with special characters", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "Price: $19.99\nDiscount: 15%",
-        engine: "paddleocr",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.text).toBe("Price: $19.99\nDiscount: 15%");
-    });
-
-    it("returns empty text string when no text detected", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "",
-        engine: "paddleocr",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.text).toBe("");
-    });
-
-    it("returns engine information", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "test",
-        engine: "tesseract",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.engine).toBe("tesseract");
-    });
-
-    it("returns undefined engine when not provided by Python", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "test",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.engine).toBeUndefined();
-    });
+    expect(sharp).not.toHaveBeenCalled();
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+    expect(runOcrRuntime).not.toHaveBeenCalled();
   });
 
-  describe("timeout calculation", () => {
-    it("uses minimum 600000ms timeout for small images", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+  it.each([
+    "balanced",
+    "best",
+  ] as const)("keeps explicit Korean on the %s accurate tier without silent rerouting", async (quality) => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+      runtimeResponse({
+        success: true,
+        text: "한글",
+        engine: "rapidocr-onnx",
+        requestedQuality: quality,
+        actualQuality: quality,
+        device: "cpu",
+        provider: "CPUExecutionProvider",
+        degraded: false,
+        warnings: [],
+      }),
+    );
 
-      // 800x600 = 0.48 MP, 0.48 * 30 * 1000 = 14400 < 600000
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBe(600000);
+    const result = await extractText(INPUT, "/tmp/ocr", { quality, language: "ko" });
+
+    expect(result.requestedQuality).toBe(quality);
+    expect(result.actualQuality).toBe(quality);
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+    expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+    const runtimeOptions = JSON.parse(
+      vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
+    ) as Record<string, unknown>;
+    expect(runtimeOptions).toMatchObject({ language: "ko", quality });
+  });
+
+  it("applies requested local-contrast preprocessing for Fast OCR", async () => {
+    const recognitionPipeline = {
+      clahe: vi.fn().mockReturnThis(),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    const pipeline = {
+      clone: vi.fn(() => recognitionPipeline),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+      metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+    };
+    vi.mocked(sharp).mockReturnValueOnce(pipeline as unknown as ReturnType<typeof sharp>);
+
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", enhance: true });
+
+    expect(recognitionPipeline.clahe).toHaveBeenCalledWith({
+      height: 75,
+      maxSlope: 2,
+      width: 100,
     });
+    expect(pipeline.toFile).toHaveBeenCalledWith("/tmp/ocr/input_ocr.png");
+    expect(recognitionPipeline.toFile).toHaveBeenCalledWith("/tmp/ocr/input_ocr_recognition.png");
+  });
 
-    it("scales timeout for large images", async () => {
-      // We need sharp to return large dimensions for the resized buffer
-      // First call resizes the input, second call reads metadata of the resized buffer
-      let _callCount = 0;
-      vi.mocked(sharp).mockImplementation(() => {
-        _callCount++;
-        return {
-          resize: vi.fn().mockReturnThis(),
+  it("automatically restores contrast on faint low-resolution Fast inputs", async () => {
+    const statsPipeline = {
+      grayscale: vi.fn().mockReturnThis(),
+      stats: vi.fn().mockResolvedValue({
+        channels: [{ mean: 225, stdev: 15 }],
+      }),
+    };
+    const recognitionPipeline = {
+      grayscale: vi.fn().mockReturnThis(),
+      linear: vi.fn().mockReturnThis(),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    const pipeline = {
+      clone: vi.fn().mockReturnValueOnce(statsPipeline).mockReturnValueOnce(recognitionPipeline),
+      metadata: vi.fn().mockResolvedValue({ width: 450, height: 640 }),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    vi.mocked(sharp).mockReturnValueOnce(pipeline as unknown as ReturnType<typeof sharp>);
+
+    const result = await extractText(INPUT, "/tmp/ocr", { quality: "fast" });
+
+    expect(recognitionPipeline.linear).toHaveBeenCalledWith(4, -650);
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      "/tmp/ocr/input_ocr.png",
+      expect.objectContaining({
+        blockLayoutOnly: true,
+        recognitionInputPath: "/tmp/ocr/input_ocr_recognition.png",
+      }),
+    );
+    expect(result.warnings).toContain("Applied automatic low-contrast OCR preprocessing.");
+  });
+
+  it("does not alter ordinary low-resolution Fast inputs", async () => {
+    const statsPipeline = {
+      grayscale: vi.fn().mockReturnThis(),
+      stats: vi.fn().mockResolvedValue({
+        channels: [{ mean: 138, stdev: 91 }],
+      }),
+    };
+    const pipeline = {
+      clone: vi.fn(() => statsPipeline),
+      linear: vi.fn().mockReturnThis(),
+      metadata: vi.fn().mockResolvedValue({ width: 432, height: 648 }),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    vi.mocked(sharp).mockReturnValueOnce(pipeline as unknown as ReturnType<typeof sharp>);
+
+    const result = await extractText(INPUT, "/tmp/ocr", { quality: "fast" });
+
+    expect(pipeline.linear).not.toHaveBeenCalled();
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("prepares two bounded horizontal fallback tiles for large CJK scene text", async () => {
+    const sourcePipeline = {
+      metadata: vi.fn().mockResolvedValue({ width: 4_000, height: 3_000 }),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    const tilePipelines = Array.from({ length: 2 }, () => ({
+      extract: vi.fn().mockReturnThis(),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    }));
+    vi.mocked(sharp)
+      .mockReturnValueOnce(sourcePipeline as unknown as ReturnType<typeof sharp>)
+      .mockReturnValueOnce(tilePipelines[0] as unknown as ReturnType<typeof sharp>)
+      .mockReturnValueOnce(tilePipelines[1] as unknown as ReturnType<typeof sharp>);
+
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ja" });
+    const fallbackInputProvider =
+      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].fallbackInputProvider;
+    await expect(fallbackInputProvider?.()).resolves.toEqual([
+      "/tmp/ocr/input_ocr_scene_upper.png",
+      "/tmp/ocr/input_ocr_scene_lower.png",
+    ]);
+
+    expect(tilePipelines[0].extract).toHaveBeenCalledWith({
+      height: 1_500,
+      left: 0,
+      top: 0,
+      width: 4_000,
+    });
+    expect(tilePipelines[1].extract).toHaveBeenCalledWith({
+      height: 1_500,
+      left: 0,
+      top: 1_500,
+      width: 4_000,
+    });
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      "/tmp/ocr/input_ocr.png",
+      expect.objectContaining({
+        fallbackInputProvider: expect.any(Function),
+      }),
+    );
+  });
+
+  it("lazily prepares a bounded dense-board enhancement for small CJK scenes", async () => {
+    const sourcePipeline = {
+      metadata: vi.fn().mockResolvedValue({ width: 1_200, height: 1_600 }),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    const densePipeline = {
+      grayscale: vi.fn().mockReturnThis(),
+      clahe: vi.fn().mockReturnThis(),
+      sharpen: vi.fn().mockReturnThis(),
+      png: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue({ size: 12 }),
+    };
+    vi.mocked(sharp)
+      .mockReturnValueOnce(sourcePipeline as unknown as ReturnType<typeof sharp>)
+      .mockReturnValueOnce(densePipeline as unknown as ReturnType<typeof sharp>);
+
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "ja" });
+    const denseCjkInputProvider =
+      vi.mocked(runAdaptiveTesseract).mock.calls[0]?.[1].denseCjkInputProvider;
+    expect(denseCjkInputProvider).toEqual(expect.any(Function));
+    expect(densePipeline.grayscale).not.toHaveBeenCalled();
+
+    await expect(denseCjkInputProvider?.()).resolves.toBe("/tmp/ocr/input_ocr_dense_cjk.png");
+    expect(sharp).toHaveBeenLastCalledWith("/tmp/ocr/input_ocr.png");
+    expect(densePipeline.grayscale).toHaveBeenCalledTimes(1);
+    expect(densePipeline.clahe).toHaveBeenCalledWith({
+      height: 200,
+      maxSlope: 2,
+      width: 150,
+    });
+    expect(densePipeline.sharpen).toHaveBeenCalledWith({ sigma: 1 });
+    expect(densePipeline.toFile).toHaveBeenCalledWith("/tmp/ocr/input_ocr_dense_cjk.png");
+  });
+
+  it("does not offer dense-board preprocessing outside its bounded CJK gate", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
           png: vi.fn().mockReturnThis(),
-          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-          metadata: vi.fn().mockResolvedValue({ width: 5000, height: 4000 }),
-        } as unknown as ReturnType<typeof sharp>;
-      });
+          toFile: vi.fn().mockResolvedValue({ size: 3 }),
+          metadata: vi.fn().mockResolvedValue({ width: 1_200, height: 1_600 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
 
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "en" });
 
-      // 5000*4000 = 20 MP, 20 * 30 * 1000 = 600000 = 600000 (equal to min)
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBeGreaterThanOrEqual(600000);
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.objectContaining({ denseCjkInputProvider: expect.anything() }),
+    );
+  });
+
+  it("does not prepare CJK scene tiles for an explicit Latin language", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          toFile: vi.fn().mockResolvedValue({ size: 3 }),
+          metadata: vi.fn().mockResolvedValue({ width: 4_000, height: 3_000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "en" });
+
+    expect(sharp).toHaveBeenCalledTimes(1);
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.objectContaining({ fallbackInputPaths: expect.anything() }),
+    );
+  });
+
+  it("uses a megapixel-scaled timeout for very large images", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          toFile: vi.fn().mockResolvedValue({ size: 3 }),
+          metadata: vi.fn().mockResolvedValue({ width: 6_000, height: 6_000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await extractText(INPUT, "/tmp/ocr", { quality: "fast", language: "en" });
+
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ timeoutMs: 1_080_000 }),
+    );
+  });
+
+  it("rejects pathological image sides before conversion or detector tiling", async () => {
+    const toFile = vi.fn().mockResolvedValue({ size: 3 });
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          toFile,
+          metadata: vi.fn().mockResolvedValue({ width: 40_001, height: 1 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(extractText(INPUT, "/tmp/ocr", { quality: "best" })).rejects.toThrow(
+      "dimension safety limit",
+    );
+    expect(toFile).not.toHaveBeenCalled();
+    expect(runOcrRuntime).not.toHaveBeenCalled();
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+  });
+
+  it("propagates image conversion failures", async () => {
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          toFile: vi.fn().mockRejectedValue(new Error("invalid pixels")),
+          metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(extractText(INPUT, "/tmp/ocr")).rejects.toThrow("invalid pixels");
+  });
+
+  it("propagates scratch write failures", async () => {
+    vi.mocked(sharp).mockImplementationOnce(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          toFile: vi.fn().mockRejectedValue(new Error("disk full")),
+          metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(extractText(INPUT, "/tmp/ocr")).rejects.toThrow("disk full");
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+  });
+
+  it("propagates Tesseract cancellation and process failures", async () => {
+    const error = new Error("Tesseract OCR was canceled");
+    error.name = "AbortError";
+    vi.mocked(runAdaptiveTesseract).mockRejectedValueOnce(error);
+
+    await expect(extractText(INPUT, "/tmp/ocr", { quality: "fast" })).rejects.toMatchObject({
+      name: "AbortError",
     });
   });
 
-  describe("error handling", () => {
-    it("throws with custom error from Python", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: false,
-        error: "PaddleOCR initialization failed",
-      });
+  it("propagates accurate-runtime transport failures without retrying", async () => {
+    vi.mocked(runOcrRuntime).mockRejectedValueOnce(new Error("OCR runtime exited unexpectedly"));
 
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-        "PaddleOCR initialization failed",
-      );
-    });
-
-    it("throws fallback error when success: false without error string", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({ success: false });
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("OCR failed");
-    });
-
-    it("propagates bridge timeout", async () => {
-      vi.mocked(runPythonWithProgress).mockRejectedValue(new Error("Python script timed out"));
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("timed out");
-    });
-
-    it("propagates OOM errors from bridge", async () => {
-      vi.mocked(runPythonWithProgress).mockRejectedValue(
-        new Error("Process killed (out of memory)"),
-      );
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("out of memory");
-    });
-
-    it("propagates parseStdoutJson errors", async () => {
-      vi.mocked(parseStdoutJson).mockImplementation(() => {
-        throw new Error("No JSON response from Python script");
-      });
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-        "No JSON response from Python script",
-      );
-    });
+    await expect(extractText(INPUT, "/tmp/ocr", { quality: "balanced" })).rejects.toThrow(
+      "exited unexpectedly",
+    );
+    expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
   });
 
-  describe("onProgress forwarding", () => {
-    it("passes onProgress to bridge", async () => {
-      const onProgress = vi.fn();
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, {}, onProgress);
+  it("emits progress heartbeats while the accurate runtime is busy", async () => {
+    vi.useFakeTimers();
+    let finishRuntime: ((value: ReturnType<typeof runtimeResponse>) => void) | undefined;
+    vi.mocked(runOcrRuntime).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRuntime = resolve;
+      }),
+    );
+    const onProgress = vi.fn();
 
-      expect(runPythonWithProgress).toHaveBeenCalledWith(
-        "ocr.py",
-        expect.any(Array),
-        expect.objectContaining({ onProgress }),
+    try {
+      const pending = extractText(INPUT, "/tmp/ocr", { quality: "balanced" }, onProgress);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onProgress).toHaveBeenCalledWith(10, "Starting accurate OCR");
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(onProgress).toHaveBeenCalledWith(10, "Running accurate OCR");
+
+      finishRuntime?.(
+        runtimeResponse({
+          success: true,
+          text: "text",
+          engine: "rapidocr-onnx",
+          requestedQuality: "balanced",
+          actualQuality: "balanced",
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
       );
-    });
-
-    it("omits onProgress when not provided", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.onProgress).toBeUndefined();
-    });
+      await pending;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  describe("image downscaling", () => {
-    it("caps input to 2048px using resize with inside fit", async () => {
-      const resizeFn = vi.fn().mockReturnThis();
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            resize: resizeFn,
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
+  it("propagates malformed accurate-runtime output", async () => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse("not an object"));
 
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      expect(resizeFn).toHaveBeenCalledWith({
-        width: 2048,
-        height: 2048,
-        fit: "inside",
-        withoutEnlargement: true,
-      });
-    });
+    await expect(extractText(INPUT, "/tmp/ocr", { quality: "balanced" })).rejects.toThrow(
+      "invalid metadata",
+    );
   });
 
-  describe("multiline and unicode text", () => {
-    it("handles multiline OCR text", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "Line 1\nLine 2\nLine 3",
-        engine: "paddleocr",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.text).toBe("Line 1\nLine 2\nLine 3");
+  it("preserves multiline Unicode text", async () => {
+    vi.mocked(runAdaptiveTesseract).mockResolvedValueOnce({
+      text: "こんにちは\n안녕하세요\n你好",
+      engine: "tesseract",
+      provider: "native",
+      device: "cpu",
     });
 
-    it("handles unicode text from CJK languages", async () => {
-      vi.mocked(parseStdoutJson).mockReturnValue({
-        success: true,
-        text: "你好世界",
-        engine: "paddleocr",
-      });
-
-      const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-      expect(result.text).toBe("你好世界");
-    });
-  });
-
-  describe("sharp conversion errors", () => {
-    it("propagates sharp conversion errors", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            resize: vi.fn().mockReturnThis(),
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockRejectedValue(new Error("Input buffer is empty")),
-            metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-        "Input buffer is empty",
-      );
-    });
-  });
-
-  describe("edge cases", () => {
-    it("propagates writeFile error", async () => {
-      vi.mocked(writeFile).mockRejectedValueOnce(new Error("Permission denied"));
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("Permission denied");
-    });
-
-    it("handles zero dimensions from metadata for timeout calculation", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            resize: vi.fn().mockReturnThis(),
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: undefined, height: undefined }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      // 0 MP: timeout = max(600_000, 0) = 600_000
-      expect(options.timeout).toBe(600_000);
-    });
-
-    it("propagates segfault from bridge", async () => {
-      vi.mocked(runPythonWithProgress).mockRejectedValue(
-        new Error("Process crashed (segmentation fault)"),
-      );
-
-      await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("segmentation fault");
-    });
-
-    it("passes empty options as empty JSON", async () => {
-      await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
-
-      const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
-      expect(JSON.parse(args[1])).toEqual({});
-    });
+    const result = await extractText(INPUT, "/tmp/ocr", { quality: "fast" });
+    expect(result.text).toBe("こんにちは\n안녕하세요\n你好");
   });
 });

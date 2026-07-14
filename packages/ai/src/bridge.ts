@@ -289,9 +289,8 @@ export class PythonDispatcher {
               continue;
             }
 
-            // Diagnostic notices (e.g. ocr.py's GPU-to-tesseract downgrade
-            // notice) - forward so they reach docker logs instead of being
-            // silently dropped for matching neither shape above.
+            // Diagnostic notices are forwarded so they reach docker logs
+            // instead of being silently dropped for matching neither shape.
             if (typeof parsed.info === "string") {
               console.log(`[python] ${parsed.info}`);
               continue;

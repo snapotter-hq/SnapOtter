@@ -8,6 +8,10 @@ export interface FeatureBundleInfo {
 
 export type FeatureStatus = "not_installed" | "queued" | "installing" | "installed" | "error";
 
+export type FeatureCompatibility = "compatible" | "incompatible" | "invalid";
+
+export type OcrQualityTier = "fast" | "balanced" | "best";
+
 export interface FeatureBundleState {
   id: string;
   name: string;
@@ -16,12 +20,21 @@ export interface FeatureBundleState {
   installedVersion: string | null;
   estimatedSize: string;
   // Real download / on-disk sizes for THIS host's architecture, read from the
-  // bundle manifest. amd64 hosts pull the CUDA-inclusive archive whether or not
-  // a GPU is present, so these can be much larger than the coarse estimatedSize
-  // label suggests. Optional/nullable: absent in native (non-Docker) mode and
+  // bundle manifest. Legacy amd64 bundles are CUDA-inclusive whether or not a
+  // GPU is present; portable v3 runtimes such as OCR report their selected CPU
+  // target instead. Optional/nullable: absent in native (non-Docker) mode and
   // when the manifest lacks the value (extractedSize is 0 for some archives).
   downloadBytes?: number | null;
   installedBytes?: number | null;
+  /** Host/runtime compatibility metadata for optional portable runtimes. */
+  compatibility?: FeatureCompatibility;
+  compatibilityReason?: string | null;
+  selectedTarget?: string | null;
+  missingDownloadBytes?: number | null;
+  healthyGeneration?: string | null;
+  availableQualities?: OcrQualityTier[];
+  requiredMemoryBytes?: number | null;
+  effectiveMemoryBytes?: number | null;
   enablesTools: string[];
   progress: { percent: number; stage: string } | null;
   error: string | null;
@@ -73,8 +86,8 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
   ocr: {
     id: "ocr",
     name: "OCR",
-    description: "Extract text from images",
-    estimatedSize: "5-6 GB",
+    description: "Extract text from images and PDFs",
+    estimatedSize: "~208-234 MiB download / ~409-488 MiB installed",
     enablesTools: ["ocr", "ocr-pdf"],
   },
   transcription: {
@@ -86,15 +99,32 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
   },
 };
 
+/**
+ * Optional feature packs that improve a tool without controlling whether the
+ * tool itself is available. OCR's Fast tier is built into the image, while its
+ * Balanced and Best tiers are provided by the separately installed OCR pack.
+ */
+export const TOOL_OPTIONAL_BUNDLE_MAP: Readonly<Record<string, string>> = {
+  ocr: "ocr",
+  "ocr-pdf": "ocr",
+};
+
 export const TOOL_BUNDLE_MAP: Record<string, string> = {};
 for (const [bundleId, bundle] of Object.entries(FEATURE_BUNDLES)) {
   for (const toolId of bundle.enablesTools) {
-    TOOL_BUNDLE_MAP[toolId] = bundleId;
+    if (!TOOL_OPTIONAL_BUNDLE_MAP[toolId]) {
+      TOOL_BUNDLE_MAP[toolId] = bundleId;
+    }
   }
 }
 
 export function getBundleForTool(toolId: string): FeatureBundleInfo | null {
   const bundleId = TOOL_BUNDLE_MAP[toolId];
+  return bundleId ? FEATURE_BUNDLES[bundleId] : null;
+}
+
+export function getOptionalBundleForTool(toolId: string): FeatureBundleInfo | null {
+  const bundleId = TOOL_OPTIONAL_BUNDLE_MAP[toolId];
   return bundleId ? FEATURE_BUNDLES[bundleId] : null;
 }
 

@@ -1589,7 +1589,9 @@ export const tr: TranslationKeys = {
       quality: "Kalite",
       enhanceBeforeScanning: "Taramadan önce iyileştir",
       enhanceHint:
-        "Daha iyi doğruluk için taramadan önce otomatik olarak eğrilik düzeltir, kontrastı artırır, gürültüyü kaldırır ve görüntüyü büyütür.",
+        "Tanımadan önce yerel kontrastı iyileştirir. Hızlı doğrudan uygular; Dengeli ve En İyi yalnızca kalibre edilmiş puan sonucu iyileştirirse bu varyantı kullanır.",
+      fastKoreanUnsupported:
+        "Hızlı OCR Koreceyi desteklemez. Doğru OCR paketini yükleyip Dengeli veya En İyi seçeneğini seçin.",
       language: "Dil",
       autoDetect: "Otomatik algıla",
       extractedText: "Çıkarılan Metin",
@@ -3567,11 +3569,18 @@ export const tr: TranslationKeys = {
       uninstall: "Kaldır",
       installing: "Kuruluyor...",
       importBundle: "Paket İçe Aktar",
-      importDescription: "Başka bir kurulumdan dışa aktarılan .tar.gz paket arşivini yükleyin.",
+      importDescription:
+        "Çevrimdışı kullanım için imzalı OCR çalışma zamanı veya eski AI paketi içe aktarın.",
       importButton: "Dosyadan içe aktar",
       importing: "İçe aktarılıyor...",
       importSuccess: "Paket başarıyla içe aktarıldı.",
       importError: "Paket içe aktarılamadı: {error}",
+      importType: "Paket türü",
+      importOcr: "Hassas OCR paketi",
+      importLegacy: "Eski AI paketi",
+      importOcrIndex: "İmzalı OCR dizini (.json)",
+      importOcrArchive: "OCR çalışma zamanı arşivi (.tar.gz)",
+      importLegacyArchive: "Eski paket arşivi (.tar.gz)",
       resetTitle: "AI Ortamını Sıfırla",
       resetDescription:
         "Kurulu tüm AI özelliklerini ve indirilen modelleri siler, ardından sıfırdan başlar. Bir güncellemeden sonra AI araçları beklenmedik şekilde davranıyorsa ve paketi yeniden kurmak sorunu çözmüyorsa bunu kullanın.",

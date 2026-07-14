@@ -1,26 +1,121 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { extractText } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  extractText,
+  getOcrRuntimeCapability,
+  MAX_OCR_INPUT_DIMENSION,
+  MAX_OCR_INPUT_PIXELS,
+} from "@snapotter/ai";
+import { getOptionalBundleForTool, TOOL_OPTIONAL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
-import { isToolInstalled } from "../../lib/feature-status.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
-import { updateSingleFileProgress } from "../progress.js";
+import { env } from "../../config.js";
+import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { enqueueToolJob, waitForJob } from "../../jobs/enqueue.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { deleteObject } from "../../lib/object-storage.js";
+import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
+import {
+  ocrUploadErrorMessage,
+  ocrUploadErrorStatus,
+  resolveOcrEncodedInputLimit,
+} from "../../lib/ocr-limits.js";
+import { receiveUpload } from "../../lib/upload-stream.js";
+import { inputHandlerFor } from "../../modality/input-handler.js";
+import { requireToolAccess } from "../../permissions.js";
+import { buildAsyncAcceptedPayload } from "../async-response.js";
+import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  quality: z.enum(["fast", "balanced", "best"]).default("balanced"),
+  quality: z.enum(["fast", "balanced", "best"]).optional(),
   language: z.enum(["auto", "en", "de", "fr", "es", "zh", "ja", "ko"]).default("auto"),
-  enhance: z.boolean().default(true),
+  enhance: z.boolean().optional(),
   // Backward compat: old "engine" param still accepted
   engine: z.enum(["tesseract", "paddleocr"]).optional(),
+});
+
+type OcrSettings = z.infer<typeof settingsSchema>;
+
+function resolveWorkerQuality(settings: OcrSettings): "fast" | "balanced" | "best" {
+  const quality =
+    settings.quality ??
+    (settings.engine ? (settings.engine === "tesseract" ? "fast" : "balanced") : undefined);
+  if (quality) return quality;
+  const capability = getOcrRuntimeCapability();
+  return capability.available && capability.qualities.includes("best") ? "best" : "fast";
+}
+
+async function processOcrJob(
+  input: Buffer,
+  settingsValue: unknown,
+  filename: string,
+  ctx: {
+    scratchDir: string;
+    signal: AbortSignal;
+    report: (percent: number, stage?: string) => void;
+  },
+) {
+  const settings = settingsSchema.parse(settingsValue);
+  const quality = resolveWorkerQuality(settings);
+  if (quality !== "fast") {
+    const capability = getOcrRuntimeCapability();
+    if (!capability.available || !capability.qualities.includes(quality)) {
+      throw new Error(`OCR ${quality} runtime is no longer available`);
+    }
+  }
+
+  ctx.signal.throwIfAborted();
+  ctx.report(2, "Validating image");
+  const prepared = await inputHandlerFor("image").prepare(input, filename, {
+    scratchDir: ctx.scratchDir,
+    maxDimension: MAX_OCR_INPUT_DIMENSION,
+    maxPixels: MAX_OCR_INPUT_PIXELS,
+    signal: ctx.signal,
+  });
+  ctx.signal.throwIfAborted();
+  ctx.report(10, "Preparing OCR");
+
+  const result = await extractText(
+    prepared.buffer,
+    ctx.scratchDir,
+    {
+      quality,
+      language: settings.language,
+      enhance: settings.enhance ?? quality === "best",
+      signal: ctx.signal,
+    },
+    (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
+  );
+  if (result.requestedQuality !== quality || result.actualQuality !== quality) {
+    throw new Error(
+      `OCR runtime tier mismatch: requested ${quality}, reported ${result.requestedQuality}/${result.actualQuality}`,
+    );
+  }
+
+  const base = prepared.filename.replace(/\.[^.]+$/, "");
+  return {
+    buffer: Buffer.from(result.text, "utf-8"),
+    filename: `${base}_ocr.txt`,
+    contentType: "text/plain",
+    resultPayload: { ...result },
+  };
+}
+
+registerAiJobHandler("ocr", async (input, data, ctx) =>
+  processOcrJob(input, data.settings, data.filename, ctx),
+);
+
+registerToolProcessFn({
+  toolId: "ocr",
+  settingsSchema,
+  process: async (input, settings, filename, ctx) => {
+    if (!ctx) throw new Error("OCR processing context is required");
+    const result = await processOcrJob(input, settings, filename, ctx);
+    return {
+      buffer: result.buffer,
+      filename: result.filename,
+      contentType: result.contentType,
+    };
+  },
 });
 
 /**
@@ -30,212 +125,132 @@ const settingsSchema = z.object({
 export function registerOcr(app: FastifyInstance) {
   app.post("/api/v1/tools/image/ocr", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "ocr";
-    if (!isToolInstalled(toolId)) {
-      const bundle = getBundleForTool(toolId);
-      return reply.status(501).send({
-        error: "Feature not installed",
-        code: "FEATURE_NOT_INSTALLED",
-        feature: TOOL_BUNDLE_MAP[toolId],
-        featureName: bundle?.name ?? toolId,
-        estimatedSize: bundle?.estimatedSize ?? "unknown",
-      });
-    }
-
-    let fileBuffer: Buffer | null = null;
+    const authUser = await requireToolAccess(request, reply, toolId);
+    if (!authUser) return;
+    const userId = authUser.id;
+    const jobId = randomUUID();
     let filename = "image";
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
+    let fileId: string | null = null;
+    let inputKey: string | null = null;
 
     try {
       const parts = request.parts();
       for await (const part of parts) {
         if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          fileBuffer = Buffer.concat(chunks);
-          filename = sanitizeFilename(part.filename ?? "image");
+          if (inputKey) throw new Error("Only one image file may be uploaded");
+          const upload = await receiveUpload(part, jobId, {
+            maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
+          });
+          inputKey = upload.key;
+          filename = upload.filename;
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
           const raw = part.value as string;
-          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
             clientJobId = raw;
           }
+        } else if (part.fieldname === "fileId") {
+          fileId = part.value as string;
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
+      if (inputKey) await deleteObject(inputKey).catch(() => {});
+      const statusCode = ocrUploadErrorStatus(err);
+      return reply.status(statusCode).send({
+        error: ocrUploadErrorMessage(statusCode),
+        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
     }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
+    if (!inputKey) {
       return reply.status(400).send({ error: "No image file provided" });
     }
 
-    const validation = await validateImageBuffer(fileBuffer, filename);
-    if (!validation.valid) {
-      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    let settings: OcrSettings;
+    let requestedSettings: unknown;
+    try {
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      requestedSettings = parsed;
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        await deleteObject(inputKey).catch(() => {});
+        return reply.status(400).send({
+          error: "Invalid settings",
+          details: formatZodErrors(result.error.issues),
+        });
+      }
+      settings = result.data;
+    } catch {
+      await deleteObject(inputKey).catch(() => {});
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
     }
 
-    let scratchDir = "";
+    const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
+    if (!ocrResolution.ok) {
+      await deleteObject(inputKey).catch(() => {});
+      const bundleId = TOOL_OPTIONAL_BUNDLE_MAP[toolId];
+      const bundle = getOptionalBundleForTool(toolId);
+      return reply.status(501).send({
+        error:
+          ocrResolution.code === "FEATURE_INCOMPATIBLE"
+            ? "Feature incompatible"
+            : "Feature not installed",
+        code: ocrResolution.code,
+        feature: bundleId,
+        featureName: bundle?.name ?? toolId,
+        estimatedSize: bundle?.estimatedSize ?? "unknown",
+        requestedQuality: ocrResolution.requestedQuality,
+        compatibilityReason: ocrResolution.reason,
+        ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+      });
+    }
+    settings = ocrResolution.settings as OcrSettings;
+    const quality = settings.quality as "fast" | "balanced" | "best";
+
+    const { engine: _legacyEngine, ...normalizedSettings } = settings;
     try {
-      // Decode HEIC/HEIF input via system decoder
-      if (validation.format === "heif") {
-        fileBuffer = await decodeHeic(fileBuffer);
-      }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR, etc.)
-      if (needsCliDecode(validation.format)) {
-        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-      }
-
-      // Auto-orient to fix EXIF rotation before OCR
-      fileBuffer = await autoOrient(fileBuffer);
-
-      let settings: z.infer<typeof settingsSchema>;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-        }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
-
-      // Backward compat: map old engine param to quality
-      let quality = settings.quality;
-      if (settings.engine && !settingsRaw?.includes('"quality"')) {
-        quality = settings.engine === "tesseract" ? "fast" : "balanced";
-      }
-
-      request.log.info(
-        {
-          toolId: "ocr",
-          imageSize: fileBuffer.length,
-          quality,
-          language: settings.language,
-        },
-        "Starting OCR",
-      );
-      const jobId = randomUUID();
-      scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
-      await mkdir(scratchDir, { recursive: true });
-
-      const jobIdForProgress = clientJobId;
-      const onProgress = jobIdForProgress
-        ? (percent: number, stage: string) => {
-            updateSingleFileProgress({
-              jobId: jobIdForProgress,
-              phase: "processing",
-              stage,
-              percent,
-            });
-          }
-        : undefined;
-
-      // Fallback chain: best -> balanced -> fast
-      // PaddleOCR can crash with segfault on some platforms, so we retry
-      // with a lower quality tier at the Node.js level.
-      const fallbackChain: Array<"fast" | "balanced" | "best"> =
-        quality === "best"
-          ? ["best", "balanced", "fast"]
-          : quality === "balanced"
-            ? ["balanced", "fast"]
-            : ["fast"];
-
-      let lastError: unknown;
-      for (const tier of fallbackChain) {
-        try {
-          const result = await extractText(
-            fileBuffer,
-            scratchDir,
-            {
-              quality: tier,
-              language: settings.language,
-              enhance: settings.enhance,
-            },
-            onProgress,
-          );
-
-          // If a higher-quality tier returns empty text but didn't crash,
-          // fall back to the next tier rather than returning nothing.
-          if (!result.text && tier !== fallbackChain[fallbackChain.length - 1]) {
-            request.log.warn(
-              { toolId: "ocr", quality: tier, engine: result.engine },
-              `OCR ${tier} returned empty text, falling back to next tier`,
-            );
-            if (onProgress) onProgress(15, "Retrying...");
-            continue;
-          }
-
-          if (clientJobId) {
-            updateSingleFileProgress({
-              jobId: clientJobId,
-              phase: "complete",
-              percent: 100,
-            });
-          }
-
-          const expectedEngine =
-            tier === "fast" ? "tesseract" : tier === "balanced" ? "paddleocr-v5" : "paddleocr-vl";
-          if (result.engine && result.engine !== expectedEngine) {
-            request.log.warn(
-              { toolId: "ocr", requested: tier, expected: expectedEngine, actual: result.engine },
-              `OCR engine fallback: requested ${tier} (${expectedEngine}) but used ${result.engine}`,
-            );
-          }
-
-          return reply.send({
-            jobId,
-            filename,
-            text: result.text,
-            engine: result.engine,
-          });
-        } catch (err) {
-          lastError = err;
-          const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-          // If the Python process crashed (segfault, dispatcher exit) or the
-          // PaddleOCR engine itself is unusable (missing dependency, an ABI
-          // conflict like the scipy strand in project_ai_bundle_numpy_abi_strand),
-          // try the next tier instead of hard-failing -- ocr.py's own error
-          // messages already suggest the lower tier, this just acts on it.
-          if (
-            msg.includes("exited unexpectedly") ||
-            msg.includes("exited with code") ||
-            msg.includes("segmentation fault") ||
-            msg.includes("process crashed") ||
-            msg.includes("paddleocr")
-          ) {
-            request.log.warn(
-              { toolId: "ocr", quality: tier, err },
-              `OCR ${tier} crashed, falling back`,
-            );
-            if (onProgress) onProgress(15, "Retrying...");
-            continue;
-          }
-          // Non-crash errors (validation, timeout) should not retry
-          throw err;
-        }
-      }
-
-      // All tiers failed
-      throw lastError;
+      await enqueueToolJob({
+        jobId,
+        toolId,
+        userId,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings: { ...normalizedSettings, quality },
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        kind: "ai-tool",
+        analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+      });
     } catch (err) {
-      request.log.error({ err, toolId: "ocr" }, "OCR failed");
+      await deleteObject(inputKey).catch(() => {});
+      request.log.error({ err, toolId, jobId }, "Failed to enqueue OCR");
+      return reply.status(503).send({
+        error: "Failed to queue OCR",
+        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+      });
+    }
+
+    try {
+      const result = await waitForJob("ai", jobId);
+      if (result) {
+        request.log.info({ toolId, jobId, quality }, "OCR complete");
+        return reply.send({
+          jobId,
+          filename,
+          ...result.resultPayload,
+        });
+      }
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+    } catch (err) {
+      request.log.error({ err, toolId, jobId }, "OCR failed");
       return reply.status(422).send({
         error: "OCR failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
-    } finally {
-      if (scratchDir) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
     }
   });
 }

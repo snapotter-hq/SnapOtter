@@ -1,8 +1,8 @@
 ---
 description: "Cấu trúc monorepo, kiến trúc ứng dụng và gói, vòng đời yêu cầu, và dấu chân tài nguyên của SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: ac9f6dfbc8b9
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Kiến trúc {#architecture}
@@ -36,13 +36,13 @@ Gói này không có phụ thuộc mạng và chạy hoàn toàn trong tiến tr
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Một lớp cầu nối gọi các script Python cho các thao tác ML. Ở lần dùng đầu tiên, cầu nối khởi động một tiến trình dispatcher Python bền vững, tiến trình này nạp trước các thư viện nặng (PIL, NumPy, MediaPipe, rembg) để các lệnh gọi AI sau đó bỏ qua chi phí nạp. Nếu dispatcher chưa sẵn sàng, cầu nối lùi về việc sinh ra một tiến trình con Python mới cho mỗi yêu cầu.
+Lớp cầu nối gọi các thời gian chạy gốc và Python ML. Hầu hết các công cụ Python đều sử dụng dispatcher liên tục để nhập trước các thư viện nặng (PIL, NumPy, MediaPipe, rembg) để các lệnh gọi tiếp theo bỏ qua chi phí nhập. OCR bị cô lập khỏi môi trường chia sẻ có thể thay đổi đó: `fast` gọi Tesseract gốc, trong khi `balanced` và `best` sử dụng JSONL dispatcher liên tục chuyên dụng được ghim vào thế hệ RapidOCR/ONNX bất biến đang hoạt động. Mỗi yêu cầu chứa một generation lease. Kích hoạt trước tiên sẽ chạy smoke test trên một ứng cử viên, sau đó chuyển sang dispatcher của nó. dispatcher trước đó sẽ cạn kiệt trước khi thế hệ của nó được thu gom rác.
 
 **Các mô hình không được nạp trước.** Mỗi script công cụ nạp trọng số mô hình của nó từ đĩa vào thời điểm yêu cầu và loại bỏ chúng khi yêu cầu hoàn tất. Xem [Dấu chân tài nguyên](#resource-footprint) để biết hồ sơ bộ nhớ đầy đủ.
 
-Các thao tác được hỗ trợ: xóa nền (rembg/BiRefNet), phóng to (RealESRGAN), làm mờ khuôn mặt (MediaPipe), tăng cường khuôn mặt (GFPGAN/CodeFormer), xóa vật thể (LaMa ONNX), OCR (PaddleOCR/Tesseract), tô màu (DDColor), khử nhiễu, xóa mắt đỏ, phục chế ảnh, tạo ảnh hộ chiếu, sửa độ trong suốt (BiRefNet HR-matting), và thay đổi kích thước nhận biết nội dung (nhị phân Go caire).
+Các thao tác được hỗ trợ: xóa nền (rembg/BiRefNet), nâng cấp (RealESRGAN), làm mờ khuôn mặt (MediaPipe), nâng cao khuôn mặt (GFPGAN/CodeFormer), xóa đối tượng (LaMa ONNX), OCR (Tesseract và RapidOCR với các mẫu PP-OCR ONNX), tô màu (DDColor), khử nhiễu, khử mắt đỏ, phục hồi ảnh, tạo ảnh hộ chiếu, độ trong suốt sửa lỗi (BiRefNet HR-matting) và thay đổi kích thước nhận biết nội dung (nhị phân Go caire).
 
-Các script Python nằm trong `packages/ai/python/`. Image Docker tải trước tất cả trọng số mô hình trong quá trình build để container hoạt động hoàn toàn ngoại tuyến.
+Các tập lệnh Python tồn tại trong `packages/ai/python/`. Các gói mô hình tùy chọn lớn được cài đặt theo yêu cầu vào khối lượng `/data/ai` liên tục. OCR chính xác sử dụng các tạo phẩm đã được ký, dành riêng cho nền tảng; tầng Tesseract tích hợp không yêu cầu tải xuống gói mô hình.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Trang VitePress này. Được triển khai lên Cloudflare Pages tự động k
 2. Frontend gửi một POST đa phần đến `/api/v1/tools/:section/:toolId` với tệp và các cài đặt.
 3. Tuyến API kiểm định đầu vào bằng Zod, rồi điều phối việc xử lý.
 4. Đối với các công cụ tiêu chuẩn, công việc được đưa vào nhóm BullMQ phù hợp (image, media hoặc docs dựa trên phương thức). Worker BullMQ trong tiến trình tự định hướng ảnh dựa trên metadata EXIF, chạy hàm xử lý của công cụ, và trả về kết quả.
-5. Đối với các công cụ AI, cầu nối TypeScript gửi một yêu cầu đến dispatcher Python bền vững (hoặc sinh ra một tiến trình con mới như phương án dự phòng), chờ nó hoàn tất, và đọc tệp đầu ra.
+5. Đối với hầu hết các công cụ AI, cầu nối TypeScript sẽ gửi yêu cầu đến Python dispatcher liên tục. Thay vào đó, OCR nhanh sẽ gọi Tesseract và OCR chính xác sẽ khởi động tệp thực thi được ghim từ thế hệ OCR bất biến đang hoạt động. Cấp OCR được yêu cầu được cố định khi xâm nhập và không bao giờ được thay đổi âm thầm trong quá trình thực thi.
 6. Tiến trình công việc được lưu bền vào bảng `jobs` trong PostgreSQL nên trạng thái tồn tại qua các lần khởi động lại container. Các cập nhật thời gian thực được chuyển qua SSE tại `/api/v1/jobs/:jobId/progress`.
 7. API trả về một `jobId` và `downloadUrl`. Người dùng tải tệp đã xử lý từ `/api/v1/download/:jobId/:filename`.
 

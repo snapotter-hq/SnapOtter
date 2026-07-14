@@ -9,18 +9,47 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
+    concurrency:
+      group: snapotter-semantic-release
+      cancel-in-progress: false
     permissions:
       contents: write
       issues: write
       pull-requests: write
     outputs:
       new_version: ${{ steps.check.outputs.version }}
+      release_commit: ${{ steps.check.outputs.release_commit }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Validate OCR release trust before publishing
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+        run: |
+          : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
+          : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
+          [[ "${OCR_RUNTIME_INDEX_KEY_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo "::error::OCR runtime signing key ID is not a safe identifier"
+            exit 1
+          }
+          umask 077
+          trap 'rm -f /tmp/ocr-release-public.pem' EXIT
+          printf '%s' "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" \
+            | base64 --decode > /tmp/ocr-release-public.pem
+          [[ "$(base64 --wrap=0 < /tmp/ocr-release-public.pem)" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
+            echo "::error::OCR runtime public key must use canonical base64"
+            exit 1
+          }
+          openssl pkey -pubin -in /tmp/ocr-release-public.pem -text -noout \
+            | grep -q ED25519 || {
+              echo "::error::Configured OCR runtime public key is not Ed25519"
+              exit 1
+            }
 
       - uses: ./.github/actions/setup
 
@@ -49,20 +78,33 @@ jobs:
         id: check
         run: |
           if [ -f .release-version ]; then
-            echo "version=$(cat .release-version)" >> "$GITHUB_OUTPUT"
+            version="$(cat .release-version)"
           else
             # semantic-release found no new commits — tag already exists from a
             # previous run. Fall back to the latest git tag so the Docker build
             # jobs still run (useful when re-triggering after a push failure).
             latest=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
             if [ -n "$latest" ]; then
-              echo "version=$latest" >> "$GITHUB_OUTPUT"
+              version="${latest}"
               echo "Re-using existing tag v${latest} for Docker build."
             else
               echo "::error::semantic-release did not produce a new version. No releasable commits found."
               exit 1
             fi
           fi
+          [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
+            echo "::error::semantic-release produced an invalid version"
+            exit 1
+          }
+          git fetch --force --no-tags origin \
+            "refs/tags/v${version}:refs/tags/v${version}"
+          release_commit="$(git rev-parse "refs/tags/v${version}^{commit}")"
+          [[ "${release_commit}" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "::error::Release tag did not peel to an immutable commit"
+            exit 1
+          }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "release_commit=${release_commit}" >> "$GITHUB_OUTPUT"
 
       - name: Update GitHub release notes
         if: steps.notes.outputs.has_notes == 'true' && steps.check.outputs.version
@@ -117,6 +159,9 @@ jobs:
     name: Archive (${{ matrix.arch }})
     needs: release
     if: needs.release.outputs.new_version
+    concurrency:
+      group: snapotter-prebuilt-${{ needs.release.outputs.new_version }}-${{ matrix.arch }}
+      cancel-in-progress: false
     permissions:
       contents: write
     strategy:
@@ -132,7 +177,32 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: v${{ needs.release.outputs.new_version }}
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Export reproducible build epoch
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+        run: |
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct "${RELEASE_COMMIT}")"
+          [[ "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]] || {
+            echo "::error::Release commit has no deterministic source timestamp"
+            exit 1
+          }
+          echo "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup
 
@@ -159,12 +229,23 @@ jobs:
           ARCHIVE_NAME="snapotter-v${VERSION}-linux-${ARCH}.tar.gz"
           cd ..
           mv SnapOtter snapotter
-          tar czf "/tmp/${ARCHIVE_NAME}" --exclude='.git' --exclude='.github' --exclude='.gitignore' snapotter/
+          LC_ALL=C tar \
+            --sort=name \
+            --format=posix \
+            --mtime="@${SOURCE_DATE_EPOCH}" \
+            --owner=0 --group=0 --numeric-owner \
+            --pax-option=delete=atime,delete=ctime \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            -cf - snapotter/ \
+            | gzip -n > "/tmp/${ARCHIVE_NAME}"
           mv snapotter SnapOtter
           cd SnapOtter
 
           echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
-          echo "Archive: ${ARCHIVE_NAME} ($(du -sh /tmp/${ARCHIVE_NAME} | cut -f1))"
+          archive_size="$(du -sh "/tmp/${ARCHIVE_NAME}" | cut -f1)"
+          echo "Archive: ${ARCHIVE_NAME} (${archive_size})"
 
       - name: Generate checksum
         run: cd /tmp && sha256sum "${archive_name}" > "${archive_name}.sha256"
@@ -173,17 +254,94 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release.outputs.new_version }}
-        run: gh release upload "v${VERSION}" "/tmp/${archive_name}" "/tmp/${archive_name}.sha256" --clobber --repo snapotter-hq/SnapOtter
+        run: |
+          REPOSITORY="snapotter-hq/SnapOtter"
+          release_id="$(
+            gh api "repos/${REPOSITORY}/releases/tags/v${VERSION}" --jq .id
+          )"
+          [[ "${release_id}" =~ ^[0-9]+$ ]] || {
+            echo "::error::GitHub release did not resolve to one immutable ID"
+            exit 1
+          }
+
+          asset_list="$(mktemp)"
+          trap 'rm -f "${asset_list}" /tmp/existing-release-asset-*' EXIT
+
+          refresh_assets() {
+            gh api --paginate \
+              "repos/${REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+              > "${asset_list}"
+          }
+
+          matching_asset_ids() {
+            local asset_name="$1"
+            jq -r --arg name "${asset_name}" \
+              '.[] | select(.name == $name) | .id' "${asset_list}"
+          }
+
+          compare_asset() {
+            local asset_id="$1"
+            local asset_path="$2"
+            local asset_name
+            local downloaded
+            asset_name="$(basename "${asset_path}")"
+            downloaded="/tmp/existing-release-asset-${asset_id}"
+            gh api \
+              -H "Accept: application/octet-stream" \
+              "repos/${REPOSITORY}/releases/assets/${asset_id}" \
+              > "${downloaded}"
+            cmp --silent "${asset_path}" "${downloaded}" || {
+              echo "::error::Existing immutable release asset differs: ${asset_name}"
+              exit 1
+            }
+            rm -f "${downloaded}"
+          }
+
+          verify_or_upload_asset() {
+            local asset_path="$1"
+            local asset_name
+            local asset_ids
+            asset_name="$(basename "${asset_path}")"
+            refresh_assets
+            mapfile -t asset_ids < <(matching_asset_ids "${asset_name}")
+            if [[ ${#asset_ids[@]} -gt 1 ]]; then
+              echo "::error::Immutable release asset name collides: ${asset_name}"
+              exit 1
+            fi
+            if [[ ${#asset_ids[@]} -eq 1 ]]; then
+              compare_asset "${asset_ids[0]}" "${asset_path}"
+              echo "Verified existing immutable release asset: ${asset_name}"
+              return
+            fi
+            gh release upload "v${VERSION}" "${asset_path}" --repo "${REPOSITORY}"
+          }
+
+          verify_or_upload_asset "/tmp/${archive_name}"
+          verify_or_upload_asset "/tmp/${archive_name}.sha256"
+
+          for asset_path in "/tmp/${archive_name}" "/tmp/${archive_name}.sha256"; do
+            asset_name="$(basename "${asset_path}")"
+            refresh_assets
+            mapfile -t asset_ids < <(matching_asset_ids "${asset_name}")
+            [[ ${#asset_ids[@]} -eq 1 ]] || {
+              echo "::error::Expected exactly one immutable release asset after upload: ${asset_name}"
+              exit 1
+            }
+            compare_asset "${asset_ids[0]}" "${asset_path}"
+          done
 
   docker:
     name: Build (${{ matrix.platform }})
     needs: release
+    concurrency:
+      group: snapotter-image-${{ needs.release.outputs.new_version }}-${{ matrix.platform }}
+      cancel-in-progress: false
     # Builds and pushes the multi-arch app image (by digest) to Docker Hub +
     # GHCR; the manifest job then creates the named tags. Only runs when
     # semantic-release produced a version (or fell back to the latest tag).
     if: needs.release.outputs.new_version
     permissions:
-      contents: read
+      contents: write
       packages: write
     strategy:
       fail-fast: false
@@ -205,12 +363,51 @@ jobs:
       - name: Prepare
         run: |
           platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
 
       - name: Checkout release tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: v${{ needs.release.outputs.new_version }}
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Validate OCR runtime trust baked into the image
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+        run: |
+          : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
+          : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
+          [[ "${OCR_RUNTIME_INDEX_KEY_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo "::error::OCR runtime signing key ID is not a safe identifier"
+            exit 1
+          }
+          umask 077
+          trap 'rm -f /tmp/ocr-runtime-public.pem' EXIT
+          printf '%s' "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" \
+            | base64 --decode > /tmp/ocr-runtime-public.pem
+          [[ "$(base64 --wrap=0 < /tmp/ocr-runtime-public.pem)" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
+            echo "::error::OCR runtime public key must use canonical base64"
+            exit 1
+          }
+          openssl pkey -pubin -in /tmp/ocr-runtime-public.pem -text -noout \
+            | grep -q ED25519 || {
+              echo "::error::Configured OCR runtime public key is not Ed25519"
+              exit 1
+            }
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -228,6 +425,202 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Reuse an existing published platform digest
+        id: existing
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PLATFORM: ${{ matrix.platform }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          ghcr_ref="ghcr.io/snapotter-hq/snapotter"
+          dockerhub_ref="snapotter/snapotter"
+          architecture="${PLATFORM#linux/}"
+          expected_source="https://github.com/${GITHUB_REPOSITORY}"
+
+          registry_digest_state() {
+            local reference="$1"
+            local digest="$2"
+            local label="$3"
+            local manifest="/tmp/${label}-release-platform-manifest.json"
+            local error="/tmp/${label}-release-platform-manifest.error"
+            if docker buildx imagetools inspect "${reference}@${digest}" --raw \
+              > "${manifest}" 2> "${error}"; then
+              local actual_digest
+              actual_digest="sha256:$(sha256sum "${manifest}" | cut -d ' ' -f 1)"
+              if [[ "${actual_digest}" != "${digest}" ]]; then
+                echo "::error::Registry returned different bytes for ${reference}@${digest}"
+                return 2
+              fi
+              if ! docker buildx imagetools inspect "${reference}@${digest}" \
+                --format '{{json .Image}}' > "${manifest}.image" 2> "${error}"; then
+                cat "${error}" >&2
+                echo "::error::Could not inspect image configuration for ${reference}@${digest}"
+                return 2
+              fi
+              if ! jq -e --arg architecture "${architecture}" \
+                '.os == "linux" and .architecture == $architecture' \
+                "${manifest}.image" >/dev/null; then
+                echo "::error::Registry digest has the wrong platform: ${reference}@${digest}"
+                return 2
+              fi
+              if ! jq -e \
+                --arg release_commit "${RELEASE_COMMIT}" \
+                --arg expected_source "${expected_source}" \
+                --arg version "${VERSION}" \
+                '(.config.Labels | type == "object")
+                  and .config.Labels["org.opencontainers.image.revision"] == $release_commit
+                  and .config.Labels["org.opencontainers.image.source"] == $expected_source
+                  and .config.Labels["org.opencontainers.image.version"] == $version' \
+                "${manifest}.image" >/dev/null; then
+                echo "::warning::Registry digest does not bind the exact release provenance: ${reference}@${digest}"
+                return 3
+              fi
+              return 0
+            fi
+            if grep -Eqi 'manifest unknown|name unknown|not found' "${error}"; then
+              return 1
+            fi
+            cat "${error}" >&2
+            echo "::error::Could not inspect ${reference}@${digest}"
+            return 2
+          }
+
+          repair_digest_replica() {
+            local source="$1"
+            local destination="$2"
+            local digest="$3"
+            local destination_label="$4"
+            docker buildx imagetools create --prefer-index=false \
+              --tag "${destination}@${digest}" "${source}@${digest}"
+            if registry_digest_state "${destination}" "${digest}" "${destination_label}"; then
+              echo "Repaired exact ${digest} replica in ${destination}."
+              return 0
+            fi
+            echo "::error::Failed to repair exact ${digest} replica in ${destination}"
+            return 2
+          }
+
+          ensure_digest_replication() {
+            local digest="$1"
+            local ghcr_status dockerhub_status
+            if registry_digest_state "${ghcr_ref}" "${digest}" ghcr; then
+              ghcr_status=0
+            else
+              ghcr_status=$?
+            fi
+            if registry_digest_state "${dockerhub_ref}" "${digest}" dockerhub; then
+              dockerhub_status=0
+            else
+              dockerhub_status=$?
+            fi
+            if (( ghcr_status == 2 || dockerhub_status == 2 )); then
+              return 2
+            fi
+            if (( ghcr_status == 3 || dockerhub_status == 3 )); then
+              return 3
+            fi
+            if (( ghcr_status == 1 && dockerhub_status == 1 )); then
+              echo "::warning::Release digest is unavailable in both registries: ${digest}"
+              return 1
+            fi
+            if (( ghcr_status == 1 )); then
+              repair_digest_replica "${dockerhub_ref}" "${ghcr_ref}" "${digest}" ghcr \
+                || return $?
+            elif (( dockerhub_status == 1 )); then
+              repair_digest_replica "${ghcr_ref}" "${dockerhub_ref}" "${digest}" dockerhub \
+                || return $?
+            fi
+            return 0
+          }
+
+          image="${ghcr_ref}:${VERSION}"
+          digest=""
+          reuse_description=""
+          if docker buildx imagetools inspect "${image}" --raw \
+            > /tmp/existing-release-manifest.json 2> /tmp/existing-release-manifest.error; then
+            jq -e '.manifests | type == "array"' /tmp/existing-release-manifest.json >/dev/null || {
+              echo "::error::Existing ${image} is not a multi-platform image index"
+              exit 1
+            }
+            mapfile -t platform_digests < <(
+              jq -r --arg architecture "${architecture}" \
+                '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $architecture) | .digest' \
+                /tmp/existing-release-manifest.json
+            )
+            [[ ${#platform_digests[@]} -eq 1 ]] || {
+              echo "::error::Existing ${image} does not contain exactly one ${PLATFORM} manifest"
+              exit 1
+            }
+            digest="${platform_digests[0]}"
+            reuse_description="${image} ${PLATFORM}"
+          else
+            if ! grep -Eqi 'manifest unknown|name unknown|not found' \
+              /tmp/existing-release-manifest.error; then
+              cat /tmp/existing-release-manifest.error >&2
+              echo "::error::Could not determine whether ${image} already exists"
+              exit 1
+            fi
+            asset_name="snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
+            if ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+              --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
+              > /tmp/existing-platform-asset-ids 2> /tmp/existing-platform-asset.error; then
+              echo "::warning::Could not read ${asset_name}; rebuilding ${PLATFORM}"
+              echo "reused=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            mapfile -t asset_ids < /tmp/existing-platform-asset-ids
+            [[ ${#asset_ids[@]} -le 1 ]] || {
+              echo "::error::GitHub release contains duplicate ${asset_name} checkpoints"
+              exit 1
+            }
+            if [[ ${#asset_ids[@]} -eq 0 ]]; then
+              echo "reused=false" >> "$GITHUB_OUTPUT"
+              echo "No published ${image} manifest or ${asset_name} checkpoint exists; building ${PLATFORM}."
+              exit 0
+            fi
+            if ! gh api -H "Accept: application/octet-stream" \
+              "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_ids[0]}" \
+              > "/tmp/${asset_name}"; then
+              echo "::warning::Could not download ${asset_name}; rebuilding ${PLATFORM}"
+              echo "reused=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            checkpoint="/tmp/${asset_name}"
+            digest="$(<"${checkpoint}")"
+            if [[ "$(wc -c < "${checkpoint}")" -ne 72 ]] \
+              || [[ "$(wc -l < "${checkpoint}")" -ne 1 ]] \
+              || [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "::warning::Ignoring unreadable ${asset_name}; rebuilding ${PLATFORM}"
+              echo "reused=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            reuse_description="immutable ${asset_name} checkpoint"
+          fi
+          [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Existing release contains an invalid ${PLATFORM} digest"
+            exit 1
+          }
+          if ensure_digest_replication "${digest}"; then
+            echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing ${reuse_description} at ${digest}."
+            exit 0
+          else
+            replication_status=$?
+          fi
+          if (( replication_status == 1 )); then
+            echo "::warning::No trustworthy registry source remains for ${digest}; rebuilding ${PLATFORM}"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if (( replication_status == 3 )); then
+            echo "::warning::Existing digest is not from release ${RELEASE_COMMIT}; rebuilding ${PLATFORM}"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit "${replication_status}"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -235,9 +628,14 @@ jobs:
           images: |
             snapotter/snapotter
             ghcr.io/snapotter-hq/snapotter
+          labels: |
+            org.opencontainers.image.revision=${{ needs.release.outputs.release_commit }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.release.outputs.new_version }}
 
       - name: Build and push by digest
         id: build
+        if: steps.existing.outputs.reused != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -249,6 +647,9 @@ jobs:
             SNAPOTTER_SENTRY_DSN=${{ secrets.SNAPOTTER_SENTRY_DSN }}
             SNAPOTTER_SENTRY_DSN_WEB=${{ secrets.SNAPOTTER_SENTRY_DSN_WEB }}
             SENTRY_RELEASE=${{ needs.release.outputs.new_version }}
+            OCR_RUNTIME_INDEX_KEY_ID=${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+            OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+            SNAPOTTER_OFFICIAL_CONTAINER=1
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -261,32 +662,113 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-${{ env.PLATFORM_PAIR }},mode=max
 
       - name: Export digest
+        env:
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
+          mkdir -p /tmp/digests /tmp/release-digests
+          digest="${EXISTING_DIGEST:-${BUILT_DIGEST}}"
+          [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Release image did not produce a valid digest"
+            exit 1
+          }
+          registry_index=0
+          architecture="${PLATFORM_PAIR#linux-}"
+          expected_source="https://github.com/${GITHUB_REPOSITORY}"
+          for reference in \
+            ghcr.io/snapotter-hq/snapotter \
+            snapotter/snapotter; do
+            manifest="/tmp/exported-release-manifest-${registry_index}.json"
+            docker buildx imagetools inspect "${reference}@${digest}" --raw > "${manifest}"
+            actual_digest="sha256:$(sha256sum "${manifest}" | cut -d ' ' -f 1)"
+            [[ "${actual_digest}" == "${digest}" ]] || {
+              echo "::error::Registry returned different bytes for ${reference}@${digest}"
+              exit 1
+            }
+            docker buildx imagetools inspect "${reference}@${digest}" \
+              --format '{{json .Image}}' > "${manifest}.image"
+            jq -e --arg architecture "${architecture}" \
+              '.os == "linux" and .architecture == $architecture' \
+              "${manifest}.image" >/dev/null || {
+                echo "::error::Registry digest has the wrong platform: ${reference}@${digest}"
+                exit 1
+              }
+            jq -e \
+              --arg release_commit "${RELEASE_COMMIT}" \
+              --arg expected_source "${expected_source}" \
+              --arg version "${VERSION}" \
+              '(.config.Labels | type == "object")
+                and .config.Labels["org.opencontainers.image.revision"] == $release_commit
+                and .config.Labels["org.opencontainers.image.source"] == $expected_source
+                and .config.Labels["org.opencontainers.image.version"] == $version' \
+              "${manifest}.image" >/dev/null || {
+                echo "::error::Release image has invalid source provenance: ${reference}@${digest}"
+                exit 1
+              }
+            registry_index=$((registry_index + 1))
+          done
           touch "/tmp/digests/${digest#sha256:}"
+          printf '%s\n' "${digest}" \
+            > "/tmp/release-digests/snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
+
+      - name: Persist immutable platform digest on the GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          asset_name="snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+            --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
+            > /tmp/platform-digest-asset-ids
+          mapfile -t asset_ids < /tmp/platform-digest-asset-ids
+          [[ ${#asset_ids[@]} -le 1 ]] || {
+            echo "::error::GitHub release contains duplicate ${asset_name} assets"
+            exit 1
+          }
+          if [[ ${#asset_ids[@]} -eq 1 ]]; then
+            gh api -H "Accept: application/octet-stream" \
+              "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_ids[0]}" \
+              > "/tmp/existing-${asset_name}"
+            cmp --silent "/tmp/existing-${asset_name}" "/tmp/release-digests/${asset_name}" || {
+              echo "::error::Existing GitHub release platform digest differs for ${PLATFORM_PAIR}"
+              exit 1
+            }
+            echo "Verified existing immutable GitHub release asset ${asset_name}."
+          else
+            gh release upload "v${VERSION}" "/tmp/release-digests/${asset_name}" \
+              --repo snapotter-hq/SnapOtter
+          fi
 
       - name: Upload digest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
+          overwrite: true
           path: /tmp/digests/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
 
   scan:
-    name: Trivy Container Scan
+    name: Trivy Container Scan (${{ matrix.platform }})
     needs: [release, docker]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux-amd64
+          - linux-arm64
     permissions:
       contents: write
       packages: read
       security-events: write
     steps:
-      - name: Download amd64 digest
+      - name: Download architecture digest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: digests-linux-amd64
+          name: digests-${{ matrix.platform }}
           path: /tmp/digests
 
       - name: Log in to GitHub Container Registry
@@ -299,14 +781,38 @@ jobs:
       - name: Get digest
         id: digest
         run: |
-          sha=$(ls /tmp/digests | head -1)
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one architecture digest"
+            exit 1
+          }
+          sha="$(basename "${digest_files[0]}")"
+          [[ "${sha}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid architecture digest"
+            exit 1
+          }
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout for trivyignore
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
           sparse-checkout: .trivyignore
           sparse-checkout-cone-mode: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -333,6 +839,7 @@ jobs:
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
+          category: trivy-${{ matrix.platform }}
 
       - name: Run Trivy (JSON report)
         if: always()
@@ -340,7 +847,7 @@ jobs:
         with:
           image-ref: "ghcr.io/snapotter-hq/snapotter@sha256:${{ steps.digest.outputs.sha }}"
           format: "json"
-          output: "snapotter-v${{ needs.release.outputs.new_version }}-trivy.json"
+          output: "snapotter-v${{ needs.release.outputs.new_version }}-${{ matrix.platform }}-trivy.json"
           ignore-unfixed: true
 
       - name: Upload Trivy report to GitHub Release
@@ -350,21 +857,27 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           gh release upload "v${VERSION}" \
-            "snapotter-v${VERSION}-trivy.json" \
+            "snapotter-v${VERSION}-${{ matrix.platform }}-trivy.json" \
             --clobber --repo snapotter-hq/SnapOtter
 
   sbom:
-    name: Generate SBOM
+    name: Generate SBOM (${{ matrix.platform }})
     needs: [release, docker]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux-amd64
+          - linux-arm64
     permissions:
       contents: write
       packages: read
     steps:
-      - name: Download amd64 digest
+      - name: Download architecture digest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: digests-linux-amd64
+          name: digests-${{ matrix.platform }}
           path: /tmp/digests
 
       - name: Log in to GitHub Container Registry
@@ -377,19 +890,60 @@ jobs:
       - name: Get digest
         id: digest
         run: |
-          sha=$(ls /tmp/digests | head -1)
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one architecture digest"
+            exit 1
+          }
+          sha="$(basename "${digest_files[0]}")"
+          [[ "${sha}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid architecture digest"
+            exit 1
+          }
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      - name: Install Syft
-        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      - name: Install pinned Syft 1.42.3 from verified release bytes
+        env:
+          SYFT_VERSION: "1.42.3"
+        run: |
+          # Published in Syft's v1.42.3 syft_1.42.3_checksums.txt release asset.
+          case "$(uname -m)" in
+            x86_64)
+              syft_arch="amd64"
+              expected_sha256="0d6be741479eddd2c8644a288990c04f3df0d609bbc1599a005532a9dff63509"
+              ;;
+            aarch64 | arm64)
+              syft_arch="arm64"
+              expected_sha256="dc630590c953347789d08f8ebf57c7d8094db89100785fcd94b1cddeac791804"
+              ;;
+            *)
+              echo "::error::Unsupported Syft installer architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+          archive="syft_${SYFT_VERSION}_linux_${syft_arch}.tar.gz"
+          install_root="${RUNNER_TEMP}/syft-${SYFT_VERSION}"
+          rm -rf "${install_root}"
+          mkdir -p "${install_root}"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${install_root}/${archive}" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/${archive}"
+          printf '%s  %s\n' "${expected_sha256}" "${install_root}/${archive}" \
+            | sha256sum --check --strict -
+          tar -xzf "${install_root}/${archive}" -C "${install_root}" syft
+          chmod 0755 "${install_root}/syft"
+          "${install_root}/syft" version -o json \
+            | jq -e --arg version "${SYFT_VERSION}" '.version == $version' >/dev/null
+          echo "${install_root}" >> "$GITHUB_PATH"
 
       - name: Generate SBOMs
         env:
           IMAGE: "ghcr.io/snapotter-hq/snapotter@sha256:${{ steps.digest.outputs.sha }}"
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          syft scan "$IMAGE" -o "cyclonedx-json=snapotter-v${VERSION}-sbom.cdx.json"
-          syft scan "$IMAGE" -o "spdx-json=snapotter-v${VERSION}-sbom.spdx.json"
+          syft scan "$IMAGE" -o "cyclonedx-json=snapotter-v${VERSION}-${{ matrix.platform }}-sbom.cdx.json"
+          syft scan "$IMAGE" -o "spdx-json=snapotter-v${VERSION}-${{ matrix.platform }}-sbom.spdx.json"
 
       - name: Upload SBOMs to GitHub Release
         env:
@@ -397,17 +951,17 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           gh release upload "v${VERSION}" \
-            "snapotter-v${VERSION}-sbom.cdx.json" \
-            "snapotter-v${VERSION}-sbom.spdx.json" \
+            "snapotter-v${VERSION}-${{ matrix.platform }}-sbom.cdx.json" \
+            "snapotter-v${VERSION}-${{ matrix.platform }}-sbom.spdx.json" \
             --clobber --repo snapotter-hq/SnapOtter
 
   ai-bundles:
     name: AI Bundles
-    needs: [release, docker]
-    # DISABLED for 2.0.0: all v2.0.0 bundles are already built, verified, and
-    # published to HuggingFace (deepsafe/feature-bundles/v2.0.0). Re-enable once
-    # the ordering is fixed so it runs after manifest creates the :VERSION tag.
-    if: false
+    needs: [release, docker, scan]
+    # Build against the already scanned, architecture-specific image digests.
+    # The named image manifest stays unpublished until every bundle (including
+    # both OCR runtimes) is verified and the OCR index is signed.
+    if: needs.release.outputs.new_version
     # The top-level `permissions: {}` default means this reusable-workflow call
     # grants no token scopes by default. ai-bundles.yml's jobs declare
     # `contents: read` / `packages: read`, and GitHub rejects a called workflow
@@ -418,29 +972,119 @@ jobs:
       packages: read
     uses: ./.github/workflows/ai-bundles.yml
     with:
+      release_commit: ${{ needs.release.outputs.release_commit }}
       version: ${{ needs.release.outputs.new_version }}
-    secrets: inherit
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      OCR_RUNTIME_INDEX_SIGNING_KEY_B64: ${{ secrets.OCR_RUNTIME_INDEX_SIGNING_KEY_B64 }}
 
   manifest:
     name: Create Multi-Arch Manifests
-    needs: [release, docker, scan]
+    needs: [release, docker, scan, sbom, ai-bundles]
     runs-on: ubuntu-latest
-    # Manual publish gate: this job creates the public `latest` / version tags on
-    # Docker Hub + GHCR (the point at which images become pullable by tag). The
-    # `publish-images` environment requires a maintainer to approve the run in the
-    # Actions UI before it proceeds, so a release never auto-publishes to the
-    # registries. The image is already built and Trivy-scanned by this point.
+    # Manual publish gate: this job creates only the immutable version tags. A
+    # downstream, globally serialized job advances moving aliases after checking
+    # all remote release tags again. Keeping the approval outside that global
+    # lock avoids blocking newer releases for up to the environment wait limit.
     environment: publish-images
     permissions:
       contents: read
       packages: write
+    outputs:
+      platform_digests: ${{ steps.verified_digests.outputs.platform_digests }}
     steps:
+      - name: Check out the approved immutable release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Revalidate the remote release tag immediately after approval
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Remote release tag moved after publication approval"
+              exit 1
+            }
+
       - name: Download digests
+        id: action_digests
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
+
+      - name: Recover expired digest artifacts from the GitHub release
+        id: verified_digests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          valid_action_digests=true
+          mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f -print 2>/dev/null)
+          [[ ${#digest_files[@]} -eq 2 ]] || valid_action_digests=false
+          if [[ "${valid_action_digests}" == true ]]; then
+            for digest_file in "${digest_files[@]}"; do
+              [[ "$(basename "${digest_file}")" =~ ^[a-f0-9]{64}$ ]] || \
+                valid_action_digests=false
+            done
+          fi
+          if [[ "${valid_action_digests}" != true ]]; then
+            rm -rf /tmp/digests /tmp/release-digest-assets
+            mkdir -p /tmp/digests /tmp/release-digest-assets
+            gh release download "v${VERSION}" \
+              --pattern "snapotter-v${VERSION}-linux-*.digest" \
+              --dir /tmp/release-digest-assets \
+              --repo snapotter-hq/SnapOtter
+            mapfile -t release_assets < <(
+              find /tmp/release-digest-assets -mindepth 1 -maxdepth 1 -type f -print
+            )
+            [[ ${#release_assets[@]} -eq 2 ]] || {
+              echo "::error::Expected exactly two immutable platform digest release assets"
+              exit 1
+            }
+            for platform in linux-amd64 linux-arm64; do
+              asset="/tmp/release-digest-assets/snapotter-v${VERSION}-${platform}.digest"
+              [[ -f "${asset}" && ! -L "${asset}" ]] || {
+                echo "::error::Missing immutable ${platform} digest release asset"
+                exit 1
+              }
+              digest="$(<"${asset}")"
+              [[ "$(wc -c < "${asset}")" -eq 72 \
+                && "$(wc -l < "${asset}")" -eq 1 \
+                && "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+                echo "::error::Invalid immutable ${platform} digest release asset"
+                exit 1
+              }
+              touch "/tmp/digests/${digest#sha256:}"
+            done
+          fi
+          mapfile -t final_digests < <(find /tmp/digests -maxdepth 1 -type f -print)
+          [[ ${#final_digests[@]} -eq 2 ]] || {
+            echo "::error::Expected exactly two verified platform digests"
+            exit 1
+          }
+          for digest_file in "${final_digests[@]}"; do
+            [[ "$(basename "${digest_file}")" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Invalid platform digest filename"
+              exit 1
+            }
+          done
+          mapfile -t digest_names < <(
+            find /tmp/digests -maxdepth 1 -type f -exec basename {} \; | sort
+          )
+          platform_digests="$(IFS=,; echo "${digest_names[*]}")"
+          echo "platform_digests=${platform_digests}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -455,29 +1099,314 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+      - name: Revalidate platform digest provenance before publication
+        working-directory: /tmp/digests
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          mapfile -t digest_files < <(find . -maxdepth 1 -type f -exec basename {} \;)
+          [[ ${#digest_files[@]} -eq 2 ]] || {
+            echo "::error::Recovered platform digest closure is invalid"
+            exit 1
+          }
+
+          expected_source="https://github.com/${GITHUB_REPOSITORY}"
+          validated_architectures=()
+          registry_index=0
+          for digest_sha in "${digest_files[@]}"; do
+            [[ "${digest_sha}" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Recovered platform digest is invalid"
+              exit 1
+            }
+            digest="sha256:${digest_sha}"
+            digest_architecture=""
+            for reference in \
+              ghcr.io/snapotter-hq/snapotter \
+              snapotter/snapotter; do
+              manifest="/tmp/publish-platform-manifest-${digest_sha}-${registry_index}.json"
+              error="${manifest}.error"
+              if ! docker buildx imagetools inspect "${reference}@${digest}" --raw \
+                > "${manifest}" 2> "${error}"; then
+                cat "${error}" >&2
+                echo "::error::Could not inspect release digest ${reference}@${digest}"
+                exit 1
+              fi
+              actual_digest="sha256:$(sha256sum "${manifest}" | cut -d ' ' -f 1)"
+              [[ "${actual_digest}" == "${digest}" ]] || {
+                echo "::error::Registry returned different bytes for ${reference}@${digest}"
+                exit 1
+              }
+              if ! docker buildx imagetools inspect "${reference}@${digest}" \
+                --format '{{json .Image}}' > "${manifest}.image" 2> "${error}"; then
+                cat "${error}" >&2
+                echo "::error::Could not inspect image configuration for ${reference}@${digest}"
+                exit 1
+              fi
+              if ! jq -e \
+                --arg release_commit "${RELEASE_COMMIT}" \
+                --arg expected_source "${expected_source}" \
+                --arg version "${VERSION}" \
+                '.os == "linux"
+                  and (.architecture == "amd64" or .architecture == "arm64")
+                  and (.config.Labels | type == "object")
+                  and .config.Labels["org.opencontainers.image.revision"] == $release_commit
+                  and .config.Labels["org.opencontainers.image.source"] == $expected_source
+                  and .config.Labels["org.opencontainers.image.version"] == $version' \
+                "${manifest}.image" >/dev/null; then
+                echo "::error::Release platform digest has invalid provenance: ${reference}@${digest}"
+                exit 1
+              fi
+              registry_architecture="$(jq -r '.architecture' "${manifest}.image")"
+              if [[ -n "${digest_architecture}" \
+                && "${registry_architecture}" != "${digest_architecture}" ]]; then
+                echo "::error::Registries disagree on the platform for ${digest}"
+                exit 1
+              fi
+              digest_architecture="${registry_architecture}"
+              registry_index=$((registry_index + 1))
+            done
+            validated_architectures+=("${digest_architecture}")
+          done
+
+          if [[ ! (
+            "${validated_architectures[0]}" == "amd64" \
+              && "${validated_architectures[1]}" == "arm64"
+            ) && ! (
+            "${validated_architectures[0]}" == "arm64" \
+              && "${validated_architectures[1]}" == "amd64"
+            ) ]]; then
+            echo "::error::Recovered platform digest closure is invalid"
+            exit 1
+          fi
+
+      - name: Create immutable Docker Hub manifest
+        working-directory: /tmp/digests
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          (
+            cd "$GITHUB_WORKSPACE"
+            git fetch --force --no-tags origin \
+              "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+            tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+            [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+              && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+                echo "::error::Remote release tag moved before Docker Hub publication"
+                exit 1
+              }
+          )
+
+          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \;)
+          [[ ${#digests[@]} -eq 2 ]] || {
+            echo "::error::Docker Hub manifest input closure is incomplete"
+            exit 1
+          }
+          arguments=("-t" "snapotter/snapotter:${VERSION}")
+          for digest in "${digests[@]}"; do
+            [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Invalid Docker Hub platform digest"
+              exit 1
+            }
+            arguments+=("snapotter/snapotter@sha256:${digest}")
+          done
+          docker buildx imagetools create "${arguments[@]}"
+
+      - name: Create immutable GHCR manifest
+        working-directory: /tmp/digests
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          (
+            cd "$GITHUB_WORKSPACE"
+            git fetch --force --no-tags origin \
+              "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+            tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+            [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+              && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+                echo "::error::Remote release tag moved before GHCR publication"
+                exit 1
+              }
+          )
+
+          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \;)
+          [[ ${#digests[@]} -eq 2 ]] || {
+            echo "::error::GHCR manifest input closure is incomplete"
+            exit 1
+          }
+          arguments=("-t" "ghcr.io/snapotter-hq/snapotter:${VERSION}")
+          for digest in "${digests[@]}"; do
+            [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Invalid GHCR platform digest"
+              exit 1
+            }
+            arguments+=("ghcr.io/snapotter-hq/snapotter@sha256:${digest}")
+          done
+          docker buildx imagetools create "${arguments[@]}"
+
+  aliases:
+    name: Advance Non-Regressing Image Aliases
+    needs: [release, manifest]
+    runs-on: ubuntu-latest
+    # GitHub does not guarantee FIFO ordering for a concurrency group. Every
+    # holder therefore fetches the complete remote tag set again while holding
+    # this lock and only publishes aliases for which its version is still the
+    # highest stable candidate.
+    concurrency:
+      group: snapotter-image-moving-aliases
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the approved immutable release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          images: |
-            snapotter/snapotter
-            ghcr.io/snapotter-hq/snapotter
-          tags: |
-            type=semver,pattern={{version}},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.release.outputs.new_version }}
-            type=semver,pattern={{major}},value=v${{ needs.release.outputs.new_version }}
-            type=raw,value=latest
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Create Docker Hub manifest
-        working-directory: /tmp/digests
+      - name: Prepare moving-alias freshness evaluator
         run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("snapotter/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'snapotter/snapotter@sha256:%s ' *)
+          cat > /tmp/eligible-image-aliases.py <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
 
-      - name: Create GHCR manifest
-        working-directory: /tmp/digests
+          version = os.environ["VERSION"]
+          output = Path(os.environ["ALIAS_OUTPUT"])
+          stable_pattern = re.compile(
+              r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
+          )
+          current_match = stable_pattern.fullmatch(f"v{version}")
+          if current_match is None:
+              output.write_text("", encoding="utf-8")
+              raise SystemExit(0)
+
+          current = tuple(int(component) for component in current_match.groups())
+          stable_versions = {
+              tuple(int(component) for component in match.groups())
+              for tag in subprocess.check_output(
+                  ["git", "tag", "--list", "v*"], text=True
+              ).splitlines()
+              if (match := stable_pattern.fullmatch(tag)) is not None
+          }
+          if current not in stable_versions:
+              raise SystemExit("Approved stable release tag is absent after remote refresh")
+
+          aliases = []
+          same_minor = [candidate for candidate in stable_versions if candidate[:2] == current[:2]]
+          same_major = [candidate for candidate in stable_versions if candidate[0] == current[0]]
+          if current == max(same_minor):
+              aliases.append(f"{current[0]}.{current[1]}")
+          if current == max(same_major):
+              aliases.append(str(current[0]))
+          if current == max(stable_versions):
+              aliases.append("latest")
+          output.write_text(
+              "".join(f"{alias}\n" for alias in aliases), encoding="utf-8"
+          )
+          PY
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Fetch and evaluate stable tags immediately before Docker Hub aliases
+        env:
+          ALIAS_OUTPUT: /tmp/dockerhub-image-aliases
+          PLATFORM_DIGESTS: ${{ needs.manifest.outputs.platform_digests }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("ghcr.io/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/snapotter-hq/snapotter@sha256:%s ' *)
+          git fetch --force --prune --prune-tags --tags origin
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Remote release tag moved before Docker Hub alias publication"
+              exit 1
+            }
+          python3 /tmp/eligible-image-aliases.py
+          mapfile -t aliases < "${ALIAS_OUTPUT}"
+          if [[ ${#aliases[@]} -eq 0 ]]; then
+            echo "No non-regressing Docker Hub aliases are eligible for v${VERSION}."
+            exit 0
+          fi
+
+          IFS=',' read -r -a digests <<< "${PLATFORM_DIGESTS}"
+          [[ ${#digests[@]} -eq 2 ]] || {
+            echo "::error::Approved platform digest closure is incomplete"
+            exit 1
+          }
+          arguments=()
+          for alias in "${aliases[@]}"; do
+            [[ "${alias}" =~ ^([0-9]+(\.[0-9]+)?|latest)$ ]] || {
+              echo "::error::Freshness evaluator returned an invalid Docker Hub alias"
+              exit 1
+            }
+            arguments+=("-t" "snapotter/snapotter:${alias}")
+          done
+          for digest in "${digests[@]}"; do
+            [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Invalid approved Docker Hub platform digest"
+              exit 1
+            }
+            arguments+=("snapotter/snapotter@sha256:${digest}")
+          done
+          docker buildx imagetools create "${arguments[@]}"
+
+      - name: Fetch and evaluate stable tags immediately before GHCR aliases
+        env:
+          ALIAS_OUTPUT: /tmp/ghcr-image-aliases
+          PLATFORM_DIGESTS: ${{ needs.manifest.outputs.platform_digests }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          git fetch --force --prune --prune-tags --tags origin
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Remote release tag moved before GHCR alias publication"
+              exit 1
+            }
+          python3 /tmp/eligible-image-aliases.py
+          mapfile -t aliases < "${ALIAS_OUTPUT}"
+          if [[ ${#aliases[@]} -eq 0 ]]; then
+            echo "No non-regressing GHCR aliases are eligible for v${VERSION}."
+            exit 0
+          fi
+
+          IFS=',' read -r -a digests <<< "${PLATFORM_DIGESTS}"
+          [[ ${#digests[@]} -eq 2 ]] || {
+            echo "::error::Approved platform digest closure is incomplete"
+            exit 1
+          }
+          arguments=()
+          for alias in "${aliases[@]}"; do
+            [[ "${alias}" =~ ^([0-9]+(\.[0-9]+)?|latest)$ ]] || {
+              echo "::error::Freshness evaluator returned an invalid GHCR alias"
+              exit 1
+            }
+            arguments+=("-t" "ghcr.io/snapotter-hq/snapotter:${alias}")
+          done
+          for digest in "${digests[@]}"; do
+            [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+              echo "::error::Invalid approved GHCR platform digest"
+              exit 1
+            }
+            arguments+=("ghcr.io/snapotter-hq/snapotter@sha256:${digest}")
+          done
+          docker buildx imagetools create "${arguments[@]}"

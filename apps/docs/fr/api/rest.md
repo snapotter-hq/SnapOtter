@@ -1,8 +1,8 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 450fd529e479
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # Référence de l'API REST {#rest-api-reference}
@@ -178,7 +178,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `remove-background` | Supprimer l'arrière-plan | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Agrandissement d'image | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Gomme d'objets | LaMa (ONNX) | Le masque est envoyé comme deuxième partie de fichier (nom de champ `mask`), `format`, `quality` |
-| `ocr` | OCR / Extraction de texte | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Extraction de texte | Tesseract (rapide) ; RapidOCR + PP-OCR ONNX (équilibré/meilleur) | `quality` (rapide/équilibré/meilleur), `language`, `enhance` |
 | `blur-faces` | Floutage des visages / données personnelles | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Rognage intelligent | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Amélioration d'image | Basé sur l'analyse | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Certains outils exposent des points de terminaison supplémentaires au-delà du 
 
 ## Traitement par lots {#batch-processing}
 
-Appliquez un outil générique compatible avec le traitement par lots à plusieurs fichiers à la fois. Renvoie une archive ZIP. Les routes personnalisées multi-fichiers ou multi-étapes, telles que la signature de PDF, l'OCR de PDF et les routes de préréglage PDF vers image, utilisent leur propre contrat de point de terminaison au lieu de la route générique `/batch`.
+Appliquez un outil générique compatible avec le traitement par lots à plusieurs fichiers à la fois. Renvoie une archive ZIP. Les routes personnalisées multi-fichiers ou multi-étapes, telles que la signature de PDF et les routes de préréglage PDF vers image, utilisent leur propre contrat de point de terminaison au lieu de la route générique `/batch`.
+
+L'outil `ocr-pdf` prend en charge cette route générique `/batch`.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Paramètres de requête :
 
 Gérez les bundles de fonctionnalités d'IA (installez/désinstallez des packages de modèles d'IA dans l'environnement Docker). Préférez le point de terminaison d'installation au niveau de l'outil lorsque vous activez un outil depuis une automatisation personnalisée : certains outils d'IA nécessitent plus d'un bundle partagé, et ce point de terminaison ignore les bundles déjà installés en ne mettant en file d'attente que ceux qui manquent.
 
+OCR est une amélioration facultative plutôt qu’une dépendance matérielle. Son niveau `fast` Tesseract fonctionne sans pack ; `POST /api/v1/admin/features/ocr/install` installe le pack RapidOCR signé pour `balanced` et `best` sur Linux amd64 ou arm64. Le runtime OCR précis utilise CPU sur les hôtes CPU uniquement et NVIDIA et nécessite au moins 4 GiB de mémoire effective (la limite cgroup du conteneur configuré, sinon la mémoire hôte). SnapOtter signale `requiredMemoryBytes`, `effectiveMemoryBytes` et une raison de compatibilité `insufficient-memory`, et rejette une installation incompatible avant le téléchargement. Cette exigence de mémoire ne s'applique pas à `fast`. Le pack contient environ 208-234 MiB à télécharger et 409-488 MiB installés, selon la cible ; l'index signé lie les tailles exactes appliquées lors de l'installation.
+
 | Méthode | Chemin | Accès | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Liste tous les bundles de fonctionnalités et leur état d'installation |
@@ -601,7 +605,18 @@ Gérez les bundles de fonctionnalités d'IA (installez/désinstallez des package
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Installe chaque bundle requis par un outil ; renvoie l'état par bundle (mis en file d'attente/ignoré) |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Désinstalle un bundle de fonctionnalités et nettoie les fichiers de modèle |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Récupère l'utilisation totale du disque par les modèles d'IA |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Importe une archive de bundle d'IA hors ligne |
+| `POST` | `/api/v1/admin/features/import` | Administrateur (`features:manage`) | Importez un ensemble d'IA hérité (`file`) ou une version OCR hors ligne signée (`index` plus `archive`) |
+
+Une importation OCR isolée doit inclure le `ocr-runtime-index.json` signé de la version et l'archive de plate-forme correspondante. SnapOtter applique les mêmes vérifications de signature Ed25519, de hachage d'artefact, de compatibilité, d'extraction et de test de fumée que celles utilisées par l'installation en ligne :
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Utilisez l'archive `linux-arm64-cpu-py311` sur arm64. Un artefact signé pour une autre cible est rejeté plutôt qu'installé.
 
 ## Opérations d'administration {#admin-operations}
 

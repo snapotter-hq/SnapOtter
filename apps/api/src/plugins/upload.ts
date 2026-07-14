@@ -23,7 +23,11 @@ export async function registerUpload(app: FastifyInstance): Promise<void> {
   // are recovered from busboy's side map.
   app.addHook("preValidation", async (request) => {
     if (request.isMultipart()) {
-      const fixedParts = (() => multipartParts(request)) as unknown as typeof request.parts;
+      const fixedParts = ((options?: Parameters<typeof request.parts>[0]) =>
+        multipartParts(request, {
+          fileSize: options?.limits?.fileSize,
+          files: options?.limits?.files,
+        })) as unknown as typeof request.parts;
       (request as { parts: typeof request.parts }).parts = fixedParts;
     }
   });

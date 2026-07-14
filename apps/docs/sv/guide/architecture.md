@@ -1,8 +1,8 @@
 ---
 description: "Monorepo-struktur, app- och paketarkitektur, förfrågningslivscykel och resursavtryck för SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: bafad20476af
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Arkitektur {#architecture}
@@ -36,13 +36,13 @@ Detta paket har inga nätverksberoenden och körs helt in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Ett brygglager som anropar Python-skript för ML-operationer. Vid första användning startar bryggan en beständig Python-dispatcherprocess som förimporterar tunga bibliotek (PIL, NumPy, MediaPipe, rembg) så att efterföljande AI-anrop hoppar över importkostnaden. Om dispatchern inte är redo än faller bryggan tillbaka på att skapa en ny Python-subprocess per förfrågan.
+Ett brygglager som anropar native och Python ML körtider. De flesta Python-verktyg använder en beständig dispatcher som förimporterar tunga bibliotek (PIL, NumPy, MediaPipe, rembg) så att efterföljande anrop hoppar över importkostnader. OCR är isolerad från den föränderliga delade miljön: `fast` anropar inbyggd Tesseract, medan `balanced` och `best` använder en dedikerad beständig JSONL dispatcher som är fäst vid den aktiva oföränderliga RapidOCR/ONNX-generationen. Varje begäran innehåller en generation lease. Aktivering kör först en smoke test på en kandidat och växlar sedan atomärt till dess dispatcher. Den tidigare dispatcher dräneras innan den genereras sopsamlas.
 
 **Modeller är inte förinlästa.** Varje verktygsskript laddar sina modellvikter från disk vid förfrågningstillfället och kasserar dem när förfrågan är klar. Se [Resursavtryck](#resource-footprint) för den fullständiga minnesprofilen.
 
-Stödda operationer: bakgrundsborttagning (rembg/BiRefNet), uppskalning (RealESRGAN), ansiktsoskärpa (MediaPipe), ansiktsförbättring (GFPGAN/CodeFormer), objektradering (LaMa ONNX), OCR (PaddleOCR/Tesseract), färgläggning (DDColor), brusborttagning, borttagning av röda ögon, fotorestaurering, generering av passfoto, genomskinlighetsfix (BiRefNet HR-matting) och innehållsmedveten storleksändring (Go caire-binär).
+Operationer som stöds: bakgrundsborttagning (rembg/BiRefNet), uppskalning (RealESRGAN), ansiktsoskärpa (MediaPipe), ansiktsförbättring (GFPGAN/CodeFormer), objektradering (LaMa ONNX), OCR (Tesseract och RapidOCR med PP-OCR ONNX-modeller), färgläggning (DDColor), bullerborttagning, borttagning av röda ögon, foto restaurering, generering av passfoto, transparensfixering (BiRefNet HR-matta), och innehållsmedveten storleksändring (Go caire binär).
 
-Python-skript finns i `packages/ai/python/`. Docker-avbildningen förnedladdar alla modellvikter under bygget så att containern fungerar helt offline.
+Python-skript live i `packages/ai/python/`. Stora valfria modellpaket installeras på begäran i den ihållande `/data/ai`-volymen. Exakt OCR använder signerade, plattformsspecifika artefakter; den inbyggda Tesseract-nivån kräver ingen nedladdning av modellpaket.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Denna VitePress-webbplats. Distribueras automatiskt till Cloudflare Pages vid pu
 2. Frontenden skickar en multipart-POST till `/api/v1/tools/:section/:toolId` med filen och inställningarna.
 3. API-rutten validerar indata med Zod och dirigerar sedan bearbetningen.
 4. För standardverktyg köas jobbet till lämplig BullMQ-pool (image, media eller docs baserat på modalitet). Den in-process-körda BullMQ-workern orienterar bilden automatiskt baserat på EXIF-metadata, kör verktygets bearbetningsfunktion och returnerar resultatet.
-5. För AI-verktyg skickar TypeScript-bryggan en förfrågan till den beständiga Python-dispatchern (eller skapar en ny subprocess som reserv), väntar på att den ska bli klar och läser utdatafilen.
+5. För de flesta AI-verktyg skickar TypeScript-bryggan en begäran till den beständiga Python dispatcher. Snabb OCR anropar istället Tesseract, och exakt OCR startar den fästa körbara filen från den aktiva oföränderliga OCR-generationen. Den begärda OCR-nivån är fixerad vid inträde och ändras aldrig tyst under exekvering.
 6. Jobbförlopp bevaras i `jobs`-tabellen i PostgreSQL så att tillståndet överlever containeromstarter. Realtidsuppdateringar levereras via SSE på `/api/v1/jobs/:jobId/progress`.
 7. API:et returnerar en `jobId` och `downloadUrl`. Användaren laddar ner den bearbetade filen från `/api/v1/download/:jobId/:filename`.
 

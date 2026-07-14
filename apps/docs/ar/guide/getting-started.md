@@ -1,8 +1,8 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: 4536d4558b8e
-i18n_provenance: machine
 i18n_output_hash: 83a518bd23e4
+i18n_source_hash: 24724b5595b2
+i18n_provenance: human
 ---
 
 # البدء {#getting-started}
@@ -32,7 +32,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip تسريع NVIDIA CUDA
-أضف `--gpus all` لإزالة الخلفية، وتكبير الدقة، و OCR، وتحسين الوجوه، والاستعادة المُسرَّعة بـ NVIDIA CUDA:
+أضف `--gpus all` لإزالة الخلفية المتسارعة بواسطة NVIDIA CUDA، ورفع مستوى الصوت، وتحسين الوجه، واستعادته. يظل OCR قائمًا على وحدة المعالجة المركزية (CPU) ويعمل بنفس الصورة مع أو بدون الوصول إلى GPU:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest

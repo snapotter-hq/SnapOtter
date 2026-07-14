@@ -124,7 +124,7 @@ function useNavItems() {
         id: "ai-features",
         label: t.settings.nav.aiFeatures,
         icon: Sparkles,
-        requiredPermission: "settings:write",
+        requiredPermission: "features:manage",
       },
       {
         id: "tools",

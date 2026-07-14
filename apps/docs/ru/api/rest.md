@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: b2ec4e36cb9f
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # Справочник REST API {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | Удаление фона | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Апскейл изображения | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Ластик объектов | LaMa (ONNX) | Маска отправляется как вторая файловая часть (fieldname `mask`), `format`, `quality` |
-| `ocr` | OCR / Извлечение текста | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Извлечение текста | Tesseract (быстрый); RapidOCR + PP-OCR ONNX (сбалансированный/лучший) | `quality` (быстрый/сбалансированный/лучший), `language`, `enhance` |
 | `blur-faces` | Размытие лиц / PII | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Умная обрезка | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Улучшение изображения | На основе анализа | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## Пакетная обработка {#batch-processing}
 
-Применение общего инструмента с поддержкой пакетной обработки к нескольким файлам сразу. Возвращает ZIP-архив. Пользовательские многофайловые или многошаговые маршруты, такие как подписание PDF, PDF OCR и маршруты пресетов PDF-в-изображение, используют собственный контракт эндпоинта вместо общего маршрута `/batch`.
+Применение общего инструмента с поддержкой пакетной обработки к нескольким файлам сразу. Возвращает ZIP-архив. Пользовательские многофайловые или многошаговые маршруты, такие как подписание PDF и маршруты пресетов PDF-в-изображение, используют собственный контракт эндпоинта вместо общего маршрута `/batch`.
+
+Инструмент `ocr-pdf` поддерживает этот общий маршрут `/batch`.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 Управление бандлами AI-функций (установка/удаление пакетов AI-моделей в среде Docker). Предпочтительнее использовать эндпоинт установки на уровне инструмента при включении инструмента из пользовательской автоматизации: некоторым AI-инструментам нужно более одного общего бандла, и этот эндпоинт пропускает уже установленные бандлы, ставя в очередь только недостающие.
 
+OCR — это необязательное расширение, а не жесткая зависимость. Его уровень `fast` Tesseract работает без пакета; `POST /api/v1/admin/features/ocr/install` устанавливает подписанный пакет RapidOCR для `balanced` и `best` на Linux amd64 или arm64. Точная среда выполнения OCR использует CPU на хостах только с ЦП и NVIDIA и требует не менее 4 GiB эффективной памяти (настроенный предел cgroup контейнера, в противном случае память хоста). SnapOtter сообщает о `requiredMemoryBytes`, `effectiveMemoryBytes` и причине совместимости `insufficient-memory` и отклоняет несовместимую установку перед загрузкой. Это требование к памяти не применяется к `fast`. Пакет составляет около 208-234 MiB для загрузки и 409-488 MiB для установки, в зависимости от цели; подписанный индекс связывает точные размеры, применяемые во время установки.
+
 | Метод | Путь | Доступ | Описание |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Список всех бандлов функций и их статуса установки |
@@ -601,7 +605,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Установить каждый бандл, который требуется инструменту; возвращает статус queued/skipped по каждому бандлу |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Удалить бандл функции и очистить файлы моделей |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Получить общее использование диска AI-моделями |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Импортировать офлайн-архив AI-бандла |
+| `POST` | `/api/v1/admin/features/import` | Администратор (`features:manage`) | Импортируйте устаревший пакет AI (`file`) или подписанный оффлайн OCR выпускать (`index` плюс `archive`) |
+
+Импорт OCR с воздушным зазором должен включать подписанный `ocr-runtime-index.json` выпуска и соответствующий архив платформы. SnapOtter применяет ту же подпись Ed25519, хэш артефакта, совместимость, извлечение и дымовые тесты, которые используются при онлайн-установке:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Используйте архив `linux-arm64-cpu-py311` на arm64. Подписанный артефакт для другой цели скорее отклоняется, чем устанавливается.
 
 ## Административные операции {#admin-operations}
 

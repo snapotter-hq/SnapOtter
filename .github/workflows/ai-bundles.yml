@@ -1,16 +1,20 @@
 name: AI Bundles
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to build bundles for (e.g., 2.0.0)"
-        required: true
-        type: string
   workflow_call:
     inputs:
       version:
         type: string
+        required: true
+      release_commit:
+        type: string
+        required: true
+    secrets:
+      GHCR_TOKEN:
+        required: true
+      HF_TOKEN:
+        required: true
+      OCR_RUNTIME_INDEX_SIGNING_KEY_B64:
         required: true
 
 concurrency:
@@ -20,151 +24,67 @@ concurrency:
 permissions: {}
 
 jobs:
-  build:
-    name: ${{ matrix.bundle }} (${{ matrix.arch }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - bundle: background-removal
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: background-removal
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: face-detection
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: face-detection
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: object-eraser-colorize
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: object-eraser-colorize
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: upscale-enhance
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: upscale-enhance
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: photo-restoration
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: photo-restoration
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: ocr
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: ocr
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: transcription
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: transcription
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: read
+  validate-inputs:
+    name: Validate release inputs
+    runs-on: ubuntu-latest
+    permissions: {}
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
-          sudo docker system prune -af
-          df -h /
-
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: v${{ inputs.version }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Build bundle inside Docker image
+      - name: Reject unsafe or non-semantic versions
         env:
-          BUNDLE: ${{ matrix.bundle }}
-          ARCH: ${{ matrix.arch }}
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
           VERSION: ${{ inputs.version }}
         run: |
-          mkdir -p /tmp/bundles
-          docker run --rm --entrypoint bash \
-            -v "$PWD/docker/build-bundle.sh:/build-bundle.sh:ro" \
-            -v "$PWD/docker/feature-manifest.json:/app/docker/feature-manifest.json:ro" \
-            -v "/tmp/bundles:/output" \
-            "ghcr.io/snapotter-hq/snapotter:${VERSION}" \
-            /build-bundle.sh "${BUNDLE}" "${ARCH}" /output
+          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
+            echo "::error::Bundle version must be a path-safe semantic version"
+            exit 1
+          }
+          [[ ${#VERSION} -le 64 ]] || {
+            echo "::error::Bundle version is too long"
+            exit 1
+          }
+          [[ "${RELEASE_COMMIT}" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "::error::Release commit must be a full immutable Git commit"
+            exit 1
+          }
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ matrix.bundle }}-${{ matrix.arch }}
-          path: /tmp/bundles/
-          retention-days: 1
+      - name: Validate OCR runtime trust configuration
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+        run: |
+          : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
+          : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
+          [[ "${OCR_RUNTIME_INDEX_KEY_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo "::error::OCR runtime signing key ID is not a safe identifier"
+            exit 1
+          }
+          umask 077
+          trap 'rm -f /tmp/ocr-runtime-public.pem' EXIT
+          printf '%s' "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" \
+            | base64 --decode > /tmp/ocr-runtime-public.pem
+          [[ "$(base64 --wrap=0 < /tmp/ocr-runtime-public.pem)" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
+            echo "::error::OCR runtime public key must use canonical base64"
+            exit 1
+          }
+          openssl pkey -pubin -in /tmp/ocr-runtime-public.pem -text -noout \
+            | grep -q ED25519 || {
+              echo "::error::Configured OCR runtime public key is not Ed25519"
+              exit 1
+            }
 
-  verify:
-    name: Verify ${{ matrix.bundle }} (${{ matrix.arch }})
-    needs: build
-    timeout-minutes: 20
+  build-ocr:
+    name: Build OCR (${{ matrix.target }})
+    needs: validate-inputs
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          - bundle: background-removal
-            arch: amd64-gpu
+          - target: linux-amd64-cpu-py312
+            image_platform: linux-amd64
             runner: ubuntu-latest
-          - bundle: background-removal
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: face-detection
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: face-detection
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: object-eraser-colorize
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: object-eraser-colorize
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: upscale-enhance
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: upscale-enhance
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: photo-restoration
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: photo-restoration
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: ocr
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: ocr
-            arch: arm64-cpu
-            runner: ubuntu-24.04-arm
-          - bundle: transcription
-            arch: amd64-gpu
-            runner: ubuntu-latest
-          - bundle: transcription
-            arch: arm64-cpu
+          - target: linux-arm64-cpu-py311
+            image_platform: linux-arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -178,88 +98,1879 @@ jobs:
           sudo docker system prune -af
           df -h /
 
-      - name: Checkout
+      - name: Checkout release tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
 
-      - name: Download build artifact
+      - name: Download unpublished image digest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ matrix.bundle }}-${{ matrix.arch }}
-          path: /tmp/bundles
+          name: digests-${{ matrix.image_platform }}
+          path: /tmp/image-digest
 
-      - name: Verify bundle
+      - name: Resolve exact build image
         env:
-          BUNDLE: ${{ matrix.bundle }}
-          ARCH: ${{ matrix.arch }}
+          IMAGE_PLATFORM: ${{ matrix.image_platform }}
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one ${IMAGE_PLATFORM} image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+          echo "SNAPOTTER_BUNDLE_IMAGE_DIGEST=${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build immutable OCR runtime in its native app image
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+        run: |
+          rm -rf /tmp/bundles
+          mkdir -p /tmp/bundles/primary /tmp/bundles/rebuild
+          [[ "${WORKFLOW_COMMIT}" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "::error::Reusable workflow revision is not an immutable commit"
+            exit 1
+          }
+          for build in primary rebuild; do
+            docker run --rm --entrypoint bash \
+              -v "$PWD/docker/build-bundle.sh:/build-bundle.sh:ro" \
+              -v "$PWD/docker/build-ocr-runtime.sh:/build-ocr-runtime.sh:ro" \
+              -v "$PWD/docker/ocr-runtime-models.json:/ocr-runtime-models.json:ro" \
+              -v "$PWD/docker/ocr-runtime-requirements-amd64.txt:/ocr-runtime-requirements-amd64.txt:ro" \
+              -v "$PWD/docker/ocr-runtime-requirements-arm64.txt:/ocr-runtime-requirements-arm64.txt:ro" \
+              -v "$PWD/docker/ocr-best-v1-calibration.json:/app/docker/ocr-best-v1-calibration.json:ro" \
+              -v "$PWD/docker/feature-manifest.json:/app/docker/feature-manifest.json:ro" \
+              -v "/tmp/bundles/${build}:/output" \
+              -e SNAPOTTER_VERSION="${VERSION}" \
+              -e SNAPOTTER_OCR_SOURCE_IMAGE_DIGEST="${SNAPOTTER_BUNDLE_IMAGE_DIGEST}" \
+              -e SNAPOTTER_OCR_SOURCE_COMMIT="${RELEASE_COMMIT}" \
+              -e SNAPOTTER_OCR_BUILDER_ID="github-actions:.github/workflows/ai-bundles.yml@${WORKFLOW_COMMIT}" \
+              "${SNAPOTTER_BUNDLE_IMAGE}" \
+              /build-bundle.sh ocr "${TARGET}" /output
+          done
+          for suffix in tar.gz tar.gz.sha256 artifact.json index-input.json; do
+            test -s "/tmp/bundles/primary/ocr-${TARGET}.${suffix}"
+            test -s "/tmp/bundles/rebuild/ocr-${TARGET}.${suffix}"
+            cmp --silent "/tmp/bundles/primary/ocr-${TARGET}.${suffix}" \
+              "/tmp/bundles/rebuild/ocr-${TARGET}.${suffix}" || {
+                echo "::error::OCR runtime rebuild is not byte-reproducible: ${suffix}"
+                exit 1
+              }
+          done
+
+      - name: Upload OCR build artifact for verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ocr-${{ matrix.target }}
+          overwrite: true
+          path: |
+            /tmp/bundles/primary/ocr-${{ matrix.target }}.tar.gz
+            /tmp/bundles/primary/ocr-${{ matrix.target }}.tar.gz.sha256
+            /tmp/bundles/primary/ocr-${{ matrix.target }}.artifact.json
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-ocr:
+    name: Verify OCR (${{ matrix.target }})
+    needs: build-ocr
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64-cpu-py312
+            image_platform: linux-amd64
+            runner: ubuntu-latest
+            gpu_visible: none
+            cuda_visible: ""
+          - target: linux-arm64-cpu-py311
+            image_platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            gpu_visible: none
+            cuda_visible: ""
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af
+          df -h /
+
+      - name: Checkout release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
           VERSION: ${{ inputs.version }}
         run: |
-          docker run --rm --entrypoint bash \
-            -v "$PWD/docker/verify-bundle.sh:/verify-bundle.sh:ro" \
-            -v "$PWD/packages/ai/python:/app/packages/ai/python:ro" \
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Download unpublished image digest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-${{ matrix.image_platform }}
+          path: /tmp/image-digest
+
+      - name: Resolve exact verification image
+        env:
+          IMAGE_PLATFORM: ${{ matrix.image_platform }}
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one ${IMAGE_PLATFORM} image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Verify image has the release trust identity
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+        run: |
+          : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
+          : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
+          actual_key_id="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
+            -c 'printf %s "$OCR_RUNTIME_INDEX_KEY_ID"')"
+          actual_public_key="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
+            -c 'printf %s "$OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64"')"
+          actual_official_container="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
+            -c 'printf %s "$SNAPOTTER_OFFICIAL_CONTAINER"')"
+          [[ "${actual_key_id}" == "${OCR_RUNTIME_INDEX_KEY_ID}" ]] || {
+            echo "::error::Verification image OCR key ID does not match the release identity"
+            exit 1
+          }
+          [[ "${actual_public_key}" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
+            echo "::error::Verification image OCR public key does not match the release identity"
+            exit 1
+          }
+          [[ "${actual_official_container}" == "1" ]] || {
+            echo "::error::Verification image is not marked as an official container"
+            exit 1
+          }
+
+      - name: Download OCR build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-${{ matrix.target }}
+          path: /tmp/bundles
+
+      - name: Verify exact Fast OCR payload
+        run: |
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
+          docker run --rm --network none \
+            -e EMBEDDED=0 \
+            -e PUID="${RUNNER_UID}" \
+            -e PGID="${RUNNER_GID}" \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            bash -ceu '
+              expected=(chi_sim deu eng fra jpn spa)
+              mapfile -t actual < <(tesseract --list-langs 2>/dev/null | tail -n +2 | LC_ALL=C sort)
+              [[ "${actual[*]}" == "${expected[*]}" ]] || {
+                echo "FAIL: Fast OCR language payload changed: ${actual[*]}" >&2
+                exit 1
+              }
+              tessdata=/usr/share/tesseract-ocr/5/tessdata
+              [[ ! -e "${tessdata}/osd.traineddata" && ! -e "${tessdata}/kor.traineddata" ]] || {
+                echo "FAIL: Fast OCR unexpectedly contains orientation or Korean traineddata" >&2
+                exit 1
+              }
+              traineddata_bytes="$(find "${tessdata}" -maxdepth 1 -type f -name "*.traineddata" -printf "%s\n" \
+                | awk "{ total += \$1 } END { print total + 0 }")"
+              [[ "${traineddata_bytes}" == "14003738" ]] || {
+                echo "FAIL: Fast OCR traineddata size changed: ${traineddata_bytes}" >&2
+                exit 1
+              }
+              echo "PASS: exact Fast OCR languages and 14003738 traineddata bytes; about 25 MiB remains a measured approximate image-layer size"
+            '
+
+      - name: Verify offline install and runtime smoke
+        env:
+          CUDA_VISIBLE_DEVICES: ${{ matrix.cuda_visible }}
+          NVIDIA_VISIBLE_DEVICES: ${{ matrix.gpu_visible }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
+          rm -rf /tmp/ocr-quality
+          install -d -m 1777 /tmp/ocr-quality
+          docker run --rm --network none --memory 3g --memory-swap 3g \
+            -v "$PWD/docker/verify-ocr-runtime.sh:/verify-ocr-runtime.sh:ro" \
+            -v "$PWD/packages/ai/python/install_runtime.py:/app/packages/ai/python/install_runtime.py:ro" \
+            -v "/tmp/bundles:/bundles:ro" \
+            -e EMBEDDED=0 \
+            -e PUID="${RUNNER_UID}" \
+            -e PGID="${RUNNER_GID}" \
+            -e CUDA_VISIBLE_DEVICES \
+            -e NVIDIA_VISIBLE_DEVICES \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            /verify-ocr-runtime.sh "${TARGET}" memory-preflight
+          docker run --rm --network none --memory 4g --memory-swap 4g \
+            --user 20001:0 \
+            -v "$PWD/docker/verify-ocr-runtime.sh:/verify-ocr-runtime.sh:ro" \
+            -v "$PWD/packages/ai/python/install_runtime.py:/app/packages/ai/python/install_runtime.py:ro" \
+            -v "/tmp/bundles:/bundles:ro" \
+            -e EMBEDDED=0 \
+            -e CUDA_VISIBLE_DEVICES \
+            -e NVIDIA_VISIBLE_DEVICES \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            /verify-ocr-runtime.sh "${TARGET}" install-smoke
+          docker run --rm --network none --memory 4g --memory-swap 4g \
+            -v "$PWD/docker/verify-ocr-runtime.sh:/verify-ocr-runtime.sh:ro" \
+            -v "$PWD/packages/ai/python/install_runtime.py:/app/packages/ai/python/install_runtime.py:ro" \
             -v "$PWD/tests/fixtures:/fixtures:ro" \
             -v "/tmp/bundles:/bundles:ro" \
-            -e SNAPOTTER_GPU=0 \
-            -e CUDA_VISIBLE_DEVICES="" \
-            -e MODELS_PATH=/tmp/verify-models \
-            -e U2NET_HOME=/tmp/verify-models/rembg \
-            -e PYTHONPATH=/app/packages/ai/python \
-            "ghcr.io/snapotter-hq/snapotter:${VERSION}" \
-            /verify-bundle.sh "${BUNDLE}" "${ARCH}"
+            -v "/tmp/ocr-quality:/reports" \
+            -e EMBEDDED=0 \
+            -e PUID="${RUNNER_UID}" \
+            -e PGID="${RUNNER_GID}" \
+            -e CUDA_VISIBLE_DEVICES \
+            -e NVIDIA_VISIBLE_DEVICES \
+            -e OCR_VERIFY_ENVIRONMENT=native-cpu \
+            -e OCR_VERIFY_REPORT_DIR=/reports \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            /verify-ocr-runtime.sh "${TARGET}" full
+          chmod 0755 /tmp/ocr-quality
+          test -r "/tmp/ocr-quality/ocr-${TARGET}-native-cpu.quality.json"
 
-  publish:
-    name: Publish to HuggingFace
-    needs: verify
+      - name: Upload native OCR quality and resource report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ocr-quality-${{ matrix.target }}
+          overwrite: true
+          path: /tmp/ocr-quality/*.quality.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Extract verified OCR runtime for supply-chain inspection
+        id: extract_runtime
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          rm -rf /tmp/ocr-runtime-scan /tmp/ocr-security
+          mkdir -p /tmp/ocr-runtime-scan /tmp/ocr-security
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import stat
+          import tarfile
+
+          bundles = pathlib.Path("/tmp/bundles")
+          scan_root = pathlib.Path("/tmp/ocr-runtime-scan")
+          target = os.environ["TARGET"]
+          artifact_path = bundles / f"ocr-{target}.artifact.json"
+          artifact = json.loads(artifact_path.read_bytes())
+          archive_metadata = artifact["archive"]
+          archive_name = f"ocr-{target}.tar.gz"
+
+          def file_sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          if (
+              artifact.get("family") != "ocr"
+              or artifact.get("target") != target
+              or archive_metadata.get("file") != archive_name
+          ):
+              raise SystemExit("OCR artifact identity changed after runtime verification")
+          if artifact.get("resources", {}).get("minimumMemoryBytes") != 4 * 1024 * 1024 * 1024:
+              raise SystemExit("OCR artifact memory policy changed after runtime verification")
+
+          archive_path = bundles / archive_name
+          if archive_path.stat().st_size != archive_metadata["size"]:
+              raise SystemExit("OCR archive size changed after runtime verification")
+          if file_sha256(archive_path) != artifact["archive"]["sha256"]:
+              raise SystemExit("OCR archive digest changed after runtime verification")
+
+          with tarfile.open(archive_path, "r:gz") as archive:
+              for member in archive.getmembers():
+                  path = pathlib.PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"Unsafe OCR archive path: {member.name}")
+                  if not member.isfile() and not member.isdir():
+                      raise SystemExit(f"Unsupported OCR archive entry: {member.name}")
+              archive.extractall(scan_root, filter=tarfile.data_filter)
+
+          expected_files = {record["path"]: record for record in artifact["files"]}
+          if len(expected_files) != len(artifact["files"]):
+              raise SystemExit("OCR artifact file manifest contains duplicate paths")
+          actual_files = {
+              path.relative_to(scan_root).as_posix(): path
+              for path in scan_root.rglob("*")
+              if path.is_file()
+          }
+          if set(actual_files) != set(expected_files):
+              raise SystemExit("Extracted OCR runtime file manifest mismatch")
+          for relative_path, expected in expected_files.items():
+              path = actual_files[relative_path]
+              info = path.stat()
+              if (
+                  info.st_size != expected["size"]
+                  or stat.S_IMODE(info.st_mode) != expected["mode"]
+                  or file_sha256(path) != expected["sha256"]
+              ):
+                  raise SystemExit(f"Extracted OCR runtime file mismatch: {relative_path}")
+          PY
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Syft 1.42.3 from verified release bytes
+        env:
+          SYFT_VERSION: "1.42.3"
+        run: |
+          # Published in Syft's v1.42.3 syft_1.42.3_checksums.txt release asset.
+          case "$(uname -m)" in
+            x86_64)
+              syft_arch="amd64"
+              expected_sha256="0d6be741479eddd2c8644a288990c04f3df0d609bbc1599a005532a9dff63509"
+              ;;
+            aarch64 | arm64)
+              syft_arch="arm64"
+              expected_sha256="dc630590c953347789d08f8ebf57c7d8094db89100785fcd94b1cddeac791804"
+              ;;
+            *)
+              echo "::error::Unsupported Syft installer architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+          archive="syft_${SYFT_VERSION}_linux_${syft_arch}.tar.gz"
+          install_root="${RUNNER_TEMP}/syft-${SYFT_VERSION}"
+          rm -rf "${install_root}"
+          mkdir -p "${install_root}"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${install_root}/${archive}" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/${archive}"
+          printf '%s  %s\n' "${expected_sha256}" "${install_root}/${archive}" \
+            | sha256sum --check --strict -
+          tar -xzf "${install_root}/${archive}" -C "${install_root}" syft
+          chmod 0755 "${install_root}/syft"
+          "${install_root}/syft" version -o json \
+            | jq -e --arg version "${SYFT_VERSION}" '.version == $version' >/dev/null
+          echo "${install_root}" >> "$GITHUB_PATH"
+
+      - name: Generate per-target OCR runtime SBOMs
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          syft scan "dir:/tmp/ocr-runtime-scan" \
+            --source-name "snapotter-ocr-${TARGET}" \
+            --source-version "${VERSION}" \
+            -o "cyclonedx-json=/tmp/ocr-security/ocr-${TARGET}-sbom.cdx.json" \
+            -o "spdx-json=/tmp/ocr-security/ocr-${TARGET}-sbom.spdx.json"
+
+      - name: Gate OCR runtime vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.70.0
+          scan-type: sbom
+          scan-ref: /tmp/ocr-security/ocr-${{ matrix.target }}-sbom.cdx.json
+          scanners: vuln
+          format: table
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          trivyignores: ".trivyignore"
+          timeout: 10m0s
+
+      - name: Record per-target OCR runtime vulnerability report
+        if: always() && steps.extract_runtime.outputs.ready == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.70.0
+          scan-type: sbom
+          scan-ref: /tmp/ocr-security/ocr-${{ matrix.target }}-sbom.cdx.json
+          scanners: vuln
+          format: json
+          output: /tmp/ocr-security/ocr-${{ matrix.target }}-trivy.json
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
+          trivyignores: ".trivyignore"
+          timeout: 10m0s
+
+      - name: Upload per-target OCR security reports
+        if: always() && steps.extract_runtime.outputs.ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ocr-security-${{ matrix.target }}
+          overwrite: true
+          path: |
+            /tmp/ocr-security/ocr-${{ matrix.target }}-sbom.cdx.json
+            /tmp/ocr-security/ocr-${{ matrix.target }}-sbom.spdx.json
+            /tmp/ocr-security/ocr-${{ matrix.target }}-trivy.json
+          if-no-files-found: error
+          retention-days: 30
+
+  verify-ocr-nvidia:
+    name: Verify amd64 CPU OCR with a real NVIDIA GPU exposed
+    needs: build-ocr
+    timeout-minutes: 60
+    runs-on: [self-hosted, linux, x64, snapotter-nvidia]
+    env:
+      DOCKER_CONFIG: /tmp/snapotter-ocr-docker-config
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Clear persistent runner release state
+        run: |
+          rm -rf /tmp/image-digest /tmp/bundles /tmp/ocr-quality /tmp/snapotter-ocr-docker-config
+          mkdir -p /tmp/image-digest /tmp/bundles /tmp/ocr-quality /tmp/snapotter-ocr-docker-config
+
+      - name: Checkout release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Require a working NVIDIA container runtime
+        run: |
+          command -v nvidia-smi >/dev/null
+          nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+          docker info --format '{{json .Runtimes}}' | grep -q 'nvidia'
+
+      - name: Download unpublished amd64 image digest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-linux-amd64
+          path: /tmp/image-digest
+
+      - name: Resolve exact amd64 verification image
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one linux-amd64 image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid amd64 image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Download amd64 OCR build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-linux-amd64-cpu-py312
+          path: /tmp/bundles
+
+      - name: Prove the GPU is exposed inside the release image
+        run: |
+          docker run --rm --gpus all --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
+            -c 'test -e /dev/nvidiactl && test -r /proc/driver/nvidia/version'
+
+      - name: Verify the portable CPU runtime with NVIDIA exposed
+        run: |
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
+          rm -rf /tmp/ocr-quality
+          install -d -m 1777 /tmp/ocr-quality
+          docker run --rm --gpus all --network none --memory 4g --memory-swap 4g \
+            -v "$PWD/docker/verify-ocr-runtime.sh:/verify-ocr-runtime.sh:ro" \
+            -v "$PWD/packages/ai/python/install_runtime.py:/app/packages/ai/python/install_runtime.py:ro" \
+            -v "$PWD/tests/fixtures:/fixtures:ro" \
+            -v "/tmp/bundles:/bundles:ro" \
+            -v "/tmp/ocr-quality:/reports" \
+            -e EMBEDDED=0 \
+            -e PUID="${RUNNER_UID}" \
+            -e PGID="${RUNNER_GID}" \
+            -e CUDA_VISIBLE_DEVICES=0 \
+            -e NVIDIA_VISIBLE_DEVICES=all \
+            -e OCR_VERIFY_ENVIRONMENT=nvidia-exposed-cpu \
+            -e OCR_VERIFY_REPORT_DIR=/reports \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            /verify-ocr-runtime.sh linux-amd64-cpu-py312 full
+          chmod 0755 /tmp/ocr-quality
+          test -r /tmp/ocr-quality/ocr-linux-amd64-cpu-py312-nvidia-exposed-cpu.quality.json
+
+      - name: Upload NVIDIA-exposed CPU OCR quality and resource report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312-nvidia
+          overwrite: true
+          path: /tmp/ocr-quality/*.quality.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove release-scoped state from persistent runner
+        if: always()
+        run: |
+          if [[ -n "${SNAPOTTER_BUNDLE_IMAGE:-}" ]]; then
+            docker image rm "${SNAPOTTER_BUNDLE_IMAGE}" || true
+          fi
+          rm -rf /tmp/image-digest /tmp/bundles /tmp/ocr-quality /tmp/snapotter-ocr-docker-config
+
+  sign-ocr-index:
+    name: Sign verified OCR runtime index
+    needs: [build-ocr, verify-ocr, verify-ocr-nvidia]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Download all artifacts
+      - name: Checkout exact release tag for provenance verification
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind signing to the checked-out release tag commit
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+            echo "::error::Checked-out commit does not match release tag v${VERSION}"
+            exit 1
+          }
+          [[ "${WORKFLOW_COMMIT}" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "::error::Reusable workflow revision is not an immutable commit"
+            exit 1
+          }
+          echo "SNAPOTTER_RELEASE_COMMIT=${RELEASE_COMMIT}" >> "$GITHUB_ENV"
+          echo "SNAPOTTER_WORKFLOW_COMMIT=${WORKFLOW_COMMIT}" >> "$GITHUB_ENV"
+
+      - name: Download exact amd64 release image digest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-linux-amd64
+          path: /tmp/image-digests/linux-amd64
+
+      - name: Download exact arm64 release image digest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-linux-arm64
+          path: /tmp/image-digests/linux-arm64
+
+      - name: Download both verified OCR artifact sets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ocr-linux-*-cpu-py*
+          path: /tmp/ocr-artifacts
+          merge-multiple: true
+
+      - name: Download OCR security attestations
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ocr-security-*
+          path: /tmp/ocr-attestations
+          merge-multiple: true
+
+      - name: Download OCR quality and resource attestations
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ocr-quality-*
+          path: /tmp/ocr-attestations
+          merge-multiple: true
+
+      - name: Create canonical unsigned index and validate its archives
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p /tmp/ocr-index
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path("/tmp/ocr-artifacts")
+          attestation_root = Path("/tmp/ocr-attestations")
+          output = Path("/tmp/ocr-index")
+          expected_targets = {"linux-amd64-cpu-py312", "linux-arm64-cpu-py311"}
+          expected_image_platforms = {
+              "linux-amd64-cpu-py312": "linux-amd64",
+              "linux-arm64-cpu-py311": "linux-arm64",
+          }
+          artifacts = []
+          seen_targets = set()
+          source_commits = set()
+
+          def canonical(value):
+              return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+          def file_sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          # OCR_MEASURED_ESTIMATE_CONTRACT_BEGIN
+          MEASURED_ESTIMATE_MINIMUM_TOLERANCE_BYTES = 1024 * 1024
+
+          def validate_measured_estimate(target, manifest_target, archive):
+              if not isinstance(manifest_target, dict):
+                  raise SystemExit(f"missing measured-estimate metadata for {target}")
+              if manifest_target.get("sizeKind") != "measured-estimate":
+                  raise SystemExit(f"invalid measured-estimate sizeKind for {target}")
+              if not isinstance(archive, dict):
+                  raise SystemExit(f"missing archive size metadata for {target}")
+
+              size_fields = (
+                  ("compressed", "compressedSizeEstimate", archive.get("size")),
+                  ("expanded", "extractedSizeEstimate", archive.get("expandedSize")),
+              )
+              for label, estimate_field, actual in size_fields:
+                  estimate = manifest_target.get(estimate_field)
+                  if type(estimate) is not int or estimate <= 0:
+                      raise SystemExit(
+                          f"invalid {label} measured-estimate field for {target}"
+                      )
+                  if type(actual) is not int or actual <= 0:
+                      raise SystemExit(f"invalid actual {label} size for {target}")
+                  difference = abs(actual - estimate)
+                  if (
+                      difference > MEASURED_ESTIMATE_MINIMUM_TOLERANCE_BYTES
+                      and difference * 100 > estimate
+                  ):
+                      raise SystemExit(
+                          f"OCR {label} size drift exceeds measured-estimate tolerance for "
+                          f"{target}: estimate={estimate}, actual={actual}, "
+                          f"difference={difference}, minimumTolerance="
+                          f"{MEASURED_ESTIMATE_MINIMUM_TOLERANCE_BYTES}, "
+                          "relativeTolerance=1%"
+                      )
+          # OCR_MEASURED_ESTIMATE_CONTRACT_END
+
+          manifest_path = Path("docker/feature-manifest.json")
+          try:
+              manifest = json.loads(manifest_path.read_bytes())
+          except (OSError, json.JSONDecodeError) as error:
+              raise SystemExit(f"invalid checked-out OCR feature manifest: {error}") from error
+          bundles = manifest.get("bundles") if isinstance(manifest, dict) else None
+          ocr_manifest = bundles.get("ocr") if isinstance(bundles, dict) else None
+          manifest_targets = (
+              ocr_manifest.get("targets") if isinstance(ocr_manifest, dict) else None
+          )
+          if (
+              not isinstance(manifest_targets, dict)
+              or set(manifest_targets) != expected_targets
+          ):
+              raise SystemExit("checked-out OCR measured-estimate target set is invalid")
+
+          workflow_commit = os.environ["SNAPOTTER_WORKFLOW_COMMIT"]
+          if (
+              len(workflow_commit) != 40
+              or any(character not in "0123456789abcdef" for character in workflow_commit)
+          ):
+              raise SystemExit("invalid reusable-workflow provenance")
+          expected_image_digests = {}
+          for target, image_platform in expected_image_platforms.items():
+              digest_root = Path("/tmp/image-digests") / image_platform
+              digest_entries = list(digest_root.iterdir())
+              if (
+                  len(digest_entries) != 1
+                  or not digest_entries[0].is_file()
+                  or digest_entries[0].is_symlink()
+                  or digest_entries[0].stat().st_size != 0
+              ):
+                  raise SystemExit(
+                      f"expected exactly one release image digest for {image_platform}"
+                  )
+              digest = digest_entries[0].name
+              if len(digest) != 64 or any(
+                  character not in "0123456789abcdef" for character in digest
+              ):
+                  raise SystemExit(f"invalid release image digest for {image_platform}")
+              expected_image_digests[target] = f"sha256:{digest}"
+
+          for metadata_path in sorted(source.glob("*.artifact.json")):
+              if metadata_path.is_symlink() or not metadata_path.is_file():
+                  raise SystemExit(f"unsafe OCR artifact metadata: {metadata_path.name}")
+              raw = metadata_path.read_bytes()
+              artifact = json.loads(raw)
+              if raw != canonical(artifact):
+                  raise SystemExit(f"artifact metadata is not canonical: {metadata_path.name}")
+              target = artifact.get("target")
+              if artifact.get("family") != "ocr" or target not in expected_targets:
+                  raise SystemExit(f"unexpected OCR artifact identity: {metadata_path.name}")
+              if target in seen_targets:
+                  raise SystemExit(f"duplicate OCR target: {target}")
+              seen_targets.add(target)
+              if metadata_path.name != f"ocr-{target}.artifact.json":
+                  raise SystemExit(f"artifact filename does not bind target {target}")
+              expected_arch = "amd64" if target == "linux-amd64-cpu-py312" else "arm64"
+              if artifact.get("platform") != "linux" or artifact.get("arch") != expected_arch:
+                  raise SystemExit(f"platform mismatch for {target}")
+              if artifact.get("version") != os.environ["VERSION"]:
+                  raise SystemExit(f"version mismatch for {target}")
+              if artifact.get("capabilities", {}).get("providers") != ["CPUExecutionProvider"]:
+                  raise SystemExit(f"non-portable provider set for {target}")
+              if artifact.get("resources", {}).get("minimumMemoryBytes") != 4 * 1024 * 1024 * 1024:
+                  raise SystemExit(f"invalid memory policy for {target}")
+              provenance = artifact.get("provenance")
+              if not isinstance(provenance, dict):
+                  raise SystemExit(f"missing build provenance for {target}")
+              source_commit = provenance.get("sourceCommit")
+              if (
+                  not isinstance(source_commit, str)
+                  or len(source_commit) != 40
+                  or any(character not in "0123456789abcdef" for character in source_commit)
+                  or provenance.get("builderId")
+                  != f"github-actions:.github/workflows/ai-bundles.yml@{workflow_commit}"
+                  or source_commit != os.environ["SNAPOTTER_RELEASE_COMMIT"]
+                  or provenance.get("sourceImageDigest") != expected_image_digests[target]
+              ):
+                  raise SystemExit(f"invalid build provenance for {target}")
+              source_commits.add(source_commit)
+              model_objects = artifact.get("modelObjects")
+              models = artifact.get("models")
+              if (
+                  not isinstance(model_objects, list)
+                  or not isinstance(models, dict)
+                  or len(model_objects) != len(models)
+              ):
+                  raise SystemExit(f"missing model provenance for {target}")
+              if {model.get("id") for model in model_objects if isinstance(model, dict)} != set(models):
+                  raise SystemExit(f"model provenance IDs do not match the digest map for {target}")
+              file_records = {
+                  record.get("path"): record
+                  for record in artifact.get("files", [])
+                  if isinstance(record, dict)
+              }
+              if len(file_records) != len(artifact.get("files", [])):
+                  raise SystemExit(f"duplicate or malformed runtime file records for {target}")
+              for model in model_objects:
+                  if not isinstance(model, dict):
+                      raise SystemExit(f"malformed model provenance for {target}")
+                  model_id = model.get("id")
+                  path = model.get("path")
+                  digest = model.get("sha256")
+                  file_record = file_records.get(path)
+                  if (
+                      not isinstance(model_id, str)
+                      or models.get(model_id) != digest
+                      or not isinstance(file_record, dict)
+                      or file_record.get("sha256") != digest
+                      or file_record.get("size") != model.get("size")
+                      or not isinstance(model.get("license"), str)
+                      or not model["license"]
+                  ):
+                      raise SystemExit(f"model provenance does not match runtime bytes for {target}")
+                  if "url" in model:
+                      revision = model.get("revision")
+                      if (
+                          not isinstance(revision, str)
+                          or len(revision) != 40
+                          or f"/resolve/{revision}/" not in str(model.get("url"))
+                      ):
+                          raise SystemExit(
+                              f"model provenance does not bind its immutable revision for {target}"
+                          )
+                  elif not isinstance(model.get("source"), str):
+                      raise SystemExit(f"local model provenance is missing its source for {target}")
+              legal_materials = artifact.get("legalMaterials")
+              expected_legal_ids = {
+                  "snapotter-agpl",
+                  "apache-2.0",
+                  "antlr-4.9.3-license",
+              }
+              if (
+                  not isinstance(legal_materials, list)
+                  or len(legal_materials) != len(expected_legal_ids)
+                  or {
+                      material.get("id")
+                      for material in legal_materials
+                      if isinstance(material, dict)
+                  }
+                  != expected_legal_ids
+              ):
+                  raise SystemExit(f"incomplete legal material set for {target}")
+              for material in legal_materials:
+                  if not isinstance(material, dict):
+                      raise SystemExit(f"malformed legal material for {target}")
+                  file_record = file_records.get(material.get("path"))
+                  if (
+                      not isinstance(file_record, dict)
+                      or file_record.get("sha256") != material.get("sha256")
+                      or file_record.get("size") != material.get("size")
+                  ):
+                      raise SystemExit(
+                          f"legal material does not match runtime bytes for {target}"
+                      )
+              notices = file_records.get("THIRD_PARTY_NOTICES.json")
+              if (
+                  not isinstance(notices, dict)
+                  or not isinstance(notices.get("sha256"), str)
+                  or len(notices["sha256"]) != 64
+                  or not isinstance(notices.get("size"), int)
+                  or notices["size"] <= 0
+              ):
+                  raise SystemExit(f"runtime third-party notices are missing for {target}")
+              archive = artifact.get("archive", {})
+              archive_name = archive.get("file")
+              if archive_name != f"ocr-{target}.tar.gz":
+                  raise SystemExit(f"unexpected archive name for {target}")
+              archive_path = source / archive_name
+              if not archive_path.is_file() or archive_path.is_symlink():
+                  raise SystemExit(f"missing archive for {target}")
+              if archive_path.stat().st_size != archive.get("size"):
+                  raise SystemExit(f"archive size mismatch for {target}")
+              digest = file_sha256(archive_path)
+              if digest != archive.get("sha256"):
+                  raise SystemExit(f"archive digest mismatch for {target}")
+              checksum_path = source / f"{archive_name}.sha256"
+              if (
+                  not checksum_path.is_file()
+                  or checksum_path.is_symlink()
+                  or checksum_path.read_bytes() != f"{digest}\n".encode()
+              ):
+                  raise SystemExit(f"archive checksum sidecar mismatch for {target}")
+              validate_measured_estimate(target, manifest_targets[target], archive)
+              artifacts.append(artifact)
+
+          if seen_targets != expected_targets:
+              raise SystemExit(f"expected both OCR targets, found {sorted(seen_targets)}")
+          if len(source_commits) != 1:
+              raise SystemExit(f"OCR targets were built from different commits: {source_commits}")
+          expected_attestations = {
+              *(f"ocr-{target}-sbom.cdx.json" for target in expected_targets),
+              *(f"ocr-{target}-sbom.spdx.json" for target in expected_targets),
+              *(f"ocr-{target}-trivy.json" for target in expected_targets),
+              *(f"ocr-{target}-native-cpu.quality.json" for target in expected_targets),
+              "ocr-linux-amd64-cpu-py312-nvidia-exposed-cpu.quality.json",
+          }
+          actual_attestations = {
+              path.name for path in attestation_root.iterdir() if path.is_file()
+          }
+          if actual_attestations != expected_attestations:
+              raise SystemExit(
+                  "OCR attestation set mismatch: "
+                  f"expected {sorted(expected_attestations)}, got {sorted(actual_attestations)}"
+              )
+          attestations = [
+              {
+                  "file": path.name,
+                  "sha256": file_sha256(path),
+                  "size": path.stat().st_size,
+              }
+              for path in sorted(attestation_root.iterdir())
+          ]
+          index = {
+              "artifacts": sorted(artifacts, key=lambda artifact: artifact["target"]),
+              "attestations": attestations,
+              "schemaVersion": 1,
+              "version": os.environ["VERSION"],
+          }
+          (output / "ocr-runtime-index.unsigned.json").write_bytes(canonical(index))
+          PY
+
+      - name: Sign with repository-trusted Ed25519 identity
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+          OCR_RUNTIME_INDEX_SIGNING_KEY_B64: ${{ secrets.OCR_RUNTIME_INDEX_SIGNING_KEY_B64 }}
+        run: |
+          : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
+          : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
+          : "${OCR_RUNTIME_INDEX_SIGNING_KEY_B64:?Set secret OCR_RUNTIME_INDEX_SIGNING_KEY_B64}"
+          [[ "${OCR_RUNTIME_INDEX_KEY_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo "::error::OCR runtime signing key ID is not a safe identifier"
+            exit 1
+          }
+          umask 077
+          trap 'rm -f /tmp/ocr-index/private.pem /tmp/ocr-index/configured-public.pem /tmp/ocr-index/derived-public.pem' EXIT
+          printf '%s' "${OCR_RUNTIME_INDEX_SIGNING_KEY_B64}" | base64 --decode > /tmp/ocr-index/private.pem
+          printf '%s' "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" | base64 --decode > /tmp/ocr-index/configured-public.pem
+          [[ "$(base64 --wrap=0 < /tmp/ocr-index/private.pem)" == "${OCR_RUNTIME_INDEX_SIGNING_KEY_B64}" ]] || {
+            echo "::error::OCR signing private key must use canonical base64"
+            exit 1
+          }
+          [[ "$(base64 --wrap=0 < /tmp/ocr-index/configured-public.pem)" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
+            echo "::error::OCR runtime public key must use canonical base64"
+            exit 1
+          }
+          openssl pkey -in /tmp/ocr-index/private.pem -text -noout | grep -q ED25519 || {
+            echo "::error::Configured OCR signing private key is not Ed25519"
+            exit 1
+          }
+          openssl pkey -in /tmp/ocr-index/private.pem -pubout -out /tmp/ocr-index/derived-public.pem
+          openssl pkey -pubin -in /tmp/ocr-index/configured-public.pem -pubout -out /tmp/ocr-index/trusted-public.pem
+          openssl pkey -pubin -in /tmp/ocr-index/trusted-public.pem -text -noout | grep -q ED25519 || {
+            echo "::error::Configured OCR runtime key is not Ed25519"
+            exit 1
+          }
+          cmp \
+            <(openssl pkey -pubin -in /tmp/ocr-index/derived-public.pem -outform DER) \
+            <(openssl pkey -pubin -in /tmp/ocr-index/trusted-public.pem -outform DER) || {
+              echo "::error::Signing key does not match the repository-trusted public key"
+              exit 1
+            }
+          openssl pkeyutl -sign -rawin \
+            -inkey /tmp/ocr-index/private.pem \
+            -in /tmp/ocr-index/ocr-runtime-index.unsigned.json \
+            -out /tmp/ocr-index/ocr-runtime-index.signature
+          openssl pkeyutl -verify -rawin \
+            -pubin -inkey /tmp/ocr-index/trusted-public.pem \
+            -in /tmp/ocr-index/ocr-runtime-index.unsigned.json \
+            -sigfile /tmp/ocr-index/ocr-runtime-index.signature
+
+      - name: Seal canonical index and public trust artifact
+        env:
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path("/tmp/ocr-index")
+
+          def canonical(value):
+              return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+          unsigned_path = root / "ocr-runtime-index.unsigned.json"
+          unsigned_bytes = unsigned_path.read_bytes()
+          unsigned = json.loads(unsigned_bytes)
+          unsigned["signature"] = {
+              "algorithm": "ed25519",
+              "keyId": os.environ["OCR_RUNTIME_INDEX_KEY_ID"],
+              "value": base64.b64encode((root / "ocr-runtime-index.signature").read_bytes()).decode(),
+          }
+          sealed_path = root / "ocr-runtime-index.json"
+          sealed_path.write_bytes(canonical(unsigned))
+          sealed = json.loads(sealed_path.read_bytes())
+          sealed.pop("signature")
+          if canonical(sealed) != unsigned_bytes:
+              raise SystemExit("sealed OCR index does not reconstruct its signed payload")
+
+          trust = {
+              "keys": [{
+                  "algorithm": "ed25519",
+                  "keyId": os.environ["OCR_RUNTIME_INDEX_KEY_ID"],
+                  "publicKey": (root / "trusted-public.pem").read_text(),
+              }],
+              "schemaVersion": 1,
+          }
+          (root / "ocr-runtime-trusted-keys.json").write_bytes(canonical(trust))
+          PY
+          rm -f \
+            /tmp/ocr-index/private.pem \
+            /tmp/ocr-index/configured-public.pem \
+            /tmp/ocr-index/derived-public.pem \
+            /tmp/ocr-index/ocr-runtime-index.signature
+
+      - name: Upload verified signed OCR metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ocr-runtime-metadata
+          overwrite: true
+          path: |
+            /tmp/ocr-index/ocr-runtime-index.json
+            /tmp/ocr-index/ocr-runtime-trusted-keys.json
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-signed-ocr-index:
+    name: Verify signed OCR index (${{ matrix.target }})
+    needs: sign-ocr-index
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64-cpu-py312
+            image_platform: linux-amd64
+            runner: ubuntu-latest
+          - target: linux-arm64-cpu-py311
+            image_platform: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      packages: read
+    steps:
+      - name: Download final signed OCR index
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-runtime-metadata
+          path: /tmp/ocr-index
+
+      - name: Download exact unpublished image digest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-${{ matrix.image_platform }}
+          path: /tmp/image-digest
+
+      - name: Resolve exact native image
+        env:
+          IMAGE_PLATFORM: ${{ matrix.image_platform }}
+        run: |
+          mapfile -t digest_files < <(find /tmp/image-digest -maxdepth 1 -type f -print)
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one ${IMAGE_PLATFORM} image digest"
+            exit 1
+          }
+          digest="$(basename "${digest_files[0]}")"
+          [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid ${IMAGE_PLATFORM} image digest artifact"
+            exit 1
+          }
+          echo "SNAPOTTER_BUNDLE_IMAGE=ghcr.io/snapotter-hq/snapotter@sha256:${digest}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Verify final index with image-baked application trust
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker run --rm --network none \
+            -v /tmp/ocr-index/ocr-runtime-index.json:/tmp/ocr-runtime-index.json:ro \
+            -e EMBEDDED=0 \
+            -e OCR_VERIFY_TARGET="${TARGET}" \
+            -e OCR_VERIFY_VERSION="${VERSION}" \
+            "${SNAPOTTER_BUNDLE_IMAGE}" \
+            /app/apps/api/node_modules/.bin/tsx -e '
+              import { readFileSync } from "node:fs";
+              import {
+                loadOcrRuntimeTrustKeys,
+                OCR_RUNTIME_INDEX_MAX_BYTES,
+                verifyRuntimeIndex,
+              } from "/app/packages/ai/src/runtime-index.ts";
+              const target = process.env.OCR_VERIFY_TARGET;
+              const version = process.env.OCR_VERIFY_VERSION;
+              if (!target || !version) throw new Error("Signed-index verification environment is incomplete");
+              const raw = readFileSync("/tmp/ocr-runtime-index.json");
+              if (raw.length > OCR_RUNTIME_INDEX_MAX_BYTES) {
+                throw new Error(`Final OCR runtime index exceeds ${OCR_RUNTIME_INDEX_MAX_BYTES} bytes`);
+              }
+              const parsed = JSON.parse(raw.toString("ascii"));
+              const targets = parsed.artifacts
+                ?.map((artifact) => artifact?.target)
+                .sort();
+              const expectedTargets = [
+                "linux-amd64-cpu-py312",
+                "linux-arm64-cpu-py311",
+              ];
+              if (JSON.stringify(targets) !== JSON.stringify(expectedTargets)) {
+                throw new Error(`Final OCR runtime index target set is invalid: ${JSON.stringify(targets)}`);
+              }
+              const trustKeys = loadOcrRuntimeTrustKeys();
+              const verified = verifyRuntimeIndex(raw, target, trustKeys, version);
+              if (verified.artifact.target !== target || verified.artifact.version !== version) {
+                throw new Error("Final OCR runtime index selected the wrong target or version");
+              }
+              process.stdout.write(`PASS: image-baked trust verified ${target} for ${version}\n`);
+            '
+
+  publish:
+    name: Publish verified bundles to HuggingFace
+    needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index]
+    # Hugging Face exposes one repository-wide branch head. Keep expensive
+    # builds parallel across releases, then serialize only the short CAS write
+    # boundary so two versions cannot race the shared `main` revision.
+    concurrency:
+      group: snapotter-hf-feature-bundles-publish
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out hash-locked release tooling
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Set up pinned release Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11.14"
+
+      - name: Download all verified build and metadata artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/artifacts
 
-      - name: Install hf CLI
-        run: pip install -U "huggingface_hub[hf_xet]"
+      - name: Install hash-locked hf CLI
+        run: |
+          python -m venv /tmp/hf-release-venv
+          /tmp/hf-release-venv/bin/python -m pip install \
+            --disable-pip-version-check --require-hashes --no-deps --only-binary=:all: \
+            --requirement docker/hf-release-requirements.txt
+          echo "/tmp/hf-release-venv/bin" >> "$GITHUB_PATH"
 
-      - name: Organize and upload to HuggingFace
+      - name: Organize and verify the exact signed OCR release closure
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
           VERSION: ${{ inputs.version }}
         run: |
-          mkdir -p "/tmp/upload/v${VERSION}"
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
 
-          find /tmp/artifacts -name '*.tar.gz' -exec cp {} "/tmp/upload/v${VERSION}/" \;
-          find /tmp/artifacts -name '*.sha256' -exec cp {} "/tmp/upload/v${VERSION}/" \;
+          root = Path("/tmp/upload") / f"v{os.environ['VERSION']}"
+          v3 = root / "v3"
+          source = Path("/tmp/artifacts")
+          if root.exists():
+              shutil.rmtree(root)
+          v3.mkdir(parents=True)
 
-          cd "/tmp/upload/v${VERSION}"
-          echo '{"version":"'"${VERSION}"'","archives":[' > manifest.json
-          first=true
-          for archive in *.tar.gz; do
-            [ -f "$archive" ] || continue
-            sha=$(sha256sum "$archive" | cut -d' ' -f1)
-            size=$(stat --format=%s "$archive")
-            if [ "$first" = true ]; then
-              first=false
-            else
-              echo ',' >> manifest.json
-            fi
-            printf '{"file":"%s","sha256":"%s","size":%s}' "$archive" "$sha" "$size" >> manifest.json
-          done
-          echo ']}' >> manifest.json
+          expected_targets = {"linux-amd64-cpu-py312", "linux-arm64-cpu-py311"}
+          expected_attestations = {
+              *(f"ocr-{target}-sbom.cdx.json" for target in expected_targets),
+              *(f"ocr-{target}-sbom.spdx.json" for target in expected_targets),
+              *(f"ocr-{target}-trivy.json" for target in expected_targets),
+              *(f"ocr-{target}-native-cpu.quality.json" for target in expected_targets),
+              "ocr-linux-amd64-cpu-py312-nvidia-exposed-cpu.quality.json",
+          }
+          expected_artifact_objects = {
+              *(f"ocr-{target}.tar.gz" for target in expected_targets),
+              *(f"ocr-{target}.tar.gz.sha256" for target in expected_targets),
+              *(f"ocr-{target}.artifact.json" for target in expected_targets),
+          }
+          fixed_objects = {"ocr-runtime-index.json", "ocr-runtime-trusted-keys.json"}
+          expected_sources = expected_artifact_objects | expected_attestations | fixed_objects
 
-          # Interim: publish to the deepsafe account (the HF_TOKEN secret is deepsafe's).
-          # Switch back to snapotter/feature-bundles once that account is restored.
-          hf upload deepsafe/feature-bundles \
-            "/tmp/upload/v${VERSION}" "v${VERSION}" \
-            --repo-type model
+          source_files = [path for path in source.rglob("*") if path.is_file()]
+          for name in sorted(expected_sources):
+              matches = [path for path in source_files if path.name == name]
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"missing or colliding OCR release objects for {name}: {len(matches)}"
+                  )
+              if matches[0].is_symlink():
+                  raise SystemExit(f"OCR release object is a symlink: {name}")
+              shutil.copyfile(matches[0], v3 / name)
 
-          echo "Published: https://huggingface.co/deepsafe/feature-bundles/tree/main/v${VERSION}"
+          unexpected_ocr_sources = {
+              path.name for path in source_files
+              if path.name.startswith("ocr-") and path.name not in expected_sources
+          }
+          if unexpected_ocr_sources:
+              raise SystemExit(
+                  f"unexpected OCR release objects: {sorted(unexpected_ocr_sources)}"
+              )
+
+          def file_sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          def canonical(value):
+              return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+          index_path = v3 / "ocr-runtime-index.json"
+          index_raw = index_path.read_bytes()
+          signed_index = json.loads(index_raw)
+          if index_raw != canonical(signed_index):
+              raise SystemExit("Candidate OCR runtime index is not canonical JSON")
+          signature = signed_index.get("signature")
+          if (
+              not isinstance(signature, dict)
+              or set(signature) != {"algorithm", "keyId", "value"}
+              or signature.get("algorithm") != "ed25519"
+              or signature.get("keyId") != os.environ["OCR_RUNTIME_INDEX_KEY_ID"]
+          ):
+              raise SystemExit("Candidate OCR runtime index has an untrusted signature identity")
+          unsigned_index = dict(signed_index)
+          unsigned_index.pop("signature")
+          try:
+              signature_bytes = base64.b64decode(signature["value"], validate=True)
+              public_key_bytes = base64.b64decode(
+                  os.environ["OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64"], validate=True
+              )
+          except (KeyError, ValueError) as error:
+              raise SystemExit("Candidate OCR runtime index signature is invalid") from error
+          with tempfile.TemporaryDirectory() as temporary:
+              temporary_root = Path(temporary)
+              payload_path = temporary_root / "index.json"
+              signature_path = temporary_root / "index.sig"
+              public_key_path = temporary_root / "public.pem"
+              payload_path.write_bytes(canonical(unsigned_index))
+              signature_path.write_bytes(signature_bytes)
+              public_key_path.write_bytes(public_key_bytes)
+              try:
+                  subprocess.run(
+                      [
+                          "openssl", "pkeyutl", "-verify", "-rawin", "-pubin",
+                          "-inkey", str(public_key_path), "-in", str(payload_path),
+                          "-sigfile", str(signature_path),
+                      ],
+                      check=True,
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL,
+                  )
+              except subprocess.CalledProcessError as error:
+                  raise SystemExit(
+                      "Candidate OCR runtime index signature is invalid"
+                  ) from error
+
+          if (
+              signed_index.get("schemaVersion") != 1
+              or signed_index.get("version") != os.environ["VERSION"]
+              or not isinstance(signed_index.get("artifacts"), list)
+              or not isinstance(signed_index.get("attestations"), list)
+          ):
+              raise SystemExit("Candidate OCR runtime index has an invalid identity")
+
+          artifact_names = set()
+          artifact_targets = set()
+          for artifact in signed_index["artifacts"]:
+              if not isinstance(artifact, dict):
+                  raise SystemExit("Signed OCR artifact record is malformed")
+              target = artifact.get("target")
+              if artifact.get("family") != "ocr" or target not in expected_targets:
+                  raise SystemExit("Signed OCR artifact has an unexpected identity")
+              if target in artifact_targets:
+                  raise SystemExit(f"Signed OCR artifact target collides: {target}")
+              artifact_targets.add(target)
+              metadata_name = f"ocr-{target}.artifact.json"
+              metadata_path = v3 / metadata_name
+              metadata_raw = metadata_path.read_bytes()
+              metadata = json.loads(metadata_raw)
+              if metadata_raw != canonical(metadata) or metadata != artifact:
+                  raise SystemExit(f"Signed OCR artifact metadata mismatch: {target}")
+              archive = artifact.get("archive")
+              archive_name = f"ocr-{target}.tar.gz"
+              if not isinstance(archive, dict) or archive.get("file") != archive_name:
+                  raise SystemExit(f"Signed OCR archive identity mismatch: {target}")
+              digest = archive.get("sha256")
+              size = archive.get("size")
+              if (
+                  not isinstance(digest, str)
+                  or len(digest) != 64
+                  or any(character not in "0123456789abcdef" for character in digest)
+                  or not isinstance(size, int)
+                  or size <= 0
+              ):
+                  raise SystemExit(f"Signed OCR archive record is malformed: {target}")
+              archive_path = v3 / archive_name
+              if archive_path.stat().st_size != size or file_sha256(archive_path) != digest:
+                  raise SystemExit(f"Signed OCR archive bytes mismatch: {target}")
+              sidecar_name = f"{archive_name}.sha256"
+              if (v3 / sidecar_name).read_bytes() != f"{digest}\n".encode():
+                  raise SystemExit(f"Signed OCR archive sidecar mismatch: {target}")
+              artifact_names.update({metadata_name, archive_name, sidecar_name})
+
+          if artifact_targets != expected_targets or artifact_names != expected_artifact_objects:
+              raise SystemExit("Signed OCR artifact closure mismatch")
+
+          attestation_names = set()
+          for attestation in signed_index["attestations"]:
+              if not isinstance(attestation, dict) or set(attestation) != {"file", "sha256", "size"}:
+                  raise SystemExit("Signed OCR attestation record is malformed")
+              name = attestation["file"]
+              if not isinstance(name, str) or Path(name).name != name or name in attestation_names:
+                  raise SystemExit(f"Signed OCR attestation path collides: {name}")
+              attestation_names.add(name)
+              path = v3 / name
+              if not path.is_file() or path.stat().st_size != attestation.get("size"):
+                  raise SystemExit(f"Signed OCR attestation size mismatch: {name}")
+              if file_sha256(path) != attestation.get("sha256"):
+                  raise SystemExit(f"Signed OCR attestation digest mismatch: {name}")
+          if attestation_names != expected_attestations:
+              raise SystemExit("Signed OCR attestation closure mismatch")
+
+          trust_path = v3 / "ocr-runtime-trusted-keys.json"
+          trust_raw = trust_path.read_bytes()
+          trust = json.loads(trust_raw)
+          if trust_raw != canonical(trust) or trust.get("schemaVersion") != 1:
+              raise SystemExit("Candidate OCR trust artifact is not canonical")
+          keys = trust.get("keys")
+          if not isinstance(keys, list) or len(keys) != 1 or not isinstance(keys[0], dict):
+              raise SystemExit("Candidate OCR trust artifact has an invalid key set")
+          if (
+              keys[0].get("algorithm") != "ed25519"
+              or keys[0].get("keyId") != os.environ["OCR_RUNTIME_INDEX_KEY_ID"]
+              or not isinstance(keys[0].get("publicKey"), str)
+          ):
+              raise SystemExit("Candidate OCR trust artifact has an untrusted identity")
+          with tempfile.TemporaryDirectory() as temporary:
+              temporary_root = Path(temporary)
+              configured_path = temporary_root / "configured.pem"
+              trust_key_path = temporary_root / "trust.pem"
+              configured_der = temporary_root / "configured.der"
+              trust_der = temporary_root / "trust.der"
+              configured_path.write_bytes(public_key_bytes)
+              trust_key_path.write_text(keys[0]["publicKey"])
+              for source_path, output_path in (
+                  (configured_path, configured_der),
+                  (trust_key_path, trust_der),
+              ):
+                  subprocess.run(
+                      [
+                          "openssl", "pkey", "-pubin", "-in", str(source_path),
+                          "-outform", "DER", "-out", str(output_path),
+                      ],
+                      check=True,
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL,
+                  )
+              if configured_der.read_bytes() != trust_der.read_bytes():
+                  raise SystemExit("Candidate OCR trust artifact contains the wrong public key")
+
+          actual_objects = {path.name for path in v3.iterdir() if path.is_file()}
+          expected_objects = artifact_names | attestation_names | fixed_objects
+          if actual_objects != expected_objects or any(path.is_dir() for path in v3.iterdir()):
+              raise SystemExit("Signed OCR artifact closure mismatch")
+
+          files = []
+          for file in sorted(path for path in root.rglob("*") if path.is_file()):
+              if file.name == "manifest.json":
+                  continue
+              files.append({
+                  "file": file.relative_to(root).as_posix(),
+                  "sha256": file_sha256(file),
+                  "size": file.stat().st_size,
+              })
+          manifest = {
+              "files": files,
+              "schemaVersion": 2,
+              "version": os.environ["VERSION"],
+          }
+          (root / "manifest.json").write_bytes(canonical(manifest))
+          PY
+
+      - name: Refuse to mutate an existing version
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          OCR_RUNTIME_INDEX_KEY_ID: ${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+          OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64: ${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          /tmp/hf-release-venv/bin/python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import tempfile
+          from pathlib import Path, PurePosixPath
+          from huggingface_hub import HfApi, hf_hub_download
+
+          repo_id = "deepsafe/feature-bundles"
+          version = os.environ["VERSION"]
+          remote_path = f"v{version}/manifest.json"
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+          snapshot_revision = api.repo_info(
+              repo_id, repo_type="model", revision="main", token=token
+          ).sha
+          if (
+              not isinstance(snapshot_revision, str)
+              or len(snapshot_revision) != 40
+              or any(character not in "0123456789abcdef" for character in snapshot_revision)
+          ):
+              raise SystemExit("Hugging Face repository did not resolve to an immutable revision")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as handle:
+              handle.write(f"HF_PARENT_COMMIT={snapshot_revision}\n")
+          if not api.file_exists(
+              repo_id,
+              remote_path,
+              repo_type="model",
+              revision=snapshot_revision,
+              token=token,
+          ):
+              existing_version_files = [
+                  path
+                  for path in api.list_repo_files(
+                      repo_id,
+                      repo_type="model",
+                      revision=snapshot_revision,
+                      token=token,
+                  )
+                  if path.startswith(f"v{version}/")
+              ]
+              if existing_version_files:
+                  raise SystemExit(
+                      f"Refusing to publish into an existing feature-bundle version without a manifest: {existing_version_files[:5]}"
+                  )
+              raise SystemExit(0)
+
+          def canonical(value):
+              return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+          def file_sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          def manifest_map(manifest):
+              if (
+                  not isinstance(manifest, dict)
+                  or manifest.get("schemaVersion") != 2
+                  or manifest.get("version") != version
+                  or not isinstance(manifest.get("files"), list)
+              ):
+                  raise SystemExit("Existing feature-bundle manifest has an invalid identity")
+              mapped = {}
+              for entry in manifest["files"]:
+                  relative_path = entry.get("file") if isinstance(entry, dict) else None
+                  parsed_path = PurePosixPath(relative_path) if isinstance(relative_path, str) else None
+                  if (
+                      not isinstance(entry, dict)
+                      or not isinstance(relative_path, str)
+                      or parsed_path is None
+                      or parsed_path.is_absolute()
+                      or ".." in parsed_path.parts
+                      or not relative_path.startswith("v3/")
+                      or not isinstance(entry.get("sha256"), str)
+                      or len(entry["sha256"]) != 64
+                      or any(
+                          character not in "0123456789abcdef"
+                          for character in entry["sha256"]
+                      )
+                      or not isinstance(entry.get("size"), int)
+                      or entry["size"] <= 0
+                      or relative_path in mapped
+                  ):
+                      raise SystemExit("Existing feature-bundle manifest has malformed files")
+                  mapped[relative_path] = entry
+              return mapped
+
+          def is_variable_ocr_attestation(path):
+              return path == "v3/ocr-runtime-index.json" or (
+                  path.startswith("v3/ocr-")
+                  and (
+                      "-sbom." in path
+                      or path.endswith("-trivy.json")
+                      or path.endswith(".quality.json")
+                  )
+              )
+
+          existing_path = Path(hf_hub_download(
+              repo_id,
+              remote_path,
+              repo_type="model",
+              revision=snapshot_revision,
+              token=token,
+          ))
+          existing_raw = existing_path.read_bytes()
+          existing_manifest = json.loads(existing_raw)
+          if existing_raw != canonical(existing_manifest):
+              raise SystemExit("Existing feature-bundle manifest is not canonical JSON")
+          candidate_path = Path("/tmp/upload") / f"v{version}" / "manifest.json"
+          candidate_raw = candidate_path.read_bytes()
+          candidate_manifest = json.loads(candidate_raw)
+          if candidate_raw != canonical(candidate_manifest):
+              raise SystemExit("Candidate feature-bundle manifest is not canonical JSON")
+          existing_files = manifest_map(existing_manifest)
+          candidate_files = manifest_map(candidate_manifest)
+          candidate_disk_files = {
+              path.relative_to(candidate_path.parent).as_posix()
+              for path in candidate_path.parent.rglob("*")
+              if path.is_file() and path != candidate_path
+          }
+          if candidate_disk_files != set(candidate_files):
+              raise SystemExit("Candidate feature-bundle manifest closure mismatch")
+          remote_prefix_files = {
+              path.removeprefix(f"v{version}/")
+              for path in api.list_repo_files(
+                  repo_id,
+                  repo_type="model",
+                  revision=snapshot_revision,
+                  token=token,
+              )
+              if path.startswith(f"v{version}/")
+          }
+          if remote_prefix_files != {"manifest.json", *existing_files}:
+              raise SystemExit("Existing feature-bundle version has uncommitted or missing objects")
+
+          existing_deterministic = {
+              path: entry for path, entry in existing_files.items()
+              if not is_variable_ocr_attestation(path)
+          }
+          candidate_deterministic = {
+              path: entry for path, entry in candidate_files.items()
+              if not is_variable_ocr_attestation(path)
+          }
+          if existing_deterministic != candidate_deterministic:
+              raise SystemExit(
+                  "Refusing to replace an existing feature-bundle version with different runtime bytes"
+              )
+
+          # Verify every object committed by the remote manifest before treating
+          # an interrupted/retried publication as a no-op. Raw performance and
+          # SBOM metadata may differ between valid reruns, so their candidate
+          # hashes are deliberately not used as the immutable identity.
+          remote_files = {}
+          for entry in existing_manifest["files"]:
+              remote_file = Path(hf_hub_download(
+                  repo_id,
+                  f"v{version}/{entry['file']}",
+                  repo_type="model",
+                  revision=snapshot_revision,
+                  token=token,
+              ))
+              if remote_file.stat().st_size != entry["size"]:
+                  raise SystemExit(f"Existing bundle object has wrong size: {entry['file']}")
+              if file_sha256(remote_file) != entry["sha256"]:
+                  raise SystemExit(f"Existing bundle object has wrong digest: {entry['file']}")
+              remote_files[entry["file"]] = remote_file
+
+          remote_index_path = remote_files.get("v3/ocr-runtime-index.json")
+          if remote_index_path is None:
+              raise SystemExit("Existing release has no signed OCR runtime index")
+          remote_index_raw = remote_index_path.read_bytes()
+          remote_index = json.loads(remote_index_raw)
+          if remote_index_raw != canonical(remote_index):
+              raise SystemExit("Existing OCR runtime index is not canonical JSON")
+          candidate_index_path = (
+              Path("/tmp/upload") / f"v{version}" / "v3" / "ocr-runtime-index.json"
+          )
+          candidate_index_raw = candidate_index_path.read_bytes()
+          candidate_index = json.loads(candidate_index_raw)
+          if candidate_index_raw != canonical(candidate_index):
+              raise SystemExit("Candidate OCR runtime index is not canonical JSON")
+          remote_signature = remote_index.get("signature")
+          if (
+              not isinstance(remote_signature, dict)
+              or remote_signature.get("algorithm") != "ed25519"
+              or remote_signature.get("keyId") != os.environ["OCR_RUNTIME_INDEX_KEY_ID"]
+          ):
+              raise SystemExit("Existing OCR runtime index has an untrusted signature identity")
+          signed_payload = dict(remote_index)
+          signed_payload.pop("signature", None)
+          with tempfile.TemporaryDirectory() as temporary:
+              root = Path(temporary)
+              payload_path = root / "index.json"
+              signature_path = root / "index.sig"
+              public_key_path = root / "public.pem"
+              payload_path.write_bytes(canonical(signed_payload))
+              signature_path.write_bytes(base64.b64decode(remote_signature.get("value", ""), validate=True))
+              public_key_path.write_bytes(
+                  base64.b64decode(os.environ["OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64"], validate=True)
+              )
+              subprocess.run(
+                  [
+                      "openssl", "pkeyutl", "-verify", "-rawin", "-pubin",
+                      "-inkey", str(public_key_path), "-in", str(payload_path),
+                      "-sigfile", str(signature_path),
+                  ],
+                  check=True,
+                  stdout=subprocess.DEVNULL,
+              )
+
+          if remote_index.get("artifacts") != candidate_index.get("artifacts"):
+              raise SystemExit("Existing release contains different OCR runtime artifacts")
+          remote_attestations = remote_index.get("attestations")
+          candidate_attestations = candidate_index.get("attestations")
+          if not isinstance(remote_attestations, list) or not isinstance(candidate_attestations, list):
+              raise SystemExit("OCR runtime index attestation set is malformed")
+          if not all(isinstance(entry, dict) for entry in [*remote_attestations, *candidate_attestations]):
+              raise SystemExit("OCR runtime index attestation record is malformed")
+          remote_attestation_names = {entry.get("file") for entry in remote_attestations}
+          candidate_attestation_names = {entry.get("file") for entry in candidate_attestations}
+          if (
+              len(remote_attestation_names) != len(remote_attestations)
+              or len(candidate_attestation_names) != len(candidate_attestations)
+              or remote_attestation_names != candidate_attestation_names
+          ):
+              raise SystemExit("Existing release has a different OCR attestation set")
+          for attestation in remote_attestations:
+              entry = existing_files.get(f"v3/{attestation.get('file')}")
+              if (
+                  entry is None
+                  or entry.get("sha256") != attestation.get("sha256")
+                  or entry.get("size") != attestation.get("size")
+              ):
+                  raise SystemExit(
+                      f"Existing signed OCR attestation is not bound by the manifest: {attestation.get('file')}"
+                  )
+
+          current_revision = api.repo_info(
+              repo_id, repo_type="model", revision="main", token=token
+          ).sha
+          if current_revision != snapshot_revision:
+              raise SystemExit("Hugging Face repository changed during release audit")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as handle:
+              handle.write("BUNDLE_RELEASE_EXISTS=true\n")
+          PY
+
+      - name: Upload only after every verification and signing gate passed
+        if: env.BUNDLE_RELEASE_EXISTS != 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          /tmp/hf-release-venv/bin/python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path, PurePosixPath
+
+          from huggingface_hub import HfApi, hf_hub_download
+
+          repo_id = "deepsafe/feature-bundles"
+          token = os.environ["HF_TOKEN"]
+          version = os.environ["VERSION"]
+          parent_commit = os.environ["HF_PARENT_COMMIT"]
+          if (
+              len(parent_commit) != 40
+              or any(character not in "0123456789abcdef" for character in parent_commit)
+          ):
+              raise SystemExit("Hugging Face parent revision is not an immutable commit")
+
+          root = Path("/tmp/upload") / f"v{version}"
+          manifest_path = root / "manifest.json"
+          manifest_raw = manifest_path.read_bytes()
+          manifest = json.loads(manifest_raw)
+
+          def canonical(value):
+              return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+          def file_sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          if (
+              manifest_raw != canonical(manifest)
+              or manifest.get("schemaVersion") != 2
+              or manifest.get("version") != version
+              or not isinstance(manifest.get("files"), list)
+          ):
+              raise SystemExit("Candidate feature-bundle manifest has an invalid identity")
+          expected_files = {}
+          for entry in manifest["files"]:
+              relative_path = entry.get("file") if isinstance(entry, dict) else None
+              parsed_path = PurePosixPath(relative_path) if isinstance(relative_path, str) else None
+              if (
+                  not isinstance(entry, dict)
+                  or not isinstance(relative_path, str)
+                  or parsed_path is None
+                  or parsed_path.is_absolute()
+                  or ".." in parsed_path.parts
+                  or not relative_path.startswith("v3/")
+                  or relative_path in expected_files
+                  or not isinstance(entry.get("sha256"), str)
+                  or len(entry["sha256"]) != 64
+                  or any(
+                      character not in "0123456789abcdef"
+                      for character in entry["sha256"]
+                  )
+                  or not isinstance(entry.get("size"), int)
+                  or entry["size"] <= 0
+              ):
+                  raise SystemExit("Candidate feature-bundle manifest has malformed files")
+              expected_files[relative_path] = entry
+          disk_files = {
+              path.relative_to(root).as_posix()
+              for path in root.rglob("*")
+              if path.is_file() and path != manifest_path
+          }
+          if disk_files != set(expected_files):
+              raise SystemExit("Candidate feature-bundle manifest closure mismatch")
+
+          publish_ref = "refs/snapotter/hf-publish-boundary-tag"
+          subprocess.run(
+              [
+                  "git", "fetch", "--force", "--no-tags", "origin",
+                  f"refs/tags/v{version}:{publish_ref}",
+              ],
+              check=True,
+              stdout=subprocess.DEVNULL,
+          )
+          published_tag_commit = subprocess.check_output(
+              ["git", "rev-parse", f"{publish_ref}^{{commit}}"], text=True
+          ).strip()
+          checked_out_commit = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          if (
+              published_tag_commit != os.environ["RELEASE_COMMIT"]
+              or checked_out_commit != os.environ["RELEASE_COMMIT"]
+          ):
+              raise SystemExit(
+                  "Release tag changed before Hugging Face publication"
+              )
+
+          api = HfApi(token=token)
+          commit_info = api.upload_folder(
+              repo_id=repo_id,
+              folder_path=root,
+              path_in_repo=f"v{version}",
+              commit_message=f"Publish immutable feature bundles v{version}",
+              token=token,
+              repo_type="model",
+              revision="main",
+              parent_commit=parent_commit,
+          )
+          published_revision = commit_info.oid
+          if (
+              not isinstance(published_revision, str)
+              or len(published_revision) != 40
+              or any(
+                  character not in "0123456789abcdef"
+                  for character in published_revision
+              )
+          ):
+              raise SystemExit("Hugging Face upload returned an invalid commit")
+          head_revision = api.repo_info(
+              repo_id, repo_type="model", revision="main", token=token
+          ).sha
+          if head_revision != published_revision:
+              raise SystemExit("Hugging Face repository changed during post-upload audit")
+
+          remote_prefix = f"v{version}/"
+          remote_files = {
+              path.removeprefix(remote_prefix)
+              for path in api.list_repo_files(
+                  repo_id,
+                  repo_type="model",
+                  revision=published_revision,
+                  token=token,
+              )
+              if path.startswith(remote_prefix)
+          }
+          if remote_files != {"manifest.json", *expected_files}:
+              raise SystemExit("Published feature-bundle closure mismatch")
+          published_manifest = Path(hf_hub_download(
+              repo_id,
+              f"v{version}/manifest.json",
+              repo_type="model",
+              revision=published_revision,
+              token=token,
+          ))
+          if published_manifest.read_bytes() != manifest_raw:
+              raise SystemExit("Published feature-bundle manifest bytes mismatch")
+          for relative_path, entry in expected_files.items():
+              published_file = Path(hf_hub_download(
+                  repo_id,
+                  f"v{version}/{relative_path}",
+                  repo_type="model",
+                  revision=published_revision,
+                  token=token,
+              ))
+              if (
+                  published_file.stat().st_size != entry["size"]
+                  or file_sha256(published_file) != entry["sha256"]
+              ):
+                  raise SystemExit(
+                      f"Published feature-bundle object mismatch: {relative_path}"
+                  )
+          final_revision = api.repo_info(
+              repo_id, repo_type="model", revision="main", token=token
+          ).sha
+          if final_revision != published_revision:
+              raise SystemExit("Hugging Face repository changed during post-upload audit")
+          print(
+              f"Published: https://huggingface.co/{repo_id}/tree/{published_revision}/v{version}"
+          )
+          PY
+
+      - name: Report identical existing bundle release
+        if: env.BUNDLE_RELEASE_EXISTS == 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: echo "Verified immutable existing bundle release v${VERSION}; upload skipped"

@@ -1,8 +1,8 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Persyaratan perangkat keras, penyiapan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: 45dafa6467df
+i18n_output_hash: 5ed614569b73
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Deployment {#deployment}
@@ -11,6 +11,12 @@ SnapOtter diterapkan sebagai stack Docker Compose 3 kontainer: image aplikasi Sn
 
 Lihat [Docker Image](./docker-tags) untuk penyiapan GPU, contoh Docker Compose, dan penyematan versi.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Kompatibilitas OCR bahasa Korea
+OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`). Bahasa Korea memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Quick Start (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ Aplikasi kemudian tersedia di `http://localhost:1349`.
 
 ## Quick Start (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Untuk akselerasi NVIDIA CUDA pada perkakas AI (penghapusan latar belakang, upscaling, penyempurnaan wajah, OCR):
+Untuk akselerasi NVIDIA CUDA pada alat AI yang didukung (penghapusan latar belakang, peningkatan skala, penyempurnaan wajah):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 core |
 | RAM | 4 GB |
-| Disk | 3 GB (image) + 24 GB (model AI) + workspace |
+| Disk | 3 GB (gambar) + sekitar 20 GB (semua paket AI opsional) + ruang kerja |
 | GPU | Tidak diperlukan (fallback CPU) |
 
-**Memasang bundle AI-lah yang mendorong RAM ke 4 GB.** Tanpa AI terpasang, aplikasi menganggur di sekitar 360 MB; dengan ketujuh bundle terpasang aplikasi menahan ~2.6 GB resident, karena sidecar AI Python memuat model-modelnya di awal (penghapusan latar belakang, upscaling, OCR, transkripsi, deteksi wajah, restorasi) saat startup. Instalasi non-AI tetap ringan; instalasi AI membutuhkan ≥4 GB.
+**Menginstal dan menjalankan paket AI yang lebih besar mendorong rekomendasi RAM menjadi 4 GB.** Tanpa paket opsional yang diinstal, aplikasi menganggur sekitar 360 MB. Alat Python yang lama berbagi sidecar, sedangkan OCR yang akurat menggunakan dispatcher khusus yang berumur panjang yang disematkan pada generasi aktif yang tidak dapat diubah. Sebelum aktivasi, penginstal menjalankan smoke test pada kandidat. Kemudian secara atom beralih ke dispatcher baru dan menguras dispatcher sebelumnya sebelum garbage collection. Setiap artefak OCR akurat resmi harus melewati release suite kasus terburuknya di dalam 4 GiB cgroup, sedangkan rekomendasi host 4 GB memberikan ruang utama untuk aplikasi Node.js, Postgres, Redis, antrean, dan pekerjaan bersamaan.
 
 Sebagian besar perkakas AI sepenuhnya dapat digunakan di CPU; beberapa benar-benar menginginkan GPU. Diukur pada CPU 4-core modern:
 
@@ -271,7 +277,7 @@ SnapOtter sengaja tidak memasukkan unduhan model ini ke dalam image Docker. Bund
 
 Beberapa perkakas bergantung pada lebih dari satu bundle bersama. Misalnya, Passport Photo membutuhkan `background-removal` dan `face-detection`; jika `background-removal` sudah terpasang, mengaktifkan Passport Photo hanya mengunduh bundle `face-detection` yang hilang. Penggunaan ulang yang sama berlaku di semua perkakas AI.
 
-Ukuran unduhan model AI:
+Perkiraan penyimpanan paket AI opsional:
 
 | Bundle | Ukuran Disk |
 |---|---|
@@ -279,9 +285,16 @@ Ukuran unduhan model AI:
 | Upscale + Penyempurnaan wajah + Penghapusan noise | 5-6 GB |
 | Deteksi wajah | 200-300 MB |
 | Object eraser + Colorize | 1-2 GB |
-| OCR | 5-6 GB |
+| OCR yang akurat (`balanced`/`best`) | ~208-234 unduhan MiB / ~409-488 MiB terpasang |
 | Restorasi foto | 4-5 GB |
-| **Semua bundle** | **~24 GB** |
+| Transkripsi | ~600 MB |
+| **Semua paket** | **~20 GB terpasang** |
+
+OCR yang cepat dimasukkan ke dalam gambar melalui Tesseract, menambahkan sekitar 25 MiB, dan tidak memerlukan paket OCR opsional atau persyaratan memori 4 GiB. Paket akurat tersedia dalam wadah resmi Linux amd64 dan arm64 dan menjalankan ONNX Runtime di CPU. Host NVIDIA menggunakan runtime CPU OCR yang sama, sehingga OCR tidak bergantung pada versi CUDA atau arsitektur GPU. Runtime yang akurat memerlukan setidaknya 4 GiB memori efektif: batas cgroup kontainer yang dikonfigurasi, jika tidak, memori host. SnapOtter menolak sistem di bawah minimum kompatibilitas yang ditandatangani sebelum mengunduh paket. Instalasi paket akurat juga ditolak pada arsip bare-metal/prebuilt yang libc dan Python ABI tidak dapat dijamin.
+
+Replika yang berbagi `DATA_DIR` yang sama harus menggunakan arsitektur CPU yang sama; sematkan deployment multi-replika ke node yang kompatibel dengan node affinity. Replika campuran amd64/arm64 memerlukan volume data terpisah dan deployment SnapOtter yang independen.
+
+Runtime yang akurat menjaga satu generasi tetap aktif dan membersihkan cache unduhannya setelah aktivasi. Untuk rilis ini, instalasi pertama untuk sementara memerlukan sekitar 620-720 MiB untuk arsip ditambah staging, dan peningkatan dapat mencapai puncaknya mendekati 1,2 GiB sementara generasi lama tetap aktif. Penginstal menghitung persyaratan yang tepat dari indeks yang ditandatangani dan generasi saat ini sebelum mengunduh atau mengekstraksi, dan gagal lebih awal jika volume data terlalu kecil.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Lihat [daftar format lengkap](/id/guide/supported-formats) untuk detail setiap f
 
 - **Content-aware resize** crash pada gambar besar (>5 MP) karena batasan pada binary caire. Bekerja baik dengan gambar yang lebih kecil.
 - **HEIF decode** memakan 13-23 detik. HEIC (varian Apple) jauh lebih cepat pada 0.3-0.9 detik.
-- **OCR Jepang** gagal di CPU karena bug MKLDNN PaddlePaddle. Bekerja di GPU.
 - **Upscale** kehabisan waktu di CPU untuk apa pun di luar gambar kecil. GPU diperlukan untuk penggunaan praktis.
 - **CodeFormer** penyempurnaan wajah jauh lebih lambat daripada GFPGAN (53d vs 2d di GPU). GFPGAN direkomendasikan untuk sebagian besar kasus penggunaan.
 
@@ -433,6 +445,26 @@ Kesalahan startup menyebutkan UID persis yang harus digunakan, jadi jalur tercep
 | `CONCURRENT_JOBS` | `0` (otomatis) | Maksimum job pemrosesan AI paralel |
 | `SESSION_DURATION_HOURS` | `168` | Masa berlaku sesi login (7 hari) |
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma, atau kosong untuk same-origin |
+
+### Proksi keluar dan CA {#outbound-proxy-and-private-ca} pribadi
+
+Kontainer resmi mengaktifkan dukungan proxy lingkungan Node. Jika SnapOtter harus mencapai repositori runtime OCR atau layanan HTTPS lainnya melalui proksi perusahaan, atur `HTTPS_PROXY` (dan `HTTP_PROXY` bila diperlukan). Setel `NO_PROXY` ke daftar host yang dipisahkan koma yang harus dijangkau secara langsung, seperti Postgres, Redis, dan penyimpanan objek internal.
+
+Jika proksi atau layanan internal ditandatangani oleh otoritas sertifikat swasta, pasang sertifikat CA hanya-baca dan arahkan `NODE_EXTRA_CA_CERTS` ke sana. File tersebut harus ada ketika proses Node dimulai:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Simpan kredensial proxy di luar file Compose (misalnya di file atau rahasia `.env` yang dilindungi). Jangan nonaktifkan verifikasi TLS: indeks OCR yang ditandatangani mengautentikasi metadata rilis, sementara validasi TLS normal masih melindungi transportasi dan setiap permintaan keluar lainnya.
 
 ## Health Check {#health-check}
 

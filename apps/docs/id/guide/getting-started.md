@@ -1,8 +1,8 @@
 ---
 description: "Pasang SnapOtter dengan Docker dalam satu perintah. Termasuk penyiapan Docker Compose, membangun dari sumber, dan gambaran lengkap fitur."
-i18n_source_hash: 4536d4558b8e
-i18n_provenance: machine
 i18n_output_hash: 6df615cedb03
+i18n_source_hash: 24724b5595b2
+i18n_provenance: human
 ---
 
 # Memulai {#getting-started}
@@ -32,7 +32,7 @@ Untuk detail tentang apa yang dikumpulkan, lihat [Apa yang dikumpulkan SnapOtter
 :::
 
 ::: tip Akselerasi NVIDIA CUDA
-Tambahkan `--gpus all` untuk penghapusan latar belakang, upscaling, OCR, penyempurnaan wajah, dan restorasi yang diakselerasi NVIDIA CUDA:
+Tambahkan `--gpus all` untuk penghapusan latar belakang yang dipercepat NVIDIA CUDA, peningkatan skala, penyempurnaan wajah, dan pemulihan. OCR tetap berbasis CPU dan bekerja pada image yang sama dengan atau tanpa akses GPU:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest

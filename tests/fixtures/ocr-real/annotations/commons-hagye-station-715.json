@@ -1,0 +1,13 @@
+{
+  "exactGroundTruth": "715\n중계\nJunggye\n中溪\n하계\nHagye\n下溪\n공릉\nGongneung\n孔陵",
+  "source": {
+    "dataset": "Wikimedia Commons",
+    "fileTimestamp": "2009-08-18T13:00:50Z",
+    "pageId": 7592246,
+    "repositoryRevision": "1234274506",
+    "sha1": "fd1f0cc88f931af22576c7404270837916c60d8d",
+    "sha256": "a9ae819505be17d87393695bdadd1aaff47b0a8b81faec98b38408397942b3dc",
+    "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Hagye01.jpg",
+    "upstreamId": "7592246"
+  }
+}

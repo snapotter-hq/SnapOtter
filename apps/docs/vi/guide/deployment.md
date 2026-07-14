@@ -1,8 +1,8 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production với Docker. Yêu cầu phần cứng, cài đặt GPU, và cấu hình reverse proxy cho Nginx, Traefik, và Cloudflare."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: a5f2e9f23d52
+i18n_output_hash: 80f0326c4672
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Triển khai {#deployment}
@@ -11,6 +11,12 @@ SnapOtter triển khai dưới dạng một stack Docker Compose gồm 3 contain
 
 Xem [Docker Image](./docker-tags) để biết cách cài đặt GPU, các ví dụ Docker Compose, và cách ghim phiên bản.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Khả năng tương thích OCR tiếng Hàn
+OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`). Tiếng Hàn cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Bắt đầu nhanh (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ Sau đó ứng dụng sẽ có sẵn tại `http://localhost:1349`.
 
 ## Bắt đầu nhanh (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Để tăng tốc NVIDIA CUDA cho các công cụ AI (xóa nền, nâng cấp độ phân giải, cải thiện khuôn mặt, OCR):
+Để tăng tốc NVIDIA CUDA trên các công cụ AI được hỗ trợ (xóa nền, nâng cấp, nâng cao khuôn mặt):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 nhân |
 | RAM | 4 GB |
-| Ổ đĩa | 3 GB (image) + 24 GB (mô hình AI) + không gian làm việc |
+| Disk | 3 GB (hình ảnh) + khoảng 20 GB (tất cả các gói AI tùy chọn) + không gian làm việc |
 | GPU | Không bắt buộc (dự phòng CPU) |
 
-**Việc cài đặt các bundle AI là điều đẩy RAM lên 4 GB.** Khi không cài AI, ứng dụng ở trạng thái nhàn rỗi khoảng 360 MB; với cả bảy bundle được cài đặt, nó giữ ~2.6 GB thường trú, bởi vì sidecar AI Python tải sẵn các mô hình của nó (xóa nền, nâng cấp độ phân giải, OCR, phiên âm, phát hiện khuôn mặt, phục hồi) khi khởi động. Các bản cài đặt không dùng AI vẫn nhẹ; các bản cài đặt AI cần ≥4 GB.
+**Cài đặt và chạy các gói AI lớn hơn là điều đẩy khuyến nghị lên 4 GB RAM.** Khi không cài đặt gói tùy chọn nào, ứng dụng sẽ không hoạt động khoảng 360 MB. Các công cụ Python cũ dùng chung sidecar, trong khi OCR chính xác sử dụng dispatcher chuyên dụng có thời gian tồn tại lâu dài được ghim vào thế hệ bất biến đang hoạt động. Trước khi kích hoạt, trình cài đặt chạy smoke test trên ứng viên. Sau đó, nó tự động chuyển sang dispatcher mới và tiêu hao dispatcher trước đó trước garbage collection. Mọi tạo phẩm OCR chính xác chính thức phải chuyển release suite trong trường hợp xấu nhất của nó bên trong 4 GiB cgroup, trong khi đề xuất máy chủ 4 GB để lại khoảng trống cho ứng dụng Node.js, Postgres, Redis, hàng đợi và công việc đồng thời.
 
 Hầu hết các công cụ AI hoàn toàn dùng được trên CPU; một vài công cụ thực sự cần GPU. Được đo trên một CPU 4 nhân hiện đại:
 
@@ -271,7 +277,7 @@ SnapOtter cố ý không nhúng sẵn các bản tải mô hình này vào image
 
 Một số công cụ phụ thuộc vào nhiều hơn một bundle được chia sẻ. Ví dụ, Ảnh Hộ chiếu cần cả `background-removal` và `face-detection`; nếu `background-removal` đã được cài đặt, việc bật Ảnh Hộ chiếu chỉ tải về bundle `face-detection` còn thiếu. Việc tái sử dụng tương tự áp dụng cho tất cả các công cụ AI.
 
-Kích thước tải mô hình AI:
+Ước tính dung lượng gói AI tùy chọn:
 
 | Bundle | Dung lượng ổ đĩa |
 |---|---|
@@ -279,9 +285,16 @@ Kích thước tải mô hình AI:
 | Nâng cấp độ phân giải + Cải thiện khuôn mặt + Khử nhiễu | 5-6 GB |
 | Phát hiện khuôn mặt | 200-300 MB |
 | Tẩy đối tượng + Tô màu | 1-2 GB |
-| OCR | 5-6 GB |
+| OCR chính xác (`balanced`/`best`) | ~208-234 Tải xuống MiB / ~409-488 MiB đã cài đặt |
 | Phục hồi ảnh | 4-5 GB |
-| **Tất cả bundle** | **~24 GB** |
+| Phiên âm | ~600 MB |
+| **Tất cả các gói** | **Đã cài đặt ~20 GB** |
+
+OCR nhanh được tích hợp vào hình ảnh thông qua Tesseract, bổ sung khoảng 25 MiB và không yêu cầu gói OCR tùy chọn hoặc yêu cầu bộ nhớ 4 GiB của nó. Gói chính xác có sẵn trong chính thức Linux  amd64 Và arm64 container và chạy ONNX Runtime TRÊN CPU. Các máy chủ NVIDIA sử dụng cùng thời gian chạy CPU OCR, vì vậy OCR không phụ thuộc vào phiên bản CUDA hoặc kiến ​​trúc GPU. Thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của vùng chứa được định cấu hình, nếu không thì bộ nhớ máy chủ. SnapOtter từ chối các hệ thống dưới mức tương thích tối thiểu đã được ký trước khi tải xuống gói. Việc cài đặt gói chính xác cũng bị từ chối trên bare-metal/các kho lưu trữ dựng sẵn mà libc và Python ABI không được đảm bảo.
+
+Các bản sao dùng chung `DATA_DIR` phải sử dụng cùng một kiến trúc CPU; hãy ghim các triển khai nhiều bản sao vào các nút tương thích bằng node affinity. Các bản sao hỗn hợp amd64/arm64 cần có các volume dữ liệu riêng biệt và các bản triển khai SnapOtter độc lập.
+
+Thời gian chạy chính xác giúp duy trì một thế hệ hoạt động và xóa bộ đệm tải xuống sau khi kích hoạt. Đối với bản phát hành này, lần cài đặt đầu tiên tạm thời cần khoảng 620-720 MiB cho kho lưu trữ cộng với dàn dựng và bản nâng cấp có thể đạt đỉnh gần 1,2 GiB trong khi thế hệ cũ vẫn hoạt động. Trình cài đặt tính toán yêu cầu chính xác từ chỉ mục đã ký và các thế hệ hiện tại trước khi tải xuống hoặc giải nén và sẽ sớm bị lỗi nếu khối lượng dữ liệu quá nhỏ.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để 
 
 - **Thay đổi kích thước nhận biết nội dung** bị lỗi trên các ảnh lớn (>5 MP) do một hạn chế trong binary caire. Hoạt động tốt với ảnh nhỏ hơn.
 - **Giải mã HEIF** mất 13-23 giây. HEIC (biến thể của Apple) nhanh hơn nhiều ở mức 0.3-0.9 giây.
-- **OCR tiếng Nhật** thất bại trên CPU do một lỗi MKLDNN của PaddlePaddle. Hoạt động trên GPU.
 - **Nâng cấp độ phân giải** hết thời gian chờ trên CPU với bất cứ thứ gì vượt quá ảnh nhỏ. Cần GPU để dùng thực tế.
 - **Cải thiện khuôn mặt CodeFormer** chậm hơn đáng kể so với GFPGAN (53 giây so với 2 giây trên GPU). GFPGAN được khuyến nghị cho hầu hết các trường hợp sử dụng.
 
@@ -433,6 +445,26 @@ Lỗi khi khởi động nêu tên chính xác UID cần dùng, nên con đườ
 | `CONCURRENT_JOBS` | `0` (tự động) | Số tác vụ xử lý AI song song tối đa |
 | `SESSION_DURATION_HOURS` | `168` | Thời gian sống của phiên đăng nhập (7 ngày) |
 | `CORS_ORIGIN` | (rỗng) | Danh sách origin được phép, phân tách bằng dấu phẩy, hoặc để rỗng cho same-origin |
+
+### Proxy gửi đi và CA riêng tư {#outbound-proxy-and-private-ca}
+
+Vùng chứa chính thức cho phép hỗ trợ proxy môi trường của Node. Nếu SnapOtter phải truy cập kho lưu trữ thời gian chạy OCR hoặc các dịch vụ HTTPS khác thông qua proxy công ty, hãy đặt `HTTPS_PROXY` (và `HTTP_PROXY` khi cần). Đặt `NO_PROXY` thành danh sách máy chủ được phân tách bằng dấu phẩy phải truy cập trực tiếp, chẳng hạn như Postgres, Redis và bộ lưu trữ đối tượng nội bộ.
+
+Nếu proxy hoặc dịch vụ nội bộ được cơ quan cấp chứng chỉ riêng ký, hãy gắn chứng chỉ CA ở chế độ chỉ đọc và trỏ `NODE_EXTRA_CA_CERTS` vào chứng chỉ đó. Tệp phải tồn tại khi quá trình Node bắt đầu:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Giữ thông tin xác thực proxy bên ngoài tệp Compose (ví dụ: trong tệp `.env` được bảo vệ hoặc bí mật). Không tắt xác minh TLS: chỉ mục OCR đã ký xác thực siêu dữ liệu phát hành, trong khi xác thực TLS thông thường vẫn bảo vệ việc truyền tải và mọi yêu cầu gửi đi khác.
 
 ## Kiểm tra sức khỏe {#health-check}
 

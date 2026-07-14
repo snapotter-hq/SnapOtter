@@ -38,7 +38,6 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 | Background removal (isnet) | 2,457ms | 1,137ms | 2.2x |
 | Upscale 2x | 350ms | 309ms | 1.1x |
 | Upscale 4x | 910ms | 310ms | 2.9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | Face blur | 139ms | 122ms | 1.1x |
 
 #### Cold start (first request after container start) {#cold-start-first-request-after-container-start}
@@ -47,7 +46,8 @@ Tested on an NVIDIA RTX 4070 (12 GB VRAM) with a 572x1024 JPEG portrait.
 |------|-----|-----|---------|
 | Background removal | 22,286ms | 4,792ms | 4.7x |
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
-| OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
+
+OCR is not included in the CUDA comparison. Both the built-in Tesseract tier and the optional RapidOCR/ONNX tiers use CPU, including when the container has NVIDIA GPU access.
 
 ### CUDA health check {#cuda-health-check}
 

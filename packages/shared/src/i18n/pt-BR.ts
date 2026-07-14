@@ -1587,7 +1587,9 @@ export const ptBR: TranslationKeys = {
       quality: "Qualidade",
       enhanceBeforeScanning: "Melhorar antes da varredura",
       enhanceHint:
-        "Endireita, melhora o contraste, remove ruído e amplia a imagem automaticamente antes da varredura para maior precisão.",
+        "Melhora o contraste local antes do reconhecimento. Rápido aplica diretamente; Equilibrado e Melhor só mantêm a variante quando a pontuação calibrada melhora o resultado.",
+      fastKoreanUnsupported:
+        "O OCR rápido não oferece suporte a coreano. Instale o pacote de OCR preciso e escolha Equilibrado ou Melhor.",
       language: "Idioma",
       autoDetect: "Detecção automática",
       extractedText: "Texto extraído",
@@ -3566,11 +3568,18 @@ export const ptBR: TranslationKeys = {
       uninstall: "Desinstalar",
       installing: "Instalando...",
       importBundle: "Importar pacote",
-      importDescription: "Envie um arquivo .tar.gz exportado de outra instalação.",
+      importDescription:
+        "Importe um ambiente OCR assinado ou pacote de AI legado para uso offline.",
       importButton: "Importar de arquivo",
       importing: "Importando...",
       importSuccess: "Pacote importado com sucesso.",
       importError: "Falha ao importar pacote: {error}",
+      importType: "Tipo de pacote",
+      importOcr: "Pacote de OCR preciso",
+      importLegacy: "Pacote de AI legado",
+      importOcrIndex: "Índice de OCR assinado (.json)",
+      importOcrArchive: "Arquivo de execução do OCR (.tar.gz)",
+      importLegacyArchive: "Arquivo do pacote legado (.tar.gz)",
       resetTitle: "Redefinir ambiente de AI",
       resetDescription:
         "Exclui todos os recursos de AI instalados e os modelos baixados, e recomeça do zero. Use isso se as ferramentas de AI estiverem se comportando de forma inesperada após uma atualização e a reinstalação de um pacote não resolver o problema.",

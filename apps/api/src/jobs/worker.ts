@@ -25,7 +25,13 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { ANALYTICS_EVENTS, getBundleForTool, isToolInputError, TOOLS } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  getBundleForTool,
+  getOptionalBundleForTool,
+  isToolInputError,
+  TOOLS,
+} from "@snapotter/shared";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
@@ -37,15 +43,32 @@ import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
-import { getObjectBuffer, putObject } from "../lib/object-storage.js";
+import {
+  copyObjectToFile,
+  getObjectBuffer,
+  getObjectSize,
+  putObject,
+} from "../lib/object-storage.js";
+import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
-import { publishEphemeral, updateSingleFileProgress } from "../routes/progress.js";
+import { InputValidationError } from "../modality/contract.js";
+import {
+  publishEphemeral,
+  updateSingleFileProgress,
+  updateSingleFileProgressAtomically,
+} from "../routes/progress.js";
 import {
   getToolConfig,
   type ToolProcessCtx,
   type ToolProcessInputV2,
 } from "../routes/tool-factory.js";
-import { hasAiJobHandler, runAiToolJob } from "./ai-handlers.js";
+import {
+  type AiPathJobInput,
+  hasAiJobHandler,
+  hasAiPathJobHandler,
+  runAiPathToolJob,
+  runAiToolJob,
+} from "./ai-handlers.js";
 import { recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
@@ -66,6 +89,86 @@ function timeoutMsFor(pool: Pool): number {
     return env.JOB_TIMEOUT_LONG_S * 1000;
   }
   return env.JOB_TIMEOUT_FAST_S * 1000;
+}
+
+/**
+ * Load one queued input while preserving OCR's encoded-size ceiling across
+ * direct, batch, and pipeline ingress. The size check happens before the
+ * object is materialized as a Buffer.
+ */
+export async function loadToolInputBuffer(toolId: string, ref: string): Promise<Buffer> {
+  if (toolId === "ocr-pdf") {
+    throw new Error("OCR PDF input must use the path-backed loader");
+  }
+  if (toolId === "ocr") {
+    const size = await getObjectSize(ref);
+    if (size > OCR_MAX_ENCODED_INPUT_BYTES) {
+      throw new InputValidationError(
+        `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+        413,
+      );
+    }
+  }
+  return getObjectBuffer(ref);
+}
+
+export interface LoadedToolInputs {
+  inputs: ToolProcessInputV2[];
+  inputBuffer?: Buffer;
+  pathInput?: AiPathJobInput;
+  originalSize: number;
+}
+
+/** Load OCR PDFs to bounded scratch storage; all other tools remain Buffer-based. */
+export async function loadToolInputs(
+  toolId: string,
+  refs: string[],
+  filename: string,
+  scratchDir: string,
+  signal: AbortSignal,
+): Promise<LoadedToolInputs> {
+  if (refs.length === 0) throw new InputValidationError("No input object was queued");
+
+  if (toolId === "ocr-pdf") {
+    if (refs.length !== 1) {
+      throw new InputValidationError("OCR PDF accepts exactly one input object");
+    }
+    const path = join(scratchDir, "input.pdf");
+    try {
+      const size = await copyObjectToFile(refs[0], path, {
+        maxBytes: OCR_MAX_ENCODED_INPUT_BYTES,
+        signal,
+      });
+      return { inputs: [], pathInput: { path, size }, originalSize: size };
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "statusCode" in error &&
+        error.statusCode === 413
+      ) {
+        throw new InputValidationError(
+          `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+          413,
+        );
+      }
+      throw error;
+    }
+  }
+
+  const inputs: ToolProcessInputV2[] = await Promise.all(
+    refs.map(async (ref) => ({
+      ref,
+      buffer: await loadToolInputBuffer(toolId, ref),
+      filename: ref.split("/").slice(2).join("/") || filename,
+    })),
+  );
+  inputs[0].filename = filename;
+  return {
+    inputs,
+    inputBuffer: inputs[0].buffer,
+    originalSize: inputs[0].buffer.length,
+  };
 }
 
 // ── Legacy result payload ──────────────────────────────────────
@@ -158,23 +261,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         })
         .where(eq(schema.jobs.id, jobId));
 
-      // Load all input refs from object storage. The primary input keeps
-      // the client-facing filename; secondary inputs derive filenames from
-      // their ref basenames.
-      const inputs: ToolProcessInputV2[] = await Promise.all(
-        data.inputRefs.map(async (ref) => ({
-          ref,
-          buffer: await getObjectBuffer(ref),
-          filename: ref.split("/").slice(2).join("/") || data.filename,
-        })),
+      const { inputs, inputBuffer, pathInput, originalSize } = await loadToolInputs(
+        data.toolId,
+        data.inputRefs,
+        data.filename,
+        scratchDir,
+        signal,
       );
-      inputs[0].filename = data.filename; // primary keeps the client-facing name
-      const inputBuffer = inputs[0].buffer; // existing metrics/size/preview paths
 
       // Progress reporter: emits both Redis pub/sub and BullMQ job progress
       const progressJobId = data.clientJobId ?? jobId;
       const report = (percent: number, stage?: string) => {
-        updateSingleFileProgress({
+        void updateSingleFileProgress({
           jobId: progressJobId,
           phase: "processing",
           percent,
@@ -196,7 +294,16 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       let resultPayload: Record<string, unknown> | undefined;
       let extraOutputs: Array<{ name: string; buffer: Buffer; contentType: string }> | undefined;
 
-      if (hasAiJobHandler(data.toolId)) {
+      if (hasAiPathJobHandler(data.toolId)) {
+        if (!pathInput) throw new Error(`No path-backed input for ${data.toolId}`);
+        const aiResult = await runAiPathToolJob(data, pathInput, ctx);
+        resultBuffer = aiResult.buffer;
+        resultFilename = aiResult.filename;
+        resultContentType = aiResult.contentType;
+        resultPayload = aiResult.resultPayload;
+        extraOutputs = aiResult.extraOutputs;
+      } else if (hasAiJobHandler(data.toolId)) {
+        if (!inputBuffer) throw new Error(`No buffered input for ${data.toolId}`);
         const aiResult = await runAiToolJob(data, inputBuffer, ctx);
         resultBuffer = aiResult.buffer;
         resultFilename = aiResult.filename;
@@ -303,26 +410,40 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         outputRefs,
         filename: outName,
         contentType: resultContentType,
-        originalSize: inputBuffer.length,
+        originalSize,
         processedSize: resultBuffer.length,
         previewRef,
         savedFileId,
         resultPayload,
       };
+      const legacyResult = buildLegacyResultPayload(jobResult, jobId);
 
-      // Update durable row to completed
-      await db
-        .update(schema.jobs)
-        .set({
-          status: "completed",
-          completedAt: new Date(),
-          durationMs,
-          bytesIn: inputBuffer.length,
-          bytesOut: resultBuffer.length,
-          outputRefs,
-          progress: { percent: 100, stage: "complete" },
-        })
-        .where(eq(schema.jobs.id, jobId));
+      // Commit the authoritative artifact row and client replay alias in one
+      // transaction before terminal Redis publication. A crash can no longer
+      // leave `completed` durable state without the exact result payload.
+      await updateSingleFileProgressAtomically(
+        {
+          jobId: progressJobId,
+          phase: "complete",
+          percent: 100,
+          stage: "complete",
+          result: legacyResult,
+        },
+        async (tx) => {
+          await tx
+            .update(schema.jobs)
+            .set({
+              status: "completed",
+              completedAt: new Date(),
+              durationMs,
+              bytesIn: originalSize,
+              bytesOut: resultBuffer.length,
+              outputRefs,
+              progress: { percent: 100, stage: "complete", result: legacyResult },
+            })
+            .where(eq(schema.jobs.id, jobId));
+        },
+      );
 
       // Record Prometheus metrics
       jobsTotal.inc({ pool: data.pool, status: "completed" });
@@ -338,21 +459,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             status: "completed",
             duration_ms: durationMs,
             category: tool?.category ?? "unknown",
-            is_ai_tool: getBundleForTool(data.toolId) !== null,
+            is_ai_tool:
+              getBundleForTool(data.toolId) !== null ||
+              getOptionalBundleForTool(data.toolId) !== null,
           },
           data.analyticsDistinctId,
         );
       }
-
-      // Emit terminal progress event with legacy result payload
-      const legacyResult = buildLegacyResultPayload(jobResult, jobId);
-      updateSingleFileProgress({
-        jobId: progressJobId,
-        phase: "complete",
-        percent: 100,
-        stage: "complete",
-        result: legacyResult,
-      });
 
       // Record queue wait time and completion on the OTel span
       if (span && job.processedOn) {
@@ -425,7 +538,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             error: "Canceled",
           });
         } else {
-          updateSingleFileProgress({
+          await updateSingleFileProgress({
             jobId: progressJobId,
             phase: "failed",
             percent: 0,
@@ -444,7 +557,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             status: "failed",
             duration_ms: durationMs,
             category: tool?.category ?? "unknown",
-            is_ai_tool: getBundleForTool(data.toolId) !== null,
+            is_ai_tool:
+              getBundleForTool(data.toolId) !== null ||
+              getOptionalBundleForTool(data.toolId) !== null,
             error_code: isTimeout ? "timeout" : isCanceled ? "cancelled" : "processing",
           },
           data.analyticsDistinctId,
@@ -526,7 +641,12 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   if (pipelineProgressId) {
     const percent = Math.round(((data.stepIndex ?? 0) / (data.totalSteps ?? 1)) * 90);
     const stage = `Step ${(data.stepIndex ?? 0) + 1}/${data.totalSteps}: ${data.toolId}`;
-    updateSingleFileProgress({ jobId: pipelineProgressId, phase: "processing", percent, stage });
+    void updateSingleFileProgress({
+      jobId: pipelineProgressId,
+      phase: "processing",
+      percent,
+      stage,
+    });
   }
 
   // Clear clientJobId so processToolJob's terminal SSE event goes to the
@@ -591,6 +711,7 @@ function contentTypeForFilename(name: string): string {
     tiff: "image/tiff",
     heic: "image/heic",
     heif: "image/heif",
+    txt: "text/plain",
   };
   return map[ext] ?? "application/octet-stream";
 }
@@ -647,7 +768,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       .set({ status: "failed", completedAt: new Date(), error: { message: errorMsg } })
       .where(eq(schema.jobs.id, data.jobId));
 
-    updateSingleFileProgress({
+    await updateSingleFileProgress({
       jobId: progressJobId,
       phase: "failed",
       percent: 0,
@@ -704,17 +825,6 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   const contentType = contentTypeForFilename(outFilename);
   const previewRef = await generatePreview(lastOutputBuffer, contentType, data.jobId);
 
-  await db
-    .update(schema.jobs)
-    .set({
-      status: "completed",
-      completedAt: new Date(),
-      outputRefs: [parentKey],
-      bytesIn: firstBytesIn,
-      bytesOut: lastBytesOut,
-    })
-    .where(eq(schema.jobs.id, data.jobId));
-
   const result: ToolJobResult = {
     outputRefs: [parentKey],
     filename: outFilename,
@@ -727,16 +837,30 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       steps,
     },
   };
+  const legacyResult = buildLegacyResultPayload(result, data.jobId);
 
-  updateSingleFileProgress({
-    jobId: progressJobId,
-    phase: "complete",
-    percent: 100,
-    stage: "complete",
-    // Carry the full result (incl. previewUrl) so the SSE fallback path
-    // (sync-window timeout) still delivers a downloadable output.
-    result: buildLegacyResultPayload(result, data.jobId),
-  });
+  await updateSingleFileProgressAtomically(
+    {
+      jobId: progressJobId,
+      phase: "complete",
+      percent: 100,
+      stage: "complete",
+      result: legacyResult,
+    },
+    async (tx) => {
+      await tx
+        .update(schema.jobs)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          outputRefs: [parentKey],
+          bytesIn: firstBytesIn,
+          bytesOut: lastBytesOut,
+          progress: { percent: 100, stage: "complete", result: legacyResult },
+        })
+        .where(eq(schema.jobs.id, data.jobId));
+    },
+  );
 
   // Batch progress (pipeline-batch only)
   if (data.parentId && data.totalFiles !== undefined) {

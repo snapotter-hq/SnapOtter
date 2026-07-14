@@ -168,6 +168,7 @@ components:
           example: Feature not installed
         code:
           type: string
+          enum: [FEATURE_NOT_INSTALLED, FEATURE_INCOMPATIBLE]
           example: FEATURE_NOT_INSTALLED
         feature:
           type: string
@@ -178,6 +179,16 @@ components:
         estimatedSize:
           type: string
           description: Estimated download size
+        requestedQuality:
+          type: string
+          enum: [fast, balanced, best]
+          description: OCR tier that could not be honored; Fast is reported when Korean is explicitly requested with Fast or the legacy Tesseract alias
+        compatibilityReason:
+          type: string
+          description: Machine-readable runtime compatibility reason, when available
+        guidance:
+          type: string
+          description: Actionable recovery guidance, when available
 
     HealthResponse:
       type: object
@@ -3777,7 +3788,11 @@ paths:
       operationId: extractText
       tags: [Tools]
       summary: OCR / text extraction
-      description: Extract text from an image using OCR. Runs locally.
+      description: |
+        Extract text from an image locally. The built-in Fast tier uses
+        Tesseract. Balanced and Best use the optional signed RapidOCR runtime
+        with pinned PP-OCR ONNX models. Explicit tier requests never silently
+        downgrade to another tier.
       security:
         - bearerAuth: []
       requestBody:
@@ -3791,15 +3806,16 @@ paths:
                 file:
                   type: string
                   format: binary
+                  maxLength: 536870912
                   description: Image file to extract text from
                 settings:
                   type: string
                   description: |
                     JSON string with options:
-                    - `quality` (string, default "balanced") - One of: fast, balanced, best
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko
-                    - `enhance` (boolean, default true) - Pre-process image for better recognition
-                    - `engine` (string, optional) - One of: tesseract, paddleocr (backward compat)
+                    - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
+                    - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
       responses:
@@ -3819,6 +3835,49 @@ paths:
                     description: Extracted text content
                   engine:
                     type: string
+                    enum: [tesseract, rapidocr-onnx]
+                  requestedQuality:
+                    type: string
+                    enum: [fast, balanced, best]
+                  actualQuality:
+                    type: string
+                    enum: [fast, balanced, best]
+                    description: Always matches requestedQuality for a successful request
+                  device:
+                    type: string
+                    enum: [cpu]
+                  provider:
+                    type: string
+                    example: CPUExecutionProvider
+                  degraded:
+                    type: boolean
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                  runtimeVersion:
+                    type: string
+                    description: Accurate OCR runtime version; omitted for Fast
+                  modelVersion:
+                    type: string
+                    description: Accurate OCR model selection; omitted for Fast
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobId, async]
+                properties:
+                  jobId:
+                    type: string
+                  progressJobId:
+                    type: string
+                  artifactJobId:
+                    type: string
+                  async:
+                    type: boolean
+                    const: true
         "400":
           description: Invalid input
           content:
@@ -3837,12 +3896,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          description: Encoded OCR input exceeds the hard 512 MiB safety limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "501":
-          description: Feature not installed
+          description: Requested Balanced/Best runtime is not installed or is incompatible
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
+        "503":
+          description: OCR could not be queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/tools/image/info:
     post:
@@ -6546,6 +6617,34 @@ paths:
                           description: >-
                             Extracted on-disk size for this host's
                             architecture, when the manifest records it.
+                        compatibility:
+                          type: string
+                          enum: [compatible, incompatible, invalid]
+                          description: OCR runtime compatibility; omitted for legacy bundles
+                        compatibilityReason:
+                          type: [string, "null"]
+                          description: OCR runtime compatibility reason; omitted for legacy bundles
+                        selectedTarget:
+                          type: [string, "null"]
+                          description: Selected OCR runtime target, such as linux-amd64-cpu-py312
+                        missingDownloadBytes:
+                          type: [integer, "null"]
+                          description: Remaining OCR runtime download size for this host
+                        requiredMemoryBytes:
+                          type: [integer, "null"]
+                          description: Minimum effective memory required by the selected OCR runtime; null for legacy bundles
+                        effectiveMemoryBytes:
+                          type: [integer, "null"]
+                          description: Effective memory available to OCR (the configured container cgroup limit, otherwise host memory); null for legacy bundles
+                        healthyGeneration:
+                          type: [string, "null"]
+                          description: Active immutable OCR generation identifier
+                        availableQualities:
+                          type: array
+                          description: OCR quality tiers currently available on this host
+                          items:
+                            type: string
+                            enum: [fast, balanced, best]
                         enablesTools:
                           type: array
                           items:
@@ -6575,6 +6674,17 @@ paths:
         Start async installation of an AI feature bundle. Downloads models and
         configures the Python sidecar. Returns a jobId for progress tracking
         via the SSE endpoint. Requires features:manage permission.
+
+        For bundleId=ocr, installation is supported in the official Linux amd64 and arm64 containers.
+        It downloads the target selected for this host, verifies the release
+        index's Ed25519 signature and the artifact/model digests, smoke-tests a
+        staged immutable generation, and atomically activates it. The OCR
+        runtime uses CPU even when the container has NVIDIA GPU access. The
+        accurate runtime requires at least 4 GiB of effective memory (the
+        configured container cgroup limit, otherwise host memory). Systems below that signed
+        compatibility minimum are rejected before download with
+        compatibilityReason=insufficient-memory. Fast Tesseract OCR is not
+        subject to this requirement.
 
         Installs are serialized server-side: a request made while another
         install is running is queued (queued=true) rather than rejected, and
@@ -6625,11 +6735,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: Bundle already installed
+          description: Bundle already installed or OCR runtime unsupported on this host
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConflictError"
+        "503":
+          description: OCR runtime trust key is not configured in this image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/admin/features/{bundleId}/uninstall:
     post:
@@ -10950,9 +11066,10 @@ paths:
       tags: [Tools]
       summary: PDF OCR
       description: |
-        AI-powered OCR to extract text from PDF documents. Supports
-        multiple quality tiers and languages. Requires the OCR feature
-        bundle to be installed.
+        Extract text from scanned PDF documents page by page. Fast uses the
+        built-in Tesseract runtime. Balanced and Best use the optional signed
+        RapidOCR runtime with pinned PP-OCR ONNX models. Explicit tier requests
+        never silently downgrade. A request can select at most 50 pages.
       security:
         - bearerAuth: []
       requestBody:
@@ -10966,14 +11083,17 @@ paths:
                 file:
                   type: string
                   format: binary
+                  maxLength: 536870912
                   description: PDF file to process (.pdf)
                 settings:
                   type: string
                   description: |
                     JSON string with options:
-                    - `quality` (string, default "balanced") - One of: fast, balanced, best
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko
+                    - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
                     - `pages` (string, default "all") - Page selection, e.g. "all", "1-3", "1,3,5"
+                    - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
+                    - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -10984,12 +11104,17 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [jobId, async]
                 properties:
                   jobId:
                     type: string
+                  progressJobId:
+                    type: string
+                  artifactJobId:
+                    type: string
                   async:
                     type: boolean
-                    example: true
+                    const: true
         "400":
           description: Invalid input
           content:
@@ -11008,12 +11133,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          description: Encoded PDF exceeds the hard 512 MiB safety limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "501":
-          description: Feature not installed
+          description: Requested Balanced/Best runtime is not installed or is incompatible
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeatureNotInstalledError"
+        "503":
+          description: PDF OCR could not be queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/tools/files/chart-maker:
     post:
       operationId: chartMaker
@@ -17551,7 +17688,13 @@ paths:
       operationId: importFeatureBundle
       tags: [Features]
       summary: Import feature bundle
-      description: Import an offline AI bundle archive. Requires features:manage permission.
+      description: |
+        Import a legacy AI bundle archive, or import an offline accurate OCR
+        release using its signed index and matching platform archive. OCR
+        import performs the same signature, hash, compatibility, extraction,
+        and smoke-test checks as online installation, including the accurate
+        runtime's 4 GiB effective-memory minimum. Fast Tesseract OCR is not
+        subject to this requirement. Requires features:manage permission.
       security:
         - bearerAuth: []
       requestBody:
@@ -17560,20 +17703,33 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              oneOf:
+                - required: [file]
+                - required: [index, archive]
               properties:
                 file:
                   type: string
                   format: binary
+                  description: One legacy AI bundle archive; mutually exclusive with index/archive
+                index:
+                  type: string
+                  format: binary
+                  description: Signed ocr-runtime-index.json from the SnapOtter release
+                archive:
+                  type: string
+                  format: binary
+                  description: OCR runtime archive for the current Linux amd64 or arm64 target; must follow index
       responses:
         "200":
-          description: Bundle imported
+          description: Bundle verified, imported, and activated
         "400":
           description: Invalid archive
         "403":
           description: Insufficient permissions
         "409":
           description: Import lock is held
+        "507":
+          description: Insufficient storage for the authenticated archive and expanded runtime
 
   /api/v1/enterprise/scim/token:
     post:

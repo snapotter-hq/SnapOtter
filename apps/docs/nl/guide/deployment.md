@@ -1,8 +1,8 @@
 ---
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse-proxyconfiguraties voor Nginx, Traefik en Cloudflare."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: 6fdbf01d5c9a
+i18n_output_hash: 21ff542fcb0c
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Implementatie {#deployment}
@@ -11,6 +11,12 @@ SnapOtter wordt geïmplementeerd als een Docker Compose-stack met 3 containers: 
 
 Zie [Docker Image](./docker-tags) voor GPU-installatie, Docker Compose-voorbeelden en versievastlegging.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Compatibiliteit voor Koreaanse OCR
+Snelle OCR ondersteunt `auto`, `en`, `de`, `es`, `fr`, `zh` en `ja`, maar geen Koreaans (`ko`). Koreaans vereist het nauwkeurige OCR-pakket en `balanced` of `best`. Het pakket werkt in officiële Linux amd64- en arm64-containers, ook op NVIDIA-hosts waar OCR op de CPU blijft draaien. Niet-ondersteunde systemen krijgen een expliciete compatibiliteitsfout en vallen nooit stil terug op `fast`. Koreaans met `fast` of de oude alias `tesseract` wordt vóór het in de wachtrij plaatsen geweigerd met `FEATURE_INCOMPATIBLE` en `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Snelstart (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ De app is daarna beschikbaar op `http://localhost:1349`.
 
 ## Snelstart (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Voor NVIDIA CUDA-versnelling op AI-tools (achtergrond verwijderen, upscalen, gezichtsverbetering, OCR):
+Voor NVIDIA CUDA-versnelling op ondersteunde AI-tools (achtergrondverwijdering, opschaling, gezichtsverbetering):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 cores |
 | RAM | 4 GB |
-| Schijf | 3 GB (image) + 24 GB (AI-modellen) + werkruimte |
+| Disk | 3 GB (afbeelding) + ongeveer 20 GB (alle optionele AI-pakketten) + werkruimte |
 | GPU | Niet vereist (CPU-terugval) |
 
-**Het installeren van de AI-bundels is wat het RAM naar 4 GB duwt.** Zonder geïnstalleerde AI blijft de app rond 360 MB in ruststand; met alle zeven bundels geïnstalleerd houdt hij ~2.6 GB resident, omdat de Python-AI-sidecar zijn modellen (achtergrond verwijderen, upscalen, OCR, transcriptie, gezichtsdetectie, restauratie) bij het opstarten vooraf laadt. Niet-AI-installaties blijven licht; AI-installaties hebben ≥4 GB nodig.
+**Het installeren en uitvoeren van de grotere AI-bundels is wat de aanbeveling naar 4 GB RAM duwt.** Als er geen optionele pakketten zijn geïnstalleerd, is de app ongeveer 360 MB inactief. Oudere Python-tools delen een sidecar, terwijl de nauwkeurige OCR een speciale, langlevende dispatcher gebruikt die is vastgemaakt aan de actieve onveranderlijke generatie. Vóór activering voert het installatieprogramma een smoke test uit op de kandidaat. Vervolgens schakelt hij atomair over naar de nieuwe dispatcher en leegt de eerdere dispatcher vóór garbage collection. Elk officieel nauwkeurig OCR-artefact moet de release suite in het slechtste geval passeren in een 4 GiB cgroup, terwijl de hostaanbeveling van 4 GB ruimte laat voor de Node.js-applicatie, Postgres, Redis, wachtrijen en gelijktijdig werk.
 
 De meeste AI-tools zijn prima bruikbaar op CPU; een paar willen echt een GPU. Gemeten op een moderne 4-core CPU:
 
@@ -271,7 +277,7 @@ SnapOtter bakt deze modeldownloads bewust niet in de Docker-image. AI-bundels wo
 
 Sommige tools zijn afhankelijk van meer dan één gedeelde bundel. Zo heeft Pasfoto zowel `background-removal` als `face-detection` nodig; als `background-removal` al is geïnstalleerd, downloadt het inschakelen van Pasfoto alleen de ontbrekende `face-detection`-bundel. Hetzelfde hergebruik geldt voor alle AI-tools.
 
-Downloadgroottes van AI-modellen:
+Schattingen van optionele AI-pakketopslag:
 
 | Bundel | Schijfgrootte |
 |---|---|
@@ -279,9 +285,16 @@ Downloadgroottes van AI-modellen:
 | Upscale + Gezichtsverbetering + Ruisverwijdering | 5-6 GB |
 | Gezichtsdetectie | 200-300 MB |
 | Objectgom + Inkleuren | 1-2 GB |
-| OCR | 5-6 GB |
+| Nauwkeurige OCR (`balanced`/`best`) | ~208-234 MiB downloaden / ~409-488 MiB geïnstalleerd |
 | Fotorestauratie | 4-5 GB |
-| **Alle bundels** | **~24 GB** |
+| Transcriptie | ~600 MB |
+| **Alle bundels** | **~20 GB geïnstalleerd** |
+
+Snelle OCR is in het beeld ingebouwd via Tesseract, voegt ongeveer 25 MiB toe en vereist niet het optionele OCR-pakket of de 4 GiB-geheugenvereiste. Het nauwkeurige pakket is beschikbaar in de officiële Linux amd64- en arm64-containers en draait ONNX Runtime op CPU. NVIDIA-hosts gebruiken dezelfde CPU OCR-runtime, dus OCR is niet afhankelijk van de CUDA-versie of GPU-architectuur. De nauwkeurige runtime vereist minimaal 4 GiB effectief geheugen: de geconfigureerde container cgroup-limiet, anders hostgeheugen. SnapOtter wijst systemen af ​​die lager zijn dan het ondertekende compatibiliteitsminimum voordat het pakket wordt gedownload. Nauwkeurige pakketinstallatie wordt ook afgewezen op bare-metal/voorafgebouwde archieven waarvan libc en Python ABI niet kunnen worden gegarandeerd.
+
+Replica's die dezelfde `DATA_DIR` delen, moeten dezelfde CPU-architectuur gebruiken; zet deployments met meerdere replica's via node-affiniteit vast op compatibele nodes. Gemengde amd64/arm64-replica's hebben afzonderlijke datavolumes en onafhankelijke SnapOtter-deployments nodig.
+
+De nauwkeurige runtime houdt één actieve generatie aan en wist de downloadcache na activering. Voor deze release heeft een eerste installatie tijdelijk ongeveer 620-720 MiB nodig voor het archief plus staging, en een upgrade kan pieken in de buurt van 1.2 GiB terwijl de oude generatie actief blijft. Het installatieprogramma berekent de exacte vereisten op basis van de ondertekende index en de huidige generaties voordat het wordt gedownload of geëxtraheerd, en mislukt vroegtijdig als het gegevensvolume te klein is.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Zie de [volledige formaatlijst](/nl/guide/supported-formats) voor details over e
 
 - **Content-aware resize** loopt vast op grote afbeeldingen (>5 MP) door een beperking in de caire-binary. Werkt prima met kleinere afbeeldingen.
 - **HEIF-decodering** duurt 13-23 seconden. HEIC (Apples variant) is veel sneller met 0.3-0.9 seconden.
-- **OCR Japans** faalt op CPU door een PaddlePaddle MKLDNN-bug. Werkt op GPU.
 - **Upscale** verloopt via time-out op CPU voor alles boven kleine afbeeldingen. GPU vereist voor praktisch gebruik.
 - **CodeFormer**-gezichtsverbetering is aanzienlijk trager dan GFPGAN (53s versus 2s op GPU). GFPGAN wordt voor de meeste gebruikssituaties aanbevolen.
 
@@ -433,6 +445,26 @@ De opstartfout noemt de exacte UID die je moet gebruiken, dus de snelste weg is 
 | `CONCURRENT_JOBS` | `0` (auto) | Max. parallelle AI-verwerkingsjobs |
 | `SESSION_DURATION_HOURS` | `168` | Levensduur van inlogsessie (7 dagen) |
 | `CORS_ORIGIN` | (leeg) | Komma-gescheiden toegestane origins, of leeg voor same-origin |
+
+### Uitgaande proxy en privé-CA {#outbound-proxy-and-private-ca}
+
+De officiële container maakt Node's omgevingsproxy-ondersteuning mogelijk. Als SnapOtter de OCR runtime repository of andere HTTPS-services moet bereiken via een bedrijfsproxy, stelt u `HTTPS_PROXY` in (en `HTTP_PROXY` indien nodig). Stel `NO_PROXY` in op een door komma's gescheiden lijst met hosts die rechtstreeks moeten worden bereikt, zoals Postgres, Redis en interne objectopslag.
+
+Als de proxy of een interne service is ondertekend door een particuliere certificeringsinstantie, koppelt u het CA-certificaat alleen-lezen en verwijst u `NODE_EXTRA_CA_CERTS` ernaar. Het bestand moet bestaan ​​wanneer het knooppuntproces start:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Bewaar de proxyreferenties buiten het Compose-bestand (bijvoorbeeld in een beveiligd `.env`-bestand of geheim). Schakel TLS-verificatie niet uit: de ondertekende OCR-index verifieert de metagegevens van de release, terwijl normale TLS-validatie nog steeds het transport en elk ander uitgaand verzoek beschermt.
 
 ## Health check {#health-check}
 

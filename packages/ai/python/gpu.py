@@ -36,10 +36,10 @@ def gpu_available():
     """Return True if a usable CUDA GPU is present at runtime.
 
     This is the general "can any framework use a GPU" check (torch, then ONNX
-    Runtime, then paddle). Tools bound to a single framework should instead call
+    Runtime). Tools bound to a single framework should instead call
     the matching per-framework helper (torch_gpu_available,
-    ctranslate2_gpu_available) so a GPU that only paddle or ONNX can use is not
-    mistaken for a torch GPU.
+    ctranslate2_gpu_available) so a GPU that only ONNX can use is not mistaken
+    for a torch GPU.
     """
     if _override_disables_gpu():
         return False
@@ -55,16 +55,14 @@ def gpu_available():
     if onnx_available:
         return True
 
-    # A GPU is physically present but neither torch nor ONNX Runtime can use it.
-    # The OCR bundle ships paddlepaddle-gpu, which still can, so probe paddle in
-    # an isolated subprocess. This runs only now that nvidia-smi confirms a GPU,
-    # and never in-process, because a GPU-less paddle import segfaults.
+    # A GPU is physically present but neither supported framework can use it.
+    # OCR is now an isolated portable CPU ONNX runtime, so Paddle must never be
+    # imported as a fallback probe here (the old GPU wheel could crash while
+    # resolving libcuda on otherwise valid CPU-only hosts).
     gpu_name = _nvidia_smi_gpu_name()
     if gpu_name:
-        if _try_paddle_cuda_subprocess():
-            return True
-        print(f"[gpu] nvidia-smi found GPU ({gpu_name}) but neither torch, ONNX "
-              "Runtime, nor paddle can use it; reinstall AI features for GPU support",
+        print(f"[gpu] nvidia-smi found GPU ({gpu_name}) but neither torch nor ONNX "
+              "Runtime can use it; reinstall the relevant AI feature for GPU support",
               file=sys.stderr, flush=True)
     return False
 
@@ -129,42 +127,12 @@ def _try_onnx_cuda():
         return False
 
 
-def _try_paddle_cuda_subprocess():
-    """Check GPU via paddle in an isolated subprocess.
-
-    The OCR bundle ships paddlepaddle-gpu with no torch or ONNX Runtime, so paddle
-    is the only framework that can see the GPU on an OCR-only host. Importing
-    paddlepaddle-gpu in-process segfaults on a GPU-less machine, so this runs in a
-    throwaway subprocess and callers must confirm a GPU is present (via nvidia-smi)
-    before invoking it. Returns True only when paddle has a CUDA build and a
-    visible GPU. The result is signalled through the exit code so paddle's own
-    import chatter on stdout cannot corrupt the reading.
-    """
-    probe = (
-        "import paddle, sys; "
-        "sys.exit(0 if (paddle.is_compiled_with_cuda() "
-        "and paddle.device.cuda.device_count() > 0) else 1)"
-    )
-    try:
-        result = subprocess.run(
-            [sys.executable, "-c", probe],
-            capture_output=True, text=True, timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    if result.returncode == 0:
-        print("[gpu] CUDA available via paddle (paddlepaddle-gpu)",
-              file=sys.stderr, flush=True)
-        return True
-    return False
-
-
 def torch_gpu_available():
     """True iff torch itself can use CUDA (honors the SNAPOTTER_GPU override).
 
     Torch-based tools (upscale, denoise, face enhancement, restore) must gate on
-    this rather than gpu_available(), which can report True based on paddle or
-    ONNX Runtime while torch is a CPU-only build. Routing those tools to CUDA on a
+    this rather than gpu_available(), which can report True based on ONNX Runtime
+    while torch is a CPU-only build. Routing those tools to CUDA on a
     device torch cannot use would crash them.
     """
     if _override_disables_gpu():

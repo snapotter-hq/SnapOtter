@@ -1,0 +1,150 @@
+{
+  "exactGroundTruth": "葛西城復元図\n今までの発掘成果を基に書き起こしたもので、葛西城の占地している微高地\nの東側には中川、西側には湿地があり、自然の地の利を活かした縄張りを行っ\nっていた。本丸をはじめとする郭は、水堀と土塁によって防御されていた。",
+  "record": {
+    "answer": "湿地",
+    "evidence": [
+      "bbox-0002",
+      "bbox-0003"
+    ],
+    "fields": {
+      "date": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "line_items": [],
+      "receipt_id": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "store_address": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "store_name": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "tax_amount": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "time": {
+        "polygon_ids": [],
+        "value": null
+      },
+      "total_amount": {
+        "polygon_ids": [],
+        "value": null
+      }
+    },
+    "filename": "0127.jpg",
+    "image_id": "0127",
+    "polygons": [
+      {
+        "direction": null,
+        "polygon": [
+          [
+            973,
+            739
+          ],
+          [
+            3163,
+            749
+          ],
+          [
+            3162,
+            1008
+          ],
+          [
+            972,
+            998
+          ]
+        ],
+        "polygon_id": "bbox-0001",
+        "text": "葛西城復元図"
+      },
+      {
+        "direction": null,
+        "polygon": [
+          [
+            906,
+            2342
+          ],
+          [
+            3224.84,
+            2342
+          ],
+          [
+            3236.68,
+            2414.7
+          ],
+          [
+            902.05,
+            2410.75
+          ]
+        ],
+        "polygon_id": "bbox-0002",
+        "text": "今までの発掘成果を基に書き起こしたもので、葛西城の占地している微高地"
+      },
+      {
+        "direction": null,
+        "polygon": [
+          [
+            898.62,
+            2447.13
+          ],
+          [
+            3227.42,
+            2447.13
+          ],
+          [
+            3227.42,
+            2514.23
+          ],
+          [
+            898.62,
+            2514.23
+          ]
+        ],
+        "polygon_id": "bbox-0003",
+        "text": "の東側には中川、西側には湿地があり、自然の地の利を活かした縄張りを行っ"
+      },
+      {
+        "direction": null,
+        "polygon": [
+          [
+            898.62,
+            2557.64
+          ],
+          [
+            3156.37,
+            2549.75
+          ],
+          [
+            3203.74,
+            2624.75
+          ],
+          [
+            898.62,
+            2624.75
+          ]
+        ],
+        "polygon_id": "bbox-0004",
+        "text": "っていた。本丸をはじめとする郭は、水堀と土塁によって防御されていた。"
+      }
+    ],
+    "question": "中川から微高地を挟んで反対側には何があるでしょう?",
+    "subset": "board_vqa",
+    "tool": null,
+    "writer_id": null
+  },
+  "source": {
+    "dataset": "llm-jp/jawildtext",
+    "globalRowIndex": 126,
+    "repositoryRevision": "627ca7ea7c224ffe1accff8737991fc2240784fa",
+    "rowGroup": 3,
+    "rowIndex": 12,
+    "split": "train",
+    "upstreamId": "0127"
+  }
+}

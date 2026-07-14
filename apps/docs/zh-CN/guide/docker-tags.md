@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter Docker 镜像标签、GPU 基准测试、版本锁定，以及对 AMD64 和 ARM64 的多平台支持。"
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 444ed01d924d
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker 镜像 {#docker-image}
@@ -41,7 +41,6 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 | 背景去除（isnet） | 2,457ms | 1,137ms | 2.2x |
 | 放大 2x | 350ms | 309ms | 1.1x |
 | 放大 4x | 910ms | 310ms | 2.9x |
-| OCR（PaddleOCR） | 137ms | 94ms | 1.5x |
 | 人脸模糊 | 139ms | 122ms | 1.1x |
 
 #### 冷启动（容器启动后的首次请求） {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 |------|-----|-----|---------|
 | 背景去除 | 22,286ms | 4,792ms | 4.7x |
 | 放大 2x | 3,957ms | 2,318ms | 1.7x |
-| OCR（PaddleOCR） | 1,469ms | 1,090ms | 1.3x |
+
+OCR 不包含在 CUDA 比较中。内置 Tesseract 层和可选的 RapidOCR/ONNX 层都使用 CPU，包括当容器具有 NVIDIA GPU 访问权限时。
 
 ### CUDA 健康检查 {#cuda-health-check}
 

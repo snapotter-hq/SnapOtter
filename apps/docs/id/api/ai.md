@@ -1,18 +1,26 @@
 ---
 description: "Referensi mesin AI dengan semua alat ML lokal. Penghapusan latar belakang, upscaling, OCR, deteksi wajah, restorasi foto, dan lainnya."
-i18n_source_hash: 14728c1dcd05
-i18n_provenance: machine
-i18n_output_hash: 690e668ae648
+i18n_output_hash: 96e0e07b8c81
+i18n_source_hash: aa9a56cdddc7
+i18n_provenance: human
 ---
 
 # Referensi Mesin AI {#ai-engine-reference}
 
-Paket `@snapotter/ai` menjembatani Node.js ke **sidecar Python persisten** untuk semua operasi ML. Proses dispatcher tetap hidup di antara permintaan demi performa warm-start yang cepat. NVIDIA CUDA dideteksi otomatis saat startup dan digunakan bila tersedia; jika tidak, alat AI berjalan di CPU.
+Paket `@snapotter/ai` mengoordinasikan alat asli dan waktu proses Python untuk operasi ML lokal. Kebanyakan alat ML menggunakan Python sidecar yang persisten untuk pemanasan cepat. OCR sengaja dipisahkan: `fast` memanggil biner Tesseract asli, sedangkan `balanced` dan `best` menggunakan JSONL dispatcher persisten khusus yang disematkan pada generasi RapidOCR aktif yang tidak dapat diubah di bawah `/data/ai/v3`. Setiap permintaan memiliki generation lease. Selama peningkatan, SnapOtter menjalankan smoke test pada kandidat sebelum aktivasi, secara atom beralih ke dispatcher baru, lalu menguras generasi lama sebelum garbage collection.
+
+NVIDIA CUDA terdeteksi secara otomatis dan digunakan oleh runtime yang mendukungnya. OCR menggunakan CPU di setiap host, termasuk sistem dengan GPU NVIDIA, menghindari CUDA dan kopling driver untuk alat ini.
 
 Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI. Memetakan `/dev/dri` ke dalam sebuah kontainer tidak mempercepat alat sidecar Python ini kecuali tersedia GPU NVIDIA yang mendukung CUDA.
 
 19 alat AI sidecar Python di empat modalitas (gambar, audio, video, dokumen), plus 2 alat dengan kemampuan AI opsional. Semua model berjalan secara lokal - tidak diperlukan internet setelah unduhan model awal.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Kompatibilitas OCR bahasa Korea
+OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`). Bahasa Korea memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Arsitektur {#architecture}
 
 ```
@@ -22,15 +30,17 @@ Node.js Tool Route
  @snapotter/ai bridge.ts
       | (stdin/stdout JSON + stderr progress events)
       v
- Python dispatcher (persistent process, "ai" profile)
+ +-- Native Tesseract + Ghostscript (fast image/PDF OCR)
+ |
+ +-- Isolated OCR runtime (persistent JSONL dispatcher)
+ |     `-- RapidOCR + ONNX Runtime CPU + pinned PP-OCR models
+ |
+ `-- Python dispatcher (persistent process, "ai" profile)
       |
       |-- remove_bg.py        (rembg / BiRefNet)
       |-- upscale.py          (RealESRGAN)
       |-- inpaint.py          (LaMa ONNX)
       |-- outpaint.py         (LaMa canvas expansion)
-      |-- ocr.py              (PaddleOCR / Tesseract)
-      |-- ocr_pdf.py          (page-by-page document OCR)
-      |-- ocr_preprocess.py   (image enhancement for OCR)
       |-- detect_faces.py     (MediaPipe)
       |-- face_landmarks.py   (MediaPipe landmarks)
       |-- enhance_faces.py    (GFPGAN / CodeFormer)
@@ -52,7 +62,7 @@ Model AI dikemas berdasarkan tumpukan dependensi bersama, bukan satu arsip per a
 
 Image Docker mengirimkan aplikasi ditambah runtime umum. Arsip model besar diunduh sesuai permintaan ke dalam volume `/data/ai` persisten, lalu dipakai ulang oleh setiap alat yang membutuhkannya. Jika sebuah bundel sudah terpasang karena alat lain memerlukannya, mengaktifkan alat dependen baru tidak mengunduh bundel itu lagi.
 
-Setiap alat AI memerlukan satu atau lebih bundel fitur sebelum dapat berjalan. UI admin memasang per alat melalui `POST /api/v1/admin/tools/:toolId/features/install`, yang menyelesaikan daftar bundel lengkap, melewati bundel yang sudah terpasang, dan mengantrekan hanya unduhan yang kurang. Sebagai contoh, mengaktifkan Passport Photo pada instansi baru mengantrekan `background-removal` dan `face-detection`; mengaktifkannya setelah Background Removal sudah terpasang hanya mengantrekan `face-detection`.
+Sebagian besar alat AI memerlukan satu atau lebih paket fitur sebelum dapat dijalankan. UI admin menginstalnya dengan alat melalui `POST /api/v1/admin/tools/:toolId/features/install`, yang menyelesaikan daftar bundel lengkap, melewati bundel yang sudah diinstal, dan hanya mengantri unduhan yang hilang. Misalnya, mengaktifkan Foto Paspor pada antrian instans baru `background-removal` dan `face-detection`; mengaktifkannya setelah Penghapusan Latar Belakang sudah diinstal antrian hanya `face-detection`. OCR adalah pengecualian karena `fast` tidak memerlukan paket; instal runtime akurat opsionalnya melalui UI atau `POST /api/v1/admin/features/ocr/install`.
 
 | Bundel | Ukuran | Grup dependensi bersama | Alat yang memakainya |
 |--------|------|-------------------------|-------------------|
@@ -61,7 +71,7 @@ Setiap alat AI memerlukan satu atau lebih bundel fitur sebelum dapat berjalan. U
 | `object-eraser-colorize` | 1-2 GB | inpainting/outpainting LaMa dan DDColor | erase-object, colorize, ai-canvas-expand |
 | `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | pipeline perbaikan goresan dan restorasi | restore-photo |
-| `ocr` | 5-6 GB | tumpukan OCR PaddleOCR / Tesseract | ocr, ocr-pdf |
+| `ocr` | ~208-234 unduhan MiB / ~409-488 MiB terpasang | Opsional RapidOCR 3.9.1, ONNX Runtime 1.20.1, dan model PP-OCR yang disematkan | ocr, ocr-pdf (hanya `balanced` dan `best`) |
 | `transcription` | ~600 MB | model speech-to-text faster-whisper | transcribe-audio, auto-subtitles |
 
 Alat dengan dependensi lintas bundel:
@@ -71,7 +81,17 @@ Alat dengan dependensi lintas bundel:
 | `passport-photo` | `background-removal`, `face-detection` | Menghapus latar belakang, lalu memakai landmark wajah untuk membingkai crop sesuai aturan foto paspor dan KTP. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Mendeteksi wajah sebelum menjalankan peningkatan GFPGAN atau CodeFormer pada wilayah wajah yang dipilih. |
 
-Sebuah alat tersedia hanya ketika semua bundel yang diperlukannya terpasang. Pemasangan sebagian valid dan ditangani secara bertahap: bundel yang terpasang dipakai ulang, bundel yang kurang ditampilkan sebagai unduhan, dan pemasangan yang diantrekan berjalan satu per satu sehingga lingkungan Python bersama tidak dimodifikasi secara bersamaan.
+Alat hanya tersedia ketika semua bundel yang diperlukan telah diinstal, kecuali OCR: tingkat `fast` bawaannya tetap tersedia tanpa paket OCR opsional. Penginstalan sebagian valid dan ditangani secara bertahap: bundel yang terinstal digunakan kembali, bundel yang hilang ditampilkan sebagai unduhan, dan antrean penginstalan dijalankan satu per satu sehingga lingkungan Python yang dibagikan tidak diubah secara bersamaan.
+
+### Instalasi runtime OCR {#accurate-ocr-runtime-installation} yang akurat
+
+Paket OCR yang akurat adalah runtime khusus platform untuk kontainer resmi Linux amd64 atau Linux arm64. Versi amd64 menggunakan Python 3.12; build arm64 menggunakan Python 3.11. Kedua build menjalankan RapidOCR melalui `CPUExecutionProvider` ONNX Runtime, sehingga paket yang sama hanya berfungsi pada CPU dan host NVIDIA Docker. Runtime yang akurat memerlukan setidaknya 4 GiB memori efektif: batas cgroup kontainer yang dikonfigurasi, jika tidak, memori host. Sistem di bawah minimum kompatibilitas yang ditandatangani akan ditolak sebelum diunduh. Persyaratan ini tidak berlaku untuk Fast OCR bawaan. Build Bare-metal ditolak karena libc dan Python ABI tidak dapat disimpulkan dengan aman; OCR cepat tetap tersedia ketika host menyediakan Tesseract dan Ghostscript.
+
+Artefak opsional adalah sekitar 208-234 MiB yang dikompresi dan 409-488 MiB yang diekstraksi, bergantung pada arsitektur. Indeks yang ditandatangani mengikat jumlah byte yang dikompresi dan diekstraksi secara tepat yang diterapkan oleh penginstal. Tesseract bawaan menambahkan sekitar 25 MiB ke gambar resmi dan tidak memerlukan file di `/data/ai`.
+
+Instalasi online mengambil indeks rilis yang ditandatangani dan artefak alamat konten yang tepat untuk platform saat ini. SnapOtter memverifikasi tanda tangan indeks Ed25519, ukuran artefak, intisari SHA-256, intisari model, jalur, mode file, dan smoke test yang dipentaskan sebelum mengaktifkan generasi baru secara atom. Penginstalan yang gagal membuat generasi sehat sebelumnya tetap aktif.
+
+Untuk instalasi dengan celah udara, unggah `ocr-runtime-index.json` rilis dan arsip runtime OCR yang cocok ke `POST /api/v1/admin/features/import` menggunakan bidang multibagian bernama `index` dan `archive`. Impor offline menerapkan pemeriksaan tanda tangan, hash, ekstraksi, kompatibilitas, dan uji asap yang sama seperti instalasi online; arsip tanpa indeks bertanda tangan tepercaya ditolak.
 
 ---
 
@@ -143,16 +163,16 @@ Memburamkan latar belakang sambil menjaga subjek tetap tajam.
 ## OCR / Ekstraksi Teks {#ocr-text-extraction}
 
 **Rute alat:** `ocr`  
-**Model:** Tesseract (cepat), PaddleOCR PP-OCRv5 (seimbang), PaddleOCR-VL 1.5 (terbaik)
+**Model:** Tesseract (`fast`); RapidOCR dengan model kecil PP-OCRv6 (`balanced`); Model medium PP-OCRv6 dengan penilaian varian terkalibrasi (`best`)
 
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Tingkat pemrosesan |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Jika `quality` dan `engine` tidak diberikan, SnapOtter memilih tingkat terbaik yang tersedia dengan urutan `best`, `balanced`, lalu `fast`. Untuk bahasa Korea, `fast` tidak pernah dipilih; sistem memakai `best`, lalu `balanced`, atau mengembalikan kesalahan instalasi maupun kompatibilitas runtime akurat. |
 | `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | boolean | `true` | Pra-proses gambar untuk meningkatkan akurasi OCR |
-| `engine` | string | - | Usang. Memetakan `tesseract` ke `fast`, `paddleocr` ke `balanced` |
+| `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
+| `engine` | rangkaian | - | Alias ​​​​kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; itu tidak memuat PaddlePaddle |
 
-Mengembalikan hasil terstruktur dengan bounding box, skor kepercayaan, dan blok teks yang diekstrak.
+Mengembalikan teks yang diekstraksi ditambah metadata asal: mesin, kualitas yang diminta dan aktual, perangkat, penyedia, status degradasi, peringatan, dan versi runtime/model yang akurat bila berlaku. Permintaan kualitas eksplisit tidak pernah kembali ke tingkat lain. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE` alih-alih menjalankan `fast` secara diam-diam.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -163,9 +183,13 @@ Mengekstrak teks dari dokumen PDF hasil pindaian menggunakan OCR bertenaga AI, h
 
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Tingkat pemrosesan |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Jika `quality` dan `engine` tidak diberikan, SnapOtter memilih tingkat terbaik yang tersedia dengan urutan `best`, `balanced`, lalu `fast`. Untuk bahasa Korea, `fast` tidak pernah dipilih; sistem memakai `best`, lalu `balanced`, atau mengembalikan kesalahan instalasi maupun kompatibilitas runtime akurat. |
 | `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
 | `pages` | string | `"all"` | Pemilihan halaman: `"all"`, `"1-3"`, `"1,3,5"` |
+| `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
+| `engine` | rangkaian | - | Alias ​​​​kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; itu tidak memuat PaddlePaddle |
+
+Aturan larangan penurunan versi yang sama juga berlaku untuk PDF OCR. Halaman PDF diraster sebelum dikenali, dan satu permintaan dapat memilih maksimal 50 halaman.
 
 ## Blur Wajah / PII {#face-pii-blur}
 

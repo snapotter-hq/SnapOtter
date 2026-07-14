@@ -1,8 +1,8 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: aa42f6d4ddbe
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST API リファレンス {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | `model`, `backgroundType`（transparent/color/gradient/blur/image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | 画像のアップスケール | RealESRGAN | `scale`（2/4）, `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | オブジェクト消しゴム | LaMa（ONNX） | マスクは 2 番目のファイルパートとして送信（フィールド名 `mask`）, `format`, `quality` |
-| `ocr` | OCR / テキスト抽出 | PaddleOCR / Tesseract | `quality`（fast/balanced/best）, `language`, `enhance` |
+| `ocr` | OCR / テキスト抽出 | Tesseract (高速); RapidOCR + PP-OCR ONNX (バランス/ベスト) | `quality` (高速/バランス/最高)、`language`、`enhance` |
 | `blur-faces` | 顔 / PII ぼかし | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | スマートクロップ | MediaPipe + Sharp | `mode`（subject/face/trim）, `strategy`（attention/entropy）, `width`, `height`, `padding`, `facePreset`（closeup/head-shoulders/upper-body/half-body）, `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | 画像の強調 | 解析ベース | `mode`（auto/exposure/contrast/color/sharpness）, `strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## バッチ処理 {#batch-processing}
 
-汎用のバッチ対応ツールを複数のファイルに一度に適用します。ZIP アーカイブを返します。PDF 署名、PDF OCR、PDF から画像へのプリセットルートなど、カスタムの複数ファイルまたは複数ステップのルートは、汎用の `/batch` ルートの代わりに独自のエンドポイント契約を使用します。
+汎用のバッチ対応ツールを複数のファイルに一度に適用します。ZIP アーカイブを返します。PDF 署名や PDF から画像へのプリセットルートなど、カスタムの複数ファイルまたは複数ステップのルートは、汎用の `/batch` ルートの代わりに独自のエンドポイント契約を使用します。
+
+`ocr-pdf` ツールは、この汎用 `/batch` ルートをサポートします。
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 AI 機能バンドル（Docker 環境での AI モデルパッケージのインストール/アンインストール）を管理します。カスタム自動化からツールを有効化する場合は、ツールレベルのインストールエンドポイントを推奨します。一部の AI ツールは複数の共有バンドルを必要とし、このエンドポイントはインストール済みのバンドルをスキップして、不足しているものだけをキューに入れます。
 
+OCR は、厳密な依存関係ではなく、オプションの拡張機能です。 `fast` Tesseract 層はパックなしで機能します。 `POST /api/v1/admin/features/ocr/install` は、`balanced` および `best` の署名付き RapidOCR パックを Linux amd64 または arm64 にインストールします。 正確な OCR ランタイムは、CPU のみおよび NVIDIA ホストで CPU を使用し、少なくとも 4 GiB の有効メモリ (構成されたコンテナーの cgroup 制限、それ以外の場合はホスト メモリ) を必要とします。 SnapOtter は、`requiredMemoryBytes`、`effectiveMemoryBytes`、および `insufficient-memory` 互換性理由を報告し、ダウンロード前に互換性のないインストールを拒否します。 このメモリ要件は、`fast` には適用されません。 このパックは、ターゲットに応じて、ダウンロードに 208 ～ 234 の MiB、インストールに 409 ～ 488 の MiB があります。 署名付きインデックスは、インストール中に適用される正確なサイズをバインドします。
+
 | メソッド | パス | アクセス | 説明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | すべての機能バンドルとそのインストール状況を一覧表示 |
@@ -601,7 +605,18 @@ AI 機能バンドル（Docker 環境での AI モデルパッケージのイン
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin（`features:manage`） | ツールが必要とするすべてのバンドルをインストール。バンドルごとの queued/skipped ステータスを返す |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin（`features:manage`） | 機能バンドルをアンインストールし、モデルファイルをクリーンアップ |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin（`features:manage`） | AI モデルの合計ディスク使用量を取得 |
-| `POST` | `/api/v1/admin/features/import` | Admin（`features:manage`） | オフラインの AI バンドルアーカイブをインポート |
+| `POST` | `/api/v1/admin/features/import` | 管理者 (`features:manage`) | レガシー AI バンドル (`file`) または署名済みオフライン OCR リリース (`index` プラス `archive`) をインポートします。 |
+
+エアギャップされた OCR インポートには、リリースの署名付き `ocr-runtime-index.json` と一致するプラットフォーム アーカイブが含まれている必要があります。 SnapOtter は、オンライン インストールで使用されるものと同じ Ed25519 署名、アーティファクト ハッシュ、互換性、抽出、およびスモーク テスト チェックを適用します。
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+arm64 の `linux-arm64-cpu-py311` アーカイブを使用します。別のターゲットの署名付きアーティファクトはインストールされずに拒否されます。
 
 ## 管理者操作 {#admin-operations}
 

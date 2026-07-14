@@ -1,8 +1,8 @@
 ---
 description: "Structure du monorepo, architecture des applications et des packages, cycle de vie des requêtes et empreinte de ressources de SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: 31c734145cf5
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Architecture {#architecture}
@@ -36,13 +36,13 @@ Ce package n'a aucune dépendance réseau et s'exécute entièrement en cours de
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Une couche de pont qui appelle des scripts Python pour les opérations de ML. Lors de la première utilisation, le pont démarre un processus dispatcher Python persistant qui pré-importe les bibliothèques lourdes (PIL, NumPy, MediaPipe, rembg) afin que les appels d'IA suivants évitent le surcoût d'import. Si le dispatcher n'est pas encore prêt, le pont se rabat sur le lancement d'un nouveau sous-processus Python par requête.
+Une couche de pont qui appelle les environnements d'exécution natifs et Python ML. La plupart des outils Python utilisent un dispatcher persistant qui pré-importe des bibliothèques lourdes (PIL, NumPy, MediaPipe, rembg), de sorte que les appels ultérieurs ignorent la surcharge d'importation. OCR est isolé de cet environnement partagé mutable : `fast` invoque Tesseract natif, tandis que `balanced` et `best` utilisent un JSONL persistant dédié dispatcher épinglé à la génération RapidOCR/ONNX active et immuable. Chaque requête contient un generation lease. L'activation exécute d'abord un smoke test sur un candidat, puis passe atomiquement à son dispatcher. Le dispatcher précédent est drainé avant que sa génération ne soit récupérée.
 
 **Les modèles ne sont pas préchargés.** Chaque script d'outil charge les poids de son modèle depuis le disque au moment de la requête et les libère une fois la requête terminée. Consultez [Empreinte de ressources](#resource-footprint) pour le profil mémoire complet.
 
-Opérations prises en charge : suppression d'arrière-plan (rembg/BiRefNet), agrandissement (RealESRGAN), floutage des visages (MediaPipe), amélioration des visages (GFPGAN/CodeFormer), effacement d'objets (LaMa ONNX), OCR (PaddleOCR/Tesseract), colorisation (DDColor), suppression du bruit, suppression des yeux rouges, restauration de photos, génération de photos d'identité, correction de la transparence (matting HR BiRefNet) et redimensionnement adaptatif au contenu (binaire Go caire).
+Opérations prises en charge : suppression de l'arrière-plan (rembg/BiRefNet), mise à l'échelle (RealESRGAN), flou du visage (MediaPipe), amélioration du visage (GFPGAN/CodeFormer), effacement d'objets (LaMa ONNX), OCR (Tesseract et RapidOCR avec les modèles PP-OCR ONNX), colorisation (DDColor), suppression du bruit, suppression des yeux rouges, restauration de photos, génération de photos d'identité, correction de la transparence. (BiRefNet HR-matting) et redimensionnement sensible au contenu (binaire Go caire).
 
-Les scripts Python se trouvent dans `packages/ai/python/`. L'image Docker pré-télécharge tous les poids des modèles pendant la build afin que le conteneur fonctionne entièrement hors ligne.
+Les scripts Python résident dans `packages/ai/python/`. De grands packs de modèles facultatifs sont installés à la demande dans le volume persistant `/data/ai`. Accurate OCR utilise des artefacts signés et spécifiques à la plate-forme ; le niveau Tesseract intégré ne nécessite aucun téléchargement de pack de modèles.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Ce site VitePress. Déployé automatiquement sur Cloudflare Pages à chaque push
 2. Le frontend envoie une requête POST multipart à `/api/v1/tools/:section/:toolId` avec le fichier et les paramètres.
 3. La route de l'API valide l'entrée avec Zod, puis lance le traitement.
 4. Pour les outils standards, la tâche est mise en file d'attente dans le pool BullMQ approprié (image, media ou docs selon la modalité). Le worker BullMQ en cours de processus oriente automatiquement l'image d'après les métadonnées EXIF, exécute la fonction de traitement de l'outil et renvoie le résultat.
-5. Pour les outils d'IA, le pont TypeScript envoie une requête au dispatcher Python persistant (ou lance un nouveau sous-processus en repli), attend qu'il termine et lit le fichier de sortie.
+5. Pour la plupart des outils d'IA, le pont TypeScript envoie une requête au Python dispatcher persistant. OCR rapide appelle à la place Tesseract, et OCR précis démarre l'exécutable épinglé à partir de la génération OCR immuable active. Le niveau OCR demandé est fixé lors de l’entrée et n’est jamais modifié silencieusement pendant l’exécution.
 6. La progression de la tâche est persistée dans la table `jobs` de PostgreSQL afin que l'état survive aux redémarrages du conteneur. Les mises à jour en temps réel sont livrées via SSE à `/api/v1/jobs/:jobId/progress`.
 7. L'API renvoie un `jobId` et une `downloadUrl`. L'utilisateur télécharge le fichier traité depuis `/api/v1/download/:jobId/:filename`.
 

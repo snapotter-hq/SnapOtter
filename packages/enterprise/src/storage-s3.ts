@@ -189,6 +189,7 @@ export async function putGenericObject(key: string, data: Buffer): Promise<void>
 export async function putGenericObjectStream(
   key: string,
   source: AsyncIterable<Buffer>,
+  signal?: AbortSignal,
 ): Promise<void> {
   const upload = new Upload({
     client: getClient(),
@@ -202,7 +203,17 @@ export async function putGenericObjectStream(
       Body: Readable.from(source),
     },
   });
-  await upload.done();
+  const abortUpload = () => {
+    void upload.abort().catch(() => {});
+  };
+  signal?.addEventListener("abort", abortUpload, { once: true });
+  if (signal?.aborted) abortUpload();
+  try {
+    await upload.done();
+    signal?.throwIfAborted();
+  } finally {
+    signal?.removeEventListener("abort", abortUpload);
+  }
 }
 
 export async function getGenericObjectStream(

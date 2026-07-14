@@ -1,8 +1,8 @@
 ---
 description: "علامات صورة SnapOtter على Docker، ومقاييس أداء GPU، وتثبيت الإصدارات، ودعم المنصات المتعددة لـ AMD64 وARM64."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 4ff4ffa4056a
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # صورة Docker {#docker-image}
@@ -41,7 +41,6 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 | إزالة الخلفية (isnet) | 2,457ms | 1,137ms | 2.2x |
 | تكبير 2x | 350ms | 309ms | 1.1x |
 | تكبير 4x | 910ms | 310ms | 2.9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | تمويه الوجه | 139ms | 122ms | 1.1x |
 
 #### البدء البارد (أول طلب بعد تشغيل الحاوية) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data s
 |------|-----|-----|---------|
 | إزالة الخلفية | 22,286ms | 4,792ms | 4.7x |
 | تكبير 2x | 3,957ms | 2,318ms | 1.7x |
-| OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
+
+لم يتم تضمين OCR في مقارنة CUDA. تستخدم كل من طبقة Tesseract المضمنة وطبقات RapidOCR/ONNX الاختيارية CPU، بما في ذلك عندما تتمتع الحاوية بإمكانية الوصول إلى NVIDIA GPU.
 
 ### فحص سلامة CUDA {#cuda-health-check}
 

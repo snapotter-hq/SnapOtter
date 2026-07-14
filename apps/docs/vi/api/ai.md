@@ -1,18 +1,26 @@
 ---
 description: "Tài liệu tham khảo engine AI với tất cả công cụ ML chạy cục bộ. Xóa nền, upscale, OCR, phát hiện khuôn mặt, phục chế ảnh và nhiều tính năng khác."
-i18n_source_hash: 14728c1dcd05
-i18n_provenance: machine
-i18n_output_hash: 5f94f953cb34
+i18n_output_hash: 937f3b5907f4
+i18n_source_hash: aa9a56cdddc7
+i18n_provenance: human
 ---
 
 # Tài liệu tham khảo Engine AI {#ai-engine-reference}
 
-Gói `@snapotter/ai` kết nối Node.js với một **sidecar Python thường trực** cho mọi thao tác ML. Tiến trình dispatcher luôn chạy giữa các yêu cầu để đạt hiệu năng khởi động ấm nhanh. NVIDIA CUDA được tự động phát hiện khi khởi động và dùng khi có sẵn; nếu không, các công cụ AI chạy trên CPU.
+Gói `@snapotter/ai` điều phối các công cụ gốc và thời gian chạy Python cho các hoạt động ML cục bộ. Hầu hết các công cụ ML đều sử dụng Python sidecar bền bỉ để khởi động ấm nhanh. OCR được cố ý tách biệt: `fast` gọi mã nhị phân Tesseract gốc, trong khi `balanced` và `best` sử dụng JSONL dispatcher liên tục chuyên dụng được ghim vào thế hệ RapidOCR bất biến đang hoạt động trong `/data/ai/v3`. Mỗi yêu cầu chứa một generation lease. Trong quá trình nâng cấp, SnapOtter chạy smoke test trên ứng viên trước khi kích hoạt, chuyển nguyên tử sang dispatcher mới, sau đó loại bỏ thế hệ cũ trước garbage collection.
+
+NVIDIA CUDA được tự động phát hiện và sử dụng bởi các thời gian chạy hỗ trợ nó. OCR sử dụng CPU trên mọi máy chủ, bao gồm cả các hệ thống có GPU NVIDIA, tránh CUDA và khớp nối trình điều khiển cho công cụ này.
 
 Hiện chưa hỗ trợ tăng tốc iGPU Intel/AMD qua VA-API, Quick Sync hay OpenCL cho suy luận AI. Việc ánh xạ `/dev/dri` vào container không tăng tốc các công cụ sidecar Python này trừ khi có một GPU NVIDIA hỗ trợ CUDA.
 
 19 công cụ AI sidecar Python trên bốn phương thức (ảnh, âm thanh, video, tài liệu), cộng thêm 2 công cụ có khả năng AI tùy chọn. Mọi mô hình đều chạy cục bộ, không cần internet sau khi tải mô hình lần đầu.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Khả năng tương thích OCR tiếng Hàn
+OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`). Tiếng Hàn cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Kiến trúc {#architecture}
 
 ```
@@ -22,15 +30,17 @@ Node.js Tool Route
  @snapotter/ai bridge.ts
       | (stdin/stdout JSON + stderr progress events)
       v
- Python dispatcher (persistent process, "ai" profile)
+ +-- Native Tesseract + Ghostscript (fast image/PDF OCR)
+ |
+ +-- Isolated OCR runtime (persistent JSONL dispatcher)
+ |     `-- RapidOCR + ONNX Runtime CPU + pinned PP-OCR models
+ |
+ `-- Python dispatcher (persistent process, "ai" profile)
       |
       |-- remove_bg.py        (rembg / BiRefNet)
       |-- upscale.py          (RealESRGAN)
       |-- inpaint.py          (LaMa ONNX)
       |-- outpaint.py         (LaMa canvas expansion)
-      |-- ocr.py              (PaddleOCR / Tesseract)
-      |-- ocr_pdf.py          (page-by-page document OCR)
-      |-- ocr_preprocess.py   (image enhancement for OCR)
       |-- detect_faces.py     (MediaPipe)
       |-- face_landmarks.py   (MediaPipe landmarks)
       |-- enhance_faces.py    (GFPGAN / CodeFormer)
@@ -52,7 +62,7 @@ Các mô hình AI được đóng gói theo ngăn xếp phụ thuộc dùng chun
 
 Image Docker đi kèm ứng dụng cộng với runtime chung. Các kho lưu trữ mô hình lớn được tải theo yêu cầu vào volume `/data/ai` thường trực, rồi được tái sử dụng bởi mọi công cụ cần đến. Nếu một gói đã được cài vì công cụ khác cần, thì việc bật một công cụ phụ thuộc mới sẽ không tải lại gói đó.
 
-Mỗi công cụ AI yêu cầu một hoặc nhiều gói tính năng trước khi có thể chạy. Giao diện quản trị cài đặt theo công cụ thông qua `POST /api/v1/admin/tools/:toolId/features/install`, giao diện này giải quyết toàn bộ danh sách gói, bỏ qua những gói đã cài và chỉ xếp hàng những phần tải còn thiếu. Ví dụ, bật Passport Photo trên một phiên bản mới sẽ xếp hàng `background-removal` và `face-detection`; bật nó sau khi Background Removal đã được cài thì chỉ xếp hàng `face-detection`.
+Hầu hết các công cụ AI đều yêu cầu một hoặc nhiều gói tính năng trước khi chúng có thể chạy. Giao diện người dùng quản trị viên cài đặt chúng theo công cụ thông qua `POST /api/v1/admin/tools/:toolId/features/install`, giải quyết danh sách gói đầy đủ, bỏ qua các gói đã được cài đặt và chỉ xếp hàng các bản tải xuống bị thiếu. Ví dụ: bật Ảnh hộ chiếu trên hàng đợi phiên bản mới `background-removal` và `face-detection`; kích hoạt nó sau khi loại bỏ nền đã được cài đặt chỉ xếp hàng `face-detection`. OCR là ngoại lệ vì `fast` không cần gói; cài đặt thời gian chạy chính xác tùy chọn thông qua UI hoặc `POST /api/v1/admin/features/ocr/install`.
 
 | Gói | Kích thước | Nhóm phụ thuộc dùng chung | Công cụ sử dụng |
 |--------|------|-------------------------|-------------------|
@@ -61,7 +71,7 @@ Mỗi công cụ AI yêu cầu một hoặc nhiều gói tính năng trước kh
 | `object-eraser-colorize` | 1-2 GB | inpainting/outpainting LaMa và DDColor | erase-object, colorize, ai-canvas-expand |
 | `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, khử nhiễu | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | quy trình sửa vết xước và phục chế | restore-photo |
-| `ocr` | 5-6 GB | ngăn xếp OCR PaddleOCR / Tesseract | ocr, ocr-pdf |
+| `ocr` | ~208-234 Tải xuống MiB / ~409-488 MiB đã cài đặt | Tùy chọn RapidOCR 3.9.1, ONNX Runtime 1.20.1 và các mẫu PP-OCR được ghim | ocr, ocr-pdf (chỉ `balanced` và `best`) |
 | `transcription` | ~600 MB | mô hình chuyển giọng nói thành văn bản faster-whisper | transcribe-audio, auto-subtitles |
 
 Các công cụ có phụ thuộc chéo giữa nhiều gói:
@@ -71,7 +81,17 @@ Các công cụ có phụ thuộc chéo giữa nhiều gói:
 | `passport-photo` | `background-removal`, `face-detection` | Xóa nền, rồi dùng mốc điểm khuôn mặt để căn khung cắt theo quy tắc ảnh hộ chiếu và ảnh thẻ. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Phát hiện khuôn mặt trước khi chạy tăng cường GFPGAN hoặc CodeFormer trên các vùng khuôn mặt đã chọn. |
 
-Một công cụ chỉ khả dụng khi tất cả gói yêu cầu của nó đã được cài. Cài đặt một phần là hợp lệ và được xử lý tăng dần: các gói đã cài được tái sử dụng, các gói còn thiếu hiển thị dưới dạng cần tải, và các lượt cài đã xếp hàng chạy lần lượt từng lượt để môi trường Python dùng chung không bị sửa đổi đồng thời.
+Một công cụ chỉ khả dụng khi tất cả các gói yêu cầu của nó được cài đặt, ngoại trừ OCR: tầng `fast` tích hợp của nó vẫn khả dụng mà không cần gói OCR tùy chọn. Các lượt cài đặt một phần là hợp lệ và được xử lý tăng dần: các gói đã cài đặt được sử dụng lại, các gói bị thiếu được hiển thị dưới dạng tải xuống và các lượt cài đặt trong hàng đợi chạy lần lượt để môi trường Python dùng chung không bị sửa đổi đồng thời.
+
+### Cài đặt thời gian chạy OCR chính xác {#accurate-ocr-runtime-installation}
+
+Gói OCR chính xác là thời gian chạy dành riêng cho nền tảng cho vùng chứa Linux amd64 hoặc Linux arm64 chính thức. Bản dựng amd64 sử dụng Python 3.12; bản dựng arm64 sử dụng Python 3.11. Cả hai bản dựng đều chạy RapidOCR thông qua `CPUExecutionProvider` của ONNX Runtime, do đó, gói tương tự chỉ hoạt động trên các máy chủ chỉ dành cho CPU và NVIDIA Docker. Thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của vùng chứa được định cấu hình, nếu không thì bộ nhớ máy chủ. Hệ thống có mức độ tương thích tối thiểu đã được ký sẽ bị từ chối trước khi tải xuống. Yêu cầu này không áp dụng cho OCR nhanh được tích hợp sẵn. Các bản dựng Bare-metal bị từ chối vì libc và Python ABI của chúng không thể được suy ra một cách an toàn; OCR nhanh vẫn khả dụng khi máy chủ cung cấp Tesseract và Ghostscript.
+
+Tạo phẩm tùy chọn có khoảng 208-234 MiB được nén và 409-488 MiB được trích xuất, tùy thuộc vào kiến ​​trúc. Chỉ mục đã ký liên kết số byte được nén và trích xuất chính xác được thực thi bởi trình cài đặt. Tesseract tích hợp thêm khoảng 25 MiB vào hình ảnh chính thức và không cần tệp trong `/data/ai`.
+
+Cài đặt trực tuyến tìm nạp chỉ mục phát hành đã ký và tạo phẩm có địa chỉ nội dung chính xác cho nền tảng hiện tại. SnapOtter xác minh chữ ký chỉ mục Ed25519, kích thước tạo phẩm, thông báo SHA-256, thông báo mô hình, đường dẫn, chế độ tệp và smoke test theo giai đoạn trước khi kích hoạt thế hệ mới một cách nguyên tử. Cài đặt không thành công sẽ khiến thế hệ khỏe mạnh trước đó hoạt động.
+
+Để cài đặt air-gapped, hãy tải cả `ocr-runtime-index.json` của bản phát hành và kho lưu trữ thời gian chạy OCR phù hợp lên `POST /api/v1/admin/features/import` bằng cách sử dụng các trường nhiều phần có tên `index` và `archive`. Nhập ngoại tuyến áp dụng các kiểm tra chữ ký, hàm băm, trích xuất, tính tương thích và kiểm tra khói giống như cài đặt trực tuyến; một kho lưu trữ không có chỉ mục được ký đáng tin cậy sẽ bị từ chối.
 
 ---
 
@@ -143,16 +163,16 @@ Làm mờ nền trong khi giữ chủ thể sắc nét.
 ## OCR / Trích xuất văn bản {#ocr-text-extraction}
 
 **Đường dẫn công cụ:** `ocr`  
-**Mô hình:** Tesseract (nhanh), PaddleOCR PP-OCRv5 (cân bằng), PaddleOCR-VL 1.5 (tốt nhất)
+**Mẫu mã:** Tesseract (`fast`); RapidOCR với các mẫu nhỏ PP-OCRv6 (`balanced`); Các mô hình trung bình PP-OCRv6 có tính năng chấm điểm biến thể đã hiệu chỉnh (`best`)
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Bậc xử lý |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Năng động | Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác. |
 | `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | boolean | `true` | Tiền xử lý ảnh để cải thiện độ chính xác OCR |
-| `engine` | string | - | Không dùng nữa. Ánh xạ `tesseract` sang `fast`, `paddleocr` sang `balanced` |
+| `enhance` | boolean | Phụ thuộc vào cấp bậc | Cải thiện độ tương phản cục bộ Nhanh chóng áp dụng nó trực tiếp; các cấp chính xác chỉ giữ lại biến thể khi tính điểm đã hiệu chỉnh cải thiện OCR. Bật mặc định cho Tốt nhất |
+| `engine` | sợi dây | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` tới `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Trả về kết quả có cấu trúc với hộp giới hạn, điểm tin cậy và các khối văn bản đã trích xuất.
+Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -163,9 +183,13 @@ Trích xuất văn bản từ tài liệu PDF đã quét bằng OCR chạy trên
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Bậc xử lý |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Năng động | Khi bỏ qua `quality` và `engine`, SnapOtter chọn cấp tốt nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Với tiếng Hàn, hệ thống không bao giờ chọn `fast`; hệ thống dùng `best`, sau đó `balanced`, hoặc trả về lỗi cài đặt hay tương thích của runtime chính xác. |
 | `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
 | `pages` | string | `"all"` | Chọn trang: `"all"`, `"1-3"`, `"1,3,5"` |
+| `enhance` | boolean | Phụ thuộc vào cấp bậc | Cải thiện độ tương phản cục bộ Nhanh chóng áp dụng nó trực tiếp; các cấp chính xác chỉ giữ lại biến thể khi tính điểm đã hiệu chỉnh cải thiện OCR. Bật mặc định cho Tốt nhất |
+| `engine` | sợi dây | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` tới `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
+
+Quy tắc không hạ cấp tương tự áp dụng cho PDF OCR. Các trang PDF được rasterized trước khi nhận dạng và một yêu cầu có thể chọn tối đa 50 trang.
 
 ## Làm mờ khuôn mặt / PII {#face-pii-blur}
 

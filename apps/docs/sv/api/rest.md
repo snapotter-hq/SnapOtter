@@ -1,8 +1,8 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 4756237a0bdc
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST API-referens {#rest-api-reference}
@@ -178,7 +178,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `remove-background` | Ta bort bakgrund | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Bilduppskalning | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objektsudd | LaMa (ONNX) | Mask skickas som andra fildel (fältnamn `mask`), `format`, `quality` |
-| `ocr` | OCR / textextraktion | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Textextraktion | Tesseract (snabb); RapidOCR + PP-OCR ONNX (balanserad/bäst) | `quality` (snabb/balanserad/bäst), `language`, `enhance` |
 | `blur-faces` | Ansikts-/PII-oskärpa | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Smart beskärning | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Bildförbättring | Analysbaserad | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Vissa verktyg exponerar ytterligare slutpunkter utöver den vanliga `POST /api/v
 
 ## Batchbearbetning {#batch-processing}
 
-Applicera ett generiskt batchaktiverat verktyg på flera filer samtidigt. Returnerar ett ZIP-arkiv. Anpassade flerfils- eller flerstegsrutter, såsom PDF-signering, PDF OCR och PDF-till-bild-förinställningsrutter, använder sitt eget slutpunktskontrakt istället för den generiska `/batch`-rutten.
+Applicera ett generiskt batchaktiverat verktyg på flera filer samtidigt. Returnerar ett ZIP-arkiv. Anpassade flerfils- eller flerstegsrutter, såsom PDF-signering och PDF-till-bild-förinställningsrutter, använder sitt eget slutpunktskontrakt istället för den generiska `/batch`-rutten.
+
+Verktyget `ocr-pdf` stöder den här generiska `/batch`-rutten.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Frågeparametrar:
 
 Hantera AI-funktionsbuntar (installera/avinstallera AI-modellpaket i Docker-miljön). Föredra slutpunkten för installation på verktygsnivå när du aktiverar ett verktyg från anpassad automatisering: vissa AI-verktyg behöver mer än en delad bunt, och denna slutpunkt hoppar över redan installerade buntar och köar endast de saknade.
 
+OCR är en valfri förbättring snarare än ett hårt beroende. Dess `fast` Tesseract-nivå fungerar utan ett paket; `POST /api/v1/admin/features/ocr/install` installerar det signerade RapidOCR-paketet för `balanced` och `best` på Linux amd64 eller arm64. Den exakta OCR-körtiden använder CPU på endast CPU- och NVIDIA-värdar och kräver minst 4 GiB effektivt minne (den konfigurerade behållarens cgroup-gräns, annars värdminne). SnapOtter rapporterar `requiredMemoryBytes`, `effectiveMemoryBytes` och en `insufficient-memory`-kompatibilitetsskäl och avvisar en inkompatibel installation före nedladdning. Detta minneskrav gäller inte för `fast`. Paketet är cirka 208-234 MiB att ladda ner och 409-488 MiB installerat, beroende på målet; det signerade indexet binder de exakta storlekarna som tillämpas under installationen.
+
 | Metod | Sökväg | Åtkomst | Beskrivning |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Lista alla funktionsbuntar och deras installationsstatus |
@@ -601,7 +605,18 @@ Hantera AI-funktionsbuntar (installera/avinstallera AI-modellpaket i Docker-milj
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Installera varje bunt som ett verktyg kräver; returnerar köad/överhoppad status per bunt |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Avinstallera en funktionsbunt och rensa upp modellfiler |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Hämta total diskanvändning för AI-modeller |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Importera ett offline-AI-buntarkiv |
+| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Importera ett äldre AI-paket (`file`) eller en signerad offline OCR-version (`index` plus `archive`) |
+
+En luftgap OCR-import måste innehålla releasens signerade `ocr-runtime-index.json` och det matchande plattformsarkivet. SnapOtter tillämpar samma Ed25519-signatur, artefakthash, kompatibilitet, extraktion och röktestkontroller som används av onlineinstallation:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Använd `linux-arm64-cpu-py311`-arkivet på arm64. En signerad artefakt för ett annat mål avvisas istället för att installeras.
 
 ## Adminåtgärder {#admin-operations}
 

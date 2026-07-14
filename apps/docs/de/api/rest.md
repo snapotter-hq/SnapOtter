@@ -1,8 +1,8 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 8efd33eca67a
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST-API-Referenz {#rest-api-reference}
@@ -178,7 +178,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `remove-background` | Hintergrund entfernen | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Bild-Hochskalierung | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objekt-Radierer | LaMa (ONNX) | Maske als zweiter Datei-Teil gesendet (Feldname `mask`), `format`, `quality` |
-| `ocr` | OCR / Textextraktion | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Textextraktion | Tesseract (schnell); RapidOCR + PP-OCR ONNX (ausgewogen/am besten) | `quality` (schnell/ausgewogen/am besten), `language`, `enhance` |
 | `blur-faces` | Gesichts-/PII-Unschärfe | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Smart Crop | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Bildverbesserung | Analysebasiert | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Einige Tools stellen zusätzliche Endpunkte über die Standard-`POST /api/v1/too
 
 ## Stapelverarbeitung {#batch-processing}
 
-Wenden Sie ein generisches batch-fähiges Tool auf mehrere Dateien gleichzeitig an. Gibt ein ZIP-Archiv zurück. Benutzerdefinierte Mehrfachdatei- oder mehrstufige Routen wie PDF-Signierung, PDF-OCR und PDF-zu-Bild-Preset-Routen verwenden ihren eigenen Endpunkt-Vertrag anstelle der generischen `/batch`-Route.
+Wenden Sie ein generisches batch-fähiges Tool auf mehrere Dateien gleichzeitig an. Gibt ein ZIP-Archiv zurück. Benutzerdefinierte Mehrfachdatei- oder mehrstufige Routen wie PDF-Signierung und PDF-zu-Bild-Preset-Routen verwenden ihren eigenen Endpunkt-Vertrag anstelle der generischen `/batch`-Route.
+
+Das Tool `ocr-pdf` unterstützt diese generische `/batch`-Route.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Abfrageparameter:
 
 KI-Feature-Bundles verwalten (KI-Modellpakete in der Docker-Umgebung installieren/deinstallieren). Bevorzugen Sie den Tool-Level-Installationsendpunkt, wenn Sie ein Tool aus benutzerdefinierter Automatisierung aktivieren: Einige KI-Tools benötigen mehr als ein gemeinsames Bundle, und dieser Endpunkt überspringt bereits installierte Bundles und reiht nur die fehlenden ein.
 
+OCR ist eine optionale Erweiterung und keine feste Abhängigkeit. Seine `fast` Tesseract-Stufe funktioniert ohne Packung; `POST /api/v1/admin/features/ocr/install` installiert das signierte RapidOCR-Paket für `balanced` und `best` auf Linux amd64 oder arm64. Die genaue OCR-Laufzeit verwendet CPU auf reinen CPU- und NVIDIA-Hosts und erfordert mindestens 4 GiB effektiven Speicher (das konfigurierte Container-cgroup-Limit, andernfalls Hostspeicher). SnapOtter meldet `requiredMemoryBytes`, `effectiveMemoryBytes` und einen `insufficient-memory`-Kompatibilitätsgrund und lehnt eine inkompatible Installation vor dem Download ab. Dieser Speicherbedarf gilt nicht für `fast`. Das Paket muss je nach Ziel zwischen 208 und 234 MiB heruntergeladen und zwischen 409 und 488 MiB installiert werden. Der signierte Index bindet die genauen Größen, die während der Installation erzwungen werden.
+
 | Methode | Pfad | Zugriff | Beschreibung |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Alle Feature-Bundles und ihren Installationsstatus auflisten |
@@ -601,7 +605,18 @@ KI-Feature-Bundles verwalten (KI-Modellpakete in der Docker-Umgebung installiere
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Jedes von einem Tool benötigte Bundle installieren; gibt den Status queued/skipped pro Bundle zurück |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Ein Feature-Bundle deinstallieren und Modelldateien bereinigen |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Den gesamten Speicherplatzverbrauch der KI-Modelle abrufen |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Ein Offline-KI-Bundle-Archiv importieren |
+| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Importieren Sie ein Legacy-KI-Bundle (`file`) oder eine signierte Offline-OCR-Version (`index` plus `archive`). |
+
+Ein Air-Gap-OCR-Import muss das signierte `ocr-runtime-index.json` der Version und das passende Plattformarchiv enthalten. SnapOtter wendet dieselben Ed25519-Signatur-, Artefakt-Hash-, Kompatibilitäts-, Extraktions- und Rauchtestprüfungen an, die auch bei der Online-Installation verwendet werden:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Verwenden Sie das `linux-arm64-cpu-py311`-Archiv auf arm64. Ein signiertes Artefakt für ein anderes Ziel wird abgelehnt und nicht installiert.
 
 ## Admin-Operationen {#admin-operations}
 

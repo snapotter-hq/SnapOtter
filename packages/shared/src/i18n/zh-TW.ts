@@ -1351,7 +1351,10 @@ export const zhTW: TranslationKeys = {
     ocr: {
       quality: "品質",
       enhanceBeforeScanning: "掃描前增強",
-      enhanceHint: "在掃描前自動進行傾斜校正、對比度增強、雜訊去除和放大處理，以提高辨識準確率。",
+      enhanceHint:
+        "辨識前改善局部對比度。快速模式會直接套用；均衡和最佳模式僅在校準評分改善結果時保留該版本。",
+      fastKoreanUnsupported:
+        "快速 OCR 不支援韓語。請安裝精確 OCR 套件，然後選擇「均衡」或「最佳」。",
       language: "語言",
       autoDetect: "自動偵測",
       extractedText: "擷取的文字",
@@ -3303,11 +3306,17 @@ export const zhTW: TranslationKeys = {
       uninstall: "解除安裝",
       installing: "安裝中...",
       importBundle: "匯入套件",
-      importDescription: "上傳從其他安裝匯出的 .tar.gz 套件封存檔。",
+      importDescription: "匯入已簽署的 OCR 執行階段或舊版 AI 套件以供離線使用。",
       importButton: "從檔案匯入",
       importing: "匯入中...",
       importSuccess: "套件匯入成功。",
       importError: "套件匯入失敗：{error}",
+      importType: "套件類型",
+      importOcr: "高精度 OCR 套件",
+      importLegacy: "舊版 AI 套件",
+      importOcrIndex: "已簽署的 OCR 索引 (.json)",
+      importOcrArchive: "OCR 執行階段封存檔 (.tar.gz)",
+      importLegacyArchive: "舊版套件封存檔 (.tar.gz)",
       resetTitle: "重設 AI 環境",
       resetDescription:
         "刪除所有已安裝的 AI 功能與已下載的模型，然後重新開始。如果更新後 AI 工具出現異常，且重新安裝套件也無法解決問題，請使用此功能。",

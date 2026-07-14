@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "selectorVersion": "best-v1",
+  "weights": {
+    "confidenceCoverage": 0.65,
+    "meanConfidence": 0.15,
+    "polygonCoherence": 0.1,
+    "readingOrderCoherence": 0.1
+  },
+  "variantPolicy": {
+    "orientationMinConfidence": 0.75,
+    "orientationMinScoreGain": 0.04,
+    "preprocessMinScoreGain": 0.06
+  }
+}

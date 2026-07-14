@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# Keep persistent runtime state private from unrelated users while making every
+# creation group-writable from its first inode state. This is required for
+# OpenShift/fsGroup rolling restarts where successive pods use different UIDs.
+umask 0007
+
 # Shared permission helpers (dir_writable, ensure_writable). Lives beside this
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
@@ -249,8 +254,8 @@ if [ "$(id -u)" = "0" ]; then
   # External mode: tini becomes PID 1 (reaps zombies, forwards signals) and runs
   # the app as snapotter, the same end state as the prior tini ENTRYPOINT.
   # gosu preserves the environment (unlike su), so HOME=/root would survive the
-  # drop; set a writable HOME or libraries that write under ~ (PaddleOCR's
-  # ~/.paddlex, plus the sidecar's expanduser caches) fail with EACCES.
+  # drop; set a writable HOME or sidecar libraries using expanduser caches fail
+  # with EACCES.
   export HOME=/data/.home
   exec tini -- gosu snapotter "$@"
 fi

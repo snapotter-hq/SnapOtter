@@ -20,10 +20,13 @@ export interface ReceivedUpload {
 export async function receiveUpload(
   part: MultipartFile,
   jobId: string,
-  opts: { maxBytes?: number } = {},
+  opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<ReceivedUpload> {
   const filename = sanitizeFilename(part.filename || "upload");
   const key = `uploads/${jobId}/${filename}`;
-  const size = await putObjectStream(key, part.file, { maxBytes: opts.maxBytes });
+  const size = await putObjectStream(key, part.file, {
+    maxBytes: opts.maxBytes,
+    signal: opts.signal,
+  });
   return { key, filename, size };
 }

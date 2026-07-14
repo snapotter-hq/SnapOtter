@@ -59,6 +59,15 @@ describe("missingBundleForScript", () => {
     expect(missingBundleForScript("unknown_script")).toBeNull();
   });
 
+  it("does not gate built-in OCR through the legacy shared environment", () => {
+    setInstalled([]);
+
+    expect(SCRIPT_BUNDLE_MAP).not.toHaveProperty("ocr");
+    expect(SCRIPT_BUNDLE_MAP).not.toHaveProperty("ocr_pdf");
+    expect(missingBundleForScript("ocr")).toBeNull();
+    expect(missingBundleForScript("ocr_pdf.py")).toBeNull();
+  });
+
   it("fails closed when installed.json is missing", () => {
     // No setInstalled(): the file does not exist. Like the dispatcher, an
     // unreadable installed.json reads as "nothing installed", so a gated

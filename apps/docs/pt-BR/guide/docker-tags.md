@@ -1,8 +1,8 @@
 ---
 description: "Tags de imagem Docker do SnapOtter, benchmarks de GPU, fixação de versão e suporte multiplataforma para AMD64 e ARM64."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 5f53a19b9daf
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Imagem Docker {#docker-image}
@@ -41,7 +41,6 @@ Testado em uma NVIDIA RTX 4070 (12 GB de VRAM) com um retrato JPEG de 572x1024.
 | Remoção de fundo (isnet) | 2.457ms | 1.137ms | 2,2x |
 | Upscale 2x | 350ms | 309ms | 1,1x |
 | Upscale 4x | 910ms | 310ms | 2,9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1,5x |
 | Desfoque de rosto | 139ms | 122ms | 1,1x |
 
 #### Inicialização a frio (primeira requisição após o início do contêiner) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ Testado em uma NVIDIA RTX 4070 (12 GB de VRAM) com um retrato JPEG de 572x1024.
 |------|-----|-----|---------|
 | Remoção de fundo | 22.286ms | 4.792ms | 4,7x |
 | Upscale 2x | 3.957ms | 2.318ms | 1,7x |
-| OCR (PaddleOCR) | 1.469ms | 1.090ms | 1,3x |
+
+OCR não está incluído na comparação CUDA. Tanto a camada Tesseract integrada quanto as camadas RapidOCR/ONNX opcionais usam CPU, inclusive quando o contêiner tem acesso NVIDIA GPU.
 
 ### Verificação de integridade do CUDA {#cuda-health-check}
 

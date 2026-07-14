@@ -1,16 +1,11 @@
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
-
-const QUALITY_OPTIONS = [
-  { value: "fast", label: "Fast" },
-  { value: "balanced", label: "Balanced" },
-  { value: "best", label: "Best" },
-] as const;
+import { OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
 const LANGUAGE_OPTIONS = [
   { value: "auto", labelKey: "autoDetect" },
@@ -29,16 +24,22 @@ export function OcrPdfSettings() {
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("ocr-pdf");
 
-  const [quality, setQuality] = useState("balanced");
   const [language, setLanguage] = useState("auto");
+  const { quality, setQuality, canRun } = useOcrQuality(language);
   const [pages, setPages] = useState("all");
+  const [enhance, setEnhance] = useState(quality === "best");
+  const [enhanceManuallySet, setEnhanceManuallySet] = useState(false);
+
+  useEffect(() => {
+    if (!enhanceManuallySet) setEnhance(quality === "best");
+  }, [enhanceManuallySet, quality]);
 
   const ts = t.toolSettings["ocr-pdf"];
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
   const handleProcess = () => {
-    const settings = { quality, language, pages };
+    const settings = { quality, language, pages, enhance };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -58,23 +59,24 @@ export function OcrPdfSettings() {
         <label htmlFor="ocrpdf-quality" className="mb-1.5 block text-sm font-medium">
           {ts.quality}
         </label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {QUALITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setQuality(opt.value)}
-              className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                quality === opt.value
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/50"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <OcrQualityControl quality={quality} language={language} onChange={setQuality} />
       </div>
+
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          checked={enhance}
+          onChange={(event) => {
+            setEnhance(event.target.checked);
+            setEnhanceManuallySet(true);
+          }}
+          className="rounded border-border accent-primary"
+        />
+        <span className="text-sm text-muted-foreground">
+          {t.toolSettings.ocr.enhanceBeforeScanning}
+        </span>
+        <span className="sr-only">{t.toolSettings.ocr.enhanceHint}</span>
+      </label>
 
       {/* Language */}
       <div>
@@ -124,7 +126,7 @@ export function OcrPdfSettings() {
       ) : (
         <button
           type="submit"
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !canRun}
           className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted w-full rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(ts.submitBatch, { count: files.length }) : ts.submit}

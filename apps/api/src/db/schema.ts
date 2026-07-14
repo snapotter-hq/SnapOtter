@@ -85,7 +85,11 @@ export const jobs = pgTable(
     type: text("type").notNull(),
     status: jobStatus("status").notNull().default("queued"),
     attempts: integer("attempts").notNull().default(0),
-    progress: jsonb("progress").$type<{ percent: number; stage?: string }>(),
+    progress: jsonb("progress").$type<{
+      percent: number;
+      stage?: string;
+      result?: Record<string, unknown>;
+    }>(),
     inputRefs: jsonb("input_refs").$type<string[]>(),
     outputRefs: jsonb("output_refs").$type<string[]>(),
     settings: jsonb("settings").$type<Record<string, unknown>>(),

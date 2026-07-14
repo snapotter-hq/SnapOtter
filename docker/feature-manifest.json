@@ -426,79 +426,38 @@
     },
     "ocr": {
       "name": "OCR",
-      "description": "Extract text from images",
-      "estimatedSize": "3-4 GB",
-      "archives": {
-        "amd64-gpu": {
-          "file": "v2.0.0/ocr-amd64-gpu.tar.gz",
-          "sha256": "2a00a3184f6a635f1fa9ae2a6517ad740a11f9e5ff58c098d2fd369a2bb1e16b",
-          "compressedSize": 5933794814,
-          "extractedSize": 9343914078
+      "description": "High-accuracy local OCR for images and PDFs",
+      "estimatedSize": "~208-234 MiB download / ~409-488 MiB installed",
+      "runtimeFormatVersion": 3,
+      "runtimeFamily": "ocr",
+      "modelManifest": "docker/ocr-runtime-models.json",
+      "targets": {
+        "linux-amd64-cpu-py312": {
+          "file": "v3/ocr-linux-amd64-cpu-py312.tar.gz",
+          "compressedSizeEstimate": 244622462,
+          "extractedSizeEstimate": 510762511,
+          "sizeKind": "measured-estimate",
+          "minimumMemoryBytes": 4294967296,
+          "requirements": "docker/ocr-runtime-requirements-amd64.txt"
         },
-        "arm64-cpu": {
-          "file": "v2.0.0/ocr-arm64-cpu.tar.gz",
-          "sha256": "6868c264069dcb74c6675c0b1f58dc1c9f60d9aa4459725e3dbde07a99a6a09a",
-          "compressedSize": 1984611355,
-          "extractedSize": 3103671712
+        "linux-arm64-cpu-py311": {
+          "file": "v3/ocr-linux-arm64-cpu-py311.tar.gz",
+          "compressedSizeEstimate": 218031562,
+          "extractedSizeEstimate": 428565655,
+          "sizeKind": "measured-estimate",
+          "minimumMemoryBytes": 4294967296,
+          "requirements": "docker/ocr-runtime-requirements-arm64.txt"
         }
       },
       "packages": {
-        "common": ["huggingface-hub[hf_xet]==0.36.2"],
-        "amd64": [
-          "paddlepaddle-gpu>=3.2.1 --index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ --extra-index-url https://pypi.org/simple/",
-          "paddleocr[doc-parser]>=3.4.0,<3.5.0"
-        ],
-        "arm64": [
-          "paddlepaddle>=3.2.1",
-          "paddleocr[doc-parser]>=3.4.0,<3.5.0",
-          "protobuf>=4.25.3,<5"
-        ]
+        "common": ["rapidocr==3.9.1", "onnxruntime==1.20.1"],
+        "amd64": [],
+        "arm64": []
       },
       "pipFlags": {},
       "postInstall": [],
-      "models": [
-        {
-          "id": "paddleocr-server-det",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PP-OCRv5_server_det", "PP-OCRv5_server_det"]
-        },
-        {
-          "id": "paddleocr-server-rec",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PP-OCRv5_server_rec", "PP-OCRv5_server_rec"]
-        },
-        {
-          "id": "paddleocr-mobile-det",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PP-OCRv5_mobile_det", "PP-OCRv5_mobile_det"]
-        },
-        {
-          "id": "paddleocr-mobile-rec",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PP-OCRv5_mobile_rec", "PP-OCRv5_mobile_rec"]
-        },
-        {
-          "id": "paddleocr-latin-rec",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/latin_PP-OCRv5_mobile_rec", "latin_PP-OCRv5_mobile_rec"]
-        },
-        {
-          "id": "paddleocr-korean-rec",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/korean_PP-OCRv5_mobile_rec", "korean_PP-OCRv5_mobile_rec"]
-        },
-        {
-          "id": "paddleocr-textline-ori",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PP-LCNet_x1_0_textline_ori", "PP-LCNet_x1_0_textline_ori"]
-        },
-        {
-          "id": "paddleocr-vl",
-          "downloadFn": "hf_snapshot",
-          "args": ["PaddlePaddle/PaddleOCR-VL-1.5", "PaddleOCR-VL-1.5"]
-        }
-      ],
-      "smokeImports": ["paddle", "paddleocr"],
+      "models": [],
+      "smokeImports": ["rapidocr", "onnxruntime"],
       "enablesTools": ["ocr", "ocr-pdf"]
     },
     "transcription": {

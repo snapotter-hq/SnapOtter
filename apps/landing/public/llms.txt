@@ -18,7 +18,7 @@ Core: Resize, Crop, Rotate & Flip, Convert (JPEG/PNG/WebP/AVIF/TIFF/GIF/HEIC/RAW
 
 Adjustments: Adjust Colors (brightness/contrast/saturation/temperature), Sharpening, Replace Color, Color Blindness Simulation, Duotone, Vignette, Pixelate.
 
-AI-Powered: Remove Background (rembg), Upscale 2x/4x (RealESRGAN), Object Eraser (LaMa), OCR (PaddleOCR, 80+ languages), Face/PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo (30+ countries), Content-Aware Resize, AI Canvas Expand, Background Replace, Blur Background, PNG Transparency Fixer.
+AI-Powered: Remove Background (rembg), Upscale 2x/4x (RealESRGAN), Object Eraser (LaMa), local OCR (built-in Tesseract plus optional RapidOCR/PP-OCR ONNX accuracy tiers), Face/PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo (30+ countries), Content-Aware Resize, AI Canvas Expand, Background Replace, Blur Background, PNG Transparency Fixer.
 
 Watermark & Overlay: Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator.
 
@@ -50,7 +50,9 @@ Chart Maker (bar/line/pie from CSV/JSON), CSV to Excel, CSV to JSON, JSON to XML
 
 ## AI Models (15, all running locally)
 
-Background Removal (rembg), Super-Resolution (RealESRGAN 2x/4x), Object Eraser (LaMa inpainting), OCR (PaddleOCR, 80+ languages), PDF OCR, Speech Transcription (faster-whisper), Face Detection (MediaPipe), Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Smart Crop, Content-Aware Resize, AI Canvas Expand (outpainting).
+Background Removal (rembg), Super-Resolution (RealESRGAN 2x/4x), Object Eraser (LaMa inpainting), local image/PDF OCR (Tesseract or RapidOCR with PP-OCR ONNX models), Speech Transcription (faster-whisper), Face Detection (MediaPipe), Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Smart Crop, Content-Aware Resize, AI Canvas Expand (outpainting).
+
+Fast OCR is built into the image and adds about 25 MiB. The optional signed RapidOCR pack adds Balanced and Best tiers on Linux amd64 and arm64, uses CPU on CPU-only and NVIDIA hosts, and is about 208-234 MiB to download / 409-488 MiB installed depending on the target. The signed release index binds the exact compressed and extracted sizes used during verification. Explicit OCR tiers never silently downgrade.
 
 ## Enterprise Features
 

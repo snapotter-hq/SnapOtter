@@ -168,11 +168,13 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as {
+          type?: string;
           phase: string;
           percent: number;
           stage: string;
           error?: string;
         };
+        if (data.type === "heartbeat") return;
         if (data.phase === "complete") {
           es.close();
           delete esRefs[bundleId];
@@ -446,7 +448,11 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       // queue: re-POSTing them just dedups server-side and used to leave a
       // second progress subscription racing the first one's terminal events.
       const pending = get().bundles.filter(
-        (b) => b.status !== "installed" && b.status !== "installing" && b.status !== "queued",
+        (b) =>
+          b.status !== "installed" &&
+          b.status !== "installing" &&
+          b.status !== "queued" &&
+          b.compatibility !== "incompatible",
       );
       if (pending.length === 0) return;
 

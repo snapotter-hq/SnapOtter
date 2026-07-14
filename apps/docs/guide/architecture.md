@@ -33,13 +33,13 @@ This package has no network dependencies and runs entirely in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-A bridge layer that calls Python scripts for ML operations. On first use, the bridge starts a persistent Python dispatcher process that pre-imports heavy libraries (PIL, NumPy, MediaPipe, rembg) so subsequent AI calls skip the import overhead. If the dispatcher is not yet ready, the bridge falls back to spawning a fresh Python subprocess per request.
+A bridge layer that calls native and Python ML runtimes. Most Python tools use a persistent dispatcher that pre-imports heavy libraries (PIL, NumPy, MediaPipe, rembg) so subsequent calls skip the import overhead. OCR is isolated from that mutable shared environment: `fast` invokes native Tesseract, while `balanced` and `best` use a dedicated persistent JSONL dispatcher pinned to the active immutable RapidOCR/ONNX generation. Each request holds a generation lease. Activation first runs a smoke test on a candidate, then atomically switches to its dispatcher. The prior dispatcher drains before its generation is garbage-collected.
 
 **Models are not pre-loaded.** Each tool script loads its model weights from disk at request time and discards them when the request finishes. See [Resource footprint](#resource-footprint) for the full memory profile.
 
-Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN), face blur (MediaPipe), face enhancement (GFPGAN/CodeFormer), object erasing (LaMa ONNX), OCR (PaddleOCR/Tesseract), colorization (DDColor), noise removal, red eye removal, photo restoration, passport photo generation, transparency fixing (BiRefNet HR-matting), and content-aware resize (Go caire binary).
+Supported operations: background removal (rembg/BiRefNet), upscaling (RealESRGAN), face blur (MediaPipe), face enhancement (GFPGAN/CodeFormer), object erasing (LaMa ONNX), OCR (Tesseract and RapidOCR with PP-OCR ONNX models), colorization (DDColor), noise removal, red eye removal, photo restoration, passport photo generation, transparency fixing (BiRefNet HR-matting), and content-aware resize (Go caire binary).
 
-Python scripts live in `packages/ai/python/`. The Docker image pre-downloads all model weights during the build so the container works fully offline.
+Python scripts live in `packages/ai/python/`. Large optional model packs are installed on demand into the persistent `/data/ai` volume. Accurate OCR uses signed, platform-specific artifacts; the built-in Tesseract tier requires no model-pack download.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -84,7 +84,7 @@ This VitePress site. Deployed to Cloudflare Pages automatically on push to `main
 2. The frontend sends a multipart POST to `/api/v1/tools/:section/:toolId` with the file and settings.
 3. The API route validates the input with Zod, then dispatches processing.
 4. For standard tools, the job is enqueued to the appropriate BullMQ pool (image, media, or docs based on modality). The in-process BullMQ worker auto-orients the image based on EXIF metadata, runs the tool's process function, and returns the result.
-5. For AI tools, the TypeScript bridge sends a request to the persistent Python dispatcher (or spawns a fresh subprocess as fallback), waits for it to finish, and reads the output file.
+5. For most AI tools, the TypeScript bridge sends a request to the persistent Python dispatcher. Fast OCR instead invokes Tesseract, and accurate OCR starts the pinned executable from the active immutable OCR generation. The requested OCR tier is fixed at ingress and is never silently changed during execution.
 6. Job progress is persisted to the `jobs` table in PostgreSQL so state survives container restarts. Real-time updates are delivered via SSE at `/api/v1/jobs/:jobId/progress`.
 7. The API returns a `jobId` and `downloadUrl`. The user downloads the processed file from `/api/v1/download/:jobId/:filename`.
 

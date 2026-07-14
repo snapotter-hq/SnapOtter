@@ -1546,7 +1546,9 @@ export const ja: TranslationKeys = {
       quality: "品質",
       enhanceBeforeScanning: "スキャン前にエンハンス",
       enhanceHint:
-        "スキャン前に自動で傾き補正、コントラスト強化、ノイズ除去、アップスケールを行い、認識精度を向上させます。",
+        "認識前に局所コントラストを改善します。高速では直接適用し、バランスと最高では調整済みスコアで結果が改善する場合のみ採用します。",
+      fastKoreanUnsupported:
+        "高速 OCR は韓国語に対応していません。高精度 OCR パックをインストールし、バランスまたは最高を選択してください。",
       language: "言語",
       autoDetect: "自動検出",
       extractedText: "抽出テキスト",
@@ -3514,11 +3516,17 @@ export const ja: TranslationKeys = {
       installing: "インストール中...",
       importBundle: "バンドルをインポート",
       importDescription:
-        "他のインストールからエクスポートした .tar.gz バンドルアーカイブをアップロードします。",
+        "オフライン用の署名済みOCRランタイムまたは従来のAIバンドルをインポートします。",
       importButton: "ファイルからインポート",
       importing: "インポート中...",
       importSuccess: "バンドルのインポートに成功しました。",
       importError: "バンドルのインポートに失敗しました: {error}",
+      importType: "バンドルの種類",
+      importOcr: "高精度OCRパック",
+      importLegacy: "従来のAIバンドル",
+      importOcrIndex: "署名済みOCRインデックス (.json)",
+      importOcrArchive: "OCRランタイムアーカイブ (.tar.gz)",
+      importLegacyArchive: "従来のバンドルアーカイブ (.tar.gz)",
       resetTitle: "AI環境をリセット",
       resetDescription:
         "インストール済みのAI機能とダウンロード済みのモデルをすべて削除し、まっさらな状態からやり直します。アップデート後にAIツールの動作がおかしくなり、バンドルを再インストールしても直らない場合に使用してください。",

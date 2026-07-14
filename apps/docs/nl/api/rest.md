@@ -1,8 +1,8 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 8f6eabc592c0
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # REST API-referentie {#rest-api-reference}
@@ -178,7 +178,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `remove-background` | Achtergrond verwijderen | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Afbeelding upscalen | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objectgum | LaMa (ONNX) | Masker verzonden als tweede bestandsdeel (veldnaam `mask`), `format`, `quality` |
-| `ocr` | OCR / Tekstextractie | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Tekstextractie | Tesseract (snel); RapidOCR + PP-OCR ONNX (gebalanceerd/beste) | `quality` (snel/gebalanceerd/beste), `language`, `enhance` |
 | `blur-faces` | Gezicht / PII vervagen | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Slim bijsnijden | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Afbeelding verbeteren | Op analyse gebaseerd | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Sommige tools stellen aanvullende endpoints beschikbaar naast de standaard `POST
 
 ## Batchverwerking {#batch-processing}
 
-Pas een generieke batch-geschikte tool tegelijk toe op meerdere bestanden. Retourneert een ZIP-archief. Aangepaste routes voor meerdere bestanden of meerdere stappen, zoals PDF-ondertekening, PDF-OCR en PDF-naar-afbeelding-preset-routes, gebruiken hun eigen endpointcontract in plaats van de generieke `/batch`-route.
+Pas een generieke batch-geschikte tool tegelijk toe op meerdere bestanden. Retourneert een ZIP-archief. Aangepaste routes voor meerdere bestanden of meerdere stappen, zoals PDF-ondertekening en PDF-naar-afbeelding-preset-routes, gebruiken hun eigen endpointcontract in plaats van de generieke `/batch`-route.
+
+De tool `ocr-pdf` ondersteunt deze generieke `/batch`-route.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Query-parameters:
 
 Beheer AI-feature-bundels (installeer/verwijder AI-modelpakketten in de Docker-omgeving). Geef bij het inschakelen van een tool vanuit aangepaste automatisering de voorkeur aan het tool-niveau-installatie-endpoint: sommige AI-tools hebben meer dan één gedeelde bundel nodig, en dit endpoint slaat reeds geïnstalleerde bundels over en zet alleen de ontbrekende in de wachtrij.
 
+OCR is een optionele verbetering in plaats van een harde afhankelijkheid. De `fast` Tesseract-laag werkt zonder pakket; `POST /api/v1/admin/features/ocr/install` installeert het ondertekende RapidOCR-pakket voor `balanced` en `best` op Linux amd64 of arm64. De nauwkeurige OCR-runtime gebruikt CPU op alleen CPU en NVIDIA-hosts en vereist minimaal 4 GiB effectief geheugen (de geconfigureerde container cgroup-limiet, anders hostgeheugen). SnapOtter rapporteert `requiredMemoryBytes`, `effectiveMemoryBytes` en een `insufficient-memory`-compatibiliteitsreden, en wijst een incompatibele installatie af vóór het downloaden. Deze geheugenvereiste is niet van toepassing op `fast`. Het pakket bevat ongeveer 208-234 MiB om te downloaden en 409-488 MiB geïnstalleerd, afhankelijk van het doel; de ondertekende index bindt de exacte afmetingen die tijdens de installatie worden afgedwongen.
+
 | Methode | Pad | Toegang | Beschrijving |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Alle feature-bundels en hun installatiestatus weergeven |
@@ -601,7 +605,18 @@ Beheer AI-feature-bundels (installeer/verwijder AI-modelpakketten in de Docker-o
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Elke bundel installeren die een tool vereist; retourneert de queued/skipped-status per bundel |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Een feature-bundel verwijderen en modelbestanden opruimen |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Het totale schijfgebruik van AI-modellen ophalen |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Een offline AI-bundelarchief importeren |
+| `POST` | `/api/v1/admin/features/import` | Beheerder (`features:manage`) | Importeer een oudere AI-bundel (`file`) of een ondertekende offline OCR-release (`index` plus `archive`) |
+
+Een air-gapped OCR-import moet de ondertekende `ocr-runtime-index.json` van de release en het bijbehorende platformarchief bevatten. SnapOtter past dezelfde Ed25519-handtekening, artefacthash, compatibiliteit, extractie en rooktestcontroles toe die worden gebruikt bij online installatie:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Gebruik het `linux-arm64-cpu-py311`-archief op arm64. Een ondertekend artefact voor een ander doel wordt afgewezen in plaats van geïnstalleerd.
 
 ## Beheerbewerkingen {#admin-operations}
 

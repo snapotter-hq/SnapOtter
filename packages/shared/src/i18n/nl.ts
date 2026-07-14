@@ -1590,7 +1590,9 @@ export const nl: TranslationKeys = {
       quality: "Kwaliteit",
       enhanceBeforeScanning: "Verbeteren voor het scannen",
       enhanceHint:
-        "Corrigeert scheefstand, verbetert contrast, verwijdert ruis en schaalt de afbeelding automatisch op voor betere nauwkeurigheid.",
+        "Verbetert lokaal contrast vóór herkenning. Snel past dit direct toe; Gebalanceerd en Beste behouden de variant alleen als de gekalibreerde score het resultaat verbetert.",
+      fastKoreanUnsupported:
+        "Snelle OCR ondersteunt geen Koreaans. Installeer het pakket voor nauwkeurige OCR en kies Gebalanceerd of Beste.",
       language: "Taal",
       autoDetect: "Automatisch detecteren",
       extractedText: "Geextraheerde tekst",
@@ -3570,11 +3572,17 @@ export const nl: TranslationKeys = {
       installing: "Installeren...",
       importBundle: "Bundel importeren",
       importDescription:
-        "Upload een .tar.gz-bundelarchief geëxporteerd vanuit een andere installatie.",
+        "Importeer een ondertekende OCR-runtime of oude AI-bundel voor offlinegebruik.",
       importButton: "Importeren uit bestand",
       importing: "Importeren...",
       importSuccess: "Bundel succesvol geïmporteerd.",
       importError: "Bundel importeren mislukt: {error}",
+      importType: "Bundeltype",
+      importOcr: "Nauwkeurig OCR-pakket",
+      importLegacy: "Oude AI-bundel",
+      importOcrIndex: "Ondertekende OCR-index (.json)",
+      importOcrArchive: "OCR-runtimearchief (.tar.gz)",
+      importLegacyArchive: "Archief van oude bundel (.tar.gz)",
       resetTitle: "AI-omgeving resetten",
       resetDescription:
         "Verwijdert alle geïnstalleerde AI-functies en gedownloade modellen, en begint daarna helemaal opnieuw. Gebruik dit als AI-tools zich na een update onverwacht gedragen en het opnieuw installeren van een bundel het probleem niet oplost.",

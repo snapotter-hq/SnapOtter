@@ -64,7 +64,7 @@ Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spread
 
 ## Local AI (all on your hardware, no cloud APIs)
 
-Background removal (rembg), image upscaling 2x/4x (RealESRGAN), object eraser (LaMa inpainting), OCR for images and PDFs (PaddleOCR, 80+ languages), speech transcription and auto subtitles (faster-whisper), face and PII blur plus face enhancement (MediaPipe), AI colorization, noise removal, red-eye removal, photo restoration, smart crop, content-aware resize, and AI canvas expand (outpainting). Model bundles install on demand.
+Background removal (rembg), image upscaling 2x/4x (RealESRGAN), object eraser (LaMa inpainting), OCR for images and PDFs (built-in Tesseract plus an optional RapidOCR/ONNX accuracy pack), speech transcription and auto subtitles (faster-whisper), face and PII blur plus face enhancement (MediaPipe), AI colorization, noise removal, red-eye removal, photo restoration, smart crop, content-aware resize, and AI canvas expand (outpainting). Built-in Fast OCR adds about 25 MiB to the official image; optional model bundles install on demand.
 
 ## REST API
 
@@ -109,7 +109,7 @@ Surrounding APIs:
 
 Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand
 Backend: Fastify 5; Sharp (images), FFmpeg (video/audio), qpdf and LibreOffice (documents); Drizzle ORM on PostgreSQL 17; BullMQ on Redis 8 for durable async jobs
-AI/ML: Python sidecar (rembg, RealESRGAN, PaddleOCR, faster-whisper, MediaPipe, LaMa)
+AI/ML: Python sidecar (rembg, RealESRGAN, RapidOCR/ONNX Runtime, faster-whisper, MediaPipe, LaMa) plus native Tesseract OCR
 Auth: Session-based with OIDC/SSO support (Google, GitHub, Okta, any OIDC provider)
 Languages: 21 locales with RTL support
 

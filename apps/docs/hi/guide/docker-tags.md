@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter Docker image टैग, GPU बेंचमार्क, वर्शन पिनिंग, और AMD64 तथा ARM64 के लिए मल्टी-प्लेटफ़ॉर्म समर्थन।"
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 5b607c2591dd
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker Image {#docker-image}
@@ -41,7 +41,6 @@ VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGP
 | Background removal (isnet) | 2,457ms | 1,137ms | 2.2x |
 | Upscale 2x | 350ms | 309ms | 1.1x |
 | Upscale 4x | 910ms | 310ms | 2.9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | Face blur | 139ms | 122ms | 1.1x |
 
 #### Cold start (container start के बाद पहला अनुरोध) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGP
 |------|-----|-----|---------|
 | Background removal | 22,286ms | 4,792ms | 4.7x |
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
-| OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
+
+OCR, CUDA तुलना में शामिल नहीं है। अंतर्निहित Tesseract टियर और वैकल्पिक RapidOCR/ONNX टियर दोनों CPU का उपयोग करते हैं, जिसमें कंटेनर में NVIDIA GPU एक्सेस शामिल है।
 
 ### CUDA health check {#cuda-health-check}
 

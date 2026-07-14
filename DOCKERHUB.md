@@ -105,7 +105,7 @@ The same image runs on CPU or NVIDIA CUDA. Intel/AMD iGPU acceleration through V
   - **Documents / PDF (28):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, OCR, and more.
   - **Files (23):** CSV, JSON, XML, and YAML conversion, CSV merge or split, chart maker, ZIP create or extract.
 - **Image editor:** layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware.
-- **Local AI:** remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required.
+- **Local AI:** remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required. Built-in Fast OCR adds about 25 MiB to the official image; the optional accuracy pack installs on demand.
 - **OIDC / SSO:** log in with Google, GitHub, Okta, or any OpenID Connect provider.
 - **21 languages:** including Arabic (with RTL support), Chinese (Simplified and Traditional), French, German, Hindi, Japanese, Korean, Portuguese, Russian, Spanish, and more.
 - **Pipelines:** chain tools into reusable workflows with unlimited steps. Import and export as JSON. Batch process unlimited files at once.
@@ -153,7 +153,7 @@ In the Compose stack, PostgreSQL and Redis keep their own volumes (`SnapOtter-pg
 
 ## NVIDIA CUDA acceleration
 
-The `amd64` image bundles CUDA. With an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add this to the `snapotter` service to accelerate background removal, upscaling, OCR, and transcription:
+The `amd64` image bundles CUDA. With an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed, add this to the `snapotter` service to accelerate background removal, upscaling, and transcription. OCR remains CPU-based and works unchanged on the same host:
 
 ```yaml
     deploy:

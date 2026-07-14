@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { decodeHeic, ensureSharpCompat } from "../../../apps/api/src/lib/heic-converter.js";
@@ -16,7 +15,55 @@ function makeHeicHeader(brand: string): Buffer {
   return buf;
 }
 
+function makeIspeBox(width: number, height: number): Buffer {
+  const box = Buffer.alloc(20);
+  box.writeUInt32BE(20, 0);
+  box.write("ispe", 4, 4, "ascii");
+  box.writeUInt32BE(width, 12);
+  box.writeUInt32BE(height, 16);
+  return box;
+}
+
 describe("decodeHeic", () => {
+  it("rejects source dimensions over a caller-supplied pixel cap", async () => {
+    const heicBuf = readFixture(fixtures.image.formats("heic"));
+
+    await expect(decodeHeic(heicBuf, { maxPixels: 1 })).rejects.toThrow(/pixel safety limit/i);
+  });
+
+  it("checks every image extent instead of trusting a small first thumbnail", async () => {
+    const multiImage = Buffer.concat([
+      makeHeicHeader("heic"),
+      makeIspeBox(1, 1),
+      makeIspeBox(10_000, 10_000),
+    ]);
+
+    await expect(decodeHeic(multiImage, { maxPixels: 40_000_000 })).rejects.toThrow(
+      /pixel safety limit/i,
+    );
+  });
+
+  it("rejects an extreme image side from encoded metadata before starting a decoder", async () => {
+    const extremeImage = Buffer.concat([
+      makeHeicHeader("heic"),
+      makeIspeBox(1_000, 1_000),
+      makeIspeBox(40_001, 1),
+    ]);
+
+    await expect(
+      decodeHeic(extremeImage, { maxDimension: 40_000, maxPixels: 40_000_000 }),
+    ).rejects.toThrow(/dimension safety limit.*40,001x1/i);
+  });
+
+  it("honors an already-aborted request", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      decodeHeic(readFixture(fixtures.image.formats("heic")), { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("decodes sample.heic to a valid PNG buffer", async () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await decodeHeic(heicBuf);

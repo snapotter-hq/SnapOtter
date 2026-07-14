@@ -21,6 +21,8 @@
 export interface QueuedInstall {
   bundleId: string;
   jobId: string;
+  /** Shared destructive-mutation generation observed when this work was submitted. */
+  mutationEpoch: string;
 }
 
 let activeInstall: QueuedInstall | null = null;
@@ -54,6 +56,10 @@ export function enqueue(entry: QueuedInstall): string {
   }
   const existing = queue.find((q) => q.bundleId === entry.bundleId);
   if (existing) {
+    // A request submitted after reset/uninstall explicitly reauthorizes this
+    // bundle. Preserve the existing job id/FIFO position while refreshing its
+    // epoch so the pump does not cancel genuinely new work with the stale one.
+    existing.mutationEpoch = entry.mutationEpoch;
     return existing.jobId;
   }
   queue.push(entry);

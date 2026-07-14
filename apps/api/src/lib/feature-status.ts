@@ -1,22 +1,36 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, type StdioOptions, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
+  chmodSync,
+  closeSync,
   constants,
   copyFileSync,
+  type Dirent,
   existsSync,
+  fchmodSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import {
+  getOcrRuntimeCapability,
+  getOcrRuntimeEffectiveMemoryBytes,
+  selectOcrRuntimeTarget,
+} from "@snapotter/ai";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
 import { FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
 import * as tar from "tar";
@@ -32,11 +46,20 @@ const AI_DIR = join(DATA_DIR, "ai");
 const MODELS_DIR = join(AI_DIR, "models");
 const INSTALLED_PATH = join(AI_DIR, "installed.json");
 const INSTALLED_TMP_PATH = `${INSTALLED_PATH}.tmp`;
+// Keep this ephemeral O_EXCL path for rolling compatibility with releases
+// that predate kernel locking.
 const LOCK_PATH = join(AI_DIR, "install.lock");
+// flock must target a permanent inode. Unlinking its path while locked would
+// allow a second process to create and lock a different inode concurrently.
+const KERNEL_LOCK_PATH = join(AI_DIR, "install.flock");
+const MUTATION_EPOCH_PATH = join(AI_DIR, "install-mutation.epoch");
 // Breadcrumb the installer drops right before it writes into the shared venv
 // site-packages and clears the instant that write completes. A survivor on boot
 // means the process died mid-write, so the venv may be torn (see move_tree).
 const VENV_WRITING_MARKER = join(AI_DIR, "venv.writing");
+const LOCK_OWNED_OFFLINE_IMPORT_PREFIX = ".offline-import-v2-";
+const LEGACY_OFFLINE_IMPORT_PREFIX = ".offline-import-";
+const LEGACY_OFFLINE_IMPORT_STALE_MS = 35 * 60 * 1000;
 const MANIFEST_PATH =
   process.env.FEATURE_MANIFEST_PATH || join(PROJECT_ROOT, "docker/feature-manifest.json");
 
@@ -54,6 +77,47 @@ export function getManifestPath(): string {
 
 export function getInstallScriptPath(): string {
   return join(PROJECT_ROOT, "packages/ai/python/install_feature.py");
+}
+
+/**
+ * Remove upload/extraction staging only while this process owns install.flock.
+ * New v2 uploads are always lock-owned. Pre-v2 upload directories are age
+ * gated so a rolling-upgrade replica that still stages before locking is not
+ * disrupted during the server's 30-minute request window.
+ */
+export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
+  getInstallLockFdForChild();
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(AI_DIR, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    return false;
+  }
+
+  let complete = true;
+  for (const entry of entries) {
+    const lockOwned =
+      entry.name.startsWith(LOCK_OWNED_OFFLINE_IMPORT_PREFIX) || entry.name.startsWith("import-");
+    const legacyUpload =
+      !entry.name.startsWith(LOCK_OWNED_OFFLINE_IMPORT_PREFIX) &&
+      entry.name.startsWith(LEGACY_OFFLINE_IMPORT_PREFIX);
+    if (!lockOwned && !legacyUpload) continue;
+
+    const path = join(AI_DIR, entry.name);
+    try {
+      const info = lstatSync(path);
+      if (legacyUpload && Math.max(0, nowMs - info.mtimeMs) <= LEGACY_OFFLINE_IMPORT_STALE_MS) {
+        continue;
+      }
+      if (info.isSymbolicLink()) unlinkSync(path);
+      else rmSync(path, { recursive: true, force: true });
+      console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") complete = false;
+    }
+  }
+  return complete;
 }
 
 // ── Directory setup ─────────────────────────────────────────────────────
@@ -144,6 +208,9 @@ export function invalidateCache(): void {
 // ── Install status queries ──────────────────────────────────────────────
 
 export function isFeatureInstalled(bundleId: string): boolean {
+  if (bundleId === "ocr") {
+    return getOcrRuntimeCapability({ aiDataDir: AI_DIR }).available;
+  }
   const data = readInstalled();
   return bundleId in data.bundles;
 }
@@ -192,65 +259,530 @@ export function markUninstalled(bundleId: string): void {
 interface LockData {
   bundleId: string;
   startedAt: string;
+  ownerToken?: string;
+  pid?: number;
 }
 
-const LOCK_STALE_MS = 45 * 60 * 1000;
+const LOCK_HEARTBEAT_MS = 30 * 1000;
+const LEGACY_LOCK_STALE_MS = 45 * 60 * 1000;
+const LOCK_BUSY_EXIT_CODE = 75;
+const MAX_LOCK_METADATA_BYTES = 64 * 1024;
+let ownedInstallLockToken: string | null = null;
+let ownedInstallLockFd: number | null = null;
+let ownedInstallMarkerFd: number | null = null;
+let ownedInstallMarkerIdentity: { dev: number; ino: number } | null = null;
+let installLockHeartbeat: NodeJS.Timeout | null = null;
 
-export function acquireInstallLock(bundleId: string): boolean {
-  // If a lock exists, check its age. OOM-killed processes or crashes
-  // may leave a stale lock file behind; treat anything older than 45
-  // minutes as abandoned.
-  if (existsSync(LOCK_PATH)) {
+function stopInstallLockHeartbeat(): void {
+  if (installLockHeartbeat) clearInterval(installLockHeartbeat);
+  installLockHeartbeat = null;
+}
+
+function startInstallLockHeartbeat(ownerToken: string): void {
+  stopInstallLockHeartbeat();
+  installLockHeartbeat = setInterval(() => {
     try {
-      const age = Date.now() - statSync(LOCK_PATH).mtimeMs;
-      if (age > LOCK_STALE_MS) {
-        unlinkSync(LOCK_PATH);
-        console.warn(
-          `[feature-status] Removed stale install lock (age: ${Math.round(age / 1000)}s)`,
-        );
+      if (ownedInstallLockToken !== ownerToken || ownedInstallMarkerFd === null) {
+        stopInstallLockHeartbeat();
+        return;
       }
+      // A same-value positional write refreshes mtime using only the write
+      // permission already proven by open(O_RDWR). futimes/fchmod require file
+      // ownership on many shared-volume setups, even when fsGroup correctly
+      // grants another replica read/write access to the permanent inode.
+      const info = fstatSync(ownedInstallMarkerFd);
+      if (info.size < 1) return;
+      const lastByte = Buffer.allocUnsafe(1);
+      if (readSync(ownedInstallMarkerFd, lastByte, 0, 1, info.size - 1) !== 1) return;
+      writeSync(ownedInstallMarkerFd, lastByte, 0, 1, info.size - 1);
     } catch {
-      // stat/unlink failed -- fall through to O_EXCL which will fail too
+      stopInstallLockHeartbeat();
+    }
+  }, LOCK_HEARTBEAT_MS);
+  installLockHeartbeat.unref();
+}
+
+/**
+ * Apply a nonblocking POSIX flock to an inherited descriptor. The lock belongs
+ * to Node's open file description after the helper exits, so the kernel drops
+ * it automatically on close or process death. util-linux is present in the
+ * official image; stdlib fcntl keeps local macOS development deterministic.
+ */
+function acquireKernelInstallLock(fd: number): boolean {
+  const stdio: StdioOptions = ["ignore", "ignore", "pipe", fd];
+  const result = existsSync("/usr/bin/flock")
+    ? spawnSync(
+        "/usr/bin/flock",
+        ["--exclusive", "--nonblock", "--conflict-exit-code", String(LOCK_BUSY_EXIT_CODE), "3"],
+        {
+          stdio,
+          timeout: 5_000,
+        },
+      )
+    : spawnSync(
+        process.env.SNAPOTTER_SYSTEM_PYTHON || "/usr/bin/python3",
+        [
+          "-c",
+          `import fcntl, sys
+try:
+    fcntl.flock(3, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    sys.exit(${LOCK_BUSY_EXIT_CODE})`,
+        ],
+        { stdio, timeout: 5_000 },
+      );
+
+  if (result.error) throw result.error;
+  if (result.status === 0) return true;
+  if (result.status === LOCK_BUSY_EXIT_CODE) return false;
+  throw new Error(
+    `Kernel install-lock helper failed with status ${String(result.status)}: ${result.stderr?.toString().trim() || "no error output"}`,
+  );
+}
+
+function openKernelInstallLockFile(): number {
+  const fd = openSync(
+    KERNEL_LOCK_PATH,
+    constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW,
+    0o660,
+  );
+  try {
+    const opened = fstatSync(fd);
+    const linked = lstatSync(KERNEL_LOCK_PATH);
+    if (
+      !opened.isFile() ||
+      opened.nlink !== 1 ||
+      linked.isSymbolicLink() ||
+      !linked.isFile() ||
+      linked.dev !== opened.dev ||
+      linked.ino !== opened.ino
+    ) {
+      throw new Error("AI install lock path is not a private regular file");
+    }
+    const mode = opened.mode & 0o777;
+    if (mode !== 0o660) {
+      try {
+        fchmodSync(fd, 0o660);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // A permanent lock inode may have been created by another pod UID and
+        // shared through fsGroup. Opening O_RDWR already proved this replica's
+        // access; do not require ownership merely to reapply an identical-safe
+        // mode. Still fail closed if the inherited inode is world-accessible.
+        if ((code !== "EPERM" && code !== "EACCES") || (mode & 0o007) !== 0) {
+          throw error;
+        }
+      }
+    }
+    return fd;
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+function applyGroupSharedMode(fd: number): void {
+  const opened = fstatSync(fd);
+  const mode = opened.mode & 0o777;
+  if (mode === 0o660) return;
+  try {
+    fchmodSync(fd, 0o660);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // An inode created by another pod UID can still be writable through an
+    // fsGroup or ACL. Opening O_RDWR already proved access. Do not require
+    // ownership just to reapply a private mode, but reject world access.
+    if ((code !== "EPERM" && code !== "EACCES") || (mode & 0o007) !== 0) {
+      throw error;
     }
   }
+}
+
+function readFd(fd: number): string {
+  const info = fstatSync(fd);
+  const length = Math.min(info.size, MAX_LOCK_METADATA_BYTES);
+  if (length === 0) return "";
+  const buffer = Buffer.alloc(length);
+  const bytesRead = readSync(fd, buffer, 0, length, 0);
+  return buffer.subarray(0, bytesRead).toString("utf8");
+}
+
+interface InstallMarkerSnapshot {
+  fd: number;
+  dev: number;
+  ino: number;
+  mtimeMs: number;
+  lock: Partial<LockData> | null;
+}
+
+function openInstallMarker(): InstallMarkerSnapshot {
+  const fd = openSync(LOCK_PATH, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    const fd = openSync(LOCK_PATH, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL);
-    const lock: LockData = {
-      bundleId,
-      startedAt: new Date().toISOString(),
+    const opened = fstatSync(fd);
+    const linked = lstatSync(LOCK_PATH);
+    if (
+      !opened.isFile() ||
+      opened.nlink !== 1 ||
+      linked.isSymbolicLink() ||
+      !linked.isFile() ||
+      linked.dev !== opened.dev ||
+      linked.ino !== opened.ino
+    ) {
+      throw new Error("AI install marker path is not a private regular file");
+    }
+    let lock: Partial<LockData> | null = null;
+    try {
+      const parsed = JSON.parse(readFd(fd)) as unknown;
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        lock = parsed as Partial<LockData>;
+      }
+    } catch {
+      // An old holder can be between O_EXCL creation and its metadata write.
+    }
+    return {
+      fd,
+      dev: opened.dev,
+      ino: opened.ino,
+      mtimeMs: opened.mtimeMs,
+      lock,
     };
-    writeFileSync(fd, JSON.stringify(lock, null, 2), "utf-8");
-    return true;
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+function markerStillNamesSnapshot(snapshot: Pick<InstallMarkerSnapshot, "dev" | "ino">): boolean {
+  try {
+    const linked = lstatSync(LOCK_PATH);
+    return (
+      !linked.isSymbolicLink() &&
+      linked.isFile() &&
+      linked.dev === snapshot.dev &&
+      linked.ino === snapshot.ino
+    );
   } catch {
     return false;
   }
 }
 
-export function releaseInstallLock(): void {
+function removeInstallMarker(snapshot: Pick<InstallMarkerSnapshot, "dev" | "ino">): boolean {
+  if (!markerStillNamesSnapshot(snapshot)) return false;
+  unlinkSync(LOCK_PATH);
+  return true;
+}
+
+function createInstallMarker(lock: LockData): InstallMarkerSnapshot {
+  const fd = openSync(
+    LOCK_PATH,
+    constants.O_RDWR | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o660,
+  );
   try {
-    unlinkSync(LOCK_PATH);
-  } catch {
-    // Lock already gone
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.nlink !== 1) {
+      throw new Error("AI install marker path is not a private regular file");
+    }
+    applyGroupSharedMode(fd);
+    writeFileSync(fd, JSON.stringify(lock, null, 2), "utf8");
+    fsyncSync(fd);
+    const finalInfo = fstatSync(fd);
+    return {
+      fd,
+      dev: finalInfo.dev,
+      ino: finalInfo.ino,
+      mtimeMs: finalInfo.mtimeMs,
+      lock,
+    };
+  } catch (error) {
+    const opened = fstatSync(fd);
+    try {
+      removeInstallMarker({ dev: opened.dev, ino: opened.ino });
+    } catch {
+      // Preserve the marker creation failure.
+    }
+    closeSync(fd);
+    throw error;
   }
+}
+
+/** Claim the legacy marker while the permanent kernel lease is held. */
+function claimInstallMarker(lock: LockData): InstallMarkerSnapshot | null {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return createInstallMarker(lock);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+
+    let existing: InstallMarkerSnapshot;
+    try {
+      existing = openInstallMarker();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    try {
+      // A token-bearing marker came from a new replica. Since we already hold
+      // the permanent flock, it is necessarily a crash remnant. Tokenless
+      // markers belong to old replicas and retain their historic 45m timeout.
+      const belongsToNewReplica = typeof existing.lock?.ownerToken === "string";
+      const ageMs = Math.max(0, Date.now() - existing.mtimeMs);
+      if (belongsToNewReplica || ageMs > LEGACY_LOCK_STALE_MS) {
+        if (removeInstallMarker(existing)) {
+          if (!belongsToNewReplica) {
+            console.warn(
+              `[feature-status] Removed stale legacy install lock (age: ${Math.round(ageMs / 1000)}s)`,
+            );
+          }
+          continue;
+        }
+      }
+      return null;
+    } finally {
+      closeSync(existing.fd);
+    }
+  }
+  return null;
+}
+
+function markerMetadata(snapshot: InstallMarkerSnapshot): {
+  bundleId: string;
+  startedAt: string;
+} {
+  if (typeof snapshot.lock?.bundleId === "string" && typeof snapshot.lock.startedAt === "string") {
+    return { bundleId: snapshot.lock.bundleId, startedAt: snapshot.lock.startedAt };
+  }
+  return { bundleId: "unknown", startedAt: new Date(snapshot.mtimeMs).toISOString() };
+}
+
+function removeOwnedInstallMarker(
+  fd: number,
+  identity: { dev: number; ino: number },
+  ownerToken: string,
+): void {
+  let parsed: Partial<LockData> | null = null;
+  try {
+    parsed = JSON.parse(readFd(fd)) as Partial<LockData>;
+  } catch {
+    return;
+  }
+  if (parsed.ownerToken !== ownerToken) return;
+  removeInstallMarker(identity);
+}
+
+export function acquireInstallLock(bundleId: string): boolean {
+  if (ownedInstallLockFd !== null || ownedInstallMarkerFd !== null) return false;
+  let kernelFd: number | null = null;
+  let marker: InstallMarkerSnapshot | null = null;
+  try {
+    kernelFd = openKernelInstallLockFile();
+    if (!acquireKernelInstallLock(kernelFd)) {
+      closeSync(kernelFd);
+      return false;
+    }
+    const ownerToken = randomUUID();
+    const lock: LockData = {
+      bundleId,
+      startedAt: new Date().toISOString(),
+      ownerToken,
+      pid: process.pid,
+    };
+    marker = claimInstallMarker(lock);
+    if (!marker) {
+      closeSync(kernelFd);
+      return false;
+    }
+    ownedInstallLockFd = kernelFd;
+    ownedInstallMarkerFd = marker.fd;
+    ownedInstallMarkerIdentity = { dev: marker.dev, ino: marker.ino };
+    ownedInstallLockToken = ownerToken;
+    startInstallLockHeartbeat(ownerToken);
+    return true;
+  } catch (error) {
+    if (marker !== null) {
+      try {
+        closeSync(marker.fd);
+      } catch {
+        // Preserve the acquisition failure.
+      }
+    }
+    if (kernelFd !== null) {
+      try {
+        closeSync(kernelFd);
+      } catch {
+        // Preserve the acquisition failure.
+      }
+    }
+    throw new Error(
+      `Unable to acquire the AI install lock: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+export function releaseInstallLock(): void {
+  if (ownedInstallLockFd === null) return;
+  const kernelFd = ownedInstallLockFd;
+  const markerFd = ownedInstallMarkerFd;
+  const markerIdentity = ownedInstallMarkerIdentity;
+  const ownerToken = ownedInstallLockToken;
+  ownedInstallLockFd = null;
+  ownedInstallMarkerFd = null;
+  ownedInstallMarkerIdentity = null;
+  ownedInstallLockToken = null;
+  stopInstallLockHeartbeat();
+  try {
+    // Remove only our marker while the permanent lease prevents another new
+    // replica from replacing it underneath the token/inode ownership checks.
+    if (markerFd !== null && markerIdentity !== null && ownerToken !== null) {
+      removeOwnedInstallMarker(markerFd, markerIdentity, ownerToken);
+    }
+  } catch (error) {
+    // The permanent kernel lease is authoritative. A leftover token-bearing
+    // marker is safe and will be removed by the next new acquirer once it
+    // proves the flock is free; teardown must never strand in-memory state.
+    console.warn("[feature-status] Unable to remove install marker during release:", error);
+  } finally {
+    if (markerFd !== null) {
+      try {
+        closeSync(markerFd);
+      } catch {
+        // Continue to the authoritative kernel descriptor.
+      }
+    }
+    try {
+      closeSync(kernelFd);
+    } catch {
+      // There is no useful recovery from an already-invalid descriptor.
+    }
+  }
+}
+
+/**
+ * Descriptor to duplicate into a child that mutates AI install state. Keeping
+ * this open in the child preserves the same kernel lease if the API controller
+ * dies before the child exits.
+ */
+export function getInstallLockFdForChild(): number {
+  if (ownedInstallLockFd === null) {
+    throw new Error("AI install lock is not held by this process");
+  }
+  return ownedInstallLockFd;
 }
 
 export function getInstallingBundle(): {
   bundleId: string;
   startedAt: string;
 } | null {
-  if (!existsSync(LOCK_PATH)) return null;
-
+  let marker: InstallMarkerSnapshot;
   try {
-    const raw = readFileSync(LOCK_PATH, "utf-8");
-    const lock = JSON.parse(raw) as LockData;
-    return { bundleId: lock.bundleId, startedAt: lock.startedAt };
-  } catch {
+    marker = openInstallMarker();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    return { bundleId: "unknown", startedAt: new Date().toISOString() };
+  }
+  const observed = markerMetadata(marker);
+  try {
+    if (ownedInstallMarkerFd !== null) return observed;
+
+    // New replicas hold the permanent flock. Old replicas own only a fresh,
+    // tokenless marker, so that marker remains authoritative when flock probes
+    // free. A token-bearing marker with a free flock is a crashed new owner.
+    let kernelFd: number | null = null;
     try {
-      unlinkSync(LOCK_PATH);
+      kernelFd = openKernelInstallLockFile();
+      if (!acquireKernelInstallLock(kernelFd)) return observed;
+      const belongsToNewReplica = typeof marker.lock?.ownerToken === "string";
+      const ageMs = Math.max(0, Date.now() - marker.mtimeMs);
+      if (belongsToNewReplica || ageMs > LEGACY_LOCK_STALE_MS) {
+        removeInstallMarker(marker);
+        return null;
+      }
+      return observed;
     } catch {
-      // already gone
+      // Fail closed for status when the filesystem/helper cannot prove that a
+      // marker is abandoned. Install paths surface the operational error.
+      return observed;
+    } finally {
+      if (kernelFd !== null) closeSync(kernelFd);
     }
-    return null;
+  } finally {
+    closeSync(marker.fd);
+  }
+}
+
+const INITIAL_AI_MUTATION_EPOCH = "initial";
+
+/**
+ * Shared generation for destructive AI-environment changes. Queue entries keep
+ * the value observed when submitted; once reset/uninstall publishes a new
+ * value, every replica can reject work that was authorized against old state.
+ */
+export function getAiMutationEpoch(): string {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let fd: number | null = null;
+    try {
+      fd = openSync(MUTATION_EPOCH_PATH, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const opened = fstatSync(fd);
+      const linked = lstatSync(MUTATION_EPOCH_PATH);
+      if (linked.dev !== opened.dev || linked.ino !== opened.ino) {
+        // Atomic publication can replace the path between open and lstat.
+        // Retry rather than turning that expected race into a failed POST.
+        continue;
+      }
+      if (!opened.isFile() || opened.nlink !== 1 || linked.isSymbolicLink() || !linked.isFile()) {
+        throw new Error("AI mutation epoch path is not a private regular file");
+      }
+      if (opened.size > 128) throw new Error("AI mutation epoch is unexpectedly large");
+      const epoch = readFd(fd).trim();
+      if (!epoch) throw new Error("AI mutation epoch is empty");
+      return epoch;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return INITIAL_AI_MUTATION_EPOCH;
+      throw error;
+    } finally {
+      if (fd !== null) closeSync(fd);
+    }
+  }
+  throw new Error("Unable to read a stable AI mutation epoch snapshot");
+}
+
+/** Atomically invalidate queue entries submitted before a destructive change. */
+export function advanceAiMutationEpoch(): string {
+  if (ownedInstallLockFd === null) {
+    throw new Error("The AI install lock must be held before advancing the mutation epoch");
+  }
+  const next = randomUUID();
+  const tempPath = join(AI_DIR, `.install-mutation.${next}.tmp`);
+  let fd: number | null = null;
+  try {
+    fd = openSync(
+      tempPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o660,
+    );
+    applyGroupSharedMode(fd);
+    writeFileSync(fd, `${next}\n`, "utf8");
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = null;
+    renameSync(tempPath, MUTATION_EPOCH_PATH);
+    return next;
+  } catch (error) {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Preserve the publication failure.
+      }
+    }
+    try {
+      unlinkSync(tempPath);
+    } catch {
+      // The temp file was either never created or was already renamed.
+    }
+    throw error;
   }
 }
 
@@ -266,8 +798,11 @@ export function getInstallingBundle(): {
  * from the HuggingFace bundle repo), but there is no partial/stale state left
  * to reason about afterward.
  */
-export function resetAiEnvironment(): void {
-  if (!acquireInstallLock("__reset__")) {
+export function resetAiEnvironment(
+  options: { installLockHeld?: boolean; mutationEpochAdvanced?: boolean } = {},
+): void {
+  const ownsLock = options.installLockHeld !== true;
+  if (ownsLock && !acquireInstallLock("__reset__")) {
     const installing = getInstallingBundle();
     throw new Error(
       `Cannot reset: a bundle install is already in progress (${installing?.bundleId ?? "unknown"})`,
@@ -275,6 +810,7 @@ export function resetAiEnvironment(): void {
   }
 
   try {
+    if (options.mutationEpochAdvanced !== true) advanceAiMutationEpoch();
     rmSync(MODELS_DIR, { recursive: true, force: true });
     rmSync(join(AI_DIR, "pip-cache"), { recursive: true, force: true });
     writeInstalled({ bundles: {} });
@@ -286,7 +822,10 @@ export function resetAiEnvironment(): void {
     // to install into -- leaving an empty directory (no python3 binary) would
     // make the very next install fail with "spawn .../python3 ENOENT".
     if (existsSync("/opt/venv")) {
-      execFileSync("/usr/local/bin/reseed-ai-venv.sh", { stdio: "ignore", timeout: 120_000 });
+      execFileSync("/usr/local/bin/reseed-ai-venv.sh", {
+        stdio: ["ignore", "ignore", "ignore", getInstallLockFdForChild()],
+        timeout: 120_000,
+      });
     } else {
       // Not a Docker image build (local dev, or a test fixture): nothing to
       // reseed from, just leave an empty directory.
@@ -294,7 +833,7 @@ export function resetAiEnvironment(): void {
     }
     ensureAiDirs();
   } finally {
-    releaseInstallLock();
+    if (ownsLock) releaseInstallLock();
   }
 }
 
@@ -353,9 +892,16 @@ interface ManifestArchive {
   extractedSize?: number;
 }
 
+interface ManifestTarget {
+  compressedSizeEstimate?: number;
+  extractedSizeEstimate?: number;
+  minimumMemoryBytes?: number;
+}
+
 interface ManifestBundle {
   models: ManifestModel[];
   archives?: Record<string, ManifestArchive>;
+  targets?: Record<string, ManifestTarget>;
 }
 
 interface Manifest {
@@ -399,167 +945,280 @@ function deleteDownloadingFiles(dir: string): void {
   }
 }
 
-export function recoverInterruptedInstalls(): void {
-  // 1. Delete partial downloads
-  deleteDownloadingFiles(MODELS_DIR);
-
-  // 2. Delete stale tmp file
-  if (existsSync(INSTALLED_TMP_PATH)) {
-    try {
-      unlinkSync(INSTALLED_TMP_PATH);
-      console.info("[feature-status] Deleted stale installed.json.tmp");
-    } catch {
-      // best-effort
-    }
+export function recoverInterruptedInstalls(): boolean {
+  if (!existsSync(AI_DIR)) {
+    invalidateCache();
+    return true;
   }
 
-  // 3. Delete bootstrapping venv
-  const bootstrappingDir = join(AI_DIR, "venv.bootstrapping");
-  if (existsSync(bootstrappingDir)) {
-    try {
-      rmSync(bootstrappingDir, { recursive: true, force: true });
-      console.info("[feature-status] Deleted stale venv.bootstrapping/");
-    } catch {
-      // best-effort
-    }
+  // A second API replica can start while the first is actively mutating this
+  // shared volume. Never erase its lock, downloads, staging, or venv marker.
+  if (!acquireInstallLock("__recovery__")) {
+    console.info("[feature-status] Another replica owns the install lease; recovery deferred");
+    return false;
   }
 
-  // 4. Delete stale lock — if the server is starting up, any previous install is dead
-  if (existsSync(LOCK_PATH)) {
-    try {
-      const raw = readFileSync(LOCK_PATH, "utf-8");
-      const lock = JSON.parse(raw) as LockData;
-      unlinkSync(LOCK_PATH);
-      console.warn(
-        `[feature-status] Removed stale install lock for "${lock.bundleId}" (server restarted)`,
-      );
-    } catch {
+  let recoveryIncomplete = false;
+  try {
+    // 1. Delete partial downloads
+    deleteDownloadingFiles(MODELS_DIR);
+
+    // 2. Delete stale tmp file
+    if (existsSync(INSTALLED_TMP_PATH)) {
       try {
-        unlinkSync(LOCK_PATH);
+        unlinkSync(INSTALLED_TMP_PATH);
+        console.info("[feature-status] Deleted stale installed.json.tmp");
       } catch {
-        // already gone
+        // best-effort
       }
     }
-  }
 
-  // 4b. Heal a torn shared venv. If the venv-writing breadcrumb survived, an
-  // install died while rewriting the shared site-packages, which can leave a
-  // package half-replaced and break EVERY AI tool (not just the one installing).
-  // Model weight files under MODELS_DIR are unaffected, so the safe, automatic
-  // recovery is to reseed the venv from the image base and reset the install
-  // ledger; the user reinstalls bundles from a known-good state. This is the
-  // same repair as "Reset AI Environment", done automatically on next boot so a
-  // crash-broken install self-heals instead of leaving mysteriously dead tools.
-  if (existsSync(VENV_WRITING_MARKER)) {
-    if (isDockerEnvironment() && existsSync("/opt/venv")) {
-      console.warn(
-        "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
-      );
+    // 3. Delete bootstrapping venv
+    const bootstrappingDir = join(AI_DIR, "venv.bootstrapping");
+    if (existsSync(bootstrappingDir)) {
       try {
-        execFileSync("/usr/local/bin/reseed-ai-venv.sh", { stdio: "ignore", timeout: 120_000 });
-        writeInstalled({ bundles: {} });
-      } catch (err) {
-        console.error("[feature-status] Failed to reseed AI venv after interrupted install:", err);
+        rmSync(bootstrappingDir, { recursive: true, force: true });
+        console.info("[feature-status] Deleted stale venv.bootstrapping/");
+      } catch {
+        // best-effort
       }
-    } else {
-      console.warn(
-        "[feature-status] An install was interrupted mid venv-write (non-Docker); the AI venv may be inconsistent. Reinstall the affected bundle.",
-      );
     }
-    try {
-      unlinkSync(VENV_WRITING_MARKER);
-    } catch {
-      // best-effort
-    }
-  }
 
-  // 5. Verify installed bundles still have their model files
-  const manifest = readManifest();
-  if (manifest) {
-    const data = readInstalled();
-    for (const bundleId of Object.keys(data.bundles)) {
-      const manifestBundle = manifest.bundles[bundleId];
-      if (!manifestBundle) continue;
-
-      for (const model of manifestBundle.models) {
-        if (model.path) {
-          const modelPath = join(MODELS_DIR, model.path);
-          if (!existsSync(modelPath)) {
-            console.warn(`[feature-status] Bundle "${bundleId}" missing model file: ${model.path}`);
-            break;
+    // 4. Heal a torn shared venv. If the venv-writing breadcrumb survived, an
+    // install died while rewriting the shared site-packages, which can leave a
+    // package half-replaced and break EVERY AI tool (not just the one installing).
+    // Model weight files under MODELS_DIR are unaffected, so the safe, automatic
+    // recovery is to reseed the venv from the image base and reset the install
+    // ledger; the user reinstalls bundles from a known-good state. This is the
+    // same repair as "Reset AI Environment", done automatically on next boot so a
+    // crash-broken install self-heals instead of leaving mysteriously dead tools.
+    if (existsSync(VENV_WRITING_MARKER)) {
+      let consumeMarker = false;
+      if (isDockerEnvironment()) {
+        if (existsSync("/opt/venv")) {
+          console.warn(
+            "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
+          );
+          try {
+            execFileSync("/usr/local/bin/reseed-ai-venv.sh", {
+              stdio: ["ignore", "ignore", "ignore", getInstallLockFdForChild()],
+              timeout: 120_000,
+            });
+            writeInstalled({ bundles: {} });
+            consumeMarker = true;
+          } catch (err) {
+            recoveryIncomplete = true;
+            console.error(
+              "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry:",
+              err,
+            );
           }
-          if (model.minSize != null && model.minSize > 0) {
-            try {
-              const st = statSync(modelPath);
-              if (st.size < model.minSize) {
+        } else {
+          recoveryIncomplete = true;
+          console.error(
+            "[feature-status] Cannot recover an interrupted AI venv write because /opt/venv is missing; retaining venv.writing for retry.",
+          );
+        }
+      } else {
+        // Local/unmanaged development has no image-owned base venv to restore.
+        // Retrying cannot change that, so surface the risk once and let the
+        // developer repair/reinstall the affected environment manually.
+        console.warn(
+          "[feature-status] An install was interrupted mid venv-write (non-Docker); the AI venv may be inconsistent. Reinstall the affected bundle.",
+        );
+        consumeMarker = true;
+      }
+      if (consumeMarker) {
+        try {
+          unlinkSync(VENV_WRITING_MARKER);
+        } catch (error) {
+          recoveryIncomplete = true;
+          console.error(
+            "[feature-status] AI venv recovery completed but venv.writing could not be cleared; retaining recovery retry:",
+            error,
+          );
+        }
+      }
+    }
+
+    // 5. Verify installed bundles still have their model files
+    const manifest = readManifest();
+    if (manifest) {
+      const data = readInstalled();
+      for (const bundleId of Object.keys(data.bundles)) {
+        const manifestBundle = manifest.bundles[bundleId];
+        if (!manifestBundle) continue;
+
+        for (const model of manifestBundle.models) {
+          if (model.path) {
+            const modelPath = join(MODELS_DIR, model.path);
+            if (!existsSync(modelPath)) {
+              console.warn(
+                `[feature-status] Bundle "${bundleId}" missing model file: ${model.path}`,
+              );
+              break;
+            }
+            if (model.minSize != null && model.minSize > 0) {
+              try {
+                const st = statSync(modelPath);
+                if (st.size < model.minSize) {
+                  console.warn(
+                    `[feature-status] Bundle "${bundleId}" model "${model.path}" is undersized (${st.size} < ${model.minSize})`,
+                  );
+                  break;
+                }
+              } catch {
                 console.warn(
-                  `[feature-status] Bundle "${bundleId}" model "${model.path}" is undersized (${st.size} < ${model.minSize})`,
+                  `[feature-status] Bundle "${bundleId}" cannot stat model: ${model.path}`,
                 );
                 break;
               }
-            } catch {
+            }
+          } else if (model.downloadFn === "rembg_session" && model.args?.[0]) {
+            const filePath = join(MODELS_DIR, "rembg", `${model.args[0]}.onnx`);
+            if (!existsSync(filePath)) {
               console.warn(
-                `[feature-status] Bundle "${bundleId}" cannot stat model: ${model.path}`,
+                `[feature-status] Bundle "${bundleId}" missing rembg model: ${model.args[0]}`,
+              );
+              break;
+            }
+          } else if (model.downloadFn === "hf_snapshot" && model.args?.[1]) {
+            const dirPath = join(MODELS_DIR, model.args[1]);
+            if (!existsSync(dirPath)) {
+              console.warn(
+                `[feature-status] Bundle "${bundleId}" missing model directory: ${model.args[1]}`,
               );
               break;
             }
           }
-        } else if (model.downloadFn === "rembg_session" && model.args?.[0]) {
-          const filePath = join(MODELS_DIR, "rembg", `${model.args[0]}.onnx`);
-          if (!existsSync(filePath)) {
-            console.warn(
-              `[feature-status] Bundle "${bundleId}" missing rembg model: ${model.args[0]}`,
-            );
-            break;
-          }
-        } else if (model.downloadFn === "hf_snapshot" && model.args?.[1]) {
-          const dirPath = join(MODELS_DIR, model.args[1]);
-          if (!existsSync(dirPath)) {
-            console.warn(
-              `[feature-status] Bundle "${bundleId}" missing model directory: ${model.args[1]}`,
-            );
-            break;
-          }
         }
       }
     }
-  }
 
-  // 6. Delete staging-{bundleId}/ directories (incomplete extraction)
-  try {
-    const aiEntries = readdirSync(AI_DIR, { withFileTypes: true });
-    for (const entry of aiEntries) {
-      if (entry.isDirectory() && entry.name.startsWith("staging-")) {
-        const stagingPath = join(AI_DIR, entry.name);
-        rmSync(stagingPath, { recursive: true, force: true });
-        console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
-      }
-    }
-  } catch {
-    // AI_DIR may not exist yet
-  }
+    // 6. Delete upload/extraction staging abandoned without a live kernel
+    // lease. A failed cleanup keeps startup recovery pending for a later retry.
+    if (!cleanupInterruptedFeatureImports()) recoveryIncomplete = true;
 
-  // 7. Clean up staging/ download directory (partial downloads, orphaned tars)
-  const downloadStaging = join(AI_DIR, "staging");
-  if (existsSync(downloadStaging)) {
+    // 7. Delete staging-{bundleId}/ directories (incomplete extraction)
     try {
-      const files = readdirSync(downloadStaging);
-      for (const file of files) {
-        const filePath = join(downloadStaging, file);
-        if (file.endsWith(".partial") || file.endsWith(".meta")) {
-          unlinkSync(filePath);
-          console.info(`[feature-status] Deleted stale download file: ${file}`);
-        } else if (file.endsWith(".tar.gz")) {
-          unlinkSync(filePath);
-          console.info(`[feature-status] Deleted orphaned archive: ${file}`);
+      const aiEntries = readdirSync(AI_DIR, { withFileTypes: true });
+      for (const entry of aiEntries) {
+        if (entry.isDirectory() && entry.name.startsWith("staging-")) {
+          const stagingPath = join(AI_DIR, entry.name);
+          rmSync(stagingPath, { recursive: true, force: true });
+          console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
         }
       }
     } catch {
-      // best-effort
+      // AI_DIR may not exist yet
     }
-  }
 
-  invalidateCache();
+    // 8. Clean up staging/ download directory (partial downloads, orphaned tars)
+    const downloadStaging = join(AI_DIR, "staging");
+    if (existsSync(downloadStaging)) {
+      try {
+        const files = readdirSync(downloadStaging);
+        for (const file of files) {
+          const filePath = join(downloadStaging, file);
+          if (file.endsWith(".partial") || file.endsWith(".meta")) {
+            unlinkSync(filePath);
+            console.info(`[feature-status] Deleted stale download file: ${file}`);
+          } else if (file.endsWith(".tar.gz")) {
+            unlinkSync(filePath);
+            console.info(`[feature-status] Deleted orphaned archive: ${file}`);
+          }
+        }
+      } catch {
+        // best-effort
+      }
+    }
+
+    invalidateCache();
+    return !recoveryIncomplete;
+  } finally {
+    releaseInstallLock();
+  }
+}
+
+interface InterruptedInstallRecoveryOptions {
+  retryMs?: number;
+  /** Return false when post-recovery work lost a lease race and must be retried. */
+  onRecovered?: () => boolean | undefined | Promise<boolean | undefined>;
+}
+
+const DEFAULT_RECOVERY_RETRY_MS = 5_000;
+let interruptedInstallRecoveryTimer: NodeJS.Timeout | null = null;
+let interruptedInstallRecoveryGeneration = 0;
+
+/** Stop a pending startup-recovery retry (primarily for orderly shutdown/tests). */
+export function stopInterruptedInstallRecovery(): void {
+  interruptedInstallRecoveryGeneration += 1;
+  if (interruptedInstallRecoveryTimer) clearTimeout(interruptedInstallRecoveryTimer);
+  interruptedInstallRecoveryTimer = null;
+}
+
+/**
+ * Run crash recovery now, retrying while another replica owns the shared
+ * install lease. A one-shot attempt is insufficient: that owner can itself
+ * crash later, leaving a torn venv and no surviving replica scheduled to heal
+ * it. The timer is unref'd so recovery never keeps an otherwise-idle process
+ * alive.
+ */
+export function startInterruptedInstallRecovery(
+  options: InterruptedInstallRecoveryOptions = {},
+): void {
+  const retryMs = options.retryMs ?? DEFAULT_RECOVERY_RETRY_MS;
+  if (!Number.isSafeInteger(retryMs) || retryMs < 1) {
+    throw new Error("Interrupted-install recovery retry must be a positive integer");
+  }
+  stopInterruptedInstallRecovery();
+  const generation = interruptedInstallRecoveryGeneration;
+
+  const scheduleRetry = () => {
+    if (generation !== interruptedInstallRecoveryGeneration) return;
+    interruptedInstallRecoveryTimer = setTimeout(attempt, retryMs);
+    interruptedInstallRecoveryTimer.unref();
+  };
+
+  const attempt = () => {
+    if (generation !== interruptedInstallRecoveryGeneration) return;
+    interruptedInstallRecoveryTimer = null;
+    let recovered = false;
+    try {
+      recovered = recoverInterruptedInstalls();
+    } catch (error) {
+      console.warn(
+        `[feature-status] Interrupted-install recovery failed; retrying: ${(error as Error).message}`,
+      );
+    }
+    if (recovered) {
+      if (!options.onRecovered) return;
+      let postRecovery: boolean | undefined | Promise<boolean | undefined>;
+      try {
+        postRecovery = options.onRecovered();
+      } catch (error) {
+        console.warn(
+          `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
+        );
+        scheduleRetry();
+        return;
+      }
+      void Promise.resolve(postRecovery)
+        .then((completed) => {
+          if (completed === false) scheduleRetry();
+        })
+        .catch((error) => {
+          console.warn(
+            `[feature-status] Post-recovery startup cleanup failed: ${(error as Error).message}`,
+          );
+          scheduleRetry();
+        });
+      return;
+    }
+    scheduleRetry();
+  };
+
+  attempt();
 }
 
 // ── Feature states (composite view) ─────────────────────────────────────
@@ -609,9 +1268,55 @@ export function getFeatureStates(): FeatureBundleState[] {
   const manifest = readManifest();
   const arch = bundleArchKey();
   const queuedIds = new Set(getQueuedBundleIds());
+  const ocrCapability = getOcrRuntimeCapability({ aiDataDir: AI_DIR });
+  const selectedOcrTarget = ocrCapability.available
+    ? ocrCapability.descriptor.artifact.target
+    : selectOcrRuntimeTarget();
+  const selectedOcrEstimate = selectedOcrTarget
+    ? manifest?.bundles.ocr?.targets?.[selectedOcrTarget]
+    : undefined;
+  const requiredOcrMemoryBytes =
+    selectedOcrEstimate?.minimumMemoryBytes && selectedOcrEstimate.minimumMemoryBytes > 0
+      ? selectedOcrEstimate.minimumMemoryBytes
+      : null;
+  let effectiveOcrMemoryBytes: number | null = null;
+  let ocrMemoryCapacityUnknown = false;
+  if (selectedOcrTarget) {
+    try {
+      effectiveOcrMemoryBytes = getOcrRuntimeEffectiveMemoryBytes();
+    } catch {
+      ocrMemoryCapacityUnknown = true;
+    }
+  }
+  const ocrMemoryCompatible =
+    !ocrMemoryCapacityUnknown &&
+    (requiredOcrMemoryBytes === null ||
+      effectiveOcrMemoryBytes === null ||
+      effectiveOcrMemoryBytes >= requiredOcrMemoryBytes);
+  const ocrUnavailableReason =
+    !ocrCapability.available &&
+    ocrCapability.reason === "descriptor-missing" &&
+    ocrMemoryCapacityUnknown
+      ? "memory-capacity-unknown"
+      : !ocrCapability.available &&
+          ocrCapability.reason === "descriptor-missing" &&
+          !ocrMemoryCompatible
+        ? "insufficient-memory"
+        : ocrCapability.available
+          ? null
+          : ocrCapability.reason;
+  const ocrInsufficientMemoryError =
+    ocrUnavailableReason === "insufficient-memory" &&
+    requiredOcrMemoryBytes !== null &&
+    effectiveOcrMemoryBytes !== null
+      ? `Accurate OCR requires ${requiredOcrMemoryBytes / 1024 ** 3} GiB configured memory, but this container has ${effectiveOcrMemoryBytes / 1024 ** 3} GiB; Fast OCR remains available`
+      : null;
 
   return Object.values(FEATURE_BUNDLES).map((bundle) => {
-    const installedBundle = installed.bundles[bundle.id];
+    // The legacy ledger is authoritative for legacy bundles only. OCR v3 is
+    // installed precisely when its canonical active descriptor resolves to a
+    // compatible, healthy generation; an old Paddle entry must not unlock it.
+    const installedBundle = bundle.id === "ocr" ? undefined : installed.bundles[bundle.id];
     let status: FeatureStatus = "not_installed";
     let error: string | null = null;
     let progress: { percent: number; stage: string } | null = null;
@@ -625,6 +1330,32 @@ export function getFeatureStates(): FeatureBundleState[] {
       if (installError) {
         status = "error";
         error = installError;
+      }
+    } else if (bundle.id === "ocr") {
+      if (ocrCapability.available) {
+        status = "installed";
+      } else if (queuedIds.has(bundle.id)) {
+        status = "queued";
+      } else if (installError) {
+        status = "error";
+        error = installError;
+      } else if (ocrCapability.status !== "missing") {
+        status = "error";
+        error =
+          ocrCapability.reason === "descriptor-invalid"
+            ? "OCR runtime descriptor is invalid"
+            : ocrCapability.reason === "insufficient-memory" && ocrInsufficientMemoryError
+              ? ocrInsufficientMemoryError
+              : ocrCapability.reason === "memory-capacity-unknown"
+                ? "Accurate OCR cannot safely determine this container's memory limit; Fast OCR remains available"
+                : ocrCapability.reason === "artifact-incompatible"
+                  ? "OCR runtime artifact is incompatible with this host or SnapOtter version"
+                  : "OCR accurate runtime is not supported on this host";
+      } else if (ocrInsufficientMemoryError) {
+        error = ocrInsufficientMemoryError;
+      } else if (ocrUnavailableReason === "memory-capacity-unknown") {
+        error =
+          "Accurate OCR cannot safely determine this container's memory limit; Fast OCR remains available";
       }
     } else if (installedBundle) {
       // Verify model files exist and are properly sized
@@ -643,24 +1374,72 @@ export function getFeatureStates(): FeatureBundleState[] {
       error = installError;
     }
 
-    const archive = manifest?.bundles[bundle.id]?.archives?.[arch];
+    const manifestBundle = manifest?.bundles[bundle.id];
+    const archives = manifestBundle?.archives;
+    const archive =
+      bundle.id === "ocr"
+        ? ((selectedOcrTarget ? archives?.[selectedOcrTarget] : undefined) ?? archives?.[arch])
+        : archives?.[arch];
+    const targetEstimate =
+      bundle.id === "ocr" && selectedOcrTarget
+        ? manifestBundle?.targets?.[selectedOcrTarget]
+        : undefined;
     const downloadBytes =
-      archive?.compressedSize && archive.compressedSize > 0 ? archive.compressedSize : null;
+      archive?.compressedSize && archive.compressedSize > 0
+        ? archive.compressedSize
+        : targetEstimate?.compressedSizeEstimate && targetEstimate.compressedSizeEstimate > 0
+          ? targetEstimate.compressedSizeEstimate
+          : null;
     const installedBytes =
-      archive?.extractedSize && archive.extractedSize > 0 ? archive.extractedSize : null;
+      archive?.extractedSize && archive.extractedSize > 0
+        ? archive.extractedSize
+        : targetEstimate?.extractedSizeEstimate && targetEstimate.extractedSizeEstimate > 0
+          ? targetEstimate.extractedSizeEstimate
+          : null;
 
-    return {
+    const baseState: FeatureBundleState = {
       id: bundle.id,
       name: bundle.name,
       description: bundle.description,
       status,
-      installedVersion: installedBundle?.version ?? null,
+      installedVersion:
+        bundle.id === "ocr"
+          ? ocrCapability.available
+            ? ocrCapability.descriptor.artifact.version
+            : null
+          : (installedBundle?.version ?? null),
       estimatedSize: bundle.estimatedSize,
       downloadBytes,
       installedBytes,
       enablesTools: bundle.enablesTools,
       progress,
       error,
+    };
+
+    if (bundle.id !== "ocr") return baseState;
+
+    const compatibility = !ocrCapability.available
+      ? ocrCapability.status === "invalid"
+        ? "invalid"
+        : ocrUnavailableReason === "unsupported-host" ||
+            ocrUnavailableReason === "insufficient-memory" ||
+            ocrUnavailableReason === "memory-capacity-unknown" ||
+            !selectedOcrTarget
+          ? "incompatible"
+          : "compatible"
+      : "compatible";
+
+    return {
+      ...baseState,
+      compatibility,
+      compatibilityReason: ocrUnavailableReason,
+      selectedTarget: selectedOcrTarget,
+      missingDownloadBytes:
+        compatibility !== "compatible" ? null : ocrCapability.available ? 0 : downloadBytes,
+      healthyGeneration: ocrCapability.available ? ocrCapability.descriptor.generation : null,
+      availableQualities: ["fast", ...(ocrCapability.available ? ocrCapability.qualities : [])],
+      requiredMemoryBytes: requiredOcrMemoryBytes,
+      effectiveMemoryBytes: effectiveOcrMemoryBytes,
     };
   });
 }
@@ -690,16 +1469,40 @@ const IMPORT_MAX_ENTRIES = 10_000;
 
 export async function importBundleArchive(
   stream: Readable,
+  options: { installLockFd?: number } = {},
 ): Promise<{ bundleId: string; version: string; models: string[] }> {
   const stagingId = `import-${randomUUID()}`;
   const stagingDir = join(AI_DIR, stagingId);
-
-  if (!acquireInstallLock("__import__")) {
-    throw new ImportLockError("Another install or import is already in progress");
-  }
+  const ownsInstallLock = options.installLockFd === undefined;
+  let acquiredInstallLock = false;
+  let installLockFd = options.installLockFd ?? -1;
 
   try {
-    mkdirSync(stagingDir, { recursive: true });
+    if (ownsInstallLock) {
+      if (!acquireInstallLock("__import__")) {
+        throw new ImportLockError("Another install or import is already in progress");
+      }
+      acquiredInstallLock = true;
+      installLockFd = getInstallLockFdForChild();
+    } else {
+      if (!Number.isSafeInteger(installLockFd) || installLockFd < 0) {
+        throw new ImportLockError("A valid inherited AI install lock descriptor is required");
+      }
+      try {
+        const lockInfo = fstatSync(installLockFd);
+        if (!lockInfo.isFile()) {
+          throw new ImportLockError("Inherited AI install lock descriptor is not a regular file");
+        }
+      } catch (error) {
+        if (error instanceof ImportLockError) throw error;
+        throw new ImportLockError(
+          `Inherited AI install lock descriptor is not open: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    mkdirSync(stagingDir, { recursive: true, mode: 0o2770 });
+    chmodSync(stagingDir, 0o2770);
 
     // Extract with safety guards
     let cumulativeBytes = 0;
@@ -804,6 +1607,11 @@ export async function importBundleArchive(
         `Unknown bundleId "${descriptor.bundleId}"; not in feature manifest`,
       );
     }
+    if (descriptor.bundleId === "ocr") {
+      throw new ImportValidationError(
+        "Legacy OCR bundle archives are no longer supported. Import the signed OCR v3 index and matching runtime archive instead.",
+      );
+    }
 
     // Move models/* into MODELS_DIR
     const stagingModels = join(stagingDir, "models");
@@ -847,7 +1655,10 @@ export async function importBundleArchive(
                 `--find-links=${stagingFixups}`,
                 wheel.split("-")[0],
               ],
-              { stdio: "ignore", timeout: 30_000 },
+              {
+                stdio: ["ignore", "ignore", "ignore", installLockFd],
+                timeout: 30_000,
+              },
             );
           } catch {
             // Non-fatal
@@ -870,7 +1681,7 @@ export async function importBundleArchive(
     } catch {
       // staging cleanup is best-effort
     }
-    releaseInstallLock();
+    if (acquiredInstallLock) releaseInstallLock();
   }
 }
 

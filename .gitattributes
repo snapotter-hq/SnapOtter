@@ -27,3 +27,6 @@ Dockerfile* text eol=lf
 *.eot       binary
 *.pth       binary
 *.onnx      binary
+
+# This frozen OCR transcript preserves upstream trailing spaces byte-for-byte.
+tests/fixtures/ocr-real/ground-truth/clinocr-poor-t7-s2.txt whitespace=-trailing-space

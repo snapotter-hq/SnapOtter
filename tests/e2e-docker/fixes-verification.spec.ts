@@ -28,6 +28,46 @@ async function waitForProcessingDone(page: Page, timeoutMs = 120_000): Promise<v
   await page.waitForTimeout(500);
 }
 
+type OcrQuality = "fast" | "balanced" | "best";
+
+async function getAvailableOcrQualities(page: Page): Promise<OcrQuality[]> {
+  const data = await page.evaluate(async () => {
+    const token = window.localStorage.getItem("snapotter-token");
+    if (!token) throw new Error("Authenticated OCR test session has no API token");
+    const response = await fetch("/api/v1/features", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`Unable to read OCR capabilities: ${response.status}`);
+    return response.json();
+  });
+  const ocr = data.bundles?.find((bundle: { id: string }) => bundle.id === "ocr");
+  expect(ocr, "OCR feature state is missing").toBeDefined();
+  expect(ocr.availableQualities).toContain("fast");
+  return ocr.availableQualities as OcrQuality[];
+}
+
+async function verifyAccurateOcrTier(
+  page: Page,
+  quality: "balanced" | "best",
+  availableQualities: OcrQuality[],
+): Promise<void> {
+  await page.getByRole("button", { name: new RegExp(quality, "i") }).click();
+  const processButton = page.getByTestId("ocr-submit");
+
+  if (!availableQualities.includes(quality)) {
+    await expect(page.getByText(/requires an additional download/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /enable ocr/i })).toBeVisible();
+    await expect(processButton).toBeDisabled();
+    return;
+  }
+
+  await expect(processButton).toBeEnabled();
+  await processButton.click();
+  await waitForProcessingDone(page, 120_000);
+  await expect(page.getByText(/extracted text/i)).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator(".text-red-500")).toHaveCount(0);
+}
+
 // ─── 1. Error messages should never show [object Object] ─────────────
 
 test.describe("Error message formatting", () => {
@@ -283,7 +323,7 @@ test.describe("Passport photo", () => {
 // ─── 6. OCR modes ────────────────────────────────────────────────────
 
 test.describe("OCR", () => {
-  test("fast mode works and returns engine info", async ({ page }) => {
+  test("fast mode renders a successful result without the optional pack", async ({ page }) => {
     await page.goto("/ocr");
     await uploadFiles(page, [getFixture("test-100x100.jpg")]);
 
@@ -298,54 +338,31 @@ test.describe("OCR", () => {
     await processBtn.click();
     await waitForProcessingDone(page, 60_000);
 
-    // Should not show [object Object]
-    const errorEl = page.locator(".text-red-500, [class*='text-red']");
-    if (await errorEl.isVisible({ timeout: 3000 })) {
-      const text = await errorEl.textContent();
-      expect(text).not.toContain("[object Object]");
-    }
+    // A readable failure is still a failure. The official image contract is
+    // covered at the API level in ai-tools.spec.ts (including engine/provider);
+    // this GUI regression must reach the result state, even when the fixture
+    // legitimately contains no recognized text.
+    await expect(page.getByText(/extracted text/i)).toBeVisible({ timeout: 120_000 });
+    await expect(page.locator("p.text-red-500")).toHaveCount(0);
+    await expect(
+      page.getByTestId("ocr-result-text").or(page.getByText(/no text detected/i)),
+    ).toBeVisible();
   });
 
   test("balanced mode works", async ({ page }) => {
     await page.goto("/ocr");
     await uploadFiles(page, [getFixture("test-100x100.jpg")]);
+    const availableQualities = await getAvailableOcrQualities(page);
 
-    const balancedBtn = page.getByRole("button", { name: /balanced/i });
-    if (await balancedBtn.isVisible({ timeout: 2000 })) {
-      await balancedBtn.click();
-    }
-
-    const processBtn = page.getByRole("button", { name: /extract|scan|process/i });
-    await expect(processBtn).toBeEnabled({ timeout: 5000 });
-    await processBtn.click();
-    await waitForProcessingDone(page, 120_000);
-
-    const errorEl = page.locator(".text-red-500, [class*='text-red']");
-    if (await errorEl.isVisible({ timeout: 5000 })) {
-      const text = await errorEl.textContent();
-      expect(text).not.toContain("[object Object]");
-    }
+    await verifyAccurateOcrTier(page, "balanced", availableQualities);
   });
 
   test("best mode works", async ({ page }) => {
     await page.goto("/ocr");
     await uploadFiles(page, [getFixture("test-100x100.jpg")]);
+    const availableQualities = await getAvailableOcrQualities(page);
 
-    const bestBtn = page.getByRole("button", { name: /best/i });
-    if (await bestBtn.isVisible({ timeout: 2000 })) {
-      await bestBtn.click();
-    }
-
-    const processBtn = page.getByRole("button", { name: /extract|scan|process/i });
-    await expect(processBtn).toBeEnabled({ timeout: 5000 });
-    await processBtn.click();
-    await waitForProcessingDone(page, 120_000);
-
-    const errorEl = page.locator(".text-red-500, [class*='text-red']");
-    if (await errorEl.isVisible({ timeout: 5000 })) {
-      const text = await errorEl.textContent();
-      expect(text).not.toContain("[object Object]");
-    }
+    await verifyAccurateOcrTier(page, "best", availableQualities);
   });
 });
 

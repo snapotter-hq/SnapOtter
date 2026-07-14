@@ -1,8 +1,8 @@
 ---
 description: "用一道 Docker 指令安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整功能總覽。"
-i18n_source_hash: 4536d4558b8e
-i18n_provenance: machine
 i18n_output_hash: 4e12779bd211
+i18n_source_hash: 24724b5595b2
+i18n_provenance: human
 ---
 
 # 快速上手 {#getting-started}
@@ -32,7 +32,7 @@ SnapOtter 預設包含匿名產品分析。若要關閉它，請開啟 **Setting
 :::
 
 ::: tip NVIDIA CUDA 加速
-加上 `--gpus all` 以取得 NVIDIA CUDA 加速的去背、放大、OCR、臉部強化與修復：
+添加 `--gpus all` 以實現 NVIDIA CUDA 加速的背景移除、放大、臉部增強和恢復。 OCR 仍然基於 CPU，並且在有或沒有 GPU 存取的情況下在相同映像中工作：
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest

@@ -1,8 +1,8 @@
 ---
 description: "Distribuera SnapOtter till produktion med Docker. Hårdvarukrav, GPU-konfiguration och konfigurationer för omvänd proxy för Nginx, Traefik och Cloudflare."
-i18n_source_hash: 6b6957060fa6
-i18n_provenance: machine
-i18n_output_hash: d357c2cff629
+i18n_output_hash: c280952d9d27
+i18n_source_hash: e0d8d5f6fc87
+i18n_provenance: human
 ---
 
 # Distribution {#deployment}
@@ -11,6 +11,12 @@ SnapOtter distribueras som en Docker Compose-stack med 3 containrar: SnapOtter-a
 
 Se [Docker-avbildning](./docker-tags) för GPU-konfiguration, Docker Compose-exempel och versionslåsning.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Kompatibilitet för koreansk OCR
+Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`). Koreanska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
+:::
+<!-- korean-ocr-contract:end -->
 ## Snabbstart (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -113,7 +119,7 @@ Appen är sedan tillgänglig på `http://localhost:1349`.
 
 ## Snabbstart (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-För NVIDIA CUDA-acceleration på AI-verktyg (bakgrundsborttagning, uppskalning, ansiktsförbättring, OCR):
+För NVIDIA CUDA acceleration på AI-verktyg som stöds (bakgrundsborttagning, uppskalning, ansiktsförbättring):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -251,10 +257,10 @@ deploy:
 |---|---|
 | CPU | 4 kärnor |
 | RAM | 4 GB |
-| Disk | 3 GB (avbildning) + 24 GB (AI-modeller) + arbetsyta |
+| Disk | 3 GB (bild) + cirka 20 GB (alla valfria AI-paket) + arbetsyta |
 | GPU | Krävs inte (CPU-reserv) |
 
-**Att installera AI-buntarna är det som driver upp RAM till 4 GB.** Utan installerad AI ligger appen på tomgång runt 360 MB; med alla sju buntar installerade håller den ~2,6 GB residerande, eftersom Python-AI-sidovagnen förladdar sina modeller (bakgrundsborttagning, uppskalning, OCR, transkribering, ansiktsigenkänning, restaurering) vid start. Icke-AI-installationer förblir lätta; AI-installationer behöver ≥4 GB.
+**Att installera och köra de större AI-paketen är det som driver rekommendationen till 4 GB RAM.** Utan några tillvalspaket installerade är appen inaktiv på cirka 360 MB. Äldre Python-verktyg delar en sidecar, medan exakt OCR använder en dedikerad långlivad dispatcher som är fäst vid den aktiva oföränderliga generationen. Före aktivering kör installatören en smoke test på kandidaten. Den växlar sedan atomärt till den nya dispatcher och dränerar den tidigare dispatcher före garbage collection. Varje officiell exakt OCR-artefakt måste passera sin värsta release suite inuti en 4 GiB cgroup, medan värdrekommendationen på 4 GB lämnar utrymme för Node.js-applikationen, Postgres, Redis, köer, och samtidigt arbete.
 
 De flesta AI-verktyg är fullt användbara på CPU; ett par vill verkligen ha en GPU. Uppmätt på en modern 4-kärnig CPU:
 
@@ -271,7 +277,7 @@ SnapOtter bakar avsiktligt inte in dessa modellnedladdningar i Docker-avbildning
 
 Vissa verktyg är beroende av mer än en delad bunt. Passfoto behöver till exempel både `background-removal` och `face-detection`; om `background-removal` redan är installerad laddar aktiveringen av Passfoto bara ner den saknade `face-detection`-bunten. Samma återanvändning gäller för alla AI-verktyg.
 
-Storlekar för AI-modellnedladdning:
+Valfria AI-paketlagringsuppskattningar:
 
 | Bunt | Diskstorlek |
 |---|---|
@@ -279,9 +285,16 @@ Storlekar för AI-modellnedladdning:
 | Uppskalning + ansiktsförbättring + brusborttagning | 5-6 GB |
 | Ansiktsigenkänning | 200-300 MB |
 | Objektradering + färgläggning | 1-2 GB |
-| OCR | 5-6 GB |
+| Exakt OCR (`balanced`/`best`) | ~208-234 MiB nedladdning / ~409-488 MiB installerad |
 | Fotorestaurering | 4-5 GB |
-| **Alla buntar** | **~24 GB** |
+| Transkription | ~600 MB |
+| **Alla paket** | **~20 GB installerat** |
+
+Snabb OCR är inbyggd i bilden genom Tesseract, lägger till cirka 25 MiB och kräver inte det valfria OCR-paketet eller dess 4 GiB minneskrav. Den exakta förpackningen är tillgänglig i de officiella Linux amd64- och arm64-behållarna och kör ONNX Runtime på CPU. NVIDIA-värdar använder samma CPU OCR körtid, så OCR är inte beroende av CUDA-versionen eller GPU-arkitekturen. Den exakta körtiden kräver minst 4 GiB effektivt minne: den konfigurerade behållarens cgroup-gräns, annars värdminne. SnapOtter avvisar system under det signerade kompatibilitetsminimum innan paketet laddas ner. Exakt paketinstallation avvisas också på bare-metal/förbyggda arkiv vars libc och Python ABI inte kan garanteras.
+
+Repliker som delar samma `DATA_DIR` måste använda samma CPU-arkitektur. Lås driftsättningar med flera repliker till kompatibla noder med hjälp av nodaffinitet. Blandade amd64/arm64-repliker behöver separata datavolymer och oberoende SnapOtter-driftsättningar.
+
+Den exakta körtiden håller en aktiv generation och rensar nedladdningscachen efter aktivering. För den här utgåvan behöver en första installation tillfälligt ungefär 620-720 MiB för arkivet plus staging, och en uppgradering kan nå en topp nära 1,2 GiB medan den gamla generationen förblir aktiv. Installationsprogrammet beräknar det exakta kravet från det signerade indexet och nuvarande generationer innan nedladdning eller extrahering, och misslyckas tidigt om datavolymen är för liten.
 
 ```yaml
 deploy:
@@ -353,7 +366,6 @@ Se den [fullständiga formatlistan](/sv/guide/supported-formats) för detaljer o
 
 - **Innehållsmedveten storleksändring** kraschar på stora bilder (>5 MP) på grund av en begränsning i caire-binären. Fungerar utmärkt med mindre bilder.
 - **HEIF-avkodning** tar 13-23 sekunder. HEIC (Apples variant) är mycket snabbare på 0,3-0,9 sekunder.
-- **OCR japanska** misslyckas på CPU på grund av en PaddlePaddle MKLDNN-bugg. Fungerar på GPU.
 - **Uppskalning** får timeout på CPU för allt utöver små bilder. GPU krävs för praktisk användning.
 - **CodeFormer**-ansiktsförbättring är betydligt långsammare än GFPGAN (53 s mot 2 s på GPU). GFPGAN rekommenderas för de flesta användningsfall.
 
@@ -433,6 +445,26 @@ Startfelet namnger det exakta UID:t som ska användas, så den snabbaste vägen 
 | `CONCURRENT_JOBS` | `0` (auto) | Max parallella AI-bearbetningsjobb |
 | `SESSION_DURATION_HOURS` | `168` | Livslängd för inloggningssession (7 dagar) |
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung, eller tom för samma ursprung |
+
+### Utgående proxy och privat CA {#outbound-proxy-and-private-ca}
+
+Den officiella behållaren möjliggör Nodes miljö-proxy-stöd. Om SnapOtter måste nå OCR runtime repository eller andra HTTPS-tjänster via en företagsproxy, ställ in `HTTPS_PROXY` (och `HTTP_PROXY` vid behov). Ställ in `NO_PROXY` på en kommaseparerad lista över värdar som måste nås direkt, såsom Postgres, Redis och intern objektlagring.
+
+Om proxyn eller en intern tjänst är signerad av en privat certifikatutfärdare, montera CA-certifikatet skrivskyddat och peka `NODE_EXTRA_CA_CERTS` till det. Filen måste finnas när nodprocessen startar:
+
+```yaml
+services:
+  app:
+    environment:
+      HTTPS_PROXY: http://proxy.example.internal:3128
+      HTTP_PROXY: http://proxy.example.internal:3128
+      NO_PROXY: postgres,redis,minio,localhost,127.0.0.1
+      NODE_EXTRA_CA_CERTS: /etc/snapotter/custom-ca.pem
+    volumes:
+      - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
+```
+
+Behåll proxyuppgifterna utanför Compose-filen (till exempel i en skyddad `.env`-fil eller hemlig). Inaktivera inte TLS-verifiering: det signerade OCR-indexet autentiserar releasemetadata, medan normal TLS-validering fortfarande skyddar transport och alla andra utgående begäranden.
 
 ## Hälsokontroll {#health-check}
 

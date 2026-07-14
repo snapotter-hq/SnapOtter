@@ -159,6 +159,9 @@ components:
           example: Feature not installed
         code:
           type: string
+          enum:
+            - FEATURE_NOT_INSTALLED
+            - FEATURE_INCOMPATIBLE
           example: FEATURE_NOT_INSTALLED
         feature:
           type: string
@@ -169,6 +172,19 @@ components:
         estimatedSize:
           type: string
           description: Estimated download size
+        requestedQuality:
+          type: string
+          enum:
+            - fast
+            - balanced
+            - best
+          description: OCR tier that could not be honored; Fast is reported when Korean is explicitly requested with Fast or the legacy Tesseract alias
+        compatibilityReason:
+          type: string
+          description: Machine-readable runtime compatibility reason, when available
+        guidance:
+          type: string
+          description: Actionable recovery guidance, when available
     HealthResponse:
       type: object
       properties:
@@ -3403,6 +3419,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/tools/image/remove-gif-background:
+    post:
+      operationId: removeGifBackground
+      tags:
+        - Tools
+      summary: Xóa nền khỏi hình ảnh động
+      description: Xóa nền khỏi GIF, WebP hoặc APNG hoạt hình theo từng khung hình bằng cách sử dụng AI (rembg). Chạy cục bộ.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Animated image file (GIF, animated WebP, or APNG)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `model` (string, optional) - AI model name
+                    - `outputFormat` (string, optional) - One of: webp, apng, gif
+                    - `backgroundType` (string, optional) - One of: transparent, color, gradient, blur, image
+                    - `backgroundColor` (string, optional) - Hex color for the color background
+                    - `gradientColor1` (string, optional) - First gradient color
+                    - `gradientColor2` (string, optional) - Second gradient color
+                    - `gradientAngle` (number, optional) - Gradient angle in degrees
+                    - `blurIntensity` (number 0-100, optional) - Blur strength for the blur background
+                    - `shadowEnabled` (boolean, optional) - Enable drop shadow
+                    - `shadowOpacity` (number 0-100, optional) - Shadow opacity
+                    - `edgeRefine` (number 0-3, optional) - Edge refinement level
+                    - `decontaminate` (boolean, optional) - Remove background color spill
+                backgroundImage:
+                  type: string
+                  format: binary
+                  description: Background image, required when backgroundType is "image"
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid input (not animated, over the frame cap, or bad settings)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '501':
+          description: Feature not installed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureNotInstalledError'
   /api/v1/tools/image/remove-background:
     post:
       operationId: removeBackground
@@ -3763,7 +3855,10 @@ paths:
       tags:
         - Tools
       summary: OCR / trích xuất văn bản
-      description: Trích xuất văn bản từ ảnh bằng OCR. Chạy cục bộ.
+      description: |-
+        Trích xuất văn bản từ một hình ảnh cục bộ. Tích hợp sẵnFastsử dụng cấp độTesseract.BalancedVàBestsử dụng chữ ký tùy chọnRapidOCRthời gian chạy
+        được ghimPP-OCRmô hình ONNX. Yêu cầu cấp độ rõ ràng không bao giờ âm thầm
+        hạ xuống tầng khác.
       security:
         - bearerAuth: []
       requestBody:
@@ -3778,15 +3873,16 @@ paths:
                 file:
                   type: string
                   format: binary
+                  maxLength: 536870912
                   description: Image file to extract text from
                 settings:
                   type: string
                   description: |
                     JSON string with options:
-                    - `quality` (string, default "balanced") - One of: fast, balanced, best
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko
-                    - `enhance` (boolean, default true) - Pre-process image for better recognition
-                    - `engine` (string, optional) - One of: tesseract, paddleocr (backward compat)
+                    - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
+                    - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
+                    - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
       responses:
@@ -3806,6 +3902,60 @@ paths:
                     description: Extracted text content
                   engine:
                     type: string
+                    enum:
+                      - tesseract
+                      - rapidocr-onnx
+                  requestedQuality:
+                    type: string
+                    enum:
+                      - fast
+                      - balanced
+                      - best
+                  actualQuality:
+                    type: string
+                    enum:
+                      - fast
+                      - balanced
+                      - best
+                    description: Always matches requestedQuality for a successful request
+                  device:
+                    type: string
+                    enum:
+                      - cpu
+                  provider:
+                    type: string
+                    example: CPUExecutionProvider
+                  degraded:
+                    type: boolean
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                  runtimeVersion:
+                    type: string
+                    description: Accurate OCR runtime version; omitted for Fast
+                  modelVersion:
+                    type: string
+                    description: Accurate OCR model selection; omitted for Fast
+        '202':
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - async
+                properties:
+                  jobId:
+                    type: string
+                  progressJobId:
+                    type: string
+                  artifactJobId:
+                    type: string
+                  async:
+                    type: boolean
+                    const: true
         '400':
           description: Invalid input
           content:
@@ -3818,6 +3968,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: Encoded OCR input exceeds the hard 512 MiB safety limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Processing failed
           content:
@@ -3825,11 +3981,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '501':
-          description: Feature not installed
+          description: Requested Balanced/Best runtime is not installed or is incompatible
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeatureNotInstalledError'
+        '503':
+          description: OCR could not be queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/info:
     post:
       operationId: getImageInfo
@@ -6595,6 +6757,52 @@ paths:
                             - integer
                             - 'null'
                           description: Extracted on-disk size for this host's architecture, when the manifest records it.
+                        compatibility:
+                          type: string
+                          enum:
+                            - compatible
+                            - incompatible
+                            - invalid
+                          description: OCR runtime compatibility; omitted for legacy bundles
+                        compatibilityReason:
+                          type:
+                            - string
+                            - 'null'
+                          description: OCR runtime compatibility reason; omitted for legacy bundles
+                        selectedTarget:
+                          type:
+                            - string
+                            - 'null'
+                          description: Selected OCR runtime target, such as linux-amd64-cpu-py312
+                        missingDownloadBytes:
+                          type:
+                            - integer
+                            - 'null'
+                          description: Remaining OCR runtime download size for this host
+                        requiredMemoryBytes:
+                          type:
+                            - integer
+                            - 'null'
+                          description: Minimum effective memory required by the selected OCR runtime; null for legacy bundles
+                        effectiveMemoryBytes:
+                          type:
+                            - integer
+                            - 'null'
+                          description: Effective memory available to OCR (the configured container cgroup limit, otherwise host memory); null for legacy bundles
+                        healthyGeneration:
+                          type:
+                            - string
+                            - 'null'
+                          description: Active immutable OCR generation identifier
+                        availableQualities:
+                          type: array
+                          description: OCR quality tiers currently available on this host
+                          items:
+                            type: string
+                            enum:
+                              - fast
+                              - balanced
+                              - best
                         enablesTools:
                           type: array
                           items:
@@ -6624,15 +6832,26 @@ paths:
       tags:
         - Features
       summary: Cài đặt một gói tính năng
-      description: |
-        Bắt đầu cài đặt bất đồng bộ một gói tính năng AI. Tải xuống các mô hình và
-        cấu hình sidecar Python. Trả về một jobId để theo dõi tiến trình
-        qua endpoint SSE. Yêu cầu quyền features:manage.
+      description: |-
+        Bắt đầu cài đặt không đồng bộ gói tính năng AI. Tải xuống các mô hình và
+        định cấu hình Python sidecar. Trả về jobId để theo dõi tiến trình
+        thông qua điểm cuối SSE. Yêu cầu sự cho phép của features:manage.
 
-        Các lần cài đặt được tuần tự hóa phía máy chủ: một yêu cầu được đưa ra khi một
-        lần cài đặt khác đang chạy sẽ được xếp hàng (queued=true) thay vì bị từ chối, và
-        tự động bắt đầu khi lần cài đặt đang chạy kết thúc. Một yêu cầu
-        lặp lại cho cùng một gói đang xử lý sẽ được khử trùng lặp và trả về cùng một
+        Đối với bundleId=ocr, việc cài đặt được hỗ trợ trong các vùng chứa Linux amd64 và arm64 chính thức.
+        Nó tải xuống mục tiêu đã chọn cho máy chủ này, xác minh bản phát hành
+        chữ ký Ed25519 của chỉ mục và bản tóm tắt artifact/mô hình, kiểm tra khói a
+        tổ chức thế hệ bất biến và kích hoạt nó về mặt nguyên tử. OCR
+        thời gian chạy sử dụng CPU ngay cả khi vùng chứa có quyền truy cập NVIDIA GPU. các
+        thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng (
+        giới hạn vùng chứa được định cấu hình cgroup, nếu không thì bộ nhớ máy chủ). Hệ thống bên dưới đã ký
+        khả năng tương thích tối thiểu bị từ chối trước khi tải xuống với
+        compatibilityReason=insufficient-memory. Fast Tesseract OCR thì không
+        phải tuân theo yêu cầu này.
+
+        Các lượt cài đặt được tuần tự hóa phía máy chủ: một yêu cầu được thực hiện trong khi một yêu cầu khác
+        cài đặt đang chạy được xếp hàng đợi (queued=true) thay vì bị từ chối và
+        tự động bắt đầu khi quá trình cài đặt đang chạy kết thúc. lặp lại
+        yêu cầu cho cùng một gói trên chuyến bay sẽ bị loại bỏ và trả lại cùng một gói
         jobId.
       security:
         - bearerAuth: []
@@ -6676,11 +6895,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bundle already installed
+          description: Bundle already installed or OCR runtime unsupported on this host
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConflictError'
+        '503':
+          description: OCR runtime trust key is not configured in this image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/uninstall:
     post:
       operationId: uninstallFeature
@@ -11096,10 +11321,11 @@ paths:
       tags:
         - Tools
       summary: OCR PDF
-      description: |
-        OCR bằng AI để trích xuất văn bản từ tài liệu PDF. Hỗ trợ
-        nhiều mức chất lượng và ngôn ngữ. Yêu cầu cài đặt gói tính năng
-        OCR.
+      description: |-
+        Trích xuất văn bản từ từng trang tài liệu PDF được quét. Fast sử dụng
+        thời gian chạy Tesseract tích hợp. Balanced và Best sử dụng chữ ký tùy chọn
+        Thời gian chạy RapidOCR với các mô hình PP-OCR ONNX được ghim. Yêu cầu cấp độ rõ ràng
+        không bao giờ âm thầm hạ cấp. Một yêu cầu có thể chọn tối đa 50 trang.
       security:
         - bearerAuth: []
       requestBody:
@@ -11114,14 +11340,17 @@ paths:
                 file:
                   type: string
                   format: binary
+                  maxLength: 536870912
                   description: PDF file to process (.pdf)
                 settings:
                   type: string
                   description: |
                     JSON string with options:
-                    - `quality` (string, default "balanced") - One of: fast, balanced, best
-                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko
+                    - `quality` (string, optional) - One of: fast, balanced, best. When both quality and engine are omitted, uses the best available tier in this order: best, balanced, fast. Korean never selects fast; it uses best, then balanced, or returns an accurate-runtime install/compatibility error
+                    - `language` (string, default "auto") - One of: auto, en, de, fr, es, zh, ja, ko. Korean is unsupported by fast and the legacy tesseract alias
                     - `pages` (string, default "all") - Page selection, e.g. "all", "1-3", "1,3,5"
+                    - `enhance` (boolean, optional) - Improve local contrast. Fast applies it directly; accurate tiers retain the variant only when calibrated scoring improves the result. Defaults to true for Best and false for Fast/Balanced
+                    - `engine` (string, deprecated) - Compatibility alias: tesseract maps to fast; the legacy paddleocr value maps to balanced but does not load PaddlePaddle
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -11132,12 +11361,19 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - jobId
+                  - async
                 properties:
                   jobId:
                     type: string
+                  progressJobId:
+                    type: string
+                  artifactJobId:
+                    type: string
                   async:
                     type: boolean
-                    example: true
+                    const: true
         '400':
           description: Invalid input
           content:
@@ -11150,6 +11386,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          description: Encoded PDF exceeds the hard 512 MiB safety limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Processing failed
           content:
@@ -11157,11 +11399,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '501':
-          description: Feature not installed
+          description: Requested Balanced/Best runtime is not installed or is incompatible
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeatureNotInstalledError'
+        '503':
+          description: PDF OCR could not be queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/files/chart-maker:
     post:
       operationId: chartMaker
@@ -17831,7 +18079,12 @@ paths:
       tags:
         - Features
       summary: Nhập gói tính năng
-      description: Nhập một tệp lưu trữ gói AI ngoại tuyến. Yêu cầu quyền features:manage.
+      description: |-
+        Nhập kho lưu trữ gói AI cũ hoặc nhập OCR chính xác ngoại tuyến
+        phát hành bằng cách sử dụng chỉ mục đã ký và kho lưu trữ nền tảng phù hợp. OCRnhập thực hiện cùng một chữ ký, băm, khả năng tương thích, khai thác,
+        và smoke-test kiểm tra cài đặt trực tuyến, bao gồm cả độ chính xác
+        tối thiểu 4 GiB bộ nhớ hiệu dụng của thời gian chạy. Fast Tesseract OCR thì không
+        phải tuân theo yêu cầu này. Yêu cầu sự cho phép của features:manage.
       security:
         - bearerAuth: []
       requestBody:
@@ -17840,21 +18093,36 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - file
+              oneOf:
+                - required:
+                    - file
+                - required:
+                    - index
+                    - archive
               properties:
                 file:
                   type: string
                   format: binary
+                  description: One legacy AI bundle archive; mutually exclusive with index/archive
+                index:
+                  type: string
+                  format: binary
+                  description: Signed ocr-runtime-index.json from the SnapOtter release
+                archive:
+                  type: string
+                  format: binary
+                  description: OCR runtime archive for the current Linux amd64 or arm64 target; must follow index
       responses:
         '200':
-          description: Bundle imported
+          description: Bundle verified, imported, and activated
         '400':
           description: Invalid archive
         '403':
           description: Insufficient permissions
         '409':
           description: Import lock is held
+        '507':
+          description: Insufficient storage for the authenticated archive and expanded runtime
   /api/v1/enterprise/scim/token:
     post:
       operationId: createScimToken
@@ -18962,6 +19230,14 @@ x-i18n:
       sourceHash: 914837a5d232
       provenance: machine
       outputHash: e08d48a9ea7a
+    paths./api/v1/tools/image/remove-gif-background.post.summary:
+      sourceHash: a316267cf5d1
+      provenance: machine
+      outputHash: 4fae42c03dc7
+    paths./api/v1/tools/image/remove-gif-background.post.description:
+      sourceHash: ef1d100f2345
+      provenance: machine
+      outputHash: 0449bd0d83cc
     paths./api/v1/tools/image/remove-background.post.summary:
       sourceHash: a8d1ab54b32c
       provenance: machine
@@ -19007,9 +19283,9 @@ x-i18n:
       provenance: machine
       outputHash: 5eb2e6db74d8
     paths./api/v1/tools/image/ocr.post.description:
-      sourceHash: ff6bdaa345fb
+      sourceHash: 7b74b30329a5
       provenance: machine
-      outputHash: 8d3e6aeaafdd
+      outputHash: 774b0ee5f205
     paths./api/v1/tools/image/info.post.summary:
       sourceHash: 1823e118aed5
       provenance: machine
@@ -19431,9 +19707,9 @@ x-i18n:
       provenance: machine
       outputHash: 84b9a79c7e5b
     paths./api/v1/admin/features/{bundleId}/install.post.description:
-      sourceHash: 7d5a5967dbdf
+      sourceHash: 6051af19be7e
       provenance: machine
-      outputHash: 2dd146d4c76f
+      outputHash: 730d86d5846a
     paths./api/v1/admin/features/{bundleId}/uninstall.post.summary:
       sourceHash: 160eaf179d4f
       provenance: machine
@@ -20143,9 +20419,9 @@ x-i18n:
       provenance: machine
       outputHash: 316bc0bd206a
     paths./api/v1/tools/pdf/ocr-pdf.post.description:
-      sourceHash: 4830abbae965
+      sourceHash: fbed951c39df
       provenance: machine
-      outputHash: 01140a6d3e80
+      outputHash: 62933646d938
     paths./api/v1/tools/files/chart-maker.post.summary:
       sourceHash: dbcca76ccbf5
       provenance: machine
@@ -21191,9 +21467,9 @@ x-i18n:
       provenance: machine
       outputHash: 421fdb76e45d
     paths./api/v1/admin/features/import.post.description:
-      sourceHash: 9acb6fd8b47d
+      sourceHash: 229fcb03f525
       provenance: machine
-      outputHash: 75aa268f9e65
+      outputHash: 1cb17f612271
     paths./api/v1/enterprise/scim/token.post.summary:
       sourceHash: e550c4aaeecf
       provenance: machine

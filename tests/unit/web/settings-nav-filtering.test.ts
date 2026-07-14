@@ -17,7 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "roles", label: "Roles", requiredPermission: "users:manage", authRequired: true },
   { id: "audit-log", label: "Audit Log", requiredPermission: "audit:read" },
   { id: "api-keys", label: "API Keys" },
-  { id: "ai-features", label: "AI Features", requiredPermission: "settings:write" },
+  { id: "ai-features", label: "AI Features", requiredPermission: "features:manage" },
   { id: "tools", label: "Tools" },
   { id: "analytics", label: "Product Analytics" },
   { id: "about", label: "About" },

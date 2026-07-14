@@ -13,6 +13,11 @@ vi.mock("@fastify/static", () => ({ default: "fastify-static-plugin" }));
 const mockMultipartPlugin = vi.fn();
 vi.mock("@fastify/multipart", () => ({ default: mockMultipartPlugin }));
 
+const multipartPartsMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/multipart-parts.js", () => ({
+  multipartParts: multipartPartsMock,
+}));
+
 vi.mock("node:fs", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -169,5 +174,23 @@ describe("registerUpload", () => {
         files: undefined,
       },
     });
+  });
+
+  it("forwards route-specific limits through the request.parts replacement", async () => {
+    let hook: ((request: unknown) => Promise<void>) | undefined;
+    const app = {
+      register: vi.fn().mockResolvedValue(undefined),
+      addHook: vi.fn((_name, handler) => {
+        hook = handler;
+      }),
+    };
+    await registerUpload(app as never);
+    const iterator = {};
+    multipartPartsMock.mockReturnValueOnce(iterator);
+    const request = { isMultipart: () => true, parts: vi.fn() };
+
+    await hook?.(request);
+    expect(request.parts({ limits: { fileSize: 1234, files: 2 } })).toBe(iterator);
+    expect(multipartPartsMock).toHaveBeenCalledWith(request, { fileSize: 1234, files: 2 });
   });
 });

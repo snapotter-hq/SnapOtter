@@ -23,8 +23,6 @@ export const SCRIPT_BUNDLE_MAP: Record<string, string> = {
   enhance_faces: "upscale-enhance",
   noise_removal: "upscale-enhance",
   restore: "photo-restoration",
-  ocr: "ocr",
-  ocr_pdf: "ocr",
   transcribe: "transcription",
 };
 

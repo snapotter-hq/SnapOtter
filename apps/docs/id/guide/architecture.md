@@ -1,8 +1,8 @@
 ---
 description: "Struktur monorepo, arsitektur aplikasi dan paket, siklus hidup permintaan, dan jejak sumber daya SnapOtter."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: d4bd8ceef301
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # Arsitektur {#architecture}
@@ -36,13 +36,13 @@ Paket ini tidak memiliki dependensi jaringan dan berjalan sepenuhnya dalam prose
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Lapisan penghubung yang memanggil skrip Python untuk operasi ML. Pada penggunaan pertama, penghubung memulai proses dispatcher Python yang persisten yang mengimpor terlebih dahulu pustaka berat (PIL, NumPy, MediaPipe, rembg) sehingga panggilan AI berikutnya melewati overhead impor. Jika dispatcher belum siap, penghubung mundur ke pemunculan subproses Python baru per permintaan.
+Lapisan jembatan yang memanggil runtime asli dan Python ML. Sebagian besar alat Python menggunakan dispatcher persisten yang melakukan pra-impor pustaka berat (PIL, NumPy, MediaPipe, rembg) sehingga panggilan berikutnya melewati overhead impor. OCR diisolasi dari lingkungan bersama yang dapat diubah: `fast` memanggil Tesseract asli, sementara `balanced` dan `best` menggunakan JSONL dispatcher persisten khusus yang disematkan pada generasi RapidOCR/ONNX aktif yang tidak dapat diubah. Setiap permintaan memiliki generation lease. Aktivasi pertama-tama menjalankan smoke test pada kandidat, kemudian beralih secara atom ke dispatcher-nya. Saluran air dispatcher sebelumnya sebelum pembangkitannya dikumpulkan sampahnya.
 
 **Model tidak dimuat terlebih dahulu.** Setiap skrip tool memuat bobot modelnya dari disk pada waktu permintaan dan membuangnya saat permintaan selesai. Lihat [Jejak sumber daya](#resource-footprint) untuk profil memori lengkap.
 
-Operasi yang didukung: penghapusan latar belakang (rembg/BiRefNet), upscaling (RealESRGAN), blur wajah (MediaPipe), penyempurnaan wajah (GFPGAN/CodeFormer), penghapusan objek (LaMa ONNX), OCR (PaddleOCR/Tesseract), pewarnaan (DDColor), penghapusan derau, penghapusan mata merah, restorasi foto, pembuatan foto paspor, pemperbaiki transparansi (matting HR BiRefNet), dan pengubahan ukuran sadar-konten (biner Go caire).
+Operasi yang didukung: penghapusan latar belakang (rembg/BiRefNet), peningkatan (RealESRGAN), keburaman wajah (MediaPipe), penyempurnaan wajah (GFPGAN/CodeFormer), penghapusan objek (LaMa ONNX), OCR (Tesseract dan RapidOCR dengan model PP-OCR ONNX), pewarnaan (DDColor), penghilangan noise, penghilangan mata merah, restorasi foto, pembuatan foto paspor, perbaikan transparansi (BiRefNet HR-matting), dan pengubahan ukuran berdasarkan konten (Go caire biner).
 
-Skrip Python berada di `packages/ai/python/`. Image Docker mengunduh terlebih dahulu semua bobot model selama build sehingga kontainer bekerja sepenuhnya offline.
+Skrip Python ada di `packages/ai/python/`. Paket model opsional berukuran besar dipasang sesuai permintaan ke dalam volume `/data/ai` yang persisten. OCR yang akurat menggunakan artefak khusus platform yang ditandatangani; tingkat Tesseract bawaan tidak memerlukan pengunduhan paket model.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Situs VitePress ini. Di-deploy ke Cloudflare Pages secara otomatis saat push ke 
 2. Frontend mengirim POST multipart ke `/api/v1/tools/:section/:toolId` dengan file dan pengaturan.
 3. Route API memvalidasi input dengan Zod, lalu mengirim pemrosesan.
 4. Untuk tool standar, job dimasukkan ke antrean ke pool BullMQ yang sesuai (image, media, atau docs berdasarkan modalitas). Worker BullMQ dalam proses secara otomatis mengorientasikan gambar berdasarkan metadata EXIF, menjalankan fungsi proses tool, dan mengembalikan hasilnya.
-5. Untuk tool AI, penghubung TypeScript mengirim permintaan ke dispatcher Python yang persisten (atau memunculkan subproses baru sebagai fallback), menunggunya selesai, dan membaca file keluaran.
+5. Untuk sebagian besar alat AI, jembatan TypeScript mengirimkan permintaan ke Python dispatcher yang persisten. OCR yang cepat malah memanggil Tesseract, dan OCR yang akurat memulai eksekusi yang disematkan dari generasi OCR aktif yang tidak dapat diubah. Tingkat OCR yang diminta ditetapkan saat masuk dan tidak pernah diubah secara diam-diam selama eksekusi.
 6. Progres job dipertahankan ke tabel `jobs` di PostgreSQL sehingga state bertahan saat kontainer dimulai ulang. Pembaruan waktu nyata dikirimkan melalui SSE di `/api/v1/jobs/:jobId/progress`.
 7. API mengembalikan `jobId` dan `downloadUrl`. Pengguna mengunduh file yang telah diproses dari `/api/v1/download/:jobId/:filename`.
 

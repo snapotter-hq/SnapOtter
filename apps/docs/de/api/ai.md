@@ -1,18 +1,26 @@
 ---
 description: "KI-Engine-Referenz mit allen lokalen ML-Werkzeugen. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr."
-i18n_source_hash: 14728c1dcd05
-i18n_provenance: machine
-i18n_output_hash: 00f94aaf3764
+i18n_output_hash: 015ad29c4981
+i18n_source_hash: aa9a56cdddc7
+i18n_provenance: human
 ---
 
 # KI-Engine-Referenz {#ai-engine-reference}
 
-Das `@snapotter/ai`-Paket verbindet Node.js mit einem **dauerhaften Python-Sidecar** für alle ML-Operationen. Der Dispatcher-Prozess bleibt zwischen Anfragen aktiv, was einen schnellen Warmstart ermöglicht. NVIDIA CUDA wird beim Start automatisch erkannt und, sofern verfügbar, genutzt; andernfalls laufen KI-Werkzeuge auf der CPU.
+Das `@snapotter/ai`-Paket koordiniert native Tools und Python-Laufzeiten für lokale ML-Vorgänge. Die meisten ML-Tools verwenden einen dauerhaften Python sidecar für schnelle Warmstarts. OCR ist absichtlich getrennt: `fast` ruft die native Tesseract-Binärdatei auf, während `balanced` und `best` ein dediziertes persistentes JSONL dispatcher verwenden, das an die aktive unveränderliche RapidOCR-Generation unter `/data/ai/v3` angeheftet ist. Jede Anfrage enthält einen generation lease. Während eines Upgrades führt SnapOtter vor der Aktivierung einen smoke test für den Kandidaten aus, wechselt atomar zum neuen dispatcher und leert dann die alte Generation vor garbage collection.
+
+NVIDIA CUDA wird automatisch erkannt und von Laufzeiten verwendet, die es unterstützen. OCR verwendet CPU auf jedem Host, einschließlich Systemen mit NVIDIA-GPUs, und vermeidet CUDA und Treiberkopplung für dieses Tool.
 
 Eine iGPU-Beschleunigung von Intel/AMD über VA-API, Quick Sync oder OpenCL wird für KI-Inferenz derzeit nicht unterstützt. Das Durchreichen von `/dev/dri` in einen Container beschleunigt diese Python-Sidecar-Werkzeuge nicht, sofern keine CUDA-fähige NVIDIA-GPU verfügbar ist.
 
 19 KI-Werkzeuge im Python-Sidecar über vier Modalitäten hinweg (Bild, Audio, Video, Dokument), plus 2 Werkzeuge mit optionalen KI-Fähigkeiten. Alle Modelle laufen lokal - nach dem ersten Modell-Download ist kein Internet erforderlich.
 
+
+<!-- korean-ocr-contract:start -->
+::: info Kompatibilität für koreanische OCR
+Fast OCR unterstützt `auto`, `en`, `de`, `es`, `fr`, `zh` und `ja`, aber kein Koreanisch (`ko`). Koreanisch benötigt das genaue OCR-Paket und `balanced` oder `best`. Das Paket läuft in offiziellen Linux-amd64- und arm64-Containern, auch auf NVIDIA-Hosts weiterhin auf der CPU. Nicht unterstützte Systeme erhalten einen eindeutigen Kompatibilitätsfehler und keinen stillen Rückfall auf `fast`. Koreanisch mit `fast` oder dem alten Alias `tesseract` wird vor dem Einreihen mit `FEATURE_INCOMPATIBLE` und `fast-korean-unsupported` abgelehnt.
+:::
+<!-- korean-ocr-contract:end -->
 ## Architektur {#architecture}
 
 ```
@@ -22,15 +30,17 @@ Node.js Tool Route
  @snapotter/ai bridge.ts
       | (stdin/stdout JSON + stderr progress events)
       v
- Python dispatcher (persistent process, "ai" profile)
+ +-- Native Tesseract + Ghostscript (fast image/PDF OCR)
+ |
+ +-- Isolated OCR runtime (persistent JSONL dispatcher)
+ |     `-- RapidOCR + ONNX Runtime CPU + pinned PP-OCR models
+ |
+ `-- Python dispatcher (persistent process, "ai" profile)
       |
       |-- remove_bg.py        (rembg / BiRefNet)
       |-- upscale.py          (RealESRGAN)
       |-- inpaint.py          (LaMa ONNX)
       |-- outpaint.py         (LaMa canvas expansion)
-      |-- ocr.py              (PaddleOCR / Tesseract)
-      |-- ocr_pdf.py          (page-by-page document OCR)
-      |-- ocr_preprocess.py   (image enhancement for OCR)
       |-- detect_faces.py     (MediaPipe)
       |-- face_landmarks.py   (MediaPipe landmarks)
       |-- enhance_faces.py    (GFPGAN / CodeFormer)
@@ -52,7 +62,7 @@ KI-Modelle werden nach gemeinsamem Abhängigkeits-Stack gebündelt, nicht als ei
 
 Das Docker-Image liefert die Anwendung sowie die gemeinsame Laufzeitumgebung. Große Modellarchive werden bei Bedarf in das dauerhafte `/data/ai`-Volume heruntergeladen und dann von jedem Werkzeug wiederverwendet, das sie benötigt. Wenn ein Bundle bereits installiert ist, weil ein anderes Werkzeug es benötigt hat, lädt das Aktivieren eines neuen abhängigen Werkzeugs dieses Bundle nicht erneut herunter.
 
-Jedes KI-Werkzeug benötigt ein oder mehrere Feature-Bundles, bevor es ausgeführt werden kann. Die Admin-Oberfläche installiert werkzeugbezogen über `POST /api/v1/admin/tools/:toolId/features/install`, das die vollständige Bundle-Liste auflöst, bereits installierte Bundles überspringt und nur die fehlenden Downloads in die Warteschlange stellt. Zum Beispiel stellt das Aktivieren von Passfoto auf einer frischen Instanz `background-removal` und `face-detection` in die Warteschlange; wird es aktiviert, nachdem Hintergrundentfernung bereits installiert ist, wird nur `face-detection` in die Warteschlange gestellt.
+Die meisten KI-Tools erfordern ein oder mehrere Funktionspakete, bevor sie ausgeführt werden können. Die Admin-Benutzeroberfläche installiert diese per Tool über `POST /api/v1/admin/tools/:toolId/features/install`, das die vollständige Bundle-Liste auflöst, bereits installierte Bundles überspringt und nur die fehlenden Downloads in die Warteschlange stellt. Wenn Sie beispielsweise Passport Photo auf einer neuen Instanz aktivieren, werden die Warteschlangen `background-removal` und `face-detection` angezeigt. Wenn Sie es aktivieren, nachdem die Hintergrundentfernung bereits installiert ist, werden nur Warteschlangen angezeigt `face-detection`. OCR ist die Ausnahme, da `fast` kein Paket benötigt; Installieren Sie die optionale genaue Laufzeit über die Benutzeroberfläche oder `POST /api/v1/admin/features/ocr/install`.
 
 | Bundle | Größe | Gemeinsame Abhängigkeitsgruppe | Werkzeuge, die es nutzen |
 |--------|------|-------------------------|-------------------|
@@ -61,7 +71,7 @@ Jedes KI-Werkzeug benötigt ein oder mehrere Feature-Bundles, bevor es ausgefüh
 | `object-eraser-colorize` | 1-2 GB | LaMa Inpainting/Outpainting und DDColor | erase-object, colorize, ai-canvas-expand |
 | `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, Rauschunterdrückung | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | Kratzerreparatur und Restaurierungs-Pipeline | restore-photo |
-| `ocr` | 5-6 GB | PaddleOCR / Tesseract OCR-Stack | ocr, ocr-pdf |
+| `ocr` | ~208-234 MiB herunterladen / ~409-488 MiB installiert | Optionale Modelle RapidOCR 3.9.1, ONNX Runtime 1.20.1 und angeheftete PP-OCR-Modelle | ocr, ocr-pdf (nur `balanced` und `best`) |
 | `transcription` | ~600 MB | faster-whisper Sprache-zu-Text-Modelle | transcribe-audio, auto-subtitles |
 
 Werkzeuge mit bundleübergreifenden Abhängigkeiten:
@@ -71,7 +81,17 @@ Werkzeuge mit bundleübergreifenden Abhängigkeiten:
 | `passport-photo` | `background-removal`, `face-detection` | Entfernt den Hintergrund und verwendet dann Gesichtslandmarken, um den Zuschnitt gemäß den Regeln für Pass- und Ausweisfotos auszurichten. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Erkennt Gesichter, bevor es GFPGAN oder CodeFormer zur Verbesserung der ausgewählten Gesichtsbereiche ausführt. |
 
-Ein Werkzeug ist nur verfügbar, wenn alle erforderlichen Bundles installiert sind. Teilinstallationen sind gültig und werden inkrementell behandelt: installierte Bundles werden wiederverwendet, fehlende Bundles werden als Downloads angezeigt, und Installationen in der Warteschlange werden nacheinander ausgeführt, damit die gemeinsame Python-Umgebung nicht gleichzeitig verändert wird.
+Ein Tool ist nur verfügbar, wenn alle erforderlichen Bundles installiert sind, mit Ausnahme von OCR: Die integrierte `fast`-Stufe bleibt auch ohne das optionale OCR-Paket verfügbar. Teilinstallationen sind gültig und werden inkrementell verarbeitet: Installierte Bundles werden wiederverwendet, fehlende Bundles werden als Downloads angezeigt und Installationen in der Warteschlange werden einzeln ausgeführt, sodass die freigegebene Python-Umgebung nicht gleichzeitig geändert wird.
+
+### Genaue OCR-Laufzeitinstallation {#accurate-ocr-runtime-installation}
+
+Das genaue OCR-Paket ist eine plattformspezifische Laufzeit für den offiziellen Linux amd64- oder Linux arm64-Container. Der amd64-Build verwendet Python 3.12; Der arm64-Build verwendet Python 3.11. Beide Builds führen RapidOCR über ONNX Runtime s `CPUExecutionProvider` aus, sodass dasselbe Paket auf Nur-CPU- und NVIDIA Docker-Hosts funktioniert. Die genaue Laufzeit erfordert mindestens 4 GiB effektiven Speicher: das konfigurierte Container-cgroup-Limit, andernfalls Host-Speicher. Ein System unterhalb dieses signierten Kompatibilitätsminimums wird vor dem Download abgelehnt. Diese Anforderung gilt nicht für integrierte Fast OCR. Bare-metal-Builds werden abgelehnt, da ihre libc und Python ABI nicht sicher abgeleitet werden können. Schnelles OCR bleibt verfügbar, wenn der Host Tesseract und Ghostscript bereitstellt.
+
+Das optionale Artefakt ist je nach Architektur etwa 208–234 MiB komprimiert und 409–488 MiB extrahiert. Der signierte Index bindet die genauen komprimierten und extrahierten Bytezahlen, die vom Installationsprogramm erzwungen werden. Das integrierte Tesseract fügt etwa 25 MiB zum offiziellen Image hinzu und benötigt keine Dateien in `/data/ai`.
+
+Die Online-Installation ruft einen signierten Release-Index und das genaue inhaltsadressierte Artefakt für die aktuelle Plattform ab. SnapOtter überprüft die Indexsignatur von Ed25519, die Artefaktgröße, den SHA-256-Digest, die Modell-Digests, Pfade, Dateimodi und bereitgestellten smoke test, bevor die neue Generation atomar aktiviert wird. Bei einer fehlgeschlagenen Installation bleibt die vorherige fehlerfreie Generation aktiv.
+
+Laden Sie für eine Air-Gap-Installation sowohl das `ocr-runtime-index.json` der Version als auch das passende OCR-Laufzeitarchiv in `POST /api/v1/admin/features/import` hoch, indem Sie mehrteilige Felder mit den Namen `index` und `archive` verwenden. Beim Offline-Import werden dieselben Signatur-, Hash-, Extraktions-, Kompatibilitäts- und Rauchtestprüfungen angewendet wie bei der Online-Installation. Ein Archiv ohne seinen vertrauenswürdigen signierten Index wird abgelehnt.
 
 ---
 
@@ -143,16 +163,16 @@ Zeichnet den Hintergrund weich und hält das Motiv scharf.
 ## OCR / Textextraktion {#ocr-text-extraction}
 
 **Werkzeug-Route:** `ocr`  
-**Modelle:** Tesseract (schnell), PaddleOCR PP-OCRv5 (ausgewogen), PaddleOCR-VL 1.5 (beste)
+**Modelle:** Tesseract (`fast`); RapidOCR mit kleinen PP-OCRv6-Modellen (`balanced`); PP-OCRv6 mittlere Modelle mit kalibrierter Variantenbewertung (`best`)
 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Verarbeitungsstufe |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
 | `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| `enhance` | boolean | `true` | Bild vorverarbeiten, um die OCR-Genauigkeit zu verbessern |
-| `engine` | string | - | Veraltet. Bildet `tesseract` auf `fast` ab, `paddleocr` auf `balanced` |
+| `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
+| `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
 
-Gibt strukturierte Ergebnisse mit Begrenzungsrahmen, Konfidenzwerten und extrahierten Textblöcken zurück.
+Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -163,9 +183,13 @@ Extrahiert Text aus gescannten PDF-Dokumenten mittels KI-gestützter OCR, Seite 
 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | `"balanced"` | Verarbeitungsstufe |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
 | `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
 | `pages` | string | `"all"` | Seitenauswahl: `"all"`, `"1-3"`, `"1,3,5"` |
+| `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
+| `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
+
+Die gleiche No-Downgrade-Regel gilt für PDF OCR. PDF Seiten werden vor der Erkennung gerastert und eine Anfrage kann höchstens 50 Seiten auswählen.
 
 ## Gesichts- / PII-Weichzeichnung {#face-pii-blur}
 

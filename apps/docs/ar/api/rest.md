@@ -1,8 +1,8 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: 89f2ba5743eb
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # مرجع REST API {#rest-api-reference}
@@ -178,7 +178,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `remove-background` | إزالة الخلفية | rembg (BiRefNet / U2-Net) | `model`، `backgroundType` (transparent/color/gradient/blur/image)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurEnabled`، `blurIntensity`، `shadowEnabled`، `shadowOpacity` |
 | `upscale` | تكبير الصورة | RealESRGAN | `scale` (2/4)، `model`، `faceEnhance`، `denoise`، `format`، `quality` |
 | `erase-object` | ممحاة الكائنات | LaMa (ONNX) | يُرسل القناع كجزء الملف الثاني (اسم الحقل `mask`)، `format`، `quality` |
-| `ocr` | OCR / استخراج النص | PaddleOCR / Tesseract | `quality` (fast/balanced/best)، `language`، `enhance` |
+| `ocr` | OCR / استخراج النص | Tesseract (سريع)؛ RapidOCR + PP-OCR ONNX (متوازن/الأفضل) | `quality` (سريع/متوازن/الأفضل)، `language`، `enhance` |
 | `blur-faces` | تمويه الوجه / معلومات التعريف الشخصية | MediaPipe | `blurRadius`، `sensitivity` |
 | `smart-crop` | قص ذكي | MediaPipe + Sharp | `mode` (subject/face/trim)، `strategy` (attention/entropy)، `width`، `height`، `padding`، `facePreset` (closeup/head-shoulders/upper-body/half-body)، `sensitivity`، `threshold`، `padToSquare`، `padColor`، `targetSize`، `quality` |
 | `image-enhancement` | تحسين الصورة | قائم على التحليل | `mode` (auto/exposure/contrast/color/sharpness)، `strength` |
@@ -425,7 +425,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 
 ## المعالجة الدفعية {#batch-processing}
 
-تطبيق أداة عامة مُفعَّلة للدفعات على عدة ملفات دفعةً واحدة. يُرجع أرشيف ZIP. تستخدم المسارات المخصصة متعددة الملفات أو متعددة الخطوات، مثل توقيع PDF وPDF OCR ومسارات الإعدادات الجاهزة PDF إلى صورة، عقد نقطة نهاية خاصة بها بدلًا من مسار `/batch` العام.
+تطبيق أداة عامة مُفعَّلة للدفعات على عدة ملفات دفعةً واحدة. يُرجع أرشيف ZIP. تستخدم المسارات المخصصة متعددة الملفات أو متعددة الخطوات، مثل توقيع PDF ومسارات الإعدادات الجاهزة PDF إلى صورة، عقد نقطة نهاية خاصة بها بدلًا من مسار `/batch` العام.
+
+تدعم أداة `ocr-pdf` مسار `/batch` العام هذا.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 إدارة حزم ميزات الذكاء الاصطناعي (تثبيت/إلغاء تثبيت حزم نماذج الذكاء الاصطناعي في بيئة Docker). فضّل نقطة نهاية التثبيت على مستوى الأداة عند تفعيل أداة من أتمتة مخصصة: تحتاج بعض أدوات الذكاء الاصطناعي إلى أكثر من حزمة مشتركة، وتتخطى هذه النقطة الحزم المثبَّتة مسبقًا وتُدرج المفقودة فقط في الطابور.
 
+OCR هو تحسين اختياري وليس تبعية ثابتة. تعمل طبقة `fast` Tesseract بدون حزمة؛ يقوم `POST /api/v1/admin/features/ocr/install` بتثبيت حزمة RapidOCR الموقعة لـ `balanced` و`best` على Linux amd64 أو arm64. يستخدم وقت تشغيل OCR الدقيق CPU على وحدة المعالجة المركزية (CPU) فقط ومضيفي NVIDIA ويتطلب ما لا يقل عن 4 GiB من الذاكرة الفعالة (حد cgroup للحاوية التي تم تكوينها، وإلا فإن ذاكرة المضيف). يُبلغ SnapOtter عن سبب توافق `requiredMemoryBytes` و`effectiveMemoryBytes` و`insufficient-memory`، ويرفض التثبيت غير المتوافق قبل التنزيل. لا تنطبق متطلبات الذاكرة هذه على `fast`. تحتوي الحزمة على حوالي 208-234 MiB للتنزيل و409-488 MiB مثبتة، اعتمادًا على الهدف؛ يربط الفهرس الموقع الأحجام الدقيقة المفروضة أثناء التثبيت.
+
 | الطريقة | المسار | الوصول | الوصف |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | مصادَق | سرد جميع حزم الميزات وحالة تثبيتها |
@@ -601,7 +605,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | مسؤول (`features:manage`) | تثبيت كل حزمة تتطلبها أداة؛ يُرجع حالة مُدرَج في الطابور/متخطى لكل حزمة |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | مسؤول (`features:manage`) | إلغاء تثبيت حزمة ميزة وتنظيف ملفات النموذج |
 | `GET` | `/api/v1/admin/features/disk-usage` | مسؤول (`features:manage`) | الحصول على إجمالي استخدام القرص لنماذج الذكاء الاصطناعي |
-| `POST` | `/api/v1/admin/features/import` | مسؤول (`features:manage`) | استيراد أرشيف حزمة ذكاء اصطناعي دون اتصال |
+| `POST` | `/api/v1/admin/features/import` | المشرف (`features:manage`) | استيراد حزمة AI قديمة (`file`) أو إصدار OCR دون اتصال (`index` بالإضافة إلى `archive`) |
+
+ذو فجوة هوائية OCR يجب أن يتضمن الاستيراد موقعة الإصدار `ocr-runtime-index.json` وأرشيف النظام الأساسي المطابق. SnapOtter ينطبق نفس الشيء Ed25519 إمضاء، تجزئة قطعة أثرية, التوافق, اِستِخلاص، وفحوصات اختبار الدخان المستخدمة في التثبيت عبر الإنترنت:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+استخدم أرشيف `linux-arm64-cpu-py311` على arm64. يتم رفض قطعة أثرية موقعة لهدف آخر بدلاً من تثبيتها.
 
 ## عمليات الإدارة {#admin-operations}
 

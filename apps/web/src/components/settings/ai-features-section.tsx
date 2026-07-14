@@ -73,6 +73,7 @@ export function AiFeaturesSection() {
     resetError,
   } = useFeaturesStore();
   const [diskUsage, setDiskUsage] = useState<number | null>(null);
+  const installableBundles = bundles.filter((bundle) => bundle.compatibility !== "incompatible");
 
   const loadDiskUsage = useCallback(async () => {
     try {
@@ -108,7 +109,9 @@ export function AiFeaturesSection() {
         <button
           type="button"
           onClick={installAll}
-          disabled={installAllActive || bundles.every((b) => b.status === "installed")}
+          disabled={
+            installAllActive || installableBundles.every((bundle) => bundle.status === "installed")
+          }
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           <Download className="h-4 w-4" />
@@ -243,18 +246,31 @@ function ResetEnvironmentSection({
 
 function ImportBundleSection({ onImported }: { onImported: () => void }) {
   const { t } = useTranslation();
+  const [mode, setMode] = useState<"ocr" | "legacy">("ocr");
   const [importing, setImporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
     null,
   );
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [ocrIndex, setOcrIndex] = useState<File | null>(null);
+  const [ocrArchive, setOcrArchive] = useState<File | null>(null);
+  const [legacyArchive, setLegacyArchive] = useState<File | null>(null);
+  const indexRef = useRef<HTMLInputElement>(null);
+  const ocrArchiveRef = useRef<HTMLInputElement>(null);
+  const legacyArchiveRef = useRef<HTMLInputElement>(null);
+  const canImport = mode === "ocr" ? !!ocrIndex && !!ocrArchive : !!legacyArchive;
 
-  const handleImport = async (file: File) => {
+  const handleImport = async () => {
+    if (!canImport) return;
     setImporting(true);
     setFeedback(null);
 
     const formData = new FormData();
-    formData.append("file", file);
+    if (mode === "ocr" && ocrIndex && ocrArchive) {
+      formData.append("index", ocrIndex);
+      formData.append("archive", ocrArchive);
+    } else if (mode === "legacy" && legacyArchive) {
+      formData.append("file", legacyArchive);
+    }
 
     try {
       const res = await fetch("/api/v1/admin/features/import", {
@@ -269,6 +285,12 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       }
 
       setFeedback({ type: "success", message: t.settings.aiFeatures.importSuccess });
+      setOcrIndex(null);
+      setOcrArchive(null);
+      setLegacyArchive(null);
+      for (const input of [indexRef.current, ocrArchiveRef.current, legacyArchiveRef.current]) {
+        if (input) input.value = "";
+      }
       onImported();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -278,7 +300,6 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       });
     } finally {
       setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -292,21 +313,84 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
           {t.settings.aiFeatures.importDescription}
         </p>
       </div>
+      <fieldset className="space-y-2">
+        <legend className="text-xs font-medium text-foreground">
+          {t.settings.aiFeatures.importType}
+        </legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <label className="flex items-center gap-2 text-xs text-foreground">
+            <input
+              type="radio"
+              name="ai-bundle-import-type"
+              value="ocr"
+              checked={mode === "ocr"}
+              onChange={() => {
+                setMode("ocr");
+                setFeedback(null);
+              }}
+            />
+            {t.settings.aiFeatures.importOcr}
+          </label>
+          <label className="flex items-center gap-2 text-xs text-foreground">
+            <input
+              type="radio"
+              name="ai-bundle-import-type"
+              value="legacy"
+              checked={mode === "legacy"}
+              onChange={() => {
+                setMode("legacy");
+                setFeedback(null);
+              }}
+            />
+            {t.settings.aiFeatures.importLegacy}
+          </label>
+        </div>
+      </fieldset>
+
+      {mode === "ocr" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-xs font-medium text-foreground">
+            <span>{t.settings.aiFeatures.importOcrIndex}</span>
+            <input
+              ref={indexRef}
+              type="file"
+              accept=".json,application/json"
+              disabled={importing}
+              onChange={(event) => setOcrIndex(event.target.files?.[0] ?? null)}
+              className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground file:me-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
+            />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-foreground">
+            <span>{t.settings.aiFeatures.importOcrArchive}</span>
+            <input
+              ref={ocrArchiveRef}
+              type="file"
+              accept=".tar.gz,.tgz,application/gzip"
+              disabled={importing}
+              onChange={(event) => setOcrArchive(event.target.files?.[0] ?? null)}
+              className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground file:me-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
+            />
+          </label>
+        </div>
+      ) : (
+        <label className="block space-y-1 text-xs font-medium text-foreground">
+          <span>{t.settings.aiFeatures.importLegacyArchive}</span>
+          <input
+            ref={legacyArchiveRef}
+            type="file"
+            accept=".tar.gz,.tgz,application/gzip"
+            disabled={importing}
+            onChange={(event) => setLegacyArchive(event.target.files?.[0] ?? null)}
+            className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground file:me-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
+          />
+        </label>
+      )}
+
       <div className="flex items-center gap-3">
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".tar.gz,.tgz"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleImport(file);
-          }}
-        />
         <button
           type="button"
-          disabled={importing}
-          onClick={() => fileRef.current?.click()}
+          disabled={importing || !canImport}
+          onClick={handleImport}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
         >
           {importing ? (
@@ -319,6 +403,8 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       </div>
       {feedback && (
         <p
+          role={feedback.type === "error" ? "alert" : "status"}
+          aria-live="polite"
           className={`text-xs ${feedback.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
         >
           {feedback.message}
@@ -356,6 +442,8 @@ function BundleCard({
 }) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
+  const incompatible = bundle.compatibility === "incompatible";
+  const displayedError = error ?? bundle.error;
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * PROGRESS_MESSAGES.length),
   );
@@ -406,7 +494,7 @@ function BundleCard({
                 </span>
               </>
             )}
-            {status === "not_installed" && !error && (
+            {status === "not_installed" && !displayedError && (
               <>
                 <span className="bg-muted-foreground rounded-full h-2 w-2" />
                 <span className="text-xs text-muted-foreground">
@@ -428,17 +516,17 @@ function BundleCard({
                 <span className="text-xs text-muted-foreground">{progress.percent}%</span>
               </>
             )}
-            {(status === "error" || error) && (
+            {(status === "error" || displayedError) && (
               <>
                 <span className="bg-destructive rounded-full h-2 w-2" />
                 <span className="text-xs text-destructive truncate max-w-[120px]">
-                  {error ?? bundle.error}
+                  {displayedError}
                 </span>
               </>
             )}
           </div>
 
-          {status === "not_installed" && !error && (
+          {status === "not_installed" && !displayedError && !incompatible && (
             <button
               type="button"
               onClick={onInstall}
@@ -500,16 +588,19 @@ function BundleCard({
               {t.settings.aiFeatures.installing}
             </button>
           )}
-          {(status === "error" || error) && !isInstalling && !isQueued && (
-            <button
-              type="button"
-              onClick={onInstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              {t.common.retry}
-            </button>
-          )}
+          {(status === "error" || displayedError) &&
+            !isInstalling &&
+            !isQueued &&
+            !incompatible && (
+              <button
+                type="button"
+                onClick={onInstall}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                {t.common.retry}
+              </button>
+            )}
         </div>
       </div>
       {status === "installing" && progress && (

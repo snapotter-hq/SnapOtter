@@ -8,7 +8,8 @@ import { apiToolPath } from "@snapotter/shared";
 // enhance-faces, colorize, noise-removal, red-eye-removal, restore-photo,
 // passport-photo, erase-object
 //
-// These tools require the AI sidecar (Python bridge). Each test detects
+// Most of these tools require the AI sidecar (Python bridge). OCR Fast is
+// built in; only its signed Balanced/Best runtime is optional. Each test detects
 // whether the required feature bundle is installed:
 //   - 200 = tool works, verify output
 //   - 501 FEATURE_NOT_INSTALLED = skip gracefully (expected when bundle missing)
@@ -71,7 +72,6 @@ async function isFeatureInstalled(
     "enhance-faces": "upscale-enhance",
     "noise-removal": "upscale-enhance",
     "restore-photo": "photo-restoration",
-    ocr: "ocr",
   };
 
   const bundleId = toolBundleMap[toolId];
@@ -79,6 +79,25 @@ async function isFeatureInstalled(
 
   const bundle = data.bundles?.find((b: { id: string }) => b.id === bundleId);
   return bundle?.status === "installed";
+}
+
+interface OcrFeatureState {
+  status: string;
+  compatibility?: "compatible" | "incompatible" | "invalid";
+  availableQualities?: Array<"fast" | "balanced" | "best">;
+}
+
+async function getOcrFeatureState(
+  request: import("@playwright/test").APIRequestContext,
+): Promise<OcrFeatureState> {
+  const res = await request.get("/api/v1/features", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(res.ok()).toBe(true);
+  const data = await res.json();
+  const state = data.bundles?.find((bundle: { id: string }) => bundle.id === "ocr");
+  expect(state).toBeDefined();
+  return state as OcrFeatureState;
 }
 
 /**
@@ -226,35 +245,68 @@ test.describe("Upscale", () => {
 // ─── OCR ────────────────────────────────────────────────────────────
 
 test.describe("OCR", () => {
-  test("OCR processes image or returns 501", async ({ request }) => {
+  test("default OCR works with or without the accurate pack", async ({ request }) => {
+    const state = await getOcrFeatureState(request);
     const result = await callAiTool(request, "ocr", JPG_100x100, {});
-    if (!result.installed) {
-      expect(result.body.feature).toBe("ocr");
-      test.skip();
-      return;
-    }
     expect(result.ok).toBe(true);
-    // OCR response may have text, blocks, or engine field
-    expect(result.body.text !== undefined || result.body.blocks !== undefined).toBe(true);
+    expect(typeof result.body.text).toBe("string");
+
+    if (state.availableQualities?.includes("best")) {
+      expect(result.body).toMatchObject({
+        engine: "rapidocr-onnx",
+        provider: "CPUExecutionProvider",
+        device: "cpu",
+        requestedQuality: "best",
+        actualQuality: "best",
+        degraded: false,
+      });
+    } else {
+      expect(result.body).toMatchObject({
+        engine: "tesseract",
+        provider: "native",
+        device: "cpu",
+        requestedQuality: "fast",
+        actualQuality: "fast",
+        degraded: false,
+      });
+    }
   });
 
-  test("OCR with tesseract engine", async ({ request }) => {
-    const result = await callAiTool(request, "ocr", JPG_100x100, { engine: "tesseract" });
-    if (!result.installed) {
-      test.skip();
-      return;
-    }
+  test("Fast OCR is always the built-in native CPU engine", async ({ request }) => {
+    const result = await callAiTool(request, "ocr", JPG_100x100, { quality: "fast" });
     expect(result.ok).toBe(true);
+    expect(result.body).toMatchObject({
+      engine: "tesseract",
+      provider: "native",
+      device: "cpu",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      degraded: false,
+    });
   });
 
-  test("OCR with paddleocr engine", async ({ request }) => {
-    const result = await callAiTool(request, "ocr", JPG_100x100, { engine: "paddleocr" });
-    if (!result.installed) {
-      test.skip();
-      return;
-    }
-    expect(result.ok).toBe(true);
-  });
+  for (const quality of ["balanced", "best"] as const) {
+    test(`${quality} OCR requires the signed accurate runtime`, async ({ request }) => {
+      const state = await getOcrFeatureState(request);
+      const result = await callAiTool(request, "ocr", JPG_100x100, { quality });
+
+      if (state.availableQualities?.includes(quality)) {
+        expect(result.ok).toBe(true);
+        expect(result.body).toMatchObject({
+          engine: "rapidocr-onnx",
+          provider: "CPUExecutionProvider",
+          device: "cpu",
+          requestedQuality: quality,
+          actualQuality: quality,
+          degraded: false,
+        });
+      } else {
+        expect(result.status).toBe(501);
+        expect(["FEATURE_NOT_INSTALLED", "FEATURE_INCOMPATIBLE"]).toContain(result.body.code);
+        expect(result.body).toMatchObject({ feature: "ocr", requestedQuality: quality });
+      }
+    });
+  }
 
   test("OCR on Japanese text image", async ({ request }) => {
     const ocrJapanese = contentFixture("ocr-japanese.png");
@@ -262,25 +314,26 @@ test.describe("OCR", () => {
       request,
       "ocr",
       ocrJapanese,
-      {},
+      { quality: "fast" },
       "ocr-japanese.png",
       "image/png",
     );
-    if (!result.installed) {
-      test.skip();
-      return;
-    }
     expect(result.ok).toBe(true);
+    expect(result.body).toMatchObject({ engine: "tesseract", actualQuality: "fast" });
   });
 
   test("OCR on chat screenshot", async ({ request }) => {
     const ocrChat = contentFixture("ocr-chat.jpeg");
-    const result = await callAiTool(request, "ocr", ocrChat, {}, "ocr-chat.jpeg", "image/jpeg");
-    if (!result.installed) {
-      test.skip();
-      return;
-    }
+    const result = await callAiTool(
+      request,
+      "ocr",
+      ocrChat,
+      { quality: "fast" },
+      "ocr-chat.jpeg",
+      "image/jpeg",
+    );
     expect(result.ok).toBe(true);
+    expect(result.body).toMatchObject({ engine: "tesseract", actualQuality: "fast" });
     // Chat screenshot should contain some readable text
     if (result.body.text) {
       expect((result.body.text as string).length).toBeGreaterThan(0);
@@ -788,7 +841,6 @@ test.describe("AI Feature Bundle Status", () => {
       { tool: "upscale", featureKey: "upscale", bundle: "upscale-enhance" },
       { tool: "blur-faces", featureKey: "blur-faces", bundle: "face-detection" },
       { tool: "erase-object", featureKey: "erase-object", bundle: "object-eraser-colorize" },
-      { tool: "ocr", featureKey: "ocr", bundle: "ocr" },
       { tool: "colorize", featureKey: "colorize", bundle: "object-eraser-colorize" },
       {
         tool: "ai-canvas-expand",

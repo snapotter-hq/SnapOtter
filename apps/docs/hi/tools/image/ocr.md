@@ -1,31 +1,39 @@
 ---
-description: "AI-संचालित ऑप्टिकल कैरेक्टर रिकग्निशन का उपयोग करके इमेज से टेक्स्ट निकालें।"
-i18n_source_hash: 3d85d423b82c
+description: "अंतर्निहित Tesseract या वैकल्पिक उच्च-सटीकता RapidOCR रनटाइम के साथ स्थानीय रूप से छवियों से पाठ निकालें।"
+i18n_output_hash: 79d324d33cc9
+i18n_source_hash: 01c6fa6aebe7
 i18n_provenance: human
-i18n_output_hash: 47b6f369cfc3
 ---
 
 # OCR / Text Extraction {#ocr-text-extraction}
 
-AI-संचालित ऑप्टिकल कैरेक्टर रिकग्निशन का उपयोग करके इमेज से टेक्स्ट निकालें। कई भाषाओं और गुणवत्ता टियर का समर्थन करता है।
+किसी बाहरी सेवा को छवि भेजे बिना छवियों से पाठ निकालें। अंतर्निर्मित `fast` टियर Tesseract का उपयोग करता है। वैकल्पिक `balanced` और `best` टियर पिन किए गए PP-OCR ONNX मॉडल के साथ RapidOCR का उपयोग करते हैं।
 
+
+<!-- korean-ocr-contract:start -->
+::: info कोरियाई OCR संगतता
+तेज़ OCR `auto`, `en`, `de`, `es`, `fr`, `zh` और `ja` का समर्थन करता है, लेकिन कोरियाई (`ko`) का नहीं। कोरियाई के लिए सटीक OCR पैक और `balanced` या `best` आवश्यक है। पैक आधिकारिक Linux amd64 और arm64 कंटेनरों पर चलता है; NVIDIA होस्ट पर भी OCR CPU पर ही चलता है। असमर्थित सिस्टम स्पष्ट संगतता त्रुटि लौटाते हैं और चुपचाप `fast` पर वापस नहीं जाते। कोरियाई के साथ `fast` या पुराने `tesseract` नाम को कतार में डालने से पहले `FEATURE_INCOMPATIBLE` और `fast-korean-unsupported` के साथ अस्वीकार किया जाता है।
+:::
+<!-- korean-ocr-contract:end -->
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/ocr`
 
-**Processing:** सिंक्रोनस JSON प्रतिक्रिया। यदि `clientJobId` प्रदान किया गया हो, तो प्रगति की जानकारी SSE के माध्यम से भी दी जाती है।
+**प्रसंस्करण:** जब OCR सिंक्रोनस विंडो के अंदर समाप्त हो जाता है, तो JSON के साथ `200` लौटाता है। लंबी नौकरियाँ `202` लौटाती हैं; कार्य की SSE प्रगति स्ट्रीम को उसके टर्मिनल इवेंट तक फ़ॉलो करें, जिसके `result` में समान OCR फ़ील्ड शामिल हैं।
 
-**Model bundle:** `ocr` (5-6 GB)
+**सटीक OCR पैक:** वैकल्पिक `ocr` रनटाइम (लक्ष्य के आधार पर डाउनलोड करने के लिए लगभग 208-234 MiB और 409-488 MiB इंस्टॉल किया गया)। `fast` को इस पैक की आवश्यकता नहीं है; इंस्टॉलर हस्ताक्षरित सूचकांक द्वारा बंधे सटीक आकारों की पुष्टि करता है।
 
 ## Parameters {#parameters}
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| file | file | Yes | - | इमेज फ़ाइल (multipart) |
-| quality | string | No | `"balanced"` | गुणवत्ता टियर: `fast` (Tesseract), `balanced` (PaddleOCR v5), `best` (PaddleOCR VL) |
+| file | file | हाँ | - | छवि फ़ाइल (मल्टीपार्ट), 512 MiB तक एन्कोडेड और 40 मेगापिक्सेल डिकोडेड; कम ऑपरेटर अपलोड सीमा अभी भी लागू है |
+| quality | string | नहीं | गतिशील | गुणवत्ता स्तर: `fast` (Tesseract), `balanced` (छोटे PP-OCRv6 मॉडल के साथ RapidOCR), या `best` (कैलिब्रेटेड वेरिएंट स्कोरिंग के साथ उच्च सटीकता वाले मध्यम PP-OCRv6 मॉडल) |
 | language | string | No | `"auto"` | भाषा संकेत: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko` |
-| enhance | boolean | No | `true` | बेहतर OCR सटीकता के लिए इमेज को पूर्व-प्रोसेस करें |
-| engine | string | No | - | अप्रचलित। इसके बजाय `quality` का उपयोग करें। `tesseract` को `fast` से, `paddleocr` को `balanced` से मैप करता है |
+| enhance | boolean | नहीं | स्तर पर निर्भर | पहचान से पहले स्थानीय कंट्रास्ट में सुधार करें। फास्ट इसे सीधे लागू करता है; बैलेंस्ड और बेस्ट वेरिएंट को तभी बरकरार रखते हैं जब कैलिब्रेटेड स्कोरिंग से परिणाम में सुधार होता है। `best` के लिए डिफ़ॉल्ट `true` और `fast`/`balanced` के लिए `false` |
+| engine | string | नहीं | - | अस्वीकृत अनुकूलता उपनाम. इसके बजाय `quality` का उपयोग करें। `tesseract` से `fast` मानचित्र; लीगेसी `paddleocr` मान `balanced` पर मैप होता है लेकिन PaddlePaddle लोड नहीं होता है |
+
+जब `quality` और `engine` नहीं दिए जाते, SnapOtter इस क्रम में सर्वोत्तम उपलब्ध टियर चुनता है: `best`, `balanced`, `fast`। कोरियाई के लिए `fast` कभी नहीं चुना जाता; `best`, फिर `balanced` उपयोग होता है, अन्यथा सटीक रनटाइम का इंस्टॉलेशन या संगतता त्रुटि लौटती है।
 
 ## Example Request {#example-request}
 
@@ -42,13 +50,21 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "filename": "document.png",
   "text": "Extracted text content from the image...",
-  "engine": "paddleocr-vl"
+  "engine": "rapidocr-onnx",
+  "requestedQuality": "best",
+  "actualQuality": "best",
+  "device": "cpu",
+  "provider": "CPUExecutionProvider",
+  "degraded": false,
+  "warnings": [],
+  "runtimeVersion": "2.1.0",
+  "modelVersion": "PP-OCRv6-best-v1-medium"
 }
 ```
 
 ### Progress (SSE, optional) {#progress-sse-optional}
 
-यदि कोई `clientJobId` फ़ॉर्म फ़ील्ड प्रदान किया गया हो, तो प्रगति इवेंट स्ट्रीम किए जाते हैं:
+यदि एक `clientJobId` फॉर्म फ़ील्ड प्रदान किया जाता है, तो प्रगति कार्यक्रम स्ट्रीम किए जाते हैं। `202` प्रतिक्रिया का मतलब है कि क्लाइंट को टर्मिनल `complete` या `failed` इवेंट तक स्ट्रीम को खुला रखना चाहिए:
 
 ```
 event: progress
@@ -57,9 +73,12 @@ data: {"phase":"processing","stage":"Recognizing text...","percent":50}
 
 ## Notes {#notes}
 
-- `ocr` मॉडल बंडल का इंस्टॉल होना आवश्यक है (5-6 GB)।
+- `fast` हमेशा समर्थित SnapOtter छवियों में उपलब्ध है। `balanced` और `best` को वैकल्पिक सटीक OCR पैक की आवश्यकता होती है।
+- बिल्ट-इन Tesseract आधिकारिक छवि में लगभग 25 MiB जोड़ता है। सटीक पैक `/data/ai` में संग्रहीत है, छवि में बेक नहीं किया गया है।
+- सटीक पैक आधिकारिक Linux amd64 और arm64 कंटेनरों के लिए प्रकाशित किया गया है। यह जानबूझकर NVIDIA होस्ट सहित ONNX Runtime के CPU प्रदाता का उपयोग करता है, इसलिए यह CUDA लाइब्रेरी या GPU संगतता पर निर्भर नहीं करता है। स्रोत और पूर्वनिर्मित bare-metal इंस्टॉल फास्ट OCR का उपयोग करते हैं जब तक कि वे अपना स्वयं का संगत रनटाइम प्रदान नहीं करते हैं।
 - OCR इमेज डाउनलोड URL के बजाय सीधे निकाला गया टेक्स्ट लौटाता है।
-- एक फ़ॉलबैक श्रृंखला का उपयोग करता है: यदि कोई उच्च-गुणवत्ता टियर क्रैश हो जाता है (उदा., PaddleOCR segfault), तो यह स्वतः अगले निचले टियर के साथ पुनः प्रयास करता है।
-- यदि कोई टियर क्रैश हुए बिना खाली टेक्स्ट लौटाता है, तो यह भी अगले टियर पर फ़ॉलबैक करता है।
-- गुणवत्ता टियर इंजनों से मैप होते हैं: `fast` = Tesseract, `balanced` = PaddleOCR v5, `best` = PaddleOCR VL।
+- SnapOtter स्पष्ट रूप से अनुरोधित स्तर का सम्मान करता है। यदि `balanced` या `best` अनुपलब्ध है, तो API `FEATURE_NOT_INSTALLED` या `FEATURE_INCOMPATIBLE` के साथ `501` लौटाता है; यह कभी भी चुपचाप अनुरोध को दूसरे स्तर पर डाउनग्रेड नहीं करता है।
+- एक सफल खाली परिणाम एक खाली परिणाम ही रहता है। रनटाइम विफलताएँ निम्न-गुणवत्ता वाले इंजन के साथ पुनः प्रयास करने के बजाय एक त्रुटि लौटाती हैं।
+- प्रतिक्रिया `requestedQuality` और `actualQuality`, साथ ही इंजन, डिवाइस, प्रदाता, रनटाइम और मॉडल संस्करण और किसी भी चेतावनी की रिपोर्ट करती है।
 - स्वचालित डिकोडिंग के माध्यम से HEIC/HEIF, RAW, TGA, PSD, EXR और HDR इनपुट प्रारूपों का समर्थन करता है।
+- बड़े आकार के एन्कोडेड इनपुट `413` लौटाते हैं। 40 मेगापिक्सेल से अधिक की छवियाँ और उनकी निर्धारित आउटपुट सीमा से अधिक OCR प्रतिक्रियाओं को आंशिक रूप से संसाधित करने के बजाय अस्वीकार कर दिया जाता है।

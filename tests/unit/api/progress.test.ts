@@ -6,21 +6,38 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const dbMocks = vi.hoisted(() => ({ failure: null as Error | null }));
+
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({ get: () => null }),
+  db: (() => {
+    const executor = {
+      select: () => ({
+        from: () => ({
+          where: async () => {
+            if (dbMocks.failure) throw dbMocks.failure;
+            return [];
+          },
+        }),
       }),
-    }),
-    insert: () => ({ values: () => ({ run: vi.fn() }) }),
-    update: () => ({
-      set: () => ({
-        where: () => ({ run: () => ({ changes: 0 }) }),
+      insert: () => ({
+        values: async () => {
+          if (dbMocks.failure) throw dbMocks.failure;
+        },
       }),
-    }),
-  },
+      update: () => ({
+        set: () => ({
+          where: async () => {
+            if (dbMocks.failure) throw dbMocks.failure;
+          },
+        }),
+      }),
+    };
+    return {
+      ...executor,
+      transaction: async (callback: (tx: typeof executor) => Promise<void>) => callback(executor),
+    };
+  })(),
   pool: {},
   closeDb: async () => {},
   schema: {
@@ -34,8 +51,11 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 
 import type { JobProgress } from "../../../apps/api/src/routes/progress.js";
 import {
+  buildPersistedSingleFileProgress,
+  buildSingleFileReplayEvent,
   updateJobProgress,
   updateSingleFileProgress,
+  updateSingleFileProgressAtomically,
 } from "../../../apps/api/src/routes/progress.js";
 
 describe("updateJobProgress", () => {
@@ -107,6 +127,7 @@ describe("updateJobProgress", () => {
 
 describe("updateSingleFileProgress", () => {
   beforeEach(() => {
+    dbMocks.failure = null;
     vi.useFakeTimers();
   });
 
@@ -156,6 +177,104 @@ describe("updateSingleFileProgress", () => {
         result: { text: "OCR result" },
       }),
     ).not.toThrow();
+  });
+
+  it("returns a persistence promise that terminal producers can await", async () => {
+    const persisted = updateSingleFileProgress({
+      jobId: "single-awaitable",
+      phase: "complete",
+      percent: 100,
+      result: { text: "durable OCR result" },
+    });
+
+    expect(persisted).toBeInstanceOf(Promise);
+    await expect(persisted).resolves.toBeUndefined();
+  });
+
+  it("propagates a durable persistence failure to an awaiting terminal producer", async () => {
+    dbMocks.failure = new Error("database unavailable");
+
+    await expect(
+      updateSingleFileProgress({
+        jobId: "single-durable-failure",
+        phase: "complete",
+        percent: 100,
+        result: { text: "must not be reported durable" },
+      }),
+    ).rejects.toThrow("database unavailable");
+  });
+
+  it("commits authoritative completion and replay state in one awaited transaction", async () => {
+    const mutateAuthoritative = vi.fn().mockResolvedValue(undefined);
+
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: "single-atomic",
+        phase: "complete",
+        percent: 100,
+        result: { text: "transactional result" },
+      },
+      mutateAuthoritative,
+    );
+
+    expect(mutateAuthoritative).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("durable single-file terminal progress", () => {
+  it("persists the terminal result alongside percent and stage", () => {
+    expect(
+      buildPersistedSingleFileProgress({
+        jobId: "single-durable",
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: { text: "OCR result", downloadUrl: "/result.txt" },
+      }),
+    ).toEqual({
+      percent: 100,
+      stage: "complete",
+      result: { text: "OCR result", downloadUrl: "/result.txt" },
+    });
+  });
+
+  it("replays a completed durable result from the database row", () => {
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-replay",
+        status: "completed",
+        progress: {
+          percent: 100,
+          stage: "complete",
+          result: { text: "recovered" },
+        },
+        error: null,
+      }),
+    ).toEqual({
+      jobId: "single-replay",
+      type: "single",
+      phase: "complete",
+      percent: 100,
+      stage: "complete",
+      result: { text: "recovered" },
+    });
+  });
+
+  it("turns legacy completed rows without results into an explicit terminal failure", () => {
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-legacy",
+        status: "completed",
+        progress: { percent: 100, stage: "complete" },
+        error: null,
+      }),
+    ).toEqual({
+      jobId: "single-legacy",
+      type: "single",
+      phase: "failed",
+      percent: 100,
+      error: "Completed result is no longer available. Run the job again.",
+    });
   });
 });
 

@@ -1,0 +1,622 @@
+{
+  "binaryBudgetBytes": 5242880,
+  "boardCohort": {
+    "distinctRowGroups": [0, 1, 3],
+    "fixtureIds": ["jawildtext-board-0001", "jawildtext-board-0049", "jawildtext-board-0127"],
+    "perImageFastFloor": {
+      "minimumTokenF1": 0.32,
+      "minimumTokenPrecision": 0.5,
+      "minimumTokenRecall": 0.25
+    },
+    "selectionRule": "The smallest byte-for-byte source image in each of row groups 0, 1, and 3; image-only visual/privacy review confirmed distinct conditions and safe public content.",
+    "selectionStatus": "FROZEN_BEFORE_ANY_OCR_OUTPUT",
+    "stopPolicy": "If any frozen cohort image fails after the general development-corpus fix, stop rotating fixtures and reconsider the Fast CJK architecture."
+  },
+  "description": "Pinned, redistributable real-capture OCR regression fixtures with verbatim source annotations.",
+  "excludedCandidates": [
+    {
+      "dataset": "TextOCR",
+      "reason": "Not redistributed: Open Images says image licenses must be verified per original Flickr image, and that chain of title was not revalidated for a selected TextOCR record.",
+      "sourceUrls": [
+        "https://textvqa.org/textocr/dataset/",
+        "https://github.com/openimages/dataset/blob/master/READMEV3.md"
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "annotation": {
+        "bytes": 19077,
+        "path": "annotations/jawildtext-board-0001.json",
+        "sha256": "4e01a2057c5f2889d78bd26b369b44e53dad9ffcdc69b2a70f28844068cafefc",
+        "sourceField": "record.polygons"
+      },
+      "category": "board-or-sign",
+      "evaluation": {
+        "ignoredTokens": ["<UNK>"],
+        "mode": "annotation-token-coverage",
+        "notes": "Polygon order is annotation order, not guaranteed page reading order; score per-polygon text coverage and ignore only literal <UNK> labels."
+      },
+      "groundTruth": {
+        "bytes": 1341,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/jawildtext-board-0001.txt",
+        "sha256": "a8e8a7adef665d299f50a355b5c79d9d2a69e4d0f187fdedfe6312befe446c02",
+        "sourceField": "record.polygons[*].text",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "jawildtext-board-0001",
+      "image": {
+        "bytes": 93653,
+        "height": 1080,
+        "mediaType": "image/jpeg",
+        "path": "images/jawildtext-board-0001.jpg",
+        "sha256": "04b24d7189f1d905b40ab784ac912c158e2f49377dbf0ec53421b4709a356bfe",
+        "sourceSha256": "04b24d7189f1d905b40ab784ac912c158e2f49377dbf0ec53421b4709a356bfe",
+        "width": 1080
+      },
+      "language": "ja",
+      "provenance": {
+        "annotationLicense": "Apache-2.0",
+        "attribution": "JaWildText by Koki Maeda and Naoaki Okazaki (LLM-jp), released as an ICDAR 2026 benchmark.",
+        "dataset": "llm-jp/jawildtext",
+        "licenseEvidenceUrls": [
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/LICENSE",
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The source row excluding image bytes was serialized as canonical UTF-8 JSON; annotation values and polygon coordinates were not changed.",
+          "Ground truth lists each polygons[*].text value verbatim in source array order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "Apache-2.0",
+        "privacyReview": "Public consumer-product instruction placard; no identifiable person or private data is visible.",
+        "repositoryRevision": "627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/tree/627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceRecordUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/board_vqa/train-00000-of-00006.parquet",
+        "sourceShard": {
+          "bytes": 558557296,
+          "globalRowIndex": 0,
+          "path": "board_vqa/train-00000-of-00006.parquet",
+          "rowGroup": 0,
+          "rowIndex": 0,
+          "sha256": "2a3ebcb8fa627d2477b8fd0190b34f4f41bb235c268131a564ccae57e44d4b14"
+        },
+        "split": "train",
+        "upstreamId": "0001"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 13942,
+        "path": "annotations/jawildtext-board-0049.json",
+        "sha256": "f16b1b9e83e99b29ad284aa7e465319eb348fb81637e679a1ed526480d477af4",
+        "sourceField": "record.polygons"
+      },
+      "category": "board-or-sign",
+      "evaluation": {
+        "ignoredTokens": ["<UNK>"],
+        "mode": "annotation-token-coverage",
+        "notes": "Polygon order is annotation order, not guaranteed page reading order; score per-polygon text coverage and ignore only literal <UNK> labels."
+      },
+      "groundTruth": {
+        "bytes": 1476,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/jawildtext-board-0049.txt",
+        "sha256": "b745aa777473596f638b7caeff48a8149494f17c5cb0be181b23a63f2a55c8f7",
+        "sourceField": "record.polygons[*].text",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "jawildtext-board-0049",
+      "image": {
+        "bytes": 1071604,
+        "height": 3338,
+        "mediaType": "image/jpeg",
+        "path": "images/jawildtext-board-0049.jpg",
+        "sha256": "17a3196219f3c512520b3880a36461a771c4558715989696f949a137e6e0867e",
+        "sourceSha256": "17a3196219f3c512520b3880a36461a771c4558715989696f949a137e6e0867e",
+        "width": 2160
+      },
+      "language": "ja",
+      "provenance": {
+        "annotationLicense": "Apache-2.0",
+        "attribution": "JaWildText by Koki Maeda and Naoaki Okazaki (LLM-jp), released as an ICDAR 2026 benchmark.",
+        "dataset": "llm-jp/jawildtext",
+        "licenseEvidenceUrls": [
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/LICENSE",
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The source row excluding image bytes was serialized as canonical UTF-8 JSON; annotation values and polygon coordinates were not changed.",
+          "Ground truth lists each polygons[*].text value verbatim in source array order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "Apache-2.0",
+        "privacyReview": "Public apartment water-service interruption notice; only public contractor phone numbers are visible, with no resident or private data.",
+        "repositoryRevision": "627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/tree/627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceRecordUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/board_vqa/train-00000-of-00006.parquet",
+        "sourceShard": {
+          "bytes": 558557296,
+          "globalRowIndex": 57,
+          "path": "board_vqa/train-00000-of-00006.parquet",
+          "rowGroup": 1,
+          "rowIndex": 19,
+          "sha256": "2a3ebcb8fa627d2477b8fd0190b34f4f41bb235c268131a564ccae57e44d4b14"
+        },
+        "split": "train",
+        "upstreamId": "0049"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 3394,
+        "path": "annotations/jawildtext-board-0127.json",
+        "sha256": "ece060bc790218e7c55af54ca69fffc2699aad5cdb713a3fa149aaed527001c6",
+        "sourceField": "record.polygons"
+      },
+      "category": "board-or-sign",
+      "evaluation": {
+        "ignoredTokens": ["<UNK>"],
+        "mode": "annotation-token-coverage",
+        "notes": "Polygon order is annotation order, not guaranteed page reading order; score per-polygon text coverage and ignore only literal <UNK> labels."
+      },
+      "groundTruth": {
+        "bytes": 331,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/jawildtext-board-0127.txt",
+        "sha256": "f4c2f2669a47d98403efb4262b1614ccd8c4c7556fe5f3ae8c5d386edc4259a8",
+        "sourceField": "record.polygons[*].text",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "jawildtext-board-0127",
+      "image": {
+        "bytes": 2501453,
+        "height": 3000,
+        "mediaType": "image/jpeg",
+        "path": "images/jawildtext-board-0127.jpg",
+        "sha256": "cae8b659138849894bcee4f420e3f54d939c34e4b24b2b6744c480d2439cfe08",
+        "sourceSha256": "cae8b659138849894bcee4f420e3f54d939c34e4b24b2b6744c480d2439cfe08",
+        "width": 4000
+      },
+      "language": "ja",
+      "provenance": {
+        "annotationLicense": "Apache-2.0",
+        "attribution": "JaWildText by Koki Maeda and Naoaki Okazaki (LLM-jp), released as an ICDAR 2026 benchmark.",
+        "dataset": "llm-jp/jawildtext",
+        "licenseEvidenceUrls": [
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/LICENSE",
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The source row excluding image bytes was serialized as canonical UTF-8 JSON; annotation values and polygon coordinates were not changed.",
+          "Ground truth lists each polygons[*].text value verbatim in source array order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "Apache-2.0",
+        "privacyReview": "Public historical-site reconstruction display; no identifiable person or private data is visible.",
+        "repositoryRevision": "627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/tree/627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceRecordUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/board_vqa/train-00000-of-00006.parquet",
+        "sourceShard": {
+          "bytes": 558557296,
+          "globalRowIndex": 126,
+          "path": "board_vqa/train-00000-of-00006.parquet",
+          "rowGroup": 3,
+          "rowIndex": 12,
+          "sha256": "2a3ebcb8fa627d2477b8fd0190b34f4f41bb235c268131a564ccae57e44d4b14"
+        },
+        "split": "train",
+        "upstreamId": "0127"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 520,
+        "path": "annotations/commons-hagye-station-715.json",
+        "sha256": "3a4d752b0403c4bbc140842bc7fce343e8caaefa13d43ddf7cdf818cb8be7241",
+        "sourceField": "manualTranscription"
+      },
+      "category": "board-or-sign",
+      "evaluation": {
+        "ignoredTokens": [],
+        "mode": "annotation-token-coverage",
+        "notes": "The station sign is manually transcribed in visual order; score normalized token coverage across the visible Hangul, Latin, CJK, and Arabic-digit labels."
+      },
+      "groundTruth": {
+        "bytes": 70,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/commons-hagye-station-715.txt",
+        "sha256": "653a0b2be1543052a42ec83c36c2c8375321a3fc03c48051dd70b4b33624d120",
+        "sourceField": "manualTranscription",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "commons-hagye-station-715",
+      "image": {
+        "bytes": 44677,
+        "height": 405,
+        "mediaType": "image/jpeg",
+        "path": "images/commons-hagye-station-715.jpg",
+        "sha256": "a9ae819505be17d87393695bdadd1aaff47b0a8b81faec98b38408397942b3dc",
+        "sourceSha256": "a9ae819505be17d87393695bdadd1aaff47b0a8b81faec98b38408397942b3dc",
+        "width": 567
+      },
+      "language": "ko",
+      "provenance": {
+        "annotationLicense": "LicenseRef-Public-Domain",
+        "attribution": "Hagye01.jpg by Wikimedia Commons user Marcopolis; dedicated to the public domain via PD-user-en.",
+        "dataset": "Wikimedia Commons",
+        "licenseEvidenceUrls": [
+          "https://commons.wikimedia.org/w/index.php?title=File:Hagye01.jpg&oldid=1234274506",
+          "https://commons.wikimedia.org/w/index.php?title=Template:PD-user-en&oldid=358311026"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Wikimedia Commons original; no crop, resize, re-encoding, or metadata rewrite.",
+          "The visible station-sign text was manually transcribed into canonical UTF-8 JSON without using OCR.",
+          "Ground truth lists each manually transcribed line in visual order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "LicenseRef-Public-Domain",
+        "privacyReview": "Public transit station sign; no person or private data is visible, and embedded EXIF contains no GPS coordinates or owner identity.",
+        "repositoryRevision": "1234274506",
+        "sourceDatasetUrl": "https://commons.wikimedia.org/wiki/Category:Train_station_signs_of_Seoul_Subway_Line_7",
+        "sourceFile": {
+          "bytes": 44677,
+          "fileTimestamp": "2009-08-18T13:00:50Z",
+          "pageId": 7592246,
+          "sha1": "fd1f0cc88f931af22576c7404270837916c60d8d",
+          "sha256": "a9ae819505be17d87393695bdadd1aaff47b0a8b81faec98b38408397942b3dc",
+          "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Hagye01.jpg"
+        },
+        "sourceRecordUrl": "https://commons.wikimedia.org/w/index.php?title=File:Hagye01.jpg&oldid=1234274506",
+        "upstreamId": "7592246"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 24532,
+        "path": "annotations/jawildtext-receipt-11120.json",
+        "sha256": "6a31a58f1a6510c1fcba4a18a212d9b18987e29806890fcfcf86f948572506b8",
+        "sourceField": "record.polygons"
+      },
+      "category": "mobile-receipt",
+      "evaluation": {
+        "ignoredTokens": [],
+        "mode": "annotation-token-coverage",
+        "notes": "The source supplies polygon transcriptions rather than a page-level reading-order transcript; compare normalized annotated text coverage."
+      },
+      "groundTruth": {
+        "bytes": 813,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/jawildtext-receipt-11120.txt",
+        "sha256": "119b1f698466d6293fabce54514c970eda70a105c8078e881c06153e84717199",
+        "sourceField": "record.polygons[*].text",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "jawildtext-receipt-11120",
+      "image": {
+        "bytes": 812782,
+        "height": 1280,
+        "mediaType": "image/jpeg",
+        "path": "images/jawildtext-receipt-11120.jpg",
+        "sha256": "beb8367c33ee91c8b7aa51f9dab491ab20899c55d2d4940756da368df8ac4264",
+        "sourceSha256": "beb8367c33ee91c8b7aa51f9dab491ab20899c55d2d4940756da368df8ac4264",
+        "width": 720
+      },
+      "language": "ja",
+      "provenance": {
+        "annotationLicense": "Apache-2.0",
+        "attribution": "JaWildText by Koki Maeda and Naoaki Okazaki (LLM-jp), released as an ICDAR 2026 benchmark.",
+        "dataset": "llm-jp/jawildtext",
+        "licenseEvidenceUrls": [
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/LICENSE",
+          "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The source row excluding image bytes was serialized as canonical UTF-8 JSON; annotation values and polygon coordinates were not changed.",
+          "Ground truth lists each polygons[*].text value verbatim in source array order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "Apache-2.0",
+        "privacyReview": "Cash receipt shows public store details, order lines, and totals; the WAON identifier is masked upstream, and no customer name, signature, or payment-card identifier is visible.",
+        "repositoryRevision": "627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/tree/627ca7ea7c224ffe1accff8737991fc2240784fa",
+        "sourceRecordUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/blob/627ca7ea7c224ffe1accff8737991fc2240784fa/receipt_kie/train-00000-of-00008.parquet",
+        "sourceShard": {
+          "bytes": 318241920,
+          "globalRowIndex": 75,
+          "path": "receipt_kie/train-00000-of-00008.parquet",
+          "rowGroup": 2,
+          "rowIndex": 17,
+          "sha256": "07c3683d639e327dd4a0d8941990a9a9ce5cc604b9ecb828a760f5586e0f19b4"
+        },
+        "split": "train",
+        "upstreamId": "11120"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 13588,
+        "path": "annotations/cord-v2-test-0080.json",
+        "sha256": "c2227948663c9ec73943fe35e485162e4eefbf1a0f17b3e3128e5f4ed804fa6e",
+        "sourceField": "record.ground_truth.valid_line"
+      },
+      "category": "mobile-receipt",
+      "evaluation": {
+        "ignoredTokens": [],
+        "mode": "annotation-token-coverage",
+        "notes": "CORD provides word boxes grouped into valid_line records; score annotated word coverage because blurred header pixels are intentionally unlabelled."
+      },
+      "groundTruth": {
+        "bytes": 87,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/cord-v2-test-0080.txt",
+        "sha256": "bf2d38b042e28634c20cb7840d81e671f4e56f0cf490ff330736b0c92fec4808",
+        "sourceField": "record.ground_truth.valid_line[*].words[*].text",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "cord-v2-test-0080",
+      "image": {
+        "bytes": 436299,
+        "height": 648,
+        "mediaType": "image/png",
+        "path": "images/cord-v2-test-0080.png",
+        "sha256": "e37ed26e77e90f45a0ad33dcb9844c61808ad75e1f4f161debaeb1c45822c3f8",
+        "sourceSha256": "e37ed26e77e90f45a0ad33dcb9844c61808ad75e1f4f161debaeb1c45822c3f8",
+        "width": 432
+      },
+      "language": "id",
+      "provenance": {
+        "annotationLicense": "CC-BY-4.0",
+        "attribution": "CORD by Seunghyun Park, Seung Shin, Bado Lee, Junyeop Lee, Jaeheung Surh, Minjoon Seo, and Hwalsuk Lee; NAVER Clova.",
+        "dataset": "naver-clova-ix/cord-v2",
+        "licenseEvidenceUrls": [
+          "https://github.com/clovaai/cord/blob/327310ce58c1623255821d062b3a759ff3789e3c/LICENSE-CC-BY",
+          "https://github.com/clovaai/cord/blob/327310ce58c1623255821d062b3a759ff3789e3c/README.md",
+          "https://huggingface.co/datasets/naver-clova-ix/cord-v2/blob/7f0115a4b758a71d6473b8d085751692da2fef98/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The original ground_truth JSON string was preserved and also parsed into canonical UTF-8 JSON without changing annotation values.",
+          "Ground truth lists each valid_line[*].words[*].text value verbatim in source order, separated by LF, with one terminal LF."
+        ],
+        "pixelLicense": "CC-BY-4.0",
+        "privacyReview": "Cash receipt contains no customer or payment identifier; identifying header content was already blurred in the upstream test image.",
+        "repositoryRevision": "7f0115a4b758a71d6473b8d085751692da2fef98",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/naver-clova-ix/cord-v2/tree/7f0115a4b758a71d6473b8d085751692da2fef98",
+        "sourceRecordUrl": "https://huggingface.co/datasets/naver-clova-ix/cord-v2/blob/7f0115a4b758a71d6473b8d085751692da2fef98/data/test-00000-of-00001-9c204eb3f4e11791.parquet",
+        "sourceShard": {
+          "bytes": 234202795,
+          "globalRowIndex": 80,
+          "path": "data/test-00000-of-00001-9c204eb3f4e11791.parquet",
+          "rowGroup": 0,
+          "rowIndex": 80,
+          "sha256": "51c65f1788faff392abe2a0b55b023eb23e9be551c509138eaa3a832514224e7"
+        },
+        "split": "test",
+        "upstreamId": "80"
+      }
+    },
+    {
+      "annotation": {
+        "bytes": 2919,
+        "path": "annotations/clinocr-poor-t7-s2.json",
+        "sha256": "0154dd0e21735d7e8b1f0c99eb961c452b5900469f710ec969721187a027a8b2",
+        "sourceField": "record.ground_truth"
+      },
+      "category": "photographed-form",
+      "evaluation": {
+        "ignoredTokens": [],
+        "mode": "page-transcript",
+        "notes": "The upstream ground_truth field is a human-audited page transcript; evaluate grapheme CER and whitespace-normalized word error rate."
+      },
+      "groundTruth": {
+        "bytes": 1203,
+        "comparisonNormalization": {
+          "case": "casefold",
+          "punctuation": "preserve",
+          "unicode": "NFC",
+          "whitespace": "collapse-runs-and-trim"
+        },
+        "derivation": "verbatim-from-annotation",
+        "encoding": "UTF-8",
+        "joinSeparator": "LF",
+        "path": "ground-truth/clinocr-poor-t7-s2.txt",
+        "sha256": "df32e31287873c452b4a504085bde178c97e9319fe740b03c616f5a689808139",
+        "sourceField": "record.ground_truth",
+        "terminalNewline": true,
+        "unicodeNormalization": "none",
+        "whitespaceNormalization": "none"
+      },
+      "id": "clinocr-poor-t7-s2",
+      "image": {
+        "bytes": 167222,
+        "height": 1707,
+        "mediaType": "image/jpeg",
+        "path": "images/clinocr-poor-t7-s2.jpg",
+        "sha256": "fd64e12da893cc1f111fade29ba4a826cc3090750d176069f10c1891e53ab4de",
+        "sourceSha256": "fd64e12da893cc1f111fade29ba4a826cc3090750d176069f10c1891e53ab4de",
+        "width": 1280
+      },
+      "language": "en",
+      "provenance": {
+        "annotationLicense": "MIT",
+        "attribution": "ClinOCR-Bench by Enshuo Hsu, Jin Zhou, and Kirk Roberts; copyright 2026 ClinOCR-Bench.",
+        "dataset": "ClinOCR-Bench/ClinOCR-Bench",
+        "licenseEvidenceUrls": [
+          "https://github.com/ClinOCR-Bench/ClinOCR-Bench/blob/3b720a951bb7eec4a4f4fb34a636e7335a19981e/LICENSE",
+          "https://github.com/ClinOCR-Bench/ClinOCR-Bench/blob/3b720a951bb7eec4a4f4fb34a636e7335a19981e/README.md",
+          "https://huggingface.co/datasets/ClinOCR-Bench/ClinOCR-Bench/blob/cb7c0c48a4f3d1c9054fb6548ccef84768983472/README.md"
+        ],
+        "modifications": [
+          "Image copied byte-for-byte from the pinned Parquet image.bytes field; no crop, resize, re-encoding, or metadata rewrite.",
+          "The source row excluding image bytes was serialized as canonical UTF-8 JSON without changing annotation values.",
+          "The human-audited ground_truth string was copied verbatim and one terminal LF was added to the text file."
+        ],
+        "pixelLicense": "MIT",
+        "privacyReview": "Dataset authors identify ClinOCR-Bench as synthetic and protected-health-information-free; displayed names, identifiers, and clinical content are fictional, and no identifiable person is visible.",
+        "repositoryRevision": "cb7c0c48a4f3d1c9054fb6548ccef84768983472",
+        "sourceDatasetUrl": "https://huggingface.co/datasets/ClinOCR-Bench/ClinOCR-Bench/tree/cb7c0c48a4f3d1c9054fb6548ccef84768983472",
+        "sourceRecordUrl": "https://huggingface.co/datasets/ClinOCR-Bench/ClinOCR-Bench/blob/cb7c0c48a4f3d1c9054fb6548ccef84768983472/poor/test-00000-of-00001.parquet",
+        "sourceShard": {
+          "bytes": 17486026,
+          "globalRowIndex": 42,
+          "path": "poor/test-00000-of-00001.parquet",
+          "rowGroup": 0,
+          "rowIndex": 42,
+          "sha256": "49109997ffd99fcf04f77d1a5507e72ea22543a1be1bc7f35babad572c703f97"
+        },
+        "split": "test",
+        "upstreamId": "poor_t7_s2"
+      }
+    }
+  ],
+  "heldOutPolicy": "These files are regression inputs only and must not be used to tune OCR models or acceptance thresholds after observing their outputs.",
+  "koreanCohort": {
+    "fastDisposition": {
+      "accurateTierResults": {
+        "balanced": {
+          "releaseGatePassed": true,
+          "tokenF1": 0.692308,
+          "tokenPrecision": 0.9,
+          "tokenRecall": 0.5625
+        },
+        "best": {
+          "releaseGatePassed": true,
+          "tokenF1": 0.692308,
+          "tokenPrecision": 0.9,
+          "tokenRecall": 0.5625
+        }
+      },
+      "boundedStrategyAudit": {
+        "diagnosticManifestSha256": "8e82e22b5d939ca40e97d8a74e8ce73dda451e99ba8b33a95a94723c4679d1b4",
+        "failed": 6,
+        "tested": 6
+      },
+      "decision": {
+        "enforcedBehavior": "reject-before-tesseract-spawn",
+        "unsupportedReason": "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best."
+      },
+      "evidence": {
+        "artifactSha256": "42b9609dab9b8680c208d4b20828314ce912f3691bbd12114b31ab31b4cfbd05",
+        "fastReportSha256": "0a9743c46e67aad7948d5a5880bfbd5096a4023c6006de5f94668580a2df276a",
+        "fastText": "=\n< 하 계\n: Hagye 최\nㅜㅠ 좋\n==",
+        "fastTextSha256": "6ddecdd52dd0a66074fb3c1d003a28493975f63421f70600706ccc01b7bb2c73",
+        "qualityCheckpointSha256": "41e4c01959602c3c255c09210fd3203ab80eee696bf28578d1137bf07f38bab7",
+        "sourceImageId": "sha256:127753b7916aea38eac139a4070af95854ccdc68f93a9c4d59618c7e8c7f4bfa",
+        "verifierSha256": "d4f9e3c1572c7eba4f5157c2a70785233ceed0296cb734a50890e940d16dd2cf"
+      },
+      "fastResult": {
+        "releaseGatePassed": false,
+        "tokenF1": 0.214286,
+        "tokenPrecision": 0.25,
+        "tokenRecall": 0.1875
+      },
+      "status": "REJECTED_AFTER_FROZEN_GATE"
+    },
+    "fixtureIds": ["commons-hagye-station-715"],
+    "perImageTierFloors": {
+      "balanced": {
+        "minimumTokenF1": 0.56,
+        "minimumTokenPrecision": 0.65,
+        "minimumTokenRecall": 0.5
+      },
+      "best": {
+        "minimumTokenF1": 0.6,
+        "minimumTokenPrecision": 0.68,
+        "minimumTokenRecall": 0.55
+      },
+      "fast": {
+        "minimumTokenF1": 0.32,
+        "minimumTokenPrecision": 0.5,
+        "minimumTokenRecall": 0.25
+      }
+    },
+    "selectionRule": "On 2026-07-13, enumerate original bitmap files in Wikimedia Commons Category:Train station signs of Seoul Subway Line 7, sort by byte size ascending, retain public-domain landscape photographs at least 500×400 with no people or private data and manually legible Hangul, Latin, and Arabic digits, then choose the smallest. Hagye01.jpg is the first eligible file; the smaller public-domain Junggokst01.jpg is only 411×308.",
+    "selectionStatus": "FROZEN_BEFORE_ANY_OCR_OUTPUT",
+    "stopPolicy": "If the frozen Korean fixture fails, do not swap or edit the fixture, transcript, or limits; reconsider the Korean Fast model."
+  },
+  "licenseFiles": [
+    {
+      "bytes": 11357,
+      "path": "licenses/apache-2.0.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "sourceUrl": "https://huggingface.co/datasets/llm-jp/jawildtext/resolve/627ca7ea7c224ffe1accff8737991fc2240784fa/LICENSE",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "bytes": 18650,
+      "path": "licenses/cc-by-4.0.txt",
+      "sha256": "7e7170e3cebf88a9f60c7b8421418323c09304da1af4d5e90f4da1dc1c8a2661",
+      "sourceUrl": "https://raw.githubusercontent.com/clovaai/cord/327310ce58c1623255821d062b3a759ff3789e3c/LICENSE-CC-BY",
+      "spdx": "CC-BY-4.0"
+    },
+    {
+      "bytes": 1070,
+      "path": "licenses/mit-clinocr-bench.txt",
+      "sha256": "0dfbe6a63906c73427ec273521bf182a636ff1cf39e8271697854229dce17b6f",
+      "sourceUrl": "https://raw.githubusercontent.com/ClinOCR-Bench/ClinOCR-Bench/3b720a951bb7eec4a4f4fb34a636e7335a19981e/LICENSE",
+      "spdx": "MIT"
+    }
+  ],
+  "schemaVersion": 1
+}

@@ -64,10 +64,7 @@ def _hf_download(
     print(f"  {label} ready ({size / 1_000_000:.1f} MB)")
     return dest
 
-# Force CPU mode during build - no GPU driver available at build time.
-# Must be set before any ML library import.
-os.environ["PADDLE_DEVICE"] = "cpu"
-os.environ["FLAGS_use_cuda"] = "0"
+# No GPU driver is available during build-time model verification.
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 # Prevent ONNX Runtime from loading the CUDA Execution Provider at build time.
@@ -188,26 +185,6 @@ REMBG_MODELS = [
     "birefnet-matting",
     "birefnet-hr-matting",
 ]
-
-# PaddleOCR PP-OCRv5 HuggingFace model repos to pre-download.
-# These are the models used by PaddleOCR(ocr_version="PP-OCRv5").
-# Downloaded via huggingface_hub to avoid initializing the PaddlePaddle
-# inference engine, which segfaults under QEMU emulation at build time.
-PADDLEOCR_MODELS = [
-    "PaddlePaddle/PP-OCRv5_server_det",
-    "PaddlePaddle/PP-OCRv5_server_rec",
-    "PaddlePaddle/PP-OCRv5_mobile_det",
-    "PaddlePaddle/PP-OCRv5_mobile_rec",
-    "PaddlePaddle/latin_PP-OCRv5_mobile_rec",
-    "PaddlePaddle/korean_PP-OCRv5_mobile_rec",
-    "PaddlePaddle/PP-LCNet_x1_0_textline_ori",
-]
-
-PADDLEOCR_VL_MODEL = "PaddlePaddle/PaddleOCR-VL-1.5"
-
-# PaddleX stores models here by default
-PADDLEX_MODEL_DIR = "/opt/models/paddlex/official_models"
-
 
 def _register_birefnet_matting():
     """Register BiRefNet-matting ONNX session for Ultra quality mode."""
@@ -407,40 +384,6 @@ def download_codeformer_onnx_model():
     print(f"  CodeFormer ONNX model ready ({size / 1_000_000:.1f} MB)\n")
 
 
-def download_paddleocr_models():
-    """Pre-download PaddleOCR PP-OCRv5 model weights from HuggingFace.
-
-    Uses huggingface_hub.snapshot_download() to fetch model files directly
-    into the PaddleX cache directory. This avoids initializing PaddlePaddle's
-    C++ inference engine, which segfaults under QEMU emulation (arm64 host
-    building amd64 image).
-    """
-    print("=== Downloading PaddleOCR PP-OCRv5 models ===")
-    from huggingface_hub import snapshot_download
-
-    os.makedirs(PADDLEX_MODEL_DIR, exist_ok=True)
-
-    for repo_id in PADDLEOCR_MODELS:
-        model_name = repo_id.split("/", 1)[1]
-        local_dir = os.path.join(PADDLEX_MODEL_DIR, model_name)
-        print(f"  Downloading {model_name}...")
-        snapshot_download(repo_id=repo_id, local_dir=local_dir)
-        print(f"  {model_name} ready")
-    print(f"All {len(PADDLEOCR_MODELS)} PaddleOCR PP-OCRv5 models downloaded.\n")
-
-
-def download_paddleocr_vl_model():
-    """Pre-download PaddleOCR-VL 1.5 model weights from HuggingFace."""
-    print("=== Downloading PaddleOCR-VL 1.5 model ===")
-    from huggingface_hub import snapshot_download
-
-    model_name = PADDLEOCR_VL_MODEL.split("/", 1)[1]
-    local_dir = os.path.join(PADDLEX_MODEL_DIR, model_name)
-    print(f"  Downloading {model_name} (~1.93 GB)...")
-    snapshot_download(repo_id=PADDLEOCR_VL_MODEL, local_dir=local_dir)
-    print(f"  {model_name} ready\n")
-
-
 def download_scunet_model():
     """Download SCUNet real-noise denoising model."""
     print(f"Downloading SCUNet model to {SCUNET_MODEL_PATH}...")
@@ -582,7 +525,7 @@ def verify_mediapipe():
 def smoke_test():
     """Final verification that all ML libraries and models are loadable.
 
-    GPU-dependent libraries (paddlepaddle-gpu, torch CUDA) cannot be imported
+    GPU-dependent libraries such as the CUDA build of torch cannot be imported
     at build time because the CUDA driver is only available at runtime. We verify
     CPU-only imports and check that model files exist on disk.
     """
@@ -663,19 +606,6 @@ def smoke_test():
     assert os.path.getsize(NAFNET_MODEL_PATH) > NAFNET_MIN_SIZE
     print("  NAFNet model file verified")
 
-    # PaddleOCR model directories must exist
-    for repo_id in PADDLEOCR_MODELS:
-        model_name = repo_id.split("/", 1)[1]
-        model_dir = os.path.join(PADDLEX_MODEL_DIR, model_name)
-        assert os.path.isdir(model_dir), f"PaddleOCR model missing: {model_dir}"
-    print(f"  PaddleOCR models verified ({len(PADDLEOCR_MODELS)} models)")
-
-    # PaddleOCR-VL model directory must exist
-    vl_name = PADDLEOCR_VL_MODEL.split("/", 1)[1]
-    vl_dir = os.path.join(PADDLEX_MODEL_DIR, vl_name)
-    assert os.path.isdir(vl_dir), f"PaddleOCR-VL model missing: {vl_dir}"
-    print("  PaddleOCR-VL model verified")
-
     # MediaPipe task models must exist (for mp.tasks fallback)
     assert os.path.exists(FACE_DETECT_MODEL_PATH), (
         f"MediaPipe face detector model missing: {FACE_DETECT_MODEL_PATH}"
@@ -733,8 +663,6 @@ def main():
         download_codeformer_model,
         download_ddcolor_model,
         download_codeformer_onnx_model,
-        download_paddleocr_models,
-        download_paddleocr_vl_model,
         download_scunet_model,
         download_nafnet_model,
         download_facexlib_models,

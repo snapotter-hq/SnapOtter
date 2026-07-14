@@ -14,12 +14,28 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const hoisted = vi.hoisted(() => ({
   shutdownDispatcherMock: vi.fn(),
+  drainOcrDispatcherMock: vi.fn(async () => {}),
+  runOcrRuntimeMaintenanceMock: vi.fn(async () => ({ deactivatedFamilies: 1 })),
 }));
 
 vi.mock("@snapotter/ai", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, shutdownDispatcher: hoisted.shutdownDispatcherMock };
+  return {
+    ...actual,
+    shutdownDispatcher: hoisted.shutdownDispatcherMock,
+    drainOcrDispatcher: hoisted.drainOcrDispatcherMock,
+  };
 });
+
+vi.mock("../../../apps/api/src/lib/ocr-runtime-install.js", () => ({
+  cleanupDownloadedRuntimeRelease: vi.fn(),
+  downloadVerifiedRuntimeRelease: vi.fn(),
+  loadOcrRuntimeTrustKeys: vi.fn(),
+  purgeOcrRuntimeDownloads: vi.fn(),
+  runOcrRuntimeInstaller: vi.fn(),
+  runOcrRuntimeMaintenance: hoisted.runOcrRuntimeMaintenanceMock,
+  waitWithOcrRuntimeHeartbeat: async <T>(operation: Promise<T>) => operation,
+}));
 
 // ── Temp DATA_DIR before importing feature-status ────────────────
 const testRoot = join(tmpdir(), `snapotter-feature-reset-${randomUUID()}`);
@@ -37,9 +53,13 @@ process.env.FEATURE_MANIFEST_PATH = join(process.cwd(), "docker/feature-manifest
 mkdirSync(modelsDir, { recursive: true });
 writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
 
-const { markInstalled, invalidateCache, releaseInstallLock, acquireInstallLock } = await import(
-  "../../../apps/api/src/lib/feature-status.js"
-);
+const {
+  markInstalled,
+  invalidateCache,
+  releaseInstallLock,
+  acquireInstallLock,
+  getAiMutationEpoch,
+} = await import("../../../apps/api/src/lib/feature-status.js");
 const { loginAsAdmin } = await import("../test-server.js");
 
 describe("POST /api/v1/admin/features/reset", () => {
@@ -96,6 +116,8 @@ describe("POST /api/v1/admin/features/reset", () => {
     writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
     invalidateCache();
     hoisted.shutdownDispatcherMock.mockClear();
+    hoisted.drainOcrDispatcherMock.mockClear();
+    hoisted.runOcrRuntimeMaintenanceMock.mockClear();
   });
 
   afterEach(() => {
@@ -112,6 +134,14 @@ describe("POST /api/v1/admin/features/reset", () => {
     return app.inject({ method: "POST", url: "/api/v1/admin/features/reset", headers: auth() });
   }
 
+  async function postOcrUninstall() {
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/ocr/uninstall",
+      headers: auth(),
+    });
+  }
+
   it("requires auth", async () => {
     const res = await app.inject({ method: "POST", url: "/api/v1/admin/features/reset" });
     expect(res.statusCode).toBe(401);
@@ -122,6 +152,7 @@ describe("POST /api/v1/admin/features/reset", () => {
     mkdirSync(join(venvDir, "lib", "python3.12", "site-packages"), { recursive: true });
     writeFileSync(join(modelsDir, "leftover.onnx"), "stale weights");
 
+    const epochBefore = getAiMutationEpoch();
     const res = await postReset();
 
     expect(res.statusCode).toBe(200);
@@ -130,11 +161,59 @@ describe("POST /api/v1/admin/features/reset", () => {
     expect(existsSync(join(modelsDir, "leftover.onnx"))).toBe(false);
     const installed = JSON.parse(readFileSync(installedPath, "utf-8"));
     expect(installed.bundles).toEqual({});
+    expect(getAiMutationEpoch()).not.toBe(epochBefore);
   });
 
-  it("shuts down the dispatcher so the next AI request starts fresh", async () => {
+  it("drains accurate OCR before GC so in-flight work completes", async () => {
     await postReset();
     expect(hoisted.shutdownDispatcherMock).toHaveBeenCalled();
+    expect(hoisted.drainOcrDispatcherMock).toHaveBeenCalled();
+    expect(hoisted.runOcrRuntimeMaintenanceMock.mock.calls).toEqual([
+      ["reset", expect.objectContaining({ aiDataDir: aiDir, installLockFd: expect.any(Number) })],
+      ["gc", expect.objectContaining({ aiDataDir: aiDir, installLockFd: expect.any(Number) })],
+    ]);
+    expect(hoisted.runOcrRuntimeMaintenanceMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.drainOcrDispatcherMock.mock.invocationCallOrder[0],
+    );
+    expect(hoisted.drainOcrDispatcherMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.runOcrRuntimeMaintenanceMock.mock.invocationCallOrder[1],
+    );
+  });
+
+  it("deactivates shared OCR routing before draining uninstall executions", async () => {
+    const epochBefore = getAiMutationEpoch();
+    const response = await postOcrUninstall();
+
+    expect(response.statusCode).toBe(200);
+    expect(hoisted.runOcrRuntimeMaintenanceMock.mock.calls).toEqual([
+      [
+        "deactivate",
+        expect.objectContaining({ aiDataDir: aiDir, installLockFd: expect.any(Number) }),
+      ],
+      ["gc", expect.objectContaining({ aiDataDir: aiDir, installLockFd: expect.any(Number) })],
+    ]);
+    expect(hoisted.runOcrRuntimeMaintenanceMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.drainOcrDispatcherMock.mock.invocationCallOrder[0],
+    );
+    expect(hoisted.drainOcrDispatcherMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.runOcrRuntimeMaintenanceMock.mock.invocationCallOrder[1],
+    );
+    expect(getAiMutationEpoch()).not.toBe(epochBefore);
+  });
+
+  it("serializes legacy bundle uninstall and invalidates older queued work", async () => {
+    markInstalled("transcription", "2.1.0", []);
+    const epochBefore = getAiMutationEpoch();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/features/transcription/uninstall",
+      headers: auth(),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getAiMutationEpoch()).not.toBe(epochBefore);
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it("returns 409 instead of tearing anything down when a bundle install is in progress", async () => {

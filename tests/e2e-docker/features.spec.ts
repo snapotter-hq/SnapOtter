@@ -17,7 +17,13 @@ async function getToken(request: import("@playwright/test").APIRequestContext): 
 
 interface BundleInfo {
   id: string;
+  name: string;
+  description: string;
+  estimatedSize: string;
+  enablesTools: string[];
   status: string;
+  compatibility?: "compatible" | "incompatible" | "invalid";
+  availableQualities?: Array<"fast" | "balanced" | "best">;
 }
 
 async function fetchBundleStatuses(
@@ -35,14 +41,14 @@ async function fetchBundleStatuses(
 // ─── Feature API tests ─────────────────────────────────────────────
 
 test.describe("Feature API", () => {
-  test("GET /api/v1/features returns all 6 bundles with correct shape", async ({ request }) => {
+  test("GET /api/v1/features returns all 7 bundles with correct shape", async ({ request }) => {
     const token = await getToken(request);
     const response = await request.get("/api/v1/features", {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.bundles).toHaveLength(6);
+    const data = (await response.json()) as { bundles: BundleInfo[] };
+    expect(data.bundles).toHaveLength(7);
 
     const expectedBundles = [
       "background-removal",
@@ -51,17 +57,18 @@ test.describe("Feature API", () => {
       "upscale-enhance",
       "photo-restoration",
       "ocr",
+      "transcription",
     ];
     for (const id of expectedBundles) {
-      const bundle = data.bundles.find((b: any) => b.id === id);
+      const bundle = data.bundles.find((candidate) => candidate.id === id);
       expect(bundle, `Bundle ${id} missing`).toBeDefined();
-      expect(bundle.name).toBeTruthy();
-      expect(bundle.description).toBeTruthy();
-      expect(bundle.estimatedSize).toBeTruthy();
-      expect(bundle.enablesTools).toBeInstanceOf(Array);
-      expect(bundle.enablesTools.length).toBeGreaterThan(0);
+      expect(bundle?.name).toBeTruthy();
+      expect(bundle?.description).toBeTruthy();
+      expect(bundle?.estimatedSize).toBeTruthy();
+      expect(bundle?.enablesTools).toBeInstanceOf(Array);
+      expect(bundle?.enablesTools.length).toBeGreaterThan(0);
       expect(["not_installed", "queued", "installed", "installing", "error"]).toContain(
-        bundle.status,
+        bundle?.status,
       );
     }
   });
@@ -71,7 +78,7 @@ test.describe("Feature API", () => {
     const response = await request.get("/api/v1/features", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await response.json();
+    const data = (await response.json()) as { bundles: BundleInfo[] };
 
     const toolMap: Record<string, string[]> = {
       "background-removal": ["remove-background", "passport-photo"],
@@ -79,12 +86,13 @@ test.describe("Feature API", () => {
       "object-eraser-colorize": ["erase-object", "colorize"],
       "upscale-enhance": ["upscale", "enhance-faces", "noise-removal"],
       "photo-restoration": ["restore-photo"],
-      ocr: ["ocr"],
+      ocr: ["ocr", "ocr-pdf"],
+      transcription: ["transcribe-audio", "auto-subtitles"],
     };
 
     for (const [bundleId, expectedTools] of Object.entries(toolMap)) {
-      const bundle = data.bundles.find((b: any) => b.id === bundleId);
-      expect(bundle.enablesTools).toEqual(expectedTools);
+      const bundle = data.bundles.find((candidate) => candidate.id === bundleId);
+      expect(bundle?.enablesTools).toEqual(expectedTools);
     }
   });
 
@@ -107,63 +115,92 @@ test.describe("Feature API", () => {
   });
 });
 
-// ─── Tool route guard tests (serial: manages ocr bundle lifecycle) ──
+// ─── Optional OCR runtime contract ────────────────────────────────
 
-test.describe("Tool route guards", () => {
-  test.describe.configure({ mode: "serial" });
-
+test.describe("Optional OCR runtime", () => {
   const pngBuffer = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
     "base64",
   );
 
-  test.beforeAll(async ({ request }) => {
+  async function callOcr(
+    request: import("@playwright/test").APIRequestContext,
+    settings: Record<string, unknown>,
+  ) {
     const token = await getToken(request);
-    const bundles = await fetchBundleStatuses(request);
-    const ocr = bundles.find((b) => b.id === "ocr");
-    if (ocr?.status === "installed") {
-      await request.post("/api/v1/admin/features/ocr/uninstall", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      for (let i = 0; i < 30; i++) {
-        const updated = await fetchBundleStatuses(request);
-        if (updated.find((b) => b.id === "ocr")?.status === "not_installed") break;
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    }
-  });
-
-  test.afterAll(async ({ request }) => {
-    const token = await getToken(request);
-    await request.post("/api/v1/admin/features/ocr/install", {
+    return request.post("/api/v1/tools/image/ocr", {
       headers: { Authorization: `Bearer ${token}` },
-    });
-    for (let i = 0; i < 60; i++) {
-      const updated = await fetchBundleStatuses(request);
-      if (updated.find((b) => b.id === "ocr")?.status === "installed") break;
-      await new Promise((r) => setTimeout(r, 5000));
-    }
-  });
-
-  // ocr bundle is uninstalled -- expect 501
-  test("ocr returns 501 FEATURE_NOT_INSTALLED with correct bundle", async ({ request }) => {
-    const response = await request.post("/api/v1/tools/image/ocr", {
       multipart: {
         file: {
           name: "test.png",
           mimeType: "image/png",
           buffer: pngBuffer,
         },
-        settings: JSON.stringify({}),
+        settings: JSON.stringify(settings),
       },
     });
-    expect(response.status()).toBe(501);
+  }
+
+  test("OCR advertises built-in Fast independently of the optional pack", async ({ request }) => {
+    const bundles = await fetchBundleStatuses(request);
+    const ocr = bundles.find((bundle) => bundle.id === "ocr");
+    expect(ocr).toBeDefined();
+    expect(ocr?.availableQualities).toContain("fast");
+
+    const response = await callOcr(request, { quality: "fast" });
+    expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body.code).toBe("FEATURE_NOT_INSTALLED");
-    expect(body.feature).toBe("ocr");
-    expect(body.featureName).toBeTruthy();
-    expect(body.estimatedSize).toBeTruthy();
+    expect(body).toMatchObject({
+      engine: "tesseract",
+      provider: "native",
+      device: "cpu",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      degraded: false,
+    });
   });
+
+  test("default OCR remains runnable with or without the accurate pack", async ({ request }) => {
+    const response = await callOcr(request, {});
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(["fast", "best"]).toContain(body.actualQuality);
+    if (body.actualQuality === "fast") {
+      expect(body).toMatchObject({ engine: "tesseract", provider: "native", device: "cpu" });
+    } else {
+      expect(body).toMatchObject({
+        engine: "rapidocr-onnx",
+        provider: "CPUExecutionProvider",
+        device: "cpu",
+      });
+    }
+  });
+
+  for (const quality of ["balanced", "best"] as const) {
+    test(`${quality} OCR is gated only by the signed accurate runtime`, async ({ request }) => {
+      const bundles = await fetchBundleStatuses(request);
+      const ocr = bundles.find((bundle) => bundle.id === "ocr");
+      const available = ocr?.availableQualities?.includes(quality) ?? false;
+      const response = await callOcr(request, { quality });
+      const body = await response.json();
+
+      if (available) {
+        expect(response.status()).toBe(200);
+        expect(body).toMatchObject({
+          engine: "rapidocr-onnx",
+          provider: "CPUExecutionProvider",
+          device: "cpu",
+          requestedQuality: quality,
+          actualQuality: quality,
+          degraded: false,
+        });
+      } else {
+        expect(response.status()).toBe(501);
+        expect(["FEATURE_NOT_INSTALLED", "FEATURE_INCOMPATIBLE"]).toContain(body.code);
+        expect(body).toMatchObject({ feature: "ocr", requestedQuality: quality });
+      }
+    });
+  }
 
   // All other AI tools have their bundles installed -- expect 200 (guard allows through)
   const installedAiTools = [
@@ -210,16 +247,7 @@ test.describe("Tool route guards", () => {
     expect(response.status()).not.toBe(501);
   });
 
-  // ─── Uninstall conflict (ocr is not installed at this point) ──────
-
-  test("POST uninstall returns 409 for not-installed bundle", async ({ request }) => {
-    const response = await request.post("/api/v1/admin/features/ocr/uninstall");
-    expect(response.status()).toBe(409);
-  });
-
-  // ─── Batch guard (ocr is not installed at this point) ─────────────
-
-  test("batch endpoint returns 501 for uninstalled AI tool", async ({ request }) => {
+  test("Fast OCR batch is not gated by the optional pack", async ({ request }) => {
     const response = await request.post("/api/v1/tools/image/ocr/batch", {
       multipart: {
         "files[]": {
@@ -227,34 +255,36 @@ test.describe("Tool route guards", () => {
           mimeType: "image/png",
           buffer: pngBuffer,
         },
-        settings: JSON.stringify({}),
+        settings: JSON.stringify({ quality: "fast" }),
       },
     });
-    expect(response.status()).toBe(501);
-    const body = await response.json();
-    expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+    expect(response.status()).not.toBe(501);
+    expect(response.ok()).toBeTruthy();
   });
 
-  // ─── GUI tests (ocr is not installed at this point) ───────────────
-
-  test("uninstalled AI tool page shows install prompt", async ({ page }) => {
+  test("OCR page always exposes Fast and offers the pack only for accurate tiers", async ({
+    page,
+    request,
+  }) => {
+    const bundles = await fetchBundleStatuses(request);
+    const ocr = bundles.find((bundle) => bundle.id === "ocr");
     await page.goto("/ocr");
-    await expect(page.getByText("OCR")).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText("additional download")).toBeVisible();
-    await expect(page.getByRole("button", { name: /enable/i })).toBeVisible();
-  });
+    const fast = page.getByRole("button", { name: "Fast", exact: true });
+    await expect(fast).toBeVisible({ timeout: 10000 });
 
-  test("AI tools show download badge in sidebar", async ({ page }) => {
-    await page.goto("/resize");
-    // Wait for the sidebar to load
-    await expect(page.locator("[data-testid='tool-panel']").or(page.locator("nav"))).toBeVisible({
-      timeout: 10000,
-    });
-    // The download icon should be visible near the OCR tool
-    const ocrLink = page.locator("a[href='/ocr']");
-    await expect(ocrLink).toBeVisible();
+    if (ocr?.availableQualities?.includes("best")) {
+      await expect(page.getByRole("button", { name: "Best", exact: true })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    } else {
+      await expect(fast).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("button", { name: "Balanced", exact: true }).click();
+      await expect(page.getByText("additional download")).toBeVisible();
+      if (ocr?.compatibility === "compatible") {
+        await expect(page.getByRole("button", { name: /enable/i })).toBeVisible();
+      }
+    }
   });
 });
 
@@ -283,7 +313,7 @@ test.describe("Feature install UI", () => {
     }
   });
 
-  test("AI Features settings shows all 6 bundles", async ({ page }) => {
+  test("AI Features settings shows all 7 bundles", async ({ page }) => {
     await page.goto("/resize");
     const settingsButton = page
       .getByRole("button", { name: /settings/i })
@@ -294,7 +324,7 @@ test.describe("Feature install UI", () => {
       const aiNav = page.getByText("AI Features");
       if (await aiNav.isVisible({ timeout: 3000 }).catch(() => false)) {
         await aiNav.click();
-        // Should show all 6 bundles
+        // Should show all 7 bundles
         await expect(page.getByText("Background Removal")).toBeVisible({
           timeout: 5000,
         });
@@ -303,6 +333,7 @@ test.describe("Feature install UI", () => {
         await expect(page.getByText("Upscale & Enhance")).toBeVisible();
         await expect(page.getByText("Photo Restoration")).toBeVisible();
         await expect(page.getByText("OCR")).toBeVisible();
+        await expect(page.getByText("Transcription")).toBeVisible();
       }
     }
   });

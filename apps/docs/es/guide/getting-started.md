@@ -1,8 +1,8 @@
 ---
 description: "Instala SnapOtter con Docker en un solo comando. Incluye la configuración de Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
-i18n_source_hash: 4536d4558b8e
-i18n_provenance: machine
 i18n_output_hash: d513d36ca8ba
+i18n_source_hash: 24724b5595b2
+i18n_provenance: human
 ---
 
 # Primeros pasos {#getting-started}
@@ -32,7 +32,7 @@ Para más detalles sobre qué se recopila, consulta [Qué recopila SnapOtter](/e
 :::
 
 ::: tip Aceleración con NVIDIA CUDA
-Añade `--gpus all` para eliminación de fondo, escalado, OCR, mejora de rostros y restauración acelerados con NVIDIA CUDA:
+Agregue `--gpus all` para NVIDIA eliminación de fondo, ampliación, mejora facial y restauración acelerada por CUDA. OCR permanece basado en CPU y funciona en la misma imagen con o sin acceso a GPU:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest

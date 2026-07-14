@@ -212,7 +212,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         const jobIdForProgress = clientJobId;
         const onProgress = jobIdForProgress
           ? (percent: number, stage: string) => {
-              updateSingleFileProgress({
+              void updateSingleFileProgress({
                 jobId: jobIdForProgress,
                 phase: "processing",
                 stage,
@@ -232,10 +232,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
           if (clientJobId) {
-            updateSingleFileProgress({
+            await updateSingleFileProgress({
               jobId: clientJobId,
               phase: "complete",
               percent: 100,
+              result: { jobId, faceDetected: false },
             });
           }
           return reply.status(422).send({
@@ -279,10 +280,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
         const preview = previewBuffer.data.toString("base64");
 
         if (clientJobId) {
-          updateSingleFileProgress({
+          await updateSingleFileProgress({
             jobId: clientJobId,
             phase: "complete",
             percent: 100,
+            result: { jobId, faceDetected: true },
           });
         }
 

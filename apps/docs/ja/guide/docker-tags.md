@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter の Docker イメージタグ、GPU ベンチマーク、バージョン固定、および AMD64 と ARM64 のマルチプラットフォーム対応。"
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 977a3cec4702
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker イメージ {#docker-image}
@@ -41,7 +41,6 @@ VA-API、Quick Sync、または OpenCL を通じた Intel/AMD の iGPU アクセ
 | 背景除去 (isnet) | 2,457ms | 1,137ms | 2.2x |
 | 2x アップスケール | 350ms | 309ms | 1.1x |
 | 4x アップスケール | 910ms | 310ms | 2.9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | 顔ぼかし | 139ms | 122ms | 1.1x |
 
 #### コールドスタート（コンテナ起動後の最初のリクエスト） {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ VA-API、Quick Sync、または OpenCL を通じた Intel/AMD の iGPU アクセ
 |------|-----|-----|---------|
 | 背景除去 | 22,286ms | 4,792ms | 4.7x |
 | 2x アップスケール | 3,957ms | 2,318ms | 1.7x |
-| OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
+
+OCR は、CUDA の比較には含まれません。組み込みの Tesseract 層とオプションの RapidOCR/ONNX 層は両方とも、コンテナーに NVIDIA GPU アクセス権がある場合を含め、CPU を使用します。
 
 ### CUDA ヘルスチェック {#cuda-health-check}
 

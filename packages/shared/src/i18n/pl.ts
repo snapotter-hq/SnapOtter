@@ -1589,7 +1589,9 @@ export const pl: TranslationKeys = {
       quality: "Jakość",
       enhanceBeforeScanning: "Ulepsz przed skanowaniem",
       enhanceHint:
-        "Automatycznie prostuje, poprawia kontrast, usuwa szum i powiększa obraz przed skanowaniem w celu lepszej dokładności.",
+        "Poprawia lokalny kontrast przed rozpoznawaniem. Tryb Szybki stosuje go bezpośrednio; Zrównoważony i Najlepszy zachowują wariant tylko wtedy, gdy skalibrowany wynik poprawia rezultat.",
+      fastKoreanUnsupported:
+        "Szybki OCR nie obsługuje języka koreańskiego. Zainstaluj pakiet dokładnego OCR i wybierz Zrównoważony lub Najlepszy.",
       language: "Język",
       autoDetect: "Automatyczne wykrywanie",
       extractedText: "Wyodrębniony tekst",
@@ -3573,11 +3575,18 @@ export const pl: TranslationKeys = {
       uninstall: "Odinstaluj",
       installing: "Instalowanie...",
       importBundle: "Importuj pakiet",
-      importDescription: "Prześlij archiwum .tar.gz wyeksportowane z innej instalacji.",
+      importDescription:
+        "Zaimportuj podpisane środowisko OCR lub starszy pakiet AI do użycia offline.",
       importButton: "Importuj z pliku",
       importing: "Importowanie...",
       importSuccess: "Pakiet zaimportowany pomyślnie.",
       importError: "Import pakietu nie powiódł się: {error}",
+      importType: "Typ pakietu",
+      importOcr: "Dokładny pakiet OCR",
+      importLegacy: "Starszy pakiet AI",
+      importOcrIndex: "Podpisany indeks OCR (.json)",
+      importOcrArchive: "Archiwum środowiska OCR (.tar.gz)",
+      importLegacyArchive: "Archiwum starszego pakietu (.tar.gz)",
       resetTitle: "Zresetuj środowisko AI",
       resetDescription:
         "Usuwa wszystkie zainstalowane funkcje AI i pobrane modele, a następnie zaczyna od nowa. Użyj tej opcji, jeśli narzędzia AI zachowują się nieprawidłowo po aktualizacji, a ponowna instalacja pakietu nie rozwiązuje problemu.",

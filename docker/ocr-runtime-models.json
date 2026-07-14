@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "family": "ocr",
+  "legalAssets": [
+    {
+      "id": "snapotter-agpl",
+      "source": "LICENSE",
+      "sourceUrl": "https://github.com/snapotter-hq/SnapOtter",
+      "path": "LICENSES/SnapOtter-AGPL-3.0.txt",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523,
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": "apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sourceUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+      "path": "THIRD_PARTY_LICENSES/Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "antlr-4.9.3-license",
+      "url": "https://raw.githubusercontent.com/antlr/antlr4/4.9.3/LICENSE.txt",
+      "sourceUrl": "https://github.com/antlr/antlr4/tree/4.9.3",
+      "path": "THIRD_PARTY_LICENSES/ANTLR-4.9.3.txt",
+      "sha256": "b1b379fcaf3219593a4c433feb1b35c780bed23fafaae440b1ae2771a9521e3a",
+      "size": 2699,
+      "license": "BSD-3-Clause"
+    }
+  ],
+  "localAssets": [
+    {
+      "id": "best-v1-calibration",
+      "source": "docker/ocr-best-v1-calibration.json",
+      "path": "models/best-v1-calibration.json",
+      "sha256": "e481678c7979347059a1f48df3f9e306016eab733d148e2241d00e4868576576",
+      "size": 335,
+      "license": "AGPL-3.0"
+    }
+  ],
+  "models": [
+    {
+      "id": "pp-ocrv6-small-det",
+      "repository": "PaddlePaddle/PP-OCRv6_small_det_onnx",
+      "revision": "28fe5895c24fd108c19eb3e8479f4ab385fbfc62",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx",
+      "path": "models/PP-OCRv6_det_small.onnx",
+      "sha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
+      "size": 9880512,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-ocrv6-small-rec",
+      "repository": "PaddlePaddle/PP-OCRv6_small_rec_onnx",
+      "revision": "b8f84f0b80c529de40b4fbb3544b84fa7233a513",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/b8f84f0b80c529de40b4fbb3544b84fa7233a513/inference.onnx",
+      "path": "models/PP-OCRv6_rec_small.onnx",
+      "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
+      "size": 21159378,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-ocrv6-medium-det",
+      "repository": "PaddlePaddle/PP-OCRv6_medium_det_onnx",
+      "revision": "61323801669c338b7891481ec7bac61ce31b576a",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx/resolve/61323801669c338b7891481ec7bac61ce31b576a/inference.onnx",
+      "path": "models/PP-OCRv6_det_medium.onnx",
+      "sha256": "eb13b44b25bb36f89528b68720af8a61d9cf381176107f465db1757b65d086e1",
+      "size": 62032837,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-ocrv6-medium-rec",
+      "repository": "PaddlePaddle/PP-OCRv6_medium_rec_onnx",
+      "revision": "50c7eacafc52fa7bcf4194e8cd08e46f8558504b",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx",
+      "path": "models/PP-OCRv6_rec_medium.onnx",
+      "sha256": "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba",
+      "size": 76554979,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "korean-pp-ocrv5-mobile-rec",
+      "repository": "PaddlePaddle/korean_PP-OCRv5_mobile_rec_onnx",
+      "revision": "5c6f574b8e2230adf4287b33e736d71b9fabd28e",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec_onnx/resolve/5c6f574b8e2230adf4287b33e736d71b9fabd28e/inference.onnx",
+      "path": "models/korean_PP-OCRv5_mobile_rec.onnx",
+      "sha256": "92f0b7785e64fc9090106a241cf4c1eb97472824558272751b88a2a4476d3a08",
+      "size": 13418787,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-lcnet-x0-25-textline-ori",
+      "repository": "PaddlePaddle/PP-LCNet_x0_25_textline_ori_onnx",
+      "revision": "aea1f18d97338aaf84b463f90192f2820524a00a",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-LCNet_x0_25_textline_ori_onnx/resolve/aea1f18d97338aaf84b463f90192f2820524a00a/inference.onnx",
+      "path": "models/PP-LCNet_x0_25_textline_ori.onnx",
+      "sha256": "94a6a0a0425f2b5f08b5df72086f2d72abe40f1d22f6d12d2cd83674f11f2ff3",
+      "size": 1019454,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-lcnet-x1-0-doc-ori",
+      "repository": "PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx",
+      "revision": "7330ab7039123e46af2dc03154b9969aa412c61d",
+      "file": "inference.onnx",
+      "url": "https://huggingface.co/PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx/resolve/7330ab7039123e46af2dc03154b9969aa412c61d/inference.onnx",
+      "path": "models/PP-LCNet_x1_0_doc_ori.onnx",
+      "sha256": "af9a0a4f317ff0709ce752067807f819cb15d883f8ecad89f28df1c6ee2d9c92",
+      "size": 6788069,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "pp-ocrv6-dictionary",
+      "repository": "RapidAI/RapidOCR",
+      "revision": "49043b4cb8eaf8388a6399394ebdc014851c217c",
+      "file": "paddle/PP-OCRv6/rec/PP-OCRv6_rec_small/ppocrv6_dict.txt",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/49043b4cb8eaf8388a6399394ebdc014851c217c/paddle/PP-OCRv6/rec/PP-OCRv6_rec_small/ppocrv6_dict.txt",
+      "path": "models/ppocrv6_dict.txt",
+      "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
+      "size": 74947,
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "korean-pp-ocrv5-dictionary",
+      "repository": "RapidAI/RapidOCR",
+      "revision": "49043b4cb8eaf8388a6399394ebdc014851c217c",
+      "file": "paddle/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile/ppocrv5_korean_dict.txt",
+      "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/49043b4cb8eaf8388a6399394ebdc014851c217c/paddle/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile/ppocrv5_korean_dict.txt",
+      "path": "models/korean_dict.txt",
+      "sha256": "a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7",
+      "size": 47451,
+      "license": "Apache-2.0"
+    }
+  ]
+}

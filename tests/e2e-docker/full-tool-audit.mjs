@@ -1,7 +1,8 @@
 /**
  * FULL TOOL AUDIT — Tests every tool in SnapOtter on Windows/amd64.
- * Verifies: (1) tool works, (2) GPU tools use GPU not CPU fallback,
- * (3) no unexpected model/method downgrades.
+ * Verifies: (1) tool works, (2) GPU-capable tools do not unexpectedly fall
+ * back, and (3) execution provenance matches the declared contract. OCR is
+ * deliberately CPU-only on every host, including NVIDIA systems.
  */
 const BASE = "http://localhost:1349";
 const USERNAME = "admin";
@@ -44,7 +45,7 @@ async function test(name, path, settings, checks = {}) {
       log(name, "FAIL", body.details || body.error || `HTTP ${status}`);
       return;
     }
-    // Check expected model/method
+    // Check expected model/method/provenance
     if (checks.expectKey && checks.expectValue) {
       const actual = body[checks.expectKey];
       if (actual !== checks.expectValue) {
@@ -56,12 +57,24 @@ async function test(name, path, settings, checks = {}) {
         return;
       }
     }
+    for (const [key, expected] of Object.entries(checks.expectFields ?? {})) {
+      if (body[key] !== expected) {
+        log(name, "FAIL", `Expected ${key}=${expected} but got ${body[key]}`);
+        return;
+      }
+    }
     // Build detail string
     const parts = [];
     for (const k of [
       "method",
       "model",
       "engine",
+      "provider",
+      "device",
+      "requestedQuality",
+      "actualQuality",
+      "runtimeVersion",
+      "modelVersion",
       "format",
       "width",
       "height",
@@ -102,10 +115,22 @@ async function main() {
   console.log(`GPU detected: ${health.ai?.gpu}`);
   console.log(`Version: ${health.version}\n`);
 
+  const featuresRes = await fetch(`${BASE}/api/v1/features`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!featuresRes.ok) {
+    throw new Error(`Could not read feature capabilities: HTTP ${featuresRes.status}`);
+  }
+  const features = await featuresRes.json();
+  const ocrFeature = features.bundles?.find((bundle) => bundle.id === "ocr");
+  if (!ocrFeature?.availableQualities?.includes("fast")) {
+    throw new Error("OCR feature state does not advertise the built-in Fast tier");
+  }
+
   // ════════════════════════════════════════════════════════════════
-  // SECTION 1: GPU/AI TOOLS — verify correct model, no fallbacks
+  // SECTION 1: GPU/AI TOOLS — verify correct model and declared provider
   // ════════════════════════════════════════════════════════════════
-  console.log("--- GPU/AI TOOLS (must use GPU, no CPU fallback) ---\n");
+  console.log("--- GPU/AI TOOLS (GPU where supported; OCR is CPU-only) ---\n");
 
   // Background removal — all models
   await test(
@@ -197,17 +222,41 @@ async function main() {
 
   // OCR
   await test(
-    "OCR (tesseract)",
+    "OCR (Fast built-in)",
     "ocr",
-    { engine: "tesseract" },
-    { expectKey: "engine", expectValue: "tesseract" },
+    { quality: "fast" },
+    {
+      expectFields: {
+        engine: "tesseract",
+        provider: "native",
+        device: "cpu",
+        requestedQuality: "fast",
+        actualQuality: "fast",
+        degraded: false,
+      },
+    },
   );
-  await test(
-    "OCR (paddleocr)",
-    "ocr",
-    { engine: "paddleocr" },
-    { expectKey: "engine", expectValue: "paddleocr-v5" },
-  );
+  for (const quality of ["balanced", "best"]) {
+    if (!ocrFeature.availableQualities.includes(quality)) {
+      log(`OCR (${quality})`, "SKIP", `signed accurate runtime unavailable (${ocrFeature.status})`);
+      continue;
+    }
+    await test(
+      `OCR (${quality})`,
+      "ocr",
+      { quality },
+      {
+        expectFields: {
+          engine: "rapidocr-onnx",
+          provider: "CPUExecutionProvider",
+          device: "cpu",
+          requestedQuality: quality,
+          actualQuality: quality,
+          degraded: false,
+        },
+      },
+    );
+  }
 
   // Face operations (MediaPipe)
   await test("Face Blur", "blur-faces", { intensity: 50 });

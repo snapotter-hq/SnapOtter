@@ -509,67 +509,24 @@ install_photo_restoration() {
 
 
 # ========================================================================
-# 7. OCR  (~3-4 GB, paddlepaddle arm64 risk)
+# 7. OCR (Fast is built in; the signed accurate pack is application-managed)
 # ========================================================================
 install_ocr() {
   log "=== Bundle 7/7: ocr ==="
 
-  # --- pip packages ---
-  pip_install "huggingface-hub" || true
-
-  log "pip install paddlepaddle>=3.2.1 (arm64 wheel -- may take a while) ..."
-  dpip install --cache-dir /data/ai/pip-cache "paddlepaddle>=3.2.1" 2>&1
-  local paddle_rc=$?
-  if [[ $paddle_rc -ne 0 ]]; then
-    fail "paddlepaddle install failed on arm64 (exit $paddle_rc)"
-    BUNDLE_STATUS[ocr]="FAILED: paddlepaddle arm64 pip install"
+  if ! dexec command -v tesseract >/dev/null 2>&1; then
+    fail "built-in Tesseract is missing from the container"
+    BUNDLE_STATUS[ocr]="FAILED: built-in Tesseract missing"
     return 1
   fi
 
-  pip_install "paddleocr[doc-parser]>=3.4.0,<3.5.0" || { fail "paddleocr pip failed"; BUNDLE_STATUS[ocr]="FAILED: paddleocr pip"; return 1; }
-
-  # Re-pin numpy after paddlepaddle (it may drag in a different version)
-  dpip install --cache-dir /data/ai/pip-cache --force-reinstall "numpy==1.26.4" 2>&1 || true
-
-  # --- models (8 HF snapshots) ---
-  local OCR_REPOS=(
-    "PaddlePaddle/PP-OCRv5_server_det:PP-OCRv5_server_det"
-    "PaddlePaddle/PP-OCRv5_server_rec:PP-OCRv5_server_rec"
-    "PaddlePaddle/PP-OCRv5_mobile_det:PP-OCRv5_mobile_det"
-    "PaddlePaddle/PP-OCRv5_mobile_rec:PP-OCRv5_mobile_rec"
-    "PaddlePaddle/latin_PP-OCRv5_mobile_rec:latin_PP-OCRv5_mobile_rec"
-    "PaddlePaddle/korean_PP-OCRv5_mobile_rec:korean_PP-OCRv5_mobile_rec"
-    "PaddlePaddle/PP-LCNet_x1_0_textline_ori:PP-LCNet_x1_0_textline_ori"
-    "PaddlePaddle/PaddleOCR-VL-1.5:PaddleOCR-VL-1.5"
-  )
-
-  for entry in "${OCR_REPOS[@]}"; do
-    local repo="${entry%%:*}"
-    local dirname="${entry##*:}"
-    hf_snapshot "$repo" "$MODELS/$dirname" \
-      || { warn "HF snapshot $repo failed"; }
-  done
-
-  # --- verify ---
-  local all_ok=true
-  for entry in "${OCR_REPOS[@]}"; do
-    local dirname="${entry##*:}"
-    dir_ok "$MODELS/$dirname" || { warn "Missing: $dirname"; all_ok=false; }
-  done
-
-  if $all_ok; then
-    mark_installed ocr \
-      paddleocr-server-det paddleocr-server-rec \
-      paddleocr-mobile-det paddleocr-mobile-rec \
-      paddleocr-latin-rec paddleocr-korean-rec \
-      paddleocr-textline-ori paddleocr-vl
-    BUNDLE_STATUS[ocr]="INSTALLED"
-    ok "ocr complete"
-  else
-    fail "ocr verification failed (some model dirs missing)"
-    BUNDLE_STATUS[ocr]="FAILED: missing model directories"
-    return 1
-  fi
+  # Do not recreate the old pip/model seeding path here. Balanced and Best are
+  # an immutable, signed runtime with architecture-specific native wheels. They
+  # must be installed through POST /api/v1/admin/features/ocr/install (or the AI
+  # Features UI) so signature, disk, transaction, compatibility, and rollback
+  # checks cannot be bypassed by QA tooling.
+  BUNDLE_STATUS[ocr]="FAST BUILT IN; ACCURATE PACK APPLICATION-MANAGED"
+  ok "ocr Fast tier is available; use the feature API to test the accurate pack"
 }
 
 
@@ -612,7 +569,7 @@ main() {
   for b in face-detection transcription object-eraser-colorize background-removal \
            upscale-enhance photo-restoration ocr; do
     local status="${BUNDLE_STATUS[$b]:-NOT RUN}"
-    if [[ "$status" == INSTALLED* ]]; then
+    if [[ "$status" == INSTALLED* || "$status" == "FAST BUILT IN;"* ]]; then
       ok "$b: $status"
     else
       fail "$b: $status"

@@ -8,6 +8,7 @@ vi.mock("sharp", () => {
     png: vi.fn().mockReturnThis(),
     jpeg: vi.fn().mockReturnThis(),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+    toFile: vi.fn().mockResolvedValue({ size: 13 }),
     metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
   }));
   return { default: mockSharp };
@@ -29,6 +30,15 @@ vi.mock("../../../packages/ai/src/bridge.js", () => ({
   shutdownDispatcher: vi.fn(),
 }));
 
+vi.mock("../../../packages/ai/src/ocr-runtime-dispatcher.js", () => ({
+  runOcrRuntime: vi.fn(),
+}));
+
+vi.mock("../../../packages/ai/src/tesseract.js", () => ({
+  runAdaptiveTesseract: vi.fn(),
+  runTesseract: vi.fn(),
+}));
+
 // Import tool functions
 import { removeBackground } from "../../../packages/ai/src/background-removal.js";
 // Import the mocked bridge functions
@@ -40,8 +50,10 @@ import { detectFaceLandmarks } from "../../../packages/ai/src/face-landmarks.js"
 import { inpaint } from "../../../packages/ai/src/inpainting.js";
 import { noiseRemoval } from "../../../packages/ai/src/noise-removal.js";
 import { extractText } from "../../../packages/ai/src/ocr.js";
+import { runOcrRuntime } from "../../../packages/ai/src/ocr-runtime-dispatcher.js";
 import { removeRedEye } from "../../../packages/ai/src/red-eye-removal.js";
 import { restorePhoto } from "../../../packages/ai/src/restoration.js";
+import { runAdaptiveTesseract } from "../../../packages/ai/src/tesseract.js";
 import { upscale } from "../../../packages/ai/src/upscaling.js";
 
 const FAKE_INPUT = Buffer.from("fake-image-data");
@@ -60,6 +72,33 @@ beforeEach(() => {
   vi.mocked(runPythonWithProgress).mockResolvedValue({
     stdout: '{"success": true}',
     stderr: "",
+  });
+  vi.mocked(runAdaptiveTesseract).mockResolvedValue({
+    text: "Hello World",
+    engine: "tesseract",
+    device: "cpu",
+    provider: "native",
+  });
+  vi.mocked(runOcrRuntime).mockResolvedValue({
+    result: {
+      success: true,
+      text: "Accurate text",
+      engine: "rapidocr-onnx",
+      requestedQuality: "best",
+      actualQuality: "best",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+    },
+    stderr: "",
+    runtime: {
+      generation: "test",
+      artifactVersion: "2.1.0",
+      target: "linux-amd64-cpu-py312",
+      providers: ["CPUExecutionProvider"],
+      models: { detection: "digest" },
+    },
   });
 });
 
@@ -229,57 +268,68 @@ describe("upscale", () => {
 // ── extractText (OCR) ─────────────────────────────────────────────────
 
 describe("extractText (OCR)", () => {
-  beforeEach(() => {
-    vi.mocked(parseStdoutJson).mockReturnValue({
-      success: true,
-      text: "Hello World",
-      engine: "paddleocr",
-    });
-  });
-
-  it("calls runPythonWithProgress with ocr.py", async () => {
+  it("uses built-in Tesseract for Fast without entering the Python bridge", async () => {
     await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-    expect(runPythonWithProgress).toHaveBeenCalledWith(
-      "ocr.py",
-      expect.arrayContaining([expect.stringContaining("input_ocr.png")]),
-      expect.objectContaining({ timeout: expect.any(Number) }),
+    expect(runAdaptiveTesseract).toHaveBeenCalledWith(
+      expect.stringContaining("input_ocr.png"),
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
+    expect(runPythonWithProgress).not.toHaveBeenCalled();
   });
 
-  it("returns OcrResult with text and engine", async () => {
+  it("returns truthful complete Fast metadata", async () => {
     const result = await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "Hello World",
-      engine: "paddleocr",
+      engine: "tesseract",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      device: "cpu",
+      provider: "native",
+      degraded: false,
     });
   });
 
-  it("passes quality and language options", async () => {
+  it("passes Best and language options to the isolated runtime", async () => {
     await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, {
       quality: "best",
       language: "en",
     });
 
-    const args = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+    const [, args] = vi.mocked(runOcrRuntime).mock.calls[0];
     const optionsArg = args[1];
-    expect(JSON.parse(optionsArg)).toEqual({ quality: "best", language: "en" });
+    expect(JSON.parse(optionsArg)).toEqual({
+      quality: "best",
+      language: "en",
+      enhance: true,
+    });
   });
 
-  it("throws when OCR fails", async () => {
-    vi.mocked(parseStdoutJson).mockReturnValue({
-      success: false,
-      error: "No text detected",
+  it("propagates Tesseract failures", async () => {
+    vi.mocked(runAdaptiveTesseract).mockRejectedValueOnce(new Error("Tesseract failed"));
+
+    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("Tesseract failed");
+  });
+
+  it("rejects an accurate runtime failure without falling back", async () => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce({
+      result: { success: false, error: "Accurate OCR failed" },
+      stderr: "",
+      runtime: {
+        generation: "test",
+        artifactVersion: "2.1.0",
+        target: "linux-amd64-cpu-py312",
+        providers: ["CPUExecutionProvider"],
+        models: {},
+      },
     });
 
-    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("No text detected");
-  });
-
-  it("uses fallback error message when no error string provided", async () => {
-    vi.mocked(parseStdoutJson).mockReturnValue({ success: false });
-
-    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("OCR failed");
+    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { quality: "best" })).rejects.toThrow(
+      "Accurate OCR failed",
+    );
+    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
   });
 });
 
@@ -885,11 +935,11 @@ describe("restorePhoto", () => {
 // ── error propagation from runPythonWithProgress ──────────────────────
 
 describe("error propagation from bridge", () => {
-  it("propagates bridge rejection through tool functions", async () => {
-    vi.mocked(runPythonWithProgress).mockRejectedValue(new Error("Python script timed out"));
+  it("propagates isolated OCR runtime transport rejection", async () => {
+    vi.mocked(runOcrRuntime).mockRejectedValue(new Error("OCR runtime timed out"));
 
-    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-      "Python script timed out",
+    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { quality: "balanced" })).rejects.toThrow(
+      "OCR runtime timed out",
     );
   });
 
@@ -1604,18 +1654,12 @@ describe("option serialization", () => {
 
 describe("OCR dynamic timeout", () => {
   it("uses megapixel-based timeout for large images", async () => {
-    vi.mocked(parseStdoutJson).mockReturnValue({
-      success: true,
-      text: "Hello",
-      engine: "paddleocr",
-    });
-
     await extractText(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
     // sharp metadata returns 800x600 = 0.48MP
     // timeout = max(600_000, 0.48 * 30 * 1000) = 600_000
-    const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-    expect(options.timeout).toBeGreaterThanOrEqual(600_000);
+    const options = vi.mocked(runAdaptiveTesseract).mock.calls[0][1];
+    expect(options.timeoutMs).toBeGreaterThanOrEqual(600_000);
   });
 });
 
@@ -1647,13 +1691,21 @@ describe("parseStdoutJson throws in tool pipeline", () => {
     );
   });
 
-  it("propagates parse error through extractText", async () => {
-    vi.mocked(parseStdoutJson).mockImplementation(() => {
-      throw new Error("No JSON response from Python script");
+  it("rejects malformed isolated OCR runtime metadata", async () => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce({
+      result: "malformed",
+      stderr: "",
+      runtime: {
+        generation: "test",
+        artifactVersion: "2.1.0",
+        target: "linux-amd64-cpu-py312",
+        providers: ["CPUExecutionProvider"],
+        models: {},
+      },
     });
 
-    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-      "No JSON response from Python script",
+    await expect(extractText(FAKE_INPUT, FAKE_OUTPUT_DIR, { quality: "balanced" })).rejects.toThrow(
+      "invalid metadata",
     );
   });
 

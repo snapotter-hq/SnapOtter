@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter Docker 이미지 태그, GPU 벤치마크, 버전 고정, AMD64 및 ARM64 멀티 플랫폼 지원."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 50cb8fc63997
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Docker Image {#docker-image}
@@ -41,7 +41,6 @@ VA-API, Quick Sync 또는 OpenCL을 통한 Intel/AMD iGPU 가속은 현재 SnapO
 | Background removal (isnet) | 2,457ms | 1,137ms | 2.2x |
 | Upscale 2x | 350ms | 309ms | 1.1x |
 | Upscale 4x | 910ms | 310ms | 2.9x |
-| OCR (PaddleOCR) | 137ms | 94ms | 1.5x |
 | Face blur | 139ms | 122ms | 1.1x |
 
 #### Cold start (first request after container start) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ VA-API, Quick Sync 또는 OpenCL을 통한 Intel/AMD iGPU 가속은 현재 SnapO
 |------|-----|-----|---------|
 | Background removal | 22,286ms | 4,792ms | 4.7x |
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
-| OCR (PaddleOCR) | 1,469ms | 1,090ms | 1.3x |
+
+OCR 에 포함되지 않습니다 CUDA 비교. 둘 다 내장 Tesseract 계층 및 선택 사항 RapidOCR/ONNX 계층 사용 CPU, 컨테이너에 NVIDIA GPU 액세스 권한이 있는 경우도 포함됩니다.
 
 ### CUDA health check {#cuda-health-check}
 

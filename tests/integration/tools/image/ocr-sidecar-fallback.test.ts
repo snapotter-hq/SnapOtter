@@ -1,9 +1,9 @@
 /**
- * Focused sidecar-free integration coverage for OCR route fallback behavior.
+ * Focused sidecar-free integration coverage for OCR route tier behavior.
  *
- * The route retries lower-quality OCR tiers when the Python process crashes or
- * a higher tier returns empty text. These tests mock only the AI bridge and the
- * installation gate so they exercise the Fastify route without running models.
+ * A request must run exactly the selected tier. Crashes and empty output are
+ * never hidden by silently switching engines, and every success reports the
+ * actual execution provenance.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   extractText: vi.fn(),
+  getOcrRuntimeCapability: vi.fn(),
 }));
 
 vi.mock("@snapotter/ai", async (importOriginal) => {
@@ -24,19 +25,19 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
   return {
     ...actual,
     extractText: mocks.extractText,
-  };
-});
-
-vi.mock("../../../../apps/api/src/lib/feature-status.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../../apps/api/src/lib/feature-status.js")>();
-  return {
-    ...actual,
-    isToolInstalled: (toolId: string) => (toolId === "ocr" ? true : actual.isToolInstalled(toolId)),
+    getOcrRuntimeCapability: mocks.getOcrRuntimeCapability,
   };
 });
 
 const PNG = readFixture(fixtures.image.ocr.clean);
+const OVERSIZED_QOI_HEADER = (() => {
+  const value = Buffer.alloc(14);
+  value.write("qoif", 0, "ascii");
+  value.writeUInt32BE(10_000, 4);
+  value.writeUInt32BE(10_000, 8);
+  value[12] = 4;
+  return value;
+})();
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -54,9 +55,15 @@ afterAll(async () => {
 
 beforeEach(() => {
   mocks.extractText.mockReset();
+  mocks.getOcrRuntimeCapability.mockReset();
+  mocks.getOcrRuntimeCapability.mockReturnValue({
+    available: true,
+    qualities: ["balanced", "best"],
+    providers: ["CPUExecutionProvider"],
+  });
 });
 
-function postOcr(settings: Record<string, unknown>) {
+function postOcr(settings: Record<string, unknown>, token = adminToken) {
   const { body, contentType } = createMultipartPayload([
     { name: "file", filename: "ocr-clean.png", contentType: "image/png", content: PNG },
     { name: "settings", content: JSON.stringify(settings) },
@@ -66,6 +73,19 @@ function postOcr(settings: Record<string, unknown>) {
     method: "POST",
     url: "/api/v1/tools/image/ocr",
     headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": contentType,
+    },
+    body,
+  });
+}
+
+function postMultipart(url: string, parts: Parameters<typeof createMultipartPayload>[0]) {
+  const { body, contentType } = createMultipartPayload(parts);
+  return app.inject({
+    method: "POST",
+    url,
+    headers: {
       authorization: `Bearer ${adminToken}`,
       "content-type": contentType,
     },
@@ -73,75 +93,250 @@ function postOcr(settings: Record<string, unknown>) {
   });
 }
 
-describe("ocr sidecar fallback coverage", () => {
-  it("falls back from crashed best tier to empty balanced tier to fast tier", async () => {
-    mocks.extractText
-      .mockRejectedValueOnce(new Error("Python process exited unexpectedly"))
-      .mockResolvedValueOnce({ text: "", engine: "paddleocr-v5" })
-      .mockResolvedValueOnce({ text: "SnapOtter OCR", engine: "tesseract" });
+describe("ocr tier execution coverage", () => {
+  it("rejects API keys without tools:use before uploading or enqueueing OCR", async () => {
+    const createKey = await app.inject({
+      method: "POST",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: "ocr-without-tools", permissions: ["settings:read"] },
+    });
+    expect(createKey.statusCode).toBe(201);
+    const apiKey = JSON.parse(createKey.body).key as string;
 
-    const res = await postOcr({ quality: "best", language: "en", enhance: false });
+    const res = await postOcr({ quality: "fast", language: "en" }, apiKey);
 
-    expect(res.statusCode).toBe(200);
-    expect(mocks.extractText).toHaveBeenCalledTimes(3);
-    expect(mocks.extractText.mock.calls.map((call) => call[2].quality)).toEqual([
-      "best",
-      "balanced",
-      "fast",
-    ]);
-
-    const json = JSON.parse(res.body);
-    expect(json.text).toBe("SnapOtter OCR");
-    expect(json.engine).toBe("tesseract");
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toBe("You don't have permission to use this tool");
+    expect(mocks.extractText).not.toHaveBeenCalled();
   });
 
-  it("does not retry non-crash OCR errors", async () => {
-    mocks.extractText.mockRejectedValueOnce(new Error("language data missing"));
+  it("serializes concurrent requests through the BullMQ AI worker", async () => {
+    let active = 0;
+    let maxActive = 0;
+    mocks.extractText.mockImplementation(async (_input, _scratch, options) => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      active--;
+      return {
+        text: "SnapOtter OCR",
+        engine: "tesseract",
+        requestedQuality: options.quality,
+        actualQuality: options.quality,
+        device: "cpu",
+        provider: "tesseract",
+        degraded: false,
+        warnings: [],
+      };
+    });
 
-    const res = await postOcr({ quality: "balanced", language: "en" });
+    const [first, second] = await Promise.all([
+      postOcr({ quality: "fast", language: "en" }),
+      postOcr({ quality: "fast", language: "en" }),
+    ]);
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(maxActive).toBe(1);
+  });
+
+  it("fails closed when the selected best runtime crashes", async () => {
+    mocks.extractText.mockRejectedValueOnce(new Error("OCR runtime exited unexpectedly"));
+
+    const res = await postOcr({ quality: "best", language: "en", enhance: false });
 
     expect(res.statusCode).toBe(422);
     expect(mocks.extractText).toHaveBeenCalledTimes(1);
+    expect(mocks.extractText.mock.calls[0][2].quality).toBe("best");
 
     const json = JSON.parse(res.body);
     expect(json.error).toBe("OCR failed");
-    expect(json.details).toContain("language data missing");
+    expect(json.details).toContain("exited unexpectedly");
   });
 
-  it("falls back to a lower tier when PaddleOCR itself is unavailable (e.g. an ABI conflict), instead of hard-failing", async () => {
-    // Exact message shapes ocr.py produces on ImportError from run_paddleocr_v5/vl
-    // (e.g. "cannot import name '_promote' from 'scipy.spatial.transform._rotation'",
-    // the BUG-2 scipy ABI conflict) -- previously matched none of the crash-only
-    // substrings below and hard-failed with 422 instead of degrading gracefully.
-    mocks.extractText
-      .mockRejectedValueOnce(
-        new Error(
-          "PaddleOCR-VL is not available: cannot import name '_promote' from 'scipy.spatial.transform._rotation'. Install the OCR feature or use quality=balanced for PP-OCRv5.",
-        ),
-      )
-      .mockRejectedValueOnce(
-        new Error(
-          "PaddleOCR is not installed: cannot import name '_promote' from 'scipy.spatial.transform._rotation'. Install the OCR feature or use quality=fast for Tesseract.",
-        ),
-      )
-      .mockResolvedValueOnce({ text: "SnapOtter OCR", engine: "tesseract" });
+  it("returns an empty result without changing the requested tier", async () => {
+    mocks.extractText.mockResolvedValueOnce({
+      text: "",
+      engine: "rapidocr-onnx",
+      requestedQuality: "best",
+      actualQuality: "best",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+      runtimeVersion: "ocr-runtime-1",
+      modelVersion: "pp-ocrv6-medium",
+    });
 
-    const res = await postOcr({ quality: "best", language: "en", enhance: false });
+    const res = await postOcr({ quality: "best", language: "en" });
 
     expect(res.statusCode).toBe(200);
-    expect(mocks.extractText).toHaveBeenCalledTimes(3);
-    expect(mocks.extractText.mock.calls.map((call) => call[2].quality)).toEqual([
-      "best",
-      "balanced",
-      "fast",
-    ]);
-
+    expect(mocks.extractText).toHaveBeenCalledTimes(1);
     const json = JSON.parse(res.body);
-    expect(json.text).toBe("SnapOtter OCR");
-    expect(json.engine).toBe("tesseract");
+    expect(json).toMatchObject({
+      text: "",
+      engine: "rapidocr-onnx",
+      requestedQuality: "best",
+      actualQuality: "best",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+      runtimeVersion: "ocr-runtime-1",
+      modelVersion: "pp-ocrv6-medium",
+    });
   });
 
-  it("validates settings after the bundle gate passes", async () => {
+  it("returns the optional-pack response before invoking an unavailable accurate tier", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      qualities: [],
+      providers: [],
+    });
+
+    const res = await postOcr({ quality: "balanced", language: "en" });
+
+    expect(res.statusCode).toBe(501);
+    expect(mocks.extractText).not.toHaveBeenCalled();
+
+    const json = JSON.parse(res.body);
+    expect(json).toMatchObject({
+      code: "FEATURE_NOT_INSTALLED",
+      feature: "ocr",
+      requestedQuality: "balanced",
+    });
+  });
+
+  it("distinguishes an incompatible accurate runtime from a missing pack", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      status: "incompatible",
+      reason: "unsupported-host",
+      qualities: [],
+      providers: [],
+    });
+
+    const res = await postOcr({ quality: "best", language: "en" });
+
+    expect(res.statusCode).toBe(501);
+    expect(mocks.extractText).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      requestedQuality: "best",
+      compatibilityReason: "unsupported-host",
+    });
+  });
+
+  it.each([
+    { quality: "fast", language: "ko" },
+    { engine: "tesseract", language: "ko" },
+  ])("rejects unsupported Fast Korean ingress before OCR execution: %j", async (settings) => {
+    const res = await postOcr(settings);
+
+    expect(res.statusCode).toBe(501);
+    expect(mocks.extractText).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      requestedQuality: "fast",
+      compatibilityReason: "fast-korean-unsupported",
+      guidance:
+        "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.",
+    });
+  });
+
+  it("defaults omitted Korean to Balanced when it is the available accurate tier", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: true,
+      qualities: ["balanced"],
+      providers: ["CPUExecutionProvider"],
+    });
+    mocks.extractText.mockResolvedValueOnce({
+      text: "한국어",
+      engine: "rapidocr-onnx",
+      requestedQuality: "balanced",
+      actualQuality: "balanced",
+      device: "cpu",
+      provider: "CPUExecutionProvider",
+      degraded: false,
+      warnings: [],
+    });
+
+    const res = await postOcr({ language: "ko" });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.extractText.mock.calls[0][2]).toMatchObject({
+      language: "ko",
+      quality: "balanced",
+    });
+  });
+
+  it("keeps omitted Korean on an accurate tier when the pack is missing", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      status: "missing",
+      reason: "descriptor-missing",
+      qualities: [],
+      providers: [],
+    });
+
+    const res = await postOcr({ language: "ko" });
+
+    expect(res.statusCode).toBe(501);
+    expect(mocks.extractText).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "FEATURE_NOT_INSTALLED",
+      requestedQuality: "best",
+      compatibilityReason: "descriptor-missing",
+    });
+  });
+
+  it.each([
+    [
+      "/api/v1/tools/image/ocr/batch",
+      "settings",
+      JSON.stringify({ quality: "fast", language: "ko" }),
+    ],
+    [
+      "/api/v1/pipeline/execute",
+      "pipeline",
+      JSON.stringify({ steps: [{ toolId: "ocr", settings: { quality: "fast", language: "ko" } }] }),
+    ],
+    [
+      "/api/v1/pipeline/batch",
+      "pipeline",
+      JSON.stringify({ steps: [{ toolId: "ocr", settings: { quality: "fast", language: "ko" } }] }),
+    ],
+  ])("rejects Fast Korean before queueing across %s", async (url, field, value) => {
+    const res = await postMultipart(url, [
+      {
+        name: "file",
+        filename: "ocr-clean.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+      { name: field, content: value },
+    ]);
+
+    expect(res.statusCode).toBe(501);
+    expect(mocks.extractText).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "FEATURE_INCOMPATIBLE",
+      requestedQuality: "fast",
+      compatibilityReason: "fast-korean-unsupported",
+      guidance:
+        "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.",
+    });
+  });
+
+  it("validates settings before checking the optional pack", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      qualities: [],
+      providers: [],
+    });
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "ocr-clean.png", contentType: "image/png", content: PNG },
       { name: "settings", content: JSON.stringify({ quality: "ultra" }) },
@@ -160,6 +355,74 @@ describe("ocr sidecar fallback coverage", () => {
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
     expect(json.error).toBe("Invalid settings");
+    expect(mocks.getOcrRuntimeCapability).not.toHaveBeenCalled();
+    expect(mocks.extractText).not.toHaveBeenCalled();
+  });
+
+  it("defaults to Fast when no healthy accurate runtime is active", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      qualities: [],
+      providers: [],
+    });
+    mocks.extractText.mockResolvedValueOnce({
+      text: "SnapOtter OCR",
+      engine: "tesseract",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      device: "cpu",
+      provider: "tesseract",
+      degraded: false,
+      warnings: [],
+      runtimeVersion: "5.5.0",
+    });
+
+    const res = await postOcr({ language: "en", enhance: false });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.extractText).toHaveBeenCalledTimes(1);
+    expect(mocks.extractText.mock.calls[0][2].quality).toBe("fast");
+    expect(JSON.parse(res.body)).toMatchObject({
+      text: "SnapOtter OCR",
+      engine: "tesseract",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      device: "cpu",
+      provider: "tesseract",
+      degraded: false,
+      warnings: [],
+    });
+  });
+
+  it.each([
+    [
+      "/api/v1/tools/image/ocr/batch",
+      "settings",
+      JSON.stringify({ quality: "fast", language: "en" }),
+    ],
+    [
+      "/api/v1/pipeline/execute",
+      "pipeline",
+      JSON.stringify({ steps: [{ toolId: "ocr", settings: { quality: "fast" } }] }),
+    ],
+    [
+      "/api/v1/pipeline/batch",
+      "pipeline",
+      JSON.stringify({ steps: [{ toolId: "ocr", settings: { quality: "fast" } }] }),
+    ],
+  ])("rejects a decoded pixel bomb before %s ingress preprocessing", async (url, field, value) => {
+    const res = await postMultipart(url, [
+      {
+        name: "file",
+        filename: "oversized.qoi",
+        contentType: "image/qoi",
+        content: OVERSIZED_QOI_HEADER,
+      },
+      { name: field, content: value },
+    ]);
+
+    expect([400, 422]).toContain(res.statusCode);
+    expect(res.body).toMatch(/40,000,000|pixel safety limit/i);
     expect(mocks.extractText).not.toHaveBeenCalled();
   });
 });

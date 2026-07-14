@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 모노레포 구조, 앱 및 패키지 아키텍처, 요청 라이프사이클, 리소스 사용량."
-i18n_source_hash: 9e8f80499a37
-i18n_provenance: human
 i18n_output_hash: 90a5f3b46d1e
+i18n_source_hash: 733cb3c10884
+i18n_provenance: human
 ---
 
 # 아키텍처 {#architecture}
@@ -36,13 +36,13 @@ snapotter/
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-ML 작업을 위해 Python 스크립트를 호출하는 브리지 계층입니다. 최초 사용 시 브리지는 무거운 라이브러리(PIL, NumPy, MediaPipe, rembg)를 미리 임포트하는 영구 Python 디스패처 프로세스를 시작하므로 이후 AI 호출은 임포트 오버헤드를 건너뜁니다. 디스패처가 아직 준비되지 않은 경우 브리지는 요청마다 새 Python 서브프로세스를 생성하는 방식으로 폴백합니다.
+네이티브 및 Python ML 런타임을 호출하는 브리지 레이어입니다. 대부분의 Python 도구는 무거운 라이브러리(PIL, NumPy, MediaPipe, rembg)를 미리 가져오는 영구 dispatcher 를 사용하므로 후속 호출에서는 가져오기 오버헤드를 건너뜁니다. OCR 는 변경 가능한 공유 환경에서 격리됩니다. `fast`는 기본 Tesseract 를 호출하는 반면, `balanced` 및 `best`는 변경 불가능한 활성 RapidOCR/ONNX 세대에 고정된 전용 영구 JSONL dispatcher 를 사용합니다. 각 요청에는 generation lease 가 포함됩니다. 활성화는 먼저 후보에서 smoke test 를 실행한 다음 원자적으로 dispatcher 로 전환합니다. 이전 dispatcher 는 생성되기 전에 가비지 수집됩니다.
 
 **모델은 사전 로드되지 않습니다.** 각 도구 스크립트는 요청 시점에 디스크에서 모델 가중치를 로드하고 요청이 끝나면 이를 해제합니다. 전체 메모리 프로필은 [리소스 사용량](#resource-footprint)을 참고하세요.
 
-지원 작업: 배경 제거(rembg/BiRefNet), 업스케일(RealESRGAN), 얼굴 블러(MediaPipe), 얼굴 보정(GFPGAN/CodeFormer), 개체 지우기(LaMa ONNX), OCR(PaddleOCR/Tesseract), 컬러화(DDColor), 노이즈 제거, 적목 제거, 사진 복원, 여권 사진 생성, 투명도 수정(BiRefNet HR-matting), 콘텐츠 인식 크기 조정(Go caire 바이너리).
+지원되는 작업: 배경 제거(rembg/BiRefNet), 업스케일링(RealESRGAN), 얼굴 흐림(MediaPipe), 얼굴 향상(GFPGAN/CodeFormer), 개체 삭제(LaMa ONNX), OCR(Tesseract 및 RapidOCR(PP-OCR ONNX 모델 포함)), 색상화(DDColor), 노이즈 제거, 적목 현상 제거, 사진 복원, 여권 사진 생성, 투명도 수정(BiRefNet HR-매팅) 및 내용 인식 크기 조정(Go caire 바이너리).
 
-Python 스크립트는 `packages/ai/python/`에 있습니다. Docker 이미지는 빌드 중 모든 모델 가중치를 미리 다운로드하므로 컨테이너가 완전히 오프라인으로 작동합니다.
+Python 스크립트가 살고 있습니다 `packages/ai/python/`. 대규모 옵션 모델 팩은 요청 시 영구 패키지에 설치됩니다. `/data/ai` 용량. 정확한 OCR 서명된 것을 사용하고, 플랫폼별 아티팩트; 내장된 Tesseract 계층에는 모델 팩 다운로드가 필요하지 않습니다.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -87,7 +87,7 @@ Vite로 빌드된 React 19 단일 페이지 앱입니다. 상태 관리에 Zusta
 2. 프런트엔드는 파일과 설정을 담아 `/api/v1/tools/:section/:toolId`에 멀티파트 POST를 보냅니다.
 3. API 경로는 Zod로 입력을 검증한 다음 처리를 디스패치합니다.
 4. 표준 도구의 경우 작업이 적절한 BullMQ 풀(모달리티에 따라 image, media 또는 docs)로 큐에 추가됩니다. 인프로세스 BullMQ 워커는 EXIF 메타데이터를 기반으로 이미지 방향을 자동 조정하고, 도구의 처리 함수를 실행한 다음 결과를 반환합니다.
-5. AI 도구의 경우 TypeScript 브리지가 영구 Python 디스패처에 요청을 보내고(또는 폴백으로 새 서브프로세스를 생성), 완료를 기다린 다음 출력 파일을 읽습니다.
+5. 대부분의 AI 도구의 경우 TypeScript 브리지는 영구 Python dispatcher 에 요청을 보냅니다. 빠른 OCR 는 대신 Tesseract 를 호출하고 정확한 OCR 는 변경 불가능한 활성 OCR 생성에서 고정된 실행 파일을 시작합니다. 요청된 OCR 계층은 수신 시 고정되며 실행 중에 자동으로 변경되지 않습니다.
 6. 작업 진행률은 PostgreSQL의 `jobs` 테이블에 유지되므로 상태가 컨테이너 재시작에도 살아남습니다. 실시간 업데이트는 `/api/v1/jobs/:jobId/progress`의 SSE를 통해 전달됩니다.
 7. API는 `jobId`와 `downloadUrl`을 반환합니다. 사용자는 `/api/v1/download/:jobId/:filename`에서 처리된 파일을 다운로드합니다.
 

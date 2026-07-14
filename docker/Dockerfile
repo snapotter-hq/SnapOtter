@@ -190,8 +190,8 @@ RUN curl -fsSL --retry 3 --retry-delay 5 "https://github.com/strukturag/libheif/
 # Pin tags to specific major.minor for reproducible builds.
 # ============================================
 FROM node:22-bookworm@sha256:a25c9934ff6382cd4f08b6bc26c82bf4ea69b1e6f8dabfb2ead457374127c365 AS base-linux-arm64
-# CUDA base must match the AI bundles' wheels (torch/paddle/onnxruntime-gpu are all
-# cu126) and the libcublas-12-6 install below. It also sets the NVIDIA_REQUIRE_CUDA
+# CUDA base must match the remaining GPU AI bundles' torch/onnxruntime wheels
+# (cu126) and the libcublas-12-6 install below. It also sets the NVIDIA_REQUIRE_CUDA
 # driver gate enforced by nvidia-container-toolkit at container start: a 12.6 base
 # needs driver R560+, vs 12.9 which needs R575+ and fails to start on common
 # production drivers (e.g. 570.x / CUDA 12.8). Keep this at 12.6.x.
@@ -210,6 +210,17 @@ FROM base-${TARGETOS}-${TARGETARCH} AS production
 
 ARG TARGETARCH
 ARG PANDOC_VERSION=3.10
+ARG OCR_RUNTIME_INDEX_KEY_ID=
+ARG OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=
+ARG SNAPOTTER_OFFICIAL_CONTAINER=0
+
+# Public release-verification key pinned independently from the bundle host.
+# Official release builds inject these repository variables and opt into the
+# exact ABI target. Source builds fail closed unless their operator explicitly
+# opts in and provides the same trust identity or mounts a trust file.
+ENV OCR_RUNTIME_INDEX_KEY_ID=${OCR_RUNTIME_INDEX_KEY_ID} \
+    OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64} \
+    SNAPOTTER_OFFICIAL_CONTAINER=${SNAPOTTER_OFFICIAL_CONTAINER}
 
 # Pin corepack's cache during image build. It is removed after dependency and
 # browser installation so pnpm is not part of the production runtime surface.
@@ -250,7 +261,7 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     libimage-exiftool-perl \
     python3 python3-pip python3-venv python3-dev \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa \
-    tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-kor \
+    tesseract-ocr-chi-sim tesseract-ocr-jpn \
     # Document engine: qpdf + LibreOffice headless + WeasyPrint runtime deps
     # calibre deferred (5.2 GB ruling; pandoc covers epub/markdown families)
     qpdf \
@@ -261,6 +272,8 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     libgl1 libglib2.0-0 libgles2 \
     libegl1 libwayland-egl1 libwayland-client0 libwayland-cursor0 \
     libxkbcommon-x11-0 libxkbcommon0 libxcursor1 \
+    && rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
+    && test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
@@ -304,7 +317,7 @@ RUN install -d /usr/share/postgresql-common/pgdg \
          > /etc/apt/sources.list.d/redis.list \
     && for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done \
     && apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17 redis-server \
-    && redis-server --version | grep -q 'v=8\.' \
+    && dpkg-query -W -f='${Version}\n' redis-server | grep -Eq '(^|:)8\.' \
     && rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem \
     && rm -rf /var/lib/apt/lists/*
 
@@ -397,6 +410,10 @@ COPY docker/feature-manifest.json /app/docker/feature-manifest.json
 COPY packages/ai/python/install_feature.py /app/packages/ai/python/install_feature.py
 
 WORKDIR /app
+
+# The immutable OCR artifact builder runs inside this final image and copies
+# the exact repository license into each signed runtime generation.
+COPY LICENSE ./LICENSE
 
 # Copy workspace config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.json ./
@@ -502,6 +519,7 @@ RUN mkdir -p /data /data/files /data/ai/models /data/ai/pip-cache /tmp/workspace
 # Environment defaults
 ENV PORT=1349 \
     NODE_ENV=production \
+    NODE_USE_ENV_PROXY=1 \
     STORAGE_MODE=local \
     WORKSPACE_PATH=/tmp/workspace \
     FILES_STORAGE_PATH=/data/files \
@@ -560,8 +578,7 @@ ENV S6_KEEP_ENV=1 \
 
 # Suppress noisy ML library output in docker logs
 ENV PYTHONWARNINGS=default \
-    TF_CPP_MIN_LOG_LEVEL=3 \
-    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+    TF_CPP_MIN_LOG_LEVEL=3
 
 # Create non-root user for runtime
 # Home is /data/.home (created + chowned by the entrypoint at runtime). Runtime

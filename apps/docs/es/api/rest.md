@@ -1,8 +1,8 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_source_hash: 8646977f7cc9
-i18n_provenance: machine
 i18n_output_hash: a9129e12a29c
+i18n_source_hash: b89b5df16af5
+i18n_provenance: human
 ---
 
 # Referencia de la API REST {#rest-api-reference}
@@ -178,7 +178,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `remove-background` | Eliminar fondo | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Escalado de imagen | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Borrador de objetos | LaMa (ONNX) | Máscara enviada como segunda parte de archivo (nombre de campo `mask`), `format`, `quality` |
-| `ocr` | OCR / Extracción de texto | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Extracción de texto | Tesseract (rápido); RapidOCR + PP-OCR ONNX (equilibrado/mejor) | `quality` (rápido/equilibrado/mejor), `language`, `enhance` |
 | `blur-faces` | Difuminar rostro / PII | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Recorte inteligente | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Mejora de imagen | Basada en análisis | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -425,7 +425,9 @@ Algunas herramientas exponen endpoints adicionales más allá del estándar `POS
 
 ## Procesamiento por lotes {#batch-processing}
 
-Aplica una herramienta genérica habilitada para lotes a varios archivos a la vez. Devuelve un archivo ZIP. Las rutas personalizadas multiarchivo o de varios pasos, como la firma de PDF, el OCR de PDF y las rutas de preajuste de PDF a imagen, usan su propio contrato de endpoint en lugar de la ruta genérica `/batch`.
+Aplica una herramienta genérica habilitada para lotes a varios archivos a la vez. Devuelve un archivo ZIP. Las rutas personalizadas multiarchivo o de varios pasos, como la firma de PDF y las rutas de preajuste de PDF a imagen, usan su propio contrato de endpoint en lugar de la ruta genérica `/batch`.
+
+La herramienta `ocr-pdf` admite esta ruta genérica `/batch`.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -594,6 +596,8 @@ Parámetros de consulta:
 
 Gestiona los paquetes de funciones de IA (instalar/desinstalar paquetes de modelos de IA en el entorno Docker). Prefiere el endpoint de instalación a nivel de herramienta cuando habilites una herramienta desde una automatización personalizada: algunas herramientas de IA necesitan más de un paquete compartido, y este endpoint omite los paquetes ya instalados y solo pone en cola los que faltan.
 
+OCR es una mejora opcional en lugar de una dependencia estricta. Su nivel `fast` Tesseract funciona sin paquete; `POST /api/v1/admin/features/ocr/install` instala el paquete RapidOCR firmado para `balanced` y `best` en Linux amd64 o arm64. El tiempo de ejecución preciso de OCR utiliza CPU en hosts de solo CPU y NVIDIA y requiere al menos 4 GiB de memoria efectiva (el límite de cgroup del contenedor configurado; de lo contrario, memoria del host). SnapOtter informa `requiredMemoryBytes`, `effectiveMemoryBytes` y un motivo de compatibilidad con `insufficient-memory`, y rechaza una instalación incompatible antes de la descarga. Este requisito de memoria no se aplica a `fast`. El paquete cuesta aproximadamente 208-234 MiB para descargar y 409-488 MiB instalado, según el objetivo; el índice firmado vincula los tamaños exactos aplicados durante la instalación.
+
 | Método | Ruta | Acceso | Descripción |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | Listar todos los paquetes de funciones y su estado de instalación |
@@ -601,7 +605,18 @@ Gestiona los paquetes de funciones de IA (instalar/desinstalar paquetes de model
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Instalar todos los paquetes que requiere una herramienta; devuelve el estado en cola/omitido por paquete |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Desinstalar un paquete de funciones y limpiar los archivos de modelos |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Obtener el uso total de disco de los modelos de IA |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Importar un archivo de paquete de IA sin conexión |
+| `POST` | `/api/v1/admin/features/import` | Administrador (`features:manage`) | Importe un paquete de IA heredado (`file`) o una versión sin conexión firmada de OCR (`index` más `archive`) |
+
+Una importación de OCR aislada debe incluir el `ocr-runtime-index.json` firmado de la versión y el archivo de plataforma correspondiente. SnapOtter aplica las mismas comprobaciones de firma, hash de artefactos, compatibilidad, extracción y prueba de humo de Ed25519 utilizadas en la instalación en línea:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Utilice el archivo `linux-arm64-cpu-py311` en arm64. Un artefacto firmado para otro destino se rechaza en lugar de instalarse.
 
 ## Operaciones de administración {#admin-operations}
 

@@ -175,7 +175,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask sent as second file part (fieldname `mask`), `format`, `quality` |
-| `ocr` | OCR / Text Extraction | PaddleOCR / Tesseract | `quality` (fast/balanced/best), `language`, `enhance` |
+| `ocr` | OCR / Text Extraction | Tesseract (fast); RapidOCR + PP-OCR ONNX (balanced/best) | `quality` (fast/balanced/best), `language`, `enhance` |
 | `blur-faces` | Face / PII Blur | MediaPipe | `blurRadius`, `sensitivity` |
 | `smart-crop` | Smart Crop | MediaPipe + Sharp | `mode` (subject/face/trim), `strategy` (attention/entropy), `width`, `height`, `padding`, `facePreset` (closeup/head-shoulders/upper-body/half-body), `sensitivity`, `threshold`, `padToSquare`, `padColor`, `targetSize`, `quality` |
 | `image-enhancement` | Image Enhancement | Analysis-based | `mode` (auto/exposure/contrast/color/sharpness), `strength` |
@@ -422,7 +422,9 @@ Some tools expose additional endpoints beyond the standard `POST /api/v1/tools/<
 
 ## Batch Processing {#batch-processing}
 
-Apply a generic batch-enabled tool to multiple files at once. Returns a ZIP archive. Custom multi-file or multi-step routes, such as PDF signing, PDF OCR, and PDF-to-image preset routes, use their own endpoint contract instead of the generic `/batch` route.
+Apply a generic batch-enabled tool to multiple files at once. Returns a ZIP archive. Custom multi-file or multi-step routes, such as PDF signing and PDF-to-image preset routes, use their own endpoint contract instead of the generic `/batch` route.
+
+The `ocr-pdf` tool supports this generic `/batch` route.
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
@@ -591,6 +593,8 @@ Query parameters:
 
 Manage AI feature bundles (install/uninstall AI model packages in the Docker environment). Prefer the tool-level install endpoint when enabling a tool from custom automation: some AI tools need more than one shared bundle, and this endpoint skips already-installed bundles while queuing only the missing ones.
 
+OCR is an optional enhancement rather than a hard dependency. Its `fast` Tesseract tier works without a pack; `POST /api/v1/admin/features/ocr/install` installs the signed RapidOCR pack for `balanced` and `best` on Linux amd64 or arm64. The accurate OCR runtime uses CPU on CPU-only and NVIDIA hosts and requires at least 4 GiB of effective memory (the configured container cgroup limit, otherwise host memory). SnapOtter reports `requiredMemoryBytes`, `effectiveMemoryBytes`, and an `insufficient-memory` compatibility reason, and rejects an incompatible install before download. This memory requirement does not apply to `fast`. The pack is about 208-234 MiB to download and 409-488 MiB installed, depending on the target; the signed index binds the exact sizes enforced during installation.
+
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/features` | Auth | List all feature bundles and their install status |
@@ -598,7 +602,18 @@ Manage AI feature bundles (install/uninstall AI model packages in the Docker env
 | `POST` | `/api/v1/admin/tools/:toolId/features/install` | Admin (`features:manage`) | Install every bundle a tool requires; returns per-bundle queued/skipped status |
 | `POST` | `/api/v1/admin/features/:bundleId/uninstall` | Admin (`features:manage`) | Uninstall a feature bundle and clean up model files |
 | `GET` | `/api/v1/admin/features/disk-usage` | Admin (`features:manage`) | Get total disk usage of AI models |
-| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Import an offline AI bundle archive |
+| `POST` | `/api/v1/admin/features/import` | Admin (`features:manage`) | Import a legacy AI bundle (`file`) or a signed offline OCR release (`index` plus `archive`) |
+
+An air-gapped OCR import must include the release's signed `ocr-runtime-index.json` and the matching platform archive. SnapOtter applies the same Ed25519 signature, artifact hash, compatibility, extraction, and smoke-test checks used by online installation:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/admin/features/import \
+  -H "Authorization: Bearer <admin-token>" \
+  -F "index=@ocr-runtime-index.json" \
+  -F "archive=@ocr-linux-amd64-cpu-py312.tar.gz"
+```
+
+Use the `linux-arm64-cpu-py311` archive on arm64. A signed artifact for another target is rejected rather than installed.
 
 ## Admin Operations {#admin-operations}
 

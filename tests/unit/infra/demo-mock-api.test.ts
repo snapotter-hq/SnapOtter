@@ -6,12 +6,43 @@ import { matchDemoRoute } from "../../../apps/demo/src/mock-api.js";
 const packageJson = JSON.parse(
   readFileSync(path.resolve(process.cwd(), "package.json"), "utf8"),
 ) as { version: string };
+const featureManifest = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), "docker/feature-manifest.json"), "utf8"),
+) as {
+  bundles: {
+    ocr: {
+      targets: Record<string, { compressedSizeEstimate: number; extractedSizeEstimate: number }>;
+    };
+  };
+};
 
 async function readJson(response: Response): Promise<unknown> {
   return response.json();
 }
 
 describe("demo mock API", () => {
+  it("mirrors the built-in Fast tier and exact amd64 Accurate OCR estimates", async () => {
+    const response = matchDemoRoute("/api/v1/features", "GET");
+    const data = (await readJson(response as Response)) as {
+      bundles: Array<{
+        id: string;
+        selectedTarget?: string;
+        availableQualities?: string[];
+        downloadBytes?: number;
+        installedBytes?: number;
+      }>;
+    };
+    const ocr = data.bundles.find((bundle) => bundle.id === "ocr");
+    const target = featureManifest.bundles.ocr.targets["linux-amd64-cpu-py312"];
+
+    expect(ocr).toMatchObject({
+      selectedTarget: "linux-amd64-cpu-py312",
+      availableQualities: ["fast", "balanced", "best"],
+      downloadBytes: target.compressedSizeEstimate,
+      installedBytes: target.extractedSizeEstimate,
+    });
+  });
+
   it("reports the same app version as the current package build", async () => {
     const response = matchDemoRoute("/api/v1/health", "GET");
 

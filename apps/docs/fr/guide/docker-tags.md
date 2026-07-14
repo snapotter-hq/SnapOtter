@@ -1,8 +1,8 @@
 ---
 description: "Tags d'image Docker de SnapOtter, benchmarks GPU, épinglage de version et prise en charge multiplateforme pour AMD64 et ARM64."
-i18n_source_hash: 148b3608e11a
-i18n_provenance: human
 i18n_output_hash: 9cbbf793ca2b
+i18n_source_hash: fda322e78b4b
+i18n_provenance: human
 ---
 
 # Image Docker {#docker-image}
@@ -41,7 +41,6 @@ Testé sur un NVIDIA RTX 4070 (12 Go de VRAM) avec un portrait JPEG de 572x1024.
 | Suppression d'arrière-plan (isnet) | 2 457 ms | 1 137 ms | 2,2x |
 | Agrandissement 2x | 350 ms | 309 ms | 1,1x |
 | Agrandissement 4x | 910 ms | 310 ms | 2,9x |
-| OCR (PaddleOCR) | 137 ms | 94 ms | 1,5x |
 | Floutage de visage | 139 ms | 122 ms | 1,1x |
 
 #### Démarrage à froid (première requête après le démarrage du conteneur) {#cold-start-first-request-after-container-start}
@@ -50,7 +49,8 @@ Testé sur un NVIDIA RTX 4070 (12 Go de VRAM) avec un portrait JPEG de 572x1024.
 |------|-----|-----|---------|
 | Suppression d'arrière-plan | 22 286 ms | 4 792 ms | 4,7x |
 | Agrandissement 2x | 3 957 ms | 2 318 ms | 1,7x |
-| OCR (PaddleOCR) | 1 469 ms | 1 090 ms | 1,3x |
+
+OCR n'est pas inclus dans la comparaison CUDA. Le niveau Tesseract intégré et les niveaux RapidOCR/ONNX facultatifs utilisent CPU, y compris lorsque le conteneur dispose d'un accès NVIDIA GPU.
 
 ### Vérification de l'état de CUDA {#cuda-health-check}
 

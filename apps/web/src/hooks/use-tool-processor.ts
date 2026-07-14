@@ -132,6 +132,25 @@ export function useToolProcessor(toolId: string) {
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.type === "heartbeat") {
+            if (asyncModeRef.current && stallTimerRef.current) {
+              clearTimeout(stallTimerRef.current);
+              stallTimerRef.current = setTimeout(() => {
+                if (eventSourceRef.current) {
+                  eventSourceRef.current.close();
+                  eventSourceRef.current = null;
+                }
+                if (elapsedRef.current) clearInterval(elapsedRef.current);
+                clearActiveJob();
+                setError(
+                  "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
+                );
+                setProcessing(false);
+                setProgress(IDLE_PROGRESS);
+              }, SSE_STALL_TIMEOUT_MS);
+            }
+            return;
+          }
           if (data.type !== "single") return;
 
           if (asyncModeRef.current && stallTimerRef.current) {
@@ -315,6 +334,10 @@ export function useToolProcessor(toolId: string) {
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            if (data.type === "heartbeat") {
+              if (asyncMode) resetStallTimer();
+              return;
+            }
             if (data.type !== "single") return;
 
             if (asyncMode) resetStallTimer();

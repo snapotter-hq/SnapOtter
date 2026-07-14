@@ -1,0 +1,24 @@
+HOSPITAL
+Oakwood Community Clinic
+450 North Main Street
+Madison, WI 53703
+(608) 555-0102
+Patient Name: Isabella Garcia 
+MRN: 9884021 
+DOB: 11/05/1998 
+Gender: Female 
+Age: 26
+MRN: 9884021 
+Accession: B11269-25 
+Date: 06/20/2025
+The patient is a 26-year-old female with a history of persistent asthma since childhood. She reports seasonal exacerbations, typically in the spring and fall. Current medications include a daily inhaled corticosteroid and an albuterol inhaler for rescue use, which she reports using 3-4 times per week recently. She has a known allergy to dust mites and pollen. No history of smoking.
+PROCEDURES:
+Spirometry (pre- and post-bronchodilator): Demonstrated a reversible obstructive pattern, consistent with asthma. FEV1 increased by 15% after albuterol administration. 
+Allergy Skin Testing: Positive reaction to tree pollen and dust mites. 
+Chest X-ray (PA and Lateral): Lungs are clear. No acute infiltrate or edema.
+IMPRESSION:
+Moderate persistent asthma, sub-optimally controlled based on recent increase in rescue inhaler use.
+Allergic rhinitis.
+Patient Name: Johnathan Smith MRN: 8675309 Age: 67
+Electronically Signed By: Dr. David Chen, M.D. 
+Date: 06/23/2025 Time: 08:56

@@ -66,8 +66,6 @@ ALLOWED_SCRIPTS = {
     "inpaint",
     "install_feature",
     "noise_removal",
-    "ocr",
-    "ocr_pdf",
     "ocr_preprocess",
     "outpaint",
     "red_eye_removal",
@@ -122,8 +120,6 @@ TOOL_BUNDLE_MAP = {
     "enhance_faces": "upscale-enhance",
     "noise_removal": "upscale-enhance",
     "restore": "photo-restoration",
-    "ocr": "ocr",
-    "ocr_pdf": "ocr",
     "transcribe": "transcription",
 }
 

@@ -1,19 +1,12 @@
 import { Check, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
-
-type OcrQuality = "fast" | "balanced" | "best";
-
-const QUALITY_OPTIONS: { value: OcrQuality; label: string }[] = [
-  { value: "fast", label: "Fast" },
-  { value: "balanced", label: "Balanced" },
-  { value: "best", label: "Best" },
-];
+import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
 const LANGUAGES = [
   { code: "auto", label: "Auto-detect" },
@@ -29,7 +22,9 @@ const LANGUAGES = [
 const ENHANCE_DEFAULTS: Record<OcrQuality, boolean> = {
   fast: false,
   balanced: false,
-  best: false,
+  // Best evaluates the conservative contrast variant and keeps it only when
+  // the calibrated selector scores it above the original.
+  best: true,
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -40,28 +35,93 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+const OCR_ASYNC_STALL_TIMEOUT_MS = 5 * 60_000;
+
 /** Send one file to the OCR API and return the extracted text. */
-function ocrOneFile(
+export function ocrOneFile(
   file: File,
   settings: { quality: string; language: string; enhance: boolean },
   callbacks: {
     onUploadProgress: (pct: number) => void;
     onProcessingProgress: (pct: number, stage: string) => void;
   },
+  messages: {
+    timeout?: string;
+    networkError?: string;
+    processingFailed?: string;
+  } = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const clientJobId = generateId();
+    let settled = false;
+    let asyncMode = false;
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
+    let es: EventSource | null = null;
 
-    const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    const cleanup = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = null;
+      es?.close();
+      es = null;
+    };
+
+    const resolveOnce = (text: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(text);
+    };
+
+    const rejectOnce = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const armStallTimer = () => {
+      if (settled) return;
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        rejectOnce(
+          new Error(
+            messages.timeout ?? "OCR timed out with no progress. Try again or use a smaller image.",
+          ),
+        );
+      }, OCR_ASYNC_STALL_TIMEOUT_MS);
+    };
+
+    try {
+      es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+    } catch {
+      rejectOnce(new Error(messages.networkError ?? "Unable to subscribe to OCR progress"));
+      return;
+    }
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "single" && typeof data.percent === "number") {
+        if (data.type === "heartbeat") {
+          if (asyncMode) armStallTimer();
+          return;
+        }
+        if (data.type !== "single") return;
+        armStallTimer();
+        if (data.phase === "complete" && data.result) {
+          resolveOnce(typeof data.result.text === "string" ? data.result.text : "");
+          return;
+        }
+        if (data.phase === "failed") {
+          rejectOnce(new Error(typeof data.error === "string" ? data.error : "OCR failed"));
+          return;
+        }
+        if (typeof data.percent === "number") {
           callbacks.onProcessingProgress(data.percent, data.stage);
         }
       } catch {}
     };
-    es.onerror = () => es.close();
+    // EventSource reconnects automatically. The progress endpoint replays the
+    // terminal frame, so transient network loss must not discard a queued OCR.
+    es.onerror = () => {};
 
     const formData = new FormData();
     formData.append("file", file);
@@ -69,30 +129,37 @@ function ocrOneFile(
     formData.append("clientJobId", clientJobId);
 
     const xhr = new XMLHttpRequest();
+    xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) callbacks.onUploadProgress((e.loaded / e.total) * 100);
     };
     xhr.onload = () => {
-      es.close();
+      // The BullMQ worker owns long OCR jobs. Keep the progress subscription
+      // alive and resolve from buildLegacyResultPayload(resultPayload).text.
+      if (xhr.status === 202) {
+        asyncMode = true;
+        armStallTimer();
+        return;
+      }
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText).text ?? "");
+          const body = JSON.parse(xhr.responseText);
+          resolveOnce(typeof body.text === "string" ? body.text : "");
         } catch {
-          reject(new Error("Invalid response"));
+          rejectOnce(new Error(messages.processingFailed ?? "Invalid response"));
         }
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          reject(new Error(body.error || body.details || `Failed: ${xhr.status}`));
+          rejectOnce(new Error(body.error || body.details || `Failed: ${xhr.status}`));
         } catch {
-          reject(new Error(`Processing failed: ${xhr.status}`));
+          rejectOnce(new Error(messages.processingFailed ?? `Processing failed: ${xhr.status}`));
         }
       }
     };
-    xhr.onerror = () => {
-      es.close();
-      reject(new Error("Network error"));
-    };
+    xhr.onerror = () => rejectOnce(new Error(messages.networkError ?? "Network error"));
+    xhr.ontimeout = () => rejectOnce(new Error(messages.timeout ?? "OCR request timed out"));
+    xhr.onabort = () => rejectOnce(new Error(messages.processingFailed ?? "OCR request canceled"));
     xhr.open("POST", "/api/v1/tools/image/ocr");
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
@@ -105,8 +172,8 @@ export function OcrSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
-  const [quality, setQuality] = useState<OcrQuality>("balanced");
   const [language, setLanguage] = useState("auto");
+  const { quality, setQuality, canRun } = useOcrQuality(language);
   const [enhance, setEnhance] = useState(false);
   const [enhanceManuallySet, setEnhanceManuallySet] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
@@ -118,6 +185,10 @@ export function OcrSettings() {
   const [progressStage, setProgressStage] = useState<string | undefined>();
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!enhanceManuallySet) setEnhance(ENHANCE_DEFAULTS[quality]);
+  }, [enhanceManuallySet, quality]);
 
   const handleQualityChange = (q: OcrQuality) => {
     setQuality(q);
@@ -158,18 +229,27 @@ export function OcrSettings() {
       const fileShare = 100 / total;
 
       try {
-        const text = await ocrOneFile(file, settings, {
-          onUploadProgress: (pct) => {
-            setProgressPhase("uploading");
-            setProgressPercent(fileBase + (pct / 100) * fileShare * 0.15);
-            setProgressStage(`${prefix}Uploading...`);
+        const text = await ocrOneFile(
+          file,
+          settings,
+          {
+            onUploadProgress: (pct) => {
+              setProgressPhase("uploading");
+              setProgressPercent(fileBase + (pct / 100) * fileShare * 0.15);
+              setProgressStage(`${prefix}Uploading...`);
+            },
+            onProcessingProgress: (pct, stage) => {
+              setProgressPhase("processing");
+              setProgressPercent(fileBase + fileShare * 0.15 + (pct / 100) * fileShare * 0.85);
+              setProgressStage(`${prefix}${stage}`);
+            },
           },
-          onProcessingProgress: (pct, stage) => {
-            setProgressPhase("processing");
-            setProgressPercent(fileBase + fileShare * 0.15 + (pct / 100) * fileShare * 0.85);
-            setProgressStage(`${prefix}${stage}`);
+          {
+            timeout: t.errors.timeout,
+            networkError: t.errors.networkError,
+            processingFailed: t.errors.processingFailed,
           },
-        });
+        );
         results.push(total > 1 ? `--- ${file.name} ---\n${text || "(no text detected)"}` : text);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -223,22 +303,7 @@ export function OcrSettings() {
     <div className="space-y-3">
       {/* Quality selector */}
       <SectionLabel>{t.toolSettings.ocr.quality}</SectionLabel>
-      <div className="grid grid-cols-3 gap-1.5">
-        {QUALITY_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => handleQualityChange(opt.value)}
-            className={`py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
-              quality === opt.value
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/50"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <OcrQualityControl quality={quality} language={language} onChange={handleQualityChange} />
 
       {/* Enhance toggle */}
       <label className="flex items-center gap-2 cursor-pointer">
@@ -252,7 +317,7 @@ export function OcrSettings() {
           {t.toolSettings.ocr.enhanceBeforeScanning}
         </span>
         <span
-          title="Automatically deskews, enhances contrast, removes noise, and upscales the image before scanning for better accuracy."
+          title={t.toolSettings.ocr.enhanceHint}
           className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground text-[10px] cursor-help"
         >
           <Info className="h-2.5 w-2.5" />
@@ -305,7 +370,7 @@ export function OcrSettings() {
           type="button"
           data-testid="ocr-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !canRun}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {files.length > 1

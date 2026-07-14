@@ -14,6 +14,22 @@ const pngBuffer = Buffer.from(
 
 const VALID_STATUSES = ["not_installed", "queued", "installed", "installing", "error"];
 
+interface BundleInfo {
+  id: string;
+  name: string;
+  description: string;
+  estimatedSize: string;
+  enablesTools: string[];
+  status: string;
+  installedVersion: string | null;
+  progress: unknown;
+  error: unknown;
+}
+
+interface FeatureResponse {
+  bundles: BundleInfo[];
+}
+
 let _token: string | undefined;
 
 async function getToken(request: APIRequestContext): Promise<string> {
@@ -33,16 +49,18 @@ async function authHeaders(request: APIRequestContext) {
 async function getBundleStatus(request: APIRequestContext, bundleId: string): Promise<string> {
   const headers = await authHeaders(request);
   const res = await request.get(`${API}/api/v1/features`, { headers });
-  const data = await res.json();
-  const bundle = data.bundles.find((b: any) => b.id === bundleId);
+  const data = (await res.json()) as FeatureResponse;
+  const bundle = data.bundles.find((candidate) => candidate.id === bundleId);
   return bundle?.status ?? "unknown";
 }
 
-async function getBundle(request: APIRequestContext, bundleId: string): Promise<any> {
+async function getBundle(request: APIRequestContext, bundleId: string): Promise<BundleInfo> {
   const headers = await authHeaders(request);
   const res = await request.get(`${API}/api/v1/features`, { headers });
-  const data = await res.json();
-  return data.bundles.find((b: any) => b.id === bundleId) ?? null;
+  const data = (await res.json()) as FeatureResponse;
+  const bundle = data.bundles.find((candidate) => candidate.id === bundleId);
+  if (!bundle) throw new Error(`Bundle ${bundleId} is missing from the feature response`);
+  return bundle;
 }
 
 async function waitForInstallComplete(
@@ -106,12 +124,12 @@ async function callTool(
 test.describe("Feature listing baseline", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("GET /api/v1/features returns all 6 bundles", async ({ request }) => {
+  test("GET /api/v1/features returns all 7 bundles", async ({ request }) => {
     const headers = await authHeaders(request);
     const res = await request.get(`${API}/api/v1/features`, { headers });
     expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.bundles).toHaveLength(6);
+    const data = (await res.json()) as FeatureResponse;
+    expect(data.bundles).toHaveLength(7);
 
     const expectedIds = [
       "background-removal",
@@ -120,8 +138,9 @@ test.describe("Feature listing baseline", () => {
       "upscale-enhance",
       "photo-restoration",
       "ocr",
+      "transcription",
     ];
-    const ids = data.bundles.map((b: any) => b.id);
+    const ids = data.bundles.map((bundle) => bundle.id);
     for (const id of expectedIds) {
       expect(ids).toContain(id);
     }
