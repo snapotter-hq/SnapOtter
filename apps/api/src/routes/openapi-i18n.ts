@@ -41,7 +41,6 @@ interface LlmsTool {
 }
 
 const CUSTOM_MODES: Record<string, string> = {
-  ocr: "sync-json",
   "content-aware-resize": "sync",
   "passport-photo": "two-phase",
 };

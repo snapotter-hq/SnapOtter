@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -226,7 +227,10 @@ const AI_TOOLS: AiToolDef[] = [
   {
     id: "ocr",
     label: "OCR",
-    settings: {},
+    // This matrix validates ingress and response shape. Dedicated OCR suites
+    // exercise the built-in Fast runtime; keeping that work out of this 17x14
+    // matrix prevents long jobs from starving unrelated format conversions.
+    settings: { quality: "balanced" },
     has501Guard: true,
     requiresMask: false,
     invalidSettings: { quality: "invalid-enum", language: "xx" },
@@ -464,8 +468,10 @@ describe("AI tool cross-format matrix", () => {
             const body = JSON.parse(res.body);
 
             if (res.statusCode === 501) {
-              // Verify FEATURE_NOT_INSTALLED shape
-              expect(body.code).toBe("FEATURE_NOT_INSTALLED");
+              // The optional runtime may be absent or present for another
+              // platform (for example, Linux bundles on a macOS developer
+              // machine). Both are truthful ingress outcomes for this matrix.
+              expect(["FEATURE_NOT_INSTALLED", "FEATURE_INCOMPATIBLE"]).toContain(body.code);
               expect(body.error).toBeDefined();
               expect(typeof body.error).toBe("string");
             } else if (res.statusCode === 202) {
@@ -473,6 +479,13 @@ describe("AI tool cross-format matrix", () => {
               expect(body.jobId).toBeDefined();
               expect(typeof body.jobId).toBe("string");
               expect(body.async).toBe(true);
+
+              // A developer may have the optional OCR runtime installed even
+              // though CI does not. This matrix owns only the enqueue contract,
+              // so never leave that long job consuming CPU after the assertion.
+              if (tool.id === "ocr") {
+                await cancelAcceptedJobAndWait(body.jobId as string, "ai");
+              }
             } else if (res.statusCode === 200) {
               // Synchronous success -- at minimum, response is valid JSON
               expect(typeof body).toBe("object");

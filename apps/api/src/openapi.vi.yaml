@@ -3886,59 +3886,8 @@ paths:
                 clientJobId:
                   type: string
       responses:
-        '200':
-          description: Extracted text
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  jobId:
-                    type: string
-                  filename:
-                    type: string
-                  text:
-                    type: string
-                    description: Extracted text content
-                  engine:
-                    type: string
-                    enum:
-                      - tesseract
-                      - rapidocr-onnx
-                  requestedQuality:
-                    type: string
-                    enum:
-                      - fast
-                      - balanced
-                      - best
-                  actualQuality:
-                    type: string
-                    enum:
-                      - fast
-                      - balanced
-                      - best
-                    description: Always matches requestedQuality for a successful request
-                  device:
-                    type: string
-                    enum:
-                      - cpu
-                  provider:
-                    type: string
-                    example: CPUExecutionProvider
-                  degraded:
-                    type: boolean
-                  warnings:
-                    type: array
-                    items:
-                      type: string
-                  runtimeVersion:
-                    type: string
-                    description: Accurate OCR runtime version; omitted for Fast
-                  modelVersion:
-                    type: string
-                    description: Accurate OCR model selection; omitted for Fast
         '202':
-          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
           content:
             application/json:
               schema:
@@ -3970,12 +3919,6 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           description: Encoded OCR input exceeds the hard 512 MiB safety limit
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '422':
-          description: Processing failed
           content:
             application/json:
               schema:
@@ -6583,8 +6526,7 @@ paths:
       tags:
         - System
       summary: Tiến trình công việc (SSE)
-      description: |
-        Luồng Server-Sent Events để theo dõi các công việc chạy lâu. Tự động đóng 5 giây sau khi hoàn thành.
+      description: Luồng Server-Sent Events để theo dõi công việc chạy lâu. Luồng gửi các frame tệp đơn, batch và heartbeat, rồi đóng ngay sau sự kiện cuối của công việc.
       security: []
       parameters:
         - name: jobId
@@ -6596,43 +6538,96 @@ paths:
       responses:
         '200':
           description: |
-            SSE stream of job progress events. Two event types: `single` (single-file tools) and `batch` (batch processing). Single events have `status` and `progress`. Batch events have `completedFiles`, `totalFiles`, `failedFiles` (integers), and an `errors` array.
+            SSE stream of job progress frames. Single-file frames use `phase`, `percent`, optional `stage`, and terminal `result` or `error` fields. Batch frames use `status`, file counters, and `errors`. Heartbeat frames keep idle connections alive.
           content:
             text/event-stream:
               schema:
-                type: object
-                description: |
-                  Event shape varies by type. Single: { status, progress }. Batch: { completedFiles, totalFiles, failedFiles, errors }.
-                properties:
-                  status:
-                    type: string
-                    enum:
-                      - processing
-                      - completed
-                      - failed
-                  progress:
-                    type: integer
-                    minimum: 0
-                    maximum: 100
-                  completedFiles:
-                    type: integer
-                    description: Number of completed files (batch mode)
-                  totalFiles:
-                    type: integer
-                    description: Total files to process (batch mode)
-                  failedFiles:
-                    type: integer
-                    description: Number of failed files (batch mode)
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        filename:
-                          type: string
-                        error:
-                          type: string
-                    description: Error details for failed files (batch mode)
+                oneOf:
+                  - title: Single-file progress frame
+                    type: object
+                    required:
+                      - jobId
+                      - type
+                      - phase
+                      - percent
+                    properties:
+                      jobId:
+                        type: string
+                      type:
+                        type: string
+                        const: single
+                      phase:
+                        type: string
+                        enum:
+                          - processing
+                          - complete
+                          - failed
+                      stage:
+                        type: string
+                      percent:
+                        type: number
+                        minimum: 0
+                        maximum: 100
+                      error:
+                        type: string
+                        description: Present on terminal failed frames
+                      result:
+                        type: object
+                        additionalProperties: true
+                        description: Present on terminal complete frames; contains the tool result
+                  - title: Batch progress frame
+                    type: object
+                    required:
+                      - jobId
+                      - type
+                      - status
+                      - totalFiles
+                      - completedFiles
+                      - failedFiles
+                      - errors
+                    properties:
+                      jobId:
+                        type: string
+                      type:
+                        type: string
+                        const: batch
+                      status:
+                        type: string
+                        enum:
+                          - processing
+                          - completed
+                          - failed
+                      totalFiles:
+                        type: integer
+                        minimum: 0
+                      completedFiles:
+                        type: integer
+                        minimum: 0
+                      failedFiles:
+                        type: integer
+                        minimum: 0
+                      currentFile:
+                        type: string
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - filename
+                            - error
+                          properties:
+                            filename:
+                              type: string
+                            error:
+                              type: string
+                  - title: Heartbeat frame
+                    type: object
+                    required:
+                      - type
+                    properties:
+                      type:
+                        type: string
+                        const: heartbeat
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck
@@ -19675,8 +19670,8 @@ x-i18n:
       provenance: machine
       outputHash: bffa1b8acb12
     paths./api/v1/jobs/{jobId}/progress.get.description:
-      sourceHash: 7b2cae779893
-      provenance: machine
+      sourceHash: 2df913c75d85
+      provenance: human
       outputHash: 8f00a6ea3d53
     paths./api/v1/admin/health.get.summary:
       sourceHash: 92f8575c9c94

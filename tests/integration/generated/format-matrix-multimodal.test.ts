@@ -4,6 +4,7 @@ import { apiToolPath, TOOL_BUNDLE_MAP, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir } from "../../fixtures/index.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
+import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -275,6 +276,13 @@ describe("multi-modality tool x format matrix", () => {
               `${toolId} x ${fixture.filename}: 202 without jobId`,
             ).toBeDefined();
             expect(typeof payload.jobId).toBe("string");
+
+            // The generic matrix verifies acceptance, not OCR execution. If an
+            // optional OCR runtime happens to be installed locally, release its
+            // long-running job immediately rather than leaking it into teardown.
+            if (toolId === "ocr-pdf") {
+              await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
+            }
           }
 
           if (res.statusCode === 501) {

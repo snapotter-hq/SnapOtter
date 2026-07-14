@@ -18,6 +18,7 @@ import {
 const PDF = readFixture(fixtures.document.pdf3);
 
 const mocks = vi.hoisted(() => ({
+  enqueueToolJob: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
 }));
 
@@ -26,6 +27,14 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
   return {
     ...actual,
     getOcrRuntimeCapability: mocks.getOcrRuntimeCapability,
+  };
+});
+
+vi.mock("../../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../apps/api/src/jobs/enqueue.js")>();
+  return {
+    ...actual,
+    enqueueToolJob: mocks.enqueueToolJob,
   };
 });
 
@@ -44,6 +53,8 @@ afterAll(async () => {
 }, 10_000);
 
 beforeEach(() => {
+  mocks.enqueueToolJob.mockReset();
+  mocks.enqueueToolJob.mockResolvedValue(undefined);
   mocks.getOcrRuntimeCapability.mockReset();
   mocks.getOcrRuntimeCapability.mockReturnValue({
     available: false,
@@ -78,6 +89,13 @@ describe("ocr-pdf", () => {
     const json = JSON.parse(res.body);
     expect(json.jobId).toBeDefined();
     expect(json.async).toBe(true);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolId: "ocr-pdf",
+        pool: "ai",
+        settings: expect.objectContaining({ quality: "fast", pages: "1" }),
+      }),
+    );
   });
 
   it("defaults to Fast when the accurate pack is absent", async () => {
@@ -102,6 +120,11 @@ describe("ocr-pdf", () => {
     });
 
     expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ quality: "fast", pages: "1" }),
+      }),
+    );
   });
 
   it("maps the legacy paddleocr engine to Balanced like batch and pipeline ingress", async () => {

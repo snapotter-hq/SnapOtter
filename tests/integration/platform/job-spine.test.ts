@@ -8,7 +8,6 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { requestCancel } from "../../../apps/api/src/jobs/cancel.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import {
   closeQueueEvents,
@@ -16,12 +15,18 @@ import {
   waitForJob,
   warmQueueEvents,
 } from "../../../apps/api/src/jobs/enqueue.js";
+import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix, type ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
   registerToolProcessFn,
   type ToolProcessCtx,
 } from "../../../apps/api/src/routes/tool-factory.js";
+import {
+  AcceptedJobTimeoutError,
+  cancelAcceptedJobAndWait,
+  waitForAcceptedJobOrCancel,
+} from "../settle-job.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 // Register test-only tools for the spine tests
@@ -149,22 +154,9 @@ describe("Job spine", () => {
     }
     expect(started).toBe(true);
 
-    // Request cancellation
-    const canceled = await requestCancel(jobId);
-    expect(canceled).toBe(true);
-
-    // Wait for the worker to finish aborting: poll until the status
-    // moves to a terminal state.
-    let finalStatus = "processing";
-    for (let i = 0; i < 30; i++) {
-      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-      if (row && row.status !== "processing" && row.status !== "queued") {
-        finalStatus = row.status;
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-
+    // A cancel request is only an acknowledgement that the signal was sent.
+    // Wait for both the durable row and BullMQ to confirm worker termination.
+    const finalStatus = await cancelAcceptedJobAndWait(jobId, "image");
     expect(finalStatus).toBe("canceled");
 
     // Verify that a terminal SSE frame is retrievable after cancel.
@@ -177,6 +169,46 @@ describe("Job spine", () => {
     expect(parsed.phase).toBe("failed");
     expect(parsed.error).toBe("Canceled");
     expect(parsed.jobId).toBe(jobId);
+  });
+
+  it("wait-or-cancel drains an accepted job when its observation window expires", async () => {
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/timeout.png`;
+    await putObject(inputRef, Buffer.from("timeout-test"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "spine-slow",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "timeout.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // Ensure this covers cooperative active-job cancellation rather than only
+    // removal from the waiting queue.
+    let started = false;
+    for (let i = 0; i < 30; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row?.status === "processing") {
+        started = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(started).toBe(true);
+
+    await expect(waitForAcceptedJobOrCancel(jobId, "image", 10)).rejects.toBeInstanceOf(
+      AcceptedJobTimeoutError,
+    );
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    expect(row?.status).toBe("canceled");
+    const queueJob = await getQueue("image").getJob(jobId);
+    const queueState = queueJob ? await queueJob.getState() : "missing";
+    expect(["failed", "missing"]).toContain(queueState);
   });
 });
 

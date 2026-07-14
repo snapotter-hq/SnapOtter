@@ -10,7 +10,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
-import { enqueueToolJob, waitForJob } from "../../jobs/enqueue.js";
+import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { deleteObject } from "../../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
@@ -120,7 +120,8 @@ registerToolProcessFn({
 
 /**
  * OCR / text extraction route.
- * Returns JSON with extracted text rather than an image.
+ * Accepts the long-running job immediately; the terminal SSE result contains
+ * both extracted text metadata and the generated text artifact URL.
  */
 export function registerOcr(app: FastifyInstance) {
   app.post("/api/v1/tools/image/ocr", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -234,23 +235,6 @@ export function registerOcr(app: FastifyInstance) {
       });
     }
 
-    try {
-      const result = await waitForJob("ai", jobId);
-      if (result) {
-        request.log.info({ toolId, jobId, quality }, "OCR complete");
-        return reply.send({
-          jobId,
-          filename,
-          ...result.resultPayload,
-        });
-      }
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
-    } catch (err) {
-      request.log.error({ err, toolId, jobId }, "OCR failed");
-      return reply.status(422).send({
-        error: "OCR failed",
-        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-      });
-    }
+    return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
   });
 }

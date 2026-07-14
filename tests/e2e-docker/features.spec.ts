@@ -126,9 +126,9 @@ test.describe("Optional OCR runtime", () => {
   async function callOcr(
     request: import("@playwright/test").APIRequestContext,
     settings: Record<string, unknown>,
-  ) {
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
     const token = await getToken(request);
-    return request.post("/api/v1/tools/image/ocr", {
+    const response = await request.post("/api/v1/tools/image/ocr", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: {
@@ -139,6 +139,30 @@ test.describe("Optional OCR runtime", () => {
         settings: JSON.stringify(settings),
       },
     });
+    const body = (await response.json()) as Record<string, unknown>;
+    if (response.status() !== 202 || typeof body.jobId !== "string") {
+      return { status: response.status(), body };
+    }
+
+    const progress = await request.get(`/api/v1/jobs/${encodeURIComponent(body.jobId)}/progress`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 120_000,
+    });
+    expect(progress.ok()).toBe(true);
+    const frames = (await progress.text())
+      .split(/\n\n/u)
+      .map((frame) => frame.match(/^data:\s*(.+)$/mu)?.[1])
+      .filter((data): data is string => data !== undefined)
+      .map((data) => JSON.parse(data) as Record<string, unknown>);
+    const terminal = [...frames]
+      .reverse()
+      .find((frame) => frame.phase === "complete" || frame.phase === "failed");
+    expect(terminal).toBeDefined();
+    if (terminal?.phase === "failed") {
+      return { status: 422, body: { error: terminal.error ?? "OCR failed" } };
+    }
+    expect(terminal?.result).toBeDefined();
+    return { status: 200, body: terminal?.result as Record<string, unknown> };
   }
 
   test("OCR advertises built-in Fast independently of the optional pack", async ({ request }) => {
@@ -148,8 +172,8 @@ test.describe("Optional OCR runtime", () => {
     expect(ocr?.availableQualities).toContain("fast");
 
     const response = await callOcr(request, { quality: "fast" });
-    expect(response.status()).toBe(200);
-    const body = await response.json();
+    expect(response.status).toBe(200);
+    const { body } = response;
     expect(body).toMatchObject({
       engine: "tesseract",
       provider: "native",
@@ -162,8 +186,8 @@ test.describe("Optional OCR runtime", () => {
 
   test("default OCR remains runnable with or without the accurate pack", async ({ request }) => {
     const response = await callOcr(request, {});
-    expect(response.status()).toBe(200);
-    const body = await response.json();
+    expect(response.status).toBe(200);
+    const { body } = response;
     expect(["fast", "best"]).toContain(body.actualQuality);
     if (body.actualQuality === "fast") {
       expect(body).toMatchObject({ engine: "tesseract", provider: "native", device: "cpu" });
@@ -182,10 +206,10 @@ test.describe("Optional OCR runtime", () => {
       const ocr = bundles.find((bundle) => bundle.id === "ocr");
       const available = ocr?.availableQualities?.includes(quality) ?? false;
       const response = await callOcr(request, { quality });
-      const body = await response.json();
+      const { body } = response;
 
       if (available) {
-        expect(response.status()).toBe(200);
+        expect(response.status).toBe(200);
         expect(body).toMatchObject({
           engine: "rapidocr-onnx",
           provider: "CPUExecutionProvider",
@@ -195,7 +219,7 @@ test.describe("Optional OCR runtime", () => {
           degraded: false,
         });
       } else {
-        expect(response.status()).toBe(501);
+        expect(response.status).toBe(501);
         expect(["FEATURE_NOT_INSTALLED", "FEATURE_INCOMPATIBLE"]).toContain(body.code);
         expect(body).toMatchObject({ feature: "ocr", requestedQuality: quality });
       }

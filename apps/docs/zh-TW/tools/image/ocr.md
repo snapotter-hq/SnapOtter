@@ -1,7 +1,7 @@
 ---
 description: "使用內建 Tesseract 或可選的高精度 RapidOCR 運行時從本機圖像中提取文字。"
 i18n_output_hash: 8e9c0c578a2d
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ i18n_provenance: human
 
 `POST /api/v1/tools/image/ocr`
 
-**處理：** 當 OCR 在同步視窗內完成時，返回 `200` 和 JSON。較長的作業返回 `202`；跟隨作業的 SSE 進度流到達其終止事件，其 `result` 包含相同的 OCR 欄位。
+**處理：** OCR 一律以非同步方式執行。驗證並加入佇列後，端點會立即傳回帶有 `jobId` 的 `202 Accepted`。請透過作業的 SSE 進度串流追蹤至最終的 `complete` 或 `failed` 事件；成功事件的 `result` 包含 OCR 欄位。
 
 **準確的 OCR 套件：** 選購的 `ocr` 執行時間（大約下載 208-234 MiB 並安裝 409-488 MiB，視目標而定）。 `fast` 不需要此套件；安裝程式會驗證簽章索引所限制的確切大小。
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## 回應（200 OK） {#response-200-ok}
+## 已接受的回應（202） {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### 進度（SSE，選用） {#progress-sse-optional}
+### 進度和結果（SSE） {#progress-sse-optional}
 
-如果提供了 `clientJobId` 表單字段，則會串流進度事件。 `202` 回應表示客戶端應保持流打開，直到終端機 `complete` 或 `failed` 事件：
+使用 `202` 回應傳回的 `jobId`（或已提供的 `clientJobId`）連線至 `GET /api/v1/jobs/{jobId}/progress`。請保持串流連線，直到收到最終的 `complete` 或 `failed` 事件。成功的最終框架會在 `result` 中包含 OCR 輸出：
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+處理失敗會透過最終 `failed` 事件的 `error` 欄位傳遞；加入佇列後不會以 HTTP `422` 回應傳回。
 
 ## 注意事項 {#notes}
 
 - `fast` 在支援的 SnapOtter 映像中始終可用。 `balanced` 和 `best` 需要選購的精確 OCR 套件。
 - 內建 Tesseract 在官方鏡像上增加了約25個 MiB。準確的套件儲存在 `/data/ai` 中，而不是烘焙到映像中。
 - 官方 Linux amd64 和 arm64 容器的準確包裝已發布。 它特意使用 ONNX Runtime 的 CPU 提供者（包括在 NVIDIA 主機上），因此它不依賴 CUDA 庫或 GPU 相容性。 來源和預先建置的 bare-metal 安裝使用 Fast OCR，除非它們提供自己的相容運行時間。
-- OCR 會直接傳回擷取的文字，而非圖片下載 URL。
+- 成功的最終 `result` 同時包含 `text` 中的擷取文字和 `downloadUrl` 中可下載的 `.txt` 成品。
 - SnapOtter 遵循明確要求的等級。如果`balanced`或`best`不可用，則 API 傳回`501`和`FEATURE_NOT_INSTALLED`或`FEATURE_INCOMPATIBLE`；它永遠不會默默地將請求降級到另一層。
 - 成功的空結果仍然是空結果。運行時失敗會傳回錯誤，而不是使用較低品質的引擎重試。
-- 回應報告 `requestedQuality` 和 `actualQuality`，以及引擎、設備、提供者、執行時間和模型版本以及任何警告。
+- 成功的最終 `result` 會報告 `requestedQuality` 和 `actualQuality`，以及引擎、設備、提供者、執行時間和模型版本及所有警告。
 - 透過自動解碼支援 HEIC/HEIF、RAW、TGA、PSD、EXR 與 HDR 輸入格式。
 - 超大編碼輸入返回 `413`。超過 4000 萬像素的圖像和超過其有限輸出限制的 OCR 回應將被拒絕，而不是部分處理。

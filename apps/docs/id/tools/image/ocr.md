@@ -1,7 +1,7 @@
 ---
 description: "Ekstrak teks dari gambar secara lokal dengan Tesseract bawaan atau runtime RapidOCR opsional dengan akurasi tinggi."
 i18n_output_hash: 18a92d67d692
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak
 
 `POST /api/v1/tools/image/ocr`
 
-**Memproses:** Mengembalikan `200` dengan JSON ketika OCR selesai di dalam jendela sinkron. Pekerjaan yang lebih lama menghasilkan `202`; ikuti aliran kemajuan SSE pekerjaan ke peristiwa terminalnya, yang `result`-nya berisi bidang OCR yang sama.
+**Pemrosesan:** OCR selalu berjalan secara asinkron. Setelah validasi dan pengantrean, endpoint segera mengembalikan `202 Accepted` dengan `jobId`. Ikuti aliran kemajuan SSE pekerjaan hingga peristiwa terminal `complete` atau `failed`; `result` dari peristiwa yang berhasil berisi bidang OCR.
 
 **Paket OCR yang akurat:** Waktu proses `ocr` opsional (sekitar 208-234 MiB untuk diunduh dan 409-488 MiB diinstal, bergantung pada target). `fast` tidak memerlukan paket ini; penginstal memverifikasi ukuran pasti yang terikat oleh indeks yang ditandatangani.
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Respons diterima (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Progress (SSE, optional) {#progress-sse-optional}
+### Kemajuan dan hasil (SSE) {#progress-sse-optional}
 
-Jika bidang formulir `clientJobId` disediakan, peristiwa kemajuan akan dialirkan. Respons `202` berarti klien harus membiarkan aliran tetap terbuka hingga peristiwa terminal `complete` atau `failed`:
+Hubungkan ke `GET /api/v1/jobs/{jobId}/progress` dengan `jobId` yang dikembalikan oleh respons `202` (atau `clientJobId` yang diberikan). Biarkan aliran tetap terbuka hingga peristiwa terminal `complete` atau `failed`. Frame terminal yang berhasil memuat keluaran OCR di `result`:
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+Kegagalan pemrosesan dikirim melalui bidang `error` pada peristiwa terminal `failed`; kegagalan tersebut tidak dikembalikan sebagai HTTP `422` setelah pengantrean.
 
 ## Notes {#notes}
 
 - `fast` selalu tersedia dalam gambar SnapOtter yang didukung. `balanced` dan `best` memerlukan paket OCR opsional yang akurat.
 - Tesseract bawaan menambahkan sekitar 25 MiB ke gambar resmi. Paket akurat disimpan di `/data/ai`, bukan dimasukkan ke dalam gambar.
 - Paket akurat diterbitkan untuk wadah resmi Linux amd64 dan arm64. Sengaja menggunakan penyedia ONNX Runtime CPU, termasuk pada host NVIDIA, sehingga tidak bergantung pada pustaka CUDA atau kompatibilitas GPU. Penginstalan bare-metal sumber dan bawaan menggunakan Fast OCR kecuali mereka menyediakan runtime yang kompatibel.
-- OCR mengembalikan teks yang diekstraksi secara langsung, bukan URL unduhan gambar.
+- `result` terminal yang berhasil memuat teks yang diekstraksi di `text` dan artefak `.txt` yang dapat diunduh di `downloadUrl`.
 - SnapOtter menghormati tingkatan yang diminta secara eksplisit. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `501` dengan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE`; itu tidak pernah secara diam-diam menurunkan versi permintaan ke tingkat lain.
 - Hasil kosong yang berhasil tetap merupakan hasil kosong. Kegagalan waktu proses menghasilkan kesalahan alih-alih mencoba ulang dengan mesin berkualitas rendah.
-- Responsnya melaporkan `requestedQuality` dan `actualQuality`, ditambah mesin, perangkat, penyedia, waktu proses dan versi model, serta peringatan apa pun.
+- `result` terminal yang berhasil melaporkan `requestedQuality` dan `actualQuality`, ditambah mesin, perangkat, penyedia, waktu proses dan versi model, serta peringatan apa pun.
 - Mendukung format input HEIC/HEIF, RAW, TGA, PSD, EXR, dan HDR via dekode otomatis.
 - Input berkode berukuran besar mengembalikan `413`. Gambar di atas 40 megapiksel dan respons OCR yang melampaui batas keluarannya akan ditolak dan bukan diproses sebagian.

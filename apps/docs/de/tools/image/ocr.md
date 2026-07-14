@@ -1,7 +1,7 @@
 ---
 description: "Extrahieren Sie Text lokal aus Bildern mit dem integrierten Tesseract oder der optionalen hochpräzisen RapidOCR-Laufzeitumgebung."
 i18n_output_hash: 7455d3e3f8ff
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ Fast OCR unterstützt `auto`, `en`, `de`, `es`, `fr`, `zh` und `ja`, aber kein K
 
 `POST /api/v1/tools/image/ocr`
 
-**Verarbeitung:** Gibt `200` mit JSON zurück, wenn OCR innerhalb des synchronen Fensters beendet wird. Längere Jobs geben `202` zurück; Verfolgen Sie den SSE-Fortschrittsstrom des Jobs bis zu seinem Terminalereignis, dessen `result` dieselben OCR-Felder enthält.
+**Verarbeitung:** OCR wird immer asynchron ausgeführt. Nach Validierung und Einreihung gibt der Endpunkt sofort `202 Accepted` mit einer `jobId` zurück. Verfolgen Sie den SSE-Fortschrittsstrom des Jobs bis zum abschließenden Ereignis `complete` oder `failed`; bei Erfolg enthält dessen `result` die OCR-Felder.
 
 **Genaues OCR-Paket:** Optionale `ocr`-Laufzeit (ca. 208–234 MiB zum Herunterladen und 409–488 MiB installiert, je nach Ziel). Für `fast` ist dieses Paket nicht erforderlich. Das Installationsprogramm überprüft die genauen Größen, die durch den signierten Index gebunden sind.
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Antwort (200 OK) {#response-200-ok}
+## Angenommene Antwort (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Fortschritt (SSE, optional) {#progress-sse-optional}
+### Fortschritt und Ergebnis (SSE) {#progress-sse-optional}
 
-Wenn ein `clientJobId`-Formularfeld bereitgestellt wird, werden Fortschrittsereignisse gestreamt. Eine `202`-Antwort bedeutet, dass der Client den Stream offen halten sollte, bis das Terminal-Ereignis `complete` oder `failed` eintritt:
+Verbinden Sie sich mit `GET /api/v1/jobs/{jobId}/progress` und verwenden Sie die `jobId` aus der `202`-Antwort (oder die übergebene `clientJobId`). Halten Sie den Stream bis zum abschließenden Ereignis `complete` oder `failed` offen. Ein erfolgreiches Terminal-Frame enthält die OCR-Ausgabe in `result`:
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+Verarbeitungsfehler werden im Feld `error` des abschließenden Ereignisses `failed` übertragen; nach dem Einreihen werden sie nicht als HTTP `422` zurückgegeben.
 
 ## Hinweise {#notes}
 
 - `fast` ist immer in unterstützten SnapOtter-Images verfügbar. `balanced` und `best` erfordern das optionale genaue OCR-Paket.
 - Das integrierte Tesseract fügt dem offiziellen Bild etwa 25 MiB hinzu. Das genaue Paket wird in `/data/ai` gespeichert und nicht in das Bild eingebrannt.
 - Das genaue Paket wird für die offiziellen Container Linux amd64 und arm64 veröffentlicht. Es verwendet bewusst den CPU-Anbieter von ONNX Runtime, auch auf NVIDIA-Hosts, sodass es nicht auf CUDA-Bibliotheken oder GPU-Kompatibilität angewiesen ist. Quelle und vorgefertigt bare-metal Installationen verwenden Fast OCR es sei denn, sie stellen ihre eigene kompatible Laufzeit bereit.
-- OCR gibt den extrahierten Text direkt zurück statt einer Download-URL für ein Bild.
+- Das erfolgreiche Terminal-`result` enthält sowohl den extrahierten Text in `text` als auch ein herunterladbares `.txt`-Artefakt in `downloadUrl`.
 – SnapOtter berücksichtigt eine explizit angeforderte Stufe. Wenn `balanced` oder `best` nicht verfügbar ist, der API gibt `501` mit `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück; Die Anfrage wird niemals stillschweigend auf eine andere Ebene herabgestuft.
 - Ein erfolgreiches leeres Ergebnis bleibt ein leeres Ergebnis. Laufzeitfehler geben einen Fehler zurück, anstatt es erneut mit einer Engine mit geringerer Qualität zu versuchen.
-– Die Antwort meldet sowohl `requestedQuality` als auch `actualQuality` sowie die Engine-, Geräte-, Anbieter-, Laufzeit- und Modellversionen sowie etwaige Warnungen.
+– Das erfolgreiche Terminal-`result` meldet sowohl `requestedQuality` als auch `actualQuality` sowie die Engine-, Geräte-, Anbieter-, Laufzeit- und Modellversionen sowie etwaige Warnungen.
 - Unterstützt die Eingabeformate HEIC/HEIF, RAW, TGA, PSD, EXR und HDR durch automatische Dekodierung.
 – Übergroße codierte Eingaben geben `413` zurück. Bilder über 40 Megapixel und OCR-Antworten, die ihre begrenzten Ausgabegrenzen überschreiten, werden abgelehnt, anstatt teilweise verarbeitet zu werden.

@@ -1,7 +1,7 @@
 ---
 description: "내장된 Tesseract 또는 선택적인 고정밀 RapidOCR 런타임을 사용하여 이미지에서 로컬로 텍스트를 추출합니다."
 i18n_output_hash: 8320ed5125e7
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ i18n_provenance: human
 
 `POST /api/v1/tools/image/ocr`
 
-**처리 중:** 반품 `200` ~와 함께 JSON 언제 OCR 동기 창 내에서 완료됩니다. 더 긴 일자리 반환 `202`; 직업을 따르다 SSE 터미널 이벤트로의 진행 스트림, `result`에는 동일한 OCR 필드가 포함되어 있습니다.
+**처리:** OCR은 항상 비동기로 실행됩니다. 유효성 검사와 대기열 등록이 끝나면 엔드포인트는 `jobId`와 함께 즉시 `202 Accepted`를 반환합니다. 작업의 SSE 진행 스트림을 최종 `complete` 또는 `failed` 이벤트까지 추적하세요. 성공 이벤트의 `result`에는 OCR 필드가 포함됩니다.
 
 **정확한 OCR 팩:** 선택적 `ocr` 런타임(대상에 따라 약 208-234 MiB 다운로드 및 409-488 MiB 설치). `fast`에는 이 팩이 필요하지 않습니다. 설치 프로그램은 서명된 인덱스에 의해 제한되는 정확한 크기를 확인합니다.
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## 수락 응답 (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Progress (SSE, optional) {#progress-sse-optional}
+### 진행 상황 및 결과 (SSE) {#progress-sse-optional}
 
-`clientJobId` 양식 필드가 제공되면 진행 이벤트가 스트리밍됩니다. `202` 응답은 클라이언트가 터미널 `complete` 또는 `failed` 이벤트가 발생할 때까지 스트림을 열어 두어야 함을 의미합니다.
+`202` 응답에서 반환된 `jobId`(또는 제공한 `clientJobId`)를 사용해 `GET /api/v1/jobs/{jobId}/progress`에 연결합니다. 최종 `complete` 또는 `failed` 이벤트까지 스트림을 열어 두세요. 성공한 최종 프레임의 `result`에는 OCR 출력이 포함됩니다.
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+처리 실패는 최종 `failed` 이벤트의 `error` 필드로 전달되며, 대기열 등록 후 HTTP `422`로 반환되지 않습니다.
 
 ## Notes {#notes}
 
 - 지원되는 SnapOtter 이미지에서는 `fast`를 항상 사용할 수 있습니다. `balanced`와 `best`에는 선택 사항인 고정확도 OCR 팩이 필요합니다.
 - 내장 Tesseract는 공식 이미지에 약 25 MiB를 추가합니다. 고정확도 팩은 이미지에 포함되지 않고 `/data/ai`에 저장됩니다.
 - 고정확도 팩은 공식 Linux amd64 및 arm64 컨테이너용으로 배포됩니다. NVIDIA 호스트에서도 ONNX Runtime의 CPU 공급자를 사용하므로 CUDA 라이브러리나 GPU 호환성에 의존하지 않습니다. 소스 및 사전 빌드된 bare-metal 설치에서는 자체 호환 런타임을 제공하지 않는 한 Fast OCR를 사용합니다.
-- OCR은 이미지 다운로드 URL이 아니라 추출된 텍스트를 직접 반환합니다.
+- 성공한 최종 `result`에는 `text`의 추출된 텍스트와 `downloadUrl`의 다운로드 가능한 `.txt` 아티팩트가 모두 포함됩니다.
 - SnapOtter 는 명시적으로 요청된 계층을 존중합니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`와 함께 `501`를 반환합니다. 요청을 다른 계층으로 자동으로 다운그레이드하지 않습니다.
 - 성공적인 빈 결과는 빈 결과로 유지됩니다. 런타임 실패는 낮은 품질의 엔진으로 다시 시도하는 대신 오류를 반환합니다.
-- 응답은 `requestedQuality` 및 `actualQuality`와 엔진, 장치, 공급자, 런타임 및 모델 버전과 모든 경고를 보고합니다.
+- 성공한 최종 `result`는 `requestedQuality` 및 `actualQuality`와 엔진, 장치, 공급자, 런타임 및 모델 버전과 모든 경고를 보고합니다.
 - HEIC/HEIF, RAW, TGA, PSD, EXR, HDR 입력 형식을 자동 디코딩으로 지원합니다.
 - 대형 인코딩 입력은 `413`를 반환합니다. 40 메가픽셀이 넘는 이미지와 제한된 출력 제한을 초과하는 OCR 응답은 부분적으로 처리되는 대신 거부됩니다.

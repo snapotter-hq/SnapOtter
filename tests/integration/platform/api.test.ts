@@ -10,6 +10,7 @@
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { cancelAcceptedJobAndWait, waitForAcceptedJobOrCancel } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -2832,7 +2833,7 @@ describe("Pipeline", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("OCR API", () => {
   describe("POST /api/v1/tools/image/ocr", () => {
-    it("accepts Fast quality and returns truthful execution metadata on success", async () => {
+    it("accepts Fast quality asynchronously and persists truthful execution metadata", async () => {
       const { body: payload, contentType } = createMultipartPayload([
         { name: "file", filename: "ocr-test.png", contentType: "image/png", content: PNG_200x150 },
         { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
@@ -2848,24 +2849,23 @@ describe("OCR API", () => {
         payload,
       });
 
-      // Fast OCR is bundle-independent. A native environment may still return
-      // 422 when its Tesseract executable/language pack is unavailable, but it
-      // must never be gated on the optional accurate-OCR pack.
-      if (res.statusCode === 200) {
-        const body = JSON.parse(res.body);
-        expect(body.text).toBeDefined();
-        expect(body.jobId).toBeDefined();
-        expect(body).toMatchObject({
+      // OCR is a long-running tool, so accepted work always leaves the HTTP
+      // request immediately. Fast remains independent of the optional pack.
+      expect(res.statusCode).toBe(202);
+      const accepted = JSON.parse(res.body);
+      expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
+
+      try {
+        const result = await waitForAcceptedJobOrCancel(accepted.jobId, "ai", 25_000);
+        expect(result?.resultPayload).toMatchObject({
           engine: "tesseract",
           provider: "native",
           requestedQuality: "fast",
           actualQuality: "fast",
         });
-      } else {
-        expect(res.statusCode).toBe(422);
-        const body = JSON.parse(res.body);
-        expect(body.error).toBe("OCR failed");
-        expect(body.details).toMatch(/Tesseract|traineddata|language pack/i);
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toMatch(/Tesseract|traineddata|language pack/i);
       }
     });
 
@@ -2877,7 +2877,7 @@ describe("OCR API", () => {
           contentType: "image/png",
           content: PNG_200x150,
         },
-        { name: "settings", content: JSON.stringify({ engine: "tesseract" }) },
+        { name: "settings", content: JSON.stringify({ engine: "tesseract", language: "en" }) },
       ]);
 
       const res = await app.inject({
@@ -2890,14 +2890,19 @@ describe("OCR API", () => {
         payload,
       });
 
-      // Should not be a 400 — engine param must still be accepted
-      expect(res.statusCode).not.toBe(400);
-      // The legacy Tesseract spelling still selects bundle-independent Fast.
-      expect([200, 422]).toContain(res.statusCode);
-      if (res.statusCode === 422) {
-        const body = JSON.parse(res.body);
-        expect(body.error).toBe("OCR failed");
-        expect(body.details).toMatch(/Tesseract|traineddata|language pack/i);
+      expect(res.statusCode).toBe(202);
+      const accepted = JSON.parse(res.body);
+      expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
+      try {
+        const result = await waitForAcceptedJobOrCancel(accepted.jobId, "ai", 25_000);
+        expect(result?.resultPayload).toMatchObject({
+          engine: "tesseract",
+          requestedQuality: "fast",
+          actualQuality: "fast",
+        });
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toMatch(/Tesseract|traineddata|language pack/i);
       }
     });
 
@@ -2922,7 +2927,10 @@ describe("OCR API", () => {
 
       // All three params should be accepted without validation errors
       expect(res.statusCode).not.toBe(400);
-      expect([200, 422, 501]).toContain(res.statusCode);
+      expect([202, 501]).toContain(res.statusCode);
+      if (res.statusCode === 202) {
+        await cancelAcceptedJobAndWait(JSON.parse(res.body).jobId, "ai");
+      }
     });
 
     it("returns 400 for invalid quality value", async () => {

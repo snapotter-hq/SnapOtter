@@ -6,8 +6,11 @@
  * actual execution provenance.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { fixtureDir, fixtures, readFixture } from "../../../fixtures/index.js";
+import { waitForAcceptedJobOrCancel } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -30,6 +33,25 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
 });
 
 const PNG = readFixture(fixtures.image.ocr.clean);
+const OCR_FORMAT_FIXTURES = [
+  "sample.jpg",
+  "sample.png",
+  "sample.webp",
+  "sample.gif",
+  "sample.avif",
+  "sample.tiff",
+  "sample.bmp",
+  "sample.heic",
+  "sample.heif",
+  "sample.svg",
+  "sample.ico",
+  "sample.psd",
+  "sample.exr",
+  "sample.hdr",
+  "sample.tga",
+  "sample.dng",
+  "sample.jxl",
+] as const;
 const OVERSIZED_QOI_HEADER = (() => {
   const value = Buffer.alloc(14);
   value.write("qoif", 0, "ascii");
@@ -63,9 +85,14 @@ beforeEach(() => {
   });
 });
 
-function postOcr(settings: Record<string, unknown>, token = adminToken) {
+function postOcrFile(
+  settings: Record<string, unknown>,
+  file: Buffer,
+  filename: string,
+  token = adminToken,
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "ocr-clean.png", contentType: "image/png", content: PNG },
+    { name: "file", filename, contentType: "application/octet-stream", content: file },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
 
@@ -78,6 +105,20 @@ function postOcr(settings: Record<string, unknown>, token = adminToken) {
     },
     body,
   });
+}
+
+function postOcr(settings: Record<string, unknown>, token = adminToken) {
+  return postOcrFile(settings, PNG, "ocr-clean.png", token);
+}
+
+async function awaitAcceptedOcr(
+  response: Awaited<ReturnType<typeof postOcr>>,
+): Promise<Record<string, unknown>> {
+  expect(response.statusCode).toBe(202);
+  const accepted = JSON.parse(response.body) as { jobId?: string; async?: boolean };
+  expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
+  const result = await waitForAcceptedJobOrCancel(accepted.jobId as string, "ai", 25_000);
+  return (result?.resultPayload ?? {}) as Record<string, unknown>;
 }
 
 function postMultipart(url: string, parts: Parameters<typeof createMultipartPayload>[0]) {
@@ -136,9 +177,42 @@ describe("ocr tier execution coverage", () => {
       postOcr({ quality: "fast", language: "en" }),
     ]);
 
-    expect(first.statusCode).toBe(200);
-    expect(second.statusCode).toBe(200);
+    await Promise.all([awaitAcceptedOcr(first), awaitAcceptedOcr(second)]);
     expect(maxActive).toBe(1);
+  });
+
+  it.each(
+    OCR_FORMAT_FIXTURES,
+  )("prepares %s through the real image ingress before mocked recognition", async (fixture) => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: false,
+      qualities: [],
+      providers: [],
+    });
+    mocks.extractText.mockImplementationOnce(async (_input, _scratch, options) => ({
+      text: "format accepted",
+      engine: "tesseract",
+      requestedQuality: options.quality,
+      actualQuality: options.quality,
+      device: "cpu",
+      provider: "tesseract",
+      degraded: false,
+      warnings: [],
+    }));
+
+    const response = await postOcrFile(
+      { quality: "fast", language: "en" },
+      readFileSync(join(fixtureDir.formats, fixture)),
+      fixture,
+    );
+    const result = await awaitAcceptedOcr(response);
+
+    expect(result).toMatchObject({
+      text: "format accepted",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+    });
+    expect(mocks.extractText).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when the selected best runtime crashes", async () => {
@@ -146,13 +220,9 @@ describe("ocr tier execution coverage", () => {
 
     const res = await postOcr({ quality: "best", language: "en", enhance: false });
 
-    expect(res.statusCode).toBe(422);
+    await expect(awaitAcceptedOcr(res)).rejects.toThrow("OCR runtime exited unexpectedly");
     expect(mocks.extractText).toHaveBeenCalledTimes(1);
     expect(mocks.extractText.mock.calls[0][2].quality).toBe("best");
-
-    const json = JSON.parse(res.body);
-    expect(json.error).toBe("OCR failed");
-    expect(json.details).toContain("exited unexpectedly");
   });
 
   it("returns an empty result without changing the requested tier", async () => {
@@ -171,9 +241,8 @@ describe("ocr tier execution coverage", () => {
 
     const res = await postOcr({ quality: "best", language: "en" });
 
-    expect(res.statusCode).toBe(200);
+    const json = await awaitAcceptedOcr(res);
     expect(mocks.extractText).toHaveBeenCalledTimes(1);
-    const json = JSON.parse(res.body);
     expect(json).toMatchObject({
       text: "",
       engine: "rapidocr-onnx",
@@ -266,7 +335,7 @@ describe("ocr tier execution coverage", () => {
 
     const res = await postOcr({ language: "ko" });
 
-    expect(res.statusCode).toBe(200);
+    await awaitAcceptedOcr(res);
     expect(mocks.extractText.mock.calls[0][2]).toMatchObject({
       language: "ko",
       quality: "balanced",
@@ -379,10 +448,10 @@ describe("ocr tier execution coverage", () => {
 
     const res = await postOcr({ language: "en", enhance: false });
 
-    expect(res.statusCode).toBe(200);
+    const json = await awaitAcceptedOcr(res);
     expect(mocks.extractText).toHaveBeenCalledTimes(1);
     expect(mocks.extractText.mock.calls[0][2].quality).toBe("fast");
-    expect(JSON.parse(res.body)).toMatchObject({
+    expect(json).toMatchObject({
       text: "SnapOtter OCR",
       engine: "tesseract",
       requestedQuality: "fast",

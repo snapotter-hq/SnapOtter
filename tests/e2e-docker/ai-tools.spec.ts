@@ -11,7 +11,7 @@ import { apiToolPath } from "@snapotter/shared";
 // Most of these tools require the AI sidecar (Python bridge). OCR Fast is
 // built in; only its signed Balanced/Best runtime is optional. Each test detects
 // whether the required feature bundle is installed:
-//   - 200 = tool works, verify output
+//   - 200 or terminal 202 = tool works, verify output
 //   - 501 FEATURE_NOT_INSTALLED = skip gracefully (expected when bundle missing)
 //   - Other errors = genuine failures
 
@@ -125,6 +125,44 @@ async function callAiTool(
 
   if (status === 501 && body.code === "FEATURE_NOT_INSTALLED") {
     return { installed: false, ok: false, status, body };
+  }
+
+  // Image OCR is a long-running API contract and always returns 202 once
+  // validation/enqueueing succeeds. Follow its SSE stream so black-box Docker
+  // assertions still inspect the authoritative terminal metadata.
+  if (toolId === "ocr" && status === 202 && typeof body.jobId === "string") {
+    const progress = await request.get(
+      `/api/v1/jobs/${encodeURIComponent(body.jobId as string)}/progress`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 120_000,
+      },
+    );
+    expect(progress.ok()).toBe(true);
+    const frames = (await progress.text())
+      .split(/\n\n/u)
+      .map((frame) => frame.match(/^data:\s*(.+)$/mu)?.[1])
+      .filter((data): data is string => data !== undefined)
+      .map((data) => JSON.parse(data) as Record<string, unknown>);
+    const terminal = [...frames]
+      .reverse()
+      .find((frame) => frame.phase === "complete" || frame.phase === "failed");
+    expect(terminal).toBeDefined();
+    if (terminal?.phase === "failed") {
+      return {
+        installed: true,
+        ok: false,
+        status: 422,
+        body: { error: terminal.error ?? "OCR failed" },
+      };
+    }
+    expect(terminal?.result).toBeDefined();
+    return {
+      installed: true,
+      ok: true,
+      status: 200,
+      body: terminal?.result as Record<string, unknown>,
+    };
   }
 
   return { installed: true, ok: res.ok(), status, body };

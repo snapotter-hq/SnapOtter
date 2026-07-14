@@ -1,7 +1,7 @@
 ---
 description: "Estrai testo dalle immagini localmente con Tesseract integrato o il runtime RapidOCR opzionale ad alta precisione."
 i18n_output_hash: 5c65c73856f7
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ OCR veloce supporta `auto`, `en`, `de`, `es`, `fr`, `zh` e `ja`, ma non il corea
 
 `POST /api/v1/tools/image/ocr`
 
-**Elaborazione:** Restituisce `200` con JSON quando OCR termina all'interno della finestra sincrona. I lavori più lunghi restituiscono `202`; seguire il flusso di avanzamento SSE del lavoro fino al suo evento terminale, il cui `result` contiene gli stessi campi OCR.
+**Elaborazione:** L’OCR è sempre asincrono. Dopo la convalida e l’accodamento, l’endpoint restituisce immediatamente `202 Accepted` con un `jobId`. Segui il flusso di avanzamento SSE del lavoro fino all’evento terminale `complete` o `failed`; il `result` di un evento riuscito contiene i campi OCR.
 
 **Pacchetto OCR accurato:** Runtime `ocr` opzionale (circa 208-234 MiB da scaricare e 409-488 MiB installati, a seconda della destinazione). `fast` non richiede questo pacchetto; l'installatore verifica le dimensioni esatte vincolate dall'indice firmato.
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Risposta accettata (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Progress (SSE, optional) {#progress-sse-optional}
+### Avanzamento e risultato (SSE) {#progress-sse-optional}
 
-Se viene fornito un campo modulo `clientJobId`, gli eventi di avanzamento vengono trasmessi in streaming. Una risposta `202` significa che il client deve mantenere il flusso aperto fino all'evento `complete` o `failed` del terminale:
+Connettiti a `GET /api/v1/jobs/{jobId}/progress` con il `jobId` restituito dalla risposta `202` (o il `clientJobId` fornito). Mantieni aperto il flusso fino all’evento terminale `complete` o `failed`. Un frame terminale riuscito contiene l’output OCR in `result`:
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+Gli errori di elaborazione arrivano nel campo `error` dell’evento terminale `failed`; dopo l’accodamento non vengono restituiti come HTTP `422`.
 
 ## Notes {#notes}
 
 - `fast` è sempre disponibile nelle immagini SnapOtter supportate. `balanced` e `best` richiedono il pacchetto OCR accurato opzionale.
 - Tesseract integrato aggiunge circa 25 MiB all'immagine ufficiale. Il pacchetto accurato viene archiviato in `/data/ai`, non inserito nell'immagine.
 - Viene pubblicato il pack accurato per i contenitori ufficiali Linux amd64 e arm64. Utilizza deliberatamente il provider CPU di ONNX Runtime, anche sugli host NVIDIA, quindi non dipende dalle librerie CUDA o dalla compatibilità GPU. Le installazioni bare-metal di origine e predefinite utilizzano OCR veloce a meno che non forniscano il proprio runtime compatibile.
-- L'OCR restituisce direttamente il testo estratto anziché un URL di download dell'immagine.
+- Il `result` terminale riuscito include sia il testo estratto in `text` sia un artefatto `.txt` scaricabile in `downloadUrl`.
 - SnapOtter rispetta un livello esplicitamente richiesto. Se `balanced` o `best` non è disponibile, API restituisce `501` con `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE`; non esegue mai il downgrade silenzioso della richiesta a un altro livello.
 - Un risultato vuoto riuscito rimane un risultato vuoto. Gli errori di runtime restituiscono un errore invece di riprovare con un motore di qualità inferiore.
-- La risposta riporta sia `requestedQuality` che `actualQuality`, oltre alle versioni del motore, del dispositivo, del provider, del runtime e del modello ed eventuali avvisi.
+- Il `result` terminale riuscito riporta sia `requestedQuality` che `actualQuality`, oltre alle versioni del motore, del dispositivo, del provider, del runtime e del modello ed eventuali avvisi.
 - Supporta i formati di input HEIC/HEIF, RAW, TGA, PSD, EXR e HDR tramite decodifica automatica.
 - Gli ingressi codificati sovradimensionati restituiscono `413`. Le immagini superiori a 40 megapixel e le risposte OCR che superano i limiti di output vengono rifiutate invece di essere parzialmente elaborate.

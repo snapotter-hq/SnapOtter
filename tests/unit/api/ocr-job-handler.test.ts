@@ -97,6 +97,48 @@ beforeEach(() => {
 });
 
 describe("OCR route enqueue safety", () => {
+  it("acknowledges long-running OCR without entering the synchronous wait window", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn() },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).resolves.toBeDefined();
+
+    expect(reply.statusCode).toBe(202);
+    expect(reply.payload).toMatchObject({
+      jobId: expect.any(String),
+      async: true,
+    });
+    expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: expect.any(String), toolId: "ocr", pool: "ai" }),
+    );
+    expect(mocks.waitForJob).not.toHaveBeenCalled();
+  });
+
   it("preserves storage-pressure failures as a truthful 503 response", async () => {
     mocks.receiveUpload.mockRejectedValueOnce(
       Object.assign(new Error("Upload storage is below its free-space reserve"), {

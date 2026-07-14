@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
+import { resolveToolPool } from "../../../apps/api/src/lib/pool.js";
 import { TOOL_DISPLAY_MODES } from "../../../apps/web/src/lib/tool-display-modes.js";
 import { fixtureDir } from "../../fixtures/index.js";
+import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -75,6 +78,65 @@ describe("hostile input matrix", () => {
     return { res, elapsedMs: Date.now() - started };
   }
 
+  function acceptedJob(toolId: string, fixtureName: string, body: string) {
+    const accepted = JSON.parse(body) as { jobId?: unknown; async?: unknown };
+    expect(accepted, `${toolId} returned an invalid 202 body for ${fixtureName}`).toMatchObject({
+      jobId: expect.any(String),
+      async: true,
+    });
+
+    return { jobId: accepted.jobId as string, pool: resolveToolPool(toolId) };
+  }
+
+  async function settleAcceptedResponse(toolId: string, fixtureName: string, body: string) {
+    const { jobId, pool } = acceptedJob(toolId, fixtureName, body);
+    await cancelAcceptedJobAndWait(jobId, pool);
+  }
+
+  async function expectAsyncRejection(toolId: string, fixtureName: string, body: string) {
+    const { jobId, pool } = acceptedJob(toolId, fixtureName, body);
+    const started = Date.now();
+    const outcome = await waitForJob(pool, jobId, 15_000).then(
+      (result) => ({ kind: "finished" as const, result }),
+      (error: unknown) => ({ kind: "failed" as const, error }),
+    );
+
+    if (outcome.kind === "finished") {
+      if (outcome.result === null) {
+        await cancelAcceptedJobAndWait(jobId, pool);
+        expect.fail(`${toolId} did not reject ${fixtureName} within 15000ms`);
+      }
+      expect.fail(`${toolId} completed hostile input ${fixtureName}`);
+    }
+
+    expect(
+      Date.now() - started,
+      `${toolId} took too long to reject ${fixtureName} asynchronously`,
+    ).toBeLessThan(15_000);
+
+    // Async tools report post-enqueue failures through their terminal SSE
+    // frame. Verify the public contract, including that it exposes a concise
+    // error rather than a worker stack trace.
+    const progress = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/jobs/${jobId}/progress`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(progress.statusCode).toBe(200);
+    const frames = progress.body
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>);
+    const terminal = frames.at(-1);
+    expect(terminal, `${toolId} emitted no terminal SSE frame for ${fixtureName}`).toMatchObject({
+      jobId,
+      type: "single",
+      phase: "failed",
+      error: expect.any(String),
+    });
+    expect(String(terminal?.error)).not.toMatch(/\n\s*at\s/u);
+  }
+
   for (const tool of TOOLS) {
     const toolId = tool.id;
     it(`${toolId} rejects hostile files cleanly`, async () => {
@@ -87,7 +149,17 @@ describe("hostile input matrix", () => {
         ).toBe(false);
         expect(elapsedMs, `${toolId} took ${elapsedMs}ms on ${fixture}`).toBeLessThan(15_000);
 
-        if (INPUT_AGNOSTIC.has(toolId)) continue;
+        if (INPUT_AGNOSTIC.has(toolId)) {
+          if (res.statusCode === 202) {
+            await settleAcceptedResponse(toolId, fixture, res.body);
+          }
+          continue;
+        }
+
+        if (res.statusCode === 202) {
+          await expectAsyncRejection(toolId, fixture, res.body);
+          continue;
+        }
 
         expect(
           REJECT_STATUSES.has(res.statusCode),
@@ -105,6 +177,9 @@ describe("hostile input matrix", () => {
         SERVER_ERRORS.includes(res.statusCode),
         `${toolId} returned ${res.statusCode} for ${MISMATCH_FIXTURE}: ${res.body.slice(0, 300)}`,
       ).toBe(false);
+      if (res.statusCode === 202) {
+        await settleAcceptedResponse(toolId, MISMATCH_FIXTURE, res.body);
+      }
     }, 120_000);
   }
 });

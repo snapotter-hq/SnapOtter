@@ -1,7 +1,7 @@
 ---
 description: "Витягуйте текст із зображень локально за допомогою вбудованого Tesseract або додаткового високоточного середовища виконання RapidOCR."
 i18n_output_hash: e4c4f8150634
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ i18n_provenance: human
 
 `POST /api/v1/tools/image/ocr`
 
-**Обробка:** повертає `200` із JSON, коли OCR завершує роботу всередині синхронного вікна. Довші роботи повертають `202`; слідкуйте за потоком виконання завдання SSE до його термінальної події, `result` якого містить ті самі поля OCR.
+**Обробка:** OCR завжди виконується асинхронно. Після перевірки та постановки в чергу кінцева точка одразу повертає `202 Accepted` з `jobId`. Відстежуйте потік виконання завдання SSE до кінцевої події `complete` або `failed`; у разі успіху її `result` містить поля OCR.
 
 **Точний пакет OCR:** Додатковий час виконання `ocr` (приблизно 208-234 MiB для завантаження та 409-488 MiB для встановлення, залежно від цілі). Для `fast` цей пакет не потрібен; інсталятор перевіряє точні розміри, обмежені підписаним індексом.
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Відповідь (200 OK) {#response-200-ok}
+## Прийнята відповідь (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Прогрес (SSE, опціонально) {#progress-sse-optional}
+### Хід виконання та результат (SSE) {#progress-sse-optional}
 
-Якщо надано поле форми `clientJobId`, події прогресу передаються потоково. Відповідь `202` означає, що клієнт повинен тримати потік відкритим до події терміналу `complete` або `failed`:
+Підключіться до `GET /api/v1/jobs/{jobId}/progress`, використовуючи `jobId` із відповіді `202` (або наданий `clientJobId`). Тримайте потік відкритим до кінцевої події `complete` або `failed`. Успішний кінцевий кадр містить результат OCR у полі `result`:
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+Помилки обробки надходять у полі `error` кінцевої події `failed`; після постановки в чергу вони не повертаються як HTTP `422`.
 
 ## Примітки {#notes}
 
 - `fast` завжди доступний у підтримуваних образах SnapOtter. Для `balanced` і `best` потрібен додатковий точний пакет OCR.
 - Вбудований Tesseract додає близько 25 MiB до офіційного зображення. Точний пакет зберігається в `/data/ai`, а не запікається в зображенні.
 - Акуратний пакет видається для офіційного Linux  amd64 і arm64 контейнери. Він навмисно використовує постачальника CPU ONNX Runtime, у тому числі на хостах NVIDIA, тому не залежить від бібліотек CUDA або сумісності GPU. Вихідні та попередньо зібрані інсталяції bare-metal використовують Fast OCR, якщо вони не надають власне сумісне середовище виконання.
-- OCR повертає витягнутий текст безпосередньо, а не URL завантаження зображення.
+- Успішний кінцевий `result` містить як витягнутий текст у `text`, так і доступний для завантаження артефакт `.txt` у `downloadUrl`.
 - SnapOtter вшановує явно запитаний рівень. Якщо `balanced` або `best` недоступні, API повертає `501` із `FEATURE_NOT_INSTALLED` або `FEATURE_INCOMPATIBLE`; він ніколи мовчки не переносить запит на інший рівень.
 - Вдалий порожній результат залишається порожнім результатом. Помилки виконання повертають помилку замість повторної спроби з механізмом нижчої якості.
-- Відповідь повідомляє як `requestedQuality`, так і `actualQuality`, а також механізм, пристрій, постачальника, середовище виконання та версії моделі, а також будь-які попередження.
+- Успішний кінцевий `result` повідомляє як `requestedQuality`, так і `actualQuality`, а також механізм, пристрій, постачальника, середовище виконання та версії моделі, а також будь-які попередження.
 - Підтримує вхідні формати HEIC/HEIF, RAW, TGA, PSD, EXR та HDR через автоматичне декодування.
 — Надмірні закодовані входи повертають `413`. Зображення розміром понад 40 мегапікселів і відповіді OCR, що перевищують обмежені вихідні межі, відхиляються замість часткової обробки.

@@ -9,6 +9,7 @@ import {
   defaultSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
+import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -153,6 +154,12 @@ describe("tool x format matrix (generated)", () => {
             const meta = await sharp(dl.rawPayload).metadata();
             expect(meta.width, `${toolId} x ${fixture}: output not decodable`).toBeGreaterThan(0);
           }
+        }
+
+        if (res.statusCode === 202 && (toolId === "ocr" || toolId === "ocr-pdf")) {
+          const payload = JSON.parse(res.body) as { jobId?: string };
+          expect(payload.jobId).toBeDefined();
+          await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
         }
       }
     }, 240_000);

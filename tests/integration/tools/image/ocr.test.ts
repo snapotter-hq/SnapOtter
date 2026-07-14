@@ -1,13 +1,13 @@
 /**
  * Integration tests for the OCR AI tool (/api/v1/tools/image/ocr).
  *
- * The Python sidecar may not be running, so processing tests accept both
- * 200 (sidecar available) and 501 (feature not installed). Validation paths
- * are always testable.
+ * OCR is always accepted asynchronously. Fast is built in; Balanced and Best
+ * return 501 when the optional accurate runtime is unavailable.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { AcceptedJobTimeoutError, waitForAcceptedJobOrCancel } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -33,13 +33,32 @@ afterAll(async () => {
   await testApp.cleanup();
 }, 10_000);
 
+async function awaitOcrResult(
+  response: { statusCode: number; body: string },
+  options: { allowFailure?: boolean } = {},
+): Promise<Record<string, unknown> | undefined> {
+  if (response.statusCode === 501) return undefined;
+
+  expect(response.statusCode).toBe(202);
+  const accepted = JSON.parse(response.body) as { jobId?: string; async?: boolean };
+  expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
+  try {
+    const result = await waitForAcceptedJobOrCancel(accepted.jobId as string, "ai", 25_000);
+    return (result?.resultPayload ?? {}) as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof AcceptedJobTimeoutError) throw error;
+    if (options.allowFailure) return undefined;
+    throw error;
+  }
+}
+
 describe("ocr", () => {
   // ── Processing (sidecar-dependent) ────────────────────────────────
 
-  it("responds to the route (200 or 501)", async () => {
+  it("accepts built-in Fast OCR asynchronously", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: JSON.stringify({}) },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
     ]);
 
     const res = await app.inject({
@@ -49,10 +68,11 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    const result = await awaitOcrResult(res);
+    expect(result).toMatchObject({ requestedQuality: "fast", actualQuality: "fast" });
   }, 60_000);
 
-  it("processes with default settings (200 or 501)", async () => {
+  it("processes with default settings", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
     ]);
@@ -64,21 +84,17 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
-    if (res.statusCode === 200) {
-      const json = JSON.parse(res.body);
-      expect(json.jobId).toBeDefined();
-      expect(json.text).toBeDefined();
-      expect(json.engine).toBeDefined();
-    }
+    const result = await awaitOcrResult(res);
+    expect(result?.text).toBeDefined();
+    expect(result?.engine).toBeDefined();
   }, 60_000);
 
-  it("accepts quality=fast (200 or 501)", async () => {
+  it("accepts quality=fast", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({ quality: "fast" }),
+        content: JSON.stringify({ quality: "fast", language: "en" }),
       },
     ]);
 
@@ -89,10 +105,10 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    await awaitOcrResult(res);
   }, 60_000);
 
-  it("accepts quality=best (200 or 501)", async () => {
+  it("accepts quality=best or reports the optional runtime unavailable", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
@@ -108,10 +124,11 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    expect([202, 501]).toContain(res.statusCode);
+    await awaitOcrResult(res);
   }, 60_000);
 
-  it("accepts explicit language and enhance=false (200 or 501)", async () => {
+  it("accepts explicit language and enhance=false", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
@@ -127,15 +144,15 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    await awaitOcrResult(res);
   }, 60_000);
 
-  it("accepts backward-compatible engine param (200 or 501)", async () => {
+  it("accepts the backward-compatible engine param", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({ engine: "tesseract" }),
+        content: JSON.stringify({ engine: "tesseract", language: "en" }),
       },
     ]);
 
@@ -146,16 +163,16 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 501]).toContain(res.statusCode);
+    await awaitOcrResult(res);
   }, 60_000);
 
   it(
-    "handles HEIC input (200 or 501)",
+    "handles HEIC input asynchronously",
     { timeout: 120_000 },
     async () => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
-        { name: "settings", content: JSON.stringify({}) },
+        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
       ]);
 
       const res = await app.inject({
@@ -165,15 +182,15 @@ describe("ocr", () => {
         body,
       });
 
-      expect([200, 501]).toContain(res.statusCode);
+      await awaitOcrResult(res);
     },
     60_000,
   );
 
-  it("handles 1x1 pixel input (200, 422, or 501)", async () => {
+  it("handles a 1x1 pixel input without leaking its async job", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
-      { name: "settings", content: JSON.stringify({}) },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
     ]);
 
     const res = await app.inject({
@@ -183,7 +200,7 @@ describe("ocr", () => {
       body,
     });
 
-    expect([200, 422, 501]).toContain(res.statusCode);
+    await awaitOcrResult(res, { allowFailure: true });
   }, 60_000);
 
   // ── Validation (always testable) ──────────────────────────────────

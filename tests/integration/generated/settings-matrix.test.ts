@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -1224,6 +1225,13 @@ describe("settings variation matrix", () => {
           if (res.statusCode === 202) {
             const json = JSON.parse(res.body);
             expect(json.jobId).toBeTruthy();
+
+            // Settings coverage ends once OCR accepts the validated request.
+            // Cancel it so Fast/default cases cannot outlive the suite and
+            // starve unrelated conversions running in parallel forks.
+            if (toolId === "ocr" || toolId === "ocr-pdf") {
+              await cancelAcceptedJobAndWait(json.jobId as string, "ai");
+            }
           }
         }, 60_000); // Generous timeout for media processing tools
       }

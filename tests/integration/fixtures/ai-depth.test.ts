@@ -6,13 +6,14 @@
  * These tests skip cleanly in CI (no bundles) but exercise real AI processing
  * when bundles are installed.
  *
- * To check whether bundles are installed, we probe the route with a real file.
- * If 501, the describe is skipped. If 200/202, we proceed with assertions.
+ * Bundle-gated cases treat 501 as a valid skip outcome. Built-in Fast OCR is
+ * always exercised and its accepted job is drained to a terminal result.
  */
 
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForAcceptedJobOrCancel } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -27,36 +28,6 @@ const SPEECH_WAV = readFixture(fixtures.audio.speech.wav);
 let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
-
-/**
- * Probe whether an AI tool's bundle is installed by sending a minimal request.
- * Returns true if the route responds with anything other than 501.
- */
-async function isBundleInstalled(
-  toolId: string,
-  file: Buffer,
-  filename: string,
-  ct: string,
-): Promise<boolean> {
-  const { body, contentType } = createMultipartPayload([
-    { name: "file", filename, contentType: ct, content: file },
-    { name: "settings", content: JSON.stringify({}) },
-  ]);
-  const res = await app.inject({
-    method: "POST",
-    url: apiToolPath(toolId),
-    headers: {
-      authorization: `Bearer ${adminToken}`,
-      "content-type": contentType,
-    },
-    body,
-  });
-  return res.statusCode !== 501;
-}
-
-// We cannot run `isBundleInstalled` at module scope (app not built yet).
-// Instead, each AI test accepts 501 as a valid "not installed" outcome and
-// only asserts on content when the response is 200/202.
 
 beforeAll(async () => {
   testApp = await buildTestApp();
@@ -95,23 +66,25 @@ async function postTool(
 // OCR depth test
 // -----------------------------------------------------------------------
 describe("AI depth: OCR on clean text image", () => {
-  it("recognizes text from ocr-clean.png (200 with text, or 501 skip)", async () => {
-    const res = await postTool("ocr", {}, OCR_CLEAN, "ocr-clean.png", "image/png");
+  it("recognizes text from ocr-clean.png through the async Fast path", async () => {
+    const res = await postTool(
+      "ocr",
+      { quality: "fast", language: "en" },
+      OCR_CLEAN,
+      "ocr-clean.png",
+      "image/png",
+    );
 
-    // 501 = bundle not installed, skip gracefully
-    if (res.statusCode === 501) {
-      const json = JSON.parse(res.body);
-      expect(json.code).toBe("FEATURE_NOT_INSTALLED");
-      return;
-    }
-
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.text).toBeDefined();
-    expect(typeof json.text).toBe("string");
+    expect(res.statusCode).toBe(202);
+    const accepted = JSON.parse(res.body) as { jobId?: string; async?: boolean };
+    expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
+    const result = await waitForAcceptedJobOrCancel(accepted.jobId as string, "ai", 60_000);
+    const payload = result?.resultPayload as Record<string, unknown>;
+    expect(payload.text).toBeDefined();
+    expect(typeof payload.text).toBe("string");
     // The OCR clean fixture has readable English text
-    expect(json.text.length).toBeGreaterThan(0);
-    expect(json.engine).toBeDefined();
+    expect((payload.text as string).length).toBeGreaterThan(0);
+    expect(payload.engine).toBe("tesseract");
   }, 120_000);
 });
 
@@ -147,7 +120,7 @@ describe("AI depth: blur-faces on multi-face hero", () => {
     expect(row?.status).toBe("completed");
     // Output should have at least one ref (the blurred image)
     expect(Array.isArray(row?.outputRefs)).toBe(true);
-    expect((row?.outputRefs as string[]).length).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(row?.outputRefs) ? row.outputRefs.length : 0).toBeGreaterThanOrEqual(1);
   }, 120_000);
 });
 

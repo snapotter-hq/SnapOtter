@@ -1,7 +1,7 @@
 ---
 description: "अंतर्निहित Tesseract या वैकल्पिक उच्च-सटीकता RapidOCR रनटाइम के साथ स्थानीय रूप से छवियों से पाठ निकालें।"
 i18n_output_hash: 79d324d33cc9
-i18n_source_hash: 01c6fa6aebe7
+i18n_source_hash: 0d453b49db02
 i18n_provenance: human
 ---
 
@@ -19,7 +19,7 @@ i18n_provenance: human
 
 `POST /api/v1/tools/image/ocr`
 
-**प्रसंस्करण:** जब OCR सिंक्रोनस विंडो के अंदर समाप्त हो जाता है, तो JSON के साथ `200` लौटाता है। लंबी नौकरियाँ `202` लौटाती हैं; कार्य की SSE प्रगति स्ट्रीम को उसके टर्मिनल इवेंट तक फ़ॉलो करें, जिसके `result` में समान OCR फ़ील्ड शामिल हैं।
+**प्रसंस्करण:** OCR हमेशा असिंक्रोनस रूप से चलता है। सत्यापन और कतार में जोड़े जाने के बाद, एंडपॉइंट तुरंत `jobId` के साथ `202 Accepted` लौटाता है। कार्य की SSE प्रगति स्ट्रीम को अंतिम `complete` या `failed` इवेंट तक फ़ॉलो करें; सफल इवेंट के `result` में OCR फ़ील्ड होते हैं।
 
 **सटीक OCR पैक:** वैकल्पिक `ocr` रनटाइम (लक्ष्य के आधार पर डाउनलोड करने के लिए लगभग 208-234 MiB और 409-488 MiB इंस्टॉल किया गया)। `fast` को इस पैक की आवश्यकता नहीं है; इंस्टॉलर हस्ताक्षरित सूचकांक द्वारा बंधे सटीक आकारों की पुष्टि करता है।
 
@@ -43,42 +43,55 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
   -F 'settings={"quality":"best","language":"en","enhance":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## स्वीकृत प्रतिक्रिया (202) {#accepted-response-202}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "document.png",
-  "text": "Extracted text content from the image...",
-  "engine": "rapidocr-onnx",
-  "requestedQuality": "best",
-  "actualQuality": "best",
-  "device": "cpu",
-  "provider": "CPUExecutionProvider",
-  "degraded": false,
-  "warnings": [],
-  "runtimeVersion": "2.1.0",
-  "modelVersion": "PP-OCRv6-best-v1-medium"
+  "async": true
 }
 ```
 
-### Progress (SSE, optional) {#progress-sse-optional}
+### प्रगति और परिणाम (SSE) {#progress-sse-optional}
 
-यदि एक `clientJobId` फॉर्म फ़ील्ड प्रदान किया जाता है, तो प्रगति कार्यक्रम स्ट्रीम किए जाते हैं। `202` प्रतिक्रिया का मतलब है कि क्लाइंट को टर्मिनल `complete` या `failed` इवेंट तक स्ट्रीम को खुला रखना चाहिए:
+`202` प्रतिक्रिया से मिले `jobId` (या दिए गए `clientJobId`) के साथ `GET /api/v1/jobs/{jobId}/progress` से जुड़ें। अंतिम `complete` या `failed` इवेंट तक स्ट्रीम खुली रखें। सफल अंतिम फ़्रेम के `result` में OCR आउटपुट होता है:
 
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "type": "single",
+  "phase": "complete",
+  "stage": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/document_ocr.txt",
+    "originalSize": 12345,
+    "processedSize": 47,
+    "text": "Extracted text content from the image...",
+    "engine": "rapidocr-onnx",
+    "requestedQuality": "best",
+    "actualQuality": "best",
+    "device": "cpu",
+    "provider": "CPUExecutionProvider",
+    "degraded": false,
+    "warnings": [],
+    "runtimeVersion": "2.1.0",
+    "modelVersion": "PP-OCRv6-best-v1-medium"
+  }
+}
 ```
-event: progress
-data: {"phase":"processing","stage":"Recognizing text...","percent":50}
-```
+
+प्रसंस्करण विफलताएँ अंतिम `failed` इवेंट के `error` फ़ील्ड में आती हैं; कतार में जोड़े जाने के बाद वे HTTP `422` के रूप में नहीं लौटतीं।
 
 ## Notes {#notes}
 
 - `fast` हमेशा समर्थित SnapOtter छवियों में उपलब्ध है। `balanced` और `best` को वैकल्पिक सटीक OCR पैक की आवश्यकता होती है।
 - बिल्ट-इन Tesseract आधिकारिक छवि में लगभग 25 MiB जोड़ता है। सटीक पैक `/data/ai` में संग्रहीत है, छवि में बेक नहीं किया गया है।
 - सटीक पैक आधिकारिक Linux amd64 और arm64 कंटेनरों के लिए प्रकाशित किया गया है। यह जानबूझकर NVIDIA होस्ट सहित ONNX Runtime के CPU प्रदाता का उपयोग करता है, इसलिए यह CUDA लाइब्रेरी या GPU संगतता पर निर्भर नहीं करता है। स्रोत और पूर्वनिर्मित bare-metal इंस्टॉल फास्ट OCR का उपयोग करते हैं जब तक कि वे अपना स्वयं का संगत रनटाइम प्रदान नहीं करते हैं।
-- OCR इमेज डाउनलोड URL के बजाय सीधे निकाला गया टेक्स्ट लौटाता है।
+- सफल अंतिम `result` में `text` के अंदर निकाला गया टेक्स्ट और `downloadUrl` में डाउनलोड करने योग्य `.txt` आर्टिफैक्ट, दोनों होते हैं।
 - SnapOtter स्पष्ट रूप से अनुरोधित स्तर का सम्मान करता है। यदि `balanced` या `best` अनुपलब्ध है, तो API `FEATURE_NOT_INSTALLED` या `FEATURE_INCOMPATIBLE` के साथ `501` लौटाता है; यह कभी भी चुपचाप अनुरोध को दूसरे स्तर पर डाउनग्रेड नहीं करता है।
 - एक सफल खाली परिणाम एक खाली परिणाम ही रहता है। रनटाइम विफलताएँ निम्न-गुणवत्ता वाले इंजन के साथ पुनः प्रयास करने के बजाय एक त्रुटि लौटाती हैं।
-- प्रतिक्रिया `requestedQuality` और `actualQuality`, साथ ही इंजन, डिवाइस, प्रदाता, रनटाइम और मॉडल संस्करण और किसी भी चेतावनी की रिपोर्ट करती है।
+- सफल अंतिम `result`, `requestedQuality` और `actualQuality` के साथ इंजन, डिवाइस, प्रदाता, रनटाइम और मॉडल संस्करण तथा सभी चेतावनियों की रिपोर्ट करता है।
 - स्वचालित डिकोडिंग के माध्यम से HEIC/HEIF, RAW, TGA, PSD, EXR और HDR इनपुट प्रारूपों का समर्थन करता है।
 - बड़े आकार के एन्कोडेड इनपुट `413` लौटाते हैं। 40 मेगापिक्सेल से अधिक की छवियाँ और उनकी निर्धारित आउटपुट सीमा से अधिक OCR प्रतिक्रियाओं को आंशिक रूप से संसाधित करने के बजाय अस्वीकार कर दिया जाता है।

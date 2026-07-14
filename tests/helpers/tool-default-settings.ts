@@ -36,6 +36,11 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "convert-spreadsheet": { format: "ods" },
   "content-aware-resize": { width: 50 },
   "ai-canvas-expand": { extendRight: 32 },
+  // Generated matrices validate route/format contracts, not long-running OCR
+  // execution. Request the optional tier so model-free test environments fail
+  // cleanly at ingress instead of saturating their shared CPUs with Tesseract.
+  ocr: { quality: "balanced" },
+  "ocr-pdf": { quality: "balanced" },
 };
 
 export function defaultSettingsFor(toolId: string): unknown {

@@ -45,7 +45,6 @@ function isPublic(op: PathOperation): boolean {
 function generateLlmsTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   const customModes: Record<string, string> = {
-    ocr: "sync-json",
     "content-aware-resize": "sync",
     "passport-photo": "two-phase",
   };
