@@ -3,6 +3,7 @@ import {
   closeSync,
   constants,
   existsSync,
+  fstatSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -39,6 +40,20 @@ const TARGET = "linux-amd64-cpu-py312" as const;
 const ARCHIVE_BYTES = Buffer.from("immutable runtime archive");
 
 const temporaryDirectories: string[] = [];
+
+function hasOpenDescriptorFor(identity: { dev: bigint; ino: bigint }): boolean {
+  return readdirSync("/dev/fd").some((entry) => {
+    if (!/^\d+$/.test(entry)) return false;
+    try {
+      const descriptor = fstatSync(Number(entry), { bigint: true });
+      return descriptor.dev === identity.dev && descriptor.ino === identity.ino;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EBADF" || code === "ENOENT") return false;
+      throw error;
+    }
+  });
+}
 
 async function withInstallLease<T>(aiDataDir: string, operation: (fd: number) => Promise<T>) {
   mkdirSync(aiDataDir, { recursive: true });
@@ -1512,18 +1527,23 @@ describe("downloadVerifiedRuntimeRelease", () => {
     const partialPath = join(downloads, `${fixture.artifact.archive.sha256}.part`);
     const prefix = ARCHIVE_BYTES.subarray(0, 10);
     writeFileSync(partialPath, prefix, { flag: "wx" });
+    const originalIdentity = statSync(partialPath, { bigint: true });
     const canceled = vi.fn();
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
       .mockImplementationOnce(async (_url, init) => {
         expect(new Headers(init?.headers).get("range")).toBe("bytes=10-");
+        expect(hasOpenDescriptorFor(originalIdentity)).toBe(true);
+        const replacementPath = `${partialPath}.replacement`;
+        writeFileSync(replacementPath, prefix, { flag: "wx" });
         rmSync(partialPath);
-        writeFileSync(partialPath, prefix, { flag: "wx" });
+        renameSync(replacementPath, partialPath);
         return new Response(
           new ReadableStream<Uint8Array>({
             start(controller) {
               controller.enqueue(ARCHIVE_BYTES);
+              controller.close();
             },
             cancel: canceled,
           }),
@@ -1543,6 +1563,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
     ).rejects.toThrow("changed while the download was in progress");
     expect(canceled).toHaveBeenCalledOnce();
     expect(readFileSync(partialPath)).toEqual(prefix);
+    expect(hasOpenDescriptorFor(originalIdentity)).toBe(false);
   });
 
   it("rejects a same-size regular-file swap during resume", async () => {
@@ -1559,8 +1580,10 @@ describe("downloadVerifiedRuntimeRelease", () => {
       .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
       .mockImplementationOnce(async (_url, init) => {
         expect(new Headers(init?.headers).get("range")).toBe("bytes=10-");
+        const replacementPath = `${partialPath}.replacement`;
+        writeFileSync(replacementPath, prefix, { flag: "wx" });
         rmSync(partialPath);
-        writeFileSync(partialPath, prefix, { flag: "wx" });
+        renameSync(replacementPath, partialPath);
         return new Response(ARCHIVE_BYTES.subarray(10), {
           status: 206,
           headers: {

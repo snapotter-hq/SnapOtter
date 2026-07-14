@@ -1147,33 +1147,45 @@ async function inspectArchiveFile(
   }
 }
 
-async function openExistingPartial(
+async function openCurrentPartial(
   path: string,
-  expected: RegularFileIdentity,
-  flags: number,
-): Promise<FileHandle> {
+): Promise<{ file: FileHandle; identity: RegularFileIdentity } | null> {
   let file: FileHandle;
   try {
-    file = await open(path, flags | fsConstants.O_NOFOLLOW);
+    file = await open(path, fsConstants.O_RDWR | fsConstants.O_APPEND | fsConstants.O_NOFOLLOW);
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw new Error("OCR runtime partial archive changed while the download was in progress", {
       cause: error,
     });
   }
   try {
-    const opened = regularFileIdentity(await file.stat({ bigint: true }), path);
-    if (!sameFileIdentity(opened, expected)) {
-      throw new Error("OCR runtime partial archive changed while the download was in progress");
-    }
+    regularFileIdentity(await file.stat({ bigint: true }), path);
     await applyExactSharedMode(file, DOWNLOAD_CACHE_FILE_MODE, path);
-    const hardened = regularFileIdentity(await file.stat({ bigint: true }), path);
-    if (!sameFileObject(hardened, expected)) {
-      throw new Error("OCR runtime partial archive changed while the download was in progress");
-    }
-    return file;
+    const identity = regularFileIdentity(await file.stat({ bigint: true }), path);
+    await assertPathIdentity(path, identity);
+    return { file, identity };
   } catch (error) {
     await file.close();
     throw error;
+  }
+}
+
+async function assertPinnedPartialIdentity(
+  file: FileHandle,
+  path: string,
+  expected: RegularFileIdentity,
+): Promise<void> {
+  try {
+    const descriptorIdentity = regularFileIdentity(await file.stat({ bigint: true }), path);
+    if (!sameFileIdentity(descriptorIdentity, expected)) {
+      throw new Error("descriptor identity mismatch");
+    }
+    await assertPathIdentity(path, expected);
+  } catch (error) {
+    throw new Error("OCR runtime partial archive changed while the download was in progress", {
+      cause: error,
+    });
   }
 }
 
@@ -1511,19 +1523,148 @@ async function downloadArchive(
 
   const partialName = `${digest}.part`;
   const partialPath = downloadCachePath(cache, partialName);
-  let partialIdentity = await existingRegularFileIdentity(partialPath);
-  let offset = partialIdentity === null ? 0 : Number(partialIdentity.size);
-  if (offset > expectedSize) {
-    if (partialIdentity === null) {
-      throw new Error("OCR runtime partial archive disappeared during validation");
+  let pinnedPartial = await openCurrentPartial(partialPath);
+  try {
+    let offset = 0;
+    if (pinnedPartial !== null) {
+      if (pinnedPartial.identity.size > BigInt(expectedSize)) {
+        await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
+        await removeExistingPartial(cache, partialName, pinnedPartial.identity);
+        await pinnedPartial.file.close();
+        pinnedPartial = null;
+      } else {
+        offset = Number(pinnedPartial.identity.size);
+      }
     }
-    await removeExistingPartial(cache, partialName, partialIdentity);
-    partialIdentity = null;
-    offset = 0;
-  }
-  if (offset === expectedSize && partialIdentity !== null) {
-    const file = await openExistingPartial(partialPath, partialIdentity, fsConstants.O_RDONLY);
+
+    if (offset === expectedSize && pinnedPartial !== null) {
+      const verifiedIdentity = await verifyArchiveHandle(
+        pinnedPartial.file,
+        partialPath,
+        expectedSize,
+        digest,
+        signal,
+      );
+      if (verifiedIdentity !== null) {
+        await promotePartial(cache, pinnedPartial.file, partialPath, finalPath, verifiedIdentity);
+        return finalPublicPath;
+      }
+      await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
+      await removeExistingPartial(cache, partialName, pinnedPartial.identity);
+      await pinnedPartial.file.close();
+      pinnedPartial = null;
+      offset = 0;
+    }
+
+    await assertOcrRuntimeInstallDiskSpace({
+      path: cache.rootPath,
+      remainingArchiveBytes: expectedSize - offset,
+      expandedSize,
+      authenticatedIndexBytes,
+      operation: "download",
+      diskFreeBytes,
+    });
+
+    const headers = new Headers({
+      accept: "application/octet-stream",
+      "accept-encoding": "identity",
+      "user-agent": "SnapOtter-OCR-runtime-installer/1",
+    });
+    if (offset > 0) headers.set("range", `bytes=${offset}-`);
+    const response = await fetchTrusted(fetchImpl, url, { headers, signal });
+    await assertDownloadResponse(response, "OCR runtime archive", retryNow);
+    if (!response.body) throw new Error("OCR runtime archive response did not contain a body");
+
+    let append = false;
+    if (offset > 0 && response.status === 206) {
+      const expectedRange = `bytes ${offset}-${expectedSize - 1}/${expectedSize}`;
+      if (response.headers.get("content-range") !== expectedRange) {
+        cancelResponseBody(response);
+        throw new Error("OCR runtime archive server returned a mismatched resume range");
+      }
+      if (pinnedPartial === null) {
+        cancelResponseBody(response);
+        throw new Error("OCR runtime partial archive disappeared before resume");
+      }
+      try {
+        await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
+      } catch (error) {
+        cancelResponseBody(response);
+        throw error;
+      }
+      append = true;
+    } else if (response.status === 200) {
+      if (pinnedPartial !== null) {
+        try {
+          await assertPinnedPartialIdentity(
+            pinnedPartial.file,
+            partialPath,
+            pinnedPartial.identity,
+          );
+          await removeExistingPartial(cache, partialName, pinnedPartial.identity);
+          await pinnedPartial.file.close();
+          pinnedPartial = null;
+        } catch (error) {
+          cancelResponseBody(response);
+          throw error;
+        }
+      }
+      offset = 0;
+    } else {
+      cancelResponseBody(response);
+      throw new Error(`Unable to download OCR runtime archive: HTTP ${response.status}`);
+    }
+
+    let file: FileHandle;
     try {
+      if (append) {
+        if (pinnedPartial === null) {
+          throw new Error("OCR runtime partial archive disappeared before resume");
+        }
+        file = pinnedPartial.file;
+        pinnedPartial = null;
+      } else {
+        file = await createPartial(partialPath);
+      }
+    } catch (error) {
+      cancelResponseBody(response);
+      throw error;
+    }
+    let reader: ReadableStreamDefaultReader<Uint8Array>;
+    try {
+      reader = response.body.getReader();
+    } catch (error) {
+      cancelResponseBody(response);
+      await file.close();
+      throw error;
+    }
+    let written = offset;
+    let partialSynced = false;
+    try {
+      while (true) {
+        const { done, value } = await readWithStallTimeout(
+          reader,
+          "OCR runtime archive",
+          signal,
+          stallTimeoutMs ?? 5 * 60_000,
+        );
+        if (done) break;
+        if (written + value.byteLength > expectedSize) {
+          throw new Error("OCR runtime archive exceeded its signed size");
+        }
+        written += await writeBufferFully(file, value);
+        const percent = 10 + Math.floor((written / expectedSize) * 78);
+        onProgress?.(Math.min(percent, 88), "Downloading OCR runtime");
+      }
+      await file.sync();
+      partialSynced = true;
+      if (written !== expectedSize) {
+        throw new RetryableOcrDownloadError(
+          `OCR runtime archive is truncated (${written}/${expectedSize} bytes)`,
+        );
+      }
+
+      onProgress?.(90, "Verifying OCR runtime archive");
       const verifiedIdentity = await verifyArchiveHandle(
         file,
         partialPath,
@@ -1531,140 +1672,32 @@ async function downloadArchive(
         digest,
         signal,
       );
-      if (verifiedIdentity !== null) {
-        await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity);
-        return finalPublicPath;
+      if (verifiedIdentity === null) {
+        if (append) {
+          const corruptIdentity = regularFileIdentity(
+            await file.stat({ bigint: true }),
+            partialPath,
+          );
+          await assertPinnedPartialIdentity(file, partialPath, corruptIdentity);
+          await removeExistingPartial(cache, partialName, corruptIdentity);
+          throw new RetryableOcrDownloadError(
+            "OCR runtime resumed archive failed SHA-256 verification; restarting from byte zero",
+          );
+        }
+        throw new Error("OCR runtime archive failed SHA-256 verification");
       }
+      await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity);
+      return finalPublicPath;
+    } catch (error) {
+      cancelReader(reader, error);
+      if (!partialSynced) await file.sync();
+      throw error;
     } finally {
+      reader.releaseLock();
       await file.close();
     }
-    await removeExistingPartial(cache, partialName, partialIdentity);
-    partialIdentity = null;
-    offset = 0;
-  }
-
-  await assertOcrRuntimeInstallDiskSpace({
-    path: cache.rootPath,
-    remainingArchiveBytes: expectedSize - offset,
-    expandedSize,
-    authenticatedIndexBytes,
-    operation: "download",
-    diskFreeBytes,
-  });
-
-  const headers = new Headers({
-    accept: "application/octet-stream",
-    "accept-encoding": "identity",
-    "user-agent": "SnapOtter-OCR-runtime-installer/1",
-  });
-  if (offset > 0) headers.set("range", `bytes=${offset}-`);
-  const response = await fetchTrusted(fetchImpl, url, { headers, signal });
-  await assertDownloadResponse(response, "OCR runtime archive", retryNow);
-  if (!response.body) throw new Error("OCR runtime archive response did not contain a body");
-
-  let append = false;
-  if (offset > 0 && response.status === 206) {
-    const expectedRange = `bytes ${offset}-${expectedSize - 1}/${expectedSize}`;
-    if (response.headers.get("content-range") !== expectedRange) {
-      cancelResponseBody(response);
-      throw new Error("OCR runtime archive server returned a mismatched resume range");
-    }
-    append = true;
-  } else if (response.status === 200) {
-    if (partialIdentity !== null) {
-      try {
-        await removeExistingPartial(cache, partialName, partialIdentity);
-      } catch (error) {
-        cancelResponseBody(response);
-        throw error;
-      }
-      partialIdentity = null;
-    }
-    offset = 0;
-  } else {
-    cancelResponseBody(response);
-    throw new Error(`Unable to download OCR runtime archive: HTTP ${response.status}`);
-  }
-
-  let file: FileHandle;
-  try {
-    if (append) {
-      if (partialIdentity === null) {
-        throw new Error("OCR runtime partial archive disappeared before resume");
-      }
-      file = await openExistingPartial(
-        partialPath,
-        partialIdentity,
-        fsConstants.O_RDWR | fsConstants.O_APPEND,
-      );
-    } else {
-      file = await createPartial(partialPath);
-    }
-  } catch (error) {
-    cancelResponseBody(response);
-    throw error;
-  }
-  let reader: ReadableStreamDefaultReader<Uint8Array>;
-  try {
-    reader = response.body.getReader();
-  } catch (error) {
-    cancelResponseBody(response);
-    await file.close();
-    throw error;
-  }
-  let written = offset;
-  let partialSynced = false;
-  try {
-    while (true) {
-      const { done, value } = await readWithStallTimeout(
-        reader,
-        "OCR runtime archive",
-        signal,
-        stallTimeoutMs ?? 5 * 60_000,
-      );
-      if (done) break;
-      if (written + value.byteLength > expectedSize) {
-        throw new Error("OCR runtime archive exceeded its signed size");
-      }
-      written += await writeBufferFully(file, value);
-      const percent = 10 + Math.floor((written / expectedSize) * 78);
-      onProgress?.(Math.min(percent, 88), "Downloading OCR runtime");
-    }
-    await file.sync();
-    partialSynced = true;
-    if (written !== expectedSize) {
-      throw new RetryableOcrDownloadError(
-        `OCR runtime archive is truncated (${written}/${expectedSize} bytes)`,
-      );
-    }
-
-    onProgress?.(90, "Verifying OCR runtime archive");
-    const verifiedIdentity = await verifyArchiveHandle(
-      file,
-      partialPath,
-      expectedSize,
-      digest,
-      signal,
-    );
-    if (verifiedIdentity === null) {
-      if (append) {
-        const corruptIdentity = regularFileIdentity(await file.stat({ bigint: true }), partialPath);
-        await removeExistingPartial(cache, partialName, corruptIdentity);
-        throw new RetryableOcrDownloadError(
-          "OCR runtime resumed archive failed SHA-256 verification; restarting from byte zero",
-        );
-      }
-      throw new Error("OCR runtime archive failed SHA-256 verification");
-    }
-    await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity);
-    return finalPublicPath;
-  } catch (error) {
-    cancelReader(reader, error);
-    if (!partialSynced) await file.sync();
-    throw error;
   } finally {
-    reader.releaseLock();
-    await file.close();
+    await pinnedPartial?.file.close().catch(() => {});
   }
 }
 
