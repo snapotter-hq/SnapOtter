@@ -19,6 +19,19 @@ const MIN_DPI = 20;
 const MAX_DPI = 300;
 const qualityToDpi = (q: number) => Math.round(MIN_DPI + ((q - 1) / 99) * (MAX_DPI - MIN_DPI));
 
+/**
+ * Single monotonic quality axis shared by both modes. Quality 1..100 maps to a
+ * (dpi, qFactor) pair whose output size increases with q. The top half (q>=50)
+ * preserves resolution and trades JPEG quality; the bottom half drops resolution
+ * for aggressive targets. Verified monotonic on real scans (see spec).
+ */
+export function paramsForQuality(q: number): { dpi: number; qFactor: number } {
+  const clamped = Math.max(1, Math.min(100, Math.round(q)));
+  const dpi = clamped >= 50 ? MAX_DPI : Math.round(MIN_DPI + ((MAX_DPI - MIN_DPI) * clamped) / 50);
+  const qFactor = 0.1 + 2.4 * ((100 - clamped) / 99) ** 1.5;
+  return { dpi, qFactor };
+}
+
 export function registerCompressPdf(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "compress-pdf",
