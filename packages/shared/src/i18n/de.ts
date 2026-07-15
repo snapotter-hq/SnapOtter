@@ -524,23 +524,23 @@ export const de: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Größe ändern",
+      name: "Bildgröße ändern",
       description: "Größe nach Pixeln, Prozent oder Social-Media-Vorlagen ändern",
     },
     crop: {
-      name: "Zuschneiden",
+      name: "Bild zuschneiden",
       description: "Freies Zuschneiden, Seitenverhältnis-Vorlagen, Formzuschnitt",
     },
     rotate: {
-      name: "Drehen & Spiegeln",
+      name: "Bild drehen & spiegeln",
       description: "Bilder drehen, spiegeln und begradigen",
     },
     convert: {
-      name: "Konvertieren",
+      name: "Bild konvertieren",
       description: "Zwischen Bildformaten konvertieren",
     },
     compress: {
-      name: "Komprimieren",
+      name: "Bild komprimieren",
       description: "Dateigröße durch Qualität oder Zielgröße reduzieren",
     },
     "optimize-for-web": {
@@ -549,11 +549,11 @@ export const de: TranslationKeys = {
         "Bilder für das Web optimieren mit Formatkonvertierung, Qualitätssteuerung und Vorschau",
     },
     "strip-metadata": {
-      name: "Metadaten entfernen",
+      name: "Bildmetadaten entfernen",
       description: "EXIF-, GPS- und Kamerainformationen entfernen",
     },
     "edit-metadata": {
-      name: "Metadaten bearbeiten",
+      name: "Bildmetadaten bearbeiten",
       description: "EXIF, IPTC, XMP, GPS, Schlüsselwörter und Daten bearbeiten",
     },
     "bulk-rename": {
@@ -577,7 +577,7 @@ export const de: TranslationKeys = {
       description: "Helligkeit, Kontrast, Belichtung, Sättigung, Temperatur, Schärfe und Effekte",
     },
     sharpening: {
-      name: "Schärfen",
+      name: "Bild schärfen",
       description: "Adaptives, Unscharf-Maskieren- und Hochpass-Schärfen mit Vorlagen",
     },
     "replace-color": {
@@ -609,7 +609,7 @@ export const de: TranslationKeys = {
       description: "Text aus PDF-Dokumenten mit KI-gestützter OCR extrahieren",
     },
     "blur-faces": {
-      name: "Gesichter / PII weichzeichnen",
+      name: "Gesichter & PII weichzeichnen",
       description: "Gesichter und sensible Daten automatisch erkennen und weichzeichnen",
     },
     "enhance-faces": {
@@ -724,15 +724,15 @@ export const de: TranslationKeys = {
       description: "Bilder nach QR-Codes, Barcodes und 2D-Codes scannen",
     },
     collage: {
-      name: "Collage / Raster",
+      name: "Collage & Raster",
       description: "Bilder in Rastercollages mit über 25 Vorlagen zusammenfügen",
     },
     stitch: {
-      name: "Zusammenfügen / Kombinieren",
+      name: "Bilder zusammenfügen",
       description: "Bilder nebeneinander, gestapelt oder im Raster verbinden",
     },
     split: {
-      name: "Bildaufteilung",
+      name: "Bild aufteilen",
       description: "Bilder in Rasterkacheln oder nach Pixelgröße aufteilen mit Vorschau",
     },
     border: {
@@ -858,7 +858,7 @@ export const de: TranslationKeys = {
       description: "Videoclip rückwärts abspielen",
     },
     "video-loudnorm": {
-      name: "Audio normalisieren",
+      name: "Videoaudio normalisieren",
       description: "Audio-Lautstärke des Videos auf Sendestandard normalisieren",
     },
     "aspect-pad": {
@@ -1056,7 +1056,7 @@ export const de: TranslationKeys = {
       description: "Alle Farben in Graustufen konvertieren",
     },
     "pdfa-convert": {
-      name: "PDF/A-Konvertierung",
+      name: "PDF/A-Konverter",
       description: "In Archivformat PDF/A-2 konvertieren",
     },
     "crop-pdf": {
@@ -1064,7 +1064,7 @@ export const de: TranslationKeys = {
       description: "Alle Seiten mit einheitlichem Rand zuschneiden",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Seiten pro Blatt (N-up)",
       description: "Mehrere Seiten pro Blatt anordnen",
     },
     "booklet-pdf": {
@@ -1123,7 +1123,7 @@ export const de: TranslationKeys = {
         "Markdown-Datei in ein gestaltetes PDF konvertieren. Externe Ressourcen sind aus Datenschutzgründen deaktiviert.",
     },
     "epub-convert": {
-      name: "EPUB konvertieren",
+      name: "Aus EPUB konvertieren",
       description:
         "EPUB in PDF, DOCX, HTML oder Markdown konvertieren. Externe Ressourcen im Buch werden nicht geladen.",
     },
@@ -1152,7 +1152,7 @@ export const de: TranslationKeys = {
       description: "Mehrere CSV- oder TSV-Dateien mit übereinstimmenden Spalten zusammenführen",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "YAML / JSON konvertieren",
       description: "Zwischen YAML und JSON konvertieren, in beide Richtungen",
     },
     "xml-to-csv": {

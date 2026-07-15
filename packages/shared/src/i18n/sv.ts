@@ -523,23 +523,23 @@ export const sv: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Ändra storlek",
+      name: "Ändra bildstorlek",
       description: "Ändra storlek efter pixlar, procent eller sociala medier-mallar",
     },
     crop: {
-      name: "Beskära",
+      name: "Beskär bild",
       description: "Fri beskäring, bildförhållandemallar, formbeskäring",
     },
     rotate: {
-      name: "Rotera & Vänd",
+      name: "Rotera & Vänd bild",
       description: "Rotera, vänd och räta upp bilder",
     },
     convert: {
-      name: "Konvertera",
+      name: "Konvertera bild",
       description: "Konvertera mellan bildformat",
     },
     compress: {
-      name: "Komprimera",
+      name: "Komprimera bild",
       description: "Minska filstorleken via kvalitet eller målstorlek",
     },
     "optimize-for-web": {
@@ -548,11 +548,11 @@ export const sv: TranslationKeys = {
         "Optimera bilder för webben med formatkonvertering, kvalitetskontroll och förhandsvisning",
     },
     "strip-metadata": {
-      name: "Ta bort metadata",
+      name: "Ta bort bildmetadata",
       description: "Ta bort EXIF, GPS och kamerainformation",
     },
     "edit-metadata": {
-      name: "Redigera metadata",
+      name: "Redigera bildmetadata",
       description: "Redigera EXIF, IPTC, XMP, GPS, nyckelord och datum",
     },
     "bulk-rename": {
@@ -576,7 +576,7 @@ export const sv: TranslationKeys = {
       description: "Ljusstyrka, kontrast, exponering, mättnad, temperatur, skärpa och effekter",
     },
     sharpening: {
-      name: "Skärpa",
+      name: "Skärp bild",
       description: "Adaptiv, oskarp mask och högpasskärpa med mallar",
     },
     "replace-color": {
@@ -608,7 +608,7 @@ export const sv: TranslationKeys = {
       description: "Extrahera text från PDF-dokument med AI-driven OCR",
     },
     "blur-faces": {
-      name: "Ansikts- / PII-oskärpning",
+      name: "Gör ansikten & PII oskarpa",
       description: "Detektera och göra ansikten och känslig information oskarpa automatiskt",
     },
     "enhance-faces": {
@@ -723,15 +723,15 @@ export const sv: TranslationKeys = {
       description: "Skanna bilder efter QR-koder, streckkoder och 2D-koder",
     },
     collage: {
-      name: "Collage / Rutnätsvy",
+      name: "Collage & Rutnät",
       description: "Kombinera bilder i rutnätscollage med 25+ mallar",
     },
     stitch: {
-      name: "Sammanfoga / Kombinera",
+      name: "Sammanfoga bilder",
       description: "Sammanfoga bilder sida vid sida, staplade eller i rutnät",
     },
     split: {
-      name: "Bilduppdelning",
+      name: "Dela bild",
       description: "Dela bilder i rutnätsplattor eller efter pixelstorlek med förhandsvisning",
     },
     border: {
@@ -854,7 +854,7 @@ export const sv: TranslationKeys = {
       description: "Spela upp ett videoklipp baklänges",
     },
     "video-loudnorm": {
-      name: "Normalisera ljud",
+      name: "Normalisera videons ljud",
       description: "Normalisera videovolymen till sändningsstandard",
     },
     "aspect-pad": {
@@ -1051,7 +1051,7 @@ export const sv: TranslationKeys = {
       description: "Konvertera alla färger till gråskala",
     },
     "pdfa-convert": {
-      name: "PDF/A-konvertering",
+      name: "PDF/A-konverterare",
       description: "Konvertera till arkivformat PDF/A-2",
     },
     "crop-pdf": {
@@ -1059,7 +1059,7 @@ export const sv: TranslationKeys = {
       description: "Beskär alla sidor med en enhetlig marginal",
     },
     "nup-pdf": {
-      name: "Flera sidor per ark",
+      name: "Sidor per ark (N-up)",
       description: "Placera flera sidor per ark",
     },
     "booklet-pdf": {
@@ -1118,7 +1118,7 @@ export const sv: TranslationKeys = {
         "Konvertera en Markdown-fil till en formaterad PDF. Externa resurser är inaktiverade av integritetsskäl.",
     },
     "epub-convert": {
-      name: "Konvertera EPUB",
+      name: "Konvertera från EPUB",
       description:
         "Konvertera en EPUB till PDF, DOCX, HTML eller Markdown. Externa resurser i boken hämtas inte.",
     },
@@ -1147,7 +1147,7 @@ export const sv: TranslationKeys = {
       description: "Kombinera flera CSV- eller TSV-filer med matchande kolumner till en",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Konvertera YAML / JSON",
       description: "Konvertera mellan YAML och JSON, båda riktningar",
     },
     "xml-to-csv": {

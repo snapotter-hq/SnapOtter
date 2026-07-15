@@ -523,23 +523,23 @@ export const nl: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Formaat wijzigen",
+      name: "Afbeelding herschalen",
       description: "Formaat wijzigen op pixels, percentage of social media-presets",
     },
     crop: {
-      name: "Bijsnijden",
+      name: "Afbeelding bijsnijden",
       description: "Vrij bijsnijden, beeldverhouding-presets, vormsnit",
     },
     rotate: {
-      name: "Draaien & Spiegelen",
+      name: "Afbeelding draaien & spiegelen",
       description: "Afbeeldingen draaien, spiegelen en rechtzetten",
     },
     convert: {
-      name: "Converteren",
+      name: "Afbeelding converteren",
       description: "Tussen afbeeldingsformaten converteren",
     },
     compress: {
-      name: "Comprimeren",
+      name: "Afbeelding comprimeren",
       description: "Bestandsgrootte verkleinen op kwaliteit of doelgrootte",
     },
     "optimize-for-web": {
@@ -548,11 +548,11 @@ export const nl: TranslationKeys = {
         "Afbeeldingen optimaliseren voor web met formaatconversie, kwaliteitsregeling en live preview",
     },
     "strip-metadata": {
-      name: "Metadata verwijderen",
+      name: "Afbeeldingsmetadata verwijderen",
       description: "EXIF-, GPS- en camera-info verwijderen",
     },
     "edit-metadata": {
-      name: "Metadata bewerken",
+      name: "Afbeeldingsmetadata bewerken",
       description: "EXIF, IPTC, XMP, GPS, trefwoorden en datums bewerken",
     },
     "bulk-rename": {
@@ -577,7 +577,7 @@ export const nl: TranslationKeys = {
         "Helderheid, contrast, belichting, verzadiging, temperatuur, scherpte en effecten",
     },
     sharpening: {
-      name: "Verscherpen",
+      name: "Afbeelding verscherpen",
       description: "Adaptief, onscherpmasker en high-pass verscherpen met presets",
     },
     "replace-color": {
@@ -610,7 +610,7 @@ export const nl: TranslationKeys = {
       description: "Tekst uit PDF-documenten extraheren met AI-gestuurde OCR",
     },
     "blur-faces": {
-      name: "Gezichten / PII vervagen",
+      name: "Gezichten & PII vervagen",
       description: "Gezichten en gevoelige info automatisch detecteren en vervagen",
     },
     "enhance-faces": {
@@ -725,11 +725,11 @@ export const nl: TranslationKeys = {
       description: "Afbeeldingen scannen op QR-codes, barcodes en 2D-codes",
     },
     collage: {
-      name: "Collage / Raster",
+      name: "Collage & Raster",
       description: "Afbeeldingen samenvoegen in rastercollages met 25+ templates",
     },
     stitch: {
-      name: "Samenvoegen / Combineren",
+      name: "Afbeeldingen samenvoegen",
       description: "Afbeeldingen naast elkaar, gestapeld of in een raster samenvoegen",
     },
     split: {
@@ -857,7 +857,7 @@ export const nl: TranslationKeys = {
       description: "Speel een videoclip achterstevoren af",
     },
     "video-loudnorm": {
-      name: "Audio normaliseren",
+      name: "Video-audio normaliseren",
       description: "Normaliseer het audiovolume van video naar uitzendstandaard",
     },
     "aspect-pad": {
@@ -1055,7 +1055,7 @@ export const nl: TranslationKeys = {
       description: "Converteer alle kleuren naar grijswaarden",
     },
     "pdfa-convert": {
-      name: "PDF/A converteren",
+      name: "PDF/A-converter",
       description: "Converteer naar archiveringsformaat PDF/A-2",
     },
     "crop-pdf": {
@@ -1063,7 +1063,7 @@ export const nl: TranslationKeys = {
       description: "Snijd alle pagina's bij met een uniforme marge",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Pagina's per vel (N-up)",
       description: "Plaats meerdere pagina's per vel",
     },
     "booklet-pdf": {
@@ -1122,7 +1122,7 @@ export const nl: TranslationKeys = {
         "Converteer een Markdown-bestand naar een opgemaakte PDF. Externe bronnen zijn uitgeschakeld voor privacy.",
     },
     "epub-convert": {
-      name: "EPUB converteren",
+      name: "Converteren vanuit EPUB",
       description:
         "Converteer een EPUB naar PDF, DOCX, HTML of Markdown. Externe bronnen in het boek worden niet opgehaald.",
     },
@@ -1152,7 +1152,7 @@ export const nl: TranslationKeys = {
         "Combineer meerdere CSV- of TSV-bestanden met overeenkomende kolommen tot een bestand",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "YAML / JSON converteren",
       description: "Converteer tussen YAML en JSON, beide richtingen",
     },
     "xml-to-csv": {

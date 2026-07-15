@@ -523,20 +523,20 @@ export const ptBR: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Redimensionar",
+      name: "Redimensionar Imagem",
       description: "Redimensione por pixels, porcentagem ou presets de redes sociais",
     },
     crop: {
-      name: "Cortar",
+      name: "Recortar Imagem",
       description: "Corte livre, proporções predefinidas, corte por forma",
     },
     rotate: {
-      name: "Girar e espelhar",
+      name: "Girar e Espelhar Imagem",
       description: "Gire, espelhe e endireite imagens",
     },
-    convert: { name: "Converter", description: "Converta entre formatos de imagem" },
+    convert: { name: "Converter Imagem", description: "Converta entre formatos de imagem" },
     compress: {
-      name: "Comprimir",
+      name: "Comprimir Imagem",
       description: "Reduza o tamanho do arquivo por qualidade ou tamanho alvo",
     },
     "optimize-for-web": {
@@ -545,11 +545,11 @@ export const ptBR: TranslationKeys = {
         "Otimize imagens para web com conversão de formato, controle de qualidade e visualização ao vivo",
     },
     "strip-metadata": {
-      name: "Remover metadados",
+      name: "Remover Metadados da Imagem",
       description: "Remova EXIF, GPS e informações da câmera",
     },
     "edit-metadata": {
-      name: "Editar metadados",
+      name: "Editar Metadados da Imagem",
       description: "Edite EXIF, IPTC, XMP, GPS, palavras-chave e datas",
     },
     "bulk-rename": {
@@ -573,7 +573,7 @@ export const ptBR: TranslationKeys = {
       description: "Brilho, contraste, exposição, saturação, temperatura, nitidez e efeitos",
     },
     sharpening: {
-      name: "Nitidez",
+      name: "Aplicar Nitidez na Imagem",
       description: "Nitidez adaptativa, máscara de desfoque e passa-alta com presets",
     },
     "replace-color": {
@@ -606,7 +606,7 @@ export const ptBR: TranslationKeys = {
       description: "Extraia texto de documentos PDF com OCR baseado em IA",
     },
     "blur-faces": {
-      name: "Desfocar rostos / dados sensíveis",
+      name: "Desfocar Rostos e Dados Sensíveis",
       description: "Detecte e desfoque automaticamente rostos e informações sensíveis",
     },
     "enhance-faces": {
@@ -722,15 +722,15 @@ export const ptBR: TranslationKeys = {
       description: "Escaneie imagens em busca de códigos QR, códigos de barras e códigos 2D",
     },
     collage: {
-      name: "Collage / Grade",
+      name: "Collage e Grade",
       description: "Combine imagens em belos collages com mais de 25 modelos",
     },
     stitch: {
-      name: "Juntar / Combinar",
+      name: "Juntar Imagens",
       description: "Junte imagens lado a lado, empilhadas ou em grade",
     },
     split: {
-      name: "Divisão de imagem",
+      name: "Dividir Imagem",
       description: "Divida imagens em grade ou por tamanho em pixels com visualização ao vivo",
     },
     border: {
@@ -856,7 +856,7 @@ export const ptBR: TranslationKeys = {
       description: "Reproduza um trecho de vídeo de trás para frente",
     },
     "video-loudnorm": {
-      name: "Normalizar Áudio",
+      name: "Normalizar Áudio do Vídeo",
       description: "Normalize o volume do áudio do vídeo para o padrão de transmissão",
     },
     "aspect-pad": {
@@ -1054,7 +1054,7 @@ export const ptBR: TranslationKeys = {
       description: "Converta todas as cores para escala de cinza",
     },
     "pdfa-convert": {
-      name: "Converter para PDF/A",
+      name: "Conversor de PDF/A",
       description: "Converta para o formato de arquivamento PDF/A-2",
     },
     "crop-pdf": {
@@ -1062,7 +1062,7 @@ export const ptBR: TranslationKeys = {
       description: "Recorte todas as páginas com uma margem uniforme",
     },
     "nup-pdf": {
-      name: "PDF N-up",
+      name: "Páginas por Folha (N-up)",
       description: "Organize várias páginas por folha",
     },
     "booklet-pdf": {
@@ -1121,7 +1121,7 @@ export const ptBR: TranslationKeys = {
         "Converta um arquivo Markdown para um PDF estilizado. Recursos remotos são desativados por privacidade.",
     },
     "epub-convert": {
-      name: "Converter EPUB",
+      name: "Converter de EPUB",
       description:
         "Converta um EPUB para PDF, DOCX, HTML ou Markdown. Recursos remotos dentro do livro não são baixados.",
     },
@@ -1150,7 +1150,7 @@ export const ptBR: TranslationKeys = {
       description: "Combine vários arquivos CSV ou TSV com colunas correspondentes em um só",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Converter YAML / JSON",
       description: "Converta entre YAML e JSON, nos dois sentidos",
     },
     "xml-to-csv": {

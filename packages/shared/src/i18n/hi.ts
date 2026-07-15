@@ -355,23 +355,23 @@ export const hi: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "रीसाइज़",
+      name: "इमेज रीसाइज़",
       description: "पिक्सेल, प्रतिशत, या सोशल मीडिया प्रीसेट से रीसाइज़ करें",
     },
     crop: {
-      name: "क्रॉप",
+      name: "इमेज क्रॉप",
       description: "फ्री क्रॉप, आस्पेक्ट रेशियो प्रीसेट, शेप क्रॉप",
     },
     rotate: {
-      name: "रोटेट और फ्लिप",
+      name: "इमेज रोटेट और फ्लिप",
       description: "इमेज को घुमाएं, पलटें और सीधा करें",
     },
     convert: {
-      name: "कन्वर्ट",
+      name: "इमेज कन्वर्ट",
       description: "इमेज फॉर्मेट के बीच कन्वर्ट करें",
     },
     compress: {
-      name: "कंप्रेस",
+      name: "इमेज कंप्रेस",
       description: "क्वालिटी या टार्गेट साइज़ के अनुसार फाइल का आकार घटाएं",
     },
     "optimize-for-web": {
@@ -379,11 +379,11 @@ export const hi: TranslationKeys = {
       description: "फॉर्मेट कन्वर्शन, क्वालिटी कंट्रोल और लाइव प्रीव्यू के साथ वेब के लिए इमेज ऑप्टिमाइज़ करें",
     },
     "strip-metadata": {
-      name: "मेटाडेटा हटाएं",
+      name: "इमेज मेटाडेटा हटाएं",
       description: "EXIF, GPS और कैमरा जानकारी हटाएं",
     },
     "edit-metadata": {
-      name: "मेटाडेटा संपादित करें",
+      name: "इमेज मेटाडेटा संपादित करें",
       description: "EXIF, IPTC, XMP, GPS, कीवर्ड और तारीखें संपादित करें",
     },
     "bulk-rename": {
@@ -407,7 +407,7 @@ export const hi: TranslationKeys = {
       description: "ब्राइटनेस, कंट्रास्ट, एक्सपोज़र, सैचुरेशन, टेम्परेचर, शार्पनेस और इफेक्ट्स",
     },
     sharpening: {
-      name: "शार्पनिंग",
+      name: "इमेज शार्पन",
       description: "एडैप्टिव, अनशार्प मास्क और हाई-पास शार्पनिंग; प्रीसेट के साथ",
     },
     "replace-color": {
@@ -439,7 +439,7 @@ export const hi: TranslationKeys = {
       description: "AI-संचालित OCR से PDF दस्तावेजों से टेक्स्ट निकालें",
     },
     "blur-faces": {
-      name: "चेहरा / संवेदनशील जानकारी ब्लर",
+      name: "चेहरे और संवेदनशील जानकारी ब्लर करें",
       description: "चेहरों और संवेदनशील जानकारी को ऑटो-डिटेक्ट करें और ब्लर करें",
     },
     "enhance-faces": {
@@ -552,15 +552,15 @@ export const hi: TranslationKeys = {
       description: "इमेज में QR कोड, बारकोड और 2D कोड स्कैन करें",
     },
     collage: {
-      name: "कोलाज / ग्रिड",
+      name: "कोलाज और ग्रिड",
       description: "25+ टेम्प्लेट के साथ इमेज को सुंदर ग्रिड कोलाज में मिलाएं",
     },
     stitch: {
-      name: "जोड़ें / मिलाएं",
+      name: "इमेज जोड़ें",
       description: "इमेज को साइड-बाय-साइड, ऊपर-नीचे या ग्रिड में जोड़ें",
     },
     split: {
-      name: "इमेज स्प्लिटिंग",
+      name: "इमेज स्प्लिट",
       description: "लाइव प्रीव्यू के साथ इमेज को ग्रिड टाइल्स या पिक्सेल साइज़ में बांटें",
     },
     border: {
@@ -680,7 +680,7 @@ export const hi: TranslationKeys = {
       description: "वीडियो क्लिप को उल्टा चलाएँ",
     },
     "video-loudnorm": {
-      name: "ऑडियो नॉर्मलाइज़",
+      name: "वीडियो ऑडियो नॉर्मलाइज़",
       description: "वीडियो ऑडियो वॉल्यूम को ब्रॉडकास्ट स्टैंडर्ड पर नॉर्मलाइज़ करें",
     },
     "aspect-pad": {
@@ -877,7 +877,7 @@ export const hi: TranslationKeys = {
       description: "सभी रंगों को ग्रेस्केल में बदलें",
     },
     "pdfa-convert": {
-      name: "PDF/A कन्वर्ट",
+      name: "PDF/A कन्वर्टर",
       description: "आर्काइवल PDF/A-2 में कन्वर्ट करें",
     },
     "crop-pdf": {
@@ -885,7 +885,7 @@ export const hi: TranslationKeys = {
       description: "एक समान मार्जिन से सभी पेज क्रॉप करें",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "प्रति शीट पेज (N-up)",
       description: "एक शीट पर कई पेज व्यवस्थित करें",
     },
     "booklet-pdf": {
@@ -942,7 +942,7 @@ export const hi: TranslationKeys = {
       description: "Markdown फ़ाइल को स्टाइल्ड PDF में कन्वर्ट करें। गोपनीयता के लिए रिमोट रिसोर्स अक्षम हैं।",
     },
     "epub-convert": {
-      name: "EPUB कन्वर्ट",
+      name: "EPUB से कन्वर्ट",
       description:
         "EPUB को PDF, DOCX, HTML, या Markdown में कन्वर्ट करें। पुस्तक के अंदर के रिमोट रिसोर्स फ़ेच नहीं किए जाते।",
     },
@@ -971,7 +971,7 @@ export const hi: TranslationKeys = {
       description: "मिलते-जुलते कॉलम वाली कई CSV या TSV फ़ाइलों को एक में जोड़ें",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "YAML / JSON कन्वर्ट",
       description: "YAML और JSON के बीच दोनों दिशाओं में कन्वर्ट करें",
     },
     "xml-to-csv": {

@@ -354,23 +354,23 @@ export const zhTW: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "調整大小",
+      name: "調整影像大小",
       description: "依像素、百分比或社群媒體預設調整大小",
     },
-    crop: { name: "裁切", description: "自由裁切、預設比例、形狀裁切" },
-    rotate: { name: "旋轉與翻轉", description: "旋轉、翻轉和校正影像" },
-    convert: { name: "轉檔", description: "在影像格式之間轉換" },
-    compress: { name: "壓縮", description: "依品質或目標大小縮減檔案體積" },
+    crop: { name: "裁切影像", description: "自由裁切、預設比例、形狀裁切" },
+    rotate: { name: "旋轉與翻轉影像", description: "旋轉、翻轉和校正影像" },
+    convert: { name: "轉換影像", description: "在影像格式之間轉換" },
+    compress: { name: "壓縮影像", description: "依品質或目標大小縮減檔案體積" },
     "optimize-for-web": {
       name: "網頁最佳化",
       description: "透過格式轉換、品質控制和即時預覽來最佳化網頁影像",
     },
     "strip-metadata": {
-      name: "移除中繼資料",
+      name: "移除影像中繼資料",
       description: "移除EXIF、GPS和相機資訊",
     },
     "edit-metadata": {
-      name: "編輯中繼資料",
+      name: "編輯影像中繼資料",
       description: "編輯EXIF、IPTC、XMP、GPS、關鍵字和日期",
     },
     "bulk-rename": { name: "批次重新命名", description: "使用模式批次重新命名多個檔案" },
@@ -388,7 +388,7 @@ export const zhTW: TranslationKeys = {
       description: "亮度、對比度、曝光度、飽和度、色溫、銳利度和效果",
     },
     sharpening: {
-      name: "銳利化",
+      name: "銳利化影像",
       description: "自適應、遮色片銳利化和高通銳利化，含預設",
     },
     "replace-color": {
@@ -414,7 +414,7 @@ export const zhTW: TranslationKeys = {
       description: "使用AI驅動的OCR從PDF文件中擷取文字",
     },
     "blur-faces": {
-      name: "臉部/隱私模糊",
+      name: "模糊臉部與隱私資訊",
       description: "自動偵測並模糊臉部和敏感資訊",
     },
     "enhance-faces": {
@@ -508,15 +508,15 @@ export const zhTW: TranslationKeys = {
       description: "掃描影像中的QR碼、條碼和二維碼",
     },
     collage: {
-      name: "拼貼畫 / 格線",
+      name: "拼貼畫與格線",
       description: "使用25+範本將影像組合為精美的格線拼貼畫",
     },
     stitch: {
-      name: "拼接 / 合併",
+      name: "拼接影像",
       description: "將影像並排、堆疊或格線拼接",
     },
     split: {
-      name: "影像分割",
+      name: "分割影像",
       description: "依格線或像素尺寸分割影像，支援即時預覽",
     },
     border: {
@@ -636,7 +636,7 @@ export const zhTW: TranslationKeys = {
       description: "將影片片段倒放播出",
     },
     "video-loudnorm": {
-      name: "音量標準化",
+      name: "標準化影片音量",
       description: "將影片音量標準化至廣播標準",
     },
     "aspect-pad": {
@@ -708,7 +708,7 @@ export const zhTW: TranslationKeys = {
       description: "從影片中提取音軌",
     },
     "volume-adjust": {
-      name: "音量調整",
+      name: "調整音量",
       description: "以固定增益增加或減少音量",
     },
     "normalize-audio": {
@@ -833,7 +833,7 @@ export const zhTW: TranslationKeys = {
       description: "將所有色彩轉換為灰階",
     },
     "pdfa-convert": {
-      name: "PDF/A 轉換",
+      name: "PDF/A 轉換器",
       description: "轉換為長期保存用 PDF/A-2",
     },
     "crop-pdf": {
@@ -841,7 +841,7 @@ export const zhTW: TranslationKeys = {
       description: "以統一邊距裁切所有頁面",
     },
     "nup-pdf": {
-      name: "多頁合印 PDF",
+      name: "每張紙頁數 (N-up)",
       description: "在單張紙上排列多個頁面",
     },
     "booklet-pdf": {
@@ -897,7 +897,7 @@ export const zhTW: TranslationKeys = {
       description: "將 Markdown 檔案轉換為樣式化 PDF。為保護隱私，已停用遠端資源載入。",
     },
     "epub-convert": {
-      name: "轉換 EPUB",
+      name: "從 EPUB 轉換",
       description: "將 EPUB 轉換為 PDF、DOCX、HTML 或 Markdown。書中的遠端資源不會被擷取。",
     },
     "to-epub": {
@@ -925,7 +925,7 @@ export const zhTW: TranslationKeys = {
       description: "將多個欄位相符的 CSV 或 TSV 檔案合併為一個",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "轉換 YAML / JSON",
       description: "在 YAML 與 JSON 之間雙向轉換",
     },
     "xml-to-csv": {

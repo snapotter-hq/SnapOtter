@@ -524,26 +524,26 @@ export const ja: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "リサイズ",
+      name: "画像リサイズ",
       description: "ピクセル、パーセント、SNSプリセットでリサイズ",
     },
     crop: {
-      name: "クロップ",
+      name: "画像クロップ",
       description: "自由クロップ、アスペクト比プリセット、シェイプクロップ",
     },
-    rotate: { name: "回転と反転", description: "画像の回転、反転、傾き補正" },
-    convert: { name: "変換", description: "画像フォーマット間の変換" },
-    compress: { name: "圧縮", description: "品質またはターゲットサイズでファイルサイズを削減" },
+    rotate: { name: "画像回転と反転", description: "画像の回転、反転、傾き補正" },
+    convert: { name: "画像変換", description: "画像フォーマット間の変換" },
+    compress: { name: "画像圧縮", description: "品質またはターゲットサイズでファイルサイズを削減" },
     "optimize-for-web": {
       name: "Web最適化",
       description: "フォーマット変換、品質調整、ライブプレビューでWeb向けに画像を最適化",
     },
     "strip-metadata": {
-      name: "メタデータ削除",
+      name: "画像メタデータ削除",
       description: "EXIF、GPS、カメラ情報を削除",
     },
     "edit-metadata": {
-      name: "メタデータ編集",
+      name: "画像メタデータ編集",
       description: "EXIF、IPTC、XMP、GPS、キーワード、日付を編集",
     },
     "bulk-rename": { name: "一括リネーム", description: "パターンで複数ファイルを一括リネーム" },
@@ -561,7 +561,7 @@ export const ja: TranslationKeys = {
       description: "明るさ、コントラスト、露出、彩度、色温度、シャープネス、エフェクト",
     },
     sharpening: {
-      name: "シャープニング",
+      name: "画像をシャープに",
       description: "アダプティブ、アンシャープマスク、ハイパスシャープニング（プリセット付き）",
     },
     "replace-color": {
@@ -587,7 +587,7 @@ export const ja: TranslationKeys = {
       description: "AI搭載のOCRでPDF文書からテキストを抽出",
     },
     "blur-faces": {
-      name: "顔/個人情報ぼかし",
+      name: "顔と個人情報のぼかし",
       description: "顔と機密情報を自動検出してぼかし",
     },
     "enhance-faces": {
@@ -691,11 +691,11 @@ export const ja: TranslationKeys = {
       description: "画像からQRコード、バーコード、二次元コードをスキャン",
     },
     collage: {
-      name: "コラージュ / グリッド",
+      name: "コラージュとグリッド",
       description: "25以上のテンプレートで画像を美しいグリッドコラージュに合成",
     },
     stitch: {
-      name: "画像結合",
+      name: "画像を結合",
       description: "画像を横並び、縦並び、またはグリッドで結合",
     },
     split: {
@@ -820,7 +820,7 @@ export const ja: TranslationKeys = {
       description: "動画クリップを逆方向に再生",
     },
     "video-loudnorm": {
-      name: "音声ノーマライズ",
+      name: "動画音声ノーマライズ",
       description: "動画の音声を放送基準の音量に正規化",
     },
     "aspect-pad": {
@@ -1018,7 +1018,7 @@ export const ja: TranslationKeys = {
       description: "すべての色をグレースケールに変換",
     },
     "pdfa-convert": {
-      name: "PDF/A 変換",
+      name: "PDF/A コンバーター",
       description: "長期保存用 PDF/A-2 に変換",
     },
     "crop-pdf": {
@@ -1026,7 +1026,7 @@ export const ja: TranslationKeys = {
       description: "全ページを均一な余白でクロップ",
     },
     "nup-pdf": {
-      name: "PDF 面付け",
+      name: "1枚あたりのページ数 (N-up)",
       description: "1枚のシートに複数ページを配置",
     },
     "booklet-pdf": {
@@ -1084,7 +1084,7 @@ export const ja: TranslationKeys = {
         "Markdown ファイルをスタイル付き PDF に変換。プライバシー保護のため外部リソースは無効です。",
     },
     "epub-convert": {
-      name: "EPUB 変換",
+      name: "EPUB から変換",
       description:
         "EPUB を PDF、DOCX、HTML、Markdown に変換。書籍内の外部リソースは取得されません。",
     },

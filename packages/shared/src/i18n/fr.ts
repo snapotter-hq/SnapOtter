@@ -524,20 +524,20 @@ export const fr: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Redimensionner",
+      name: "Redimensionner une image",
       description: "Redimensionnez par pixels, pourcentage ou presets pour réseaux sociaux",
     },
     crop: {
-      name: "Recadrer",
+      name: "Recadrer une image",
       description: "Recadrage libre, presets de ratio, recadrage par forme",
     },
     rotate: {
-      name: "Rotation et miroir",
+      name: "Rotation et miroir d'image",
       description: "Rotation, miroir et redressement d'images",
     },
-    convert: { name: "Convertir", description: "Convertissez entre formats d'image" },
+    convert: { name: "Convertir une image", description: "Convertissez entre formats d'image" },
     compress: {
-      name: "Compresser",
+      name: "Compresser une image",
       description: "Réduisez la taille du fichier par qualité ou taille cible",
     },
     "optimize-for-web": {
@@ -546,11 +546,11 @@ export const fr: TranslationKeys = {
         "Optimisez les images pour le web avec conversion de format, contrôle de qualité et aperçu en direct",
     },
     "strip-metadata": {
-      name: "Supprimer les métadonnées",
+      name: "Supprimer les métadonnées d'une image",
       description: "Supprimez EXIF, GPS et informations de l'appareil photo",
     },
     "edit-metadata": {
-      name: "Modifier les métadonnées",
+      name: "Modifier les métadonnées d'une image",
       description: "Modifiez EXIF, IPTC, XMP, GPS, mots-clés et dates",
     },
     "bulk-rename": {
@@ -574,7 +574,7 @@ export const fr: TranslationKeys = {
       description: "Luminosité, contraste, exposition, saturation, température, netteté et effets",
     },
     sharpening: {
-      name: "Netteté",
+      name: "Accentuer la netteté d'une image",
       description: "Netteté adaptative, masque flou et passe-haut avec presets",
     },
     "replace-color": {
@@ -607,7 +607,7 @@ export const fr: TranslationKeys = {
       description: "Extrayez du texte de documents PDF avec OCR alimenté par l'IA",
     },
     "blur-faces": {
-      name: "Floutage de visages / données sensibles",
+      name: "Flouter les visages et données sensibles",
       description: "Détectez et floutez automatiquement les visages et informations sensibles",
     },
     "enhance-faces": {
@@ -725,15 +725,15 @@ export const fr: TranslationKeys = {
       description: "Scannez les images pour détecter les codes QR, codes-barres et codes 2D",
     },
     collage: {
-      name: "Collage / Grille",
+      name: "Collage et grille",
       description: "Combinez des images en de magnifiques collages avec plus de 25 modèles",
     },
     stitch: {
-      name: "Assembler / Combiner",
+      name: "Assembler des images",
       description: "Assemblez des images côte à côte, empilées ou en grille",
     },
     split: {
-      name: "Découpage d'image",
+      name: "Découper une image",
       description: "Découpez des images en grille ou par taille en pixels avec aperçu en direct",
     },
     border: {
@@ -863,7 +863,7 @@ export const fr: TranslationKeys = {
       description: "Lisez un extrait vidéo à l’envers",
     },
     "video-loudnorm": {
-      name: "Normaliser l’audio",
+      name: "Normaliser l’audio de la vidéo",
       description: "Normalisez le volume audio de la vidéo au standard de diffusion",
     },
     "aspect-pad": {
@@ -935,7 +935,7 @@ export const fr: TranslationKeys = {
       description: "Extrayez la piste audio d’une vidéo",
     },
     "volume-adjust": {
-      name: "Réglage du volume",
+      name: "Régler le volume",
       description: "Augmentez ou diminuez le volume audio d’un gain fixe",
     },
     "normalize-audio": {
@@ -1061,7 +1061,7 @@ export const fr: TranslationKeys = {
       description: "Convertissez toutes les couleurs en niveaux de gris",
     },
     "pdfa-convert": {
-      name: "Conversion PDF/A",
+      name: "Convertisseur PDF/A",
       description: "Convertissez au format d’archivage PDF/A-2",
     },
     "crop-pdf": {
@@ -1069,7 +1069,7 @@ export const fr: TranslationKeys = {
       description: "Recadrez toutes les pages avec une marge uniforme",
     },
     "nup-pdf": {
-      name: "PDF N-up",
+      name: "Pages par feuille (N-up)",
       description: "Disposez plusieurs pages par feuille",
     },
     "booklet-pdf": {
@@ -1128,7 +1128,7 @@ export const fr: TranslationKeys = {
         "Convertissez un fichier Markdown en PDF stylisé. Les ressources distantes sont désactivées pour la confidentialité.",
     },
     "epub-convert": {
-      name: "Convertir un EPUB",
+      name: "Convertir depuis EPUB",
       description:
         "Convertissez un EPUB en PDF, DOCX, HTML ou Markdown. Les ressources distantes du livre ne sont pas récupérées.",
     },
@@ -1158,7 +1158,7 @@ export const fr: TranslationKeys = {
         "Combinez plusieurs fichiers CSV ou TSV avec des colonnes correspondantes en un seul",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Convertir YAML / JSON",
       description: "Convertissez entre YAML et JSON, dans les deux sens",
     },
     "xml-to-csv": {

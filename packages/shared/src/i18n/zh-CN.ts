@@ -353,23 +353,23 @@ export const zhCN: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "调整大小",
+      name: "调整图片尺寸",
       description: "按像素、百分比或社交媒体预设调整大小",
     },
-    crop: { name: "裁剪", description: "自由裁剪、预设比例、形状裁剪" },
-    rotate: { name: "旋转和翻转", description: "旋转、翻转和校正图片" },
-    convert: { name: "转换", description: "在图片格式之间转换" },
-    compress: { name: "压缩", description: "通过质量或目标大小缩减文件体积" },
+    crop: { name: "裁剪图片", description: "自由裁剪、预设比例、形状裁剪" },
+    rotate: { name: "旋转和翻转图片", description: "旋转、翻转和校正图片" },
+    convert: { name: "转换图片", description: "在图片格式之间转换" },
+    compress: { name: "压缩图片", description: "通过质量或目标大小缩减文件体积" },
     "optimize-for-web": {
       name: "网页优化",
       description: "通过格式转换、质量控制和实时预览优化网页图片",
     },
     "strip-metadata": {
-      name: "移除元数据",
+      name: "移除图片元数据",
       description: "移除 EXIF、GPS 和相机信息",
     },
     "edit-metadata": {
-      name: "编辑元数据",
+      name: "编辑图片元数据",
       description: "编辑 EXIF、IPTC、XMP、GPS、关键词和日期",
     },
     "bulk-rename": { name: "批量重命名", description: "使用模式批量重命名多个文件" },
@@ -387,7 +387,7 @@ export const zhCN: TranslationKeys = {
       description: "亮度、对比度、曝光度、饱和度、色温、锐度和效果",
     },
     sharpening: {
-      name: "锐化",
+      name: "锐化图片",
       description: "自适应、USM 锐化和高通锐化，含预设",
     },
     "replace-color": {
@@ -413,7 +413,7 @@ export const zhCN: TranslationKeys = {
       description: "使用AI驱动的OCR从PDF文档中提取文字",
     },
     "blur-faces": {
-      name: "人脸 / 隐私模糊",
+      name: "模糊人脸和隐私信息",
       description: "自动检测并模糊人脸和敏感信息",
     },
     "enhance-faces": {
@@ -508,15 +508,15 @@ export const zhCN: TranslationKeys = {
       description: "扫描图片中的 QR 码、条形码和二维码",
     },
     collage: {
-      name: "拼贴 / 网格",
+      name: "拼贴和网格",
       description: "使用 25+ 模板将图片拼成精美网格拼贴",
     },
     stitch: {
-      name: "拼接 / 合并",
+      name: "拼接合并图片",
       description: "将图片横向、纵向或网格排列拼接",
     },
     split: {
-      name: "图片分割",
+      name: "分割图片",
       description: "按网格或像素大小分割图片，支持实时预览",
     },
     border: {
@@ -636,7 +636,7 @@ export const zhCN: TranslationKeys = {
       description: "将视频倒序播放",
     },
     "video-loudnorm": {
-      name: "音频标准化",
+      name: "视频音频标准化",
       description: "将视频音频音量标准化至广播标准",
     },
     "aspect-pad": {
@@ -833,7 +833,7 @@ export const zhCN: TranslationKeys = {
       description: "将所有颜色转换为灰度",
     },
     "pdfa-convert": {
-      name: "PDF/A 转换",
+      name: "PDF/A 转换器",
       description: "转换为存档格式 PDF/A-2",
     },
     "crop-pdf": {
@@ -841,7 +841,7 @@ export const zhCN: TranslationKeys = {
       description: "按统一边距裁剪所有页面",
     },
     "nup-pdf": {
-      name: "多页合印 PDF",
+      name: "每张纸多页 (N-up)",
       description: "在每张纸上排列多个页面",
     },
     "booklet-pdf": {
@@ -897,7 +897,7 @@ export const zhCN: TranslationKeys = {
       description: "将 Markdown 文件转换为带样式的 PDF。出于隐私考虑，远程资源已禁用。",
     },
     "epub-convert": {
-      name: "转换 EPUB",
+      name: "从 EPUB 转换",
       description: "将 EPUB 转换为 PDF、DOCX、HTML 或 Markdown。书中的远程资源不会被获取。",
     },
     "to-epub": {
@@ -925,7 +925,7 @@ export const zhCN: TranslationKeys = {
       description: "将多个列匹配的 CSV 或 TSV 文件合并为一个",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "转换 YAML / JSON",
       description: "在 YAML 和 JSON 之间双向转换",
     },
     "xml-to-csv": {

@@ -524,7 +524,7 @@ export const vi: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Thay đổi kích thước",
+      name: "Thay đổi kích thước ảnh",
       description: "Thay đổi kích thước theo pixel, phần trăm hoặc mẫu mạng xã hội",
     },
     crop: {
@@ -532,11 +532,11 @@ export const vi: TranslationKeys = {
       description: "Cắt tự do, tỷ lệ khung hình có sẵn, cắt theo hình dạng",
     },
     rotate: {
-      name: "Xoay & Lật",
+      name: "Xoay & Lật ảnh",
       description: "Xoay, lật và chỉnh thẳng hình ảnh",
     },
     convert: {
-      name: "Chuyển đổi",
+      name: "Chuyển đổi ảnh",
       description: "Chuyển đổi giữa các định dạng ảnh",
     },
     compress: {
@@ -549,11 +549,11 @@ export const vi: TranslationKeys = {
         "Tối ưu hình ảnh cho web với chuyển đổi định dạng, kiểm soát chất lượng và xem trước trực tiếp",
     },
     "strip-metadata": {
-      name: "Xóa siêu dữ liệu",
+      name: "Xóa siêu dữ liệu ảnh",
       description: "Xóa EXIF, GPS và thông tin máy ảnh",
     },
     "edit-metadata": {
-      name: "Chỉnh sửa siêu dữ liệu",
+      name: "Chỉnh sửa siêu dữ liệu ảnh",
       description: "Chỉnh sửa EXIF, IPTC, XMP, GPS, từ khóa và ngày tháng",
     },
     "bulk-rename": {
@@ -578,7 +578,7 @@ export const vi: TranslationKeys = {
         "Độ sáng, độ tương phản, phơi sáng, độ bão hòa, nhiệt độ màu, độ nét và hiệu ứng",
     },
     sharpening: {
-      name: "Làm nét",
+      name: "Làm nét ảnh",
       description: "Làm nét thích ứng, mặt nạ không sắc nét và làm nét cao tần với các mẫu",
     },
     "replace-color": {
@@ -610,7 +610,7 @@ export const vi: TranslationKeys = {
       description: "Trích xuất văn bản từ tài liệu PDF bằng OCR hỗ trợ bởi AI",
     },
     "blur-faces": {
-      name: "Làm mờ khuôn mặt / Thông tin nhạy cảm",
+      name: "Làm mờ khuôn mặt và thông tin nhạy cảm",
       description: "Tự động phát hiện và làm mờ khuôn mặt cùng thông tin nhạy cảm",
     },
     "enhance-faces": {
@@ -725,11 +725,11 @@ export const vi: TranslationKeys = {
       description: "Quét hình ảnh để tìm mã QR, mã vạch và mã 2D",
     },
     collage: {
-      name: "Ảnh ghép / Lưới",
+      name: "Ảnh ghép và Lưới",
       description: "Kết hợp hình ảnh thành ảnh ghép dạng lưới đẹp mắt với hơn 25 mẫu",
     },
     stitch: {
-      name: "Ghép nối / Kết hợp",
+      name: "Ghép nối ảnh",
       description: "Nối hình ảnh cạnh nhau, xếp chồng hoặc theo lưới",
     },
     split: {
@@ -858,7 +858,7 @@ export const vi: TranslationKeys = {
       description: "Phát ngược một đoạn video",
     },
     "video-loudnorm": {
-      name: "Chuẩn hóa âm thanh",
+      name: "Chuẩn hóa âm thanh video",
       description: "Chuẩn hóa âm lượng video theo tiêu chuẩn phát sóng",
     },
     "aspect-pad": {
@@ -1056,7 +1056,7 @@ export const vi: TranslationKeys = {
       description: "Chuyển tất cả màu sang thang xám",
     },
     "pdfa-convert": {
-      name: "Chuyển đổi PDF/A",
+      name: "Bộ chuyển đổi PDF/A",
       description: "Chuyển đổi sang PDF/A-2 để lưu trữ",
     },
     "crop-pdf": {
@@ -1064,7 +1064,7 @@ export const vi: TranslationKeys = {
       description: "Cắt tất cả các trang với lề đồng nhất",
     },
     "nup-pdf": {
-      name: "Ghép trang PDF",
+      name: "Số trang mỗi tờ (N-up)",
       description: "Xếp nhiều trang trên một tờ",
     },
     "booklet-pdf": {
@@ -1122,7 +1122,7 @@ export const vi: TranslationKeys = {
         "Chuyển đổi tệp Markdown sang PDF có định dạng. Tài nguyên từ xa bị tắt vì quyền riêng tư.",
     },
     "epub-convert": {
-      name: "Chuyển đổi EPUB",
+      name: "Chuyển đổi từ EPUB",
       description:
         "Chuyển đổi EPUB sang PDF, DOCX, HTML hoặc Markdown. Tài nguyên từ xa trong sách không được tải.",
     },
@@ -1151,7 +1151,7 @@ export const vi: TranslationKeys = {
       description: "Gộp nhiều tệp CSV hoặc TSV có cùng cột thành một",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Chuyển đổi YAML / JSON",
       description: "Chuyển đổi hai chiều giữa YAML và JSON",
     },
     "xml-to-csv": {

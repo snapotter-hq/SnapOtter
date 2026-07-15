@@ -522,23 +522,23 @@ export const ko: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "리사이즈",
+      name: "이미지 크기 조정",
       description: "픽셀, 퍼센트 또는 소셜 미디어 프리셋으로 리사이즈",
     },
-    crop: { name: "크롭", description: "자유 크롭, 비율 프리셋, 도형 크롭" },
-    rotate: { name: "회전 및 뒤집기", description: "이미지 회전, 뒤집기 및 기울기 보정" },
-    convert: { name: "변환", description: "이미지 포맷 간 변환" },
-    compress: { name: "압축", description: "품질 또는 목표 크기로 파일 크기 축소" },
+    crop: { name: "이미지 크롭", description: "자유 크롭, 비율 프리셋, 도형 크롭" },
+    rotate: { name: "이미지 회전 및 뒤집기", description: "이미지 회전, 뒤집기 및 기울기 보정" },
+    convert: { name: "이미지 변환", description: "이미지 포맷 간 변환" },
+    compress: { name: "이미지 압축", description: "품질 또는 목표 크기로 파일 크기 축소" },
     "optimize-for-web": {
       name: "웹 최적화",
       description: "포맷 변환, 품질 조절, 실시간 미리보기로 웹용 이미지 최적화",
     },
     "strip-metadata": {
-      name: "메타데이터 제거",
+      name: "이미지 메타데이터 제거",
       description: "EXIF, GPS 및 카메라 정보 제거",
     },
     "edit-metadata": {
-      name: "메타데이터 편집",
+      name: "이미지 메타데이터 편집",
       description: "EXIF, IPTC, XMP, GPS, 키워드 및 날짜 편집",
     },
     "bulk-rename": { name: "일괄 이름 변경", description: "패턴으로 여러 파일 일괄 이름 변경" },
@@ -556,7 +556,7 @@ export const ko: TranslationKeys = {
       description: "밝기, 대비, 노출, 채도, 색온도, 선명도 및 효과",
     },
     sharpening: {
-      name: "선명하게",
+      name: "이미지 선명하게",
       description: "적응형, 언샵 마스크, 하이패스 샤프닝(프리셋 포함)",
     },
     "replace-color": {
@@ -582,7 +582,7 @@ export const ko: TranslationKeys = {
       description: "AI 기반 OCR로 PDF 문서에서 텍스트 추출",
     },
     "blur-faces": {
-      name: "얼굴/개인정보 블러",
+      name: "얼굴 및 개인정보 블러",
       description: "얼굴과 민감한 정보를 자동 감지하여 블러 처리",
     },
     "enhance-faces": {
@@ -677,7 +677,7 @@ export const ko: TranslationKeys = {
       description: "이미지에서 QR 코드, 바코드 및 2D 코드 스캔",
     },
     collage: {
-      name: "콜라주 / 그리드",
+      name: "콜라주 및 그리드",
       description: "25가지 이상의 템플릿으로 이미지를 아름다운 그리드 콜라주로 합성",
     },
     stitch: {
@@ -805,7 +805,7 @@ export const ko: TranslationKeys = {
       description: "동영상 클립을 거꾸로 재생",
     },
     "video-loudnorm": {
-      name: "오디오 정규화",
+      name: "동영상 오디오 정규화",
       description: "동영상 오디오 볼륨을 방송 표준으로 정규화",
     },
     "aspect-pad": {
@@ -1002,7 +1002,7 @@ export const ko: TranslationKeys = {
       description: "모든 색상을 흑백으로 변환",
     },
     "pdfa-convert": {
-      name: "PDF/A 변환",
+      name: "PDF/A 변환기",
       description: "보관용 PDF/A-2로 변환",
     },
     "crop-pdf": {
@@ -1010,7 +1010,7 @@ export const ko: TranslationKeys = {
       description: "균일한 여백으로 모든 페이지 크롭",
     },
     "nup-pdf": {
-      name: "PDF 모아찍기",
+      name: "한 장에 여러 페이지 (N-up)",
       description: "한 장에 여러 페이지 배치",
     },
     "booklet-pdf": {
@@ -1068,7 +1068,7 @@ export const ko: TranslationKeys = {
         "Markdown 파일을 스타일이 적용된 PDF로 변환. 개인정보 보호를 위해 외부 리소스는 비활성화됩니다.",
     },
     "epub-convert": {
-      name: "EPUB 변환",
+      name: "EPUB에서 변환",
       description:
         "EPUB을 PDF, DOCX, HTML 또는 Markdown으로 변환. 책 내부의 외부 리소스는 가져오지 않습니다.",
     },
@@ -1097,7 +1097,7 @@ export const ko: TranslationKeys = {
       description: "동일한 열을 가진 여러 CSV 또는 TSV 파일을 하나로 합치기",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "YAML / JSON 변환",
       description: "YAML과 JSON 간 양방향 변환",
     },
     "xml-to-csv": {

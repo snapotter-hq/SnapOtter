@@ -523,20 +523,20 @@ export const it: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Ridimensiona",
+      name: "Ridimensiona Immagine",
       description: "Ridimensiona per pixel, percentuale o preset per social media",
     },
     crop: {
-      name: "Ritaglia",
+      name: "Ritaglia Immagine",
       description: "Ritaglio libero, rapporti d'aspetto preimpostati, ritaglio a forma",
     },
     rotate: {
-      name: "Ruota e capovolgi",
+      name: "Ruota e capovolgi immagine",
       description: "Ruota, capovolgi e raddrizza le immagini",
     },
-    convert: { name: "Converti", description: "Converti tra formati di immagine" },
+    convert: { name: "Converti Immagine", description: "Converti tra formati di immagine" },
     compress: {
-      name: "Comprimi",
+      name: "Comprimi Immagine",
       description: "Riduci la dimensione del file per qualità o dimensione obiettivo",
     },
     "optimize-for-web": {
@@ -545,11 +545,11 @@ export const it: TranslationKeys = {
         "Ottimizza le immagini per il web con conversione del formato, controllo della qualità e anteprima in tempo reale",
     },
     "strip-metadata": {
-      name: "Rimuovi metadati",
+      name: "Rimuovi metadati immagine",
       description: "Rimuovi EXIF, GPS e informazioni della fotocamera",
     },
     "edit-metadata": {
-      name: "Modifica metadati",
+      name: "Modifica metadati immagine",
       description: "Modifica EXIF, IPTC, XMP, GPS, parole chiave e date",
     },
     "bulk-rename": {
@@ -574,7 +574,7 @@ export const it: TranslationKeys = {
         "Luminosità, contrasto, esposizione, saturazione, temperatura, nitidezza ed effetti",
     },
     sharpening: {
-      name: "Nitidezza",
+      name: "Aumenta nitidezza immagine",
       description: "Nitidezza adattiva, maschera di contrasto e passa-alto con preset",
     },
     "replace-color": {
@@ -607,7 +607,7 @@ export const it: TranslationKeys = {
       description: "Estrai testo da documenti PDF con OCR basato su IA",
     },
     "blur-faces": {
-      name: "Sfocatura volti / dati sensibili",
+      name: "Sfoca volti e dati sensibili",
       description: "Rileva e sfoca automaticamente volti e informazioni sensibili",
     },
     "enhance-faces": {
@@ -723,15 +723,15 @@ export const it: TranslationKeys = {
       description: "Scansiona immagini alla ricerca di codici QR, codici a barre e codici 2D",
     },
     collage: {
-      name: "Collage / Griglia",
+      name: "Collage e griglia",
       description: "Combina immagini in bellissimi collage con oltre 25 modelli",
     },
     stitch: {
-      name: "Unisci / Combina",
+      name: "Unisci immagini",
       description: "Unisci immagini affiancate, impilate o in griglia",
     },
     split: {
-      name: "Divisione immagine",
+      name: "Dividi immagine",
       description:
         "Dividi immagini in griglia o per dimensione in pixel con anteprima in tempo reale",
     },
@@ -858,7 +858,7 @@ export const it: TranslationKeys = {
       description: "Riproduce una clip video al contrario",
     },
     "video-loudnorm": {
-      name: "Normalizza Audio",
+      name: "Normalizza Audio del Video",
       description: "Normalizza il volume audio del video agli standard di broadcast",
     },
     "aspect-pad": {
@@ -1057,7 +1057,7 @@ export const it: TranslationKeys = {
       description: "Converte tutti i colori in scala di grigi",
     },
     "pdfa-convert": {
-      name: "Converti in PDF/A",
+      name: "Convertitore PDF/A",
       description: "Converte in PDF/A-2 per l'archiviazione",
     },
     "crop-pdf": {
@@ -1065,7 +1065,7 @@ export const it: TranslationKeys = {
       description: "Ritaglia tutte le pagine con un margine uniforme",
     },
     "nup-pdf": {
-      name: "PDF N-up",
+      name: "Pagine per foglio (N-up)",
       description: "Dispone più pagine per foglio",
     },
     "booklet-pdf": {
@@ -1123,7 +1123,7 @@ export const it: TranslationKeys = {
         "Converte un file Markdown in un PDF con stile. Le risorse remote sono disattivate per privacy.",
     },
     "epub-convert": {
-      name: "Converti EPUB",
+      name: "Converti da EPUB",
       description:
         "Converte un EPUB in PDF, DOCX, HTML o Markdown. Le risorse remote all'interno del libro non vengono recuperate.",
     },
@@ -1152,7 +1152,7 @@ export const it: TranslationKeys = {
       description: "Combina più file CSV o TSV con colonne corrispondenti in un unico file",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Converti YAML / JSON",
       description: "Converte tra YAML e JSON in entrambe le direzioni",
     },
     "xml-to-csv": {

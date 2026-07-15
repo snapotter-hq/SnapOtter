@@ -521,21 +521,21 @@ export const pl: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Zmiana rozmiaru",
+      name: "Zmień rozmiar obrazu",
       description:
         "Zmiana rozmiaru w pikselach, procentach lub według szablonów mediów społecznościowych",
     },
     crop: {
-      name: "Kadrowanie",
+      name: "Kadruj obraz",
       description: "Kadrowanie dowolne, szablony proporcji, kadrowanie kształtowe",
     },
     rotate: {
-      name: "Obrót i odbicie",
+      name: "Obróć i odbij obraz",
       description: "Obracanie, odbijanie i prostowanie obrazów",
     },
-    convert: { name: "Konwersja", description: "Konwersja między formatami obrazów" },
+    convert: { name: "Konwertuj obraz", description: "Konwersja między formatami obrazów" },
     compress: {
-      name: "Kompresja",
+      name: "Kompresuj obraz",
       description: "Zmniejszenie rozmiaru pliku przez jakość lub docelowy rozmiar",
     },
     "optimize-for-web": {
@@ -544,11 +544,11 @@ export const pl: TranslationKeys = {
         "Optymalizacja obrazów dla sieci z konwersją formatu, kontrolą jakości i podglądem na żywo",
     },
     "strip-metadata": {
-      name: "Usuwanie metadanych",
+      name: "Usuwanie metadanych obrazu",
       description: "Usuwanie EXIF, GPS i informacji o aparacie",
     },
     "edit-metadata": {
-      name: "Edycja metadanych",
+      name: "Edycja metadanych obrazu",
       description: "Edycja EXIF, IPTC, XMP, GPS, słów kluczowych i dat",
     },
     "bulk-rename": {
@@ -572,7 +572,7 @@ export const pl: TranslationKeys = {
       description: "Jasność, kontrast, ekspozycja, nasycenie, temperatura, ostrość i efekty",
     },
     sharpening: {
-      name: "Wyostrzanie",
+      name: "Wyostrz obraz",
       description: "Wyostrzanie adaptacyjne, maska wyostrzająca i górnoprzepustowe z szablonami",
     },
     "replace-color": {
@@ -604,7 +604,7 @@ export const pl: TranslationKeys = {
       description: "Wyodrębnianie tekstu z dokumentów PDF za pomocą OCR opartego na AI",
     },
     "blur-faces": {
-      name: "Rozmywanie twarzy / danych",
+      name: "Rozmyj twarze i dane osobowe",
       description: "Automatyczne wykrywanie i rozmywanie twarzy oraz danych wrażliwych",
     },
     "enhance-faces": {
@@ -722,15 +722,15 @@ export const pl: TranslationKeys = {
       description: "Skanowanie obrazów w poszukiwaniu kodów QR, kreskowych i 2D",
     },
     collage: {
-      name: "Kolaż / Siatka",
+      name: "Kolaż i siatka",
       description: "Łączenie obrazów w piękne kolaże siatkowe z ponad 25 szablonami",
     },
     stitch: {
-      name: "Łączenie / Scalanie",
+      name: "Połącz obrazy",
       description: "Łączenie obrazów obok siebie, w stos lub w siatkę",
     },
     split: {
-      name: "Dzielenie obrazu",
+      name: "Podziel obraz",
       description:
         "Dzielenie obrazów na kafelki siatki lub według rozmiaru w pikselach z podglądem na żywo",
     },
@@ -856,7 +856,7 @@ export const pl: TranslationKeys = {
       description: "Odtwórz klip wideo od tyłu",
     },
     "video-loudnorm": {
-      name: "Normalizuj audio",
+      name: "Normalizuj audio wideo",
       description: "Znormalizuj głośność audio wideo do standardu emisyjnego",
     },
     "aspect-pad": {
@@ -1054,7 +1054,7 @@ export const pl: TranslationKeys = {
       description: "Konwertuj wszystkie kolory na skalę szarości",
     },
     "pdfa-convert": {
-      name: "Konwersja PDF/A",
+      name: "Konwerter PDF/A",
       description: "Konwertuj do archiwalnego formatu PDF/A-2",
     },
     "crop-pdf": {
@@ -1062,7 +1062,7 @@ export const pl: TranslationKeys = {
       description: "Przytnij wszystkie strony z jednolitym marginesem",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Strony na arkusz (N-up)",
       description: "Rozmieść wiele stron na jednym arkuszu",
     },
     "booklet-pdf": {
@@ -1121,7 +1121,7 @@ export const pl: TranslationKeys = {
         "Konwertuj plik Markdown na stylizowany PDF. Zdalne zasoby są wyłączone ze względu na prywatność.",
     },
     "epub-convert": {
-      name: "Konwertuj EPUB",
+      name: "Konwertuj z EPUB",
       description:
         "Konwertuj EPUB na PDF, DOCX, HTML lub Markdown. Zdalne zasoby w książce nie są pobierane.",
     },
@@ -1150,7 +1150,7 @@ export const pl: TranslationKeys = {
       description: "Połącz wiele plików CSV lub TSV z pasującymi kolumnami w jeden",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Konwertuj YAML / JSON",
       description: "Konwertuj pomiędzy YAML i JSON w obu kierunkach",
     },
     "xml-to-csv": {

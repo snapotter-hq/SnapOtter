@@ -520,23 +520,23 @@ export const th: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "ปรับขนาด",
+      name: "ปรับขนาดภาพ",
       description: "ปรับขนาดตามพิกเซล เปอร์เซ็นต์ หรือพรีเซ็ตสื่อสังคม",
     },
     crop: {
-      name: "ครอป",
+      name: "ครอปภาพ",
       description: "ครอปอิสระ พรีเซ็ตอัตราส่วนภาพ ครอปตามรูปทรง",
     },
     rotate: {
-      name: "หมุนและพลิก",
+      name: "หมุนและพลิกภาพ",
       description: "หมุน พลิก และปรับให้ตรงของภาพ",
     },
     convert: {
-      name: "แปลงไฟล์",
+      name: "แปลงภาพ",
       description: "แปลงระหว่างรูปแบบภาพต่างๆ",
     },
     compress: {
-      name: "บีบอัด",
+      name: "บีบอัดภาพ",
       description: "ลดขนาดไฟล์ตามคุณภาพหรือขนาดเป้าหมาย",
     },
     "optimize-for-web": {
@@ -544,11 +544,11 @@ export const th: TranslationKeys = {
       description: "เพิ่มประสิทธิภาพภาพสำหรับเว็บด้วยการแปลงรูปแบบ ควบคุมคุณภาพ และแสดงตัวอย่างแบบสด",
     },
     "strip-metadata": {
-      name: "ลบข้อมูลเมตา",
+      name: "ลบข้อมูลเมตาของภาพ",
       description: "ลบ EXIF, GPS และข้อมูลกล้อง",
     },
     "edit-metadata": {
-      name: "แก้ไขข้อมูลเมตา",
+      name: "แก้ไขข้อมูลเมตาของภาพ",
       description: "แก้ไข EXIF, IPTC, XMP, GPS, คำสำคัญ และวันที่",
     },
     "bulk-rename": {
@@ -572,7 +572,7 @@ export const th: TranslationKeys = {
       description: "ความสว่าง คอนทราสต์ ค่าแสง ความอิ่มตัวของสี อุณหภูมิสี ความคมชัด และเอฟเฟกต์",
     },
     sharpening: {
-      name: "เพิ่มความคมชัด",
+      name: "เพิ่มความคมชัดของภาพ",
       description: "เพิ่มความคมชัดแบบปรับตัว อันชาร์ปมาสก์ และไฮพาสพร้อมพรีเซ็ต",
     },
     "replace-color": {
@@ -604,7 +604,7 @@ export const th: TranslationKeys = {
       description: "แยกข้อความจากเอกสาร PDF ด้วย OCR ที่ขับเคลื่อนด้วย AI",
     },
     "blur-faces": {
-      name: "เบลอใบหน้า / ข้อมูลส่วนตัว",
+      name: "เบลอใบหน้าและข้อมูลส่วนตัว",
       description: "ตรวจจับอัตโนมัติและเบลอใบหน้าและข้อมูลที่ละเอียดอ่อน",
     },
     "enhance-faces": {
@@ -717,11 +717,11 @@ export const th: TranslationKeys = {
       description: "สแกนภาพเพื่อหาคิวอาร์โค้ด บาร์โค้ด และโค้ด 2D",
     },
     collage: {
-      name: "คอลลาจ / กริด",
+      name: "คอลลาจและกริด",
       description: "รวมภาพเป็นคอลลาจกริดสวยงามด้วยเทมเพลตกว่า 25 แบบ",
     },
     stitch: {
-      name: "ต่อภาพ / รวมภาพ",
+      name: "ต่อและรวมภาพ",
       description: "ต่อภาพเรียงข้าง ซ้อนกัน หรือเป็นกริด",
     },
     split: {
@@ -846,7 +846,7 @@ export const th: TranslationKeys = {
       description: "เล่นคลิปวิดีโอย้อนกลับ",
     },
     "video-loudnorm": {
-      name: "นอร์มอลไลซ์เสียง",
+      name: "นอร์มอลไลซ์เสียงวิดีโอ",
       description: "ปรับระดับเสียงวิดีโอให้ได้มาตรฐานการออกอากาศ",
     },
     "aspect-pad": {
@@ -1042,7 +1042,7 @@ export const th: TranslationKeys = {
       description: "แปลงสีทั้งหมดเป็นโทนสีเทา",
     },
     "pdfa-convert": {
-      name: "แปลงเป็น PDF/A",
+      name: "ตัวแปลง PDF/A",
       description: "แปลงเป็น PDF/A-2 สำหรับจัดเก็บถาวร",
     },
     "crop-pdf": {
@@ -1050,7 +1050,7 @@ export const th: TranslationKeys = {
       description: "ครอปทุกหน้าด้วยขอบเท่ากัน",
     },
     "nup-pdf": {
-      name: "PDF หลายหน้าต่อแผ่น",
+      name: "หน้าต่อแผ่น (N-up)",
       description: "จัดวางหลายหน้าในแผ่นเดียว",
     },
     "booklet-pdf": {
@@ -1106,7 +1106,7 @@ export const th: TranslationKeys = {
       description: "แปลงไฟล์ Markdown เป็น PDF ที่จัดรูปแบบแล้ว ทรัพยากรภายนอกถูกปิดเพื่อความเป็นส่วนตัว",
     },
     "epub-convert": {
-      name: "แปลง EPUB",
+      name: "แปลงจาก EPUB",
       description: "แปลง EPUB เป็น PDF, DOCX, HTML หรือ Markdown ทรัพยากรภายนอกในหนังสือจะไม่ถูกดึงมา",
     },
     "to-epub": {
@@ -1134,7 +1134,7 @@ export const th: TranslationKeys = {
       description: "รวมไฟล์ CSV หรือ TSV หลายไฟล์ที่มีคอลัมน์ตรงกันเป็นไฟล์เดียว",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "แปลง YAML / JSON",
       description: "แปลงระหว่าง YAML และ JSON ทั้งสองทิศทาง",
     },
     "xml-to-csv": {

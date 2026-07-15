@@ -522,23 +522,23 @@ export const tr: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Boyutlandır",
+      name: "Görüntü Boyutlandır",
       description: "Piksel, yüzde veya sosyal medya şablonlarıyla boyutlandırın",
     },
     crop: {
-      name: "Kırp",
+      name: "Görüntü Kırp",
       description: "Serbest kırpma, en-boy oranı şablonları, şekil kırpma",
     },
     rotate: {
-      name: "Döndür ve Çevir",
+      name: "Görüntü Döndür ve Çevir",
       description: "Görüntüleri döndürün, çevirin ve düzeltin",
     },
     convert: {
-      name: "Dönüştür",
+      name: "Görüntü Dönüştür",
       description: "Görüntü biçimleri arasında dönüştürme",
     },
     compress: {
-      name: "Sıkıştır",
+      name: "Görüntü Sıkıştır",
       description: "Kalite veya hedef boyuta göre dosya boyutunu küçültün",
     },
     "optimize-for-web": {
@@ -547,11 +547,11 @@ export const tr: TranslationKeys = {
         "Biçim dönüştürme, kalite kontrolü ve canlı önizleme ile web için görüntü optimizasyonu",
     },
     "strip-metadata": {
-      name: "Meta Veri Kaldır",
+      name: "Görüntü Meta Verisi Kaldır",
       description: "EXIF, GPS ve kamera bilgilerini kaldırın",
     },
     "edit-metadata": {
-      name: "Meta Veri Düzenle",
+      name: "Görüntü Meta Verisi Düzenle",
       description: "EXIF, IPTC, XMP, GPS, anahtar kelimeler ve tarihleri düzenleyin",
     },
     "bulk-rename": {
@@ -575,7 +575,7 @@ export const tr: TranslationKeys = {
       description: "Parlaklık, kontrast, pozlama, doygunluk, sıcaklık, keskinlik ve efektler",
     },
     sharpening: {
-      name: "Keskinleştirme",
+      name: "Görüntü Keskinleştir",
       description: "Uyarlanabilir, unsharp mask ve yüksek geçiş keskinleştirme; şablonlarla",
     },
     "replace-color": {
@@ -607,7 +607,7 @@ export const tr: TranslationKeys = {
       description: "AI destekli OCR ile PDF belgelerinden metin çıkarma",
     },
     "blur-faces": {
-      name: "Yüz / Kişisel Bilgi Bulanıklaştırma",
+      name: "Yüzleri ve Kişisel Bilgileri Bulanıklaştır",
       description: "Yüzleri ve hassas bilgileri otomatik algılayıp bulanıklaştırın",
     },
     "enhance-faces": {
@@ -723,15 +723,15 @@ export const tr: TranslationKeys = {
       description: "Görüntülerde QR kodu, barkod ve 2D kodları tarayın",
     },
     collage: {
-      name: "Kolaj / Izgara",
+      name: "Kolaj ve Izgara",
       description: "25+ şablonla görüntüleri güzel ızgara kolajlarda birleştirin",
     },
     stitch: {
-      name: "Birleştir / Ekle",
+      name: "Görüntüleri Birleştir",
       description: "Görüntüleri yan yana, üst üste veya ızgara olarak birleştirin",
     },
     split: {
-      name: "Görüntü Bölme",
+      name: "Görüntü Böl",
       description:
         "Canlı önizleme ile görüntüleri ızgara karelerine veya piksel boyutuna göre bölün",
     },
@@ -857,7 +857,7 @@ export const tr: TranslationKeys = {
       description: "Bir video klibi geriye doğru oynat",
     },
     "video-loudnorm": {
-      name: "Ses Normalleştirme",
+      name: "Video Sesini Normalleştir",
       description: "Video ses seviyesini yayın standardına normalleştir",
     },
     "aspect-pad": {
@@ -929,7 +929,7 @@ export const tr: TranslationKeys = {
       description: "Videodan ses parçasını çıkar",
     },
     "volume-adjust": {
-      name: "Ses Seviyesi Ayarla",
+      name: "Ses Seviyesini Ayarla",
       description: "Ses seviyesini sabit kazançla artır veya azalt",
     },
     "normalize-audio": {
@@ -1055,7 +1055,7 @@ export const tr: TranslationKeys = {
       description: "Tüm renkleri gri tonlamaya dönüştür",
     },
     "pdfa-convert": {
-      name: "PDF/A Dönüştür",
+      name: "PDF/A Dönüştürücü",
       description: "Arşiv formatı PDF/A-2'ye dönüştür",
     },
     "crop-pdf": {
@@ -1063,7 +1063,7 @@ export const tr: TranslationKeys = {
       description: "Tüm sayfaları tek tip kenar boşluğuyla kırp",
     },
     "nup-pdf": {
-      name: "Yaprak Başına Çok Sayfa (N-up)",
+      name: "Yaprak Başına Sayfa (N-up)",
       description: "Tek sayfaya birden fazla sayfa yerleştir",
     },
     "booklet-pdf": {
@@ -1121,7 +1121,7 @@ export const tr: TranslationKeys = {
         "Markdown dosyasını stillenmiş PDF'e dönüştür. Gizlilik için uzak kaynaklar devre dışıdır.",
     },
     "epub-convert": {
-      name: "EPUB Dönüştür",
+      name: "EPUB'dan Dönüştür",
       description:
         "EPUB'u PDF, DOCX, HTML veya Markdown'a dönüştür. Kitaptaki uzak kaynaklar getirilmez.",
     },
@@ -1150,7 +1150,7 @@ export const tr: TranslationKeys = {
       description: "Eşleşen sütunlara sahip birden fazla CSV veya TSV dosyasını birleştir",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "YAML / JSON Dönüştür",
       description: "YAML ile JSON arasında çift yönlü dönüştürme yap",
     },
     "xml-to-csv": {

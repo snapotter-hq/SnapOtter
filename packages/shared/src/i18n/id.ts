@@ -522,23 +522,23 @@ export const id: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Ubah Ukuran",
+      name: "Ubah Ukuran Gambar",
       description: "Ubah ukuran berdasarkan piksel, persentase, atau preset media sosial",
     },
     crop: {
-      name: "Potong",
+      name: "Potong Gambar",
       description: "Potong bebas, preset rasio aspek, potong bentuk",
     },
     rotate: {
-      name: "Putar & Balik",
+      name: "Putar & Balik Gambar",
       description: "Putar, balik, dan luruskan gambar",
     },
     convert: {
-      name: "Konversi",
+      name: "Konversi Gambar",
       description: "Konversi antar format gambar",
     },
     compress: {
-      name: "Kompres",
+      name: "Kompres Gambar",
       description: "Kurangi ukuran file berdasarkan kualitas atau ukuran target",
     },
     "optimize-for-web": {
@@ -547,11 +547,11 @@ export const id: TranslationKeys = {
         "Optimasi gambar untuk web dengan konversi format, kontrol kualitas, dan pratinjau langsung",
     },
     "strip-metadata": {
-      name: "Hapus Metadata",
+      name: "Hapus Metadata Gambar",
       description: "Hapus EXIF, GPS, dan info kamera",
     },
     "edit-metadata": {
-      name: "Sunting Metadata",
+      name: "Sunting Metadata Gambar",
       description: "Edit EXIF, IPTC, XMP, GPS, kata kunci, dan tanggal",
     },
     "bulk-rename": {
@@ -575,7 +575,7 @@ export const id: TranslationKeys = {
       description: "Kecerahan, kontras, eksposur, saturasi, suhu warna, ketajaman, dan efek",
     },
     sharpening: {
-      name: "Pertajam",
+      name: "Pertajam Gambar",
       description: "Pertajam adaptif, unsharp mask, dan pertajam high-pass dengan preset",
     },
     "replace-color": {
@@ -607,7 +607,7 @@ export const id: TranslationKeys = {
       description: "Ekstrak teks dari dokumen PDF menggunakan OCR bertenaga AI",
     },
     "blur-faces": {
-      name: "Blur Wajah / Info Pribadi",
+      name: "Blur Wajah & Info Pribadi",
       description: "Deteksi otomatis dan blur wajah serta informasi sensitif",
     },
     "enhance-faces": {
@@ -722,11 +722,11 @@ export const id: TranslationKeys = {
       description: "Pindai gambar untuk kode QR, barcode, dan kode 2D",
     },
     collage: {
-      name: "Kolase / Grid",
+      name: "Kolase & Grid",
       description: "Gabungkan gambar menjadi kolase grid yang indah dengan 25+ template",
     },
     stitch: {
-      name: "Jahit / Gabungkan",
+      name: "Gabungkan Gambar",
       description: "Gabungkan gambar secara berdampingan, bertumpuk, atau dalam grid",
     },
     split: {
@@ -856,7 +856,7 @@ export const id: TranslationKeys = {
       description: "Putar klip video secara terbalik",
     },
     "video-loudnorm": {
-      name: "Normalisasi Audio",
+      name: "Normalisasi Audio Video",
       description: "Normalisasi volume audio video ke standar siaran",
     },
     "aspect-pad": {
@@ -1053,7 +1053,7 @@ export const id: TranslationKeys = {
       description: "Konversi semua warna ke grayscale",
     },
     "pdfa-convert": {
-      name: "Konversi PDF/A",
+      name: "Konverter PDF/A",
       description: "Konversi ke format arsip PDF/A-2",
     },
     "crop-pdf": {
@@ -1061,7 +1061,7 @@ export const id: TranslationKeys = {
       description: "Potong semua halaman dengan margin seragam",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Halaman Per Lembar (N-up)",
       description: "Tata beberapa halaman per lembar",
     },
     "booklet-pdf": {
@@ -1119,7 +1119,7 @@ export const id: TranslationKeys = {
         "Konversi file Markdown menjadi PDF bergaya. Sumber daya jarak jauh dinonaktifkan demi privasi.",
     },
     "epub-convert": {
-      name: "Konversi EPUB",
+      name: "Konversi dari EPUB",
       description:
         "Konversi EPUB ke PDF, DOCX, HTML, atau Markdown. Sumber daya jarak jauh di dalam buku tidak diambil.",
     },
@@ -1148,7 +1148,7 @@ export const id: TranslationKeys = {
       description: "Gabungkan beberapa file CSV atau TSV dengan kolom yang cocok menjadi satu",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Konversi YAML / JSON",
       description: "Konversi antara YAML dan JSON, dua arah",
     },
     "xml-to-csv": {

@@ -520,23 +520,23 @@ export const ar: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "تغيير الحجم",
+      name: "تغيير حجم الصورة",
       description: "تغيير الحجم بالبكسل أو النسبة المئوية أو قوالب وسائل التواصل",
     },
     crop: {
-      name: "قص",
+      name: "اقتصاص الصورة",
       description: "قص حر، قوالب نسب أبعاد، قص بأشكال",
     },
     rotate: {
-      name: "تدوير وعكس",
+      name: "تدوير وعكس الصورة",
       description: "تدوير الصور وعكسها وتعديل استقامتها",
     },
     convert: {
-      name: "تحويل",
+      name: "تحويل الصورة",
       description: "التحويل بين صيغ الصور",
     },
     compress: {
-      name: "ضغط",
+      name: "ضغط الصورة",
       description: "تقليل حجم الملف حسب الجودة أو الحجم المستهدف",
     },
     "optimize-for-web": {
@@ -544,11 +544,11 @@ export const ar: TranslationKeys = {
       description: "تحسين الصور للويب مع تحويل الصيغة والتحكم بالجودة والمعاينة المباشرة",
     },
     "strip-metadata": {
-      name: "إزالة البيانات الوصفية",
+      name: "إزالة البيانات الوصفية للصورة",
       description: "إزالة بيانات EXIF و GPS ومعلومات الكاميرا",
     },
     "edit-metadata": {
-      name: "تعديل البيانات الوصفية",
+      name: "تعديل البيانات الوصفية للصورة",
       description: "تعديل بيانات EXIF و IPTC و XMP و GPS والكلمات المفتاحية والتواريخ",
     },
     "bulk-rename": {
@@ -572,7 +572,7 @@ export const ar: TranslationKeys = {
       description: "السطوع والتباين والتعريض والتشبع ودرجة الحرارة والحدة والتأثيرات",
     },
     sharpening: {
-      name: "زيادة الحدة",
+      name: "زيادة حدة الصورة",
       description: "حدة تكيفية وقناع إخفاء الحدة والحدة العالية مع قوالب جاهزة",
     },
     "replace-color": {
@@ -604,7 +604,7 @@ export const ar: TranslationKeys = {
       description: "استخراج النصوص من مستندات PDF باستخدام OCR مدعوم بـ AI",
     },
     "blur-faces": {
-      name: "تمويه الوجوه / المعلومات الحساسة",
+      name: "تمويه الوجوه والمعلومات الحساسة",
       description: "اكتشاف تلقائي وتمويه الوجوه والمعلومات الحساسة",
     },
     "enhance-faces": {
@@ -718,15 +718,15 @@ export const ar: TranslationKeys = {
       description: "مسح الصور بحثًا عن رموز QR والباركود والرموز ثنائية الأبعاد",
     },
     collage: {
-      name: "صورة مجمّعة / شبكة",
+      name: "صورة مجمّعة وشبكة",
       description: "دمج الصور في شبكات مجمّعة جميلة مع أكثر من 25 قالبًا",
     },
     stitch: {
-      name: "دمج / تجميع",
+      name: "دمج الصور وتجميعها",
       description: "ربط الصور جنبًا إلى جنب أو فوق بعضها أو في شبكة",
     },
     split: {
-      name: "تقسيم الصور",
+      name: "تقسيم الصورة",
       description: "تقسيم الصور إلى مربعات شبكية أو حسب حجم البكسل مع معاينة مباشرة",
     },
     border: {
@@ -848,7 +848,7 @@ export const ar: TranslationKeys = {
       description: "تشغيل مقطع الفيديو بالعكس",
     },
     "video-loudnorm": {
-      name: "تسوية الصوت",
+      name: "تسوية صوت الفيديو",
       description: "تسوية مستوى صوت الفيديو وفق معيار البث",
     },
     "aspect-pad": {
@@ -1045,7 +1045,7 @@ export const ar: TranslationKeys = {
       description: "تحويل جميع الألوان إلى تدرج رمادي",
     },
     "pdfa-convert": {
-      name: "تحويل PDF/A",
+      name: "محوّل PDF/A",
       description: "التحويل إلى صيغة الأرشفة PDF/A-2",
     },
     "crop-pdf": {
@@ -1053,7 +1053,7 @@ export const ar: TranslationKeys = {
       description: "اقتصاص جميع الصفحات بهامش موحد",
     },
     "nup-pdf": {
-      name: "تجميع صفحات PDF",
+      name: "صفحات لكل ورقة (N-up)",
       description: "ترتيب عدة صفحات في ورقة واحدة",
     },
     "booklet-pdf": {
@@ -1110,7 +1110,7 @@ export const ar: TranslationKeys = {
       description: "تحويل ملف Markdown إلى PDF منسّق. الموارد الخارجية معطّلة لحماية الخصوصية.",
     },
     "epub-convert": {
-      name: "تحويل EPUB",
+      name: "التحويل من EPUB",
       description:
         "تحويل EPUB إلى PDF أو DOCX أو HTML أو Markdown. الموارد الخارجية داخل الكتاب لا يتم جلبها.",
     },
@@ -1139,7 +1139,7 @@ export const ar: TranslationKeys = {
       description: "دمج ملفات CSV أو TSV متعددة ذات أعمدة متطابقة في ملف واحد",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "تحويل YAML / JSON",
       description: "التحويل بين YAML وJSON في الاتجاهين",
     },
     "xml-to-csv": {

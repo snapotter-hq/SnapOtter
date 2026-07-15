@@ -522,20 +522,20 @@ export const uk: TranslationKeys = {
     },
     // END conversion-presets
     resize: {
-      name: "Зміна розміру",
+      name: "Зміна розміру зображення",
       description: "Зміна розміру в пікселях, відсотках або за шаблонами соцмереж",
     },
     crop: {
-      name: "Обрізка",
+      name: "Обрізка зображення",
       description: "Довільна обрізка, шаблони пропорцій, фігурна обрізка",
     },
     rotate: {
-      name: "Обертання та відображення",
+      name: "Обертання та відображення зображення",
       description: "Обертання, відображення та вирівнювання зображень",
     },
-    convert: { name: "Конвертація", description: "Конвертація між форматами зображень" },
+    convert: { name: "Конвертація зображення", description: "Конвертація між форматами зображень" },
     compress: {
-      name: "Стиснення",
+      name: "Стиснення зображення",
       description: "Зменшення розміру файлу за якістю або цільовим розміром",
     },
     "optimize-for-web": {
@@ -544,11 +544,11 @@ export const uk: TranslationKeys = {
         "Оптимізація зображень для вебу з конвертацією формату, контролем якості та попереднім переглядом",
     },
     "strip-metadata": {
-      name: "Видалення метаданих",
+      name: "Видалення метаданих зображення",
       description: "Видалення EXIF, GPS та інформації про камеру",
     },
     "edit-metadata": {
-      name: "Редагування метаданих",
+      name: "Редагування метаданих зображення",
       description: "Редагування EXIF, IPTC, XMP, GPS, ключових слів і дат",
     },
     "bulk-rename": {
@@ -573,7 +573,7 @@ export const uk: TranslationKeys = {
         "Яскравість, контрастність, експозиція, насиченість, температура, різкість та ефекти",
     },
     sharpening: {
-      name: "Підвищення різкості",
+      name: "Підвищення різкості зображення",
       description: "Адаптивна, маска нерізкості та високочастотна різкість із шаблонами",
     },
     "replace-color": {
@@ -605,7 +605,7 @@ export const uk: TranslationKeys = {
       description: "Витягування тексту з PDF-документiв за допомогою OCR на базi ШI",
     },
     "blur-faces": {
-      name: "Розмиття облич / ПД",
+      name: "Розмиття облич та ПД",
       description: "Автоматичне виявлення та розмиття облич і конфіденційних даних",
     },
     "enhance-faces": {
@@ -722,11 +722,11 @@ export const uk: TranslationKeys = {
       description: "Сканування зображень на наявність QR-кодів, штрихкодів та 2D-кодів",
     },
     collage: {
-      name: "Колаж / Сітка",
+      name: "Колаж та сітка",
       description: "Об'єднання зображень у красиві колажі-сітки з 25+ шаблонами",
     },
     stitch: {
-      name: "Об'єднання / Склейка",
+      name: "Склейка зображень",
       description: "З'єднання зображень поруч, стопкою або сіткою",
     },
     split: {
@@ -857,7 +857,7 @@ export const uk: TranslationKeys = {
       description: "Відтворити відеокліп у зворотному порядку",
     },
     "video-loudnorm": {
-      name: "Нормалізація звуку",
+      name: "Нормалізація звуку відео",
       description: "Нормалізувати гучність аудіо відео до ефірного стандарту",
     },
     "aspect-pad": {
@@ -1055,7 +1055,7 @@ export const uk: TranslationKeys = {
       description: "Перетворити всі кольори на відтінки сірого",
     },
     "pdfa-convert": {
-      name: "Конвертація у PDF/A",
+      name: "Конвертер PDF/A",
       description: "Конвертувати в архівний формат PDF/A-2",
     },
     "crop-pdf": {
@@ -1063,7 +1063,7 @@ export const uk: TranslationKeys = {
       description: "Обрізати всі сторінки з однаковими полями",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Сторінок на аркуш (N-up)",
       description: "Розмістити кілька сторінок на одному аркуші",
     },
     "booklet-pdf": {
@@ -1121,7 +1121,7 @@ export const uk: TranslationKeys = {
         "Конвертувати файл Markdown у стилізований PDF. Зовнішні ресурси вимкнені для конфіденційності.",
     },
     "epub-convert": {
-      name: "Конвертація EPUB",
+      name: "Конвертація з EPUB",
       description:
         "Конвертувати EPUB у PDF, DOCX, HTML або Markdown. Зовнішні ресурси книги не завантажуються.",
     },
@@ -1150,7 +1150,7 @@ export const uk: TranslationKeys = {
       description: "Об'єднати кілька файлів CSV або TSV з відповідними стовпцями в один",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Конвертація YAML / JSON",
       description: "Конвертувати між YAML та JSON в обох напрямках",
     },
     "xml-to-csv": {
