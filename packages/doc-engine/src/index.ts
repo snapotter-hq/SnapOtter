@@ -10,7 +10,7 @@ export {
 } from "./binaries.js";
 export {
   gsCompressPdf,
-  gsCompressPdfQuality,
+  gsCompressPdfTuned,
   gsGrayscalePdf,
   gsPdfaConvert,
   type PdfCompressionPreset,

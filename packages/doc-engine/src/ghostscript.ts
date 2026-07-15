@@ -56,18 +56,26 @@ export async function gsCompressPdf(
 }
 
 /**
- * Image-downsampling compression at a target resolution (DPI). Lower DPI
- * yields a smaller file; image resolution is the dominant size lever for
- * PDFs. Uses /ebook as a base for sensible JPEG defaults, then overrides the
- * image resolutions. The compress-pdf tool maps a quality slider (and a
- * target-size binary search) onto this DPI.
+ * Image compression at a target resolution (DPI) and JPEG quality (QFactor).
+ * Both are size levers for PDFs: lower DPI and higher QFactor each yield a
+ * smaller file, and output size is monotonic in both. Forces re-encode of image
+ * streams so QFactor actually applies: Ghostscript otherwise passes already-JPEG
+ * images through untouched (PassThroughJPEGImages defaults true), which makes the
+ * quality lever a no-op on scans. The compress-pdf tool maps a single quality
+ * axis (and a target-size binary search) onto this (dpi, qFactor) pair.
  */
-export async function gsCompressPdfQuality(
+export async function gsCompressPdfTuned(
   inputPath: string,
   outPath: string,
   dpi: number,
+  qFactor: number,
 ): Promise<void> {
   const res = Math.max(9, Math.min(600, Math.round(dpi)));
+  const qf = Math.max(0.05, Math.min(4, qFactor));
+  // 2x2 chroma subsampling ([2 1 1 2]) keeps photo output small and predictable.
+  const dict =
+    `<< /ColorImageDict << /QFactor ${qf} /Blend 1 /HSamples [2 1 1 2] /VSamples [2 1 1 2] >>` +
+    ` /GrayImageDict << /QFactor ${qf} /Blend 1 >> >> setdistillerparams`;
   await runGs([
     "-dSAFER",
     "-dBATCH",
@@ -75,7 +83,6 @@ export async function gsCompressPdfQuality(
     "-dQUIET",
     "-sDEVICE=pdfwrite",
     "-dCompatibilityLevel=1.6",
-    "-dPDFSETTINGS=/ebook",
     "-dDownsampleColorImages=true",
     "-dColorImageDownsampleType=/Average",
     `-dColorImageResolution=${res}`,
@@ -85,7 +92,15 @@ export async function gsCompressPdfQuality(
     "-dDownsampleMonoImages=true",
     "-dMonoImageDownsampleType=/Subsample",
     `-dMonoImageResolution=${Math.min(600, res * 4)}`,
+    "-dAutoFilterColorImages=false",
+    "-dColorImageFilter=/DCTEncode",
+    "-dAutoFilterGrayImages=false",
+    "-dGrayImageFilter=/DCTEncode",
+    "-dPassThroughJPEGImages=false",
     `-sOutputFile=${outPath}`,
+    "-c",
+    dict,
+    "-f",
     inputPath,
   ]);
 }

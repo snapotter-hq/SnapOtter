@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   gsAvailable,
   gsCompressPdf,
+  gsCompressPdfTuned,
   gsGrayscalePdf,
   gsPdfaConvert,
   qpdfAvailable,
@@ -167,6 +168,23 @@ describe.skipIf(!gsAvailable())("doc-engine ghostscript compress (requires gs)",
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("gsCompressPdfTuned: lower quality (higher QFactor) yields a smaller file at fixed DPI", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
+    try {
+      const best = join(dir, "tuned-best.pdf");
+      const worst = join(dir, "tuned-worst.pdf");
+      // Image-heavy scan: QFactor only bites because the primitive forces re-encode.
+      await gsCompressPdfTuned(fixtures.document.pdfScanned, best, 150, 0.1);
+      await gsCompressPdfTuned(fixtures.document.pdfScanned, worst, 150, 2.0);
+      const bestBytes = await readFile(best);
+      const worstBytes = await readFile(worst);
+      expect(worstBytes.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(worstBytes.length).toBeLessThan(bestBytes.length);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   it("converts to grayscale (valid pdf out)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pdf-ops-"));
