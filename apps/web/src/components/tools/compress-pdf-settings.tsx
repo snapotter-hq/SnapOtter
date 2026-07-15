@@ -10,8 +10,15 @@ export function CompressPdfSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["compress-pdf"];
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, progress } =
-    useToolProcessor("compress-pdf");
+  const {
+    processFiles,
+    processAllFiles,
+    processing,
+    error,
+    progress,
+    resultPayload,
+    processedSize,
+  } = useToolProcessor("compress-pdf");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   const hasFile = files.length > 0;
@@ -20,6 +27,12 @@ export function CompressPdfSettings() {
   const canProcess =
     settings.mode === "quality" ||
     (settings.mode === "targetSize" && Number(settings.targetSizeKb) > 0);
+
+  // Honest reporting for target-size mode: whether we actually hit the ceiling.
+  const targetMet = resultPayload?.targetMet as boolean | undefined;
+  const targetKb = resultPayload?.targetKb as number | undefined;
+  const targetLabel = targetKb != null ? `${Math.round(targetKb)} KB` : "";
+  const achievedLabel = processedSize != null ? `${Math.round(processedSize / 1024)} KB` : "";
 
   const handleProcess = () => {
     if (hasMultiple) {
@@ -34,7 +47,22 @@ export function CompressPdfSettings() {
       {/* Same quality / target-size controls as the image compress tool */}
       <CompressControls onChange={setSettings} />
 
+      {settings.mode === "targetSize" && (
+        <p className="text-[11px] text-muted-foreground">{s.bestEffortHint}</p>
+      )}
+
       {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {targetMet === false && (
+        <p className="text-xs text-amber-600">
+          {format(s.targetMissed, { target: targetLabel, size: achievedLabel })}
+        </p>
+      )}
+      {targetMet === true && (
+        <p className="text-xs text-green-600">
+          {format(s.targetReached, { target: targetLabel, size: achievedLabel })}
+        </p>
+      )}
 
       {processing ? (
         <ProgressCard
