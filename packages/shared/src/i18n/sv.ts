@@ -2651,6 +2651,11 @@ export const sv: TranslationKeys = {
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
       progressLabel: "Komprimerar",
+      bestEffortHint:
+        "Bästa möjliga maximum. Bildbaserade PDF:er kommer nära; PDF:er med enbart text krymper kanske inte till denna storlek.",
+      targetReached: "Målet på {target} uppnåddes (resultat: {size}).",
+      targetMissed:
+        "Kunde inte nå {target}. Minsta möjliga storlek var {size} eftersom denna PDF mestadels består av text eller vektorer, som bildkomprimering inte kan krympa.",
     },
     "rotate-pdf": {
       angle: "Rotationsvinkel",

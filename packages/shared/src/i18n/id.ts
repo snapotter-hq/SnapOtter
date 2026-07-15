@@ -2652,6 +2652,11 @@ export const id: TranslationKeys = {
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
       progressLabel: "Mengompres",
+      bestEffortHint:
+        "Maksimum sebisa mungkin. PDF berbasis gambar mendekati ukuran ini; PDF berisi teks saja mungkin tidak menyusut ke ukuran ini.",
+      targetReached: "Target {target} tercapai (hasil: {size}).",
+      targetMissed:
+        "Tidak dapat mencapai {target}. Ukuran terkecil yang bisa dicapai adalah {size} karena PDF ini sebagian besar berupa teks atau vektor, yang tidak dapat diperkecil oleh kompresi gambar.",
     },
     "rotate-pdf": {
       angle: "Sudut rotasi",

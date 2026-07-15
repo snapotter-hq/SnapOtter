@@ -2669,6 +2669,11 @@ export const fr: TranslationKeys = {
       submit: "Compresser",
       submitBatch: "Compresser ({count} fichiers)",
       progressLabel: "Compression",
+      bestEffortHint:
+        "Maximum au mieux. Les PDF composés d'images s'en approchent ; les PDF uniquement texte peuvent ne pas atteindre cette taille.",
+      targetReached: "Objectif de {target} atteint (résultat : {size}).",
+      targetMissed:
+        "Impossible d'atteindre {target}. La plus petite taille possible était {size}, car ce PDF est principalement composé de texte ou de vecteurs, que la compression d'images ne peut pas réduire.",
     },
     "rotate-pdf": {
       angle: "Angle de rotation",

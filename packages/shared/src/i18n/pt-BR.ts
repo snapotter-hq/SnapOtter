@@ -2654,6 +2654,11 @@ export const ptBR: TranslationKeys = {
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} arquivos)",
       progressLabel: "Comprimindo",
+      bestEffortHint:
+        "Máximo possível. PDFs baseados em imagens chegam perto; PDFs somente com texto podem não reduzir para este tamanho.",
+      targetReached: "Alvo de {target} atingido (resultado: {size}).",
+      targetMissed:
+        "Não foi possível atingir {target}. O menor tamanho possível foi {size} porque este PDF é composto principalmente de texto ou vetores, que a compressão de imagem não consegue reduzir.",
     },
     "rotate-pdf": {
       angle: "Ângulo de rotação",

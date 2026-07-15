@@ -2612,6 +2612,11 @@ export const ja: TranslationKeys = {
       submit: "圧縮",
       submitBatch: "圧縮 ({count}ファイル)",
       progressLabel: "圧縮中",
+      bestEffortHint:
+        "可能な限りの上限です。画像ベースのPDFはこのサイズに近づきますが、テキストのみのPDFはこのサイズまで縮小できない場合があります。",
+      targetReached: "目標の{target}に到達しました（結果: {size}）。",
+      targetMissed:
+        "{target}に到達できませんでした。このPDFは主にテキストまたはベクターで構成されており、画像圧縮では縮小できないため、達成できた最小サイズは{size}でした。",
     },
     "rotate-pdf": {
       angle: "回転角度",

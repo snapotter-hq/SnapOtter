@@ -2411,6 +2411,11 @@ export const zhCN: TranslationKeys = {
       submit: "压缩",
       submitBatch: "压缩（{count} 个文件）",
       progressLabel: "正在压缩",
+      bestEffortHint:
+        "尽力压缩的上限。基于图像的 PDF 会接近该大小；纯文本 PDF 可能无法缩小到此大小。",
+      targetReached: "已达到你设定的 {target} 目标（结果：{size}）。",
+      targetMissed:
+        "无法达到 {target}。可实现的最小体积为 {size}，因为此 PDF 主要由文本或矢量图形组成，图像压缩无法将其缩小。",
     },
     "rotate-pdf": {
       angle: "旋转角度",

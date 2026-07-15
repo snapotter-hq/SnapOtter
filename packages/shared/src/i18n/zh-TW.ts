@@ -2411,6 +2411,11 @@ export const zhTW: TranslationKeys = {
       submit: "壓縮",
       submitBatch: "壓縮（{count} 個檔案）",
       progressLabel: "正在壓縮",
+      bestEffortHint:
+        "盡力壓縮的上限。以影像為主的 PDF 會接近此大小；純文字 PDF 可能無法縮小到此大小。",
+      targetReached: "已達到你設定的 {target} 目標（結果：{size}）。",
+      targetMissed:
+        "無法達到 {target}。可達成的最小大小為 {size}，因為此 PDF 主要由文字或向量圖形組成，影像壓縮無法將其縮小。",
     },
     "rotate-pdf": {
       angle: "旋轉角度",

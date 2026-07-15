@@ -2639,6 +2639,11 @@ export const ar: TranslationKeys = {
       submit: "ضغط",
       submitBatch: "ضغط ({count} ملفات)",
       progressLabel: "جارٍ الضغط",
+      bestEffortHint:
+        "الحد الأقصى قدر الإمكان. ملفات PDF المستندة إلى الصور تقترب من هذا الحجم؛ أما ملفات PDF النصية فقد لا تنكمش إلى هذا الحجم.",
+      targetReached: "تم الوصول إلى الحجم المستهدف {target} (النتيجة: {size}).",
+      targetMissed:
+        "تعذّر الوصول إلى {target}. أصغر حجم يمكن تحقيقه هو {size} لأن ملف PDF هذا يتكوّن في الغالب من نصوص أو رسومات متجهة لا يمكن لضغط الصور تصغيرها.",
     },
     "rotate-pdf": {
       angle: "زاوية التدوير",

@@ -2656,6 +2656,11 @@ export const pl: TranslationKeys = {
       submit: "Kompresuj",
       submitBatch: "Kompresuj ({count} plików)",
       progressLabel: "Kompresja",
+      bestEffortHint:
+        "Maksimum w miarę możliwości. Pliki PDF oparte na obrazach zbliżają się do tego rozmiaru; pliki PDF zawierające tylko tekst mogą się do niego nie zmniejszyć.",
+      targetReached: "Osiągnięto docelowy rozmiar {target} (wynik: {size}).",
+      targetMissed:
+        "Nie udało się osiągnąć {target}. Najmniejszy możliwy rozmiar to {size}, ponieważ ten plik PDF składa się głównie z tekstu lub wektorów, których kompresja obrazu nie może zmniejszyć.",
     },
     "rotate-pdf": {
       angle: "Kąt obrotu",

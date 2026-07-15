@@ -2592,6 +2592,11 @@ export const ko: TranslationKeys = {
       submit: "압축",
       submitBatch: "압축 ({count}개 파일)",
       progressLabel: "압축 중",
+      bestEffortHint:
+        "최대한 노력한 최대치입니다. 이미지 기반 PDF는 이 크기에 가깝게 도달하지만, 텍스트 전용 PDF는 이 크기까지 줄어들지 않을 수 있습니다.",
+      targetReached: "목표 {target}에 도달했습니다(결과: {size}).",
+      targetMissed:
+        "{target}에 도달할 수 없습니다. 이 PDF는 대부분 텍스트나 벡터로 이루어져 있어 이미지 압축으로 줄일 수 없으므로, 달성 가능한 최소 크기는 {size}였습니다.",
     },
     "rotate-pdf": {
       angle: "회전 각도",
