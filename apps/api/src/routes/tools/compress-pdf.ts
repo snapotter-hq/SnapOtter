@@ -1,14 +1,15 @@
 import { copyFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { gsCompressPdfQuality } from "@snapotter/doc-engine";
+import { gsCompressPdfTuned } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
 
 // Mirrors the image "compress" tool: compress by a quality slider or to a
-// target file size. For PDFs the size lever is image downsampling resolution
-// (DPI), so quality 1..100 maps onto a DPI range and target-size binary-
-// searches that DPI.
+// target file size. Both size levers (image DPI and JPEG quality) are folded
+// into one monotonic quality axis (paramsForQuality). Quality mode runs one
+// pass at the slider value; target-size binary-searches the axis for the
+// largest output that still fits the target.
 const settingsSchema = z.object({
   mode: z.enum(["quality", "targetSize"]).default("quality"),
   quality: z.number().int().min(1).max(100).optional(),
@@ -17,7 +18,6 @@ const settingsSchema = z.object({
 
 const MIN_DPI = 20;
 const MAX_DPI = 300;
-const qualityToDpi = (q: number) => Math.round(MIN_DPI + ((q - 1) / 99) * (MAX_DPI - MIN_DPI));
 
 /**
  * Single monotonic quality axis shared by both modes. Quality 1..100 maps to a
@@ -47,43 +47,61 @@ export function registerCompressPdf(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
       const outPath = join(ctx.scratchDir, `${base}_compressed.pdf`);
 
+      let resultPayload: Record<string, unknown> | undefined;
+
       if (settings.mode === "targetSize" && settings.targetSizeKb) {
-        // Binary-search the DPI for the highest quality that still fits the
-        // target. Output size is monotonic in DPI, so the search converges.
         const targetBytes = settings.targetSizeKb * 1024;
-        let lo = MIN_DPI;
-        let hi = MAX_DPI;
-        let bestPath: string | null = null;
-        for (let i = 0; i < 6 && lo <= hi; i++) {
-          const dpi = Math.round((lo + hi) / 2);
-          const candidate = join(ctx.scratchDir, `cand-${dpi}.pdf`);
-          ctx.report(10 + i * 13, "Compressing");
-          await gsCompressPdfQuality(inPath, candidate, dpi);
-          const size = (await stat(candidate)).size;
-          if (size <= targetBytes) {
-            bestPath = candidate;
-            lo = dpi + 1; // fits: try higher quality
+        // Binary-search the quality axis for the largest output that still fits.
+        // Memoize by q so repeated probes never re-run ghostscript.
+        const cache = new Map<number, { path: string; size: number }>();
+        const runQ = async (q: number) => {
+          const key = Math.max(1, Math.min(100, Math.round(q)));
+          const hit = cache.get(key);
+          if (hit) return hit;
+          const { dpi, qFactor } = paramsForQuality(key);
+          const path = join(ctx.scratchDir, `cand-q${key}.pdf`);
+          await gsCompressPdfTuned(inPath, path, dpi, qFactor);
+          const entry = { path, size: (await stat(path)).size };
+          cache.set(key, entry);
+          return entry;
+        };
+
+        let lo = 1;
+        let hi = 100;
+        let best: { path: string; size: number } | null = null;
+        let smallest: { path: string; size: number } | null = null;
+        const MAX_ITERS = 8;
+        for (let iter = 0; iter < MAX_ITERS && lo <= hi; iter++) {
+          const q = Math.round((lo + hi) / 2);
+          ctx.report(10 + iter * 10, "Searching");
+          const cand = await runQ(q);
+          if (!smallest || cand.size < smallest.size) smallest = cand;
+          if (cand.size <= targetBytes) {
+            if (!best || cand.size > best.size) best = cand;
+            if (cand.size >= targetBytes * 0.9) break; // close enough
+            lo = q + 1; // room to grow: raise quality
           } else {
-            hi = dpi - 1; // too big: compress harder
+            hi = q - 1; // too big: compress harder
           }
         }
-        if (!bestPath) {
-          // Target unreachable (e.g. a text-only PDF below the floor); fall
-          // back to the most aggressive compression we can do.
-          bestPath = join(ctx.scratchDir, "cand-min.pdf");
-          await gsCompressPdfQuality(inPath, bestPath, MIN_DPI);
+
+        // smallest is always set after >=1 iteration.
+        const chosen = best ?? (smallest as { path: string; size: number });
+        if (chosen.size >= input.buffer.length) {
+          await writeFile(outPath, input.buffer); // never enlarge
+        } else {
+          await copyFile(chosen.path, outPath);
         }
-        await copyFile(bestPath, outPath);
+        const finalSize = (await stat(outPath)).size;
+        resultPayload = { targetKb: settings.targetSizeKb, targetMet: finalSize <= targetBytes };
       } else {
         ctx.report(10, "Compressing");
-        await gsCompressPdfQuality(inPath, outPath, qualityToDpi(settings.quality ?? 75));
-      }
-
-      // A "Compress" tool must never enlarge the file. If re-encoding produced
-      // something at least as large as the original (common for already
-      // compressed or low-DPI scanned PDFs), keep the original bytes instead.
-      if ((await stat(outPath)).size >= input.buffer.length) {
-        await writeFile(outPath, input.buffer);
+        const { dpi, qFactor } = paramsForQuality(settings.quality ?? 75);
+        await gsCompressPdfTuned(inPath, outPath, dpi, qFactor);
+        // A "Compress" tool must never enlarge the file.
+        if ((await stat(outPath)).size >= input.buffer.length) {
+          await writeFile(outPath, input.buffer);
+        }
       }
 
       ctx.report(95, "Done");
@@ -91,6 +109,7 @@ export function registerCompressPdf(app: FastifyInstance) {
         scratchPath: outPath,
         filename: `${base}_compressed.pdf`,
         contentType: "application/pdf",
+        resultPayload,
       };
     },
   });
