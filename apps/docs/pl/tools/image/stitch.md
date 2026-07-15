@@ -1,11 +1,11 @@
 ---
 description: "Łącz obrazy obok siebie, jeden nad drugim lub w siatce, z kontrolą wyrównania, odstępów, obramowań i trybu skalowania."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 74ff73169fd0
 ---
 
-# Łączenie / Scalanie {#stitch-combine}
+# Połącz obrazy {#stitch-combine}
 
 Łącz wiele obrazów obok siebie, ułożonych pionowo lub rozmieszczonych w siatce. Obsługuje wyrównanie, odstępy, obramowanie, zaokrąglenie narożników i wiele trybów skalowania.
 

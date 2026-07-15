@@ -1,11 +1,11 @@
 ---
 description: "Détecte et floute automatiquement les visages dans les images grâce à la détection de visages par IA, pour la confidentialité et une anonymisation conforme au RGPD."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: db97c8556891
 ---
 
-# Floutage de visages / PII {#face-pii-blur}
+# Flouter les visages et données sensibles {#face-pii-blur}
 
 Détecte et floute automatiquement les visages dans les images grâce à la détection de visages assistée par IA (MediaPipe).
 

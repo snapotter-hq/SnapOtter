@@ -1,11 +1,11 @@
 ---
 description: "Elimina metadatos EXIF, GPS, ICC y XMP de las imágenes para mayor privacidad y menor tamaño de archivo."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: a5c840a8408d
 ---
 
-# Eliminar metadatos {#remove-metadata}
+# Eliminar metadatos de imagen {#remove-metadata}
 
 Elimina los metadatos EXIF, GPS, perfiles de color ICC y XMP de las imágenes. Útil para la privacidad (eliminar coordenadas GPS, información de la cámara) y para reducir el tamaño del archivo.
 

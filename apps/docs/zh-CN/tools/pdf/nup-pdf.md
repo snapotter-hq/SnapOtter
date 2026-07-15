@@ -1,11 +1,11 @@
 ---
 description: "在每张纸上排布多个 PDF 页面（2 合 1、4 合 1 等）。"
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: f7c9899d22b1
 ---
 
-# N-up PDF {#n-up-pdf}
+# 每张纸多页 (N-up) {#n-up-pdf}
 
 在每张纸上排布多个页面以在打印时节省纸张，例如 2 合 1 或 4 合 1 版式。
 

@@ -1,11 +1,11 @@
 ---
 description: "ลบเมทาดาทา EXIF, GPS, ICC และ XMP ออกจากภาพเพื่อความเป็นส่วนตัวและลดขนาดไฟล์"
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 58afe13510ea
 ---
 
-# Remove Metadata {#remove-metadata}
+# ลบข้อมูลเมตาของภาพ {#remove-metadata}
 
 ลบเมทาดาทา EXIF, GPS, โปรไฟล์สี ICC และ XMP ออกจากภาพ มีประโยชน์สำหรับความเป็นส่วนตัว (ลบพิกัด GPS, ข้อมูลกล้อง) และลดขนาดไฟล์
 

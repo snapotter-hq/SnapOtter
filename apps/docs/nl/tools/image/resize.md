@@ -1,11 +1,11 @@
 ---
 description: "Verklein of vergroot afbeeldingen op pixels, percentage of met fit-modi."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: ddca03289601
 ---
 
-# Resize {#resize}
+# Afbeelding herschalen {#resize}
 
 Pas de grootte van afbeeldingen aan door exacte pixelafmetingen op te geven, een percentageschaalfactor of een fit-modus die bepaalt hoe de afbeelding zich aanpast aan de doelafmetingen.
 

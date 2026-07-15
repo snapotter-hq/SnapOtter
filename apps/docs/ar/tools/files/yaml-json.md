@@ -1,11 +1,11 @@
 ---
 description: "التحويل بين YAML وJSON في الاتجاهين."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: 3f6fafb6b475
 ---
 
-# YAML / JSON {#yaml-json}
+# تحويل YAML / JSON {#yaml-json}
 
 حوّل بين صيغتَي YAML وJSON في كلا الاتجاهين. ارفع ملف YAML لتحصل على JSON، أو ارفع ملف JSON لتحصل على YAML.
 

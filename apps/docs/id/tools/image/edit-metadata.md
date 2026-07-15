@@ -1,11 +1,11 @@
 ---
 description: "Edit field metadata EXIF, IPTC, GPS, dan XMP dalam gambar tanpa mengenkode ulang piksel."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 9e6badffd745
 ---
 
-# Edit Metadata {#edit-metadata}
+# Sunting Metadata Gambar {#edit-metadata}
 
 Edit field metadata gambar termasuk EXIF, IPTC, koordinat GPS, tanggal, dan kata kunci. Menggunakan ExifTool di baliknya, sehingga metadata ditulis di tempat tanpa mengenkode ulang piksel, mempertahankan kualitas gambar penuh.
 

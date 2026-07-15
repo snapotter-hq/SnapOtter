@@ -1,11 +1,11 @@
 ---
 description: "Uzun süreli koruma için bir PDF'i arşiv PDF/A-2 biçimine dönüştürün."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 4d58e80e853a
 ---
 
-# PDF/A Dönüştür {#pdf-a-convert}
+# PDF/A Dönüştürücü {#pdf-a-convert}
 
 Bir PDF'i, uzun süreli koruma ve mevzuata uyum için uygun olan PDF/A-2 arşiv biçimine dönüştürün.
 

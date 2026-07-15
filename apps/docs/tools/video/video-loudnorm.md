@@ -2,7 +2,7 @@
 description: Normalize video audio volume to broadcast standard.
 ---
 
-# Normalize Audio {#normalize-audio}
+# Normalize Video Audio {#normalize-audio}
 
 Normalize video audio volume to the EBU R128 broadcast loudness standard.
 

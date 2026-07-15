@@ -1,11 +1,11 @@
 ---
 description: "Une imagens lado a lado, empilhadas ou em grade, com controle sobre alinhamento, espaçamentos, bordas e modo de redimensionamento."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: d66a33caeb4f
 ---
 
-# Costurar / Combinar (Stitch / Combine) {#stitch-combine}
+# Juntar Imagens {#stitch-combine}
 
 Une várias imagens lado a lado, empilhadas verticalmente ou dispostas em grade. Suporta alinhamento, espaçamento, borda, raio de canto e vários modos de redimensionamento.
 

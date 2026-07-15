@@ -2,7 +2,7 @@
 description: Increase or decrease audio volume by a fixed gain in decibels.
 ---
 
-# Volume Adjust {#volume-adjust}
+# Adjust Volume {#volume-adjust}
 
 Increase or decrease the volume of an audio file by applying a fixed gain in decibels.
 

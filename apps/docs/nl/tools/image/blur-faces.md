@@ -1,11 +1,11 @@
 ---
 description: "Detecteer en vervaag gezichten in afbeeldingen automatisch met AI-gezichtsdetectie voor privacy en AVG-conforme anonimisering."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 47020ab1bcc1
 ---
 
-# Gezichts- / PII-vervaging {#face-pii-blur}
+# Gezichten & PII vervagen {#face-pii-blur}
 
 Detecteer en vervaag gezichten in afbeeldingen automatisch met AI-gestuurde gezichtsdetectie (MediaPipe).
 

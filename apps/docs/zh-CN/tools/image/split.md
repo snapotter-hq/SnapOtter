@@ -1,11 +1,11 @@
 ---
 description: "按行列数或像素尺寸将一张图像分割为网格图块，以 ZIP 压缩包形式返回。"
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 49ea1a52dd18
 ---
 
-# 图像分割 {#image-splitting}
+# 分割图片 {#image-splitting}
 
 按列/行数或指定的像素尺寸将单张图像分割为网格图块。返回包含所有图块的 ZIP 压缩包。
 

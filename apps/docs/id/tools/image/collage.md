@@ -1,11 +1,11 @@
 ---
 description: "Gabungkan beberapa gambar menjadi kolase grid dengan 25+ template, jarak dan sudut yang dapat disesuaikan, serta pan dan zoom per sel."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: e7c79856f0ca
 ---
 
-# Kolase / Grid {#collage-grid}
+# Kolase & Grid {#collage-grid}
 
 Gabungkan beberapa gambar menjadi kolase grid yang indah dengan 25+ template. Mendukung tata letak 2-9 gambar dengan kontrol jarak, radius sudut, warna latar belakang, dan pan/zoom per sel yang dapat disesuaikan.
 

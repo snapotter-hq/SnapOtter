@@ -1,11 +1,11 @@
 ---
 description: "将 PDF 转换为归档用 PDF/A-2 格式以实现长期保存。"
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 49f702ce85db
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A 转换器 {#pdf-a-convert}
 
 将 PDF 转换为 PDF/A-2 归档格式，适用于长期保存和合规要求。
 

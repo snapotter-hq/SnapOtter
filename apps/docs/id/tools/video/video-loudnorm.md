@@ -1,11 +1,11 @@
 ---
 description: "Menormalkan volume audio video ke standar siaran."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 4c658bcf24f2
 ---
 
-# Normalize Audio {#normalize-audio}
+# Normalisasi Audio Video {#normalize-audio}
 
 Menormalkan volume audio video ke standar loudness siaran EBU R128.
 

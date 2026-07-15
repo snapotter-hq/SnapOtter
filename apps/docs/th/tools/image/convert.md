@@ -1,11 +1,11 @@
 ---
 description: "แปลงภาพระหว่างรูปแบบต่าง ๆ รวมถึงรูปแบบสมัยใหม่อย่าง AVIF, JXL และ HEIC"
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: d311eca561a0
 ---
 
-# Convert {#convert}
+# แปลงภาพ {#convert}
 
 แปลงภาพระหว่างรูปแบบต่าง ๆ รองรับรูปแบบเว็บทั่วไปรวมถึงรูปแบบเฉพาะทางอย่าง HEIC, JXL, BMP, ICO, JP2, QOI และ PSD
 

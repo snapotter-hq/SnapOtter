@@ -1,11 +1,11 @@
 ---
 description: "Normalise le volume audio de la vidéo selon la norme de diffusion."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 0f0b60162fcf
 ---
 
-# Normalize Audio {#normalize-audio}
+# Normaliser l’audio de la vidéo {#normalize-audio}
 
 Normalise le volume audio de la vidéo selon la norme de sonie de diffusion EBU R128.
 

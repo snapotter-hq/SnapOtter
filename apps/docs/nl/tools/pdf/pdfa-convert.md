@@ -1,11 +1,11 @@
 ---
 description: "Converteer een PDF naar het archief-PDF/A-2-formaat voor langdurige bewaring."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 75010fc5a155
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A-converter {#pdf-a-convert}
 
 Converteer een PDF naar het PDF/A-2-archiefformaat, geschikt voor langdurige bewaring en naleving van regelgeving.
 

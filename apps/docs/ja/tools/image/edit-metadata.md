@@ -1,11 +1,11 @@
 ---
 description: "ピクセルを再エンコードせずに、画像のEXIF、IPTC、GPS、XMP メタデータフィールドを編集します。"
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: cc4a554a90d8
 ---
 
-# メタデータ編集 {#edit-metadata}
+# 画像メタデータ編集 {#edit-metadata}
 
 EXIF、IPTC、GPS座標、日付、キーワードを含む画像メタデータフィールドを編集します。内部でExifToolを使用するため、メタデータはピクセルを再エンコードせずにその場で書き込まれ、画像品質が完全に保持されます。
 

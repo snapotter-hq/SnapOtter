@@ -1,11 +1,11 @@
 ---
 description: "Combineer meerdere afbeeldingen tot rastercollages met meer dan 25 sjablonen, aanpasbare tussenruimtes en hoeken, en pannen en zoomen per cel."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: a9345e0095b7
 ---
 
-# Collage / Raster {#collage-grid}
+# Collage & Raster {#collage-grid}
 
 Combineer meerdere afbeeldingen tot fraaie rastercollages met meer dan 25 sjablonen. Ondersteunt lay-outs van 2 tot 9 afbeeldingen met aanpasbare tussenruimte, hoekstraal, achtergrondkleur en pan/zoom-instellingen per cel.
 

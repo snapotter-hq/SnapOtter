@@ -1,11 +1,11 @@
 ---
 description: "장기 보존을 위해 PDF를 아카이브용 PDF/A-2 형식으로 변환합니다."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 09cd8068f7f5
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A 변환기 {#pdf-a-convert}
 
 PDF를 PDF/A-2 아카이브 형식으로 변환하며, 이는 장기 보존과 규정 준수에 적합합니다.
 

@@ -1,11 +1,11 @@
 ---
 description: "Menggabungkan gambar berdampingan, ditumpuk, atau dalam grid dengan kontrol atas perataan, celah, tepi, dan mode pengubahan ukuran."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 22d6b7c3538e
 ---
 
-# Stitch / Combine {#stitch-combine}
+# Gabungkan Gambar {#stitch-combine}
 
 Menggabungkan beberapa gambar berdampingan, ditumpuk secara vertikal, atau disusun dalam grid. Mendukung perataan, celah, tepi, radius sudut, dan beberapa mode pengubahan ukuran.
 

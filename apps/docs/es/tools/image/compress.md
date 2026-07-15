@@ -1,11 +1,11 @@
 ---
 description: "Reduce el tamaño del archivo de imagen por nivel de calidad o hasta un tamaño de archivo objetivo."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 2bec513af1bd
 ---
 
-# Comprimir {#compress}
+# Comprimir imagen {#compress}
 
 Reduce el tamaño del archivo de imagen especificando un nivel de calidad o un tamaño de archivo objetivo en kilobytes. La herramienta usa búsqueda binaria iterativa para alcanzar los tamaños objetivo con precisión.
 

@@ -1,11 +1,11 @@
 ---
 description: "Размещение нескольких страниц PDF на одном листе (2-up, 4-up и т. д.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: d435e250f7fc
 ---
 
-# N-up PDF {#n-up-pdf}
+# Страниц на листе (N-up) {#n-up-pdf}
 
 Разместите несколько страниц на одном листе, чтобы экономить бумагу при печати, например в раскладках 2-up или 4-up.
 

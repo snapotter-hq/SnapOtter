@@ -1,11 +1,11 @@
 ---
 description: "위치와 치수로 영역을 지정하여 이미지를 자릅니다."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: de94f3937d00
 ---
 
-# 자르기 {#crop}
+# 이미지 크롭 {#crop}
 
 위치와 크기를 사용하여 직사각형 영역을 정의해 이미지를 자릅니다. 픽셀 단위와 백분율 단위를 모두 지원합니다.
 

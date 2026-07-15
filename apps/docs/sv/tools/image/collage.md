@@ -1,11 +1,11 @@
 ---
 description: "Kombinera flera bilder till rutnätscollage med 25+ mallar, justerbara mellanrum och hörn samt panorering och zoom per cell."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 8f2a14aa47e4
 ---
 
-# Collage / Rutnät {#collage-grid}
+# Collage & Rutnät {#collage-grid}
 
 Kombinera flera bilder till snygga rutnätscollage med 25+ mallar. Stöder layouter för 2-9 bilder med anpassningsbart mellanrum, hörnradie, bakgrundsfärg och kontroller för panorering/zoom per cell.
 

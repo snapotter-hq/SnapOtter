@@ -1,11 +1,11 @@
 ---
 description: "Erhöht oder verringert die Audiolautstärke um eine feste Verstärkung in Dezibel."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 6857a2f0c216
 ---
 
-# Volume Adjust {#volume-adjust}
+# Lautstärke anpassen {#volume-adjust}
 
 Erhöht oder verringert die Lautstärke einer Audiodatei durch Anwendung einer festen Verstärkung in Dezibel.
 

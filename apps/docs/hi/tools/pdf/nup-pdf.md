@@ -1,11 +1,11 @@
 ---
 description: "प्रति शीट कई PDF पृष्ठ व्यवस्थित करें (2-up, 4-up, आदि)।"
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 733e3a2ddc60
 ---
 
-# N-up PDF {#n-up-pdf}
+# प्रति शीट पेज (N-up) {#n-up-pdf}
 
 प्रिंट करते समय कागज़ बचाने के लिए प्रति शीट कई पृष्ठ व्यवस्थित करें, जैसे 2-up या 4-up लेआउट।
 

@@ -1,11 +1,11 @@
 ---
 description: "เพิ่มความคมชัดของภาพด้วยวิธี adaptive, unsharp mask หรือ high-pass พร้อมตัวเลือกการลดสัญญาณรบกวน"
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: ef763699aca0
 ---
 
-# Sharpening {#sharpening}
+# เพิ่มความคมชัดของภาพ {#sharpening}
 
 เครื่องมือเพิ่มความคมชัดขั้นสูงพร้อมสามวิธี: adaptive (รับรู้ขอบภาพอย่างชาญฉลาด), unsharp mask (radius/amount แบบคลาสสิก) และ high-pass (เน้นพื้นผิว) มีการลดสัญญาณรบกวนในตัวเพื่อป้องกันสิ่งแปลกปลอมจากการเพิ่มความคมชัด
 

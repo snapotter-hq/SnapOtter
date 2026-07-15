@@ -1,11 +1,11 @@
 ---
 description: "Supprime les métadonnées EXIF, GPS, ICC et XMP des images pour préserver la confidentialité et réduire la taille des fichiers."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 1c6931be00aa
 ---
 
-# Suppression des métadonnées {#remove-metadata}
+# Supprimer les métadonnées d'une image {#remove-metadata}
 
 Supprime les métadonnées EXIF, GPS, les profils colorimétriques ICC et les métadonnées XMP des images. Utile pour la confidentialité (suppression des coordonnées GPS, des informations d'appareil photo) et pour réduire la taille des fichiers.
 

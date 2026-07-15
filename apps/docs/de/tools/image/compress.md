@@ -1,11 +1,11 @@
 ---
 description: "Verringert die Dateigröße eines Bildes über eine Qualitätsstufe oder auf eine Zieldateigröße."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: f52fc9641e64
 ---
 
-# Komprimieren {#compress}
+# Bild komprimieren {#compress}
 
 Verringert die Dateigröße eines Bildes durch Angabe einer Qualitätsstufe oder einer Zieldateigröße in Kilobyte. Das Werkzeug verwendet eine iterative binäre Suche, um Größenvorgaben präzise zu treffen.
 

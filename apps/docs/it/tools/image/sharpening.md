@@ -1,11 +1,11 @@
 ---
 description: "Aumenta la nitidezza delle immagini con metodi adattivo, maschera di contrasto o passa-alto, con riduzione del rumore opzionale."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 6d9118872bed
 ---
 
-# Nitidezza {#sharpening}
+# Aumenta nitidezza immagine {#sharpening}
 
 Strumento avanzato per la nitidezza con tre metodi: adattivo (intelligente, sensibile ai bordi), maschera di contrasto (raggio/quantità classici) e passa-alto (enfasi sulla texture). Include una riduzione del rumore integrata per prevenire artefatti dovuti alla nitidezza.
 

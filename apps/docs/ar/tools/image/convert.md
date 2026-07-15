@@ -1,11 +1,11 @@
 ---
 description: "تحويل الصور بين الصيغ بما في ذلك الصيغ الحديثة مثل AVIF وJXL وHEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: c4d219043dd6
 ---
 
-# Convert {#convert}
+# تحويل الصورة {#convert}
 
 حوّل الصور بين الصيغ. يدعم صيغ الويب الشائعة إضافة إلى صيغ متخصصة مثل HEIC وJXL وBMP وICO وJP2 وQOI وPSD.
 

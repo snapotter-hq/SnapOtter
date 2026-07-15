@@ -2,7 +2,7 @@
 description: Sharpen images using adaptive, unsharp mask, or high-pass methods with optional noise reduction.
 ---
 
-# Sharpening {#sharpening}
+# Sharpen Image {#sharpening}
 
 Advanced sharpening tool with three methods: adaptive (smart edge-aware), unsharp mask (classic radius/amount), and high-pass (texture emphasis). Includes built-in noise reduction to prevent sharpening artifacts.
 

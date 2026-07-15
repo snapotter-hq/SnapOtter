@@ -1,11 +1,11 @@
 ---
 description: "Gizlilik ve GDPR uyumlu anonimleştirme için AI yüz algılamayla görsellerdeki yüzleri otomatik algılayıp bulanıklaştırın."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: bd0aa1e11901
 ---
 
-# Yüz / PII Bulanıklaştırma {#face-pii-blur}
+# Yüzleri ve Kişisel Bilgileri Bulanıklaştır {#face-pii-blur}
 
 AI destekli yüz algılama (MediaPipe) kullanarak görsellerdeki yüzleri otomatik algılayın ve bulanıklaştırın.
 

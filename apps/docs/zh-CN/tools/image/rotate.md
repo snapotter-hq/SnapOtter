@@ -1,11 +1,11 @@
 ---
 description: "按任意角度旋转图片，并进行水平或垂直翻转。"
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: dcbaa2a45cbf
 ---
 
-# 旋转与翻转 {#rotate-flip}
+# 旋转和翻转图片 {#rotate-flip}
 
 按任意角度旋转图片，和/或对其进行水平或垂直翻转。旋转和翻转操作可以在单次请求中组合使用。
 

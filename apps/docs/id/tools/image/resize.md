@@ -1,11 +1,11 @@
 ---
 description: "Ubah ukuran gambar berdasarkan piksel, persentase, atau dengan mode fit."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: c35e9fa1bead
 ---
 
-# Resize {#resize}
+# Ubah Ukuran Gambar {#resize}
 
 Ubah ukuran gambar dengan menentukan dimensi piksel persis, faktor skala persentase, atau mode fit yang mengontrol bagaimana gambar menyesuaikan dengan dimensi target.
 

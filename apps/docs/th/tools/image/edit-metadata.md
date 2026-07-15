@@ -1,11 +1,11 @@
 ---
 description: "แก้ไขฟิลด์เมทาดาทา EXIF, IPTC, GPS และ XMP ในภาพโดยไม่ต้องเข้ารหัสพิกเซลใหม่"
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 44bdc9fac5c5
 ---
 
-# Edit Metadata {#edit-metadata}
+# แก้ไขข้อมูลเมตาของภาพ {#edit-metadata}
 
 แก้ไขฟิลด์เมทาดาทาของภาพรวมถึง EXIF, IPTC, พิกัด GPS, วันที่ และคีย์เวิร์ด ใช้ ExifTool เบื้องหลัง ดังนั้นเมทาดาทาจึงถูกเขียนแบบในตำแหน่งเดิมโดยไม่ต้องเข้ารหัสพิกเซลใหม่ รักษาคุณภาพภาพเต็มรูปแบบเอาไว้
 

@@ -1,11 +1,11 @@
 ---
 description: "Konversi gambar antar format termasuk format modern seperti AVIF, JXL, dan HEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: c8ad4d0044bd
 ---
 
-# Konversi {#convert}
+# Konversi Gambar {#convert}
 
 Konversi gambar antar format. Mendukung format web umum serta format khusus seperti HEIC, JXL, BMP, ICO, JP2, QOI, dan PSD.
 

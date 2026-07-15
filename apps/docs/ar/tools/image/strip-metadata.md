@@ -1,11 +1,11 @@
 ---
 description: "إزالة بيانات EXIF وGPS وICC وXMP الوصفية من الصور من أجل الخصوصية وتصغير أحجام الملفات."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 0ae6fb6a5ae7
 ---
 
-# إزالة البيانات الوصفية {#remove-metadata}
+# إزالة البيانات الوصفية للصورة {#remove-metadata}
 
 أزل بيانات EXIF وGPS وملفات ألوان ICC وبيانات XMP الوصفية من الصور. مفيد للخصوصية (إزالة إحداثيات GPS ومعلومات الكاميرا) وتقليل حجم الملف.
 

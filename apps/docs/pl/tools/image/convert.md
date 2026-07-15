@@ -1,11 +1,11 @@
 ---
 description: "Konwertuj obrazy między formatami, w tym nowoczesnymi jak AVIF, JXL i HEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: 7d07d56af008
 ---
 
-# Konwersja {#convert}
+# Konwertuj obraz {#convert}
 
 Konwertuj obrazy między formatami. Obsługuje popularne formaty webowe oraz specjalistyczne, takie jak HEIC, JXL, BMP, ICO, JP2, QOI i PSD.
 

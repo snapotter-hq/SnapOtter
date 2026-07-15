@@ -1,11 +1,11 @@
 ---
 description: "Eén afbeelding opsplitsen in rastertegels op basis van rijen en kolommen of op pixelgrootte, geretourneerd als ZIP-archief."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: b64e36398c5b
 ---
 
-# Afbeelding Opsplitsen {#image-splitting}
+# Afbeelding splitsen {#image-splitting}
 
 Splits één afbeelding op in rastertegels op basis van het aantal kolommen/rijen of specifieke pixelafmetingen. Retourneert een ZIP-archief met alle tegels.
 

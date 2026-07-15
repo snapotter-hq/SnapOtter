@@ -1,11 +1,11 @@
 ---
 description: "將影像並排、堆疊或以網格方式接合，並可控制對齊、間隙、邊框與縮放模式。"
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 450bbb6647a7
 ---
 
-# 接合 / 合併 {#stitch-combine}
+# 拼接影像 {#stitch-combine}
 
 將多張影像並排接合、垂直堆疊或以網格排列。支援對齊、間隙、邊框、圓角半徑以及多種縮放模式。
 

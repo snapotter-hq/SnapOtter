@@ -1,11 +1,11 @@
 ---
 description: "Rangschik meerdere PDF-pagina's per vel (2-up, 4-up, enz.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 0bc3216f7107
 ---
 
-# N-up PDF {#n-up-pdf}
+# Pagina's per vel (N-up) {#n-up-pdf}
 
 Rangschik meerdere pagina's per vel om papier te besparen bij het afdrukken, zoals 2-up- of 4-up-indelingen.
 

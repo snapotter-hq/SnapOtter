@@ -1,11 +1,11 @@
 ---
 description: "EXIF-, GPS-, ICC- en XMP-metadata uit afbeeldingen verwijderen voor privacy en kleinere bestandsgroottes."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: f966cb3141d7
 ---
 
-# Metadata Verwijderen {#remove-metadata}
+# Afbeeldingsmetadata verwijderen {#remove-metadata}
 
 Verwijder EXIF-, GPS-, ICC-kleurprofielen en XMP-metadata uit afbeeldingen. Handig voor privacy (het verwijderen van GPS-coördinaten, camera-informatie) en het verkleinen van de bestandsgrootte.
 

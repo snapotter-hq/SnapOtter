@@ -1,11 +1,11 @@
 ---
 description: "Ritaglia immagini specificando una regione con posizione e dimensioni."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 7f9ff6b77a1f
 ---
 
-# Ritaglia {#crop}
+# Ritaglia Immagine {#crop}
 
 Ritaglia immagini definendo una regione rettangolare usando posizione e dimensione. Supporta unità sia in pixel che in percentuale.
 

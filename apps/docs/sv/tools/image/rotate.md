@@ -1,11 +1,11 @@
 ---
 description: "Rotera bilder i valfri vinkel och vänd horisontellt eller vertikalt."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 79a7660c15b8
 ---
 
-# Rotera och vänd {#rotate-flip}
+# Rotera & Vänd bild {#rotate-flip}
 
 Rotera bilder i en godtycklig vinkel och/eller vänd dem horisontellt eller vertikalt. Rotations- och vändningsåtgärder kan kombineras i en enda förfrågan.
 

@@ -1,11 +1,11 @@
 ---
 description: "任意の角度で画像を回転し、水平方向または垂直方向に反転します。"
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: f4f347d12e10
 ---
 
-# 回転・反転 {#rotate-flip}
+# 画像回転と反転 {#rotate-flip}
 
 画像を任意の角度で回転したり、水平方向または垂直方向に反転したりします。回転と反転の操作は 1 回のリクエストで組み合わせられます。
 

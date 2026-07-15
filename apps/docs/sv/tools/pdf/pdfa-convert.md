@@ -1,11 +1,11 @@
 ---
 description: "Konvertera en PDF till arkivformatet PDF/A-2 för långtidsbevarande."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: b40ae095488f
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A-konverterare {#pdf-a-convert}
 
 Konvertera en PDF till arkivformatet PDF/A-2, lämpligt för långtidsbevarande och regelefterlevnad.
 

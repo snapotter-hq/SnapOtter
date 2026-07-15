@@ -1,11 +1,11 @@
 ---
 description: "Hizalama, boşluk, kenarlık ve yeniden boyutlandırma modu üzerinde denetimle görüntüleri yan yana, üst üste veya bir ızgarada birleştirin."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: b7f7b4ff7d50
 ---
 
-# Birleştir / Combine {#stitch-combine}
+# Görüntüleri Birleştir {#stitch-combine}
 
 Birden fazla görüntüyü yan yana, dikey olarak üst üste veya bir ızgara halinde birleştirin. Hizalama, boşluk, kenarlık, köşe yarıçapı ve birden fazla yeniden boyutlandırma modunu destekler.
 

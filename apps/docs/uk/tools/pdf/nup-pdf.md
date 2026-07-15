@@ -1,11 +1,11 @@
 ---
 description: "Розміщення кількох сторінок PDF на аркуші (2-up, 4-up тощо)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: e73fe9651fd8
 ---
 
-# N-up PDF {#n-up-pdf}
+# Сторінок на аркуш (N-up) {#n-up-pdf}
 
 Розміщуйте кілька сторінок на аркуші, щоб заощадити папір під час друку, наприклад у розкладках 2-up або 4-up.
 

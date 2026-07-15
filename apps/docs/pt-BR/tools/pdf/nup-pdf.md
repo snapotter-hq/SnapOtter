@@ -1,11 +1,11 @@
 ---
 description: "Organize várias páginas de PDF por folha (2 por folha, 4 por folha, etc.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 7ce40924fea5
 ---
 
-# N-up PDF {#n-up-pdf}
+# Páginas por Folha (N-up) {#n-up-pdf}
 
 Organize várias páginas por folha para economizar papel na impressão, como layouts de 2 por folha ou 4 por folha.
 

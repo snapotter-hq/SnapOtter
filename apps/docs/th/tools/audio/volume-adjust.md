@@ -1,11 +1,11 @@
 ---
 description: "เพิ่มหรือลดระดับเสียงด้วยเกนคงที่เป็นเดซิเบล"
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 17ef005cb8a2
 ---
 
-# Volume Adjust {#volume-adjust}
+# ปรับระดับเสียง {#volume-adjust}
 
 เพิ่มหรือลดระดับเสียงของไฟล์เสียงโดยใช้เกนคงที่เป็นเดซิเบล
 

@@ -1,11 +1,11 @@
 ---
 description: "Afbeeldingen verscherpen met adaptieve, unsharp mask- of high-passmethoden, met optionele ruisonderdrukking."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 6f670017465b
 ---
 
-# Verscherping {#sharpening}
+# Afbeelding verscherpen {#sharpening}
 
 Geavanceerd verscherpingsgereedschap met drie methoden: adaptief (slim, randbewust), unsharp mask (klassiek radius/hoeveelheid) en high-pass (nadruk op textuur). Bevat ingebouwde ruisonderdrukking om verscherpingsartefacten te voorkomen.
 

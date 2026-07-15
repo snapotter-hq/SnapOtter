@@ -1,11 +1,11 @@
 ---
 description: "从图像中移除 EXIF、GPS、ICC 和 XMP 元数据，以保护隐私并减小文件大小。"
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 0beed818cd0e
 ---
 
-# 移除元数据 {#remove-metadata}
+# 移除图片元数据 {#remove-metadata}
 
 从图像中移除 EXIF、GPS、ICC 色彩配置文件和 XMP 元数据。适用于保护隐私（移除 GPS 坐标、相机信息）以及减小文件大小。
 

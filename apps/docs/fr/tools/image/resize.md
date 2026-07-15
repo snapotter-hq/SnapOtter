@@ -1,11 +1,11 @@
 ---
 description: "Redimensionnez les images en pixels, en pourcentage ou avec des modes d'ajustement."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: 8e0697d78a16
 ---
 
-# Redimensionner {#resize}
+# Redimensionner une image {#resize}
 
 Redimensionnez les images en spécifiant des dimensions exactes en pixels, un facteur d'échelle en pourcentage ou un mode d'ajustement qui contrôle la façon dont l'image s'adapte aux dimensions cibles.
 

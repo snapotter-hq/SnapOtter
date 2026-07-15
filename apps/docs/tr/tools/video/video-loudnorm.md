@@ -1,11 +1,11 @@
 ---
 description: "Video ses seviyesini yayın standardına normalize edin."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: c00465d6a4f0
 ---
 
-# Normalize Audio {#normalize-audio}
+# Video Sesini Normalleştir {#normalize-audio}
 
 Video ses seviyesini EBU R128 yayın ses yüksekliği standardına normalize edin.
 

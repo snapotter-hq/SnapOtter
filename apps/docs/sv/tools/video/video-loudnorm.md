@@ -1,11 +1,11 @@
 ---
 description: "Normalisera videons ljudvolym till broadcast-standard."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: e9c221d506ca
 ---
 
-# Normalisera ljud {#normalize-audio}
+# Normalisera videons ljud {#normalize-audio}
 
 Normalisera videons ljudvolym till broadcast-standarden EBU R128 för ljudstyrka.
 

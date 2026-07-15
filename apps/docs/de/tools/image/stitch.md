@@ -1,11 +1,11 @@
 ---
 description: "Bilder nebeneinander, gestapelt oder in einem Raster zusammenfügen, mit Kontrolle über Ausrichtung, Abstände, Ränder und Skalierungsmodus."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: c197046add93
 ---
 
-# Zusammenfügen / Kombinieren {#stitch-combine}
+# Bilder zusammenfügen {#stitch-combine}
 
 Fügt mehrere Bilder nebeneinander, vertikal gestapelt oder in einem Raster angeordnet zusammen. Unterstützt Ausrichtung, Abstand, Rand, Eckradius und mehrere Skalierungsmodi.
 

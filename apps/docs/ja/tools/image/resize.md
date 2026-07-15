@@ -1,11 +1,11 @@
 ---
 description: "ピクセル、パーセンテージ、またはフィットモードで画像をリサイズします。"
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: 73a139cca480
 ---
 
-# リサイズ {#resize}
+# 画像リサイズ {#resize}
 
 正確なピクセル寸法、パーセンテージによる拡大縮小率、または画像をターゲット寸法にどう適応させるかを制御するフィットモードを指定して、画像をリサイズします。
 

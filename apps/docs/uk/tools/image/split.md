@@ -1,6 +1,6 @@
 ---
 description: "Розділення одного зображення на плитки сітки за рядками та стовпцями або за розміром у пікселях, повертається як архів ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 428b04bfeb55
 ---

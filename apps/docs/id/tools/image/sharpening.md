@@ -1,11 +1,11 @@
 ---
 description: "Menajamkan gambar menggunakan metode adaptive, unsharp mask, atau high-pass dengan pengurangan noise opsional."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 1990226b51e3
 ---
 
-# Sharpening {#sharpening}
+# Pertajam Gambar {#sharpening}
 
 Alat penajaman lanjutan dengan tiga metode: adaptive (cerdas dan sadar-tepi), unsharp mask (radius/amount klasik), dan high-pass (penekanan tekstur). Menyertakan pengurangan noise bawaan untuk mencegah artefak penajaman.
 

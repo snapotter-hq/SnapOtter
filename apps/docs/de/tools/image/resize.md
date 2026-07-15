@@ -1,11 +1,11 @@
 ---
 description: "Ändere die Größe von Bildern nach Pixeln, Prozent oder mit Anpassungsmodi."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: b6058533f4c2
 ---
 
-# Größe ändern {#resize}
+# Bildgröße ändern {#resize}
 
 Ändere die Größe von Bildern durch Angabe exakter Pixelabmessungen, eines prozentualen Skalierungsfaktors oder eines Anpassungsmodus, der steuert, wie sich das Bild an die Zielabmessungen anpasst.
 

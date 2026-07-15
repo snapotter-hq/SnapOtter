@@ -1,11 +1,11 @@
 ---
 description: "गोपनीयता और छोटे फ़ाइल आकार के लिए छवियों से EXIF, GPS, ICC, और XMP मेटाडेटा हटाएँ।"
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: fec74f7b6c23
 ---
 
-# Remove Metadata {#remove-metadata}
+# इमेज मेटाडेटा हटाएं {#remove-metadata}
 
 छवियों से EXIF, GPS, ICC कलर प्रोफ़ाइल, और XMP मेटाडेटा हटाएँ। गोपनीयता (GPS निर्देशांक, कैमरा जानकारी हटाना) और फ़ाइल आकार कम करने के लिए उपयोगी।
 

@@ -1,11 +1,11 @@
 ---
 description: "YAML と JSON を双方向で変換します。"
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: e39453464e79
 ---
 
-# YAML / JSON {#yaml-json}
+# YAML / JSON 変換 {#yaml-json}
 
 YAML と JSON 形式を双方向で変換します。YAML ファイルをアップロードすると JSON が得られ、JSON ファイルをアップロードすると YAML が得られます。
 

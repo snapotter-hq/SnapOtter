@@ -2,7 +2,7 @@
 description: Auto-detect and blur faces in images with AI face detection for privacy and GDPR-compliant anonymization.
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# Blur Faces & PII {#face-pii-blur}
 
 Auto-detect and blur faces in images using AI-powered face detection (MediaPipe).
 

@@ -1,11 +1,11 @@
 ---
 description: "在 YAML 与 JSON 之间双向转换。"
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: 6a8b52e9fe79
 ---
 
-# YAML / JSON {#yaml-json}
+# 转换 YAML / JSON {#yaml-json}
 
 在 YAML 与 JSON 格式之间双向转换。上传 YAML 文件可得到 JSON，或上传 JSON 文件可得到 YAML。
 

@@ -1,11 +1,11 @@
 ---
 description: "Нормализация громкости аудио видео до вещательного стандарта."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 791c95bb5835
 ---
 
-# Normalize Audio {#normalize-audio}
+# Нормализация звука видео {#normalize-audio}
 
 Нормализация громкости аудио видео до вещательного стандарта громкости EBU R128.
 

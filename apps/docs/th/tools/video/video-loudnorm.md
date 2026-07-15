@@ -1,11 +1,11 @@
 ---
 description: "ปรับระดับความดังเสียงของวิดีโอให้เป็นมาตรฐานการออกอากาศ"
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 65ca4caaefc8
 ---
 
-# Normalize Audio {#normalize-audio}
+# นอร์มอลไลซ์เสียงวิดีโอ {#normalize-audio}
 
 ปรับระดับความดังเสียงของวิดีโอให้เป็นมาตรฐานความดังการออกอากาศ EBU R128
 

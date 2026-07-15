@@ -1,11 +1,11 @@
 ---
 description: "在每張紙上排列多個 PDF 頁面（2 合 1、4 合 1 等）。"
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 92b5b8e56c3d
 ---
 
-# N 合 1 PDF {#n-up-pdf}
+# 每張紙頁數 (N-up) {#n-up-pdf}
 
 在每張紙上排列多個頁面以在列印時節省紙張，例如 2 合 1 或 4 合 1 版面配置。
 

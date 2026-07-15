@@ -1,11 +1,11 @@
 ---
 description: "使用自適應、遮色片銳利化或高通方法銳利化影像，並可選用降噪。"
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: a37165c2f0bd
 ---
 
-# 銳利化 {#sharpening}
+# 銳利化影像 {#sharpening}
 
 進階銳利化工具，提供三種方法：自適應（智慧邊緣感知）、遮色片銳利化（傳統的半徑/強度）與高通（強調紋理）。內建降噪功能，可防止銳利化產生瑕疵。
 

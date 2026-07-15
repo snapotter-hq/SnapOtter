@@ -1,11 +1,11 @@
 ---
 description: "Làm sắc nét ảnh bằng phương pháp adaptive, unsharp mask hoặc high-pass với tùy chọn giảm nhiễu."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: c519581a7822
 ---
 
-# Làm sắc nét {#sharpening}
+# Làm nét ảnh {#sharpening}
 
 Công cụ làm sắc nét nâng cao với ba phương pháp: adaptive (nhận biết cạnh thông minh), unsharp mask (radius/amount cổ điển), và high-pass (nhấn mạnh kết cấu). Bao gồm tính năng giảm nhiễu tích hợp để ngăn các hiện tượng lỗi khi làm sắc nét.
 

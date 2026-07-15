@@ -1,11 +1,11 @@
 ---
 description: "Konversi EPUB ke PDF, DOCX, HTML, atau Markdown."
-i18n_source_hash: 7d94fc18ca97
+i18n_source_hash: cb39f254ff2f
 i18n_provenance: human
 i18n_output_hash: cf8d4169cf9e
 ---
 
-# Convert EPUB {#convert-epub}
+# Konversi dari EPUB {#convert-epub}
 
 Konversi e-book EPUB ke PDF, Word (DOCX), HTML, atau Markdown. Sumber daya jarak jauh di dalam buku tidak diambil.
 

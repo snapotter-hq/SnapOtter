@@ -1,11 +1,11 @@
 ---
 description: "한 장에 여러 PDF 페이지를 배열합니다(2-up, 4-up 등)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: e2bb8d16e545
 ---
 
-# N-up PDF {#n-up-pdf}
+# 한 장에 여러 페이지 (N-up) {#n-up-pdf}
 
 2-up 또는 4-up 레이아웃처럼 한 장에 여러 페이지를 배열하여 인쇄 시 종이를 절약합니다.
 

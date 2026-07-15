@@ -1,11 +1,11 @@
 ---
 description: "使用 25+ 種範本、可調整的間距與圓角，以及每格的平移與縮放，將多張圖片組合成網格拼貼。"
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 562975f3d64d
 ---
 
-# 拼貼 / 網格 {#collage-grid}
+# 拼貼畫與格線 {#collage-grid}
 
 使用 25+ 種範本將多張圖片組合成精美的網格拼貼。支援 2-9 張圖片的版面配置，並可自訂間距、圓角半徑、背景顏色，以及每格的平移／縮放控制。
 

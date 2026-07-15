@@ -1,11 +1,11 @@
 ---
 description: "تحويل ملف PDF إلى صيغة أرشيفية PDF/A-2 للحفظ طويل الأمد."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 35aad5da4358
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# محوّل PDF/A {#pdf-a-convert}
 
 حوّل ملف PDF إلى الصيغة الأرشيفية PDF/A-2، المناسبة للحفظ طويل الأمد والامتثال التنظيمي.
 

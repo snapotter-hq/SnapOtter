@@ -1,11 +1,11 @@
 ---
 description: "Ruota le immagini di qualsiasi angolo e capovolgile orizzontalmente o verticalmente."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: caf0161dab05
 ---
 
-# Rotate & Flip {#rotate-flip}
+# Ruota e capovolgi immagine {#rotate-flip}
 
 Ruota le immagini di un angolo arbitrario e/o capovolgile orizzontalmente o verticalmente. Le operazioni di rotazione e capovolgimento possono essere combinate in un'unica richiesta.
 

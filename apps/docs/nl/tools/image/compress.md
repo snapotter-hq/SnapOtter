@@ -1,11 +1,11 @@
 ---
 description: "Verklein de bestandsgrootte van afbeeldingen op basis van kwaliteitsniveau of naar een doelbestandsgrootte."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: c556a6d13f9f
 ---
 
-# Comprimeren {#compress}
+# Afbeelding comprimeren {#compress}
 
 Verklein de bestandsgrootte van afbeeldingen door een kwaliteitsniveau of een doelbestandsgrootte in kilobytes op te geven. De tool gebruikt iteratieve binaire zoekopdrachten om doelgroottes nauwkeurig te bereiken.
 

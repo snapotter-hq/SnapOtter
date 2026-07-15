@@ -1,11 +1,11 @@
 ---
 description: "Rileva e sfoca automaticamente i volti nelle immagini con il rilevamento facciale basato su IA per la privacy e l'anonimizzazione conforme al GDPR."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: d32c51859f58
 ---
 
-# Sfocatura volti / PII {#face-pii-blur}
+# Sfoca volti e dati sensibili {#face-pii-blur}
 
 Rileva e sfoca automaticamente i volti nelle immagini usando il rilevamento facciale basato su IA (MediaPipe).
 

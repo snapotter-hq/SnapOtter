@@ -1,11 +1,11 @@
 ---
 description: "YAML과 JSON 간 양방향 변환을 수행합니다."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: c24cc0d2741c
 ---
 
-# YAML / JSON {#yaml-json}
+# YAML / JSON 변환 {#yaml-json}
 
 YAML과 JSON 형식 간 양방향 변환을 수행합니다. YAML 파일을 업로드하면 JSON을 얻고, JSON 파일을 업로드하면 YAML을 얻습니다.
 

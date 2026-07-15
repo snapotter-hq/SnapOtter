@@ -1,11 +1,11 @@
 ---
 description: "YAML ve JSON arasında her iki yönde dönüştürün."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: a0463e61bb6c
 ---
 
-# YAML / JSON {#yaml-json}
+# YAML / JSON Dönüştür {#yaml-json}
 
 YAML ve JSON biçimleri arasında her iki yönde dönüştürün. JSON almak için bir YAML dosyası, YAML almak için bir JSON dosyası yükleyin.
 

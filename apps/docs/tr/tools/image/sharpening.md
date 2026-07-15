@@ -1,11 +1,11 @@
 ---
 description: "İsteğe bağlı gürültü azaltma ile uyarlanabilir, unsharp mask veya high-pass yöntemlerini kullanarak görüntüleri keskinleştirin."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 9951348a9731
 ---
 
-# Keskinleştirme {#sharpening}
+# Görüntü Keskinleştir {#sharpening}
 
 Üç yöntemli gelişmiş keskinleştirme aracı: uyarlanabilir (akıllı kenar farkındalıklı), unsharp mask (klasik yarıçap/miktar) ve high-pass (doku vurgusu). Keskinleştirme artefaktlarını önlemek için yerleşik gürültü azaltma içerir.
 

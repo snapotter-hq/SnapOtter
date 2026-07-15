@@ -1,6 +1,6 @@
 ---
 description: "رفع أو خفض مستوى الصوت بمقدار كسب ثابت بالديسيبل."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: d9fa73e130aa
 ---

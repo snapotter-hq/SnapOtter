@@ -1,11 +1,11 @@
 ---
 description: "Aumenta o riduce il volume dell'audio applicando un guadagno fisso in decibel."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 5872c4abd11c
 ---
 
-# Volume Adjust {#volume-adjust}
+# Regola Volume {#volume-adjust}
 
 Aumenta o riduce il volume di un file audio applicando un guadagno fisso in decibel.
 

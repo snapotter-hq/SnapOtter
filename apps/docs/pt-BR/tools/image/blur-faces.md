@@ -1,11 +1,11 @@
 ---
 description: "Detecte e desfoque rostos em imagens automaticamente com detecção de rostos por IA para privacidade e anonimização em conformidade com o GDPR."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 62a67ea12e80
 ---
 
-# Desfoque de Rosto / PII {#face-pii-blur}
+# Desfocar Rostos e Dados Sensíveis {#face-pii-blur}
 
 Detecte e desfoque rostos em imagens automaticamente usando detecção de rostos por IA (MediaPipe).
 

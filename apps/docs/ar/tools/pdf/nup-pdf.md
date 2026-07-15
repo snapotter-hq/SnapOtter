@@ -1,11 +1,11 @@
 ---
 description: "ترتيب عدة صفحات PDF في كل ورقة (صفحتان لكل ورقة، أربع صفحات لكل ورقة، وهكذا)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 903fc659cd1e
 ---
 
-# N-up PDF {#n-up-pdf}
+# صفحات لكل ورقة (N-up) {#n-up-pdf}
 
 رتّب عدة صفحات في كل ورقة لتوفير الورق عند الطباعة، مثل تخطيطات صفحتين أو أربع صفحات لكل ورقة.
 

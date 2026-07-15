@@ -1,11 +1,11 @@
 ---
 description: "Découpe une image en tuiles de grille selon des lignes et des colonnes ou selon une taille en pixels, renvoyées sous forme d'archive ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: bc8f0812ff9f
 ---
 
-# Découpage d'image {#image-splitting}
+# Découper une image {#image-splitting}
 
 Découpe une seule image en tuiles de grille selon un nombre de colonnes/lignes ou selon des dimensions en pixels précises. Renvoie une archive ZIP contenant toutes les tuiles.
 

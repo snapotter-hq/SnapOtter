@@ -1,11 +1,11 @@
 ---
 description: "Tăng hoặc giảm âm lượng bằng một mức khuếch đại cố định tính bằng decibel."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 08ab23fad5a9
 ---
 
-# Volume Adjust {#volume-adjust}
+# Điều chỉnh âm lượng {#volume-adjust}
 
 Tăng hoặc giảm âm lượng của một tệp âm thanh bằng cách áp dụng một mức khuếch đại cố định tính bằng decibel.
 

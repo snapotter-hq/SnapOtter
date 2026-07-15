@@ -1,11 +1,11 @@
 ---
 description: "비디오 오디오 볼륨을 방송 표준으로 정규화합니다."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: c0432472f482
 ---
 
-# Normalize Audio {#normalize-audio}
+# 동영상 오디오 정규화 {#normalize-audio}
 
 비디오 오디오 볼륨을 EBU R128 방송 라우드니스 표준으로 정규화합니다.
 

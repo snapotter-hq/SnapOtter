@@ -1,11 +1,11 @@
 ---
 description: "Ta bort EXIF-, GPS-, ICC- och XMP-metadata från bilder för integritet och mindre filstorlekar."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 691746073839
 ---
 
-# Ta bort metadata {#remove-metadata}
+# Ta bort bildmetadata {#remove-metadata}
 
 Ta bort EXIF, GPS, ICC-färgprofiler och XMP-metadata från bilder. Användbart för integritet (ta bort GPS-koordinater, kamerainformation) och för att minska filstorleken.
 

@@ -1,11 +1,11 @@
 ---
 description: "AVIF, JXL, और HEIC जैसे आधुनिक फ़ॉर्मेट सहित छवियों को फ़ॉर्मेट के बीच परिवर्तित करें।"
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: d2a3deb5118b
 ---
 
-# Convert {#convert}
+# इमेज कन्वर्ट {#convert}
 
 छवियों को फ़ॉर्मेट के बीच परिवर्तित करें। सामान्य वेब फ़ॉर्मेट के साथ-साथ HEIC, JXL, BMP, ICO, JP2, QOI, और PSD जैसे विशेष फ़ॉर्मेट का समर्थन करता है।
 

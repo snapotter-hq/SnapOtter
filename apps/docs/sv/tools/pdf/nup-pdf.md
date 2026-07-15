@@ -1,11 +1,11 @@
 ---
 description: "Placera flera PDF-sidor per ark (2-up, 4-up osv.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 454082da0433
 ---
 
-# N-up PDF {#n-up-pdf}
+# Sidor per ark (N-up) {#n-up-pdf}
 
 Placera flera sidor per ark för att spara papper vid utskrift, till exempel 2-up- eller 4-up-layouter.
 

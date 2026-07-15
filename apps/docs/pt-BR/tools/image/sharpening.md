@@ -1,11 +1,11 @@
 ---
 description: "Realce imagens usando os métodos adaptativo, máscara de nitidez (unsharp mask) ou passa-alta, com redução de ruído opcional."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 4d24bdae0af1
 ---
 
-# Nitidez (Sharpening) {#sharpening}
+# Aplicar Nitidez na Imagem {#sharpening}
 
 Ferramenta avançada de nitidez com três métodos: adaptativo (inteligente, sensível a bordas), máscara de nitidez (unsharp mask, com raio/quantidade clássicos) e passa-alta (ênfase em textura). Inclui redução de ruído embutida para evitar artefatos de nitidez.
 

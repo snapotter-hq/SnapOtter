@@ -1,11 +1,11 @@
 ---
 description: "將 PDF 轉換為封存用的 PDF/A-2 格式以供長期保存。"
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 3dbdd411b552
 ---
 
-# PDF/A 轉換 {#pdf-a-convert}
+# PDF/A 轉換器 {#pdf-a-convert}
 
 將 PDF 轉換為 PDF/A-2 封存格式，適用於長期保存與法規遵循。
 

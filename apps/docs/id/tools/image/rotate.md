@@ -1,11 +1,11 @@
 ---
 description: "Putar gambar pada sudut mana pun dan balik secara horizontal atau vertikal."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: daef1621cb61
 ---
 
-# Rotate & Flip {#rotate-flip}
+# Putar & Balik Gambar {#rotate-flip}
 
 Putar gambar pada sudut sembarang dan/atau balik secara horizontal atau vertikal. Operasi rotasi dan pembalikan dapat digabungkan dalam satu permintaan.
 

@@ -1,11 +1,11 @@
 ---
 description: "Chuyển đổi ảnh giữa các định dạng bao gồm các định dạng hiện đại như AVIF, JXL và HEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: b90c7763aa36
 ---
 
-# Chuyển đổi {#convert}
+# Chuyển đổi ảnh {#convert}
 
 Chuyển đổi ảnh giữa các định dạng. Hỗ trợ các định dạng web phổ biến cũng như các định dạng chuyên biệt như HEIC, JXL, BMP, ICO, JP2, QOI và PSD.
 

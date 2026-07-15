@@ -1,11 +1,11 @@
 ---
 description: "Kombiniert mehrere Bilder zu Rastercollagen mit über 25 Vorlagen, einstellbaren Abständen und Ecken sowie Schwenken und Zoomen pro Zelle."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 480169ab7be2
 ---
 
-# Collage / Raster {#collage-grid}
+# Collage & Raster {#collage-grid}
 
 Kombiniert mehrere Bilder zu ansprechenden Rastercollagen mit über 25 Vorlagen. Unterstützt Layouts für 2 bis 9 Bilder mit anpassbarem Abstand, Eckenradius, Hintergrundfarbe sowie Schwenk-/Zoom-Steuerung pro Zelle.
 

@@ -1,6 +1,6 @@
 ---
 description: "Aumente ou diminua o volume do áudio por um ganho fixo em decibéis."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 8d205884bf96
 ---

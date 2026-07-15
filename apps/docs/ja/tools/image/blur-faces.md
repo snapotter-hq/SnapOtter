@@ -1,11 +1,11 @@
 ---
 description: "AI 顔検出で画像内の顔を自動検出してぼかし、プライバシー保護と GDPR に準拠した匿名化を行います。"
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: a863b71fd7e4
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# 顔と個人情報のぼかし {#face-pii-blur}
 
 AI 対応の顔検出 (MediaPipe) を使用して、画像内の顔を自動検出してぼかします。
 

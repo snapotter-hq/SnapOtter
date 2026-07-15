@@ -1,11 +1,11 @@
 ---
 description: "Łącz wiele obrazów w kolaże siatkowe z ponad 25 szablonami, regulowanymi odstępami i narożnikami oraz przesuwaniem i powiększaniem dla każdej komórki."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 12ed9b5e0135
 ---
 
-# Kolaż / Siatka {#collage-grid}
+# Kolaż i siatka {#collage-grid}
 
 Łącz wiele obrazów w piękne kolaże siatkowe z ponad 25 szablonami. Obsługuje układy od 2 do 9 obrazów z konfigurowalnym odstępem, promieniem narożnika, kolorem tła oraz przesuwaniem/powiększaniem dla każdej komórki.
 

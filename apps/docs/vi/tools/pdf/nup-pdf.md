@@ -1,11 +1,11 @@
 ---
 description: "Sắp xếp nhiều trang PDF trên mỗi tờ (2-up, 4-up, v.v.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 1012fd595786
 ---
 
-# N-up PDF {#n-up-pdf}
+# Số trang mỗi tờ (N-up) {#n-up-pdf}
 
 Sắp xếp nhiều trang trên mỗi tờ để tiết kiệm giấy khi in, chẳng hạn như bố cục 2-up hoặc 4-up.
 

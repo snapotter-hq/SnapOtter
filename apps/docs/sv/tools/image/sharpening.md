@@ -1,11 +1,11 @@
 ---
 description: "Skärp bilder med adaptiva metoder, oskarp mask eller högpass, med valfri brusreducering."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: ddc9e7b2c36e
 ---
 
-# Skärpning {#sharpening}
+# Skärp bild {#sharpening}
 
 Avancerat skärpningsverktyg med tre metoder: adaptiv (smart kantmedveten), oskarp mask (klassisk radie/mängd) och högpass (texturbetoning). Innehåller inbyggd brusreducering för att förhindra skärpningsartefakter.
 

@@ -1,11 +1,11 @@
 ---
 description: "將影片音訊音量正規化為廣播標準。"
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 6bfd06fe9eb2
 ---
 
-# Normalize Audio {#normalize-audio}
+# 標準化影片音量 {#normalize-audio}
 
 將影片音訊音量正規化為 EBU R128 廣播響度標準。
 

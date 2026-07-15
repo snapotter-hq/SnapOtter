@@ -1,6 +1,6 @@
 ---
 description: "Cắt ảnh bằng cách chỉ định một vùng với vị trí và kích thước."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: da847123a2f2
 ---

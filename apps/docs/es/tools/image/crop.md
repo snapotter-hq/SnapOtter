@@ -1,11 +1,11 @@
 ---
 description: "Recorta imágenes especificando una región con posición y dimensiones."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: ac5e5e050598
 ---
 
-# Recortar {#crop}
+# Recortar imagen {#crop}
 
 Recorta imágenes definiendo una región rectangular mediante posición y tamaño. Admite unidades tanto de píxeles como de porcentaje.
 

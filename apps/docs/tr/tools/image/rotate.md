@@ -1,11 +1,11 @@
 ---
 description: "Görselleri herhangi bir açıyla döndürün ve yatay veya dikey olarak çevirin."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 7c555cd57021
 ---
 
-# Döndür ve Çevir {#rotate-flip}
+# Görüntü Döndür ve Çevir {#rotate-flip}
 
 Görselleri isteğe bağlı bir açıyla döndürün ve/veya yatay ya da dikey olarak çevirin. Döndürme ve çevirme işlemleri tek bir istekte birleştirilebilir.
 

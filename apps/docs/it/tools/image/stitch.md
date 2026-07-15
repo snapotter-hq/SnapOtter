@@ -1,11 +1,11 @@
 ---
 description: "Unisce le immagini affiancate, impilate o in griglia con controllo su allineamento, spazi, bordi e modalità di ridimensionamento."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: bf3eaa505310
 ---
 
-# Unisci / Combina {#stitch-combine}
+# Unisci immagini {#stitch-combine}
 
 Unisce più immagini affiancate, impilate verticalmente o disposte in una griglia. Supporta allineamento, spazio, bordo, raggio degli angoli e diverse modalità di ridimensionamento.
 

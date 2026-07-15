@@ -1,11 +1,11 @@
 ---
 description: "หมุนรูปภาพในมุมใดก็ได้และพลิกในแนวนอนหรือแนวตั้ง"
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 6b9c6e8bbef1
 ---
 
-# Rotate & Flip {#rotate-flip}
+# หมุนและพลิกภาพ {#rotate-flip}
 
 หมุนรูปภาพในมุมใดก็ได้ และ/หรือพลิกในแนวนอนหรือแนวตั้ง การหมุนและการพลิกสามารถทำร่วมกันในคำขอเดียวได้
 

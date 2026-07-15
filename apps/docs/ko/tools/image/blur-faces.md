@@ -1,11 +1,11 @@
 ---
 description: "개인정보 보호 및 GDPR 준수 익명화를 위해 AI 얼굴 감지로 이미지 속 얼굴을 자동 감지하고 흐리게 합니다."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 8e812f7a6ae1
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# 얼굴 및 개인정보 블러 {#face-pii-blur}
 
 AI 기반 얼굴 감지(MediaPipe)를 사용하여 이미지 속 얼굴을 자동으로 감지하고 흐리게 합니다.
 

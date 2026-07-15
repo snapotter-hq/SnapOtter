@@ -1,11 +1,11 @@
 ---
 description: "使用 AI 人脸检测自动识别并模糊图像中的人脸，用于隐私保护和符合 GDPR 的匿名化。"
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 3a0007f60b8a
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# 模糊人脸和隐私信息 {#face-pii-blur}
 
 使用 AI 驱动的人脸检测（MediaPipe）自动识别并模糊图像中的人脸。
 

@@ -1,11 +1,11 @@
 ---
 description: "Disponi più pagine PDF per foglio (2-up, 4-up, ecc.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 82856ec4f5a3
 ---
 
-# PDF N-up {#n-up-pdf}
+# Pagine per foglio (N-up) {#n-up-pdf}
 
 Disponi più pagine per foglio per risparmiare carta in fase di stampa, ad esempio con layout 2-up o 4-up.
 

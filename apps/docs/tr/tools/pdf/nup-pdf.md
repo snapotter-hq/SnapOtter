@@ -1,11 +1,11 @@
 ---
 description: "Yaprak başına birden fazla PDF sayfasını düzenleyin (2'li, 4'lü vb.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 5fd7f68b9845
 ---
 
-# N-up PDF {#n-up-pdf}
+# Yaprak Başına Sayfa (N-up) {#n-up-pdf}
 
 Yazdırırken kâğıttan tasarruf etmek için yaprak başına birden fazla sayfayı, örneğin 2'li veya 4'lü düzenlerde yerleştirin.
 

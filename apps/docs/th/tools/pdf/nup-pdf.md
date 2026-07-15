@@ -1,11 +1,11 @@
 ---
 description: "จัดหน้า PDF หลายหน้าต่อแผ่น (2-up, 4-up และอื่น ๆ)"
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 42ffd479de9c
 ---
 
-# N-up PDF {#n-up-pdf}
+# หน้าต่อแผ่น (N-up) {#n-up-pdf}
 
 จัดหลายหน้าต่อแผ่นเพื่อประหยัดกระดาษเมื่อพิมพ์ เช่น เค้าโครง 2-up หรือ 4-up
 

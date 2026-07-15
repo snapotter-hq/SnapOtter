@@ -1,11 +1,11 @@
 ---
 description: "Rozmieść wiele stron PDF na jednym arkuszu (2-up, 4-up itd.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: af436a5cb52d
 ---
 
-# N-up PDF {#n-up-pdf}
+# Strony na arkusz (N-up) {#n-up-pdf}
 
 Rozmieść wiele stron na jednym arkuszu, aby oszczędzać papier podczas drukowania, na przykład w układach 2-up lub 4-up.
 

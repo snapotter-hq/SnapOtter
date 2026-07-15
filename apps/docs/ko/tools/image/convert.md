@@ -1,11 +1,11 @@
 ---
 description: "AVIF, JXL, HEIC와 같은 최신 형식을 포함하여 이미지를 형식 간에 변환합니다."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: 4d24e322a7ac
 ---
 
-# 변환 {#convert}
+# 이미지 변환 {#convert}
 
 이미지를 형식 간에 변환합니다. 일반적인 웹 형식은 물론 HEIC, JXL, BMP, ICO, JP2, QOI, PSD와 같은 특수 형식도 지원합니다.
 

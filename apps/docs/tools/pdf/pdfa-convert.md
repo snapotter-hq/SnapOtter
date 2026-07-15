@@ -2,7 +2,7 @@
 description: Convert a PDF to archival PDF/A-2 format for long-term preservation.
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A Converter {#pdf-a-convert}
 
 Convert a PDF to the PDF/A-2 archival format, suitable for long-term preservation and regulatory compliance.
 

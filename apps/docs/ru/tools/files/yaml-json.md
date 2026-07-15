@@ -1,11 +1,11 @@
 ---
 description: "Преобразование между YAML и JSON в обоих направлениях."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: 2634cecb09dc
 ---
 
-# YAML / JSON {#yaml-json}
+# Конвертация YAML / JSON {#yaml-json}
 
 Преобразуйте форматы YAML и JSON в обоих направлениях. Загрузите файл YAML, чтобы получить JSON, или загрузите файл JSON, чтобы получить YAML.
 

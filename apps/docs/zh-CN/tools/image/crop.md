@@ -1,11 +1,11 @@
 ---
 description: "通过指定位置和尺寸的区域裁剪图片。"
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 6d45b3b09301
 ---
 
-# 裁剪 {#crop}
+# 裁剪图片 {#crop}
 
 通过位置和尺寸定义一个矩形区域来裁剪图片。支持像素和百分比两种单位。
 

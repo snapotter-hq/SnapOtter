@@ -1,11 +1,11 @@
 ---
 description: "اقتصاص الصور بتحديد منطقة بموضع وأبعاد."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 507104de8aef
 ---
 
-# Crop {#crop}
+# اقتصاص الصورة {#crop}
 
 اقتص الصور بتعريف منطقة مستطيلة باستخدام الموضع والحجم. يدعم وحدات البكسل والنسبة المئوية.
 

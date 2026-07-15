@@ -1,11 +1,11 @@
 ---
 description: "Normalizacja głośności audio wideo do standardu transmisyjnego."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 71fe7bfb8be2
 ---
 
-# Normalize Audio {#normalize-audio}
+# Normalizuj audio wideo {#normalize-audio}
 
 Normalizuje głośność audio wideo do standardu głośności transmisyjnej EBU R128.
 

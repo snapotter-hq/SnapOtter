@@ -1,11 +1,11 @@
 ---
 description: "Ses seviyesini desibel cinsinden sabit bir kazançla artırın veya azaltın."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 7103af0b532c
 ---
 
-# Volume Adjust {#volume-adjust}
+# Ses Seviyesini Ayarla {#volume-adjust}
 
 Desibel cinsinden sabit bir kazanç uygulayarak bir ses dosyasının ses seviyesini artırın veya azaltın.
 

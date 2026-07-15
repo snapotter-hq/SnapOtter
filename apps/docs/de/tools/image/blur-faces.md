@@ -1,11 +1,11 @@
 ---
 description: "Gesichter in Bildern per KI-Gesichtserkennung automatisch erkennen und weichzeichnen, für Datenschutz und DSGVO-konforme Anonymisierung."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: b1283a5f8b45
 ---
 
-# Gesichts- / PII-Weichzeichnung {#face-pii-blur}
+# Gesichter & PII weichzeichnen {#face-pii-blur}
 
 Erkennt und zeichnet Gesichter in Bildern automatisch mithilfe KI-gestützter Gesichtserkennung (MediaPipe) weich.
 

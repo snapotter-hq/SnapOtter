@@ -1,11 +1,11 @@
 ---
 description: "Edita campos de metadatos EXIF, IPTC, GPS y XMP en imágenes sin recodificar los píxeles."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 9ee294905c8a
 ---
 
-# Editar metadatos {#edit-metadata}
+# Editar metadatos de imagen {#edit-metadata}
 
 Edita campos de metadatos de imagen, incluidos EXIF, IPTC, coordenadas GPS, fechas y palabras clave. Usa ExifTool internamente, por lo que los metadatos se escriben en el sitio sin recodificar los píxeles, preservando la calidad completa de la imagen.
 

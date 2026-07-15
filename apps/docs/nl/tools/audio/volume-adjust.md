@@ -1,11 +1,11 @@
 ---
 description: "Verhoog of verlaag het audiovolume met een vaste versterking in decibel."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 43dca36f14df
 ---
 
-# Volume Adjust {#volume-adjust}
+# Volume aanpassen {#volume-adjust}
 
 Verhoog of verlaag het volume van een audiobestand door een vaste versterking in decibel toe te passen.
 

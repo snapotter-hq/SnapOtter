@@ -1,11 +1,11 @@
 ---
 description: "Giảm kích thước tệp ảnh theo mức chất lượng hoặc theo kích thước tệp mục tiêu."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: af62b2e13a07
 ---
 
-# Nén {#compress}
+# Nén ảnh {#compress}
 
 Giảm kích thước tệp ảnh bằng cách chỉ định mức chất lượng hoặc kích thước tệp mục tiêu tính bằng kilobyte. Công cụ dùng tìm kiếm nhị phân lặp để đạt mục tiêu kích thước một cách chính xác.
 

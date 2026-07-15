@@ -1,11 +1,11 @@
 ---
 description: "编辑图片中的 EXIF、IPTC、GPS 和 XMP 元数据字段，无需重新编码像素。"
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 7b3853980f3b
 ---
 
-# 编辑元数据 {#edit-metadata}
+# 编辑图片元数据 {#edit-metadata}
 
 编辑图片的元数据字段，包括 EXIF、IPTC、GPS 坐标、日期和关键词。底层使用 ExifTool，因此元数据是就地写入的，无需重新编码像素，从而完整保留图片质量。
 

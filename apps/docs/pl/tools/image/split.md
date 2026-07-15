@@ -1,11 +1,11 @@
 ---
 description: "Podziel jeden obraz na kafelki siatki według wierszy i kolumn lub według rozmiaru w pikselach, zwracane jako archiwum ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: fe0c6f88ea40
 ---
 
-# Dzielenie obrazu {#image-splitting}
+# Podziel obraz {#image-splitting}
 
 Podziel pojedynczy obraz na kafelki siatki według liczby kolumn/wierszy lub według konkretnych wymiarów w pikselach. Zwraca archiwum ZIP zawierające wszystkie kafelki.
 

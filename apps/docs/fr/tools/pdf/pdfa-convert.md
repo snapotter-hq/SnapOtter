@@ -1,11 +1,11 @@
 ---
 description: "Convertir un PDF au format d'archivage PDF/A-2 pour une conservation à long terme."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: a18ec51a3d2c
 ---
 
-# Conversion PDF/A {#pdf-a-convert}
+# Convertisseur PDF/A {#pdf-a-convert}
 
 Convertissez un PDF au format d'archivage PDF/A-2, adapté à la conservation à long terme et à la conformité réglementaire.
 

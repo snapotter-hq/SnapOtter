@@ -1,11 +1,11 @@
 ---
 description: "Gizlilik ve daha küçük dosya boyutları için görüntülerden EXIF, GPS, ICC ve XMP meta verilerini kaldırın."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: fdd4a93992b6
 ---
 
-# Meta Verileri Kaldır {#remove-metadata}
+# Görüntü Meta Verisi Kaldır {#remove-metadata}
 
 Görüntülerden EXIF, GPS, ICC renk profilleri ve XMP meta verilerini kaldırın. Gizlilik (GPS koordinatlarını, kamera bilgilerini kaldırma) ve dosya boyutunu küçültme için kullanışlıdır.
 

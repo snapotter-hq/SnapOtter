@@ -1,11 +1,11 @@
 ---
 description: "長期保存のために PDF をアーカイブ用 PDF/A-2 形式に変換します。"
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 706a11edc6f1
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A コンバーター {#pdf-a-convert}
 
 PDF を PDF/A-2 アーカイブ形式に変換します。長期保存や規制対応に適しています。
 

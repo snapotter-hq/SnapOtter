@@ -1,11 +1,11 @@
 ---
 description: "Foga samman bilder sida vid sida, staplade eller i ett rutnät med kontroll över justering, mellanrum, kanter och storleksändringsläge."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 2c395845781e
 ---
 
-# Sammanfogning / Kombinering {#stitch-combine}
+# Sammanfoga bilder {#stitch-combine}
 
 Foga samman flera bilder sida vid sida, staplade vertikalt eller arrangerade i ett rutnät. Stöder justering, mellanrum, kant, hörnradie och flera storleksändringslägen.
 

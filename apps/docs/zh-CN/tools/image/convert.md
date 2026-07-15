@@ -1,11 +1,11 @@
 ---
 description: "在各种格式之间转换图片，包括 AVIF、JXL 和 HEIC 等现代格式。"
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: 238017f07183
 ---
 
-# 转换 {#convert}
+# 转换图片 {#convert}
 
 在各种格式之间转换图片。支持常见的网页格式，以及 HEIC、JXL、BMP、ICO、JP2、QOI 和 PSD 等专业格式。
 

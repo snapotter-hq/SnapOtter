@@ -1,11 +1,11 @@
 ---
 description: "Görselleri piksel, yüzde veya sığdırma modlarıyla yeniden boyutlandırın."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: f5e1119e470e
 ---
 
-# Yeniden Boyutlandır {#resize}
+# Görüntü Boyutlandır {#resize}
 
 Görselleri tam piksel boyutları, bir yüzde ölçek katsayısı veya görselin hedef boyutlara nasıl uyum sağlayacağını denetleyen bir sığdırma modu belirterek yeniden boyutlandırın.
 

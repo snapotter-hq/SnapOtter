@@ -1,11 +1,11 @@
 ---
 description: "Kurangi ukuran file gambar berdasarkan level kualitas atau ke ukuran file target."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 327a0ac6cf15
 ---
 
-# Kompres {#compress}
+# Kompres Gambar {#compress}
 
 Kurangi ukuran file gambar dengan menentukan level kualitas atau ukuran file target dalam kilobyte. Alat ini menggunakan pencarian biner iteratif untuk mencapai target ukuran secara akurat.
 

@@ -1,11 +1,11 @@
 ---
 description: "EPUB를 PDF, DOCX, HTML, 또는 Markdown으로 변환합니다."
-i18n_source_hash: 7d94fc18ca97
+i18n_source_hash: cb39f254ff2f
 i18n_provenance: human
 i18n_output_hash: 19ff29a02151
 ---
 
-# EPUB 변환 {#convert-epub}
+# EPUB에서 변환 {#convert-epub}
 
 EPUB 전자책을 PDF, Word(DOCX), HTML, 또는 Markdown으로 변환합니다. 책 내부의 원격 리소스는 가져오지 않습니다.
 

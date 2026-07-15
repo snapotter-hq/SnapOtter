@@ -1,11 +1,11 @@
 ---
 description: "Converteer afbeeldingen tussen formaten, waaronder moderne formaten zoals AVIF, JXL en HEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: 312bf34b0b8a
 ---
 
-# Converteren {#convert}
+# Afbeelding converteren {#convert}
 
 Converteer afbeeldingen tussen formaten. Ondersteunt gangbare webformaten en gespecialiseerde formaten zoals HEIC, JXL, BMP, ICO, JP2, QOI en PSD.
 

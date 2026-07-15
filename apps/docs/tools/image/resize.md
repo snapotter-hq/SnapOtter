@@ -2,7 +2,7 @@
 description: Resize images by pixels, percentage, or with fit modes.
 ---
 
-# Resize {#resize}
+# Resize Image {#resize}
 
 Resize images by specifying exact pixel dimensions, a percentage scale factor, or a fit mode that controls how the image adapts to the target dimensions.
 

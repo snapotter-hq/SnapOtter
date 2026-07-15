@@ -1,11 +1,11 @@
 ---
 description: "Combina varias imágenes en collages de cuadrícula con más de 25 plantillas, espacios y esquinas ajustables, y desplazamiento y zoom por celda."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 76d7bdb22d30
 ---
 
-# Collage / Cuadrícula {#collage-grid}
+# Collage y cuadrícula {#collage-grid}
 
 Combina varias imágenes en collages de cuadrícula atractivos con más de 25 plantillas. Admite diseños de 2 a 9 imágenes con espacio, radio de esquina, color de fondo y controles de desplazamiento/zoom por celda personalizables.
 

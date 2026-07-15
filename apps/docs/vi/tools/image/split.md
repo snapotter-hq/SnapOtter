@@ -1,11 +1,11 @@
 ---
 description: "Chia một ảnh thành các ô lưới theo hàng và cột hoặc theo kích thước pixel, trả về dưới dạng kho lưu trữ ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: b767a4ac891e
 ---
 
-# Chia ảnh {#image-splitting}
+# Tách ảnh {#image-splitting}
 
 Chia một ảnh đơn thành các ô lưới theo số cột/hàng hoặc theo kích thước pixel cụ thể. Trả về một kho lưu trữ ZIP chứa tất cả các ô.
 

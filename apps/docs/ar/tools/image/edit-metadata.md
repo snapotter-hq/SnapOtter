@@ -1,11 +1,11 @@
 ---
 description: "تحرير حقول بيانات EXIF وIPTC وGPS وXMP الوصفية في الصور دون إعادة ترميز البكسلات."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 476b3bfa39e7
 ---
 
-# Edit Metadata {#edit-metadata}
+# تعديل البيانات الوصفية للصورة {#edit-metadata}
 
 حرّر حقول البيانات الوصفية للصورة بما في ذلك EXIF وIPTC وإحداثيات GPS والتواريخ والكلمات المفتاحية. يستخدم ExifTool خلف الكواليس، لذا تُكتَب البيانات الوصفية في مكانها دون إعادة ترميز البكسلات، مع الحفاظ على جودة الصورة الكاملة.
 

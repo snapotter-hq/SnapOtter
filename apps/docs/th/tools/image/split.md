@@ -1,11 +1,11 @@
 ---
 description: "แบ่งภาพหนึ่งภาพออกเป็นไทล์แบบตารางตามจำนวนแถวและคอลัมน์ หรือตามขนาดพิกเซล คืนค่าเป็นไฟล์ ZIP"
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 1e134c68d446
 ---
 
-# Image Splitting {#image-splitting}
+# แบ่งภาพ {#image-splitting}
 
 แบ่งภาพเดียวออกเป็นไทล์แบบตารางตามจำนวนคอลัมน์/แถว หรือตามขนาดพิกเซลที่กำหนด คืนค่าเป็นไฟล์ ZIP ที่มีไทล์ทั้งหมด
 

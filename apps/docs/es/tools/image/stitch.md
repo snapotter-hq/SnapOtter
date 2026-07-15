@@ -1,11 +1,11 @@
 ---
 description: "Une imágenes en horizontal, apiladas o en cuadrícula, con control sobre la alineación, los espacios, los bordes y el modo de redimensionado."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 1679f36e5612
 ---
 
-# Unir / Combinar {#stitch-combine}
+# Unir imágenes {#stitch-combine}
 
 Une varias imágenes en horizontal, apiladas en vertical o dispuestas en cuadrícula. Admite alineación, espacio, borde, radio de esquina y varios modos de redimensionado.
 

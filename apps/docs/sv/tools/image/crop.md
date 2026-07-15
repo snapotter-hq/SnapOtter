@@ -1,11 +1,11 @@
 ---
 description: "Beskär bilder genom att ange ett område med position och dimensioner."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 37bd3b1a4f17
 ---
 
-# Beskär {#crop}
+# Beskär bild {#crop}
 
 Beskär bilder genom att definiera ett rektangulärt område med hjälp av position och storlek. Stöder både pixel- och procentenheter.
 

@@ -1,11 +1,11 @@
 ---
 description: "Deteksi dan buramkan wajah dalam gambar secara otomatis dengan deteksi wajah AI untuk privasi dan anonimisasi yang patuh GDPR."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: a2d660c6993d
 ---
 
-# Buramkan Wajah / PII {#face-pii-blur}
+# Blur Wajah & Info Pribadi {#face-pii-blur}
 
 Deteksi dan buramkan wajah dalam gambar secara otomatis menggunakan deteksi wajah bertenaga AI (MediaPipe).
 

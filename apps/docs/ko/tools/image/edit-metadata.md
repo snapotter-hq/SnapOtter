@@ -1,11 +1,11 @@
 ---
 description: "픽셀을 다시 인코딩하지 않고 이미지의 EXIF, IPTC, GPS, XMP 메타데이터 필드를 편집합니다."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 8891cb76ddef
 ---
 
-# 메타데이터 편집 {#edit-metadata}
+# 이미지 메타데이터 편집 {#edit-metadata}
 
 EXIF, IPTC, GPS 좌표, 날짜, 키워드를 포함한 이미지 메타데이터 필드를 편집합니다. 내부적으로 ExifTool을 사용하므로 메타데이터가 픽셀 재인코딩 없이 제자리에서 기록되어 완전한 이미지 품질이 유지됩니다.
 

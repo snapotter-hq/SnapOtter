@@ -1,11 +1,11 @@
 ---
 description: "적응형, 언샤프 마스크 또는 하이패스 방식으로 이미지를 선명하게 하며, 선택적 노이즈 감소를 지원합니다."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 8f49728a6c6f
 ---
 
-# Sharpening {#sharpening}
+# 이미지 선명하게 {#sharpening}
 
 세 가지 방식을 제공하는 고급 선명화 도구입니다: 적응형(스마트 에지 인식), 언샤프 마스크(고전적인 반경/강도), 하이패스(질감 강조). 선명화 아티팩트를 방지하기 위한 내장 노이즈 감소 기능을 포함합니다.
 

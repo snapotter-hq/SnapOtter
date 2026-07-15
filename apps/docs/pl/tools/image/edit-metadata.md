@@ -1,11 +1,11 @@
 ---
 description: "Edytuj pola metadanych EXIF, IPTC, GPS i XMP w obrazach bez ponownego kodowania pikseli."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: d5065d34ee21
 ---
 
-# Edycja metadanych {#edit-metadata}
+# Edycja metadanych obrazu {#edit-metadata}
 
 Edytuj pola metadanych obrazu, w tym EXIF, IPTC, współrzędne GPS, daty i słowa kluczowe. Wykorzystuje pod spodem ExifTool, więc metadane są zapisywane w miejscu bez ponownego kodowania pikseli, zachowując pełną jakość obrazu.
 

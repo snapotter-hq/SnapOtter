@@ -1,11 +1,11 @@
 ---
 description: "Enfoca imágenes mediante métodos adaptativos, de máscara de enfoque o de paso alto, con reducción de ruido opcional."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 1be8c72c3aa0
 ---
 
-# Enfoque {#sharpening}
+# Enfocar imagen {#sharpening}
 
 Herramienta de enfoque avanzada con tres métodos: adaptativo (inteligente y sensible a los bordes), máscara de enfoque (radio/cantidad clásicos) y paso alto (énfasis en la textura). Incluye reducción de ruido integrada para evitar artefactos de enfoque.
 

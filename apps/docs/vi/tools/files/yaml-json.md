@@ -1,11 +1,11 @@
 ---
 description: "Chuyển đổi giữa YAML và JSON, cả hai chiều."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: e960d9244e1a
 ---
 
-# YAML / JSON {#yaml-json}
+# Chuyển đổi YAML / JSON {#yaml-json}
 
 Chuyển đổi giữa các định dạng YAML và JSON theo cả hai chiều. Tải lên một tệp YAML để nhận JSON, hoặc tải lên một tệp JSON để nhận YAML.
 

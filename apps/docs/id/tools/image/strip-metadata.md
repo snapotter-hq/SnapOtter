@@ -1,11 +1,11 @@
 ---
 description: "Menghapus metadata EXIF, GPS, ICC, dan XMP dari gambar untuk privasi dan ukuran file yang lebih kecil."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 522e570f7a41
 ---
 
-# Remove Metadata {#remove-metadata}
+# Hapus Metadata Gambar {#remove-metadata}
 
 Menghapus metadata EXIF, GPS, profil warna ICC, dan XMP dari gambar. Berguna untuk privasi (menghapus koordinat GPS, info kamera) dan mengurangi ukuran file.
 

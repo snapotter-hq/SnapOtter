@@ -2,7 +2,7 @@
 description: Rotate images by any angle and flip horizontally or vertically.
 ---
 
-# Rotate & Flip {#rotate-flip}
+# Rotate & Flip Image {#rotate-flip}
 
 Rotate images by an arbitrary angle and/or flip them horizontally or vertically. Rotation and flip operations can be combined in a single request.
 

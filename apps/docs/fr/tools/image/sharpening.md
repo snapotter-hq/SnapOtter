@@ -1,11 +1,11 @@
 ---
 description: "Accentue la netteté des images avec des méthodes adaptative, masque flou ou passe-haut, avec réduction du bruit facultative."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: a502bbfe8589
 ---
 
-# Renforcement de la netteté {#sharpening}
+# Accentuer la netteté d'une image {#sharpening}
 
 Outil avancé de renforcement de la netteté offrant trois méthodes : adaptative (intelligente et sensible aux contours), masque flou (rayon/quantité classiques) et passe-haut (accentuation des textures). Comprend une réduction du bruit intégrée pour éviter les artefacts de netteté.
 

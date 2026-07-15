@@ -1,11 +1,11 @@
 ---
 description: "Combina più immagini in collage a griglia con oltre 25 modelli, spazi e angoli regolabili e pan e zoom per singola cella."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 6a2fb7cb8440
 ---
 
-# Collage / Griglia {#collage-grid}
+# Collage e griglia {#collage-grid}
 
 Combina più immagini in bellissimi collage a griglia con oltre 25 modelli. Supporta layout da 2 a 9 immagini con spazio, raggio degli angoli, colore di sfondo e controlli di pan/zoom per singola cella personalizzabili.
 

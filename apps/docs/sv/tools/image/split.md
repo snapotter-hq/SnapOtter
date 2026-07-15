@@ -1,11 +1,11 @@
 ---
 description: "Dela en bild i rutnätsplattor efter rader och kolumner eller efter pixelstorlek, returnerat som ett ZIP-arkiv."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 59d8521bc5bc
 ---
 
-# Bilduppdelning {#image-splitting}
+# Dela bild {#image-splitting}
 
 Dela en enda bild i rutnätsplattor efter antal kolumner/rader eller efter specifika pixeldimensioner. Returnerar ett ZIP-arkiv som innehåller alla plattor.
 

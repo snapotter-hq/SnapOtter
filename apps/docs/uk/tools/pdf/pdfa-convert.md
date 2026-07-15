@@ -1,11 +1,11 @@
 ---
 description: "Перетворення PDF на архівний формат PDF/A-2 для тривалого зберігання."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 8d349af0ad83
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# Конвертер PDF/A {#pdf-a-convert}
 
 Перетворюйте PDF на архівний формат PDF/A-2, придатний для тривалого зберігання та відповідності нормативним вимогам.
 

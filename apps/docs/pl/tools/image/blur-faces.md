@@ -1,11 +1,11 @@
 ---
 description: "Automatycznie wykrywaj i rozmywaj twarze na obrazach dzięki wykrywaniu twarzy AI, na potrzeby prywatności i anonimizacji zgodnej z RODO."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: c2fb28beda96
 ---
 
-# Rozmycie twarzy / PII {#face-pii-blur}
+# Rozmyj twarze i dane osobowe {#face-pii-blur}
 
 Automatycznie wykrywaj i rozmywaj twarze na obrazach za pomocą wykrywania twarzy wspomaganego przez AI (MediaPipe).
 

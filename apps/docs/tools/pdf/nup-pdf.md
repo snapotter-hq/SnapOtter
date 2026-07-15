@@ -2,7 +2,7 @@
 description: Arrange multiple PDF pages per sheet (2-up, 4-up, etc.).
 ---
 
-# N-up PDF {#n-up-pdf}
+# Pages Per Sheet (N-up) {#n-up-pdf}
 
 Arrange multiple pages per sheet to save paper when printing, such as 2-up or 4-up layouts.
 

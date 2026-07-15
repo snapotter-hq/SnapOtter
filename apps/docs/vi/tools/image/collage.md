@@ -1,11 +1,11 @@
 ---
 description: "Ghép nhiều ảnh thành các bố cục ghép ảnh dạng lưới với hơn 25 mẫu, khoảng cách và bo góc điều chỉnh được, cùng thao tác di chuyển và phóng to theo từng ô."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: d0c4f3ac88f9
 ---
 
-# Ghép ảnh / Lưới {#collage-grid}
+# Ảnh ghép và Lưới {#collage-grid}
 
 Ghép nhiều ảnh thành các bố cục ghép ảnh dạng lưới đẹp mắt với hơn 25 mẫu. Hỗ trợ bố cục từ 2 đến 9 ảnh với khoảng cách, bán kính bo góc, màu nền tùy chỉnh và điều khiển di chuyển/phóng to theo từng ô.
 

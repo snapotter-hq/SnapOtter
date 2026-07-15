@@ -1,11 +1,11 @@
 ---
 description: "픽셀, 백분율 또는 맞춤 모드로 이미지 크기를 조정합니다."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: 52abf03aea71
 ---
 
-# Resize {#resize}
+# 이미지 크기 조정 {#resize}
 
 정확한 픽셀 치수, 백분율 배율 계수, 또는 이미지가 대상 치수에 어떻게 맞춰지는지 제어하는 맞춤 모드를 지정하여 이미지 크기를 조정합니다.
 

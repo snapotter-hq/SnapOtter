@@ -1,11 +1,11 @@
 ---
 description: "Wyostrzaj obrazy metodami adaptacyjną, maski wyostrzającej lub filtra górnoprzepustowego z opcjonalną redukcją szumów."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 6d8a1b16e180
 ---
 
-# Wyostrzanie {#sharpening}
+# Wyostrz obraz {#sharpening}
 
 Zaawansowane narzędzie do wyostrzania z trzema metodami: adaptacyjną (inteligentne rozpoznawanie krawędzi), maską wyostrzającą (klasyczny promień/siła) oraz filtrem górnoprzepustowym (uwydatnienie tekstury). Zawiera wbudowaną redukcję szumów, aby zapobiec powstawaniu artefaktów wyostrzania.
 

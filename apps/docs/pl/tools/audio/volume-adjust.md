@@ -1,11 +1,11 @@
 ---
 description: "Zwiększa lub zmniejsza głośność audio o stałe wzmocnienie w decybelach."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 4d06574f6787
 ---
 
-# Volume Adjust {#volume-adjust}
+# Regulacja głośności {#volume-adjust}
 
 Zwiększa lub zmniejsza głośność pliku audio, stosując stałe wzmocnienie w decybelach.
 

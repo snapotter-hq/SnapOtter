@@ -1,11 +1,11 @@
 ---
 description: "Het audiovolume van video normaliseren naar de broadcast-standaard."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 3d5f398c155a
 ---
 
-# Normalize Audio {#normalize-audio}
+# Video-audio normaliseren {#normalize-audio}
 
 Normaliseer het audiovolume van video naar de EBU R128 broadcast-luidheidsstandaard.
 

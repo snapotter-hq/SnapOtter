@@ -1,11 +1,11 @@
 ---
 description: "Bir EPUB'ı PDF, DOCX, HTML veya Markdown'a dönüştürün."
-i18n_source_hash: 7d94fc18ca97
+i18n_source_hash: cb39f254ff2f
 i18n_provenance: human
 i18n_output_hash: f1e1c836f0ac
 ---
 
-# Convert EPUB {#convert-epub}
+# EPUB'dan Dönüştür {#convert-epub}
 
 Bir EPUB e-kitabını PDF, Word (DOCX), HTML veya Markdown'a dönüştürün. Kitabın içindeki uzak kaynaklar getirilmez.
 

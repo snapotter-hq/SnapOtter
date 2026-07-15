@@ -1,11 +1,11 @@
 ---
 description: "품질 수준 또는 목표 파일 크기로 이미지 파일 크기를 줄입니다."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 63d2f45fe4ca
 ---
 
-# 압축 {#compress}
+# 이미지 압축 {#compress}
 
 품질 수준 또는 킬로바이트 단위의 목표 파일 크기를 지정하여 이미지 파일 크기를 줄입니다. 이 도구는 반복적인 이진 검색을 사용하여 크기 목표를 정확히 맞춥니다.
 

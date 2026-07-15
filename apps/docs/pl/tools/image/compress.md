@@ -1,11 +1,11 @@
 ---
 description: "Zmniejsz rozmiar pliku obrazu według poziomu jakości lub do docelowego rozmiaru pliku."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: ad5235390f3f
 ---
 
-# Kompresja {#compress}
+# Kompresuj obraz {#compress}
 
 Zmniejsz rozmiar pliku obrazu, określając poziom jakości lub docelowy rozmiar pliku w kilobajtach. Narzędzie wykorzystuje iteracyjne wyszukiwanie binarne, aby dokładnie trafić w docelowy rozmiar.
 

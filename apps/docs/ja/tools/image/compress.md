@@ -1,11 +1,11 @@
 ---
 description: "品質レベル、または目標ファイルサイズによって画像のファイルサイズを削減します。"
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 2aa6e052c339
 ---
 
-# 圧縮 {#compress}
+# 画像圧縮 {#compress}
 
 品質レベルまたはキロバイト単位の目標ファイルサイズを指定して画像のファイルサイズを削減します。目標サイズに正確に合わせるため、反復的な二分探索を使用します。
 

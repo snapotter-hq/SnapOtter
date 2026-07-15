@@ -1,11 +1,11 @@
 ---
 description: "แปลง PDF เป็นรูปแบบเก็บถาวร PDF/A-2 เพื่อการเก็บรักษาระยะยาว"
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 937598e2fa49
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# ตัวแปลง PDF/A {#pdf-a-convert}
 
 แปลง PDF เป็นรูปแบบเก็บถาวร PDF/A-2 ซึ่งเหมาะสำหรับการเก็บรักษาระยะยาวและการปฏิบัติตามข้อกำหนดด้านกฎระเบียบ
 

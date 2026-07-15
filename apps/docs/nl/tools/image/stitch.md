@@ -1,11 +1,11 @@
 ---
 description: "Afbeeldingen naast elkaar, gestapeld of in een raster samenvoegen, met controle over uitlijning, tussenruimtes, randen en schaalmodus."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 20f87ea80878
 ---
 
-# Samenvoegen / Combineren {#stitch-combine}
+# Afbeeldingen samenvoegen {#stitch-combine}
 
 Voeg meerdere afbeeldingen naast elkaar, verticaal gestapeld of gerangschikt in een raster samen. Ondersteunt uitlijning, tussenruimte, rand, hoekradius en meerdere schaalmodi.
 

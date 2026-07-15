@@ -1,11 +1,11 @@
 ---
 description: "按质量级别或目标文件大小减小图片文件体积。"
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: e50a856e4af0
 ---
 
-# 压缩 {#compress}
+# 压缩图片 {#compress}
 
 通过指定质量级别或以千字节为单位的目标文件大小来减小图片文件体积。该工具使用迭代二分搜索来精确命中目标大小。
 

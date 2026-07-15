@@ -1,11 +1,11 @@
 ---
 description: "Divide uma imagem em blocos de grade por linhas e colunas ou por tamanho em pixels, retornados como um arquivo ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 3bdfc58d5c96
 ---
 
-# Divisão de Imagem (Image Splitting) {#image-splitting}
+# Dividir Imagem {#image-splitting}
 
 Divide uma única imagem em blocos de grade por contagem de colunas/linhas ou por dimensões específicas em pixels. Retorna um arquivo ZIP contendo todos os blocos.
 

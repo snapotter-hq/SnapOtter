@@ -1,11 +1,11 @@
 ---
 description: "Ridimensiona le immagini per pixel, percentuale o con modalità di adattamento."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: ebde5f2f8019
 ---
 
-# Resize {#resize}
+# Ridimensiona Immagine {#resize}
 
 Ridimensiona le immagini specificando dimensioni esatte in pixel, un fattore di scala percentuale o una modalità di adattamento che controlla come l'immagine si adatta alle dimensioni target.
 

@@ -1,11 +1,11 @@
 ---
 description: "Obracaj obrazy o dowolny kąt i odbijaj je w poziomie lub pionie."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 4e6c302679f5
 ---
 
-# Obrót i odbicie {#rotate-flip}
+# Obróć i odbij obraz {#rotate-flip}
 
 Obracaj obrazy o dowolny kąt i/lub odbijaj je w poziomie lub pionie. Operacje obrotu i odbicia można łączyć w jednym żądaniu.
 

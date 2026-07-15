@@ -1,11 +1,11 @@
 ---
 description: "從影像移除 EXIF、GPS、ICC 與 XMP 中繼資料，以保護隱私並縮小檔案大小。"
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 11185204026f
 ---
 
-# 移除中繼資料 {#remove-metadata}
+# 移除影像中繼資料 {#remove-metadata}
 
 從影像移除 EXIF、GPS、ICC 色彩描述檔與 XMP 中繼資料。適用於保護隱私（移除 GPS 座標、相機資訊）以及縮小檔案大小。
 

@@ -1,11 +1,11 @@
 ---
 description: "Susun beberapa halaman PDF per lembar (2-up, 4-up, dll.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: f41409f0d574
 ---
 
-# N-up PDF {#n-up-pdf}
+# Halaman Per Lembar (N-up) {#n-up-pdf}
 
 Susun beberapa halaman per lembar untuk menghemat kertas saat mencetak, seperti tata letak 2-up atau 4-up.
 

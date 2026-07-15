@@ -1,11 +1,11 @@
 ---
 description: "गोपनीयता और GDPR-अनुरूप गुमनामीकरण के लिए AI चेहरा पहचान से छवियों में चेहरों को स्वतः पहचानें और धुंधला करें।"
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 34ba52083c4a
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# चेहरे और संवेदनशील जानकारी ब्लर करें {#face-pii-blur}
 
 AI-संचालित चेहरा पहचान (MediaPipe) का उपयोग करके छवियों में चेहरों को स्वतः पहचानें और धुंधला करें।
 

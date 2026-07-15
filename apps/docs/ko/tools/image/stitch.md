@@ -1,11 +1,11 @@
 ---
 description: "정렬, 간격, 테두리, 리사이즈 모드를 제어하며 이미지를 나란히, 세로로 쌓거나 격자로 결합합니다."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: d0910de94ddb
 ---
 
-# Stitch / Combine {#stitch-combine}
+# 이미지 결합 {#stitch-combine}
 
 여러 이미지를 나란히, 세로로 쌓거나 격자로 배열해 결합합니다. 정렬, 간격, 테두리, 모서리 반경, 여러 리사이즈 모드를 지원합니다.
 

@@ -2,7 +2,7 @@
 description: Reduce image file size by quality level or to a target file size.
 ---
 
-# Compress {#compress}
+# Compress Image {#compress}
 
 Reduce image file size by specifying a quality level or a target file size in kilobytes. The tool uses iterative binary search to hit size targets accurately.
 

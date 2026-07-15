@@ -1,11 +1,11 @@
 ---
 description: "Combinez plusieurs images en collages en grille avec plus de 25 modèles, des espacements et coins réglables, ainsi qu'un panoramique et un zoom par cellule."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: d23b0c41aa81
 ---
 
-# Collage / Grille {#collage-grid}
+# Collage et grille {#collage-grid}
 
 Combinez plusieurs images en superbes collages en grille avec plus de 25 modèles. Prend en charge les dispositions de 2 à 9 images avec espacement, rayon des coins, couleur d'arrière-plan et contrôles de panoramique/zoom par cellule personnalisables.
 

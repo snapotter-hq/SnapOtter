@@ -1,11 +1,11 @@
 ---
 description: "画像を横並び、縦積み、またはグリッド状に結合し、配置・間隔・境界線・リサイズモードを制御できます。"
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: e7e483233339
 ---
 
-# Stitch / Combine {#stitch-combine}
+# 画像を結合 {#stitch-combine}
 
 複数の画像を横並び、縦積み、またはグリッド状に結合します。配置、間隔、境界線、角丸、複数のリサイズモードに対応します。
 

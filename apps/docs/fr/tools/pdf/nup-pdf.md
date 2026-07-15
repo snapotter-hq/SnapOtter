@@ -1,11 +1,11 @@
 ---
 description: "Disposer plusieurs pages PDF par feuille (2-up, 4-up, etc.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 4f094c78685e
 ---
 
-# PDF N-up {#n-up-pdf}
+# Pages par feuille (N-up) {#n-up-pdf}
 
 Disposez plusieurs pages par feuille pour économiser du papier à l'impression, comme les mises en page 2-up ou 4-up.
 

@@ -1,11 +1,11 @@
 ---
 description: "以固定的分貝增益增加或降低音訊音量。"
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: dcf6dce7f3b9
 ---
 
-# 音量調整 {#volume-adjust}
+# 調整音量 {#volume-adjust}
 
 透過套用固定的分貝增益，增加或降低音訊檔案的音量。
 

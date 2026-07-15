@@ -1,11 +1,11 @@
 ---
 description: "Konversi antara YAML dan JSON, dua arah."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: 5e593eb54bf0
 ---
 
-# YAML / JSON {#yaml-json}
+# Konversi YAML / JSON {#yaml-json}
 
 Konversi antara format YAML dan JSON dalam kedua arah. Unggah berkas YAML untuk mendapatkan JSON, atau unggah berkas JSON untuk mendapatkan YAML.
 

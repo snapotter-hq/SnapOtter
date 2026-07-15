@@ -1,11 +1,11 @@
 ---
 description: "Chỉnh sửa các trường metadata EXIF, IPTC, GPS và XMP trong ảnh mà không mã hóa lại pixel."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 2a197547d5bd
 ---
 
-# Chỉnh sửa metadata {#edit-metadata}
+# Chỉnh sửa siêu dữ liệu ảnh {#edit-metadata}
 
 Chỉnh sửa các trường metadata của ảnh bao gồm EXIF, IPTC, tọa độ GPS, ngày tháng và từ khóa. Sử dụng ExifTool bên dưới, nên metadata được ghi tại chỗ mà không mã hóa lại pixel, giữ nguyên chất lượng ảnh đầy đủ.
 

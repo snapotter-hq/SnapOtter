@@ -1,11 +1,11 @@
 ---
 description: "Combine várias imagens em colagens em grade com mais de 25 modelos, espaçamentos e cantos ajustáveis, além de deslocamento e zoom por célula."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 5d70719c40fc
 ---
 
-# Colagem / Grade {#collage-grid}
+# Collage e Grade {#collage-grid}
 
 Combine várias imagens em colagens em grade com mais de 25 modelos. Suporta layouts de 2 a 9 imagens com espaçamento, raio de canto, cor de fundo e controles de deslocamento/zoom por célula personalizáveis.
 

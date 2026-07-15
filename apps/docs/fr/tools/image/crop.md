@@ -1,11 +1,11 @@
 ---
 description: "Recadrez les images en spécifiant une région avec position et dimensions."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: e9310ed8f439
 ---
 
-# Recadrer {#crop}
+# Recadrer une image {#crop}
 
 Recadrez les images en définissant une région rectangulaire à l'aide d'une position et d'une taille. Prend en charge les unités en pixels et en pourcentage.
 

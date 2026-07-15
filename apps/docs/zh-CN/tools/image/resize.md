@@ -1,11 +1,11 @@
 ---
 description: "按像素、百分比或使用适配模式调整图片尺寸。"
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: 0a8f45ef34da
 ---
 
-# 调整尺寸 {#resize}
+# 调整图片尺寸 {#resize}
 
 通过指定精确的像素尺寸、百分比缩放系数，或控制图片如何适配目标尺寸的适配模式来调整图片尺寸。
 

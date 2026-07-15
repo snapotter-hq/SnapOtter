@@ -1,11 +1,11 @@
 ---
 description: "행과 열 또는 픽셀 크기로 하나의 이미지를 격자 타일로 분할하며, ZIP 아카이브로 반환합니다."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 12cc7ec531f9
 ---
 
-# Image Splitting {#image-splitting}
+# 이미지 분할 {#image-splitting}
 
 단일 이미지를 열/행 개수 또는 특정 픽셀 크기로 격자 타일로 분할합니다. 모든 타일을 담은 ZIP 아카이브를 반환합니다.
 

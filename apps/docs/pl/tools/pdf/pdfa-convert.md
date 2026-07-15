@@ -1,11 +1,11 @@
 ---
 description: "Przekształć plik PDF na archiwalny format PDF/A-2 do długoterminowego przechowywania."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 05ef368e1850
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# Konwerter PDF/A {#pdf-a-convert}
 
 Przekształć plik PDF na archiwalny format PDF/A-2, odpowiedni do długoterminowego przechowywania i zgodności z przepisami.
 

@@ -1,11 +1,11 @@
 ---
 description: "Rota imágenes en cualquier ángulo y voltéalas horizontal o verticalmente."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: e8b33640b0cc
 ---
 
-# Rotar y voltear {#rotate-flip}
+# Rotar y voltear imagen {#rotate-flip}
 
 Rota imágenes en un ángulo arbitrario o voltéalas horizontal o verticalmente. Las operaciones de rotación y volteo se pueden combinar en una sola solicitud.
 

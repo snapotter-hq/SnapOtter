@@ -1,11 +1,11 @@
 ---
 description: "Конвертуйте зображення між форматами, включно із сучасними форматами, як-от AVIF, JXL та HEIC."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: cc673ec4e84d
 ---
 
-# Convert {#convert}
+# Конвертація зображення {#convert}
 
 Конвертуйте зображення між форматами. Підтримує поширені веб-формати, а також спеціалізовані формати, як-от HEIC, JXL, BMP, ICO, JP2, QOI та PSD.
 

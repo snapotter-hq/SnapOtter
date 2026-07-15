@@ -1,11 +1,11 @@
 ---
 description: "Redigera EXIF-, IPTC-, GPS- och XMP-metadatafält i bilder utan att koda om pixlarna."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: e19a6cf535ce
 ---
 
-# Redigera metadata {#edit-metadata}
+# Redigera bildmetadata {#edit-metadata}
 
 Redigera bildmetadatafält inklusive EXIF, IPTC, GPS-koordinater, datum och nyckelord. Använder ExifTool i bakgrunden, så metadata skrivs på plats utan att koda om pixlar, vilket bevarar full bildkvalitet.
 

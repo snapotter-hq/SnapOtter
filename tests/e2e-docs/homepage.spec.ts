@@ -58,7 +58,7 @@ test.describe("docs homepage (Two Doors)", () => {
     // so a stale href 404s here even though a full page load would redirect.
     await page.getByRole("link", { name: /^Image/ }).click();
     await expect(page).toHaveURL(/\/tools\/image\/resize/);
-    await expect(page.getByRole("heading", { level: 1, name: "Resize" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Resize Image" })).toBeVisible();
   });
 
   test("nav links work", async ({ page }) => {

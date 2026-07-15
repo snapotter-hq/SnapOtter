@@ -2,7 +2,7 @@
 description: Convert images between formats including modern formats like AVIF, JXL, and HEIC.
 ---
 
-# Convert {#convert}
+# Convert Image {#convert}
 
 Convert images between formats. Supports common web formats as well as specialized formats like HEIC, JXL, BMP, ICO, JP2, QOI, and PSD.
 

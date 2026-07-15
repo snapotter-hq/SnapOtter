@@ -1,11 +1,11 @@
 ---
 description: "1枚の画像を行と列またはピクセルサイズでグリッドタイルに分割し、ZIPアーカイブとして返します。"
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: ed25c8d33ed5
 ---
 
-# Image Splitting {#image-splitting}
+# 画像分割 {#image-splitting}
 
 1枚の画像を、列/行数または特定のピクセル寸法でグリッドタイルに分割します。すべてのタイルを含むZIPアーカイブを返します。
 

@@ -1,11 +1,11 @@
 ---
 description: "Ändra storlek på bilder efter pixlar, procent eller med anpassningslägen."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: 1e73827cf480
 ---
 
-# Ändra storlek {#resize}
+# Ändra bildstorlek {#resize}
 
 Ändra storlek på bilder genom att ange exakta pixeldimensioner, en procentuell skalfaktor eller ett anpassningsläge som styr hur bilden anpassas till måldimensionerna.
 

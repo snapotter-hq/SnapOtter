@@ -1,11 +1,11 @@
 ---
 description: "Convertit entre YAML et JSON, dans les deux sens."
-i18n_source_hash: acf8ca21ee99
+i18n_source_hash: ef0c9b633797
 i18n_provenance: human
 i18n_output_hash: b8a94654ee90
 ---
 
-# YAML / JSON {#yaml-json}
+# Convertir YAML / JSON {#yaml-json}
 
 Convertit entre les formats YAML et JSON dans les deux sens. Téléversez un fichier YAML pour obtenir du JSON, ou téléversez un fichier JSON pour obtenir du YAML.
 

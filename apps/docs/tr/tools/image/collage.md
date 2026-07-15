@@ -1,11 +1,11 @@
 ---
 description: "Birden fazla görüntüyü 25'ten fazla şablon, ayarlanabilir boşluklar ve köşeler ve hücre başına kaydırma ve yakınlaştırma ile ızgara kolajlarında birleştirin."
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: 32baf2d667fc
 ---
 
-# Kolaj / Izgara {#collage-grid}
+# Kolaj ve Izgara {#collage-grid}
 
 Birden fazla görüntüyü 25'ten fazla şablonla güzel ızgara kolajlarında birleştirin. Özelleştirilebilir boşluk, köşe yarıçapı, arka plan rengi ve hücre başına kaydırma/yakınlaştırma denetimleriyle 2-9 görüntülü düzenleri destekler.
 

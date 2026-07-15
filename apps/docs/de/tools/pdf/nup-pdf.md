@@ -1,11 +1,11 @@
 ---
 description: "Mehrere PDF-Seiten pro Blatt anordnen (2-fach, 4-fach usw.)."
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: 6a57859bbdc9
 ---
 
-# N-up PDF {#n-up-pdf}
+# Seiten pro Blatt (N-up) {#n-up-pdf}
 
 Ordnen Sie mehrere Seiten pro Blatt an, um beim Drucken Papier zu sparen, etwa in 2-fach- oder 4-fach-Layouts.
 

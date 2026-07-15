@@ -1,11 +1,11 @@
 ---
 description: "依品質層級或目標檔案大小縮減圖片檔案大小。"
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 87b36988f2d2
 ---
 
-# 壓縮 {#compress}
+# 壓縮影像 {#compress}
 
 透過指定品質層級或以 KB 為單位的目標檔案大小來縮減圖片檔案大小。此工具使用迭代式二元搜尋以精準達到大小目標。
 

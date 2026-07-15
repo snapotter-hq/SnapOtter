@@ -1,11 +1,11 @@
 ---
 description: "डेसिबल में एक निश्चित गेन द्वारा ऑडियो वॉल्यूम बढ़ाएं या घटाएं।"
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 4c6ec316cac8
 ---
 
-# Volume Adjust {#volume-adjust}
+# वॉल्यूम समायोजन {#volume-adjust}
 
 डेसिबल में एक निश्चित गेन लागू करके किसी ऑडियो फ़ाइल के वॉल्यूम को बढ़ाएं या घटाएं।
 

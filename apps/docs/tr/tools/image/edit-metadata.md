@@ -1,11 +1,11 @@
 ---
 description: "Görüntülerde EXIF, IPTC, GPS ve XMP meta veri alanlarını piksel yeniden kodlaması olmadan düzenleyin."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 1ba065328abd
 ---
 
-# Meta Veri Düzenle {#edit-metadata}
+# Görüntü Meta Verisi Düzenle {#edit-metadata}
 
 EXIF, IPTC, GPS koordinatları, tarihler ve anahtar kelimeler dahil olmak üzere görüntü meta veri alanlarını düzenleyin. Arka planda ExifTool kullanır, bu nedenle meta veriler pikselleri yeniden kodlamadan yerinde yazılır ve tam görüntü kalitesi korunur.
 

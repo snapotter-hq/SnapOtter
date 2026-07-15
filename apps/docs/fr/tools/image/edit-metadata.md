@@ -1,11 +1,11 @@
 ---
 description: "Modifiez les champs de métadonnées EXIF, IPTC, GPS et XMP des images sans réencoder les pixels."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: 8b7e70a7ac08
 ---
 
-# Modifier les métadonnées {#edit-metadata}
+# Modifier les métadonnées d'une image {#edit-metadata}
 
 Modifiez les champs de métadonnées d'image, notamment EXIF, IPTC, les coordonnées GPS, les dates et les mots-clés. Utilise ExifTool en interne, de sorte que les métadonnées sont écrites sur place sans réencoder les pixels, préservant la qualité complète de l'image.
 

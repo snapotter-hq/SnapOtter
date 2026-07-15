@@ -1,11 +1,11 @@
 ---
 description: "Chuẩn hóa âm lượng của video theo tiêu chuẩn phát sóng."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 863140216785
 ---
 
-# Normalize Audio {#normalize-audio}
+# Chuẩn hóa âm thanh video {#normalize-audio}
 
 Chuẩn hóa âm lượng âm thanh của video theo tiêu chuẩn độ ồn phát sóng EBU R128.
 

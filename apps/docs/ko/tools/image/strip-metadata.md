@@ -1,11 +1,11 @@
 ---
 description: "개인정보 보호와 파일 크기 축소를 위해 이미지에서 EXIF, GPS, ICC, XMP 메타데이터를 제거합니다."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: e5894cf9c431
 ---
 
-# Remove Metadata {#remove-metadata}
+# 이미지 메타데이터 제거 {#remove-metadata}
 
 이미지에서 EXIF, GPS, ICC 색상 프로파일, XMP 메타데이터를 제거합니다. 개인정보 보호(GPS 좌표, 카메라 정보 제거)와 파일 크기 축소에 유용합니다.
 

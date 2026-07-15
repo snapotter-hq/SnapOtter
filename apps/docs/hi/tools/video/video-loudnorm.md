@@ -1,11 +1,11 @@
 ---
 description: "वीडियो ऑडियो वॉल्यूम को ब्रॉडकास्ट मानक पर सामान्यीकृत करें।"
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: d1d8be10a3c6
 ---
 
-# Normalize Audio {#normalize-audio}
+# वीडियो ऑडियो नॉर्मलाइज़ {#normalize-audio}
 
 वीडियो ऑडियो वॉल्यूम को EBU R128 ब्रॉडकास्ट लाउडनेस मानक पर सामान्यीकृत करें।
 

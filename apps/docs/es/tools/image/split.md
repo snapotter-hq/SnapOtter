@@ -1,11 +1,11 @@
 ---
 description: "Divide una imagen en teselas de cuadrícula por filas y columnas o por tamaño en píxeles, devueltas como archivo ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 2fb6a84c24e9
 ---
 
-# División de imágenes {#image-splitting}
+# Dividir imagen {#image-splitting}
 
 Divide una sola imagen en teselas de cuadrícula por número de columnas/filas o por dimensiones específicas en píxeles. Devuelve un archivo ZIP con todas las teselas.
 

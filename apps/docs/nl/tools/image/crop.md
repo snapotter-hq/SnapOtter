@@ -1,11 +1,11 @@
 ---
 description: "Snijd afbeeldingen bij door een gebied met positie en afmetingen op te geven."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 132d91d80d4e
 ---
 
-# Bijsnijden {#crop}
+# Afbeelding bijsnijden {#crop}
 
 Snijd afbeeldingen bij door een rechthoekig gebied te definiëren met positie en grootte. Ondersteunt zowel pixel- als percentage-eenheden.
 

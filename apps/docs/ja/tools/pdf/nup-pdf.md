@@ -1,11 +1,11 @@
 ---
 description: "1 枚のシートに複数の PDF ページを配置します（2-up、4-up など）。"
-i18n_source_hash: 9dd82737cb72
+i18n_source_hash: 972bf997c95c
 i18n_provenance: human
 i18n_output_hash: ae5be144f5e9
 ---
 
-# N-up PDF {#n-up-pdf}
+# 1枚あたりのページ数 (N-up) {#n-up-pdf}
 
 2-up や 4-up レイアウトのように 1 枚のシートに複数ページを配置し、印刷時の用紙を節約します。
 

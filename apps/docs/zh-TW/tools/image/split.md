@@ -1,11 +1,11 @@
 ---
 description: "依列數與欄數或依像素大小將一張影像切割成網格圖塊，並以 ZIP 壓縮檔回傳。"
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 8ac843918d49
 ---
 
-# 影像切割 {#image-splitting}
+# 分割影像 {#image-splitting}
 
 依欄/列數或指定的像素尺寸將單一影像切割成網格圖塊。回傳包含所有圖塊的 ZIP 壓縮檔。
 

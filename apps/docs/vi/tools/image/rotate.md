@@ -1,11 +1,11 @@
 ---
 description: "Xoay ảnh theo bất kỳ góc nào và lật ngang hoặc dọc."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 6da34b96b804
 ---
 
-# Rotate & Flip {#rotate-flip}
+# Xoay & Lật ảnh {#rotate-flip}
 
 Xoay ảnh theo một góc bất kỳ và/hoặc lật chúng theo chiều ngang hoặc dọc. Các thao tác xoay và lật có thể kết hợp trong một yêu cầu duy nhất.
 

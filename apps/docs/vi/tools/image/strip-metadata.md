@@ -1,11 +1,11 @@
 ---
 description: "Xóa metadata EXIF, GPS, ICC, và XMP khỏi ảnh để bảo vệ quyền riêng tư và giảm kích thước tệp."
-i18n_source_hash: e89147734fd0
+i18n_source_hash: 07f61cdb2c26
 i18n_provenance: human
 i18n_output_hash: 80a3f4fa0543
 ---
 
-# Xóa Metadata {#remove-metadata}
+# Xóa siêu dữ liệu ảnh {#remove-metadata}
 
 Xóa EXIF, GPS, hồ sơ màu ICC, và metadata XMP khỏi ảnh. Hữu ích cho quyền riêng tư (xóa tọa độ GPS, thông tin máy ảnh) và giảm kích thước tệp.
 

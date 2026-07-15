@@ -2,7 +2,7 @@
 description: Crop images by specifying a region with position and dimensions.
 ---
 
-# Crop {#crop}
+# Crop Image {#crop}
 
 Crop images by defining a rectangular region using position and size. Supports both pixel and percentage units.
 

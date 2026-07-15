@@ -1,11 +1,11 @@
 ---
 description: "Convertit un EPUB en PDF, DOCX, HTML ou Markdown."
-i18n_source_hash: 7d94fc18ca97
+i18n_source_hash: cb39f254ff2f
 i18n_provenance: human
 i18n_output_hash: 2c403470bb3d
 ---
 
-# Convertir un EPUB {#convert-epub}
+# Convertir depuis EPUB {#convert-epub}
 
 Convertit un livre électronique EPUB en PDF, Word (DOCX), HTML ou Markdown. Les ressources distantes contenues dans le livre ne sont pas récupérées.
 

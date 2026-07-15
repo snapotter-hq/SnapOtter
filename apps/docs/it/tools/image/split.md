@@ -1,11 +1,11 @@
 ---
 description: "Divide un'immagine in tessere a griglia per righe e colonne o per dimensione in pixel, restituite come archivio ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 1f01741aaff9
 ---
 
-# Divisione immagine {#image-splitting}
+# Dividi immagine {#image-splitting}
 
 Divide una singola immagine in tessere a griglia per numero di colonne/righe o per dimensioni specifiche in pixel. Restituisce un archivio ZIP contenente tutte le tessere.
 

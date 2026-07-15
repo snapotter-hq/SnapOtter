@@ -1,11 +1,11 @@
 ---
 description: "アダプティブ、アンシャープマスク、ハイパスの各手法で画像をシャープ化し、オプションでノイズ低減も行います。"
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: d5113ae4e40c
 ---
 
-# Sharpening {#sharpening}
+# 画像をシャープに {#sharpening}
 
 3つの手法を備えた高度なシャープ化ツールです。アダプティブ（スマートなエッジ認識）、アンシャープマスク（従来のradius/amount指定）、ハイパス（テクスチャ強調）に対応します。シャープ化によるアーティファクトを防ぐノイズ低減機能を内蔵しています。
 

@@ -2,7 +2,7 @@
 description: Convert between YAML and JSON, both directions.
 ---
 
-# YAML / JSON {#yaml-json}
+# Convert YAML / JSON {#yaml-json}
 
 Convert between YAML and JSON formats in both directions. Upload a YAML file to get JSON, or upload a JSON file to get YAML.
 

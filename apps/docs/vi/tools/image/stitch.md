@@ -1,11 +1,11 @@
 ---
 description: "Ghép ảnh cạnh nhau, xếp chồng, hoặc theo lưới với kiểm soát căn chỉnh, khoảng cách, viền, và chế độ đổi kích thước."
-i18n_source_hash: 39333210505a
+i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
 i18n_output_hash: 43e42bf99bdb
 ---
 
-# Ghép / Kết hợp {#stitch-combine}
+# Ghép nối ảnh {#stitch-combine}
 
 Ghép nhiều ảnh cạnh nhau, xếp chồng theo chiều dọc, hoặc sắp xếp theo lưới. Hỗ trợ căn chỉnh, khoảng cách, viền, bo góc, và nhiều chế độ đổi kích thước.
 

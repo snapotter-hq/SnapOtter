@@ -1,11 +1,11 @@
 ---
 description: "Konum ve boyutlarla bir bölge belirterek görüntüleri kırpın."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 0cccc18a666b
 ---
 
-# Kırp {#crop}
+# Görüntü Kırp {#crop}
 
 Konum ve boyut kullanarak dikdörtgen bir bölge tanımlayarak görüntüleri kırpın. Hem piksel hem de yüzde birimlerini destekler.
 

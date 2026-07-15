@@ -2,7 +2,7 @@
 description: Convert an EPUB to PDF, DOCX, HTML, or Markdown.
 ---
 
-# Convert EPUB {#convert-epub}
+# Convert from EPUB {#convert-epub}
 
 Convert an EPUB e-book to PDF, Word (DOCX), HTML, or Markdown. Remote resources inside the book are not fetched.
 

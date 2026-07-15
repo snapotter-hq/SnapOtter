@@ -1,11 +1,11 @@
 ---
 description: "Faites pivoter les images de n'importe quel angle et retournez-les horizontalement ou verticalement."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 05069a24e70c
 ---
 
-# Pivoter et retourner {#rotate-flip}
+# Rotation et miroir d'image {#rotate-flip}
 
 Faites pivoter les images d'un angle arbitraire et/ou retournez-les horizontalement ou verticalement. Les opérations de rotation et de retournement peuvent être combinées dans une seule requête.
 

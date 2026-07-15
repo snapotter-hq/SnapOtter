@@ -1,11 +1,11 @@
 ---
 description: "Tự động phát hiện và làm mờ khuôn mặt trong hình ảnh bằng phát hiện khuôn mặt AI để bảo vệ quyền riêng tư và ẩn danh tuân thủ GDPR."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 06621651ff17
 ---
 
-# Face / PII Blur {#face-pii-blur}
+# Làm mờ khuôn mặt và thông tin nhạy cảm {#face-pii-blur}
 
 Tự động phát hiện và làm mờ khuôn mặt trong hình ảnh bằng phát hiện khuôn mặt dựa trên AI (MediaPipe).
 

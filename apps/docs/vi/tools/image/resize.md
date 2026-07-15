@@ -1,11 +1,11 @@
 ---
 description: "Thay đổi kích thước ảnh theo pixel, phần trăm hoặc với các chế độ vừa khít."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: bcce4cd579a4
 ---
 
-# Resize {#resize}
+# Thay đổi kích thước ảnh {#resize}
 
 Thay đổi kích thước ảnh bằng cách chỉ định kích thước pixel chính xác, hệ số tỷ lệ phần trăm, hoặc một chế độ vừa khít kiểm soát cách ảnh thích ứng với kích thước đích.
 

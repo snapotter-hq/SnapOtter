@@ -1,11 +1,11 @@
 ---
 description: "Draai afbeeldingen onder elke hoek en spiegel ze horizontaal of verticaal."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 5fd343c155c7
 ---
 
-# Rotate & Flip {#rotate-flip}
+# Afbeelding draaien & spiegelen {#rotate-flip}
 
 Draai afbeeldingen onder een willekeurige hoek en/of spiegel ze horizontaal of verticaal. Draai- en spiegelbewerkingen kunnen in één verzoek worden gecombineerd.
 

@@ -1,11 +1,11 @@
 ---
 description: "Membagi satu gambar menjadi petak-petak grid berdasarkan baris dan kolom atau berdasarkan ukuran piksel, dikembalikan sebagai arsip ZIP."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 8fcbdb41456e
 ---
 
-# Image Splitting {#image-splitting}
+# Bagi Gambar {#image-splitting}
 
 Membagi satu gambar menjadi petak-petak grid berdasarkan jumlah kolom/baris atau berdasarkan dimensi piksel tertentu. Mengembalikan arsip ZIP yang berisi semua petak.
 

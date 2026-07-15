@@ -1,11 +1,11 @@
 ---
 description: "Upptäck och gör ansikten suddiga automatiskt i bilder med AI-ansiktsigenkänning för integritet och GDPR-kompatibel anonymisering."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 6b12ac5945fa
 ---
 
-# Ansikts-/PII-oskärpa {#face-pii-blur}
+# Gör ansikten & PII oskarpa {#face-pii-blur}
 
 Upptäck och gör ansikten suddiga automatiskt i bilder med AI-driven ansiktsigenkänning (MediaPipe).
 

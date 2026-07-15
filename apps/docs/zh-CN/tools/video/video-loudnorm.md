@@ -1,11 +1,11 @@
 ---
 description: "将视频音频音量归一化到广播标准。"
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 3523e302d9c6
 ---
 
-# Normalize Audio {#normalize-audio}
+# 视频音频标准化 {#normalize-audio}
 
 将视频音频音量归一化到 EBU R128 广播响度标准。
 

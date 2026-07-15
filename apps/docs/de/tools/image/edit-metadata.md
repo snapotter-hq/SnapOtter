@@ -1,11 +1,11 @@
 ---
 description: "Bearbeitet EXIF-, IPTC-, GPS- und XMP-Metadatenfelder in Bildern, ohne die Pixel neu zu kodieren."
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: e0f8d58bc6c3
 ---
 
-# Metadaten bearbeiten {#edit-metadata}
+# Bildmetadaten bearbeiten {#edit-metadata}
 
 Bearbeitet Bildmetadatenfelder einschließlich EXIF, IPTC, GPS-Koordinaten, Daten und Schlüsselwörter. Verwendet ExifTool im Hintergrund, sodass Metadaten direkt geschrieben werden, ohne die Pixel neu zu kodieren, wodurch die volle Bildqualität erhalten bleibt.
 

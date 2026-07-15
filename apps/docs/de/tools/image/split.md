@@ -1,6 +1,6 @@
 ---
 description: "Ein Bild nach Zeilen und Spalten oder nach Pixelgröße in Rasterkacheln aufteilen, ausgegeben als ZIP-Archiv."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: b8740b8935b1
 ---

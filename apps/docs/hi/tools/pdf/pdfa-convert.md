@@ -1,11 +1,11 @@
 ---
 description: "दीर्घकालिक संरक्षण के लिए एक PDF को आर्काइवल PDF/A-2 फ़ॉर्मेट में बदलें।"
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 2a283e7010ee
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# PDF/A कन्वर्टर {#pdf-a-convert}
 
 एक PDF को PDF/A-2 आर्काइवल फ़ॉर्मेट में बदलें, जो दीर्घकालिक संरक्षण और नियामक अनुपालन के लिए उपयुक्त है।
 

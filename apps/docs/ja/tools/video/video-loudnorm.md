@@ -1,11 +1,11 @@
 ---
 description: "動画の音声音量を放送規格に正規化します。"
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 38db801bdebb
 ---
 
-# Normalize Audio {#normalize-audio}
+# 動画音声ノーマライズ {#normalize-audio}
 
 動画の音声音量を EBU R128 放送ラウドネス規格に正規化します。
 

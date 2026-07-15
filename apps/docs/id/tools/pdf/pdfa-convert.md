@@ -1,11 +1,11 @@
 ---
 description: "Konversi PDF menjadi format arsip PDF/A-2 untuk pengarsipan jangka panjang."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: e383a7d5863f
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# Konverter PDF/A {#pdf-a-convert}
 
 Konversi PDF menjadi format arsip PDF/A-2, cocok untuk pengarsipan jangka panjang dan kepatuhan regulasi.
 

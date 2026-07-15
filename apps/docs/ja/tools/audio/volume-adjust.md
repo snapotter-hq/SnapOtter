@@ -1,11 +1,11 @@
 ---
 description: "固定のゲイン（デシベル）で音声の音量を上げ下げします。"
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 6d3dabd3cb22
 ---
 
-# Volume Adjust {#volume-adjust}
+# 音量調整 {#volume-adjust}
 
 固定のゲイン（デシベル）を適用して、音声ファイルの音量を上げ下げします。
 

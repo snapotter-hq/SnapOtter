@@ -1,11 +1,11 @@
 ---
 description: "Bilder mit adaptiven, Unschärfemaskierungs- oder Hochpass-Verfahren schärfen, optional mit Rauschreduzierung."
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 0d7818436c69
 ---
 
-# Schärfen {#sharpening}
+# Bild schärfen {#sharpening}
 
 Erweitertes Schärfungswerkzeug mit drei Verfahren: adaptiv (intelligent kantenbewusst), Unschärfemaskierung (klassisch mit Radius/Stärke) und Hochpass (Texturbetonung). Enthält eine integrierte Rauschreduzierung, um Schärfungsartefakte zu vermeiden.
 

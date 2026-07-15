@@ -1,11 +1,11 @@
 ---
 description: "Minska bildfilstorleken efter kvalitetsnivå eller till en målfilstorlek."
-i18n_source_hash: af4685da7e64
+i18n_source_hash: 342c5cf1f864
 i18n_provenance: human
 i18n_output_hash: 3eccb093997f
 ---
 
-# Komprimera {#compress}
+# Komprimera bild {#compress}
 
 Minska bildfilstorleken genom att ange en kvalitetsnivå eller en målfilstorlek i kilobyte. Verktyget använder iterativ binärsökning för att träffa storleksmål exakt.
 

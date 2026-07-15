@@ -1,11 +1,11 @@
 ---
 description: "Schneidet Bilder zu, indem ein Bereich über Position und Abmessungen angegeben wird."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 381bf2d3b47b
 ---
 
-# Zuschneiden {#crop}
+# Bild zuschneiden {#crop}
 
 Schneidet Bilder zu, indem ein rechteckiger Bereich über Position und Größe definiert wird. Unterstützt sowohl Pixel- als auch Prozenteinheiten.
 

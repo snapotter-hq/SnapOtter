@@ -2,7 +2,7 @@
 description: Remove EXIF, GPS, ICC, and XMP metadata from images for privacy and smaller file sizes.
 ---
 
-# Remove Metadata {#remove-metadata}
+# Remove Image Metadata {#remove-metadata}
 
 Remove EXIF, GPS, ICC color profiles, and XMP metadata from images. Useful for privacy (removing GPS coordinates, camera info) and reducing file size.
 

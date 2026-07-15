@@ -1,11 +1,11 @@
 ---
 description: "Нормалізує гучність аудіо відео до стандарту мовлення."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 5fceeac77e8e
 ---
 
-# Normalize Audio {#normalize-audio}
+# Нормалізація звуку відео {#normalize-audio}
 
 Нормалізує гучність аудіо відео до стандарту гучності мовлення EBU R128.
 

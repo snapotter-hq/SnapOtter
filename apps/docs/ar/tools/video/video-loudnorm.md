@@ -1,11 +1,11 @@
 ---
 description: "تسوية مستوى صوت الفيديو إلى معيار البث."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: 3f821e929306
 ---
 
-# Normalize Audio {#normalize-audio}
+# تسوية صوت الفيديو {#normalize-audio}
 
 تسوية مستوى صوت الفيديو إلى معيار جهارة البث EBU R128.
 

@@ -1,11 +1,11 @@
 ---
 description: "AVIF, JXL ve HEIC gibi modern biçimler dahil olmak üzere görüntüleri biçimler arasında dönüştürün."
-i18n_source_hash: 562f8270e8c3
+i18n_source_hash: 2639f333073f
 i18n_provenance: human
 i18n_output_hash: 2ff55524f83b
 ---
 
-# Dönüştür {#convert}
+# Görüntü Dönüştür {#convert}
 
 Görüntüleri biçimler arasında dönüştürün. HEIC, JXL, BMP, ICO, JP2, QOI ve PSD gibi özel biçimlerin yanı sıra yaygın web biçimlerini de destekler.
 

@@ -1,11 +1,11 @@
 ---
 description: "Chuyển đổi một PDF sang định dạng lưu trữ PDF/A-2 để bảo tồn dài hạn."
-i18n_source_hash: 4c6bf7a12e84
+i18n_source_hash: 9c568a340b6f
 i18n_provenance: human
 i18n_output_hash: 13590adfaafe
 ---
 
-# PDF/A Convert {#pdf-a-convert}
+# Bộ chuyển đổi PDF/A {#pdf-a-convert}
 
 Chuyển đổi một PDF sang định dạng lưu trữ PDF/A-2, phù hợp cho việc bảo tồn dài hạn và tuân thủ quy định.
 

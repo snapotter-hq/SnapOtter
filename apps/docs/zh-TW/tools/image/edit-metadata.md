@@ -1,11 +1,11 @@
 ---
 description: "編輯圖片中的 EXIF、IPTC、GPS 與 XMP 中繼資料欄位，無需重新編碼像素。"
-i18n_source_hash: a37746db11c3
+i18n_source_hash: 9271d3d8f278
 i18n_provenance: human
 i18n_output_hash: bac2c78cbec4
 ---
 
-# 編輯中繼資料 {#edit-metadata}
+# 編輯影像中繼資料 {#edit-metadata}
 
 編輯圖片中繼資料欄位，包含 EXIF、IPTC、GPS 座標、日期與關鍵字。底層使用 ExifTool，因此中繼資料會就地寫入而不重新編碼像素，完整保留圖片品質。
 

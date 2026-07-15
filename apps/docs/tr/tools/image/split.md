@@ -1,11 +1,11 @@
 ---
 description: "Bir görüntüyü satır ve sütuna göre veya piksel boyutuna göre ızgara döşemelerine bölün, ZIP arşivi olarak döndürülür."
-i18n_source_hash: 57a2e11e7cce
+i18n_source_hash: 838f5fa791b0
 i18n_provenance: human
 i18n_output_hash: 01424920320f
 ---
 
-# Görüntü Bölme {#image-splitting}
+# Görüntü Böl {#image-splitting}
 
 Tek bir görüntüyü sütun/satır sayısına göre veya belirli piksel boyutlarına göre ızgara döşemelerine bölün. Tüm döşemeleri içeren bir ZIP arşivi döndürür.
 

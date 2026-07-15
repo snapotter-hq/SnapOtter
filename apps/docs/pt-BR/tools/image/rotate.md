@@ -1,11 +1,11 @@
 ---
 description: "Gire imagens em qualquer ângulo e espelhe na horizontal ou na vertical."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 064aa90129d1
 ---
 
-# Girar e Espelhar {#rotate-flip}
+# Girar e Espelhar Imagem {#rotate-flip}
 
 Gire imagens em um ângulo arbitrário e/ou espelhe-as na horizontal ou na vertical. As operações de rotação e espelhamento podem ser combinadas em uma única requisição.
 

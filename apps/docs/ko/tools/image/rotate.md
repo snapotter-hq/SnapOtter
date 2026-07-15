@@ -1,11 +1,11 @@
 ---
 description: "임의의 각도로 이미지를 회전하고 가로 또는 세로로 뒤집습니다."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: 20d61f10ef3e
 ---
 
-# Rotate & Flip {#rotate-flip}
+# 이미지 회전 및 뒤집기 {#rotate-flip}
 
 임의의 각도로 이미지를 회전하고 가로 또는 세로로 뒤집습니다. 회전과 뒤집기 작업을 단일 요청으로 결합할 수 있습니다.
 

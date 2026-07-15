@@ -2,7 +2,7 @@
 description: Edit EXIF, IPTC, GPS, and XMP metadata fields in images without re-encoding pixels.
 ---
 
-# Edit Metadata {#edit-metadata}
+# Edit Image Metadata {#edit-metadata}
 
 Edit image metadata fields including EXIF, IPTC, GPS coordinates, dates, and keywords. Uses ExifTool under the hood, so metadata is written in-place without re-encoding pixels, preserving full image quality.
 

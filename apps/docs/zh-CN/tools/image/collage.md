@@ -1,11 +1,11 @@
 ---
 description: "使用 25 多种模板将多张图片合成为网格拼贴，可调整间距与圆角，并支持逐单元格平移与缩放。"
-i18n_source_hash: 96f2055717df
+i18n_source_hash: cd50a782239d
 i18n_provenance: human
 i18n_output_hash: a4e5c1913881
 ---
 
-# 拼贴 / 网格 {#collage-grid}
+# 拼贴和网格 {#collage-grid}
 
 使用 25 多种模板将多张图片合成为精美的网格拼贴。支持 2-9 张图片的布局，可自定义间距、圆角半径、背景颜色，以及逐单元格的平移/缩放控制。
 

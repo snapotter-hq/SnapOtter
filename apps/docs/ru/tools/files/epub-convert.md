@@ -1,11 +1,11 @@
 ---
 description: "Конвертация EPUB в PDF, DOCX, HTML или Markdown."
-i18n_source_hash: 7d94fc18ca97
+i18n_source_hash: cb39f254ff2f
 i18n_provenance: human
 i18n_output_hash: e6fc76653944
 ---
 
-# Конвертация EPUB {#convert-epub}
+# Конвертация из EPUB {#convert-epub}
 
 Конвертация электронной книги EPUB в PDF, Word (DOCX), HTML или Markdown. Удалённые ресурсы внутри книги не загружаются.
 

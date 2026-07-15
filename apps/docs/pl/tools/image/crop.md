@@ -1,11 +1,11 @@
 ---
 description: "Kadruj obrazy, określając obszar za pomocą pozycji i wymiarów."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: ac8f21ea2c80
 ---
 
-# Kadrowanie {#crop}
+# Kadruj obraz {#crop}
 
 Kadruj obrazy, definiując prostokątny obszar za pomocą pozycji i rozmiaru. Obsługuje zarówno jednostki pikselowe, jak i procentowe.
 

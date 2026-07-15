@@ -1,11 +1,11 @@
 ---
 description: "Zmieniaj rozmiar obrazów w pikselach, procentowo lub z trybami dopasowania."
-i18n_source_hash: 00d1bffa4d38
+i18n_source_hash: 53866e8266b8
 i18n_provenance: human
 i18n_output_hash: d0de66d1ead7
 ---
 
-# Zmiana rozmiaru {#resize}
+# Zmień rozmiar obrazu {#resize}
 
 Zmieniaj rozmiar obrazów, podając dokładne wymiary w pikselach, procentowy współczynnik skali lub tryb dopasowania kontrolujący, jak obraz dostosowuje się do wymiarów docelowych.
 

@@ -1,6 +1,6 @@
 ---
 description: "데시벨 단위의 고정 게인으로 오디오 볼륨을 높이거나 낮춥니다."
-i18n_source_hash: b9bc1de2c9ef
+i18n_source_hash: 4bc993fd4e08
 i18n_provenance: human
 i18n_output_hash: 6f5ebbf33cd7
 ---

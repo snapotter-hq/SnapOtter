@@ -1,11 +1,11 @@
 ---
 description: "Detecta y desenfoca caras automáticamente en imágenes con detección facial por IA para privacidad y anonimización conforme al RGPD."
-i18n_source_hash: fb861c12aea5
+i18n_source_hash: 314e3e16a422
 i18n_provenance: human
 i18n_output_hash: 83a6acb36226
 ---
 
-# Desenfoque de caras / PII {#face-pii-blur}
+# Desenfocar rostros y datos sensibles {#face-pii-blur}
 
 Detecta y desenfoca caras automáticamente en imágenes usando detección facial impulsada por IA (MediaPipe).
 

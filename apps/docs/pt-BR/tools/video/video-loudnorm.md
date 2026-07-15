@@ -1,11 +1,11 @@
 ---
 description: "Normaliza o volume do áudio do vídeo para o padrão de broadcast."
-i18n_source_hash: 078f1e819c9a
+i18n_source_hash: c7a53b5faf1b
 i18n_provenance: human
 i18n_output_hash: ae3de30eeee0
 ---
 
-# Normalize Audio {#normalize-audio}
+# Normalizar Áudio do Vídeo {#normalize-audio}
 
 Normaliza o volume do áudio do vídeo para o padrão de loudness de broadcast EBU R128.
 

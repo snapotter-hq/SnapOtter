@@ -1,11 +1,11 @@
 ---
 description: "Potong gambar dengan menentukan area menggunakan posisi dan dimensi."
-i18n_source_hash: aab38ccd7c53
+i18n_source_hash: 556f37893553
 i18n_provenance: human
 i18n_output_hash: 9d19b11b1cf9
 ---
 
-# Potong {#crop}
+# Potong Gambar {#crop}
 
 Potong gambar dengan mendefinisikan area persegi panjang menggunakan posisi dan ukuran. Mendukung satuan piksel dan persentase.
 

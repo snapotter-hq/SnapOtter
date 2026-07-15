@@ -1,11 +1,11 @@
 ---
 description: "Drehe Bilder um jeden beliebigen Winkel und spiegle sie horizontal oder vertikal."
-i18n_source_hash: af2581d7cd8d
+i18n_source_hash: c4ed5f7e270b
 i18n_provenance: human
 i18n_output_hash: b73dc2e4ca1c
 ---
 
-# Drehen & Spiegeln {#rotate-flip}
+# Bild drehen & spiegeln {#rotate-flip}
 
 Drehe Bilder um einen beliebigen Winkel und/oder spiegle sie horizontal oder vertikal. Dreh- und Spiegeloperationen können in einer einzigen Anfrage kombiniert werden.
 

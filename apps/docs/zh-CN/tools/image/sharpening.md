@@ -1,11 +1,11 @@
 ---
 description: "使用自适应、USM 锐化或高通方法锐化图像，并可选降噪。"
-i18n_source_hash: ccb60af9faae
+i18n_source_hash: 66dce4068899
 i18n_provenance: human
 i18n_output_hash: 8096d6bf1ecd
 ---
 
-# 锐化 {#sharpening}
+# 锐化图片 {#sharpening}
 
 提供三种方法的高级锐化工具：自适应（智能边缘感知）、USM 锐化（经典的半径/强度）和高通（纹理强化）。内置降噪功能，可防止锐化产生伪影。
 
