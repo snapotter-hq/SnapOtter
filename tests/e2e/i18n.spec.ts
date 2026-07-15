@@ -166,7 +166,7 @@ test.describe("i18n - tool names translate", () => {
 
     const body = await page.textContent("body");
     expect(body).toContain("Grundlagen");
-    expect(body).toContain("Komprimieren");
+    expect(body).toContain("Bild komprimieren");
   });
 
   test("tool names show in Japanese", async ({ page }) => {

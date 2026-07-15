@@ -260,7 +260,7 @@ paths:
       operationId: resizeImage
       tags:
         - Tools
-      summary: Thay đổi kích thước
+      summary: Thay đổi kích thước ảnh
       description: Thay đổi kích thước ảnh theo kích thước cụ thể hoặc theo phần trăm.
       security:
         - bearerAuth: []
@@ -370,7 +370,7 @@ paths:
       operationId: cropImage
       tags:
         - Tools
-      summary: Cắt xén
+      summary: Cắt ảnh
       description: Cắt xén ảnh theo một vùng cụ thể.
       security:
         - bearerAuth: []
@@ -420,7 +420,7 @@ paths:
       operationId: rotateImage
       tags:
         - Tools
-      summary: Xoay và lật
+      summary: Xoay & Lật ảnh
       description: Xoay ảnh theo góc hoặc lật ngang/dọc.
       security:
         - bearerAuth: []
@@ -468,7 +468,7 @@ paths:
       operationId: convertFormat
       tags:
         - Tools
-      summary: Chuyển đổi định dạng
+      summary: Chuyển đổi ảnh
       description: Chuyển đổi ảnh sang một định dạng khác.
       security:
         - bearerAuth: []
@@ -515,7 +515,7 @@ paths:
       operationId: compressImage
       tags:
         - Tools
-      summary: Nén
+      summary: Nén ảnh
       description: Giảm kích thước tệp ảnh theo mức chất lượng hoặc kích thước mục tiêu.
       security:
         - bearerAuth: []
@@ -563,7 +563,7 @@ paths:
       operationId: stripMetadata
       tags:
         - Tools
-      summary: Xóa metadata
+      summary: Xóa siêu dữ liệu ảnh
       description: Loại bỏ metadata EXIF, GPS, ICC hoặc XMP khỏi ảnh.
       security:
         - bearerAuth: []
@@ -800,7 +800,7 @@ paths:
       operationId: sharpenImage
       tags:
         - Tools
-      summary: Làm nét
+      summary: Làm nét ảnh
       description: Làm nét ảnh bằng các phương pháp adaptive, unsharp mask hoặc high-pass với tùy chọn giảm nhiễu.
       security:
         - bearerAuth: []
@@ -2591,7 +2591,7 @@ paths:
       operationId: splitImage
       tags:
         - Tools
-      summary: Chia tách ảnh
+      summary: Tách ảnh
       description: Chia tách ảnh thành lưới các ô. Trả về một tệp ZIP.
       security:
         - bearerAuth: []
@@ -3312,7 +3312,7 @@ paths:
       operationId: createCollage
       tags:
         - Tools
-      summary: Ảnh ghép / lưới
+      summary: Ảnh ghép và Lưới
       description: Kết hợp nhiều ảnh thành một ảnh ghép dạng lưới.
       security:
         - bearerAuth: []
@@ -3786,7 +3786,7 @@ paths:
       operationId: blurFaces
       tags:
         - Tools
-      summary: Làm mờ khuôn mặt
+      summary: Làm mờ khuôn mặt và thông tin nhạy cảm
       description: Phát hiện và làm mờ khuôn mặt trong ảnh để bảo vệ quyền riêng tư. Dùng OpenCV. Chạy cục bộ.
       security:
         - bearerAuth: []
@@ -4512,7 +4512,7 @@ paths:
       operationId: editMetadata
       tags:
         - Tools
-      summary: Chỉnh sửa metadata
+      summary: Chỉnh sửa siêu dữ liệu ảnh
       description: Chỉnh sửa các trường metadata EXIF, IPTC, GPS và các trường khác trong ảnh bằng ExifTool.
       security:
         - bearerAuth: []
@@ -7973,7 +7973,7 @@ paths:
       operationId: videoLoudnorm
       tags:
         - Tools
-      summary: Chuẩn hóa âm thanh
+      summary: Chuẩn hóa âm thanh video
       description: Chuẩn hóa âm lượng âm thanh video theo chuẩn phát sóng (EBU R128).
       security:
         - bearerAuth: []
@@ -10191,7 +10191,7 @@ paths:
       operationId: pdfaConvert
       tags:
         - Tools
-      summary: Chuyển đổi PDF/A
+      summary: Bộ chuyển đổi PDF/A
       description: Chuyển đổi một PDF sang định dạng lưu trữ PDF/A-2 để bảo tồn lâu dài.
       security:
         - bearerAuth: []
@@ -10278,7 +10278,7 @@ paths:
       operationId: nupPdf
       tags:
         - Tools
-      summary: N-up PDF
+      summary: Số trang mỗi tờ (N-up)
       description: Sắp xếp nhiều trang trên mỗi tờ (ví dụ 2-up, 4-up).
       security:
         - bearerAuth: []
@@ -10964,7 +10964,7 @@ paths:
       operationId: epubConvert
       tags:
         - Tools
-      summary: Chuyển đổi EPUB
+      summary: Chuyển đổi từ EPUB
       description: Chuyển đổi một EPUB sang PDF, DOCX, HTML hoặc Markdown. Tài nguyên từ xa bên trong cuốn sách không được lấy về.
       security:
         - bearerAuth: []
@@ -11687,7 +11687,7 @@ paths:
       operationId: yamlJson
       tags:
         - Tools
-      summary: YAML / JSON
+      summary: Chuyển đổi YAML / JSON
       description: Chuyển đổi giữa YAML và JSON, cả hai chiều. Tải lên một tệp YAML để nhận JSON, hoặc tải lên một tệp JSON để nhận YAML.
       security:
         - bearerAuth: []
@@ -18810,9 +18810,9 @@ x-i18n:
       provenance: machine
       outputHash: 12765950aa8d
     paths./api/v1/tools/image/resize.post.summary:
-      sourceHash: 2956e06ac065
+      sourceHash: 6cc5dc48975b
       provenance: machine
-      outputHash: aa6eeff4e366
+      outputHash: 313e862f7dbf
     paths./api/v1/tools/image/resize.post.description:
       sourceHash: 3dd014df5258
       provenance: machine
@@ -18826,41 +18826,41 @@ x-i18n:
       provenance: machine
       outputHash: a4ea80dee1f7
     paths./api/v1/tools/image/crop.post.summary:
-      sourceHash: 98caf7c43c6f
+      sourceHash: fb3dabcf0d02
       provenance: machine
-      outputHash: 7dc39c45f9df
+      outputHash: 522d6153dfda
     paths./api/v1/tools/image/crop.post.description:
       sourceHash: db6c5c89d359
       provenance: machine
       outputHash: 8ce294b9fec3
     paths./api/v1/tools/image/rotate.post.summary:
-      sourceHash: c98856efbb08
+      sourceHash: 816edfdfe65e
       provenance: machine
-      outputHash: 0b00288e34d8
+      outputHash: 0c8c9b90c611
     paths./api/v1/tools/image/rotate.post.description:
       sourceHash: 5360b7d1a4c3
       provenance: machine
       outputHash: 26939174030e
     paths./api/v1/tools/image/convert.post.summary:
-      sourceHash: 3c2ee9bc3ec8
+      sourceHash: 6ccca094d767
       provenance: machine
-      outputHash: 6cb9d55f89e6
+      outputHash: 0dfff1e3a1ed
     paths./api/v1/tools/image/convert.post.description:
       sourceHash: 2298d8af460d
       provenance: machine
       outputHash: 86ee25db4708
     paths./api/v1/tools/image/compress.post.summary:
-      sourceHash: 033fc0445b90
+      sourceHash: a18573a37f49
       provenance: machine
-      outputHash: c7dac95e170c
+      outputHash: 886d04862ece
     paths./api/v1/tools/image/compress.post.description:
       sourceHash: 01f63e9e928a
       provenance: machine
       outputHash: 812f40ee0e88
     paths./api/v1/tools/image/strip-metadata.post.summary:
-      sourceHash: 013af4252599
+      sourceHash: 1b49ff96cee6
       provenance: machine
-      outputHash: 46955af8ac09
+      outputHash: f3cd8deca373
     paths./api/v1/tools/image/strip-metadata.post.description:
       sourceHash: b5718bfd5335
       provenance: machine
@@ -18890,9 +18890,9 @@ x-i18n:
       provenance: machine
       outputHash: a0346108ad6a
     paths./api/v1/tools/image/sharpening.post.summary:
-      sourceHash: 73fb568dcab6
+      sourceHash: d07b9f428bbf
       provenance: machine
-      outputHash: cca7797107e8
+      outputHash: d16ad76445de
     paths./api/v1/tools/image/sharpening.post.description:
       sourceHash: 8080cda0610a
       provenance: machine
@@ -19106,9 +19106,9 @@ x-i18n:
       provenance: machine
       outputHash: 877b36bcb32e
     paths./api/v1/tools/image/split.post.summary:
-      sourceHash: 21b17b422f71
+      sourceHash: 6a45e35cf509
       provenance: machine
-      outputHash: 4298dbffd92d
+      outputHash: 5a0dd39454b9
     paths./api/v1/tools/image/split.post.description:
       sourceHash: d7d4988765b3
       provenance: machine
@@ -19210,15 +19210,15 @@ x-i18n:
       provenance: machine
       outputHash: 450096ddf0bb
     paths./api/v1/tools/image/collage.post.summary:
-      sourceHash: 792f730c3eb6
+      sourceHash: 6e5e905e8c16
       provenance: machine
-      outputHash: b6ec1f28df6d
+      outputHash: d616b7364fbe
     paths./api/v1/tools/image/collage.post.description:
       sourceHash: fb0ba3d2cf44
       provenance: machine
       outputHash: 300e6ce3a3f2
     paths./api/v1/tools/image/stitch.post.summary:
-      sourceHash: dd874f58b1aa
+      sourceHash: d0e2b34fe22b
       provenance: machine
       outputHash: 183c85f19ea3
     paths./api/v1/tools/image/stitch.post.description:
@@ -19266,9 +19266,9 @@ x-i18n:
       provenance: machine
       outputHash: fad5f1dab8e5
     paths./api/v1/tools/image/blur-faces.post.summary:
-      sourceHash: 635ee975dace
+      sourceHash: d9a7e1d9a145
       provenance: machine
-      outputHash: 8e4a74763c38
+      outputHash: 07316a533dc3
     paths./api/v1/tools/image/blur-faces.post.description:
       sourceHash: 28790ae08ac7
       provenance: machine
@@ -19338,9 +19338,9 @@ x-i18n:
       provenance: machine
       outputHash: 595cb8affb74
     paths./api/v1/tools/image/edit-metadata.post.summary:
-      sourceHash: a4ce10f7b615
+      sourceHash: b2e22f0aa9d8
       provenance: machine
-      outputHash: fea440a733e9
+      outputHash: 5c1278334ab0
     paths./api/v1/tools/image/edit-metadata.post.description:
       sourceHash: 70d277ec5566
       provenance: machine
@@ -19858,9 +19858,9 @@ x-i18n:
       provenance: machine
       outputHash: c221f0239a4f
     paths./api/v1/tools/video/video-loudnorm.post.summary:
-      sourceHash: f5298327c322
+      sourceHash: e502f3536632
       provenance: machine
-      outputHash: ebc87a2b295c
+      outputHash: 28ebe70c22dc
     paths./api/v1/tools/video/video-loudnorm.post.description:
       sourceHash: 019f6147f722
       provenance: machine
@@ -20010,7 +20010,7 @@ x-i18n:
       provenance: machine
       outputHash: 6093c11bf4c4
     paths./api/v1/tools/audio/volume-adjust.post.summary:
-      sourceHash: 399e64735825
+      sourceHash: 04257764f127
       provenance: machine
       outputHash: 2e956c549bcb
     paths./api/v1/tools/audio/volume-adjust.post.description:
@@ -20226,9 +20226,9 @@ x-i18n:
       provenance: machine
       outputHash: 92077c0d8d5e
     paths./api/v1/tools/pdf/pdfa-convert.post.summary:
-      sourceHash: 1a5ec4af8f0e
+      sourceHash: 9971b16fe624
       provenance: machine
-      outputHash: 835999c0cd3f
+      outputHash: 78e7a0f246f6
     paths./api/v1/tools/pdf/pdfa-convert.post.description:
       sourceHash: 3c8ad47aa904
       provenance: machine
@@ -20242,9 +20242,9 @@ x-i18n:
       provenance: machine
       outputHash: 725d76794b8e
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
-      sourceHash: 779949cba319
+      sourceHash: dac1b895452a
       provenance: machine
-      outputHash: 779949cba319
+      outputHash: e6ecaed2f27a
     paths./api/v1/tools/pdf/nup-pdf.post.description:
       sourceHash: 5e2a264dafb0
       provenance: machine
@@ -20354,9 +20354,9 @@ x-i18n:
       provenance: machine
       outputHash: 8d89e078933a
     paths./api/v1/tools/files/epub-convert.post.summary:
-      sourceHash: f03cffcd951f
+      sourceHash: dcee1b93b5d5
       provenance: machine
-      outputHash: 01aea727635f
+      outputHash: fe9a0a44e439
     paths./api/v1/tools/files/epub-convert.post.description:
       sourceHash: 5a42072194d3
       provenance: machine
@@ -20466,9 +20466,9 @@ x-i18n:
       provenance: machine
       outputHash: d88098216ffb
     paths./api/v1/tools/files/yaml-json.post.summary:
-      sourceHash: c73b92121dff
+      sourceHash: cd3e06c3d51d
       provenance: machine
-      outputHash: c73b92121dff
+      outputHash: 83f68e860bab
     paths./api/v1/tools/files/yaml-json.post.description:
       sourceHash: a7fa089ac00a
       provenance: machine

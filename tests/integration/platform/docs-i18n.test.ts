@@ -21,7 +21,7 @@ describe("API docs i18n serving", () => {
     const res = await testApp.app.inject({ method: "GET", url: "/api/v1/openapi.yaml?lang=de" });
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("text/yaml");
-    expect(res.body).toContain("Größe ändern");
+    expect(res.body).toContain("Bildgröße ändern");
     expect(res.body).toContain("locale: de");
   });
 
@@ -30,7 +30,7 @@ describe("API docs i18n serving", () => {
     expect(res.statusCode).toBe(200);
     // English spec has the English summary, not the German one.
     expect(res.body).toContain("openapi: 3.1.0");
-    expect(res.body).not.toContain("Größe ändern");
+    expect(res.body).not.toContain("Bildgröße ändern");
   });
 
   it("serves another committed locale spec without falling back to English", async () => {
@@ -54,7 +54,7 @@ describe("API docs i18n serving", () => {
     // Tag prose comes from the committed German spec.
     expect(res.body).toContain("Datei-Verarbeitungstools");
     // Tool lines come from shared i18n; the Resize tool id is present with a mode.
-    expect(res.body).toContain("Größe ändern - Größe nach Pixeln");
+    expect(res.body).toContain("Bildgröße ändern - Größe nach Pixeln");
     expect(res.body).toContain("(resize, sync)");
   });
 

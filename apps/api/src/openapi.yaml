@@ -261,7 +261,7 @@ paths:
     post:
       operationId: resizeImage
       tags: [Tools]
-      summary: Resize
+      summary: Resize Image
       description: Resize an image to specific dimensions or by percentage.
       security:
         - bearerAuth: []
@@ -369,7 +369,7 @@ paths:
     post:
       operationId: cropImage
       tags: [Tools]
-      summary: Crop
+      summary: Crop Image
       description: Crop an image to a specific region.
       security:
         - bearerAuth: []
@@ -418,7 +418,7 @@ paths:
     post:
       operationId: rotateImage
       tags: [Tools]
-      summary: Rotate and flip
+      summary: Rotate & Flip Image
       description: Rotate an image by angle or flip horizontally/vertically.
       security:
         - bearerAuth: []
@@ -465,7 +465,7 @@ paths:
     post:
       operationId: convertFormat
       tags: [Tools]
-      summary: Convert format
+      summary: Convert Image
       description: Convert an image to a different format.
       security:
         - bearerAuth: []
@@ -511,7 +511,7 @@ paths:
     post:
       operationId: compressImage
       tags: [Tools]
-      summary: Compress
+      summary: Compress Image
       description: Reduce image file size by quality level or target size.
       security:
         - bearerAuth: []
@@ -558,7 +558,7 @@ paths:
     post:
       operationId: stripMetadata
       tags: [Tools]
-      summary: Strip metadata
+      summary: Remove Image Metadata
       description: Remove EXIF, GPS, ICC, or XMP metadata from an image.
       security:
         - bearerAuth: []
@@ -793,7 +793,7 @@ paths:
     post:
       operationId: sharpenImage
       tags: [Tools]
-      summary: Sharpening
+      summary: Sharpen Image
       description: Sharpen an image using adaptive, unsharp mask, or high-pass methods with optional noise reduction.
       security:
         - bearerAuth: []
@@ -2552,7 +2552,7 @@ paths:
     post:
       operationId: splitImage
       tags: [Tools]
-      summary: Split image
+      summary: Split Image
       description: Split an image into a grid of tiles. Returns a ZIP file.
       security:
         - bearerAuth: []
@@ -3252,7 +3252,7 @@ paths:
     post:
       operationId: createCollage
       tags: [Tools]
-      summary: Collage / grid
+      summary: Collage & Grid
       description: Combine multiple images into a grid collage.
       security:
         - bearerAuth: []
@@ -3306,7 +3306,7 @@ paths:
     post:
       operationId: stitchImages
       tags: [Tools]
-      summary: Stitch images
+      summary: Stitch Images
       description: Join multiple images horizontally, vertically, or in a grid layout.
       security:
         - bearerAuth: []
@@ -3720,7 +3720,7 @@ paths:
     post:
       operationId: blurFaces
       tags: [Tools]
-      summary: Face blur
+      summary: Blur Faces & PII
       description: Detect and blur faces in an image for privacy. Uses OpenCV. Runs locally.
       security:
         - bearerAuth: []
@@ -4407,7 +4407,7 @@ paths:
     post:
       operationId: editMetadata
       tags: [Tools]
-      summary: Edit metadata
+      summary: Edit Image Metadata
       description: Edit EXIF, IPTC, GPS, and other metadata fields in an image using ExifTool.
       security:
         - bearerAuth: []
@@ -7780,7 +7780,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags: [Tools]
-      summary: Normalize Audio
+      summary: Normalize Video Audio
       description: Normalize video audio volume to broadcast standard (EBU R128).
       security:
         - bearerAuth: []
@@ -8707,7 +8707,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags: [Tools]
-      summary: Volume Adjust
+      summary: Adjust Volume
       description: Increase or decrease audio volume by a fixed gain.
       security:
         - bearerAuth: []
@@ -9950,7 +9950,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags: [Tools]
-      summary: PDF/A convert
+      summary: PDF/A Converter
       description: Convert a PDF to archival PDF/A-2 format for long-term preservation.
       security:
         - bearerAuth: []
@@ -10035,7 +10035,7 @@ paths:
     post:
       operationId: nupPdf
       tags: [Tools]
-      summary: N-up PDF
+      summary: Pages Per Sheet (N-up)
       description: Arrange multiple pages per sheet (e.g. 2-up, 4-up).
       security:
         - bearerAuth: []
@@ -10706,7 +10706,7 @@ paths:
     post:
       operationId: epubConvert
       tags: [Tools]
-      summary: Convert EPUB
+      summary: Convert from EPUB
       description: Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.
       security:
         - bearerAuth: []
@@ -11412,7 +11412,7 @@ paths:
     post:
       operationId: yamlJson
       tags: [Tools]
-      summary: YAML / JSON
+      summary: Convert YAML / JSON
       description: Convert between YAML and JSON, both directions. Upload a YAML file to get JSON, or upload a JSON file to get YAML.
       security:
         - bearerAuth: []
