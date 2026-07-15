@@ -1360,7 +1360,9 @@ const BASE_TOOLS: Tool[] = [
     route: "/compress-pdf",
     modality: "document",
     acceptedInputs: [".pdf"],
-    executionHint: "fast",
+    // "long": the target-size mode runs several ghostscript passes; async keeps
+    // the request off the sync window and surfaces a real progress bar.
+    executionHint: "long",
   },
   {
     id: "rotate-pdf",
