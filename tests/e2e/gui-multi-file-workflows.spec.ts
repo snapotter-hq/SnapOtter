@@ -612,7 +612,7 @@ test.describe("Pipeline Builder - execution progress", () => {
     // rejects the bare defaults (width unset / target size 0).
     await addToolStep(page, "Resize", 1);
     await page.locator("#resize-width").fill("100");
-    await addToolStep(page, "Remove Metadata", 2);
+    await addToolStep(page, "Remove Image Metadata", 2);
     await addToolStep(page, "Compress", 3);
     await page.getByRole("button", { name: "Quality", exact: true }).click();
 
@@ -791,7 +791,7 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
   test("3 images through 2-step pipeline produces all results", async ({ loggedInPage: page }) => {
     await gotoAutomate(page);
 
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to an invalid Target Size of 0; switch to Quality mode.
     await page.getByRole("button", { name: "Quality", exact: true }).click();
@@ -829,7 +829,7 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
     test.setTimeout(90_000);
     await gotoAutomate(page);
 
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to an invalid Target Size of 0; switch to Quality mode.
     await page.getByRole("button", { name: "Quality", exact: true }).click();
@@ -865,7 +865,7 @@ test.describe("Batch + Pipeline - multi-file workflow", () => {
     await gotoAutomate(page);
 
     await addToolStep(page, "Resize", 1);
-    await addToolStep(page, "Remove Metadata", 2);
+    await addToolStep(page, "Remove Image Metadata", 2);
     await addToolStep(page, "Compress", 3);
 
     // Upload 2 images

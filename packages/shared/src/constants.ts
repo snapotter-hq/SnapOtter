@@ -39,7 +39,7 @@ const BASE_TOOLS: Tool[] = [
   // Essentials
   {
     id: "resize",
-    name: "Resize",
+    name: "Resize Image",
     description: "Resize by pixels, percentage, or social media presets",
     category: "essentials",
     icon: "Maximize2",
@@ -50,7 +50,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "crop",
-    name: "Crop",
+    name: "Crop Image",
     description: "Freeform crop, aspect ratio presets, shape crop",
     category: "essentials",
     icon: "Crop",
@@ -61,7 +61,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "rotate",
-    name: "Rotate & Flip",
+    name: "Rotate & Flip Image",
     description: "Rotate, flip, and straighten images",
     category: "essentials",
     icon: "RotateCw",
@@ -72,7 +72,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "convert",
-    name: "Convert",
+    name: "Convert Image",
     description: "Convert between image formats",
     category: "essentials",
     icon: "FileOutput",
@@ -91,7 +91,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "compress",
-    name: "Compress",
+    name: "Compress Image",
     description: "Reduce file size by quality or target size",
     category: "essentials",
     icon: "Minimize2",
@@ -115,7 +115,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "strip-metadata",
-    name: "Remove Metadata",
+    name: "Remove Image Metadata",
     description: "Remove EXIF, GPS, and camera info",
     category: "optimization",
     icon: "ShieldOff",
@@ -126,7 +126,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "edit-metadata",
-    name: "Edit Metadata",
+    name: "Edit Image Metadata",
     description: "Edit EXIF, GPS, and camera info",
     category: "optimization",
     icon: "PenLine",
@@ -183,8 +183,9 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "sharpening",
-    name: "Sharpening",
+    name: "Sharpen Image",
     description: "Adaptive, unsharp mask, and high-pass sharpening with presets",
+    keywords: ["sharpen", "sharpening", "unsharp", "clarity"],
     category: "adjustments",
     icon: "Focus",
     route: "/sharpening",
@@ -297,8 +298,9 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "blur-faces",
-    name: "Face / PII Blur",
+    name: "Blur Faces & PII",
     description: "Auto-detect and blur faces and sensitive info",
+    keywords: ["blur faces", "pii", "redact face", "anonymize"],
     category: "enhance",
     icon: "EyeOff",
     route: "/blur-faces",
@@ -632,7 +634,7 @@ const BASE_TOOLS: Tool[] = [
   // Layout & Composition
   {
     id: "collage",
-    name: "Collage / Grid",
+    name: "Collage & Grid",
     description: "Combine images into beautiful grid collages with 25+ templates",
     category: "layout",
     icon: "LayoutGrid",
@@ -643,7 +645,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "stitch",
-    name: "Stitch / Combine",
+    name: "Stitch Images",
     description: "Join images side by side, stacked, or in a grid",
     category: "layout",
     icon: "Columns2",
@@ -654,7 +656,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "split",
-    name: "Image Splitting",
+    name: "Split Image",
     description: "Split images into grid tiles or by pixel size with live preview",
     category: "layout",
     icon: "Grid3x3",
@@ -968,8 +970,9 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "video-loudnorm",
-    name: "Normalize Audio",
+    name: "Normalize Video Audio",
     description: "Normalize video audio volume to broadcast standard",
+    keywords: ["loudness", "loudnorm", "normalize audio", "broadcast"],
     category: "video-edit",
     icon: "Volume2",
     route: "/video-loudnorm",
@@ -1172,7 +1175,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "volume-adjust",
-    name: "Volume Adjust",
+    name: "Adjust Volume",
     description: "Increase or decrease audio volume by a fixed gain",
     category: "audio-edit",
     icon: "Volume2",
@@ -1517,7 +1520,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "pdfa-convert",
-    name: "PDF/A Convert",
+    name: "PDF/A Converter",
     description: "Convert to archival PDF/A-2",
     category: "pdf-optimize",
     icon: "Archive",
@@ -1539,8 +1542,9 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "nup-pdf",
-    name: "N-up PDF",
+    name: "Pages Per Sheet (N-up)",
     description: "Arrange multiple pages per sheet",
+    keywords: ["nup", "n-up", "pages per sheet", "impose", "2-up", "4-up"],
     category: "pdf-optimize",
     icon: "LayoutGrid",
     route: "/nup-pdf",
@@ -1708,7 +1712,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "epub-convert",
-    name: "Convert EPUB",
+    name: "Convert from EPUB",
     description:
       "Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.",
     category: "doc-convert",
@@ -1799,7 +1803,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: "yaml-json",
-    name: "YAML / JSON",
+    name: "Convert YAML / JSON",
     description: "Convert between YAML and JSON, both directions",
     category: "data",
     icon: "Braces",

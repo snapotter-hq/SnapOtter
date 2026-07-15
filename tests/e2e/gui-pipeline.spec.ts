@@ -348,7 +348,7 @@ test.describe("Pipeline Builder - File upload and processing", () => {
     test.setTimeout(90_000);
     await gotoAutomate(page);
 
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to Target Size mode with an invalid empty value; switch
     // the active (just-added) step to Quality mode so the pipeline can execute.
@@ -391,7 +391,7 @@ test.describe("Pipeline Builder - File upload and processing", () => {
     test.setTimeout(90_000);
     await gotoAutomate(page);
 
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to Target Size mode with an invalid empty value; switch
     // the active (just-added) step to Quality mode so the pipeline can execute.
@@ -442,7 +442,7 @@ test.describe("Pipeline Builder - File upload and processing", () => {
     test.setTimeout(90_000);
     await gotoAutomate(page);
 
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to Target Size mode with an invalid empty value; switch
     // the active (just-added) step to Quality mode so the pipeline can execute.
@@ -515,7 +515,7 @@ test.describe("Pipeline Builder - Batch processing", () => {
     await gotoAutomate(page);
 
     // Add 2 pipeline steps
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to Target Size mode with an invalid empty value; switch
     // the active (just-added) step to Quality mode so the pipeline can execute.

@@ -266,14 +266,14 @@ const DROPZONE_TOOLS = [
   { id: "compress", name: "Compress" },
   // Optimization
   { id: "optimize-for-web", name: "Optimize for Web" },
-  { id: "strip-metadata", name: "Remove Metadata" },
-  { id: "edit-metadata", name: "Edit Metadata" },
+  { id: "strip-metadata", name: "Remove Image Metadata" },
+  { id: "edit-metadata", name: "Edit Image Metadata" },
   { id: "bulk-rename", name: "Bulk Rename" },
   { id: "image-to-pdf", name: "Image to PDF" },
   { id: "favicon", name: "Favicon Generator" },
   // Adjustments
   { id: "adjust-colors", name: "Adjust Colors" },
-  { id: "sharpening", name: "Sharpening" },
+  { id: "sharpening", name: "Sharpen Image" },
   { id: "replace-color", name: "Replace & Invert Color" },
   { id: "color-blindness", name: "Color Blindness Simulation" },
   // AI Tools
@@ -281,7 +281,7 @@ const DROPZONE_TOOLS = [
   { id: "upscale", name: "Image Upscaling" },
   { id: "erase-object", name: "Object Eraser" },
   { id: "ocr", name: "OCR / Text Extraction" },
-  { id: "blur-faces", name: "Face / PII Blur" },
+  { id: "blur-faces", name: "Blur Faces & PII" },
   { id: "smart-crop", name: "Smart Crop" },
   { id: "image-enhancement", name: "Image Enhancement" },
   { id: "enhance-faces", name: "Face Enhancement" },
@@ -306,8 +306,8 @@ const DROPZONE_TOOLS = [
   { id: "barcode-read", name: "Barcode Reader" },
   { id: "image-to-base64", name: "Image to Base64" },
   // Layout & Composition
-  { id: "stitch", name: "Stitch / Combine" },
-  { id: "split", name: "Image Splitting" },
+  { id: "stitch", name: "Stitch Images" },
+  { id: "split", name: "Split Image" },
   { id: "border", name: "Border & Frame" },
   { id: "beautify", name: "Beautify Screenshot" },
   // Format & Conversion

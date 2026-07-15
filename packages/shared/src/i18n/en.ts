@@ -523,24 +523,24 @@ export const en = {
     },
     // END conversion-presets
     resize: {
-      name: "Resize",
+      name: "Resize Image",
       description: "Resize by pixels, percentage, or social media presets",
     },
-    crop: { name: "Crop", description: "Freeform crop, aspect ratio presets, shape crop" },
-    rotate: { name: "Rotate & Flip", description: "Rotate, flip, and straighten images" },
-    convert: { name: "Convert", description: "Convert between image formats" },
-    compress: { name: "Compress", description: "Reduce file size by quality or target size" },
+    crop: { name: "Crop Image", description: "Freeform crop, aspect ratio presets, shape crop" },
+    rotate: { name: "Rotate & Flip Image", description: "Rotate, flip, and straighten images" },
+    convert: { name: "Convert Image", description: "Convert between image formats" },
+    compress: { name: "Compress Image", description: "Reduce file size by quality or target size" },
     "optimize-for-web": {
       name: "Optimize for Web",
       description:
         "Optimize images for web with format conversion, quality control, and live preview",
     },
     "strip-metadata": {
-      name: "Remove Metadata",
+      name: "Remove Image Metadata",
       description: "Remove EXIF, GPS, and camera info",
     },
     "edit-metadata": {
-      name: "Edit Metadata",
+      name: "Edit Image Metadata",
       description: "Edit EXIF, IPTC, XMP, GPS, keywords, and dates",
     },
     "bulk-rename": { name: "Bulk Rename", description: "Rename multiple files with patterns" },
@@ -559,7 +559,7 @@ export const en = {
         "Brightness, contrast, exposure, saturation, temperature, sharpness, and effects",
     },
     sharpening: {
-      name: "Sharpening",
+      name: "Sharpen Image",
       description: "Adaptive, unsharp mask, and high-pass sharpening with presets",
     },
     "replace-color": {
@@ -585,7 +585,7 @@ export const en = {
       description: "Extract text from PDF documents using AI-powered OCR",
     },
     "blur-faces": {
-      name: "Face / PII Blur",
+      name: "Blur Faces & PII",
       description: "Auto-detect and blur faces and sensitive info",
     },
     "enhance-faces": {
@@ -682,15 +682,15 @@ export const en = {
       description: "Scan images for QR codes, barcodes, and 2D codes",
     },
     collage: {
-      name: "Collage / Grid",
+      name: "Collage & Grid",
       description: "Combine images into beautiful grid collages with 25+ templates",
     },
     stitch: {
-      name: "Stitch / Combine",
+      name: "Stitch Images",
       description: "Join images side by side, stacked, or in a grid",
     },
     split: {
-      name: "Image Splitting",
+      name: "Split Image",
       description: "Split images into grid tiles or by pixel size with live preview",
     },
     border: {
@@ -813,7 +813,7 @@ export const en = {
       description: "Play a video clip backwards",
     },
     "video-loudnorm": {
-      name: "Normalize Audio",
+      name: "Normalize Video Audio",
       description: "Normalize video audio volume to broadcast standard",
     },
     "aspect-pad": {
@@ -885,7 +885,7 @@ export const en = {
       description: "Pull the audio track out of a video",
     },
     "volume-adjust": {
-      name: "Volume Adjust",
+      name: "Adjust Volume",
       description: "Increase or decrease audio volume by a fixed gain",
     },
     "normalize-audio": {
@@ -1010,7 +1010,7 @@ export const en = {
       description: "Convert all colors to grayscale",
     },
     "pdfa-convert": {
-      name: "PDF/A Convert",
+      name: "PDF/A Converter",
       description: "Convert to archival PDF/A-2",
     },
     "crop-pdf": {
@@ -1018,7 +1018,7 @@ export const en = {
       description: "Crop all pages with a uniform margin",
     },
     "nup-pdf": {
-      name: "N-up PDF",
+      name: "Pages Per Sheet (N-up)",
       description: "Arrange multiple pages per sheet",
     },
     "booklet-pdf": {
@@ -1076,7 +1076,7 @@ export const en = {
         "Convert a Markdown file to a styled PDF. Remote resources are disabled for privacy.",
     },
     "epub-convert": {
-      name: "Convert EPUB",
+      name: "Convert from EPUB",
       description:
         "Convert an EPUB to PDF, DOCX, HTML, or Markdown. Remote resources inside the book are not fetched.",
     },
@@ -1105,7 +1105,7 @@ export const en = {
       description: "Combine multiple CSV or TSV files with matching columns into one",
     },
     "yaml-json": {
-      name: "YAML / JSON",
+      name: "Convert YAML / JSON",
       description: "Convert between YAML and JSON, both directions",
     },
     "xml-to-csv": {

@@ -173,7 +173,7 @@ test.describe("GUI Layout Tools", () => {
   test.describe("Split", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/split");
-      await expect(page.getByText("Image Splitting").first()).toBeVisible();
+      await expect(page.getByText("Split Image").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 

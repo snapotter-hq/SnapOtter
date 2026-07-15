@@ -12,7 +12,7 @@ test.describe("GUI Metadata Tools", () => {
   test.describe("Strip Metadata", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/strip-metadata");
-      await expect(page.getByText("Remove Metadata").first()).toBeVisible();
+      await expect(page.getByText("Remove Image Metadata").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 
@@ -93,7 +93,7 @@ test.describe("GUI Metadata Tools", () => {
   test.describe("Edit Metadata", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/edit-metadata");
-      await expect(page.getByText("Edit Metadata").first()).toBeVisible();
+      await expect(page.getByText("Edit Image Metadata").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 

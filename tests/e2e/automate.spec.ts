@@ -241,7 +241,7 @@ test.describe("Automate Page", () => {
     // worker pool; give it room.
     test.setTimeout(90_000);
     await gotoAutomate(page);
-    await addToolStep(page, "Remove Metadata", 1);
+    await addToolStep(page, "Remove Image Metadata", 1);
     await addToolStep(page, "Compress", 2);
     // Compress defaults to Target Size mode with an unset (0) size, which is
     // invalid; switch the step to Quality mode so the pipeline has valid

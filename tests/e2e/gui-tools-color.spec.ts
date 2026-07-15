@@ -167,7 +167,7 @@ test.describe("GUI Color & Adjustment Tools", () => {
   test.describe("Sharpening", () => {
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/sharpening");
-      await expect(page.getByText("Sharpening").first()).toBeVisible();
+      await expect(page.getByText("Sharpen Image").first()).toBeVisible();
       await expect(page.getByText("Upload from computer")).toBeVisible();
     });
 

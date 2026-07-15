@@ -137,7 +137,7 @@ describe("API docs", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("## Tools");
     expect(res.body).toContain("- Image (106 tools)");
-    expect(res.body).toContain("Resize - Resize by pixels");
+    expect(res.body).toContain("Resize Image - Resize by pixels");
     expect(res.body).toContain("Sign PDF -");
   });
 });
