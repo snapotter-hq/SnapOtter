@@ -75,7 +75,7 @@ export function ReviewPanel({
 
   const handleDownload = () => {
     import("@/lib/analytics").then(({ track }) => {
-      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {});
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
     triggerDownload(downloadUrl, filename);
   };
@@ -99,6 +99,12 @@ export function ReviewPanel({
       });
       if (!uploadRes.ok) throw new Error("Upload failed");
       setSaveStatus("saved");
+      // "Save to library" is the real success signal for a self-hosted tool
+      // (there is no purchase). result_saved was defined + allowlisted but never
+      // fired, so save-rate was unmeasurable.
+      import("@/lib/analytics").then(({ track }) => {
+        track(ANALYTICS_EVENTS.RESULT_SAVED, { tool_id: currentToolId });
+      });
     } catch {
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
