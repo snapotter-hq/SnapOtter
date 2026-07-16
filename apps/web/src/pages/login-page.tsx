@@ -129,7 +129,7 @@ function LanguageSelector() {
 export function LoginPage() {
   const { t } = useTranslation();
   const { oidcEnabled, oidcProviderName, samlEnabled, samlProviderName, ssoEnforced } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -150,6 +150,11 @@ export function LoginPage() {
       setMfaToken(redirectedMfaToken);
       setShowMfaPrompt(true);
       setTimeout(() => mfaInputRef.current?.focus(), 100);
+      // Drop it from the URL: it's a one-time credential and has no business
+      // sitting in browser history or a Referer header for the rest of the
+      // challenge. Also stops a later effect re-run (e.g. a locale switch)
+      // from reopening the prompt after the user has moved past it.
+      setSearchParams({}, { replace: true });
       return;
     }
 
@@ -167,8 +172,9 @@ export function LoginPage() {
         mfa_enrollment_required: t.auth.mfaEnrollmentRequired,
       };
       setError(errorMessages[authError] || t.auth.oidcGenericError);
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, t]);
+  }, [searchParams, setSearchParams, t]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

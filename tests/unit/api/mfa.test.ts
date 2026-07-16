@@ -191,21 +191,27 @@ describe("MFA", () => {
   });
 
   describe("resolveExternalLoginMfaOutcome", () => {
-    it("challenges an already-enrolled user regardless of policy", () => {
-      expect(resolveExternalLoginMfaOutcome("optional", "user", true)).toBe("challenge");
-      expect(resolveExternalLoginMfaOutcome("required", "admin", true)).toBe("challenge");
-    });
-
-    it("proceeds when unenrolled and policy doesn't require MFA for this role", () => {
-      expect(resolveExternalLoginMfaOutcome("optional", "user", false)).toBe("proceed");
-      expect(resolveExternalLoginMfaOutcome("admins_only", "user", false)).toBe("proceed");
-    });
-
-    it("requires enrollment when unenrolled and policy requires MFA for this role", () => {
-      expect(resolveExternalLoginMfaOutcome("required", "user", false)).toBe("enrollment_required");
-      expect(resolveExternalLoginMfaOutcome("admins_only", "admin", false)).toBe(
-        "enrollment_required",
-      );
+    // Exhaustive over the full input space: 3 policies x 2 roles x 2
+    // totpEnabled states. Role only matters via isMfaRequiredForUser, which
+    // branches solely on role === "admin", so {admin, user} covers it.
+    it.each([
+      ["optional", "user", false, "proceed"],
+      ["optional", "user", true, "challenge"],
+      ["optional", "admin", false, "proceed"],
+      ["optional", "admin", true, "challenge"],
+      ["admins_only", "user", false, "proceed"],
+      ["admins_only", "user", true, "challenge"],
+      ["admins_only", "admin", false, "enrollment_required"],
+      ["admins_only", "admin", true, "challenge"],
+      // required+user+enrolled is the exact shape of the #533 bug: an
+      // enrolled non-admin user under a required policy must be challenged,
+      // not hard-blocked.
+      ["required", "user", false, "enrollment_required"],
+      ["required", "user", true, "challenge"],
+      ["required", "admin", false, "enrollment_required"],
+      ["required", "admin", true, "challenge"],
+    ] as const)("policy=%s role=%s totpEnabled=%s -> %s", (policy, role, totpEnabled, expected) => {
+      expect(resolveExternalLoginMfaOutcome(policy, role, totpEnabled)).toBe(expected);
     });
 
     it("enrollment takes priority: an enrolled user is challenged even under a required policy", () => {

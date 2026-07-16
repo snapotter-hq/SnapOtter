@@ -12,6 +12,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { eq } from "drizzle-orm";
+import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const authorizationCodeGrantMock = vi.hoisted(() => vi.fn());
@@ -20,6 +22,10 @@ vi.mock("openid-client", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return { ...actual, authorizationCodeGrant: authorizationCodeGrantMock };
 });
+
+vi.resetModules();
+const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
+mockEnterpriseFeatures(["mfa"]);
 
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
@@ -50,6 +56,11 @@ async function startOidcLoginAndGetStateCookie() {
   return { cookieValue, state };
 }
 
+function generateTotpCode(uri: string): string {
+  const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
+  return totp.generate();
+}
+
 async function insertOidcUser(opts: { role?: string; totpEnabled?: boolean } = {}) {
   const externalId = `sub-${randomUUID()}`;
   const userId = randomUUID();
@@ -67,6 +78,50 @@ async function insertOidcUser(opts: { role?: string; totpEnabled?: boolean } = {
     totpEnabled: opts.totpEnabled ?? false,
   });
   return { userId, username, externalId };
+}
+
+/**
+ * Inserts an OIDC user and drives them through the REAL self-service TOTP
+ * enrollment flow (enroll -> generate a real code -> verify), the same way
+ * `apps/web/src/components/settings/two-factor-settings.tsx` does it. This
+ * leaves a genuine, working, encrypted totpSecret in the DB -- not just a
+ * `totpEnabled: true` flag -- so a challenge issued for this user can
+ * actually be completed with a generated code, proving the OIDC-issued
+ * challenge is real and not just a Redis key that happens to exist.
+ */
+async function insertAndEnrollOidcUser(opts: { role?: string } = {}) {
+  const { userId, username, externalId } = await insertOidcUser({
+    role: opts.role,
+    totpEnabled: false,
+  });
+
+  const sessionToken = randomUUID();
+  await db.insert(schema.sessions).values({
+    id: sessionToken,
+    userId,
+    expiresAt: new Date(Date.now() + 3_600_000),
+  });
+
+  const enrollRes = await oidcApp.app.inject({
+    method: "POST",
+    url: "/api/auth/mfa/enroll",
+    headers: { authorization: `Bearer ${sessionToken}` },
+  });
+  const { uri } = JSON.parse(enrollRes.body) as { uri: string };
+
+  const verifyRes = await oidcApp.app.inject({
+    method: "POST",
+    url: "/api/auth/mfa/verify",
+    headers: { authorization: `Bearer ${sessionToken}` },
+    payload: { code: generateTotpCode(uri) },
+  });
+  expect(verifyRes.statusCode).toBe(200);
+
+  // This bootstrap session isn't the one under test; drop it so it can't
+  // mask a bug where the OIDC callback fails to mint its own.
+  await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionToken));
+
+  return { userId, username, externalId, totpUri: uri };
 }
 
 async function callbackAsUser(externalId: string) {
@@ -175,8 +230,8 @@ describe("OIDC callback MFA outcomes", () => {
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
   });
 
-  it("issues an MFA challenge (not a hard block) when the user has already enrolled TOTP", async () => {
-    const { externalId } = await insertOidcUser({ role: "user", totpEnabled: true });
+  it("issues an MFA challenge that is genuinely completable end to end with a real TOTP code", async () => {
+    const { username, externalId, totpUri } = await insertAndEnrollOidcUser({ role: "user" });
     await setMfaPolicy("required");
 
     const res = await callbackAsUser(externalId);
@@ -187,17 +242,51 @@ describe("OIDC callback MFA outcomes", () => {
     const setCookie = res.headers["set-cookie"];
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
 
-    // The token is real: it resolves via Redis to this exact user, and
-    // completing it with a real TOTP code creates a session, proving the
-    // challenge is actually completable end to end.
     const mfaToken = location.split("mfaToken=")[1];
     const redis = sharedRedis();
-    const storedUserId = await redis.get(`mfa:${mfaToken}`);
-    expect(storedUserId).toBeTruthy();
+    expect(await redis.get(`mfa:${mfaToken}`)).toBeTruthy();
+
+    // Actually complete it -- this is the real end-to-end proof, not just
+    // that a Redis key exists.
+    const completeRes = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(totpUri) },
+    });
+    expect(completeRes.statusCode).toBe(200);
+    const body = JSON.parse(completeRes.body);
+    expect(body.token).toBeDefined();
+    expect(body.user.username).toBe(username);
   });
 
-  it("still creates a session directly when the user is enrolled but policy is optional", async () => {
-    const { externalId } = await insertOidcUser({ totpEnabled: true });
+  it("rejects completing an OIDC-issued challenge with an invalid code, and does not create a session", async () => {
+    const { externalId } = await insertAndEnrollOidcUser({ role: "user" });
+    await setMfaPolicy("required");
+
+    const res = await callbackAsUser(externalId);
+    const mfaToken = (res.headers.location as string).split("mfaToken=")[1];
+
+    const completeRes = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "000000" },
+    });
+    expect(completeRes.statusCode).toBe(401);
+    expect(JSON.parse(completeRes.body).code).toBe("INVALID_CODE");
+  });
+
+  it("rejects completing with an unknown/expired mfaToken", async () => {
+    const completeRes = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: randomUUID(), code: "123456" },
+    });
+    expect(completeRes.statusCode).toBe(401);
+    expect(JSON.parse(completeRes.body).code).toBe("MFA_EXPIRED");
+  });
+
+  it("challenges an enrolled user even when policy is optional (enrollment beats policy)", async () => {
+    const { externalId } = await insertAndEnrollOidcUser({});
     await setMfaPolicy("optional");
 
     const res = await callbackAsUser(externalId);
@@ -213,5 +302,36 @@ describe("OIDC callback MFA outcomes", () => {
     const res = await callbackAsUser(externalId);
 
     expect(res.headers.location).toBe("/");
+  });
+
+  it("fails closed (does not create a session) when the MFA enrollment-status query throws", async () => {
+    const { externalId } = await insertOidcUser({ role: "user", totpEnabled: true });
+    await setMfaPolicy("required");
+
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "totpEnabled" in selection) {
+        throw new Error("simulated DB failure");
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+
+    try {
+      const res = await callbackAsUser(externalId);
+
+      // Must NOT silently proceed without MFA and must NOT issue a challenge
+      // either -- a broken enrollment-status read means the login fails,
+      // full stop, not "let them in" or "pretend they're unenrolled".
+      expect(res.statusCode).toBe(302);
+      const location = res.headers.location as string;
+      expect(location).not.toBe("/");
+      expect(location).not.toMatch(/^\/login\?mfaToken=/);
+      const setCookie = res.headers["set-cookie"];
+      expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    } finally {
+      selectSpy.mockRestore();
+    }
   });
 });

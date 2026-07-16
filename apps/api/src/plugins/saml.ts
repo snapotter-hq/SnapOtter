@@ -167,13 +167,33 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
 
       const resolvedUser = result.user;
 
-      let mfaOutcome: "proceed" | "challenge" | "enrollment_required" = "proceed";
+      // Unguarded on purpose: this read decides whether MFA gets checked at
+      // all, so a DB error here must fail the login, not silently skip MFA
+      // for an enrolled user. The try/catch below is scoped only to the
+      // optional MFA plugin/policy lookup, same as it always was.
+      let dbUser: { totpEnabled: boolean } | undefined;
       try {
-        const { getMfaPolicy, resolveExternalLoginMfaOutcome } = await import("./mfa.js");
-        const [dbUser] = await db
+        [dbUser] = await db
           .select({ totpEnabled: schema.users.totpEnabled })
           .from(schema.users)
           .where(eq(schema.users.id, resolvedUser.id));
+      } catch (err) {
+        request.log.error(
+          { err, userId: resolvedUser.id },
+          "SAML callback: failed to read MFA enrollment status",
+        );
+        authAttempts.inc({ method: "saml", result: "failure" });
+        await audit("SAML_LOGIN_FAILED", {
+          userId: resolvedUser.id,
+          username: resolvedUser.username,
+          reason: "mfa_check_error",
+        });
+        return redirectToLogin(reply, "saml_auth_failed");
+      }
+
+      let mfaOutcome: "proceed" | "challenge" | "enrollment_required" = "proceed";
+      try {
+        const { getMfaPolicy, resolveExternalLoginMfaOutcome } = await import("./mfa.js");
         const policy = await getMfaPolicy();
         mfaOutcome = resolveExternalLoginMfaOutcome(
           policy,
