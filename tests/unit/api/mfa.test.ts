@@ -4,6 +4,7 @@ import {
   createTotp,
   hashRecoveryCodes,
   isMfaRequiredForUser,
+  resolveExternalLoginMfaOutcome,
   verifyRecoveryCode,
   verifyTotpCode,
 } from "../../../apps/api/src/plugins/mfa.js";
@@ -186,6 +187,31 @@ describe("MFA", () => {
     it("returns false for admins_only policy when role is not admin", () => {
       expect(isMfaRequiredForUser("admins_only", "editor")).toBe(false);
       expect(isMfaRequiredForUser("admins_only", "user")).toBe(false);
+    });
+  });
+
+  describe("resolveExternalLoginMfaOutcome", () => {
+    it("challenges an already-enrolled user regardless of policy", () => {
+      expect(resolveExternalLoginMfaOutcome("optional", "user", true)).toBe("challenge");
+      expect(resolveExternalLoginMfaOutcome("required", "admin", true)).toBe("challenge");
+    });
+
+    it("proceeds when unenrolled and policy doesn't require MFA for this role", () => {
+      expect(resolveExternalLoginMfaOutcome("optional", "user", false)).toBe("proceed");
+      expect(resolveExternalLoginMfaOutcome("admins_only", "user", false)).toBe("proceed");
+    });
+
+    it("requires enrollment when unenrolled and policy requires MFA for this role", () => {
+      expect(resolveExternalLoginMfaOutcome("required", "user", false)).toBe("enrollment_required");
+      expect(resolveExternalLoginMfaOutcome("admins_only", "admin", false)).toBe(
+        "enrollment_required",
+      );
+    });
+
+    it("enrollment takes priority: an enrolled user is challenged even under a required policy", () => {
+      expect(resolveExternalLoginMfaOutcome("required", "admin", true)).not.toBe(
+        "enrollment_required",
+      );
     });
   });
 });

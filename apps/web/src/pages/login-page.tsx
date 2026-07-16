@@ -141,6 +141,18 @@ export function LoginPage() {
   const mfaInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // A successful OIDC/SAML login for an already-enrolled user redirects
+    // here with a one-time mfaToken instead of completing the session
+    // directly, so the TOTP challenge can be completed the same way a local
+    // login's challenge is.
+    const redirectedMfaToken = searchParams.get("mfaToken");
+    if (redirectedMfaToken) {
+      setMfaToken(redirectedMfaToken);
+      setShowMfaPrompt(true);
+      setTimeout(() => mfaInputRef.current?.focus(), 100);
+      return;
+    }
+
     const authError = searchParams.get("error");
     if (authError) {
       const errorMessages: Record<string, string> = {
@@ -152,6 +164,7 @@ export function LoginPage() {
         saml_auth_failed: t.auth.samlAuthFailed,
         saml_user_not_authorized: t.auth.samlUserNotAuthorized,
         saml_user_limit_reached: t.auth.samlUserLimitReached,
+        mfa_enrollment_required: t.auth.mfaEnrollmentRequired,
       };
       setError(errorMessages[authError] || t.auth.oidcGenericError);
     }

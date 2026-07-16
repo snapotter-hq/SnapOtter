@@ -106,6 +106,22 @@ export function isMfaRequiredForUser(policy: MfaPolicy, userRole: string): boole
   return false;
 }
 
+// The post-authentication MFA decision, shared by every login path (local
+// password, OIDC, SAML) so a new auth method can't silently diverge from the
+// others the way OIDC/SAML once did (they blocked on policy alone, with no
+// totpEnabled check and no challenge step -- snapotter-hq/SnapOtter#533).
+export type ExternalMfaOutcome = "proceed" | "challenge" | "enrollment_required";
+
+export function resolveExternalLoginMfaOutcome(
+  policy: MfaPolicy,
+  userRole: string,
+  totpEnabled: boolean,
+): ExternalMfaOutcome {
+  if (totpEnabled) return "challenge";
+  if (isMfaRequiredForUser(policy, userRole)) return "enrollment_required";
+  return "proceed";
+}
+
 // ── MFA plugin registration ───────────────────────────────────────
 
 export async function registerMfa(app: FastifyInstance): Promise<void> {

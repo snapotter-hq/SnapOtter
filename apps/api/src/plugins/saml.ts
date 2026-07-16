@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { parse as parseQs } from "node:querystring";
 import type {} from "@fastify/cookie";
 import { SAML } from "@node-saml/node-saml";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import {
   findUniqueUsername,
@@ -164,22 +167,42 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
 
       const resolvedUser = result.user;
 
-      let mfaRequired = false;
+      let mfaOutcome: "proceed" | "challenge" | "enrollment_required" = "proceed";
       try {
-        const { getMfaPolicy, isMfaRequiredForUser } = await import("./mfa.js");
+        const { getMfaPolicy, resolveExternalLoginMfaOutcome } = await import("./mfa.js");
+        const [dbUser] = await db
+          .select({ totpEnabled: schema.users.totpEnabled })
+          .from(schema.users)
+          .where(eq(schema.users.id, resolvedUser.id));
         const policy = await getMfaPolicy();
-        mfaRequired = isMfaRequiredForUser(policy, resolvedUser.role);
+        mfaOutcome = resolveExternalLoginMfaOutcome(
+          policy,
+          resolvedUser.role,
+          dbUser?.totpEnabled ?? false,
+        );
       } catch {
         // MFA plugin not loaded
       }
-      if (mfaRequired) {
+
+      if (mfaOutcome === "challenge") {
+        const mfaToken = randomUUID();
+        const redis = sharedRedis();
+        await redis.setex(`mfa:${mfaToken}`, 300, resolvedUser.id);
+        await audit("MFA_CHALLENGE_ISSUED", {
+          userId: resolvedUser.id,
+          username: resolvedUser.username,
+        });
+        return reply.redirect(`/login?mfaToken=${mfaToken}`);
+      }
+
+      if (mfaOutcome === "enrollment_required") {
         authAttempts.inc({ method: "saml", result: "failure" });
         await audit("SAML_LOGIN_FAILED", {
           userId: resolvedUser.id,
           username: resolvedUser.username,
-          reason: "mfa_required",
+          reason: "mfa_enrollment_required",
         });
-        return redirectToLogin(reply, "mfa_required");
+        return redirectToLogin(reply, "mfa_enrollment_required");
       }
 
       // Create session (same pattern as OIDC)
