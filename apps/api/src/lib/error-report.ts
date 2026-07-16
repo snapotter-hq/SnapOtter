@@ -34,6 +34,8 @@ export interface ReportContext {
   method?: string;
   statusCode?: number;
   subsystem?: string;
+  /** Safe input format (file extension) for triage; never the filename. */
+  inputFormat?: string;
 }
 
 export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
@@ -97,6 +99,17 @@ export function errorSignature(err: unknown): string {
   return `${name}:${code}:${frame}`;
 }
 
+/**
+ * The lowercase file extension as a safe, non-PII tag value, or undefined. The
+ * filename itself can carry user data, but a short alphanumeric extension (jpg,
+ * png, pdf, mp4) is a safe triage signal for which input format failed.
+ */
+export function safeFormatTag(filename?: string): string | undefined {
+  if (!filename) return undefined;
+  const m = filename.match(/\.([a-z0-9]{1,8})$/i);
+  return m ? m[1].toLowerCase() : undefined;
+}
+
 /** Fire-and-forget; never throws, never blocks. */
 export async function reportError(err: unknown, ctx: ReportContext): Promise<void> {
   try {
@@ -113,6 +126,7 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
       scope.setTag("error_class", cls);
       const code = extractErrorCode(err);
       if (code) scope.setTag("error_code", code);
+      if (ctx.inputFormat) scope.setTag("input_format", ctx.inputFormat);
       if (ctx.toolId) scope.setTag("tool_id", ctx.toolId);
       if (ctx.pool) scope.setTag("pool", ctx.pool);
       if (ctx.route) scope.setTag("route", ctx.route);

@@ -14,7 +14,7 @@ const evt = (over: AnyEvent = {}): AnyEvent => ({
     runtime: { name: "node", version: "22.1.0" },
     device: { hostname: "leak" },
   },
-  tags: { tool_id: "resize", secret_tag: "leak" },
+  tags: { tool_id: "resize", input_format: "webp", secret_tag: "leak" },
   exception: {
     values: [
       {
@@ -99,6 +99,7 @@ describe("buildBeforeSend (api)", () => {
       runtime: { name: "node", version: "22.1.0" },
     });
     expect(out.tags.tool_id).toBe("resize");
+    expect(out.tags.input_format).toBe("webp");
     expect(out.tags.secret_tag).toBeUndefined();
   });
   it("drops contexts entirely when nothing allowlisted survives", () => {

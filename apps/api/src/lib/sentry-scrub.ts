@@ -22,6 +22,7 @@ const TAG_ALLOWLIST = new Set([
   "deploy_mode",
   "subsystem",
   "status_code",
+  "input_format",
 ]);
 
 const URL_RE = /https?:\/\/[^\s"')]+/g;

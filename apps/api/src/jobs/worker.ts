@@ -39,7 +39,7 @@ import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
-import { reportError } from "../lib/error-report.js";
+import { reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -1047,6 +1047,7 @@ export function startWorkers(): void {
         source: "worker",
         pool,
         toolId: (job.data as ToolJobData | undefined)?.toolId,
+        inputFormat: safeFormatTag((job.data as ToolJobData | undefined)?.filename),
       });
     });
 

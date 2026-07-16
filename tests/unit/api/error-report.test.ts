@@ -4,8 +4,22 @@ import {
   classifyError,
   errorSignature,
   resetThrottleForTests,
+  safeFormatTag,
   shouldReport,
 } from "../../../apps/api/src/lib/error-report.js";
+
+describe("safeFormatTag", () => {
+  it("returns the lowercase extension as a safe, non-PII tag", () => {
+    expect(safeFormatTag("photo.JPEG")).toBe("jpeg");
+    expect(safeFormatTag("doc.pdf")).toBe("pdf");
+    expect(safeFormatTag("clip.final.mp4")).toBe("mp4");
+  });
+  it("returns undefined when there is no plausible extension", () => {
+    expect(safeFormatTag(undefined)).toBeUndefined();
+    expect(safeFormatTag("noext")).toBeUndefined();
+    expect(safeFormatTag("weird.name-with-dashes")).toBeUndefined();
+  });
+});
 
 describe("classifyError", () => {
   it("expected: tool input, aborts, worker cancel/timeout strings, zod, upload validation", () => {
