@@ -3316,6 +3316,8 @@ export const ru: TranslationKeys = {
         "Сохраните эти коды в надёжном месте. Каждый из них можно использовать один раз для входа, если вы потеряете доступ к приложению-аутентификатору.",
       twoFactorCopyRecoveryCodes: "Копировать коды",
       twoFactorCodesCopied: "Скопировано",
+      twoFactorCopyFailed:
+        "Не удалось скопировать автоматически. Выделите коды выше и скопируйте их вручную.",
       twoFactorEnterCode: "Введите 6-значный код из приложения, чтобы подтвердить настройку.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Подтвердить и включить",

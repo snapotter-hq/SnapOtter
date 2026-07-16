@@ -3315,6 +3315,8 @@ export const uk: TranslationKeys = {
         "Збережіть ці коди в надійному місці. Кожен із них можна використати один раз для входу, якщо ви втратите доступ до застосунку-автентифікатора.",
       twoFactorCopyRecoveryCodes: "Копіювати коди",
       twoFactorCodesCopied: "Скопійовано",
+      twoFactorCopyFailed:
+        "Не вдалося скопіювати автоматично. Виділіть коди вище і скопіюйте їх вручну.",
       twoFactorEnterCode: "Введіть 6-значний код із застосунку, щоб підтвердити налаштування.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Підтвердити та ввімкнути",

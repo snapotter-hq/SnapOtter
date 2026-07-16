@@ -145,14 +145,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Check if there's already a pending (unverified) enrollment
-      if (dbUser.totpSecret && !dbUser.totpEnabled) {
-        return reply.status(409).send({
-          error:
-            "MFA enrollment already pending. Complete verification first or contact an admin to reset.",
-          code: "MFA_ENROLLMENT_PENDING",
-        });
-      }
+      // A pending (unverified) enrollment from an earlier attempt the user
+      // canceled or abandoned is intentionally overwritten below rather than
+      // blocked: it was never activated, so nothing depends on it, and
+      // starting fresh is strictly safer than leaving a stale, possibly
+      // already-screenshotted QR code valid.
 
       // Generate TOTP secret
       const totp = createTotp(user.username);

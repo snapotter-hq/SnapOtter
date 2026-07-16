@@ -3065,6 +3065,7 @@ export const zhCN: TranslationKeys = {
         "请将这些代码妥善保存。如果您无法访问身份验证器应用，每个代码均可用于登录一次。",
       twoFactorCopyRecoveryCodes: "复制代码",
       twoFactorCodesCopied: "已复制",
+      twoFactorCopyFailed: "无法自动复制。请选择上方的代码并手动复制。",
       twoFactorEnterCode: "输入应用中的 6 位数验证码以确认设置。",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "确认并启用",

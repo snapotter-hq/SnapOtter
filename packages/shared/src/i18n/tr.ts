@@ -3317,6 +3317,8 @@ export const tr: TranslationKeys = {
         "Bu kodları güvenli bir yerde saklayın. Kimlik doğrulayıcı uygulamanıza erişimi kaybederseniz her biri giriş yapmak için bir kez kullanılabilir.",
       twoFactorCopyRecoveryCodes: "Kodları kopyala",
       twoFactorCodesCopied: "Kopyalandı",
+      twoFactorCopyFailed:
+        "Otomatik olarak kopyalanamadı. Yukarıdaki kodları seçip elle kopyalayın.",
       twoFactorEnterCode: "Kurulumu onaylamak için uygulamanızdaki 6 haneli kodu girin.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Onayla ve etkinleştir",

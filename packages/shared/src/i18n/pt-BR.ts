@@ -3317,6 +3317,8 @@ export const ptBR: TranslationKeys = {
         "Guarde estes códigos em um local seguro. Cada um pode ser usado uma vez para entrar caso você perca o acesso ao seu aplicativo autenticador.",
       twoFactorCopyRecoveryCodes: "Copiar códigos",
       twoFactorCodesCopied: "Copiado",
+      twoFactorCopyFailed:
+        "Não foi possível copiar automaticamente. Selecione os códigos acima e copie-os manualmente.",
       twoFactorEnterCode:
         "Digite o código de 6 dígitos do seu aplicativo para confirmar a configuração.",
       twoFactorCodePlaceholder: "000000",

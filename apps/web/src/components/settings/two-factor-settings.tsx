@@ -99,8 +99,11 @@ export function TwoFactorSettings() {
       setEnrollment(null);
       setCode("");
       setCodesCopied(false);
-    } catch {
-      setMessage({ type: "error", text: t.auth.mfaInvalidCode });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -115,8 +118,11 @@ export function TwoFactorSettings() {
       setMessage({ type: "success", text: t.settings.security.twoFactorDisableSuccess });
       setStep("idle");
       setCode("");
-    } catch {
-      setMessage({ type: "error", text: t.auth.mfaInvalidCode });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -128,6 +134,8 @@ export function TwoFactorSettings() {
     if (ok) {
       setCodesCopied(true);
       setTimeout(() => setCodesCopied(false), 2000);
+    } else {
+      setMessage({ type: "error", text: t.settings.security.twoFactorCopyFailed });
     }
   };
 

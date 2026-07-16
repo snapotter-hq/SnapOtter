@@ -3321,6 +3321,8 @@ export const nl: TranslationKeys = {
         "Bewaar deze codes op een veilige plek. Elke code kun je eenmalig gebruiken om in te loggen als je geen toegang meer hebt tot je authenticator-app.",
       twoFactorCopyRecoveryCodes: "Codes kopiëren",
       twoFactorCodesCopied: "Gekopieerd",
+      twoFactorCopyFailed:
+        "Automatisch kopiëren is mislukt. Selecteer de codes hierboven en kopieer ze handmatig.",
       twoFactorEnterCode: "Voer de 6-cijferige code uit je app in om de installatie te bevestigen.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Bevestigen en inschakelen",

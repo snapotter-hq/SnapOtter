@@ -3250,6 +3250,8 @@ export const ko: TranslationKeys = {
         "이 코드를 안전한 곳에 보관하세요. 인증 앱에 접근할 수 없을 때 각 코드는 로그인에 한 번씩 사용할 수 있습니다.",
       twoFactorCopyRecoveryCodes: "코드 복사",
       twoFactorCodesCopied: "복사되었습니다",
+      twoFactorCopyFailed:
+        "자동으로 복사하지 못했습니다. 위의 코드를 선택하여 수동으로 복사하세요.",
       twoFactorEnterCode: "설정을 확인하려면 앱에 표시된 6자리 코드를 입력하세요.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "확인 후 활성화",

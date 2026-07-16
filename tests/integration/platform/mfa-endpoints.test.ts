@@ -6,7 +6,7 @@ vi.resetModules();
 const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
 mockEnterpriseFeatures(["mfa"]);
 
-const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
+const { buildTestApp, loginAsAdmin, loginAsUser } = await import("../test-server.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 
 import type { TestApp } from "../test-server.js";
@@ -111,6 +111,36 @@ describe("POST /api/auth/mfa/enroll", () => {
     expect(res.statusCode).toBe(409);
     const body = JSON.parse(res.body);
     expect(body.code).toBe("MFA_ALREADY_ENABLED");
+  });
+
+  it("restarting enrollment after canceling (no verify in between) issues a fresh, working secret instead of 409ing", async () => {
+    // First attempt: user clicks Enable, sees the QR, then cancels/abandons
+    // without verifying. This leaves a pending, unverified secret.
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    // Second attempt: user clicks Enable again later. Must not be a dead
+    // end requiring an admin reset -- it should just issue a new secret.
+    const secondEnrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(secondEnrollRes.statusCode).toBe(200);
+    const { uri: secondUri } = JSON.parse(secondEnrollRes.body);
+
+    // The new secret is genuinely live: verifying with it actually works.
+    const code = generateTotpCode(secondUri);
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code },
+    });
+    expect(verifyRes.statusCode).toBe(200);
   });
 });
 
@@ -346,5 +376,117 @@ describe("MFA login flow", () => {
     expect(body.user).toBeDefined();
     expect(body.user.username).toBe("admin");
     expect(body.expiresAt).toBeDefined();
+  });
+});
+
+async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Promise<void> {
+  await db
+    .insert(schema.settings)
+    .values({ key: "mfaPolicy", value })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value } });
+}
+
+// This is the actual fix for #515/#529: exercises the real /api/auth/login
+// route end to end, not a mocked response. Everything else in this repo that
+// covers this bug (the license gate on saving the setting, the frontend's
+// handling of a stubbed 403) would still pass if this exact backend branch
+// were reverted or its response code were renamed.
+describe("POST /api/auth/login with mfaPolicy enforcement", () => {
+  afterEach(async () => {
+    await setMfaPolicy("optional");
+    await clearMfaState("admin");
+  });
+
+  it("blocks an unenrolled admin with 403 MFA_ENROLLMENT_REQUIRED when policy is required", async () => {
+    await setMfaPolicy("required");
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("MFA_ENROLLMENT_REQUIRED");
+    expect(body.token).toBeUndefined();
+  });
+
+  it("blocks an unenrolled admin under an admins_only policy", async () => {
+    await setMfaPolicy("admins_only");
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe("MFA_ENROLLMENT_REQUIRED");
+  });
+
+  it("does not block a non-admin user under an admins_only policy", async () => {
+    // Ensure the shared test user exists while policy is still permissive.
+    await loginAsUser(testApp.app);
+    await setMfaPolicy("admins_only");
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "plainuser", password: "Userpass1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).token).toBeDefined();
+  });
+
+  it("does not block anyone when policy is optional", async () => {
+    await setMfaPolicy("optional");
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).token).toBeDefined();
+  });
+});
+
+// The mirror image of tests/integration/platform/mfa-policy-license-gate.test.ts
+// (which proves an UNlicensed instance can't save this policy). This file is
+// already licensed (mockEnterpriseFeatures(["mfa"]) above), so it proves the
+// gate doesn't also accidentally block a legitimately licensed instance.
+describe("PUT /api/v1/settings mfaPolicy (licensed)", () => {
+  afterEach(async () => {
+    await setMfaPolicy("optional");
+  });
+
+  it("allows saving required when mfa is licensed", async () => {
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { mfaPolicy: "required" },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const check = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings/mfaPolicy",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(JSON.parse(check.body).value).toBe("required");
+  });
+
+  it("allows saving admins_only when mfa is licensed", async () => {
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { mfaPolicy: "admins_only" },
+    });
+    expect(res.statusCode).toBe(200);
   });
 });

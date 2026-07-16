@@ -3313,6 +3313,8 @@ export const id: TranslationKeys = {
         "Simpan kode ini di tempat yang aman. Setiap kode dapat digunakan sekali untuk masuk jika Anda kehilangan akses ke aplikasi autentikator.",
       twoFactorCopyRecoveryCodes: "Salin kode",
       twoFactorCodesCopied: "Disalin",
+      twoFactorCopyFailed:
+        "Tidak dapat menyalin secara otomatis. Pilih kode di atas dan salin secara manual.",
       twoFactorEnterCode: "Masukkan kode 6 digit dari aplikasi Anda untuk mengonfirmasi penyiapan.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Konfirmasi dan aktifkan",

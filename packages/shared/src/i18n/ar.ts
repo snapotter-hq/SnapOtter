@@ -3297,6 +3297,7 @@ export const ar: TranslationKeys = {
         "احفظ هذه الرموز في مكان آمن. يمكن استخدام كل رمز مرة واحدة لتسجيل الدخول إذا فقدت الوصول إلى تطبيق المصادقة.",
       twoFactorCopyRecoveryCodes: "نسخ الرموز",
       twoFactorCodesCopied: "تم النسخ",
+      twoFactorCopyFailed: "تعذّر النسخ تلقائيًا. حدد الرموز أعلاه وانسخها يدويًا.",
       twoFactorEnterCode: "أدخل الرمز المكوّن من 6 أرقام من تطبيقك لتأكيد الإعداد.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "تأكيد وتفعيل",

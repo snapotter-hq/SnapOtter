@@ -3270,6 +3270,8 @@ export const ja: TranslationKeys = {
         "これらのコードを安全な場所に保管してください。認証アプリにアクセスできなくなった場合、各コードを 1 回だけサインインに使用できます。",
       twoFactorCopyRecoveryCodes: "コードをコピー",
       twoFactorCodesCopied: "コピーしました",
+      twoFactorCopyFailed:
+        "自動的にコピーできませんでした。上のコードを選択して手動でコピーしてください。",
       twoFactorEnterCode: "設定を確定するには、アプリに表示される 6 桁のコードを入力してください。",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "確定して有効にする",

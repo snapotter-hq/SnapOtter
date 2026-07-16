@@ -3334,6 +3334,8 @@ export const fr: TranslationKeys = {
         "Conservez ces codes en lieu sûr. Chacun peut servir une fois à vous connecter si vous perdez l'accès à votre application d'authentification.",
       twoFactorCopyRecoveryCodes: "Copier les codes",
       twoFactorCodesCopied: "Copié",
+      twoFactorCopyFailed:
+        "Impossible de copier automatiquement. Sélectionnez les codes ci-dessus et copiez-les manuellement.",
       twoFactorEnterCode:
         "Saisissez le code à 6 chiffres de votre application pour confirmer la configuration.",
       twoFactorCodePlaceholder: "000000",

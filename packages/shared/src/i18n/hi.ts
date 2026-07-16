@@ -3127,6 +3127,8 @@ export const hi: TranslationKeys = {
         "इन कोड को कहीं सुरक्षित रूप से सहेजें। अपने ऑथेंटिकेटर ऐप तक पहुंच खोने पर हर कोड का उपयोग साइन इन करने के लिए एक बार किया जा सकता है।",
       twoFactorCopyRecoveryCodes: "कोड कॉपी करें",
       twoFactorCodesCopied: "कॉपी किया गया",
+      twoFactorCopyFailed:
+        "स्वचालित रूप से कॉपी नहीं हो सका। ऊपर दिए गए कोड चुनें और उन्हें मैन्युअल रूप से कॉपी करें।",
       twoFactorEnterCode: "सेटअप की पुष्टि के लिए अपने ऐप से 6-अंकों का कोड दर्ज करें।",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "पुष्टि करें और सक्षम करें",

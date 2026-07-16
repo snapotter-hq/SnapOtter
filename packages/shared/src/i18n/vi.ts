@@ -3312,6 +3312,8 @@ export const vi: TranslationKeys = {
         "Hãy lưu các mã này ở nơi an toàn. Mỗi mã dùng được một lần để đăng nhập nếu bạn mất quyền truy cập vào ứng dụng xác thực.",
       twoFactorCopyRecoveryCodes: "Sao chép mã",
       twoFactorCodesCopied: "Đã sao chép",
+      twoFactorCopyFailed:
+        "Không thể sao chép tự động. Hãy chọn các mã ở trên và sao chép theo cách thủ công.",
       twoFactorEnterCode: "Nhập mã 6 chữ số từ ứng dụng của bạn để xác nhận thiết lập.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Xác nhận và bật",

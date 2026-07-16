@@ -3264,6 +3264,8 @@ export const en = {
         "Save these codes somewhere safe. Each one can be used once to sign in if you lose access to your authenticator app.",
       twoFactorCopyRecoveryCodes: "Copy codes",
       twoFactorCodesCopied: "Copied",
+      twoFactorCopyFailed:
+        "Couldn't copy automatically. Select the codes above and copy them manually.",
       twoFactorEnterCode: "Enter the 6-digit code from your app to confirm setup.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Confirm and enable",

@@ -3065,6 +3065,7 @@ export const zhTW: TranslationKeys = {
         "請將這些代碼妥善保存。若您無法存取驗證器應用程式，每組代碼可用於登入一次。",
       twoFactorCopyRecoveryCodes: "複製代碼",
       twoFactorCodesCopied: "已複製",
+      twoFactorCopyFailed: "無法自動複製。請選取上方的代碼並手動複製。",
       twoFactorEnterCode: "請輸入應用程式中的 6 位數代碼以確認設定。",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "確認並啟用",

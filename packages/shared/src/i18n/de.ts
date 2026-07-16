@@ -3328,6 +3328,8 @@ export const de: TranslationKeys = {
         "Bewahren Sie diese Codes sicher auf. Jeder Code lässt sich einmal verwenden, um sich anzumelden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
       twoFactorCopyRecoveryCodes: "Codes kopieren",
       twoFactorCodesCopied: "Kopiert",
+      twoFactorCopyFailed:
+        "Automatisches Kopieren fehlgeschlagen. Wählen Sie die Codes oben aus und kopieren Sie sie manuell.",
       twoFactorEnterCode:
         "Geben Sie den 6-stelligen Code aus Ihrer App ein, um die Einrichtung zu bestätigen.",
       twoFactorCodePlaceholder: "000000",

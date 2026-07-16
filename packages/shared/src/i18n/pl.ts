@@ -3320,6 +3320,8 @@ export const pl: TranslationKeys = {
         "Zapisz te kody w bezpiecznym miejscu. Każdego z nich można użyć jednorazowo do zalogowania się, jeśli utracisz dostęp do aplikacji uwierzytelniającej.",
       twoFactorCopyRecoveryCodes: "Kopiuj kody",
       twoFactorCodesCopied: "Skopiowano",
+      twoFactorCopyFailed:
+        "Nie udało się skopiować automatycznie. Zaznacz kody powyżej i skopiuj je ręcznie.",
       twoFactorEnterCode: "Wprowadź 6-cyfrowy kod z aplikacji, aby potwierdzić konfigurację.",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "Potwierdź i włącz",

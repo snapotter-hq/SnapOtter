@@ -32,4 +32,16 @@ describe("AdminSecuritySettings save errors", () => {
     const message = await screen.findByText("MFA requires an enterprise license");
     expect(message).toHaveClass("text-destructive");
   });
+
+  it("falls back to a generic message when the save rejects with a non-Error value", async () => {
+    apiPut.mockRejectedValue("network exploded");
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+
+    const message = await screen.findByText("Failed to save security settings");
+    expect(message).toHaveClass("text-destructive");
+  });
 });

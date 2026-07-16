@@ -3312,6 +3312,8 @@ export const sv: TranslationKeys = {
         "Spara de här koderna på ett säkert ställe. Var och en kan användas en gång för att logga in om du förlorar åtkomsten till din autentiseringsapp.",
       twoFactorCopyRecoveryCodes: "Kopiera koder",
       twoFactorCodesCopied: "Kopierat",
+      twoFactorCopyFailed:
+        "Det gick inte att kopiera automatiskt. Markera koderna ovan och kopiera dem manuellt.",
       twoFactorEnterCode:
         "Ange den 6-siffriga koden från din app för att bekräfta konfigurationen.",
       twoFactorCodePlaceholder: "000000",

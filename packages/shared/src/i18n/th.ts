@@ -3280,6 +3280,7 @@ export const th: TranslationKeys = {
         "เก็บรหัสเหล่านี้ไว้ในที่ปลอดภัย แต่ละรหัสใช้เข้าสู่ระบบได้ครั้งเดียวหากคุณเข้าถึงแอปยืนยันตัวตนไม่ได้",
       twoFactorCopyRecoveryCodes: "คัดลอกรหัส",
       twoFactorCodesCopied: "คัดลอกแล้ว",
+      twoFactorCopyFailed: "คัดลอกอัตโนมัติไม่สำเร็จ กรุณาเลือกรหัสด้านบนแล้วคัดลอกด้วยตนเอง",
       twoFactorEnterCode: "กรอกรหัส 6 หลักจากแอปของคุณเพื่อยืนยันการตั้งค่า",
       twoFactorCodePlaceholder: "000000",
       twoFactorConfirmButton: "ยืนยันและเปิดใช้งาน",

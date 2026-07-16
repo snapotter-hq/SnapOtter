@@ -3308,6 +3308,8 @@ export const es: TranslationKeys = {
         "Guarda estos códigos en un lugar seguro. Cada uno se puede usar una vez para iniciar sesión si pierdes el acceso a tu app de autenticación.",
       twoFactorCopyRecoveryCodes: "Copiar códigos",
       twoFactorCodesCopied: "Copiado",
+      twoFactorCopyFailed:
+        "No se pudieron copiar automáticamente. Selecciona los códigos de arriba y cópialos manualmente.",
       twoFactorEnterCode:
         "Introduce el código de 6 dígitos de tu app para confirmar la configuración.",
       twoFactorCodePlaceholder: "000000",
