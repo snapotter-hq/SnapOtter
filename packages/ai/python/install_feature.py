@@ -540,6 +540,70 @@ def move_tree(src: str, dst: str) -> None:
     shutil.rmtree(src, ignore_errors=True)
 
 
+# -- ONNX Runtime flavor reconciliation (GPU wins) --
+
+def _onnx_dist_infos(sp_dir: str) -> tuple:
+    """Return (cpu, gpu) lists of onnxruntime dist-info directory names.
+
+    Wheel metadata dirs are `<normalized-name>-<version>.dist-info`, and name
+    normalization turns every other onnxruntime distribution into
+    `onnxruntime_<suffix>` (onnxruntime-gpu -> onnxruntime_gpu), so a directory
+    starting with exactly "onnxruntime-" can only be the CPU build.
+    """
+    if not os.path.isdir(sp_dir):
+        return ([], [])
+    names = os.listdir(sp_dir)
+    cpu = sorted(n for n in names if n.startswith("onnxruntime-") and n.endswith(".dist-info"))
+    gpu = sorted(n for n in names if n.startswith("onnxruntime_gpu-") and n.endswith(".dist-info"))
+    return (cpu, gpu)
+
+
+def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
+    """Never let a bundle downgrade the venv's ONNX Runtime from GPU to CPU.
+
+    `onnxruntime` (CPU) and `onnxruntime-gpu` unpack into the SAME package
+    directory (`onnxruntime/`), so whichever bundle lands last wins
+    file-by-file. A CPU build arriving after the GPU build (e.g. transcription's
+    faster-whisper dependency, after background-removal put onnxruntime-gpu in
+    place) silently strips CUDAExecutionProvider while the surviving
+    onnxruntime_gpu dist-info keeps claiming it is installed (#490). The GPU
+    build ships CPUExecutionProvider too, so it satisfies every consumer of the
+    CPU build; the reverse is not true. Hence: GPU wins, in both install orders.
+    """
+    staging_cpu, staging_gpu = _onnx_dist_infos(staging_sp)
+    venv_cpu, venv_gpu = _onnx_dist_infos(site_packages_dir)
+
+    if staging_cpu and (venv_gpu or staging_gpu):
+        # Incoming CPU flavor while a GPU build exists: drop the CPU metadata,
+        # and when the staged package files ARE the CPU build (no GPU flavor in
+        # this same bundle), drop them too so they cannot clobber the venv's
+        # GPU libraries.
+        for name in staging_cpu:
+            shutil.rmtree(os.path.join(staging_sp, name), ignore_errors=True)
+        if not staging_gpu:
+            pkg_dir = os.path.join(staging_sp, "onnxruntime")
+            if os.path.isdir(pkg_dir):
+                shutil.rmtree(pkg_dir, ignore_errors=True)
+        sys.stderr.write(
+            "[install] kept the GPU build of onnxruntime: dropped this bundle's CPU "
+            "onnxruntime so it cannot disable CUDA for other AI tools (#490)\n"
+        )
+        sys.stderr.flush()
+
+    if staging_gpu and venv_cpu:
+        # Incoming GPU flavor over a CPU install: the GPU files win the merge;
+        # clear the venv's stale CPU metadata so pip reflects reality. This also
+        # makes reinstalling any GPU bundle repair a venv clobbered before this
+        # guard existed.
+        for name in venv_cpu:
+            shutil.rmtree(os.path.join(site_packages_dir, name), ignore_errors=True)
+        sys.stderr.write(
+            "[install] replacing the CPU build of onnxruntime with the GPU build; "
+            "removed its stale metadata\n"
+        )
+        sys.stderr.flush()
+
+
 # -- Fixups (NCCL wheel) --
 
 def apply_fixups(staging_dir: str, venv_path: str) -> None:
@@ -819,6 +883,7 @@ def _install() -> None:
                     },
                     mf,
                 )
+            reconcile_onnxruntime(staging_sp, site_packages_dir)
             move_tree(staging_sp, site_packages_dir)
             if os.path.exists(venv_writing_marker):
                 os.unlink(venv_writing_marker)

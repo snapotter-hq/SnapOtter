@@ -168,8 +168,10 @@ def onnx_providers():
             available = _ort.get_available_providers()
             if "CUDAExecutionProvider" in available:
                 return (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
-            emit_info("GPU detected by torch but CUDAExecutionProvider not available in onnxruntime "
-                      "-- install onnxruntime-gpu for GPU acceleration")
+            emit_info("GPU detected by torch but CUDAExecutionProvider is missing from onnxruntime. "
+                      "A bundle install likely replaced onnxruntime-gpu with the CPU build (#490); "
+                      "reinstall the Background Removal bundle from Settings > AI Features to "
+                      "restore the GPU build")
         except ImportError:
             emit_info("onnxruntime not installed, cannot check CUDA provider")
     emit_info("No GPU detected, processing on CPU")

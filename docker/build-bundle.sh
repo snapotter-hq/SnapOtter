@@ -252,6 +252,38 @@ for patch in patches:
 print("  Source patches applied")
 PYPATCH
 
+# ── Step 4.6: ONNX Runtime flavor hygiene ────────────────────────────────
+# A pinned onnxruntime-gpu plus a transitive CPU onnxruntime (rembg and
+# faster-whisper both depend on plain `onnxruntime`) leaves BOTH dist-infos in
+# site-packages, with the package files belonging to whichever installed last.
+# Force the GPU build's files back and drop the CPU metadata, so a bundle can
+# never ship CPU files under GPU metadata, or two flavors at once (#490).
+echo "=== Reconciling ONNX Runtime flavor ==="
+python3 << 'PYONNX'
+import os, shlex, shutil, site, subprocess, sys
+
+site_packages = site.getsitepackages()[0]
+names = os.listdir(site_packages)
+cpu = sorted(n for n in names if n.startswith("onnxruntime-") and n.endswith(".dist-info"))
+gpu = sorted(n for n in names if n.startswith("onnxruntime_gpu-") and n.endswith(".dist-info"))
+
+if not (cpu and gpu):
+    print("  Single ONNX Runtime flavor (or none); nothing to reconcile")
+    sys.exit(0)
+
+version = gpu[-1][len("onnxruntime_gpu-"):-len(".dist-info")]
+cmd = (f"{sys.executable} -m pip install --no-cache-dir --force-reinstall "
+       f"--no-deps onnxruntime-gpu=={version}")
+print(f"  > {cmd}", flush=True)
+if subprocess.run(shlex.split(cmd)).returncode != 0:
+    print("ERROR: onnxruntime-gpu reinstall failed", file=sys.stderr)
+    sys.exit(1)
+
+for name in cpu:
+    shutil.rmtree(os.path.join(site_packages, name), ignore_errors=True)
+print(f"  Kept onnxruntime-gpu=={version}; removed CPU dist-info: {', '.join(cpu)}")
+PYONNX
+
 # ── Step 5: Download models ──────────────────────────────────────────────
 echo "=== Downloading models ==="
 python3 << 'PYMODELS'
