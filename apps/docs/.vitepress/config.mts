@@ -3,6 +3,7 @@ import llmstxt from "vitepress-plugin-llms";
 import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
+import { t } from "./i18n/ui.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
@@ -16,6 +17,26 @@ function prefixLinks(items: any[], locale: string): any[] {
       next.link = `/${locale}${next.link}`;
     }
     if (Array.isArray(next.items)) next.items = prefixLinks(next.items, locale);
+    return next;
+  });
+}
+
+// Translate top-level nav labels for a locale via the shared UI catalog. Labels
+// with no mapping (e.g. the version item) pass through unchanged. The nav is a
+// flat list, so no recursion is needed here.
+const NAV_KEY: Record<string, string> = {
+  Home: "nav.home",
+  Guide: "nav.guide",
+  Tools: "nav.tools",
+  "API Reference": "nav.apiReference",
+  Changelog: "nav.changelog",
+};
+// biome-ignore lint/suspicious/noExplicitAny: VitePress nav item trees are recursively typed.
+function localizeNav(items: any[], locale: string): any[] {
+  return (items ?? []).map((it) => {
+    const next = { ...it };
+    const key = NAV_KEY[next.text];
+    if (key) next.text = t(locale, key);
     return next;
   });
 }
@@ -177,7 +198,7 @@ export default defineConfig({
           dir: l.dir,
           link: `/${l.code}/`,
           themeConfig: {
-            nav: prefixLinks(buildBaseTheme().nav, l.code),
+            nav: prefixLinks(localizeNav(buildBaseTheme().nav, l.code), l.code),
             sidebar: prefixLinks(buildBaseTheme().sidebar, l.code),
             editLink: {
               pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",

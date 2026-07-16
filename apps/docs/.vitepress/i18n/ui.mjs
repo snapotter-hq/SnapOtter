@@ -1,19 +1,64 @@
 // apps/docs/.vitepress/i18n/ui.mjs
 import { SUPPORTED_LOCALES } from "../../../../packages/shared/src/i18n/index.ts";
+import { OVERRIDES } from "./overrides.mjs";
 
-// Source strings (English). Other locales override keys as translations land;
-// missing keys fall back to English via t().
+// Source strings (English). Other locales override keys via ./overrides.mjs;
+// missing keys fall back to English through t().
 const EN = {
-  // DocsHome.vue
+  // DocsHome.vue - hero
   "home.title": "SnapOtter Documentation",
+  "home.heroSub":
+    "Install, operate, and build on your self-hosted file-processing infrastructure. Get running in one command:",
   "home.copy": "Copy",
   "home.copied": "Copied!",
+  "home.clickToCopy": "Click to copy",
+  "home.copyCommandAria": "Copy command",
+  "home.fullInstallGuide": "Full install guide",
+  "home.gpuComposeSetup": "GPU & Compose setup",
+  "home.tryDemo": "Try the live demo",
+  // DocsHome.vue - doors
   "home.selfHosting": "Self-hosting",
+  "home.selfHostingSub": "Get SnapOtter running and keep it healthy.",
   "home.enterprise": "Enterprise",
+  "home.enterpriseSub": "Evaluate, secure & govern your deployment.",
   "home.startSelfHosting": "Start self-hosting →",
   "home.evaluate": "See enterprise features →",
+  // DocsHome.vue - self-hosting links
+  "home.link.quickStart": "Quick start",
+  "home.link.configuration": "Configuration",
+  "home.link.hardwareSizing": "Hardware & sizing",
+  "home.link.databaseBackups": "Database & backups",
+  "home.link.dockerTagsGpu": "Docker tags & GPU",
+  "home.link.supportedFormats": "Supported formats",
+  // DocsHome.vue - enterprise links
+  "home.link.architecture": "Architecture",
+  "home.link.securityHardening": "Security & hardening",
+  "home.link.ssoSamlOidc": "SSO · SAML · OIDC",
+  "home.link.scimProvisioning": "SCIM provisioning",
+  "home.link.usersRolesAudit": "Users, roles & audit",
+  "home.link.complianceSbom": "Compliance & SBOM",
+  // DocsHome.vue - modalities
   "home.modalities": "200+ tools across 5 modalities",
   "home.browseByType": "browse the full reference by type",
+  "home.mod.image": "Image",
+  "home.mod.video": "Video",
+  "home.mod.audio": "Audio",
+  "home.mod.pdf": "PDF",
+  "home.mod.files": "Files",
+  "home.toolsSuffix": "tools",
+  // DocsHome.vue - shared cards
+  "home.card.restApi": "REST API",
+  "home.card.restApiSub": "Keys, endpoints & OpenAPI",
+  "home.card.changelog": "Changelog",
+  "home.card.changelogSub": "What's new in 2.0",
+  "home.card.llmsTxt": "llms.txt",
+  "home.card.llmsTxtSub": "AI-friendly docs",
+  // Top nav (config.mts)
+  "nav.home": "Home",
+  "nav.guide": "Guide",
+  "nav.tools": "Tools",
+  "nav.apiReference": "API Reference",
+  "nav.changelog": "Changelog",
   // FundButton.vue
   "fund.label": "Fund Development",
   // GitHubStars.vue
@@ -26,11 +71,6 @@ const EN = {
   "notFound.text": "This page swam away. Let's get you back on track.",
   "notFound.link": "Back to docs",
 };
-
-// Per-locale overrides. Generated/refined by the pipeline in Plan 05; ships with
-// English only, so t() returns English for every non-en locale until then.
-/** @type {Record<string, Record<string, string>>} */
-const OVERRIDES = {};
 
 /**
  * @param {string} locale
@@ -52,4 +92,4 @@ export function normalizeLocale(lang) {
   return SUPPORTED_LOCALES.some((l) => l.code === code) ? code : "en";
 }
 
-export { SUPPORTED_LOCALES };
+export { EN, SUPPORTED_LOCALES };
