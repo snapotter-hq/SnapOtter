@@ -116,6 +116,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Tag Sentry with the active locale so locale-specific i18n/interpolation
+    // crashes are identifiable as such.
+    import("@/lib/analytics").then(({ setSentryTag }) => setSentryTag("locale", locale));
     loadLocale(locale).then((t) => {
       if (!cancelled) setTranslations(t);
     });

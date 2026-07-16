@@ -14,6 +14,14 @@ export const IGNORE_ERRORS: (string | RegExp)[] = [
   "Load failed",
   /^ResizeObserver loop/,
   "The operation was aborted.",
+  // Third-party browser-extension and injected-webview noise. These throw from
+  // the page context, so DENY_URLS on the extension origin never sees them;
+  // match the telltale message instead. Seen as WEB-2 (password-manager
+  // autofill) and WEB-7 (Android WebView bridge). Not our code.
+  /sendExtensionMessage/i,
+  /getUrlAutofillTargetingRules/i,
+  /onLongParse/i,
+  /Java exception was raised during method invocation/i,
 ];
 
 export const DENY_URLS: RegExp[] = [

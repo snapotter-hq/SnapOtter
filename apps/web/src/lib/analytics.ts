@@ -113,6 +113,20 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   }
 }
 
+/**
+ * Set an allowlisted Sentry tag (route / tool_id / locale / error_class, see
+ * sentry-scrub.ts TAG_ALLOWLIST) so web errors become filterable by which tool
+ * and route the user was on. No-op until Sentry is initialized; lazy so this
+ * module keeps no static @sentry/react import.
+ */
+export function setSentryTag(key: string, value: string): void {
+  void import("@sentry/react")
+    .then((Sentry) => {
+      if (Sentry.getClient()) Sentry.setTag(key, value);
+    })
+    .catch(() => {});
+}
+
 export function track(event: string, properties?: Record<string, unknown>): void {
   if (!enabled || !posthog) return;
   try {

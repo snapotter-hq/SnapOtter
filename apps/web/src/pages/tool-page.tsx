@@ -268,7 +268,11 @@ export function ToolPage() {
   useEffect(() => {
     if (tool) {
       recordRecentTool(tool.id);
-      import("@/lib/analytics").then(({ track }) => {
+      import("@/lib/analytics").then(({ track, setSentryTag }) => {
+        // Tag Sentry so a frontend crash is filterable by which tool/section the
+        // user was on (the web TAG_ALLOWLIST reserves these but nothing set them).
+        setSentryTag("tool_id", tool.id);
+        setSentryTag("route", toolSection(tool));
         track(ANALYTICS_EVENTS.TOOL_OPENED, {
           tool_id: tool.id,
           modality: tool.modality,
