@@ -1241,7 +1241,7 @@ export function AdminSecuritySettings() {
           onChange={(e) => updateSetting("passwordMinLength", e.target.value)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={4}
+          min={1}
           max={128}
         />
       </SettingRow>
