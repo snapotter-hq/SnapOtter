@@ -1,9 +1,10 @@
 import { SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
-import { Download, Info, Link, Unlink } from "lucide-react";
+import { Download, Info } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { largestRatioBox, pairedDimension, RESIZE_RATIO_PRESETS } from "@/lib/aspect-ratio";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -33,13 +34,16 @@ export interface ResizeControlsProps {
 
 export function ResizeControls({ settings: initialSettings, onChange }: ResizeControlsProps) {
   const { t } = useTranslation();
+  const { currentEntry } = useFileStore();
   const [tab, setTab] = useState<ResizeTab>("custom");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [width, setWidth] = useState<string>("");
   const [height, setHeight] = useState<string>("");
   const [percentage, setPercentage] = useState<string>("50");
   const [fit, setFit] = useState<FitMode>("cover");
-  const [lockAspect, setLockAspect] = useState(true);
+  // "free" = independent width/height (default, unchanged behavior). "original" =
+  // lock to the source image's ratio. Otherwise a RESIZE_RATIO_PRESETS id (e.g. "16:9").
+  const [ratioId, setRatioId] = useState<string>("free");
   const [withoutEnlargement, setWithoutEnlargement] = useState(false);
   const contentAware = tab === "content-aware";
   const [protectFaces, setProtectFaces] = useState(false);
@@ -107,6 +111,59 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     contentAware,
   ]);
 
+  // Resolve a chip id to a numeric ratio (width / height), or null when it
+  // shouldn't lock (Free, or Original before the source dimensions are known).
+  const ratioValueFor = (id: string): number | null => {
+    if (id === "free") return null;
+    if (id === "original") {
+      const w = currentEntry?.originalWidth;
+      const h = currentEntry?.originalHeight;
+      return w && h ? w / h : null;
+    }
+    return RESIZE_RATIO_PRESETS.find((p) => p.id === id)?.value ?? null;
+  };
+
+  // Linking only applies on the Custom tab; the width/height inputs are shared
+  // with the Content-Aware tab, which manages its dimensions independently.
+  const handleWidthChange = (raw: string) => {
+    setWidth(raw);
+    if (tab !== "custom") return;
+    const r = ratioValueFor(ratioId);
+    const n = Number(raw);
+    if (r && raw !== "" && Number.isFinite(n) && n > 0) {
+      setHeight(String(pairedDimension(n, r, "width")));
+    }
+  };
+
+  const handleHeightChange = (raw: string) => {
+    setHeight(raw);
+    if (tab !== "custom") return;
+    const r = ratioValueFor(ratioId);
+    const n = Number(raw);
+    if (r && raw !== "" && Number.isFinite(n) && n > 0) {
+      setWidth(String(pairedDimension(n, r, "height")));
+    }
+  };
+
+  const handleRatioSelect = (id: string) => {
+    setRatioId(id);
+    const r = ratioValueFor(id);
+    if (!r) return;
+    const w = Number(width);
+    const h = Number(height);
+    if (width !== "" && Number.isFinite(w) && w > 0) {
+      // Keep the width the user already has, snap height to the ratio.
+      setHeight(String(pairedDimension(w, r, "width")));
+    } else if (height !== "" && Number.isFinite(h) && h > 0) {
+      setWidth(String(pairedDimension(h, r, "height")));
+    } else if (currentEntry?.originalWidth && currentEntry?.originalHeight) {
+      // Nothing typed yet: prefill the largest box of this ratio that fits.
+      const box = largestRatioBox(currentEntry.originalWidth, currentEntry.originalHeight, r);
+      setWidth(String(box.width));
+      setHeight(String(box.height));
+    }
+  };
+
   const handlePreset = (preset: (typeof SOCIAL_MEDIA_PRESETS)[number]) => {
     const key = `${preset.platform}-${preset.name}`;
     if (selectedPreset === key) {
@@ -123,6 +180,12 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
   const tabClass = (t: ResizeTab) =>
     `flex-1 text-xs py-1.5 rounded ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`;
 
+  const ratioChips: { id: string; label: string }[] = [
+    { id: "free", label: t.toolSettings.resize.ratioFree },
+    { id: "original", label: t.toolSettings.resize.ratioOriginal },
+    ...RESIZE_RATIO_PRESETS.map((p) => ({ id: p.id, label: p.id })),
+  ];
+
   const dimensionInputs = (
     <div className="flex items-end gap-2">
       <div className="flex-1">
@@ -133,20 +196,12 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           id="resize-width"
           type="number"
           value={width}
-          onChange={(e) => setWidth(e.target.value)}
+          onChange={(e) => handleWidthChange(e.target.value)}
           placeholder="Auto"
           disabled={squareMode && contentAware}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
         />
       </div>
-      <button
-        type="button"
-        onClick={() => setLockAspect(!lockAspect)}
-        className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-        title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-      >
-        {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
-      </button>
       <div className="flex-1">
         <label htmlFor="resize-height" className="text-xs text-muted-foreground">
           {t.toolSettings.resize.heightPx}
@@ -155,7 +210,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           id="resize-height"
           type="number"
           value={height}
-          onChange={(e) => setHeight(e.target.value)}
+          onChange={(e) => handleHeightChange(e.target.value)}
           placeholder="Auto"
           disabled={squareMode && contentAware}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
@@ -241,6 +296,28 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
       {tab === "custom" && (
         <div className="space-y-3">
           {dimensionInputs}
+
+          {/* Aspect ratio */}
+          <div>
+            <p className="text-xs text-muted-foreground">{t.toolSettings.resize.aspectRatio}</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {ratioChips.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => handleRatioSelect(chip.id)}
+                  aria-pressed={ratioId === chip.id}
+                  className={`px-2.5 py-1 rounded text-xs ${
+                    ratioId === chip.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Fit mode */}
           <div>

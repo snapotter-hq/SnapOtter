@@ -823,18 +823,25 @@ test.describe("GUI Essential Tools", () => {
   // RESIZE: LINKED ASPECT RATIO AUTO-UPDATE
   // ========================================================================
   test.describe("Resize Aspect Ratio Linked Fields", () => {
-    // The resize component stores lockAspect as UI state but does not
-    // auto-compute the paired dimension on input change. The width/height
-    // onChange handlers call setWidth/setHeight independently. Linked
-    // auto-update is not implemented in the current component, so these
-    // tests cannot pass until that feature is added.
-    test.skip("width auto-updates height when aspect ratio locked", async ({
-      loggedInPage: _page,
-    }) => {});
+    // Selecting a ratio chip on the Custom tab locks the width/height fields:
+    // editing one recomputes the other. 16:9 is fixture-independent (1600 -> 900).
+    test("width auto-updates height when a ratio is locked", async ({ loggedInPage: page }) => {
+      await page.goto("/image/resize");
+      await uploadTestImage(page);
 
-    test.skip("height auto-updates width when aspect ratio locked", async ({
-      loggedInPage: _page,
-    }) => {});
+      await page.getByRole("button", { name: "16:9", exact: true }).click();
+      await page.locator("#resize-width").fill("1600");
+      await expect(page.locator("#resize-height")).toHaveValue("900");
+    });
+
+    test("height auto-updates width when a ratio is locked", async ({ loggedInPage: page }) => {
+      await page.goto("/image/resize");
+      await uploadTestImage(page);
+
+      await page.getByRole("button", { name: "16:9", exact: true }).click();
+      await page.locator("#resize-height").fill("900");
+      await expect(page.locator("#resize-width")).toHaveValue("1600");
+    });
   });
 
   // ========================================================================
