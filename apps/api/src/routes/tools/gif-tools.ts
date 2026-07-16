@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { zipSync } from "fflate";
 import sharp from "sharp";
 import { z } from "zod";
+import { withImageEncodeContext } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
 
 /**
@@ -146,163 +147,167 @@ export function registerGifTools(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "gif-tools",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const baseName = filename.replace(/\.[^.]+$/, "");
-      const loop = settings.loop;
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "GIF processing failed",
+      (s) => s.mode,
+      async (inputBuffer, settings, filename) => {
+        const baseName = filename.replace(/\.[^.]+$/, "");
+        const loop = settings.loop;
 
-      switch (settings.mode) {
-        case "resize": {
-          const image = sharp(inputBuffer, { animated: true });
+        switch (settings.mode) {
+          case "resize": {
+            const image = sharp(inputBuffer, { animated: true });
 
-          if (settings.percentage) {
-            const meta = await image.metadata();
-            const w = Math.round(((meta.width ?? 0) * settings.percentage) / 100);
-            const h = Math.round(
-              ((meta.pageHeight ?? meta.height ?? 0) * settings.percentage) / 100,
-            );
-            image.resize(w || undefined, h || undefined, { fit: "inside" });
-          } else if (settings.width || settings.height) {
-            image.resize(settings.width, settings.height, { fit: "inside" });
-          }
+            if (settings.percentage) {
+              const meta = await image.metadata();
+              const w = Math.round(((meta.width ?? 0) * settings.percentage) / 100);
+              const h = Math.round(
+                ((meta.pageHeight ?? meta.height ?? 0) * settings.percentage) / 100,
+              );
+              image.resize(w || undefined, h || undefined, { fit: "inside" });
+            } else if (settings.width || settings.height) {
+              image.resize(settings.width, settings.height, { fit: "inside" });
+            }
 
-          const buffer = await image.gif({ loop }).toBuffer();
-          return { buffer, filename, contentType: "image/gif" };
-        }
-
-        case "optimize": {
-          const buffer = await sharp(inputBuffer, { animated: true })
-            .gif({
-              effort: settings.effort,
-              colours: settings.colors,
-              dither: settings.dither,
-              loop,
-            })
-            .toBuffer();
-          return { buffer, filename, contentType: "image/gif" };
-        }
-
-        case "speed": {
-          const meta = await sharp(inputBuffer, { animated: true }).metadata();
-          const origDelays = meta.delay ?? Array(meta.pages ?? 1).fill(100);
-          const newDelays = origDelays.map((d: number) =>
-            Math.max(20, Math.round(d / settings.speedFactor)),
-          );
-
-          const buffer = await sharp(inputBuffer, { animated: true })
-            .gif({ delay: newDelays, loop })
-            .toBuffer();
-          return { buffer, filename, contentType: "image/gif" };
-        }
-
-        case "reverse": {
-          const meta = await sharp(inputBuffer, { animated: true }).metadata();
-          const pageCount = meta.pages ?? 1;
-          const delays = [...(meta.delay ?? Array(pageCount).fill(100))];
-
-          if (pageCount <= 1) {
-            const buffer = await sharp(inputBuffer).gif({ loop }).toBuffer();
+            const buffer = await image.gif({ loop }).toBuffer();
             return { buffer, filename, contentType: "image/gif" };
           }
 
-          delays.reverse();
-
-          // Apply optional speed adjustment (used when "Also adjust speed" is checked)
-          if (settings.speedFactor !== 1.0) {
-            for (let i = 0; i < delays.length; i++) {
-              delays[i] = Math.max(20, Math.round(delays[i] / settings.speedFactor));
-            }
-          }
-
-          // Extract each frame as a single-frame GIF with the correct delay,
-          // then combine into a multi-frame GIF at the binary level.
-          // This avoids going through raw pixel data, which loses the
-          // page-height metadata that sharp/libvips needs for animation.
-          const frameGifs: Buffer[] = [];
-          for (let i = pageCount - 1; i >= 0; i--) {
-            const frameBuf = await sharp(inputBuffer, { page: i })
-              .gif({ delay: [delays[pageCount - 1 - i]], loop })
+          case "optimize": {
+            const buffer = await sharp(inputBuffer, { animated: true })
+              .gif({
+                effort: settings.effort,
+                colours: settings.colors,
+                dither: settings.dither,
+                loop,
+              })
               .toBuffer();
-            frameGifs.push(frameBuf);
+            return { buffer, filename, contentType: "image/gif" };
           }
 
-          const buffer = assembleAnimatedGif(frameGifs, loop);
-          return { buffer, filename, contentType: "image/gif" };
-        }
+          case "speed": {
+            const meta = await sharp(inputBuffer, { animated: true }).metadata();
+            const origDelays = meta.delay ?? Array(meta.pages ?? 1).fill(100);
+            const newDelays = origDelays.map((d: number) =>
+              Math.max(20, Math.round(d / settings.speedFactor)),
+            );
 
-        case "extract": {
-          if (settings.extractMode === "single") {
-            const frame = sharp(inputBuffer, { page: settings.frameNumber });
+            const buffer = await sharp(inputBuffer, { animated: true })
+              .gif({ delay: newDelays, loop })
+              .toBuffer();
+            return { buffer, filename, contentType: "image/gif" };
+          }
+
+          case "reverse": {
+            const meta = await sharp(inputBuffer, { animated: true }).metadata();
+            const pageCount = meta.pages ?? 1;
+            const delays = [...(meta.delay ?? Array(pageCount).fill(100))];
+
+            if (pageCount <= 1) {
+              const buffer = await sharp(inputBuffer).gif({ loop }).toBuffer();
+              return { buffer, filename, contentType: "image/gif" };
+            }
+
+            delays.reverse();
+
+            // Apply optional speed adjustment (used when "Also adjust speed" is checked)
+            if (settings.speedFactor !== 1.0) {
+              for (let i = 0; i < delays.length; i++) {
+                delays[i] = Math.max(20, Math.round(delays[i] / settings.speedFactor));
+              }
+            }
+
+            // Extract each frame as a single-frame GIF with the correct delay,
+            // then combine into a multi-frame GIF at the binary level.
+            // This avoids going through raw pixel data, which loses the
+            // page-height metadata that sharp/libvips needs for animation.
+            const frameGifs: Buffer[] = [];
+            for (let i = pageCount - 1; i >= 0; i--) {
+              const frameBuf = await sharp(inputBuffer, { page: i })
+                .gif({ delay: [delays[pageCount - 1 - i]], loop })
+                .toBuffer();
+              frameGifs.push(frameBuf);
+            }
+
+            const buffer = assembleAnimatedGif(frameGifs, loop);
+            return { buffer, filename, contentType: "image/gif" };
+          }
+
+          case "extract": {
+            if (settings.extractMode === "single") {
+              const frame = sharp(inputBuffer, { page: settings.frameNumber });
+              const ext = settings.extractFormat;
+              const buffer =
+                ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
+              const outName = `${baseName}_frame${settings.frameNumber}.${ext}`;
+              return {
+                buffer,
+                filename: outName,
+                contentType: ext === "webp" ? "image/webp" : "image/png",
+              };
+            }
+
+            // Range or All
+            const meta = await sharp(inputBuffer).metadata();
+            const pageCount = meta.pages ?? 1;
+            const start = settings.extractMode === "all" ? 0 : settings.frameStart;
+            const end =
+              settings.extractMode === "all"
+                ? pageCount - 1
+                : Math.min(settings.frameEnd ?? pageCount - 1, pageCount - 1);
+
             const ext = settings.extractFormat;
-            const buffer =
-              ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
-            const outName = `${baseName}_frame${settings.frameNumber}.${ext}`;
+            const files: Record<string, Uint8Array> = {};
+
+            for (let i = start; i <= end; i++) {
+              const frame = sharp(inputBuffer, { page: i });
+              const buf =
+                ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
+              files[`frame_${String(i).padStart(4, "0")}.${ext}`] = new Uint8Array(buf);
+            }
+
+            const zipData = zipSync(files);
+            const zipBuffer = Buffer.from(zipData);
             return {
-              buffer,
-              filename: outName,
-              contentType: ext === "webp" ? "image/webp" : "image/png",
+              buffer: zipBuffer,
+              filename: `${baseName}_frames.zip`,
+              contentType: "application/zip",
             };
           }
 
-          // Range or All
-          const meta = await sharp(inputBuffer).metadata();
-          const pageCount = meta.pages ?? 1;
-          const start = settings.extractMode === "all" ? 0 : settings.frameStart;
-          const end =
-            settings.extractMode === "all"
-              ? pageCount - 1
-              : Math.min(settings.frameEnd ?? pageCount - 1, pageCount - 1);
+          case "rotate": {
+            const meta = await sharp(inputBuffer, { animated: true }).metadata();
+            const pageCount = meta.pages ?? 1;
+            const delays = meta.delay ?? Array(pageCount).fill(100);
 
-          const ext = settings.extractFormat;
-          const files: Record<string, Uint8Array> = {};
+            // Sharp cannot rotate multi-page images directly, so process
+            // each frame individually and reassemble the animation.
+            const frameGifs: Buffer[] = [];
+            for (let i = 0; i < pageCount; i++) {
+              let frame = sharp(inputBuffer, { page: i });
+              if (settings.angle) {
+                frame = frame.rotate(settings.angle);
+              }
+              if (settings.flipV) {
+                frame = frame.flip();
+              }
+              if (settings.flipH) {
+                frame = frame.flop();
+              }
+              const frameBuf = await frame.gif({ delay: [delays[i]], loop }).toBuffer();
+              frameGifs.push(frameBuf);
+            }
 
-          for (let i = start; i <= end; i++) {
-            const frame = sharp(inputBuffer, { page: i });
-            const buf =
-              ext === "webp" ? await frame.webp().toBuffer() : await frame.png().toBuffer();
-            files[`frame_${String(i).padStart(4, "0")}.${ext}`] = new Uint8Array(buf);
+            const buffer = pageCount > 1 ? assembleAnimatedGif(frameGifs, loop) : frameGifs[0];
+            return { buffer, filename, contentType: "image/gif" };
           }
 
-          const zipData = zipSync(files);
-          const zipBuffer = Buffer.from(zipData);
-          return {
-            buffer: zipBuffer,
-            filename: `${baseName}_frames.zip`,
-            contentType: "application/zip",
-          };
-        }
-
-        case "rotate": {
-          const meta = await sharp(inputBuffer, { animated: true }).metadata();
-          const pageCount = meta.pages ?? 1;
-          const delays = meta.delay ?? Array(pageCount).fill(100);
-
-          // Sharp cannot rotate multi-page images directly, so process
-          // each frame individually and reassemble the animation.
-          const frameGifs: Buffer[] = [];
-          for (let i = 0; i < pageCount; i++) {
-            let frame = sharp(inputBuffer, { page: i });
-            if (settings.angle) {
-              frame = frame.rotate(settings.angle);
-            }
-            if (settings.flipV) {
-              frame = frame.flip();
-            }
-            if (settings.flipH) {
-              frame = frame.flop();
-            }
-            const frameBuf = await frame.gif({ delay: [delays[i]], loop }).toBuffer();
-            frameGifs.push(frameBuf);
+          default: {
+            const buffer = await sharp(inputBuffer, { animated: true }).gif({ loop }).toBuffer();
+            return { buffer, filename, contentType: "image/gif" };
           }
-
-          const buffer = pageCount > 1 ? assembleAnimatedGif(frameGifs, loop) : frameGifs[0];
-          return { buffer, filename, contentType: "image/gif" };
         }
-
-        default: {
-          const buffer = await sharp(inputBuffer, { animated: true }).gif({ loop }).toBuffer();
-          return { buffer, filename, contentType: "image/gif" };
-        }
-      }
-    },
+      },
+    ),
   });
 }

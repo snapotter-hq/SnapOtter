@@ -19,6 +19,7 @@ import {
   encodeTga,
 } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
+import { withImageEncodeContext } from "../../lib/image-error.js";
 import { isSvgBuffer } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -104,62 +105,66 @@ export function registerConvert(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "convert",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      // CLI-encoded formats bypass Sharp entirely
-      const cliEncoder = CLI_ENCODERS[settings.format];
-      if (cliEncoder) {
-        const outputBuffer = await cliEncoder(inputBuffer, settings.quality);
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Image conversion failed",
+      (s) => s.format,
+      async (inputBuffer, settings, filename) => {
+        // CLI-encoded formats bypass Sharp entirely
+        const cliEncoder = CLI_ENCODERS[settings.format];
+        if (cliEncoder) {
+          const outputBuffer = await cliEncoder(inputBuffer, settings.quality);
+          const ext = extname(filename);
+          const baseName = ext ? filename.slice(0, -ext.length) : filename;
+          const contentType = FORMAT_CONTENT_TYPES[settings.format] || "application/octet-stream";
+          return {
+            buffer: outputBuffer,
+            filename: `${baseName}.${settings.format}`,
+            contentType,
+          };
+        }
+
+        const inputExt = extname(filename).toLowerCase().replace(".", "");
+        const sharpOpts: SharpOptions = isSvgBuffer(inputBuffer) ? { density: 300 } : {};
+        // Preserve animation frames when both input and output are animatable formats
+        if (ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)) {
+          sharpOpts.animated = true;
+        }
+        const image = sharp(inputBuffer, sharpOpts);
+
+        let buffer: Buffer;
+        if (settings.format === "psd") {
+          const pngBuffer = await image.png().toBuffer();
+          const id = randomUUID();
+          const inputPath = join(tmpdir(), `psd-enc-in-${id}.png`);
+          const outputPath = join(tmpdir(), `psd-enc-out-${id}.psd`);
+          try {
+            await writeFile(inputPath, pngBuffer);
+            const cmd = await findMagickCmd();
+            await execFileAsync(cmd, magickArgs(cmd, [inputPath, `psd:${outputPath}`]), {
+              timeout: 120_000,
+            });
+            buffer = await readFile(outputPath);
+          } finally {
+            await rm(inputPath, { force: true }).catch(() => {});
+            await rm(outputPath, { force: true }).catch(() => {});
+          }
+        } else if (settings.format === "heic" || settings.format === "heif") {
+          const pngBuffer = await image.png().toBuffer();
+          buffer = await encodeHeic(pngBuffer, settings.quality);
+        } else {
+          const result = await convert(image, settings as Parameters<typeof convert>[1]);
+          buffer = await result.toBuffer();
+        }
+
+        // Change filename extension to match the output format
         const ext = extname(filename);
         const baseName = ext ? filename.slice(0, -ext.length) : filename;
+        const outputFilename = `${baseName}.${settings.format}`;
+
         const contentType = FORMAT_CONTENT_TYPES[settings.format] || "application/octet-stream";
-        return {
-          buffer: outputBuffer,
-          filename: `${baseName}.${settings.format}`,
-          contentType,
-        };
-      }
 
-      const inputExt = extname(filename).toLowerCase().replace(".", "");
-      const sharpOpts: SharpOptions = isSvgBuffer(inputBuffer) ? { density: 300 } : {};
-      // Preserve animation frames when both input and output are animatable formats
-      if (ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)) {
-        sharpOpts.animated = true;
-      }
-      const image = sharp(inputBuffer, sharpOpts);
-
-      let buffer: Buffer;
-      if (settings.format === "psd") {
-        const pngBuffer = await image.png().toBuffer();
-        const id = randomUUID();
-        const inputPath = join(tmpdir(), `psd-enc-in-${id}.png`);
-        const outputPath = join(tmpdir(), `psd-enc-out-${id}.psd`);
-        try {
-          await writeFile(inputPath, pngBuffer);
-          const cmd = await findMagickCmd();
-          await execFileAsync(cmd, magickArgs(cmd, [inputPath, `psd:${outputPath}`]), {
-            timeout: 120_000,
-          });
-          buffer = await readFile(outputPath);
-        } finally {
-          await rm(inputPath, { force: true }).catch(() => {});
-          await rm(outputPath, { force: true }).catch(() => {});
-        }
-      } else if (settings.format === "heic" || settings.format === "heif") {
-        const pngBuffer = await image.png().toBuffer();
-        buffer = await encodeHeic(pngBuffer, settings.quality);
-      } else {
-        const result = await convert(image, settings as Parameters<typeof convert>[1]);
-        buffer = await result.toBuffer();
-      }
-
-      // Change filename extension to match the output format
-      const ext = extname(filename);
-      const baseName = ext ? filename.slice(0, -ext.length) : filename;
-      const outputFilename = `${baseName}.${settings.format}`;
-
-      const contentType = FORMAT_CONTENT_TYPES[settings.format] || "application/octet-stream";
-
-      return { buffer, filename: outputFilename, contentType };
-    },
+        return { buffer, filename: outputFilename, contentType };
+      },
+    ),
   });
 }
