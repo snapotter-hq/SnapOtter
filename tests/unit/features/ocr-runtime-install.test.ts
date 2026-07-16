@@ -1866,17 +1866,33 @@ describe("downloadVerifiedRuntimeRelease", () => {
     temporaryDirectories.push(directory);
     const nativeSetTimeout = globalThis.setTimeout;
     const retryTimers: ReturnType<typeof setTimeout>[] = [];
+    let startDeadline: (() => void) | undefined;
     vi.spyOn(globalThis, "setTimeout").mockImplementation(((handler, delay, ...args) => {
+      // Defer the overall 100ms deadline until the first fetch is dispatched, so a
+      // loaded CI runner cannot fire it before fetch is even called (the source of
+      // this test's flakiness). Mirrors the deferred-deadline trick used above.
+      if (delay === 100 && !startDeadline) {
+        const placeholder = nativeSetTimeout(() => {}, 60_000);
+        startDeadline = () => {
+          clearTimeout(placeholder);
+          nativeSetTimeout(handler, delay, ...args);
+        };
+        return placeholder;
+      }
       const timer = nativeSetTimeout(handler, delay, ...args);
       if (delay === 500) retryTimers.push(timer);
       return timer;
     }) as typeof setTimeout);
     const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response("temporary outage", {
-        status: 503,
-      }),
-    );
+    let armed = false;
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => {
+      if (!armed) {
+        if (!startDeadline) throw new Error("overall deadline was not registered before fetch");
+        startDeadline();
+        armed = true;
+      }
+      return new Response("temporary outage", { status: 503 });
+    });
 
     await expect(
       downloadVerifiedRuntimeRelease({
