@@ -1,7 +1,7 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Persyaratan perangkat keras, penyiapan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
 i18n_output_hash: 5ed614569b73
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Persyaratan Perangkat Keras {#hardware-requirements}
 
 Angka-angka ini berasal dari benchmark di berbagai sistem, mulai dari workstation amd64 modern dengan NVIDIA RTX 4070 hingga Raspberry Pi, menjalankan seluruh katalog perkakas pada masing-masing dan menyapu batas sumber daya Docker untuk menemukan batas bawah yang sebenarnya.
+
+Berjalan di ujung kecil tingkatan ini (Pi, laptop lama, VPS 2 GB)? [Penyiapan Sumber Daya Rendah](/id/guide/low-resource) mengubah angka-angka ini menjadi panduan konkret dengan batas yang sudah disetel.
 
 ### Referensi Singkat {#quick-reference}
 

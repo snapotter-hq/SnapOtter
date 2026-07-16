@@ -1,7 +1,7 @@
 ---
 description: "Handleiding voor beveiligingsverharding van SnapOtter. Containerbeveiliging, netwerkisolatie, Docker-secrets, Kubernetes-implementatie en compliance-artefacten."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: 2131ba905ef5
 ---
 

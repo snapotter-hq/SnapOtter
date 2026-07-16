@@ -16,6 +16,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 This single container runs everything it needs: with no `DATABASE_URL` set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It is the fastest way to try SnapOtter or self-host on a homelab. For production, run the [Docker Compose](#docker-compose) stack below, which keeps PostgreSQL and Redis in their own containers. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`.
 
+Installing on a Raspberry Pi, an old laptop, or a small VPS? See [Low-Resource Setups](/guide/low-resource) for a tuned walkthrough and what to expect from constrained hardware.
+
 You will be asked to change your password on first login.
 
 ::: tip Anonymous Product Analytics

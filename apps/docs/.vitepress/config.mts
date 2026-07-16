@@ -227,6 +227,7 @@ function buildBaseTheme() {
           { text: "What SnapOtter collects", link: "/guide/telemetry" },
           { text: "Supported Formats", link: "/guide/supported-formats" },
           { text: "Hardware requirements", link: "/guide/deployment#hardware-requirements" },
+          { text: "Low-resource setups", link: "/guide/low-resource" },
           { text: "Docker tags", link: "/guide/docker-tags" },
           { text: "Developer guide", link: "/guide/developer" },
           { text: "Translation guide", link: "/guide/translations" },

@@ -1,7 +1,7 @@
 ---
 description: "SnapOtter を Docker で本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare 向けのリバースプロキシ設定を扱います。"
 i18n_output_hash: 2b65cb4be9d1
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## ハードウェア要件 {#hardware-requirements}
 
 これらの数値は、NVIDIA RTX 4070 を搭載した最新の amd64 ワークステーションから Raspberry Pi に至るまで、さまざまなシステムでベンチマークを取ったものです。各システムでツールカタログ全体を実行し、Docker のリソース制限をスイープして実際の下限を見極めました。
+
+これらのティアの下限（Pi、古いラップトップ、2 GB の VPS）で運用していますか？[低リソース環境のセットアップ](/ja/guide/low-resource) は、これらの数値を調整済みの上限を備えた具体的な手順に落とし込んでいます。
 
 ### クイックリファレンス {#quick-reference}
 

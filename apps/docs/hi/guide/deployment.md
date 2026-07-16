@@ -1,7 +1,7 @@
 ---
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik, तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
 i18n_output_hash: 23f4f331a239
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Hardware Requirements {#hardware-requirements}
 
 ये संख्याएँ कई तरह के सिस्टमों पर किए गए बेंचमार्क से आती हैं, एक आधुनिक amd64 वर्कस्टेशन (NVIDIA RTX 4070 के साथ) से लेकर एक Raspberry Pi तक, जिनमें से हर एक पर पूरा टूल कैटलॉग चलाया गया और असली न्यूनतम सीमा खोजने के लिए Docker रिसोर्स लिमिट को स्वीप किया गया।
+
+इन टियरों के छोटे सिरे पर चला रहे हैं (कोई Pi, पुराना लैपटॉप, 2 GB VPS)? [कम संसाधन वाले सेटअप](/hi/guide/low-resource) इन संख्याओं को ट्यून की गई सीमाओं के साथ एक ठोस वॉकथ्रू में बदल देता है।
 
 ### Quick Reference {#quick-reference}
 

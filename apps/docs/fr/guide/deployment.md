@@ -1,7 +1,7 @@
 ---
 description: "Déployez SnapOtter en production avec Docker. Exigences matérielles, configuration GPU et configs de reverse proxy pour Nginx, Traefik et Cloudflare."
 i18n_output_hash: 61b221ad6255
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Exigences matérielles {#hardware-requirements}
 
 Ces chiffres proviennent de tests de performance sur toute une gamme de systèmes, d'un poste de travail amd64 moderne équipé d'une NVIDIA RTX 4070 jusqu'à un Raspberry Pi, en exécutant l'intégralité du catalogue d'outils sur chacun et en balayant les limites de ressources Docker pour trouver le plancher réel.
+
+Vous tournez au bas de ces niveaux (un Pi, un vieux portable, un VPS de 2 Go) ? [Configurations à ressources limitées](/fr/guide/low-resource) transforme ces chiffres en un pas à pas concret avec des plafonds ajustés.
 
 ### Référence rapide {#quick-reference}
 

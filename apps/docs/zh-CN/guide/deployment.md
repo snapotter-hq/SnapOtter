@@ -1,7 +1,7 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。涵盖硬件要求、GPU 配置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
 i18n_output_hash: 63267650bd5f
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## 硬件要求 {#hardware-requirements}
 
 这些数字来自一系列系统上的基准测试，从配备 NVIDIA RTX 4070 的现代 amd64 工作站到 Raspberry Pi，在每台设备上运行整个工具目录，并扫描 Docker 资源限制以找出真实的下限。
+
+运行在这些层级的低端（Pi、旧笔记本电脑、2 GB 的 VPS）？[低资源环境部署](/zh-CN/guide/low-resource)把这些数字变成一份带有调优上限的具体分步指南。
 
 ### 快速参考 {#quick-reference}
 

@@ -1,7 +1,7 @@
 ---
 description: "Installez SnapOtter avec Docker en une seule commande. Inclut la configuration Docker Compose, la construction depuis les sources et un aperçu complet des fonctionnalités."
 i18n_output_hash: 2c2f3f2e8ae1
-i18n_source_hash: 24724b5595b2
+i18n_source_hash: 68bf7f60b68d
 i18n_provenance: human
 ---
 
@@ -18,6 +18,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 Ce conteneur unique exécute tout ce dont il a besoin : sans `DATABASE_URL` défini, il démarre ses propres PostgreSQL et Redis sur l'interface de bouclage (mode embarqué) et conserve toutes les données dans le volume `SnapOtter-data`. C'est le moyen le plus rapide d'essayer SnapOtter ou de l'auto-héberger sur un homelab. Pour la production, exécutez la pile [Docker Compose](#docker-compose) ci-dessous, qui garde PostgreSQL et Redis dans leurs propres conteneurs. Le mode embarqué s'exécute en root (le défaut) et se désactive automatiquement dès que vous définissez `DATABASE_URL`.
+
+Vous installez sur un Raspberry Pi, un vieux portable ou un petit VPS ? Consultez [Configurations à ressources limitées](/fr/guide/low-resource) pour un guide pas à pas adapté et savoir à quoi vous attendre sur du matériel contraint.
 
 Il vous sera demandé de changer votre mot de passe à la première connexion.
 

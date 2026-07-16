@@ -1,7 +1,7 @@
 ---
 description: "SnapOtter 보안 강화 가이드. 컨테이너 보안, 네트워크 격리, Docker 시크릿, Kubernetes 배포, 컴플라이언스 산출물."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: 6386fbda69b4
 ---
 

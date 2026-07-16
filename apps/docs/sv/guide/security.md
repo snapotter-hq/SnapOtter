@@ -1,7 +1,7 @@
 ---
 description: "Guide för säkerhetshärdning för SnapOtter. Containersäkerhet, nätverksisolering, Docker-hemligheter, Kubernetes-distribution och efterlevnadsartefakter."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: a8e16c353a09
 ---
 

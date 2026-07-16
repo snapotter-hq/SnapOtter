@@ -1,7 +1,7 @@
 ---
 description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secret, triển khai Kubernetes, và các tài liệu tuân thủ."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: 3eec3ab8360c
 ---
 
