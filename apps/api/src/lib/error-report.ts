@@ -39,6 +39,8 @@ export interface ReportContext {
   inputFormat?: string;
   /** BullMQ job id, so the event cross-references the jobs DB row and logs. */
   jobId?: string;
+  /** Tool settings; a vetted (PII-safe) projection is attached for bug events. */
+  settings?: unknown;
 }
 
 export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
@@ -114,6 +116,33 @@ export function safeFormatTag(filename?: string): string | undefined {
   return m ? m[1].toLowerCase() : undefined;
 }
 
+// Setting keys whose values can carry user data (filenames, free text, secrets)
+// even when short, and which must never reach the Sentry `tool` context.
+const UNSAFE_SETTING_KEY =
+  /pass|secret|token|credential|auth|file|name|path|url|email|user|title|text|label|query|prompt|message|caption|content|watermark/i;
+const SAFE_ENUM_VALUE = /^[A-Za-z0-9_.-]{1,32}$/;
+
+/**
+ * A privacy-safe projection of tool settings for the Sentry `tool` context, so
+ * a bug-class event carries the knobs that triggered it (format, quality, mode,
+ * ...) without ever including filenames, free text, or secrets. Keeps only
+ * numbers, booleans, and short enum-like strings under non-sensitive keys;
+ * drops objects, arrays, and long strings entirely. Returns undefined when
+ * nothing safe survives.
+ */
+export function vetSettings(
+  settings: unknown,
+): Record<string, string | number | boolean> | undefined {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return undefined;
+  const out: Record<string, string | number | boolean> = {};
+  for (const [k, v] of Object.entries(settings as Record<string, unknown>)) {
+    if (UNSAFE_SETTING_KEY.test(k)) continue;
+    if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+    else if (typeof v === "string" && SAFE_ENUM_VALUE.test(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Fire-and-forget; never throws, never blocks. */
 export async function reportError(err: unknown, ctx: ReportContext): Promise<void> {
   try {
@@ -147,6 +176,12 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
         // as 5 issues). bug-class errors keep default per-frame grouping, where
         // distinct frames usually are distinct bugs.
         scope.setFingerprint(["operational", code ?? (err as { name?: string }).name ?? "op"]);
+      }
+      if (cls === "bug" && ctx.settings !== undefined) {
+        // Attach the knobs that triggered a bug (format, quality, mode, ...) so
+        // it is reproducible, without leaking filenames, free text, or secrets.
+        const vetted = vetSettings(ctx.settings);
+        if (vetted) scope.setContext("tool", vetted);
       }
       Sentry.captureException(err instanceof Error ? err : new Error(String(err)));
     });

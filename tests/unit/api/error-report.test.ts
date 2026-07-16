@@ -6,6 +6,7 @@ import {
   resetThrottleForTests,
   safeFormatTag,
   shouldReport,
+  vetSettings,
 } from "../../../apps/api/src/lib/error-report.js";
 
 describe("safeFormatTag", () => {
@@ -130,5 +131,39 @@ describe("errorSignature", () => {
   it("degrades gracefully without stack or code", () => {
     expect(errorSignature(new TypeError("t"))).toMatch(/^TypeError:-:/);
     expect(errorSignature(null)).toBe("Unknown:-:-");
+  });
+});
+
+describe("vetSettings", () => {
+  it("keeps numbers, booleans, and short enum-like string values", () => {
+    expect(vetSettings({ quality: 80, lossless: true, format: "png", fit: "cover" })).toEqual({
+      quality: 80,
+      lossless: true,
+      format: "png",
+      fit: "cover",
+    });
+  });
+  it("drops sensitive keys, free-text/PII-shaped values, objects and arrays", () => {
+    // A password, a filename, and watermark text must never reach Sentry; nested
+    // objects/arrays and long strings can carry user data, so drop them too.
+    expect(
+      vetSettings({
+        password: "hunter2",
+        filename: "IMG_1234.png",
+        watermarkText: "Property of Jane",
+        crop: { x: 1, y: 2 },
+        sizes: [1, 2, 3],
+        width: 1024,
+        format: "webp",
+      }),
+    ).toEqual({ width: 1024, format: "webp" });
+  });
+  it("returns undefined for non-objects and when nothing safe survives", () => {
+    expect(vetSettings(undefined)).toBeUndefined();
+    expect(vetSettings("nope")).toBeUndefined();
+    expect(vetSettings([1, 2])).toBeUndefined();
+    expect(
+      vetSettings({ note: "a long free-text field well beyond the safe length" }),
+    ).toBeUndefined();
   });
 });

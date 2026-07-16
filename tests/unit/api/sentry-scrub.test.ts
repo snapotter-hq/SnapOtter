@@ -108,6 +108,15 @@ describe("buildBeforeSend (api)", () => {
     expect(out.tags.instance_id).toBe("i1");
     expect(out.tags.secret_tag).toBeUndefined();
   });
+  it("keeps a vetted tool context (primitives) and drops non-primitive fields", () => {
+    const out = send(
+      evt({
+        contexts: { tool: { format: "png", quality: 80, blob: { x: 1 }, long: "x".repeat(40) } },
+      }),
+      {},
+    )!;
+    expect(out.contexts.tool).toEqual({ format: "png", quality: 80 });
+  });
   it("drops contexts entirely when nothing allowlisted survives", () => {
     const out = send(evt({ contexts: { device: { hostname: "leak" } } }), {})!;
     expect(out.contexts).toBeUndefined();

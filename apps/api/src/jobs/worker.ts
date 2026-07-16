@@ -1050,6 +1050,7 @@ export function startWorkers(): void {
         toolId: (job.data as ToolJobData | undefined)?.toolId,
         jobId: job.id,
         inputFormat: safeFormatTag((job.data as ToolJobData | undefined)?.filename),
+        settings: (job.data as ToolJobData | undefined)?.settings,
       });
     });
 

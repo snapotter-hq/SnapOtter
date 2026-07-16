@@ -104,6 +104,17 @@ export function buildBeforeSend(isActive: () => boolean) {
     if (os?.name) keep.os = { name: os.name, version: os.version };
     const runtime = asObj(ctx?.runtime);
     if (runtime?.name) keep.runtime = { name: runtime.name, version: runtime.version };
+    // The `tool` context is set only by reportError from an already-vetted
+    // settings projection; re-enforce primitives-only here as a final boundary.
+    const tool = asObj(ctx?.tool);
+    if (tool) {
+      const safe: AnyEvent = {};
+      for (const [k, v] of Object.entries(tool)) {
+        if (typeof v === "number" || typeof v === "boolean") safe[k] = v;
+        else if (typeof v === "string" && v.length <= 32) safe[k] = v;
+      }
+      if (Object.keys(safe).length) keep.tool = safe;
+    }
     event.contexts = Object.keys(keep).length ? keep : undefined;
 
     const tags = asObj(event.tags);

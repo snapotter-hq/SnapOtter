@@ -15,7 +15,12 @@ import {
 } from "../../../apps/api/src/lib/error-report.js";
 
 const h = vi.hoisted(() => {
-  const scope = { setTag: vi.fn(), setLevel: vi.fn(), setFingerprint: vi.fn() };
+  const scope = {
+    setTag: vi.fn(),
+    setLevel: vi.fn(),
+    setFingerprint: vi.fn(),
+    setContext: vi.fn(),
+  };
   const globalScope = { setTag: vi.fn() };
   return {
     scope,
@@ -105,6 +110,21 @@ describe("capture path", () => {
       pool: "image",
     });
     expect(h.scope.setFingerprint).not.toHaveBeenCalled();
+  });
+
+  it("attaches a vetted tool context for bug-class events to aid reproduction", async () => {
+    await reportError(new Error("boom"), {
+      source: "worker",
+      pool: "image",
+      settings: { format: "png", quality: 80, filename: "my secret vacation.png" },
+    });
+    expect(h.scope.setContext).toHaveBeenCalledWith("tool", { format: "png", quality: 80 });
+  });
+
+  it("does not attach a settings context for non-bug errors", async () => {
+    const full = Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    await reportError(full, { source: "worker", pool: "image", settings: { format: "png" } });
+    expect(h.scope.setContext).not.toHaveBeenCalled();
   });
 });
 
