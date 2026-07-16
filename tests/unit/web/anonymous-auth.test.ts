@@ -131,6 +131,57 @@ describe("useAuth anonymous happy path", () => {
   });
 });
 
+describe("useAuth totpEnabled", () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.resetModules();
+  });
+
+  it("reflects session.user.totpEnabled when authenticated", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ authEnabled: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: { role: "admin", permissions: [], totpEnabled: true },
+        }),
+      });
+
+    const { renderHook, act } = await import("@testing-library/react");
+    const { useAuth } = await import("@/hooks/use-auth");
+
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {});
+
+    expect(result.current.totpEnabled).toBe(true);
+  });
+
+  it("defaults to false when the session omits totpEnabled", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ authEnabled: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: { role: "admin", permissions: [] } }),
+      });
+
+    const { renderHook, act } = await import("@testing-library/react");
+    const { useAuth } = await import("@/hooks/use-auth");
+
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {});
+
+    expect(result.current.totpEnabled).toBe(false);
+  });
+});
+
 describe("useAuth hasPermission", () => {
   beforeEach(() => {
     fetchMock.mockReset();

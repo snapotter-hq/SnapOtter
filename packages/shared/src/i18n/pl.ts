@@ -3305,6 +3305,29 @@ export const pl: TranslationKeys = {
       changePasswordButton: "Zmień hasło",
       loginAttemptLimitNote:
         "Limity prób logowania można skonfigurować w Ustawieniach systemowych.",
+      twoFactorHeading: "Uwierzytelnianie dwuskładnikowe",
+      twoFactorDescription:
+        "Zwiększ bezpieczeństwo konta o dodatkową warstwę dzięki aplikacji uwierzytelniającej.",
+      twoFactorEnabledStatus: "Uwierzytelnianie dwuskładnikowe jest włączone.",
+      twoFactorDisabledStatus: "Uwierzytelnianie dwuskładnikowe jest wyłączone.",
+      enableTwoFactorButton: "Włącz uwierzytelnianie dwuskładnikowe",
+      disableTwoFactorButton: "Wyłącz uwierzytelnianie dwuskładnikowe",
+      twoFactorScanQr:
+        "Zeskanuj ten kod QR aplikacją uwierzytelniającą (np. Google Authenticator, Authy lub 1Password).",
+      twoFactorManualEntry: "Nie możesz zeskanować kodu? Wprowadź ten klucz ręcznie:",
+      twoFactorRecoveryCodesHeading: "Kody odzyskiwania",
+      twoFactorRecoveryCodesDescription:
+        "Zapisz te kody w bezpiecznym miejscu. Każdego z nich można użyć jednorazowo do zalogowania się, jeśli utracisz dostęp do aplikacji uwierzytelniającej.",
+      twoFactorCopyRecoveryCodes: "Kopiuj kody",
+      twoFactorCodesCopied: "Skopiowano",
+      twoFactorEnterCode: "Wprowadź 6-cyfrowy kod z aplikacji, aby potwierdzić konfigurację.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Potwierdź i włącz",
+      twoFactorCancelButton: "Anuluj",
+      twoFactorEnableSuccess: "Uwierzytelnianie dwuskładnikowe jest teraz włączone.",
+      twoFactorDisableSuccess: "Uwierzytelnianie dwuskładnikowe zostało wyłączone.",
+      twoFactorDisablePrompt:
+        "Wprowadź bieżący kod z aplikacji uwierzytelniającej, aby wyłączyć uwierzytelnianie dwuskładnikowe.",
       adminHeading: "Ustawienia zabezpieczeń administratora",
       adminDescription:
         "Ustawienia polityki bezpieczeństwa dla organizacji. Dotyczą wszystkich użytkowników.",

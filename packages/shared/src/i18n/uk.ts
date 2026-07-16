@@ -3300,6 +3300,29 @@ export const uk: TranslationKeys = {
       currentPasswordIncorrect: "Поточний пароль невірний",
       changePasswordButton: "Змінити пароль",
       loginAttemptLimitNote: "Ліміти спроб входу можна налаштувати в Системних налаштуваннях.",
+      twoFactorHeading: "Двофакторна автентифікація",
+      twoFactorDescription:
+        "Додайте додатковий рівень захисту облікового запису за допомогою застосунку-автентифікатора.",
+      twoFactorEnabledStatus: "Двофакторну автентифікацію ввімкнено.",
+      twoFactorDisabledStatus: "Двофакторну автентифікацію не ввімкнено.",
+      enableTwoFactorButton: "Увімкнути двофакторну автентифікацію",
+      disableTwoFactorButton: "Вимкнути двофакторну автентифікацію",
+      twoFactorScanQr:
+        "Відскануйте цей QR-код застосунком-автентифікатором (наприклад, Google Authenticator, Authy чи 1Password).",
+      twoFactorManualEntry: "Не вдається відсканувати код? Введіть цей ключ вручну:",
+      twoFactorRecoveryCodesHeading: "Коди відновлення",
+      twoFactorRecoveryCodesDescription:
+        "Збережіть ці коди в надійному місці. Кожен із них можна використати один раз для входу, якщо ви втратите доступ до застосунку-автентифікатора.",
+      twoFactorCopyRecoveryCodes: "Копіювати коди",
+      twoFactorCodesCopied: "Скопійовано",
+      twoFactorEnterCode: "Введіть 6-значний код із застосунку, щоб підтвердити налаштування.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Підтвердити та ввімкнути",
+      twoFactorCancelButton: "Скасувати",
+      twoFactorEnableSuccess: "Двофакторну автентифікацію ввімкнено.",
+      twoFactorDisableSuccess: "Двофакторну автентифікацію вимкнено.",
+      twoFactorDisablePrompt:
+        "Введіть поточний код автентифікатора, щоб вимкнути двофакторну автентифікацію.",
       adminHeading: "Налаштування безпеки адміністратора",
       adminDescription:
         "Корпоративні налаштування політики безпеки. Застосовуються до всіх користувачів.",

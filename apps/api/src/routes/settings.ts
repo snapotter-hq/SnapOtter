@@ -139,6 +139,25 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Enforcing MFA requires a way to actually enroll, which is gated behind
+      // the "mfa" enterprise feature. Letting this save through on an unlicensed
+      // instance creates a login rule nobody can satisfy (snapotter-hq/SnapOtter#515).
+      if (key === "mfaPolicy" && (strValue === "admins_only" || strValue === "required")) {
+        let mfaLicensed = false;
+        try {
+          const { isFeatureEnabled } = await import("@snapotter/enterprise");
+          mfaLicensed = isFeatureEnabled("mfa");
+        } catch {
+          // Enterprise package not available
+        }
+        if (!mfaLicensed) {
+          return reply.status(403).send({
+            error: "MFA requires an enterprise license",
+            code: "FEATURE_NOT_LICENSED",
+          });
+        }
+      }
+
       entries.push({ key, strValue });
     }
 

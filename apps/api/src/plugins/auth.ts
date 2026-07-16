@@ -590,6 +590,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         email: user.email ?? null,
         hasLocalPassword: !!user.passwordHash,
         hasOidcLink: !!user.externalId,
+        totpEnabled: user.totpEnabled,
       },
       expiresAt: session.expiresAt.toISOString(),
     });

@@ -3293,6 +3293,30 @@ export const es: TranslationKeys = {
       changePasswordButton: "Cambiar contraseña",
       loginAttemptLimitNote:
         "Los límites de intentos de inicio de sesión se pueden configurar en Configuración del sistema.",
+      twoFactorHeading: "Autenticación en dos pasos",
+      twoFactorDescription:
+        "Añade una capa extra de seguridad a tu cuenta con una app de autenticación.",
+      twoFactorEnabledStatus: "La autenticación en dos pasos está activada.",
+      twoFactorDisabledStatus: "La autenticación en dos pasos no está activada.",
+      enableTwoFactorButton: "Activar la autenticación en dos pasos",
+      disableTwoFactorButton: "Desactivar la autenticación en dos pasos",
+      twoFactorScanQr:
+        "Escanea este código QR con tu app de autenticación (como Google Authenticator, Authy o 1Password).",
+      twoFactorManualEntry: "¿No puedes escanear el código? Introduce esta clave manualmente:",
+      twoFactorRecoveryCodesHeading: "Códigos de recuperación",
+      twoFactorRecoveryCodesDescription:
+        "Guarda estos códigos en un lugar seguro. Cada uno se puede usar una vez para iniciar sesión si pierdes el acceso a tu app de autenticación.",
+      twoFactorCopyRecoveryCodes: "Copiar códigos",
+      twoFactorCodesCopied: "Copiado",
+      twoFactorEnterCode:
+        "Introduce el código de 6 dígitos de tu app para confirmar la configuración.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Confirmar y activar",
+      twoFactorCancelButton: "Cancelar",
+      twoFactorEnableSuccess: "La autenticación en dos pasos ya está activada.",
+      twoFactorDisableSuccess: "La autenticación en dos pasos se ha desactivado.",
+      twoFactorDisablePrompt:
+        "Introduce tu código de autenticación actual para desactivar la autenticación en dos pasos.",
       adminHeading: "Configuración de seguridad del administrador",
       adminDescription:
         "Configuración de políticas de seguridad empresarial. Se aplica a todos los usuarios.",

@@ -3308,6 +3308,31 @@ export const it: TranslationKeys = {
       changePasswordButton: "Cambia password",
       loginAttemptLimitNote:
         "I limiti dei tentativi di accesso possono essere configurati nelle Impostazioni di sistema.",
+      twoFactorHeading: "Autenticazione a due fattori",
+      twoFactorDescription:
+        "Aggiungi un ulteriore livello di sicurezza al tuo account con un'app di autenticazione.",
+      twoFactorEnabledStatus: "L'autenticazione a due fattori è attiva.",
+      twoFactorDisabledStatus: "L'autenticazione a due fattori non è attiva.",
+      enableTwoFactorButton: "Attiva l'autenticazione a due fattori",
+      disableTwoFactorButton: "Disattiva l'autenticazione a due fattori",
+      twoFactorScanQr:
+        "Scansiona questo codice QR con la tua app di autenticazione (come Google Authenticator, Authy o 1Password).",
+      twoFactorManualEntry:
+        "Non riesci a scansionare il codice? Inserisci questa chiave manualmente:",
+      twoFactorRecoveryCodesHeading: "Codici di recupero",
+      twoFactorRecoveryCodesDescription:
+        "Conserva questi codici in un luogo sicuro. Ognuno può essere usato una sola volta per accedere se perdi l'accesso alla tua app di autenticazione.",
+      twoFactorCopyRecoveryCodes: "Copia codici",
+      twoFactorCodesCopied: "Copiati",
+      twoFactorEnterCode:
+        "Inserisci il codice a 6 cifre della tua app per confermare la configurazione.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Conferma e attiva",
+      twoFactorCancelButton: "Annulla",
+      twoFactorEnableSuccess: "L'autenticazione a due fattori è ora attiva.",
+      twoFactorDisableSuccess: "L'autenticazione a due fattori è stata disattivata.",
+      twoFactorDisablePrompt:
+        "Inserisci il codice attuale della tua app di autenticazione per disattivare l'autenticazione a due fattori.",
       adminHeading: "Impostazioni di sicurezza amministratore",
       adminDescription:
         "Impostazioni delle policy di sicurezza aziendale. Si applicano a tutti gli utenti.",

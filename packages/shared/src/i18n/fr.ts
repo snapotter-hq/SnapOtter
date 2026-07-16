@@ -3319,6 +3319,30 @@ export const fr: TranslationKeys = {
       changePasswordButton: "Changer le mot de passe",
       loginAttemptLimitNote:
         "Les limites de tentatives de connexion peuvent être configurées dans les Paramètres système.",
+      twoFactorHeading: "Authentification à deux facteurs",
+      twoFactorDescription:
+        "Ajoutez une couche de sécurité supplémentaire à votre compte avec une application d'authentification.",
+      twoFactorEnabledStatus: "L'authentification à deux facteurs est activée.",
+      twoFactorDisabledStatus: "L'authentification à deux facteurs n'est pas activée.",
+      enableTwoFactorButton: "Activer l'authentification à deux facteurs",
+      disableTwoFactorButton: "Désactiver l'authentification à deux facteurs",
+      twoFactorScanQr:
+        "Scannez ce QR code avec votre application d'authentification (par exemple Google Authenticator, Authy ou 1Password).",
+      twoFactorManualEntry: "Impossible de scanner le code ? Saisissez cette clé manuellement :",
+      twoFactorRecoveryCodesHeading: "Codes de récupération",
+      twoFactorRecoveryCodesDescription:
+        "Conservez ces codes en lieu sûr. Chacun peut servir une fois à vous connecter si vous perdez l'accès à votre application d'authentification.",
+      twoFactorCopyRecoveryCodes: "Copier les codes",
+      twoFactorCodesCopied: "Copié",
+      twoFactorEnterCode:
+        "Saisissez le code à 6 chiffres de votre application pour confirmer la configuration.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Confirmer et activer",
+      twoFactorCancelButton: "Annuler",
+      twoFactorEnableSuccess: "L'authentification à deux facteurs est maintenant activée.",
+      twoFactorDisableSuccess: "L'authentification à deux facteurs a été désactivée.",
+      twoFactorDisablePrompt:
+        "Saisissez votre code d'authentification actuel pour désactiver l'authentification à deux facteurs.",
       adminHeading: "Paramètres de sécurité admin",
       adminDescription:
         "Paramètres de politique de sécurité entreprise. S'appliquent à tous les utilisateurs.",

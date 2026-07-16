@@ -168,7 +168,12 @@ export function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
-        setError(t.auth.invalidCredentials);
+        const failure = await res.json().catch(() => null);
+        setError(
+          failure?.code === "MFA_ENROLLMENT_REQUIRED"
+            ? t.auth.mfaEnrollmentRequired
+            : t.auth.invalidCredentials,
+        );
         return;
       }
       const data = await res.json();

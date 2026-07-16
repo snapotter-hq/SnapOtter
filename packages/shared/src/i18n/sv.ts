@@ -3297,6 +3297,30 @@ export const sv: TranslationKeys = {
       currentPasswordIncorrect: "Nuvarande lösenord är felaktigt",
       changePasswordButton: "Byt lösenord",
       loginAttemptLimitNote: "Inloggningsförsöksgränser kan konfigureras i Systeminställningar.",
+      twoFactorHeading: "Tvåfaktorsautentisering",
+      twoFactorDescription:
+        "Lägg till ett extra säkerhetslager på ditt konto med en autentiseringsapp.",
+      twoFactorEnabledStatus: "Tvåfaktorsautentisering är aktiverad.",
+      twoFactorDisabledStatus: "Tvåfaktorsautentisering är inte aktiverad.",
+      enableTwoFactorButton: "Aktivera tvåfaktorsautentisering",
+      disableTwoFactorButton: "Inaktivera tvåfaktorsautentisering",
+      twoFactorScanQr:
+        "Skanna den här QR-koden med din autentiseringsapp (till exempel Google Authenticator, Authy eller 1Password).",
+      twoFactorManualEntry: "Kan du inte skanna koden? Ange den här nyckeln manuellt:",
+      twoFactorRecoveryCodesHeading: "Återställningskoder",
+      twoFactorRecoveryCodesDescription:
+        "Spara de här koderna på ett säkert ställe. Var och en kan användas en gång för att logga in om du förlorar åtkomsten till din autentiseringsapp.",
+      twoFactorCopyRecoveryCodes: "Kopiera koder",
+      twoFactorCodesCopied: "Kopierat",
+      twoFactorEnterCode:
+        "Ange den 6-siffriga koden från din app för att bekräfta konfigurationen.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Bekräfta och aktivera",
+      twoFactorCancelButton: "Avbryt",
+      twoFactorEnableSuccess: "Tvåfaktorsautentisering är nu aktiverad.",
+      twoFactorDisableSuccess: "Tvåfaktorsautentisering har inaktiverats.",
+      twoFactorDisablePrompt:
+        "Ange din nuvarande autentiseringskod för att inaktivera tvåfaktorsautentisering.",
       adminHeading: "Säkerhetsinställningar för admin",
       adminDescription: "Säkerhetspolicyinställningar för företag. Gäller alla användare.",
       sessionIdleTimeout: "Tidsgräns för inaktiv session (minuter)",

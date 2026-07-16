@@ -45,6 +45,7 @@ import { OtterLogo } from "../common/otter-logo";
 import { AdminInstallFeedbackCard } from "../feedback/admin-install-feedback-card";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
 import { AiFeaturesSection } from "./ai-features-section";
+import { TwoFactorSettings } from "./two-factor-settings";
 import { UsageSection } from "./usage-section";
 
 interface SettingsDialogProps {
@@ -1068,12 +1069,14 @@ function SecuritySection() {
         <p className="text-sm text-muted-foreground">{t.settings.security.loginAttemptLimitNote}</p>
       </div>
 
+      <TwoFactorSettings />
+
       {hasPermission("settings:write") && <AdminSecuritySettings />}
     </div>
   );
 }
 
-function AdminSecuritySettings() {
+export function AdminSecuritySettings() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<Record<string, string>>({});
   // Snapshot of the last server state; a save sends only the fields this tab changed
@@ -1082,7 +1085,7 @@ function AdminSecuritySettings() {
   const originalSettingsRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
@@ -1107,9 +1110,12 @@ function AdminSecuritySettings() {
         writableSettings(changedSettings(originalSettingsRef.current, settings)),
       );
       originalSettingsRef.current = { ...settings };
-      setSaveMsg(t.settings.security.securitySettingsSaved);
-    } catch {
-      setSaveMsg(t.settings.security.securitySettingsFailed);
+      setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
+    } catch (err) {
+      setSaveMsg({
+        type: "error",
+        text: err instanceof Error ? err.message : t.settings.security.securitySettingsFailed,
+      });
     } finally {
       setSaving(false);
       setTimeout(() => setSaveMsg(null), 3000);
@@ -1341,12 +1347,10 @@ function AdminSecuritySettings() {
           <span
             className={cn(
               "text-sm",
-              saveMsg === t.settings.security.securitySettingsFailed
-                ? "text-destructive"
-                : "text-green-600 dark:text-green-400",
+              saveMsg.type === "error" ? "text-destructive" : "text-green-600 dark:text-green-400",
             )}
           >
-            {saveMsg}
+            {saveMsg.text}
           </span>
         )}
       </div>

@@ -244,6 +244,47 @@ describe("POST /api/auth/users/:id/mfa/reset", () => {
   });
 });
 
+describe("GET /api/auth/session totpEnabled", () => {
+  afterEach(async () => {
+    await clearMfaState("admin");
+  });
+
+  it("is false when the user has not enrolled", async () => {
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.user.totpEnabled).toBe(false);
+  });
+
+  it("is true once the user has completed enrollment", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const code = generateTotpCode(uri);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code },
+    });
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const body = JSON.parse(res.body);
+    expect(body.user.totpEnabled).toBe(true);
+  });
+});
+
 describe("MFA login flow", () => {
   let totpUri: string;
 

@@ -3302,6 +3302,30 @@ export const ptBR: TranslationKeys = {
       changePasswordButton: "Alterar senha",
       loginAttemptLimitNote:
         "Os limites de tentativas de login podem ser configurados nas Configurações do sistema.",
+      twoFactorHeading: "Autenticação de dois fatores",
+      twoFactorDescription:
+        "Adicione uma camada extra de segurança à sua conta com um aplicativo autenticador.",
+      twoFactorEnabledStatus: "A autenticação de dois fatores está ativada.",
+      twoFactorDisabledStatus: "A autenticação de dois fatores não está ativada.",
+      enableTwoFactorButton: "Ativar autenticação de dois fatores",
+      disableTwoFactorButton: "Desativar autenticação de dois fatores",
+      twoFactorScanQr:
+        "Escaneie este código QR com seu aplicativo autenticador (como Google Authenticator, Authy ou 1Password).",
+      twoFactorManualEntry: "Não consegue escanear o código? Digite esta chave manualmente:",
+      twoFactorRecoveryCodesHeading: "Códigos de recuperação",
+      twoFactorRecoveryCodesDescription:
+        "Guarde estes códigos em um local seguro. Cada um pode ser usado uma vez para entrar caso você perca o acesso ao seu aplicativo autenticador.",
+      twoFactorCopyRecoveryCodes: "Copiar códigos",
+      twoFactorCodesCopied: "Copiado",
+      twoFactorEnterCode:
+        "Digite o código de 6 dígitos do seu aplicativo para confirmar a configuração.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Confirmar e ativar",
+      twoFactorCancelButton: "Cancelar",
+      twoFactorEnableSuccess: "A autenticação de dois fatores agora está ativada.",
+      twoFactorDisableSuccess: "A autenticação de dois fatores foi desativada.",
+      twoFactorDisablePrompt:
+        "Digite seu código de autenticação atual para desativar a autenticação de dois fatores.",
       adminHeading: "Configurações de segurança do administrador",
       adminDescription:
         "Configurações de política de segurança empresarial. Aplicam-se a todos os usuários.",

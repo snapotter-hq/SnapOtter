@@ -17,6 +17,7 @@ interface AuthState {
   ssoEnforced: boolean;
   loginMethod: string | null;
   hasLocalPassword: boolean;
+  totpEnabled: boolean;
 }
 
 const ANON_ADMIN_PERMISSIONS = [
@@ -52,6 +53,7 @@ export function useAuth() {
     ssoEnforced: false,
     loginMethod: null,
     hasLocalPassword: false,
+    totpEnabled: false,
   });
 
   useEffect(() => {
@@ -79,6 +81,7 @@ export function useAuth() {
               ssoEnforced: false,
               loginMethod: null,
               hasLocalPassword: false,
+              totpEnabled: false,
             });
           return;
         }
@@ -108,6 +111,7 @@ export function useAuth() {
               ssoEnforced: config.ssoEnforced ?? false,
               loginMethod: session.user?.loginMethod ?? null,
               hasLocalPassword: session.user?.hasLocalPassword ?? false,
+              totpEnabled: session.user?.totpEnabled === true,
             });
         } else {
           clearToken();
@@ -127,6 +131,7 @@ export function useAuth() {
               ssoEnforced: config.ssoEnforced ?? false,
               loginMethod: null,
               hasLocalPassword: false,
+              totpEnabled: false,
             });
         }
       } catch {

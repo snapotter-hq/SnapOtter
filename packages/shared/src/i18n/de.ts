@@ -3313,6 +3313,30 @@ export const de: TranslationKeys = {
       changePasswordButton: "Passwort ändern",
       loginAttemptLimitNote:
         "Anmeldeversuchslimits können in den Systemeinstellungen konfiguriert werden.",
+      twoFactorHeading: "Zwei-Faktor-Authentifizierung",
+      twoFactorDescription: "Schützen Sie Ihr Konto zusätzlich mit einer Authentifizierungs-App.",
+      twoFactorEnabledStatus: "Zwei-Faktor-Authentifizierung ist aktiviert.",
+      twoFactorDisabledStatus: "Zwei-Faktor-Authentifizierung ist nicht aktiviert.",
+      enableTwoFactorButton: "Zwei-Faktor-Authentifizierung aktivieren",
+      disableTwoFactorButton: "Zwei-Faktor-Authentifizierung deaktivieren",
+      twoFactorScanQr:
+        "Scannen Sie diesen QR-Code mit Ihrer Authentifizierungs-App (zum Beispiel Google Authenticator, Authy oder 1Password).",
+      twoFactorManualEntry:
+        "Code lässt sich nicht scannen? Geben Sie diesen Schlüssel manuell ein:",
+      twoFactorRecoveryCodesHeading: "Wiederherstellungscodes",
+      twoFactorRecoveryCodesDescription:
+        "Bewahren Sie diese Codes sicher auf. Jeder Code lässt sich einmal verwenden, um sich anzumelden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
+      twoFactorCopyRecoveryCodes: "Codes kopieren",
+      twoFactorCodesCopied: "Kopiert",
+      twoFactorEnterCode:
+        "Geben Sie den 6-stelligen Code aus Ihrer App ein, um die Einrichtung zu bestätigen.",
+      twoFactorCodePlaceholder: "000000",
+      twoFactorConfirmButton: "Bestätigen und aktivieren",
+      twoFactorCancelButton: "Abbrechen",
+      twoFactorEnableSuccess: "Zwei-Faktor-Authentifizierung ist jetzt aktiviert.",
+      twoFactorDisableSuccess: "Zwei-Faktor-Authentifizierung wurde deaktiviert.",
+      twoFactorDisablePrompt:
+        "Geben Sie Ihren aktuellen Code aus der Authentifizierungs-App ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.",
       adminHeading: "Admin-Sicherheitseinstellungen",
       adminDescription: "Enterprise-Sicherheitsrichtlinien. Diese gelten für alle Benutzer.",
       sessionIdleTimeout: "Sitzungszeitlimit bei Inaktivität (Minuten)",
