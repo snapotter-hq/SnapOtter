@@ -2,6 +2,7 @@
 import { useData } from "vitepress";
 import { computed, ref } from "vue";
 import { normalizeLocale, t } from "../i18n/ui.mjs";
+import { data as sectionCounts } from "./section-counts.data.ts";
 
 const { lang } = useData();
 const locale = computed(() => normalizeLocale(lang.value));
@@ -27,11 +28,11 @@ const entLinks = [
   { key: "home.link.complianceSbom", href: "/guide/security#compliance-artifacts" },
 ];
 const modalities = [
-  { key: "home.mod.image", count: 64, href: "/tools/image/resize" },
-  { key: "home.mod.video", count: 29, href: "/tools/video/convert-video" },
-  { key: "home.mod.audio", count: 17, href: "/tools/audio/convert-audio" },
-  { key: "home.mod.pdf", count: 37, href: "/tools/pdf/merge-pdf" },
-  { key: "home.mod.files", count: 10, href: "/tools/files/chart-maker" },
+  { key: "home.mod.image", count: sectionCounts.image, href: "/tools/image/resize" },
+  { key: "home.mod.video", count: sectionCounts.video, href: "/tools/video/convert-video" },
+  { key: "home.mod.audio", count: sectionCounts.audio, href: "/tools/audio/convert-audio" },
+  { key: "home.mod.pdf", count: sectionCounts.pdf, href: "/tools/pdf/merge-pdf" },
+  { key: "home.mod.files", count: sectionCounts.files, href: "/tools/files/chart-maker" },
 ];
 const shared = [
   { key: "home.card.restApi", subKey: "home.card.restApiSub", href: "/api/rest" },
