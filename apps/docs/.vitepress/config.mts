@@ -41,6 +41,73 @@ function localizeNav(items: any[], locale: string): any[] {
   });
 }
 
+// Structural sidebar labels -> UI-catalog key. Individual tool names (the
+// /tools/ leaves) are intentionally absent, so they stay in English; the
+// acronym-only guide labels (OIDC / SSO, SAML SSO) are absent for the same
+// reason. Reuses nav.* / home.mod.* / home.card.* keys where the label matches.
+const SIDEBAR_KEY: Record<string, string> = {
+  Guide: "nav.guide",
+  Tools: "nav.tools",
+  Image: "home.mod.image",
+  Video: "home.mod.video",
+  Audio: "home.mod.audio",
+  PDF: "home.mod.pdf",
+  Files: "home.mod.files",
+  Essentials: "sidebar.cat.essentials",
+  Optimization: "sidebar.cat.optimization",
+  Adjustments: "sidebar.cat.adjustments",
+  "Watermark & Overlay": "sidebar.cat.watermarkOverlay",
+  Utilities: "sidebar.cat.utilities",
+  Layout: "sidebar.cat.layout",
+  Format: "sidebar.cat.format",
+  "AI Tools": "sidebar.cat.aiTools",
+  "API reference": "sidebar.sec.apiReference",
+  Project: "sidebar.sec.project",
+  "REST API": "home.card.restApi",
+  "Image engine": "sidebar.page.imageEngine",
+  "AI engine": "sidebar.page.aiEngine",
+  Changelog: "nav.changelog",
+  "Getting started": "sidebar.guide.gettingStarted",
+  Architecture: "sidebar.guide.architecture",
+  Configuration: "sidebar.guide.configuration",
+  "SCIM Provisioning": "sidebar.guide.scimProvisioning",
+  "Users, Roles & Permissions": "sidebar.guide.usersRolesPermissions",
+  Database: "sidebar.guide.database",
+  "Upgrading from 1.x": "sidebar.guide.upgrading",
+  Deployment: "sidebar.guide.deployment",
+  "Security & Hardening": "sidebar.guide.securityHardening",
+  "What SnapOtter collects": "sidebar.guide.telemetry",
+  "Supported Formats": "sidebar.guide.supportedFormats",
+  "Hardware requirements": "sidebar.guide.hardware",
+  "Docker tags": "sidebar.guide.dockerTags",
+  "Developer guide": "sidebar.guide.developer",
+  "Translation guide": "sidebar.guide.translations",
+  Contributing: "sidebar.guide.contributing",
+};
+
+// Translate a locale's sidebar tree. Only "structural" nodes are eligible:
+// group headers (anything with child items) and non-tool doc pages (/guide/,
+// /api/, /changelog). Tool leaves (/tools/) never qualify, so a tool whose name
+// happens to collide with a structural label is still left in English.
+// biome-ignore lint/suspicious/noExplicitAny: VitePress sidebar item trees are recursively typed.
+function localizeSidebar(items: any[], locale: string): any[] {
+  return (items ?? []).map((it) => {
+    const next = { ...it };
+    const link = typeof next.link === "string" ? next.link : "";
+    const structural =
+      Array.isArray(next.items) ||
+      link.startsWith("/guide/") ||
+      link.startsWith("/api/") ||
+      link === "/changelog";
+    if (structural) {
+      const key = SIDEBAR_KEY[next.text];
+      if (key) next.text = t(locale, key);
+    }
+    if (Array.isArray(next.items)) next.items = localizeSidebar(next.items, locale);
+    return next;
+  });
+}
+
 export default defineConfig({
   title: "SnapOtter",
   description:
@@ -199,10 +266,10 @@ export default defineConfig({
           link: `/${l.code}/`,
           themeConfig: {
             nav: prefixLinks(localizeNav(buildBaseTheme().nav, l.code), l.code),
-            sidebar: prefixLinks(buildBaseTheme().sidebar, l.code),
+            sidebar: prefixLinks(localizeSidebar(buildBaseTheme().sidebar, l.code), l.code),
             editLink: {
               pattern: "https://github.com/snapotter-hq/snapotter/edit/main/apps/docs/:path",
-              text: "Edit this page on GitHub",
+              text: t(l.code, "sidebar.editLink"),
             },
           },
         },
