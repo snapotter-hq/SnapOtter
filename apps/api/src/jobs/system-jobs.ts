@@ -13,6 +13,7 @@ import type { Job } from "bullmq";
 import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
@@ -67,9 +68,85 @@ export async function enqueueSystemJob(name: string): Promise<void> {
   await q.add(name, {} as never);
 }
 
+// -- Cron monitors (canonical host only) --------------------------------------
+
+// Sentry cron monitors for the repeatable sweeps, so a silently-dead scheduler
+// (disks fill, audit rows never prune) is caught. OFF by default: only the
+// maintainers' canonical hosted instance sets SENTRY_CRON_MONITORS=1, because
+// thousands of self-hosted installs checking into one org's monitors would make
+// a "missed" signal meaningless. High-frequency pollers (siemForward,
+// alertEvaluator) and on-demand jobs (gdprExport) are intentionally excluded.
+type MonitorSchedule =
+  | { type: "crontab"; value: string }
+  | { type: "interval"; value: number; unit: "minute" | "hour" | "day" };
+
+interface MonitorConfig {
+  schedule: MonitorSchedule;
+  checkinMargin: number;
+  maxRuntime: number;
+}
+
+const MONITOR_CONFIG: Record<string, MonitorConfig> = {
+  [SYSTEM_JOBS.storageTtl]: {
+    schedule: {
+      type: "interval",
+      value: Math.max(1, env.CLEANUP_INTERVAL_MINUTES),
+      unit: "minute",
+    },
+    checkinMargin: 5,
+    maxRuntime: 20,
+  },
+  [SYSTEM_JOBS.sessionPurge]: {
+    schedule: { type: "interval", value: 1, unit: "hour" },
+    checkinMargin: 10,
+    maxRuntime: 5,
+  },
+  [SYSTEM_JOBS.retention]: {
+    schedule: { type: "interval", value: 6, unit: "hour" },
+    checkinMargin: 15,
+    maxRuntime: 30,
+  },
+  [SYSTEM_JOBS.auditArchive]: {
+    schedule: { type: "crontab", value: "0 2 1 * *" },
+    checkinMargin: 30,
+    maxRuntime: 60,
+  },
+  [SYSTEM_JOBS.storageReconciliation]: {
+    schedule: { type: "crontab", value: "0 3 * * 0" },
+    checkinMargin: 30,
+    maxRuntime: 60,
+  },
+};
+
+function cronMonitorsEnabled(): boolean {
+  const v = process.env.SENTRY_CRON_MONITORS;
+  return (v === "1" || v === "true") && analyticsEnabled();
+}
+
+async function withCronMonitor(name: string, fn: () => Promise<unknown>): Promise<unknown> {
+  const cfg = MONITOR_CONFIG[name];
+  if (!cfg || !cronMonitorsEnabled()) return fn();
+  try {
+    const Sentry = await import("@sentry/node");
+    // Monitor slugs cannot contain ":".
+    return await Sentry.withMonitor(
+      name.replace(/:/g, "-"),
+      fn,
+      cfg as Parameters<typeof Sentry.withMonitor>[2],
+    );
+  } catch {
+    // Monitoring must never break the actual job.
+    return fn();
+  }
+}
+
 // -- Dispatcher ---------------------------------------------------------------
 
 export async function runSystemJob(job: Job): Promise<unknown> {
+  return withCronMonitor(job.name, () => dispatchSystemJob(job));
+}
+
+async function dispatchSystemJob(job: Job): Promise<unknown> {
   switch (job.name) {
     case SYSTEM_JOBS.storageTtl:
       return storageTtlSweep();
