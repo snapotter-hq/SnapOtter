@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type {} from "@fastify/cookie";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as oidc from "openid-client";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
+import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { resolveExternalUser, sanitizeUsername } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
@@ -347,6 +349,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       });
 
       authAttempts.inc({ method: "oidc", result: "success" });
+      void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN, { method: "oidc" });
       await audit("OIDC_LOGIN_SUCCESS", {
         userId: resolvedUser.id,
         username: resolvedUser.username,

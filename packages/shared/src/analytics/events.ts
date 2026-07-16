@@ -21,6 +21,8 @@ export const ANALYTICS_EVENTS = {
   PIPELINE_STEP_ADDED: "pipeline_step_added",
   PIPELINE_SAVED: "pipeline_saved",
   PIPELINE_TEMPLATE_SELECTED: "pipeline_template_selected",
+  AUTH_LOGIN: "auth_login",
+  AUTH_LOGIN_FAILED: "auth_login_failed",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];

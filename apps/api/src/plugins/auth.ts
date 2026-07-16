@@ -1,11 +1,13 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
+import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { authAttempts } from "../lib/metrics.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
@@ -380,6 +382,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // response timing doesn't reveal whether the username exists.
         await verifyPassword(body.password, await getDummyHash());
         authAttempts.inc({ method: "password", result: "failure" });
+        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "unknown_user",
@@ -390,6 +393,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const valid = await verifyPassword(body.password, user.passwordHash);
       if (!valid) {
         authAttempts.inc({ method: "password", result: "failure" });
+        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "bad_password",
@@ -463,6 +467,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       authAttempts.inc({ method: "password", result: "success" });
+      void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN, { method: "password" });
       await audit("LOGIN_SUCCESS", { userId: user.id, username: user.username });
 
       const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
