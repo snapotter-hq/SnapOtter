@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -31,7 +32,7 @@ export function registerCsvExcel(app: FastifyInstance) {
         await workbook.xlsx.load(input.buffer as unknown as ArrayBuffer);
         const ws = workbook.worksheets[settings.sheet - 1];
         if (!ws) {
-          throw new Error(
+          throw new InputValidationError(
             `Worksheet ${settings.sheet} not found (workbook has ${workbook.worksheets.length} sheets)`,
           );
         }
@@ -59,7 +60,7 @@ export function registerCsvExcel(app: FastifyInstance) {
         skipEmptyLines: true,
       });
       if (parsed.errors.length > 0) {
-        throw new Error(`CSV parse failed: ${parsed.errors[0].message}`);
+        throw new InputValidationError(`CSV parse failed: ${parsed.errors[0].message}`);
       }
       const workbook = new ExcelJS.Workbook();
       const ws = workbook.addWorksheet("Sheet1");

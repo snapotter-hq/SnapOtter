@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -26,13 +27,15 @@ export function registerCsvJson(app: FastifyInstance) {
           data = JSON.parse(input.buffer.toString("utf8"));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          throw new Error(`Not valid JSON: ${msg.split("\n")[0]}`);
+          throw new InputValidationError(`Not valid JSON: ${msg.split("\n")[0]}`);
         }
         if (!Array.isArray(data)) {
-          throw new Error("JSON input must be an array of objects to convert to CSV");
+          throw new InputValidationError(
+            "JSON input must be an array of objects to convert to CSV",
+          );
         }
         if (data.some((r) => r === null || typeof r !== "object" || Array.isArray(r))) {
-          throw new Error("JSON array elements must be objects to convert to CSV");
+          throw new InputValidationError("JSON array elements must be objects to convert to CSV");
         }
         // Flatten nested objects/arrays to JSON strings (Papa would otherwise emit
         // "[object Object]"), and pass the union of all keys so columns appearing
@@ -58,7 +61,7 @@ export function registerCsvJson(app: FastifyInstance) {
         skipEmptyLines: true,
       });
       if (parsed.errors.length > 0) {
-        throw new Error(`CSV parse failed: ${parsed.errors[0].message}`);
+        throw new InputValidationError(`CSV parse failed: ${parsed.errors[0].message}`);
       }
       const json = JSON.stringify(parsed.data, null, settings.pretty ? 2 : 0);
       return {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { qpdfMerge } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
@@ -17,7 +18,7 @@ export function registerMergePdf(app: FastifyInstance) {
     },
     processV2: async (ctx) => {
       if (ctx.inputs.length < 2) {
-        throw new Error("Merging needs at least two PDFs");
+        throw new InputValidationError("Merging needs at least two PDFs");
       }
       ctx.report(10, "Staging");
       const paths: string[] = [];

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { markToolInputError } from "@snapotter/shared";
+import { markToolInputError, SafeError } from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 import { type FfmpegProgress, parseProgressBlock } from "./progress.js";
 
@@ -48,7 +48,7 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
     const timeoutMs = opts.timeoutMs;
     const timer = timeoutMs
       ? setTimeout(() => {
-          fail(new Error(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s`));
+          fail(new SafeError("ffmpeg timed out", { kind: "operational", code: "timeout" }));
         }, timeoutMs)
       : undefined;
     const onAbort = () => fail(new Error("Canceled"));

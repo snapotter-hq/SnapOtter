@@ -1,3 +1,4 @@
+import { ToolInputError } from "@snapotter/shared";
 import type { CropOptions, Sharp } from "../types.js";
 
 export async function crop(image: Sharp, options: CropOptions): Promise<Sharp> {
@@ -23,19 +24,19 @@ export async function crop(image: Sharp, options: CropOptions): Promise<Sharp> {
   }
 
   if (width <= 0 || height <= 0) {
-    throw new Error("Crop width and height must be greater than 0");
+    throw new ToolInputError("Crop width and height must be greater than 0");
   }
   if (left < 0 || top < 0) {
-    throw new Error("Crop left and top must be non-negative");
+    throw new ToolInputError("Crop left and top must be non-negative");
   }
 
   if (left + width > imgWidth) {
-    throw new Error(
+    throw new ToolInputError(
       `Crop region exceeds image width: left(${left}) + width(${width}) > ${imgWidth}`,
     );
   }
   if (top + height > imgHeight) {
-    throw new Error(
+    throw new ToolInputError(
       `Crop region exceeds image height: top(${top}) + height(${height}) > ${imgHeight}`,
     );
   }
