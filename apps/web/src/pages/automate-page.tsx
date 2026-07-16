@@ -1,4 +1,4 @@
-import { modalityForExtension, type PipelineTemplate } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, modalityForExtension, type PipelineTemplate } from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronDown,
@@ -69,6 +69,10 @@ function previewIcon(kind: string) {
 export function AutomatePage() {
   const { t } = useTranslation();
   usePageTitle(t.sidebar.automate);
+
+  useEffect(() => {
+    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.PIPELINE_OPENED, {}));
+  }, []);
   const {
     files,
     entries,
@@ -232,6 +236,9 @@ export function AutomatePage() {
         }),
       });
       if (res.ok) {
+        import("@/lib/analytics").then(({ track }) =>
+          track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
+        );
         const listRes = await fetch("/api/v1/pipeline/list", {
           headers: formatHeaders(),
         });
@@ -281,6 +288,9 @@ export function AutomatePage() {
   const handleUseTemplate = useCallback(
     (template: PipelineTemplate) => {
       loadSteps(template.steps);
+      import("@/lib/analytics").then(({ track }) =>
+        track(ANALYTICS_EVENTS.PIPELINE_TEMPLATE_SELECTED, { template_id: template.id }),
+      );
     },
     [loadSteps],
   );
@@ -412,6 +422,9 @@ export function AutomatePage() {
   const handleAddStep = useCallback(
     (toolId: string) => {
       addStep(toolId);
+      import("@/lib/analytics").then(({ track }) =>
+        track(ANALYTICS_EVENTS.PIPELINE_STEP_ADDED, { tool_id: toolId }),
+      );
       if (isMobile) setMobileToolPaletteOpen(false);
     },
     [addStep, isMobile],

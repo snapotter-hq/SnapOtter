@@ -1,6 +1,6 @@
 // apps/web/src/components/editor/common/export-dialog.tsx
 
-import { apiToolPath } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
 import {
   Check,
   ClipboardCopy,
@@ -158,6 +158,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   // Issue #6: Export using Konva stage.toDataURL for correct output
   const handleExport = useCallback(() => {
+    import("@/lib/analytics").then(({ track }) =>
+      track(ANALYTICS_EVENTS.EDITOR_EXPORTED, { output_format: settings.format }),
+    );
     const stage = editorStageRefHolder.current;
     if (!stage) return;
 

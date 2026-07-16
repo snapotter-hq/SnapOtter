@@ -1,5 +1,5 @@
 // apps/web/src/pages/editor-page.tsx
-import { apiToolPath } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
 import { Monitor } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
@@ -51,6 +51,10 @@ export function EditorPage() {
     onExport: () => setShowExport(true),
     onFillDialog: () => setFillDialogOpen(true),
   });
+
+  useEffect(() => {
+    import("@/lib/analytics").then(({ track }) => track(ANALYTICS_EVENTS.EDITOR_OPENED, {}));
+  }, []);
 
   // Listen for fill-dialog custom event (dispatched from Shift+Backspace shortcut)
   useEffect(() => {

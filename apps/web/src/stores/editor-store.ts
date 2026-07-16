@@ -1,5 +1,6 @@
 // apps/web/src/stores/editor-store.ts
 
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { temporal } from "zundo";
 import { create } from "zustand";
 import { generateId } from "@/lib/utils";
@@ -253,6 +254,13 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       setTool: (tool) => {
         const { activeTool, canvasSize, cropState } = get();
+        if (tool !== activeTool) {
+          // Which editor tools users actually engage (brush/shape/adjust/...);
+          // the single chokepoint, so UI clicks and keyboard shortcuts both count.
+          import("@/lib/analytics").then(({ track }) =>
+            track(ANALYTICS_EVENTS.EDITOR_TOOL_USED, { editor_tool: tool }),
+          );
+        }
         const leavingCrop = activeTool === "crop" && tool !== "crop";
         const enteringCrop = tool === "crop" && activeTool !== "crop";
         set({

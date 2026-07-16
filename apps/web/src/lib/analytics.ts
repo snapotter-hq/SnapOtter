@@ -17,6 +17,13 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   search: new Set(["results_count", "clicked_tool_id"]),
   ai_bundle_prompted: new Set(["bundle_id"]),
   batch_processed: new Set(["tool_id", "file_count", "status"]),
+  editor_opened: new Set<string>([]),
+  editor_tool_used: new Set(["editor_tool"]),
+  editor_exported: new Set(["output_format"]),
+  pipeline_opened: new Set<string>([]),
+  pipeline_step_added: new Set(["tool_id"]),
+  pipeline_saved: new Set(["step_count"]),
+  pipeline_template_selected: new Set(["template_id"]),
 };
 
 function sanitize(event: string, properties?: Record<string, unknown>): Record<string, unknown> {
