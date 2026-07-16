@@ -46,7 +46,11 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
         posthogJs.init(config.posthogApiKey, {
           api_host: config.posthogHost,
           autocapture: false,
-          capture_pageview: true,
+          // Fire $pageview on SPA history changes, not just the initial hard
+          // load, so react-router route changes (tool pages, editor, automate,
+          // files) are captured. capture_pageleave gives accurate time-on-page.
+          capture_pageview: "history_change",
+          capture_pageleave: true,
           disable_session_recording: true,
           ip: false,
           persistence: "localStorage",
@@ -68,8 +72,15 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
     } catch {
       // ignore
     }
-    // app_version only; no instance_id, so plain events stay person-less.
-    posthog.register({ app_version: (await import("@snapotter/shared")).APP_VERSION });
+    // Super properties on every event. instance_id is an event PROPERTY (not an
+    // identify() call), so events stay anonymous and person-less while enabling
+    // fleet rollups ("how many distinct instances use tool X") via a HogQL
+    // uniq(). Omitted when empty so we never register a blank value.
+    const superProps: Record<string, string> = {
+      app_version: (await import("@snapotter/shared")).APP_VERSION,
+    };
+    if (config.instanceId) superProps.instance_id = config.instanceId;
+    posthog.register(superProps);
   }
 
   try {
