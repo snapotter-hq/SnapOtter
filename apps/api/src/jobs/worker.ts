@@ -249,6 +249,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             "snapotter.tool_id": data.toolId,
             "snapotter.pool": data.pool,
             "snapotter.attempt_number": job.attemptsMade + 1,
+            // Standard messaging semantics so Sentry (when tracing is enabled)
+            // labels this as a queue-consumer span and the tracesSampler
+            // recognizes a real job execution vs a poll.
+            "messaging.system": "bullmq",
+            "messaging.destination.name": queueName(data.pool),
           },
         },
         parentCtx,

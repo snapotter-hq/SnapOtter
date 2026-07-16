@@ -34,7 +34,10 @@ export function buildTracesSampler(httpRate: number): (ctx: SamplingContext) => 
     // Any queue root span: only sample a real job execution we explicitly named
     // "job <name>" (see worker.ts); drop the continuous poll transactions.
     if (attrs["messaging.system"] !== undefined) {
-      return name.startsWith("job ") ? Math.min(httpRate, 0.2) : 0;
+      // Sample a real job execution (the worker's "job.process" span, or a
+      // "job <name>" span); drop the continuous BullMQ poll transactions.
+      const isJob = name === "job.process" || name.startsWith("job ");
+      return isJob ? Math.min(httpRate, 0.2) : 0;
     }
 
     // Never sample infra endpoints, even though they are real HTTP.

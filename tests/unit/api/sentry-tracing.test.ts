@@ -13,8 +13,11 @@ describe("buildTracesSampler (the July-incident guard)", () => {
     expect(sampler({ name: "pg", attributes: { "sentry.op": "db.redis" } })).toBe(0);
   });
 
-  it("drops queue poll transactions but samples real named job executions", () => {
+  it("drops queue poll transactions but samples real job executions", () => {
     expect(sampler({ name: "queue.poll", attributes: { "messaging.system": "bullmq" } })).toBe(0);
+    expect(
+      sampler({ name: "job.process", attributes: { "messaging.system": "bullmq" } }),
+    ).toBeGreaterThan(0);
     expect(
       sampler({ name: "job resize", attributes: { "messaging.system": "bullmq" } }),
     ).toBeGreaterThan(0);
