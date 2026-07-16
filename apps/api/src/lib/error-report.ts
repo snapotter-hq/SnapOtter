@@ -15,6 +15,7 @@ import {
   connectivityClass,
   extractErrorCode,
   isClientAbort,
+  isEnvironmentalDbError,
   isSafeMessageError,
   isToolInputError,
 } from "@snapotter/shared";
@@ -59,6 +60,7 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
   }
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
+  if (isEnvironmentalDbError(err)) return "operational";
   if (e?.code && OPERATIONAL_CODES.has(e.code)) return "operational";
   return "bug";
 }

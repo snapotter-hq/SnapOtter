@@ -146,6 +146,33 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
   }
 }
 
+// pg SQLSTATE classes that mean the deployment's database is misconfigured or
+// resource-starved (the operator's environment), not that our code is wrong:
+// class 28 (invalid authorization), 53 (insufficient resources), 57 (operator
+// intervention). 42501 is insufficient_privilege, the one access code in class
+// 42 (otherwise our query bugs). Connection loss (class 08 / 57P0x) is already
+// covered by connectivityClass; overlap here is harmless.
+const ENVIRONMENTAL_PG_CLASS = /^(28|53|57)/;
+
+/**
+ * True when the error chain carries a pg SQLSTATE indicating an environmental
+ * database problem (bad credentials, missing privilege, exhausted resources,
+ * operator shutdown) rather than a bug in our queries. Lets self-hosters' DB
+ * misconfiguration classify as operational instead of a code bug.
+ */
+export function isEnvironmentalDbError(err: unknown): boolean {
+  try {
+    return chain(err).some((l) => {
+      if (typeof l.code !== "string" || !SQLSTATE.test(l.code) || NODE_CODE.test(l.code)) {
+        return false;
+      }
+      return ENVIRONMENTAL_PG_CLASS.test(l.code) || l.code === "42501";
+    });
+  } catch {
+    return false;
+  }
+}
+
 /** Client went away mid-request; operational noise, never reported. */
 export function isClientAbort(err: unknown): boolean {
   try {

@@ -35,6 +35,29 @@ describe("classifyError", () => {
       "operational",
     );
   });
+  it("operational: environmental database errors (auth, permission, resources), not query bugs", () => {
+    // The deployment's DB is misconfigured or starved -- the operator's
+    // environment, not our code. These flooded the bug view as pg auth /
+    // permission failures from background sweeps (NODE-1G/1F/1D).
+    expect(
+      classifyError(Object.assign(new Error("password authentication failed"), { code: "28P01" })),
+    ).toBe("operational");
+    // drizzle wraps the pg error, so the SQLSTATE is on the cause, not the top level.
+    expect(
+      classifyError(
+        Object.assign(new Error("Failed query: DELETE FROM jobs"), {
+          cause: Object.assign(new Error("permission denied for relation jobs"), { code: "42501" }),
+        }),
+      ),
+    ).toBe("operational");
+    expect(
+      classifyError(Object.assign(new Error("no space left on device"), { code: "53100" })),
+    ).toBe("operational");
+    // A pg SYNTAX error is our query bug, not the environment -- must stay a bug.
+    expect(
+      classifyError(Object.assign(new Error("syntax error at or near"), { code: "42601" })),
+    ).toBe("bug");
+  });
   it("bug: everything else, including bug-kind SafeError and ReplyError", () => {
     expect(classifyError(new Error("undefined is not a function"))).toBe("bug");
     expect(classifyError(new SafeError("Impossible state", { kind: "bug" }))).toBe("bug");
