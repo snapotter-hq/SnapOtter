@@ -14,11 +14,6 @@ vi.mock("../../../packages/ai/src/bridge.js", () => ({
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { removeBackground } from "../../../packages/ai/src/background-removal.js";
 
-function causeMessage(err: unknown): string {
-  const cause = (err as { cause?: unknown }).cause;
-  return cause instanceof Error ? cause.message : String(cause ?? "");
-}
-
 let png: Buffer;
 beforeAll(async () => {
   png = await sharp({
@@ -46,10 +41,9 @@ describe("removeBackground error surfacing", () => {
     }
 
     expect(isSafeMessageError(caught)).toBe(true);
-    expect((caught as SafeError).message).toBe("Background removal failed");
+    // The specific sidecar reason is preserved as the message (and survives scrubbing).
+    expect((caught as SafeError).message).toBe("rembg model load failed");
     expect((caught as SafeError).kind).toBe("bug");
-    // The real reason is preserved in the cause (kept out of the scrubbed title).
-    expect(causeMessage(caught)).toContain("rembg model load failed");
     expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
   });
 
@@ -69,8 +63,7 @@ describe("removeBackground error surfacing", () => {
     // OOM detection still works: the fallback attempt fired (two sidecar calls).
     expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
     expect(isSafeMessageError(caught)).toBe(true);
-    expect((caught as SafeError).message).toBe("Background removal failed");
-    expect(causeMessage(caught)).toContain("still failing");
+    expect((caught as SafeError).message).toBe("still failing");
   });
 
   it("passes a bridge SafeError (e.g. timeout) through unchanged, not re-wrapped as a bug", async () => {

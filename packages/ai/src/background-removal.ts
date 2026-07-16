@@ -30,20 +30,17 @@ export function isMemoryAllocError(err: unknown): boolean {
 }
 
 /**
- * Wrap a background-removal failure in a SafeError so Sentry shows an authored
- * title ("Background removal failed") instead of a message the scrubber reduces
- * to "Error". The real reason (the sidecar's error string, which may include a
- * server temp path) stays in the cause, where the scrubber renders it type-only
- * for Sentry while local logs keep it. Errors we already author (the bridge's
- * SafeError timeout/OOM) pass through so their class is not masked.
+ * Wrap a background-removal failure in a SafeError so its message survives the
+ * API's Sentry scrubber, which otherwise reduces a plain Error to "Error:
+ * Error". The specific sidecar reason is kept as the message (callers and the
+ * existing tests rely on it, matching the ai-bridge behavior); an empty reason
+ * falls back to a constant. Errors we already author (the bridge's SafeError
+ * timeout/OOM) pass through unchanged so their kind is not masked.
  */
 function toBgRemovalError(reason: unknown): Error {
   if (isSafeMessageError(reason)) return reason;
-  const cause =
-    reason instanceof Error
-      ? reason
-      : new Error(String(reason ?? "") || "sidecar reported no error detail");
-  return new SafeError("Background removal failed", { kind: "bug", cause });
+  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  return new SafeError(message || "Background removal failed", { kind: "bug" });
 }
 
 export async function removeBackground(
