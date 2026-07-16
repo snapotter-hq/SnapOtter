@@ -161,11 +161,22 @@ describe.skipIf(!gsAvailable())("Document depth: compress-pdf multipage hero", (
       },
       body,
     });
-    expect(res.statusCode).toBe(200);
-    const envelope = JSON.parse(res.body);
-    expect(envelope.downloadUrl).toBeDefined();
+    // compress-pdf has executionHint "long": 202 + poll the durable job row.
+    expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
+    const { db, schema } = await import("../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    let row: { status: string; outputRefs: unknown } | undefined;
+    for (let i = 0; i < 120; i++) {
+      [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(row?.status).toBe("completed");
+    const completed = row as { status: string; outputRefs: string[] };
+    const outName = completed.outputRefs[0].split("/").pop() as string;
 
-    const payload = await download(envelope.downloadUrl);
+    const payload = await download(`/api/v1/download/${jobId}/${encodeURIComponent(outName)}`);
     // Valid PDF header
     expect(payload.subarray(0, 5).toString()).toBe("%PDF-");
     expect(payload.length).toBeGreaterThan(0);
