@@ -23,6 +23,8 @@ const TAG_ALLOWLIST = new Set([
   "subsystem",
   "status_code",
   "input_format",
+  "job_id",
+  "instance_id",
 ]);
 
 const URL_RE = /https?:\/\/[^\s"')]+/g;

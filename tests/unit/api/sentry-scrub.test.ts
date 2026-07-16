@@ -102,6 +102,12 @@ describe("buildBeforeSend (api)", () => {
     expect(out.tags.input_format).toBe("webp");
     expect(out.tags.secret_tag).toBeUndefined();
   });
+  it("keeps job_id and instance_id tags for cross-referencing and blast-radius triage", () => {
+    const out = send(evt({ tags: { job_id: "j1", instance_id: "i1", secret_tag: "x" } }), {})!;
+    expect(out.tags.job_id).toBe("j1");
+    expect(out.tags.instance_id).toBe("i1");
+    expect(out.tags.secret_tag).toBeUndefined();
+  });
   it("drops contexts entirely when nothing allowlisted survives", () => {
     const out = send(evt({ contexts: { device: { hostname: "leak" } } }), {})!;
     expect(out.contexts).toBeUndefined();

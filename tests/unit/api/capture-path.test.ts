@@ -8,20 +8,28 @@
  * and the throttle allows one capture per distinct signature.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { reportError, resetThrottleForTests } from "../../../apps/api/src/lib/error-report.js";
+import {
+  reportError,
+  resetThrottleForTests,
+  setSentryInstanceTag,
+} from "../../../apps/api/src/lib/error-report.js";
 
 const h = vi.hoisted(() => {
   const scope = { setTag: vi.fn(), setLevel: vi.fn(), setFingerprint: vi.fn() };
+  const globalScope = { setTag: vi.fn() };
   return {
     scope,
+    globalScope,
     captureException: vi.fn(),
     withScope: vi.fn((cb: (s: typeof scope) => unknown) => cb(scope)),
+    getGlobalScope: vi.fn(() => globalScope),
   };
 });
 
 vi.mock("@sentry/node", () => ({
   captureException: h.captureException,
   withScope: h.withScope,
+  getGlobalScope: h.getGlobalScope,
 }));
 
 vi.mock("../../../apps/api/src/lib/analytics-gate.js", () => ({
@@ -70,5 +78,44 @@ describe("capture path", () => {
     const denied = Object.assign(new Error("denied"), { code: "EACCES" });
     await reportError(denied, { source: "worker", pool: "image" });
     expect(h.captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it("tags job_id so the event cross-references the DB row, logs, and PostHog stream", async () => {
+    await reportError(new Error("boom"), { source: "worker", pool: "image", jobId: "job-abc" });
+    expect(h.scope.setTag).toHaveBeenCalledWith("job_id", "job-abc");
+  });
+
+  it("collapses operational errors to one issue per code via fingerprint", async () => {
+    const full = Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    await reportError(full, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenCalledWith(["operational", "ENOSPC"]);
+  });
+
+  it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
+    const pg = Object.assign(new Error("Failed query: select 1"), {
+      cause: Object.assign(new Error("57P01"), { code: "57P01" }),
+    });
+    await reportError(pg, { source: "worker", pool: "docs" });
+    expect(h.scope.setFingerprint).toHaveBeenCalledWith(["connectivity", "pg-unavailable"]);
+  });
+
+  it("leaves bug-class errors on default per-frame grouping (no fingerprint)", async () => {
+    await reportError(new Error("undefined is not a function"), {
+      source: "worker",
+      pool: "image",
+    });
+    expect(h.scope.setFingerprint).not.toHaveBeenCalled();
+  });
+});
+
+describe("setSentryInstanceTag", () => {
+  it("sets instance_id on the global scope so every event carries it", async () => {
+    await setSentryInstanceTag("inst-xyz");
+    expect(h.globalScope.setTag).toHaveBeenCalledWith("instance_id", "inst-xyz");
+  });
+
+  it("is a no-op on a falsy id and never throws", async () => {
+    await expect(setSentryInstanceTag("")).resolves.toBeUndefined();
+    expect(h.globalScope.setTag).not.toHaveBeenCalled();
   });
 });

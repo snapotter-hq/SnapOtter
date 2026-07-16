@@ -20,7 +20,7 @@ import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
-import { reportError } from "./lib/error-report.js";
+import { reportError, setSentryInstanceTag } from "./lib/error-report.js";
 import { stripInternalPaths } from "./lib/errors.js";
 import {
   acquireInstallLock,
@@ -180,17 +180,21 @@ if (env.AUTH_ENABLED) {
   await ensureAnonymousUser();
 }
 
-async function ensureInstanceId() {
+async function ensureInstanceId(): Promise<string> {
   const [existing] = await db
     .select()
     .from(schema.settings)
     .where(eq(schema.settings.key, "instance_id"));
-  if (!existing) {
-    await db.insert(schema.settings).values({ key: "instance_id", value: randomUUID() });
-  }
+  if (existing) return existing.value;
+  const value = randomUUID();
+  await db.insert(schema.settings).values({ key: "instance_id", value });
+  return value;
 }
 
-await ensureInstanceId();
+// Tag every Sentry event with the anonymized instance id so triage can tell one
+// broken install from the whole fleet, and cross-reference an event to the same
+// instance_id used by the PostHog server-side stream.
+await setSentryInstanceTag(await ensureInstanceId());
 
 async function ensureDefaultSettings() {
   const defaults: Record<string, string> = {

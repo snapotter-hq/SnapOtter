@@ -1016,6 +1016,7 @@ export function startWorkers(): void {
           source: "worker",
           pool,
           toolId: (job.data as ToolJobData | undefined)?.toolId,
+          jobId: job.id,
         });
       });
 
@@ -1047,6 +1048,7 @@ export function startWorkers(): void {
         source: "worker",
         pool,
         toolId: (job.data as ToolJobData | undefined)?.toolId,
+        jobId: job.id,
         inputFormat: safeFormatTag((job.data as ToolJobData | undefined)?.filename),
       });
     });
