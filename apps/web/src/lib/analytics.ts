@@ -55,6 +55,20 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
           ip: false,
           persistence: "localStorage",
           person_profiles: "identified_only",
+          // Last-line PII boundary at the SDK, independent of track()'s per-call
+          // sanitize(): strip any query string / fragment from URL properties.
+          // SnapOtter routes carry no PII, but pageview, survey, and other
+          // SDK-generated events never pass through track()'s allowlist, so the
+          // invariant is enforced here too.
+          before_send: (event) => {
+            const props = event?.properties;
+            if (props) {
+              const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
+              props.$current_url = strip(props.$current_url);
+              props.$referrer = strip(props.$referrer);
+            }
+            return event;
+          },
         }) ?? null;
       initialized = true;
       enabled = true;
