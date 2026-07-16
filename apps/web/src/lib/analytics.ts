@@ -1,4 +1,5 @@
 import type { AnalyticsConfig } from "@snapotter/shared";
+import { flushEarlyErrors } from "./early-errors";
 
 type PostHogInstance = import("posthog-js").PostHog;
 
@@ -132,6 +133,10 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   } catch (err) {
     console.warn("[analytics] Sentry init failed:", err);
   }
+
+  // Replay crashes captured before Sentry was ready (no-op if Sentry did not
+  // init, e.g. analytics disabled, so opt-out is respected).
+  if (enabled) void flushEarlyErrors();
 }
 
 /**
