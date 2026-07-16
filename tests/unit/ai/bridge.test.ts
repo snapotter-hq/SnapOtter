@@ -203,11 +203,16 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     mock.stderr.emit("data", Buffer.from("RuntimeError: model not found\n"));
     mock.emitEvent("close", 1, null);
 
-    const err = (await promise.catch((e: unknown) => e)) as Error & { isSafeMessage?: unknown };
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+    };
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toContain("RuntimeError: model not found");
-    // Variable python-derived text must stay a plain Error, never a SafeError
-    expect(err.isSafeMessage).toBeUndefined();
+    // The sidecar reason is wrapped in a SafeError so it survives the Sentry
+    // scrubber instead of showing as "Error: Error" (NODE-24).
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
   });
 
   it("rejects with OOM message on exit code 137 (SIGKILL)", async () => {
@@ -1585,7 +1590,7 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
     expect(err.code).toBe("exit-139");
   });
 
-  it("keeps extracted python text as a plain Error even on dispatcher exitCode 137", async () => {
+  it("classifies dispatcher exitCode 137 as an operational OOM SafeError", async () => {
     const mock = await setupReadyDispatcher();
 
     const promise = runPythonWithProgress("heavy.py", []);
@@ -1594,7 +1599,8 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
     const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
     const id = JSON.parse(line).id;
 
-    // Extractable error text takes precedence over the constant signal message
+    // 137 is an OS OOM kill: the operational message keeps "out of memory" so
+    // memory-aware callers retry, and it does not surface possibly-unrelated stderr.
     mock.stdout.emit(
       "data",
       Buffer.from(
@@ -1602,10 +1608,13 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
       ),
     );
 
-    const err = (await promise.catch((e: unknown) => e)) as Error & { isSafeMessage?: unknown };
-    expect(err).toBeInstanceOf(Error);
-    expect(err.message).toBe("CUDA out of memory");
-    expect(err.isSafeMessage).toBeUndefined();
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+    };
+    expect(err.message).toContain("out of memory");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
   });
 
   it("ignores stdout lines that are not valid JSON", async () => {
@@ -2312,6 +2321,48 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 42, stdout: "" })}\n`));
 
     await expect(promise).rejects.toThrow("exited with code 42");
+  });
+
+  it("rejects a non-zero exit with a bug-classed SafeError so the reason survives Sentry scrubbing", async () => {
+    const mock = await setupReadyDispatcher();
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id, exitCode: 1, stdout: '{"error": "model not found"}' })}\n`,
+      ),
+    );
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+    };
+    expect(err.message).toBe("model not found");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+  });
+
+  it("classifies an out-of-memory exit reported in-band as operational", async () => {
+    const mock = await setupReadyDispatcher();
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id, exitCode: 1, stdout: '{"error": "CUDA out of memory"}' })}\n`,
+      ),
+    );
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+    };
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.message).toContain("out of memory");
   });
 });
 

@@ -80,6 +80,39 @@ function getPythonPath(): string {
 /**
  * Extract a user-friendly error from a Python process error.
  */
+const OOM_EXIT_TEXT =
+  /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc/i;
+
+/**
+ * Build the error to reject a non-zero Python exit with. The extracted reason is
+ * kept as the message (it is already surfaced to callers) but wrapped in a
+ * SafeError so it survives the API's Sentry scrubber, which otherwise reduces a
+ * plain Error to "Error: Error" (NODE-24). Classification is deliberate: a kill
+ * signal / OS OOM (SIGKILL, exit 137) and a segfault (SIGSEGV, exit 139) are
+ * operational, and their constant messages keep the "out of memory" text so
+ * memory-aware callers still retry on a lighter model. Any other non-zero exit
+ * is a bug, with the extracted reason (or an OOM reported in-band) preserved.
+ */
+function pythonExitError(code: number | null, signal: string | null, extracted: string): SafeError {
+  if (signal === "SIGSEGV" || code === 139) {
+    return new SafeError("Process crashed (segmentation fault)", {
+      kind: "operational",
+      code: `exit-${code ?? signal ?? "unknown"}`,
+    });
+  }
+  if (signal === "SIGKILL" || code === 137) {
+    return new SafeError("Process killed (out of memory) -- try a lighter model or smaller image", {
+      kind: "operational",
+      code: `exit-${code ?? signal ?? "unknown"}`,
+    });
+  }
+  const message = extracted || `Python script exited with code ${code}`;
+  return new SafeError(message, {
+    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    code: `exit-${code ?? "unknown"}`,
+  });
+}
+
 function extractPythonError(error: unknown): string {
   if (error && typeof error === "object") {
     const pErr = error as {
@@ -331,20 +364,7 @@ export class PythonDispatcher {
                   stdout: response.stdout,
                   stderr: req.stderrLines.join("\n"),
                 });
-                if (!extracted && (response.exitCode === 137 || response.exitCode === 139)) {
-                  req.reject(
-                    new SafeError(
-                      response.exitCode === 137
-                        ? "Process killed (out of memory) -- try a lighter model or smaller image"
-                        : "Process crashed (segmentation fault)",
-                      { kind: "operational", code: `exit-${response.exitCode}` },
-                    ),
-                  );
-                } else {
-                  req.reject(
-                    new Error(extracted || `Python script exited with code ${response.exitCode}`),
-                  );
-                }
+                req.reject(pythonExitError(response.exitCode, null, extracted));
               } else {
                 req.resolve({
                   stdout: response.stdout || "",
@@ -567,24 +587,9 @@ export class PythonDispatcher {
           const stderr = stderrLines.join("\n");
 
           if (code !== 0) {
-            // When the process was killed by a signal, use a clear message
-            // instead of surfacing unrelated stderr (e.g. CUDA warnings).
-            const signalMsg =
-              signal === "SIGKILL" || code === 137
-                ? "Process killed (out of memory) -- try a lighter model or smaller image"
-                : signal === "SIGSEGV" || code === 139
-                  ? "Process crashed (segmentation fault)"
-                  : null;
-            if (signalMsg) {
-              rejectPromise(
-                new SafeError(signalMsg, { kind: "operational", code: `exit-${code ?? signal}` }),
-              );
-              return;
-            }
-            const errorText =
-              extractPythonError({ stdout: stdout.trim(), stderr }) ||
-              `Python script exited with code ${code}`;
-            rejectPromise(new Error(errorText));
+            rejectPromise(
+              pythonExitError(code, signal, extractPythonError({ stdout: stdout.trim(), stderr })),
+            );
             return;
           }
 
