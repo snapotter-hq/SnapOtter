@@ -2821,6 +2821,8 @@ export const de: TranslationKeys = {
       signingPercent: "Wird unterschrieben… {percent}%",
       downloadSigned: "Unterschriebenes PDF herunterladen",
       addFirst: "Fügen Sie vor dem Herunterladen mindestens eine Unterschrift hinzu.",
+      loadFailed:
+        "Dieses PDF konnte nicht angezeigt werden. Die Datei ist möglicherweise beschädigt oder passwortgeschützt; falls sie verschlüsselt ist, entfernen Sie das Passwort zuerst mit dem Werkzeug „PDF entsperren“.",
       pad: {
         title: "Unterschrift erstellen",
         draw: "Zeichnen",

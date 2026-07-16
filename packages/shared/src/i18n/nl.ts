@@ -2816,6 +2816,8 @@ export const nl: TranslationKeys = {
       signingPercent: "Bezig met ondertekenen… {percent}%",
       downloadSigned: "Ondertekende PDF downloaden",
       addFirst: "Voeg ten minste één handtekening toe voordat je downloadt.",
+      loadFailed:
+        "Deze PDF kan niet worden weergegeven. Het bestand is mogelijk beschadigd of met een wachtwoord beveiligd; als het versleuteld is, verwijder dan eerst het wachtwoord met de tool PDF ontgrendelen.",
       pad: {
         title: "Handtekening maken",
         draw: "Tekenen",

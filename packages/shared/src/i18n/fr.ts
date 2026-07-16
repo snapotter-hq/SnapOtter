@@ -2827,6 +2827,8 @@ export const fr: TranslationKeys = {
       signingPercent: "Signature en cours… {percent}%",
       downloadSigned: "Télécharger le PDF signé",
       addFirst: "Ajoutez au moins une signature avant de télécharger.",
+      loadFailed:
+        "Impossible d'afficher ce PDF. Le fichier est peut-être corrompu ou protégé par mot de passe ; s'il est chiffré, retirez d'abord le mot de passe avec l'outil Déverrouiller le PDF.",
       pad: {
         title: "Créer une signature",
         draw: "Dessiner",

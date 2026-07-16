@@ -2769,6 +2769,8 @@ export const ja: TranslationKeys = {
       signingPercent: "署名中… {percent}%",
       downloadSigned: "署名済み PDF をダウンロード",
       addFirst: "ダウンロードする前に署名を 1 つ以上追加してください。",
+      loadFailed:
+        "このPDFを表示できませんでした。ファイルが破損しているか、パスワードで保護されている可能性があります。暗号化されている場合は、先にPDFロック解除ツールでパスワードを解除してください。",
       pad: {
         title: "署名を作成",
         draw: "手書き",

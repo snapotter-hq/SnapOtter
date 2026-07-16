@@ -68,6 +68,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   // the first page, since setPage(0) is a no-op when page is already 0 (and
   // pageCount never changes for single-page PDFs).
   const [docReady, setDocReady] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Load the document once per file. A replaced file starts clean: drop the
   // previous document's placements and stage so they don't carry over.
@@ -75,6 +76,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
   useEffect(() => {
     let cancelled = false;
     setDocReady(false);
+    setLoadFailed(false);
     for (const placed of placementsRef.current) placed.node.destroy();
     placementsRef.current = [];
     pageMetaRef.current.clear();
@@ -92,9 +94,11 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       setPage(0);
       setDocReady(true);
     })().catch(() => {
-      // loadingTask.destroy() in the cleanup rejects the in-flight promise;
-      // swallowing it is the fix for Sentry NODE-1N. A genuine load failure
-      // leaves docReady false, which the existing UI already handles.
+      // loadingTask.destroy() in the cleanup rejects the in-flight promise
+      // (Sentry NODE-1N); `cancelled` is already true then, so stay silent. A
+      // genuine load failure (corrupt or password-protected file) must surface
+      // instead of leaving a blank canvas that looks like it is still loading.
+      if (!cancelled) setLoadFailed(true);
     });
     return () => {
       cancelled = true;
@@ -323,6 +327,16 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     }),
     [page, size],
   );
+
+  if (loadFailed) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <p className="max-w-md text-center text-sm text-destructive">
+          {t.toolSettings["sign-pdf"].loadFailed}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col items-center gap-3 p-4">

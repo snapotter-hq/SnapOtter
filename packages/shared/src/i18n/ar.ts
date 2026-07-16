@@ -2796,6 +2796,8 @@ export const ar: TranslationKeys = {
       signingPercent: "جارٍ التوقيع… {percent}%",
       downloadSigned: "تنزيل ملف PDF الموقَّع",
       addFirst: "أضف توقيعًا واحدًا على الأقل قبل التنزيل.",
+      loadFailed:
+        "تعذّر عرض ملف PDF هذا. قد يكون الملف تالفًا أو محميًا بكلمة مرور؛ إذا كان مشفّرًا، فأزل كلمة المرور أولًا باستخدام أداة فتح قفل PDF.",
       pad: {
         title: "إنشاء توقيع",
         draw: "رسم",

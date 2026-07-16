@@ -2811,6 +2811,8 @@ export const vi: TranslationKeys = {
       signingPercent: "Đang ký… {percent}%",
       downloadSigned: "Tải PDF đã ký",
       addFirst: "Thêm ít nhất một chữ ký trước khi tải xuống.",
+      loadFailed:
+        "Không thể hiển thị PDF này. Tệp có thể bị hỏng hoặc được bảo vệ bằng mật khẩu; nếu tệp được mã hóa, hãy xóa mật khẩu bằng công cụ Mở khóa PDF trước.",
       pad: {
         title: "Tạo chữ ký",
         draw: "Vẽ",

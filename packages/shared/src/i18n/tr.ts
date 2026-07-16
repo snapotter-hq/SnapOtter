@@ -2813,6 +2813,8 @@ export const tr: TranslationKeys = {
       signingPercent: "İmzalanıyor… {percent}%",
       downloadSigned: "İmzalı PDF'yi indir",
       addFirst: "İndirmeden önce en az bir imza ekleyin.",
+      loadFailed:
+        "Bu PDF görüntülenemedi. Dosya bozuk veya parola korumalı olabilir; şifrelenmişse önce PDF Kilidini Aç aracıyla parolayı kaldırın.",
       pad: {
         title: "İmza oluştur",
         draw: "Çiz",

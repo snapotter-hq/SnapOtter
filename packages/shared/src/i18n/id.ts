@@ -2810,6 +2810,8 @@ export const id: TranslationKeys = {
       signingPercent: "Menandatangani… {percent}%",
       downloadSigned: "Unduh PDF yang ditandatangani",
       addFirst: "Tambahkan setidaknya satu tanda tangan sebelum mengunduh.",
+      loadFailed:
+        "Tidak dapat menampilkan PDF ini. File mungkin rusak atau dilindungi kata sandi; jika terenkripsi, hapus kata sandinya terlebih dahulu dengan alat Buka Kunci PDF.",
       pad: {
         title: "Buat tanda tangan",
         draw: "Gambar",

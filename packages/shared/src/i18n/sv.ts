@@ -2809,6 +2809,8 @@ export const sv: TranslationKeys = {
       signingPercent: "Signerar… {percent}%",
       downloadSigned: "Ladda ner signerad PDF",
       addFirst: "Lägg till minst en signatur innan du laddar ner.",
+      loadFailed:
+        "Det gick inte att visa denna PDF. Filen kan vara skadad eller lösenordsskyddad; om den är krypterad, ta först bort lösenordet med verktyget Lås upp PDF.",
       pad: {
         title: "Skapa signatur",
         draw: "Rita",
