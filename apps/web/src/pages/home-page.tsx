@@ -403,7 +403,22 @@ function SearchResults({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {results.map((tool) => (
-          <ToolCard key={tool.id} tool={tool} variant="descriptive" showModalityBadge showPin />
+          <ToolCard
+            key={tool.id}
+            tool={tool}
+            variant="descriptive"
+            showModalityBadge
+            showPin
+            onNavigate={() => {
+              // search -> click attribution: which result the user opened.
+              import("@/lib/analytics").then(({ track }) =>
+                track(ANALYTICS_EVENTS.SEARCH, {
+                  results_count: results.length,
+                  clicked_tool_id: tool.id,
+                }),
+              );
+            }}
+          />
         ))}
       </div>
       <div className="pt-1 text-center">

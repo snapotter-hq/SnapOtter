@@ -566,6 +566,17 @@ export function useToolProcessor(toolId: string) {
         return;
       }
 
+      // batch_processed fires once for the batch as a unit (distinct from the N
+      // per-file tool_used events), so batch usage is separable from single runs.
+      const trackBatch = (status: "completed" | "failed") =>
+        void import("@/lib/analytics").then(({ track }) =>
+          track(ANALYTICS_EVENTS.BATCH_PROCESSED, {
+            tool_id: toolId,
+            file_count: files.length,
+            status,
+          }),
+        );
+
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
@@ -648,6 +659,7 @@ export function useToolProcessor(toolId: string) {
           setError(errorMsg);
           setProcessing(false);
           setProgress(IDLE_PROGRESS);
+          trackBatch("failed");
           return;
         }
 
@@ -693,6 +705,7 @@ export function useToolProcessor(toolId: string) {
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        trackBatch("completed");
       } catch (err) {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
         if (eventSourceRef.current) {
@@ -703,6 +716,7 @@ export function useToolProcessor(toolId: string) {
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        trackBatch("failed");
       }
     },
     [toolId, processFiles, setProcessing, setError, clearActiveJob, toolName],

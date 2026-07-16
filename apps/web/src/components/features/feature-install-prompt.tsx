@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_EVENTS,
   FEATURE_BUNDLES,
   type FeatureBundleState,
   getRequiredBundlesForTool,
@@ -144,6 +145,16 @@ export function FeatureInstallPrompt({
     }, 3000);
     return () => clearInterval(interval);
   }, [isInstalling]);
+
+  useEffect(() => {
+    if (!isAdmin || bundle.status === "installed") return;
+    // Install-prompt impression: the top of the AI-adoption funnel
+    // (prompted -> ai_bundle_action install -> tool_used is_ai_tool). Non-admins
+    // see a different "not enabled" message, not this prompt.
+    import("@/lib/analytics").then(({ track }) => {
+      track(ANALYTICS_EVENTS.AI_BUNDLE_PROMPTED, { bundle_id: bundle.id });
+    });
+  }, [bundle.id, bundle.status, isAdmin]);
 
   const eta = (() => {
     if (!progress || !startTime || progress.percent <= 2) return null;

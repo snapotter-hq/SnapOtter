@@ -20,6 +20,8 @@ interface ToolCardProps {
   variant?: "compact" | "descriptive";
   showModalityBadge?: boolean;
   showPin?: boolean;
+  /** Fired when the card is clicked (before navigation), for search attribution. */
+  onNavigate?: () => void;
 }
 
 function PinButton({ toolId }: { toolId: string }) {
@@ -57,7 +59,13 @@ const SECTION_COLOR_MAP: Record<string, string> = Object.fromEntries(
   SECTIONS.map((s) => [s.id, s.color]),
 );
 
-export function ToolCard({ tool, variant = "compact", showModalityBadge, showPin }: ToolCardProps) {
+export function ToolCard({
+  tool,
+  variant = "compact",
+  showModalityBadge,
+  showPin,
+  onNavigate,
+}: ToolCardProps) {
   const { t } = useTranslation();
   const IconComponent =
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
@@ -110,6 +118,7 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge, showPin
     const card = (
       <Link
         to={tool.route}
+        onClick={onNavigate}
         className={cn(
           "flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-card transition-all",
           "hover:border-border hover:shadow-sm",
@@ -156,6 +165,7 @@ export function ToolCard({ tool, variant = "compact", showModalityBadge, showPin
   return (
     <Link
       to={tool.route}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-3 p-2.5 px-3 rounded-lg transition-colors",
         "hover:bg-muted",
