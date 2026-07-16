@@ -59,18 +59,22 @@ describe("buildBeforeSend (api)", () => {
     );
     expect(out.exception.values[0].stacktrace.frames[0].abs_path).toBe("/app/x");
   });
-  it("keeps the breadcrumb trail, redacting paths/urls and dropping data payloads", () => {
+  it("keeps the breadcrumb trail, redacting urls but keeping safe http status/method", () => {
     const out = send(
       evt({
         breadcrumbs: [
-          { message: "GET https://host/u/photo.jpg 200", category: "http", data: { url: "x" } },
+          {
+            message: "GET https://host/u/photo.jpg 500",
+            category: "http",
+            data: { url: "https://host/u/photo.jpg", status_code: 500, method: "GET" },
+          },
           { message: "reading /Users/me/secret.txt", category: "console", level: "info" },
         ],
       }),
       {},
     )!;
     expect(out.breadcrumbs).toEqual([
-      { message: "GET <url> 200", category: "http" },
+      { message: "GET <url> 500", category: "http", data: { status_code: 500, method: "GET" } },
       { message: "reading <path>", category: "console", level: "info" },
     ]);
   });

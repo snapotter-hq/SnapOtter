@@ -71,19 +71,23 @@ describe("buildWebBeforeSend", () => {
     expect(buildWebBeforeSend(() => false)(baseEvent(), {})).toBeNull();
   });
 
-  it("keeps the breadcrumb trail, redacting paths/urls and dropping data payloads", () => {
+  it("keeps the breadcrumb trail, redacting urls but keeping safe fetch status/method", () => {
     const send = buildWebBeforeSend(() => true);
     const out = send(
       baseEvent({
         breadcrumbs: [
-          { message: "fetch https://host/user.png", category: "fetch", data: { url: "x" } },
+          {
+            message: "fetch https://host/user.png",
+            category: "fetch",
+            data: { url: "https://host/user.png", status_code: 500, method: "POST" },
+          },
           { message: "open /Users/a/secret.pdf", category: "console", level: "warning" },
         ],
       }),
       {},
     )!;
     expect(out.breadcrumbs).toEqual([
-      { message: "fetch <url>", category: "fetch" },
+      { message: "fetch <url>", category: "fetch", data: { status_code: 500, method: "POST" } },
       { message: "open <path>", category: "console", level: "warning" },
     ]);
   });

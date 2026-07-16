@@ -61,6 +61,16 @@ function scrubBreadcrumb(entry: unknown): AnyEvent | null {
     if (b[k] !== undefined) out[k] = b[k];
   }
   if (typeof b.message === "string") out.message = scrubText(b.message);
+  // For http breadcrumbs keep the non-PII status_code + method (the url is the
+  // sensitive part, dropped with the rest of `data`): they answer "what request
+  // failed right before the error".
+  if (b.category === "http") {
+    const data = asObj(b.data);
+    const safe: AnyEvent = {};
+    if (data?.status_code !== undefined) safe.status_code = data.status_code;
+    if (typeof data?.method === "string") safe.method = data.method;
+    if (Object.keys(safe).length) out.data = safe;
+  }
   return out;
 }
 
