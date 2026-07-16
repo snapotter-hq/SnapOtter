@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   ANALYTICS_EVENTS,
+  extractErrorCode,
   getBundleForTool,
   getOptionalBundleForTool,
   isToolInputError,
@@ -39,7 +40,7 @@ import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
-import { reportError, safeFormatTag } from "../lib/error-report.js";
+import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -208,6 +209,27 @@ export function buildLegacyResultPayload(
 }
 
 // ── Tool job processor ─────────────────────────────────────────
+
+/**
+ * Dimensions shared by both tool_used branches, kept in one place so the
+ * success and failure events never drift. input_format is the safe extension
+ * only (never the filename); is_batch flags a per-file batch child so batch
+ * volume is distinguishable from single runs; execution_hint records the tool's
+ * sync/async class.
+ */
+function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string, unknown> {
+  const tool = TOOLS.find((t) => t.id === data.toolId);
+  return {
+    tool_id: data.toolId,
+    duration_ms: durationMs,
+    category: tool?.category ?? "unknown",
+    is_ai_tool:
+      getBundleForTool(data.toolId) !== null || getOptionalBundleForTool(data.toolId) !== null,
+    is_batch: data.kind === "batch-child",
+    input_format: safeFormatTag(data.filename) ?? "unknown",
+    execution_hint: tool?.executionHint ?? "fast",
+  };
+}
 
 async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
@@ -451,17 +473,14 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       // Analytics: emit tool_used on success
       if (analyticsEnabled()) {
-        const tool = TOOLS.find((t) => t.id === data.toolId);
         void trackEvent(
           ANALYTICS_EVENTS.TOOL_USED,
           {
-            tool_id: data.toolId,
+            ...toolUsedBaseProps(data, durationMs),
             status: "completed",
-            duration_ms: durationMs,
-            category: tool?.category ?? "unknown",
-            is_ai_tool:
-              getBundleForTool(data.toolId) !== null ||
-              getOptionalBundleForTool(data.toolId) !== null,
+            output_format: safeFormatTag(outName) ?? "unknown",
+            bytes_in: originalSize,
+            bytes_out: resultBuffer.length,
           },
           data.analyticsDistinctId,
         );
@@ -549,18 +568,25 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       // Analytics: emit tool_used on failure
       if (analyticsEnabled()) {
-        const tool = TOOLS.find((t) => t.id === data.toolId);
+        const errorClass = isTimeout
+          ? "timeout"
+          : isCanceled
+            ? "cancelled"
+            : classifyError(err, "worker");
         void trackEvent(
           ANALYTICS_EVENTS.TOOL_USED,
           {
-            tool_id: data.toolId,
+            ...toolUsedBaseProps(data, durationMs),
             status: "failed",
-            duration_ms: durationMs,
-            category: tool?.category ?? "unknown",
-            is_ai_tool:
-              getBundleForTool(data.toolId) !== null ||
-              getOptionalBundleForTool(data.toolId) !== null,
-            error_code: isTimeout ? "timeout" : isCanceled ? "cancelled" : "processing",
+            error_code: isTimeout
+              ? "timeout"
+              : isCanceled
+                ? "cancelled"
+                : (extractErrorCode(err) ?? "processing"),
+            // A coarse, low-cardinality reason bucket so "why do tools fail" is
+            // answerable without leaking messages: bad input, environment, or
+            // our bug (classifyError's "expected" == bad user input).
+            error_kind: errorClass === "expected" ? "input" : errorClass,
           },
           data.analyticsDistinctId,
         );

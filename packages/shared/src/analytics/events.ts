@@ -24,9 +24,16 @@ export interface ToolUsedProperties {
   duration_ms: number;
   category: string;
   is_ai_tool: boolean;
-  params?: Record<string, string | number | boolean>;
+  is_batch: boolean;
+  /** Safe input extension (never the filename), e.g. "heic"; "unknown" if none. */
+  input_format: string;
+  execution_hint: "fast" | "long";
+  output_format?: string;
+  bytes_in?: number;
+  bytes_out?: number;
   error_code?: string;
-  error_message?: string;
+  /** Coarse failure reason so "why do tools fail" is answerable without messages. */
+  error_kind?: "input" | "operational" | "bug" | "timeout" | "cancelled";
 }
 
 export interface SearchProperties {
