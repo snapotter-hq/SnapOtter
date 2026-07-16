@@ -36,6 +36,10 @@ const envSchema = z
     RATE_LIMIT_PER_MIN: z.coerce.number().default(1000),
     API_KEYS_RATE_LIMIT_PER_MIN: z.coerce.number().default(30),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
+    // How long to wait for Postgres/Redis to accept connections at startup before
+    // giving up. A dependency ordered but not yet ready (fresh boot) recovers within
+    // this window instead of crash-looping. 0 = try once, fail fast.
+    DB_STARTUP_TIMEOUT_MS: z.coerce.number().default(30_000),
     SQLITE_MIGRATE_PATH: z.string().default(""),
     DATA_DIR: z.string().default("./data"),
     FILES_STORAGE_PATH: z.string().default("./data/files"),

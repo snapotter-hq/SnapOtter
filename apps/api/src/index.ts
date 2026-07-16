@@ -38,6 +38,7 @@ import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-ru
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
+import { waitForService } from "./lib/wait-for-service.js";
 import { requirePermission } from "./permissions.js";
 import {
   authMiddleware,
@@ -77,8 +78,22 @@ import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 import { shutdownTracing } from "./tracing.js";
 
-// Run before anything else
+// Run before anything else. Wait briefly for Postgres to accept connections: on a
+// fresh boot it may still be starting (Compose without a healthcheck gate, or a
+// systemd unit ordered after Debian's no-op `postgresql.service` umbrella rather
+// than the real cluster), and a short retry turns a crash-loop into a clean start.
 try {
+  await waitForService(() => db.execute(sql`SELECT 1`).then(() => undefined), {
+    timeoutMs: env.DB_STARTUP_TIMEOUT_MS,
+    intervalMs: 1_000,
+    onRetry: (attempt) => {
+      if (attempt === 1) {
+        console.log(
+          `Waiting up to ${Math.round(env.DB_STARTUP_TIMEOUT_MS / 1000)}s for Postgres to accept connections...`,
+        );
+      }
+    },
+  });
   await runMigrations();
 } catch (err) {
   const safeUrl = env.DATABASE_URL.replace(/:\/\/[^@]*@/, "://***@");
@@ -90,9 +105,25 @@ try {
 }
 console.log("Database initialized");
 
-// Verify Redis is reachable (required for BullMQ job queues)
+// Verify Redis is reachable (required for BullMQ job queues). Same brief wait as
+// Postgres so an ordered-but-not-ready Redis recovers instead of crash-looping.
 try {
-  await pingRedis();
+  await waitForService(
+    async () => {
+      if (!(await pingRedis())) throw new Error("Redis did not answer PONG");
+    },
+    {
+      timeoutMs: env.DB_STARTUP_TIMEOUT_MS,
+      intervalMs: 1_000,
+      onRetry: (attempt) => {
+        if (attempt === 1) {
+          console.log(
+            `Waiting up to ${Math.round(env.DB_STARTUP_TIMEOUT_MS / 1000)}s for Redis to accept connections...`,
+          );
+        }
+      },
+    },
+  );
 } catch (err) {
   const safeUrl = env.REDIS_URL.replace(/:\/\/[^@]*@/, "://***@");
   console.error(
