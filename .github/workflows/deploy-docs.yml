@@ -24,6 +24,10 @@ jobs:
 
       - name: Build Docs
         run: pnpm --filter @snapotter/docs docs:build
+        env:
+          # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
+          # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy apps/docs/.vitepress/dist --project-name snapotter-docs --branch main --commit-dirty=true
