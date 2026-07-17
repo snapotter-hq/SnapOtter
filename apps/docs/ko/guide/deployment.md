@@ -1,7 +1,7 @@
 ---
 description: "Docker로 SnapOtter를 프로덕션에 배포. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 구성."
 i18n_output_hash: a82cc0e64487
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## 하드웨어 요구 사항 {#hardware-requirements}
 
 이 수치는 NVIDIA RTX 4070을 탑재한 최신 amd64 워크스테이션부터 Raspberry Pi에 이르기까지 다양한 시스템에서, 각각 전체 도구 카탈로그를 실행하고 Docker 리소스 제한을 조정하며 실제 하한선을 찾는 벤치마크에서 나온 것이다.
+
+이 등급의 낮은 쪽 사양(Pi, 오래된 노트북, 2 GB VPS)에서 실행한다면, [저사양 환경 설정](/ko/guide/low-resource)이 이 수치를 조정된 상한이 적용된 구체적인 설치 가이드로 풀어낸다.
 
 ### 빠른 참조 {#quick-reference}
 

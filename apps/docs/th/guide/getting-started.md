@@ -1,7 +1,7 @@
 ---
 description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว รวมถึงการตั้งค่า Docker Compose การ build จากซอร์ส และภาพรวมฟีเจอร์ทั้งหมด"
 i18n_output_hash: 5353dda97d38
-i18n_source_hash: 24724b5595b2
+i18n_source_hash: 68bf7f60b68d
 i18n_provenance: human
 ---
 
@@ -18,6 +18,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 คอนเทนเนอร์เดียวนี้รันทุกอย่างที่จำเป็น: เมื่อไม่ได้ตั้งค่า `DATABASE_URL` มันจะเริ่ม PostgreSQL และ Redis ของตัวเองบนอินเทอร์เฟซ loopback (โหมด embedded) และเก็บข้อมูลทั้งหมดไว้ในวอลุ่ม `SnapOtter-data` นี่คือวิธีที่เร็วที่สุดในการลอง SnapOtter หรือ self-host บน homelab สำหรับโปรดักชัน ให้รันสแตก [Docker Compose](#docker-compose) ด้านล่าง ซึ่งเก็บ PostgreSQL และ Redis ไว้ในคอนเทนเนอร์ของตัวเอง โหมด embedded รันเป็น root (ค่าเริ่มต้น) และปิดโดยอัตโนมัติทันทีที่คุณตั้งค่า `DATABASE_URL`
+
+หากกำลังติดตั้งบน Raspberry Pi แล็ปท็อปเครื่องเก่า หรือ VPS ขนาดเล็ก ดู [Low-Resource Setups](/th/guide/low-resource) สำหรับคู่มือทีละขั้นที่ปรับจูนมาแล้ว และสิ่งที่ควรคาดหวังจากฮาร์ดแวร์ที่จำกัด
 
 คุณจะถูกขอให้เปลี่ยนรหัสผ่านตอนล็อกอินครั้งแรก
 

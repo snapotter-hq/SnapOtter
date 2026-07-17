@@ -2814,6 +2814,8 @@ export const pl: TranslationKeys = {
       signingPercent: "Podpisywanie… {percent}%",
       downloadSigned: "Pobierz podpisany PDF",
       addFirst: "Dodaj co najmniej jeden podpis przed pobraniem.",
+      loadFailed:
+        "Nie udało się wyświetlić tego pliku PDF. Plik może być uszkodzony lub chroniony hasłem; jeśli jest zaszyfrowany, najpierw usuń hasło narzędziem Odblokuj PDF.",
       pad: {
         title: "Utwórz podpis",
         draw: "Rysuj",

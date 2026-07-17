@@ -2761,6 +2761,8 @@ export const en = {
       signingPercent: "Signing… {percent}%",
       downloadSigned: "Download signed PDF",
       addFirst: "Add at least one signature before downloading.",
+      loadFailed:
+        "Couldn't display this PDF. The file may be corrupted or password-protected; if it's encrypted, remove the password first with the Unlock PDF tool.",
       pad: {
         title: "Create signature",
         draw: "Draw",

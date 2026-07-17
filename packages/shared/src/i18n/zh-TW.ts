@@ -2568,6 +2568,8 @@ export const zhTW: TranslationKeys = {
       signingPercent: "正在簽署… {percent}%",
       downloadSigned: "下載已簽署的 PDF",
       addFirst: "下載前請至少新增一個簽名。",
+      loadFailed:
+        "無法顯示此 PDF。檔案可能已損毀或受密碼保護；如果已加密，請先使用「解鎖 PDF」工具移除密碼。",
       pad: {
         title: "建立簽名",
         draw: "手寫",

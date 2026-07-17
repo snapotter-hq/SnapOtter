@@ -2568,6 +2568,8 @@ export const zhCN: TranslationKeys = {
       signingPercent: "正在签名… {percent}%",
       downloadSigned: "下载已签名的 PDF",
       addFirst: "下载前请至少添加一个签名。",
+      loadFailed:
+        "无法显示此 PDF。文件可能已损坏或受密码保护；如果已加密，请先使用“PDF 解锁”工具移除密码。",
       pad: {
         title: "创建签名",
         draw: "手写",

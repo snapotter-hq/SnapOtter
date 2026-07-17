@@ -1,7 +1,7 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ve Cloudflare için ters proxy yapılandırmaları."
 i18n_output_hash: 4fadf7841bd7
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Donanım Gereksinimleri {#hardware-requirements}
 
 Bu sayılar, NVIDIA RTX 4070'li modern bir amd64 iş istasyonundan Raspberry Pi'ye kadar çeşitli sistemlerde yapılan kıyaslamalardan gelmektedir; her birinde tüm araç kataloğu çalıştırılmış ve gerçek alt sınırı bulmak için Docker kaynak limitleri taranmıştır.
+
+Bu seviyelerin alt ucunda mı çalışıyorsunuz (bir Pi, eski bir dizüstü, 2 GB'lık bir VPS)? [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) bu sayıları, ayarlanmış sınırlar içeren somut bir adım adım kılavuza dönüştürür.
 
 ### Hızlı Referans {#quick-reference}
 

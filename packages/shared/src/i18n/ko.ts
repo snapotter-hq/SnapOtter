@@ -2749,6 +2749,8 @@ export const ko: TranslationKeys = {
       signingPercent: "서명 중… {percent}%",
       downloadSigned: "서명된 PDF 다운로드",
       addFirst: "다운로드하기 전에 서명을 하나 이상 추가하세요.",
+      loadFailed:
+        "이 PDF를 표시할 수 없습니다. 파일이 손상되었거나 비밀번호로 보호되어 있을 수 있습니다. 암호화된 경우 먼저 PDF 잠금 해제 도구로 비밀번호를 제거하세요.",
       pad: {
         title: "서명 만들기",
         draw: "그리기",

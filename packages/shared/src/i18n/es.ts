@@ -2801,6 +2801,8 @@ export const es: TranslationKeys = {
       signingPercent: "Firmando… {percent}%",
       downloadSigned: "Descargar PDF firmado",
       addFirst: "Añade al menos una firma antes de descargar.",
+      loadFailed:
+        "No se pudo mostrar este PDF. El archivo puede estar dañado o protegido con contraseña; si está cifrado, quita primero la contraseña con la herramienta Desbloquear PDF.",
       pad: {
         title: "Crear firma",
         draw: "Dibujar",

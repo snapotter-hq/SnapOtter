@@ -1,7 +1,7 @@
 ---
 description: "Distribuera SnapOtter till produktion med Docker. Hårdvarukrav, GPU-konfiguration och konfigurationer för omvänd proxy för Nginx, Traefik och Cloudflare."
 i18n_output_hash: c280952d9d27
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Hårdvarukrav {#hardware-requirements}
 
 Dessa siffror kommer från benchmarktester över en rad system, från en modern amd64-arbetsstation med en NVIDIA RTX 4070 ner till en Raspberry Pi, där hela verktygskatalogen kördes på var och en och Docker-resursgränserna svepte över värdena för att hitta det verkliga golvet.
+
+Kör du i den nedre änden av dessa nivåer (en Pi, en gammal bärbar dator, en VPS med 2 GB)? [Resurssnåla installationer](/sv/guide/low-resource) omvandlar dessa siffror till en konkret genomgång med anpassade tak.
 
 ### Snabbreferens {#quick-reference}
 

@@ -1,7 +1,7 @@
 ---
 description: "Guida al rafforzamento della sicurezza per SnapOtter. Sicurezza del container, isolamento di rete, Docker secrets, distribuzione Kubernetes e artefatti di conformità."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: 24c63a8f7f16
 ---
 

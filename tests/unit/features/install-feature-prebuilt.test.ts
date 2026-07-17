@@ -241,3 +241,103 @@ describe("install_feature.py prebuilt mode", () => {
     expect(installed.bundles["face-detection"]).toBeDefined();
   });
 });
+
+/** Build a tar whose site-packages carries a fake onnxruntime of the given flavor. */
+function createOnnxTar(
+  bundleId: string,
+  flavor: "cpu" | "gpu",
+): { tarPath: string; sha256: string } {
+  const buildDir = join(tempDir, `build-${bundleId}`);
+  const capi = join(buildDir, "site-packages", "onnxruntime", "capi");
+  mkdirSync(capi, { recursive: true });
+  writeFileSync(join(buildDir, "site-packages", "onnxruntime", "__init__.py"), flavor);
+  writeFileSync(join(capi, "onnxruntime_pybind11_state.so"), flavor);
+  if (flavor === "gpu") {
+    writeFileSync(join(capi, "libonnxruntime_providers_cuda.so"), "cuda");
+  }
+  const distInfo =
+    flavor === "gpu" ? "onnxruntime_gpu-1.20.1.dist-info" : "onnxruntime-1.20.1.dist-info";
+  mkdirSync(join(buildDir, "site-packages", distInfo), { recursive: true });
+  writeFileSync(
+    join(buildDir, "site-packages", distInfo, "METADATA"),
+    flavor === "gpu" ? "Name: onnxruntime-gpu" : "Name: onnxruntime",
+  );
+  writeFileSync(
+    join(buildDir, "bundle.json"),
+    JSON.stringify({
+      bundleId,
+      version: "1.0.0-test",
+      arch: "amd64-gpu",
+      imageVersion: "2.0.0",
+      pythonVersion: "3.12",
+      models: [],
+    }),
+  );
+
+  const tarPath = join(tempDir, `${bundleId}-test.tar.gz`);
+  execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+  rmSync(buildDir, { recursive: true });
+
+  const hash = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+  return { tarPath, sha256: hash };
+}
+
+function installBundle(bundleId: string, tarPath: string) {
+  return spawnSync("python3", [scriptPath, bundleId, manifestPath, modelsDir], {
+    env: {
+      ...process.env,
+      DATA_DIR: tempDir,
+      PYTHON_VENV_PATH: venvDir,
+      SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+    },
+    timeout: 30_000,
+  });
+}
+
+describe("onnxruntime flavor reconciliation (#490)", () => {
+  const cudaLib = () =>
+    join(sitePackagesDir, "onnxruntime", "capi", "libonnxruntime_providers_cuda.so");
+  const coreLib = () =>
+    join(sitePackagesDir, "onnxruntime", "capi", "onnxruntime_pybind11_state.so");
+
+  it("a bundle carrying CPU onnxruntime cannot clobber the venv's GPU build", () => {
+    const gpu = createOnnxTar("gpu-bundle", "gpu");
+    writeManifest("gpu-bundle", gpu.tarPath, gpu.sha256, { models: [] });
+    let result = installBundle("gpu-bundle", gpu.tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    const cpu = createOnnxTar("cpu-bundle", "cpu");
+    writeManifest("cpu-bundle", cpu.tarPath, cpu.sha256, { models: [] });
+    result = installBundle("cpu-bundle", cpu.tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    // The GPU build survives: CUDA provider intact, core lib not downgraded.
+    expect(existsSync(cudaLib())).toBe(true);
+    expect(readFileSync(coreLib(), "utf-8")).toBe("gpu");
+    // Metadata stays truthful: no CPU dist-info shipped in.
+    expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(true);
+    // Both bundles still recorded as installed.
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["gpu-bundle"]).toBeDefined();
+    expect(installed.bundles["cpu-bundle"]).toBeDefined();
+  });
+
+  it("installing a GPU bundle repairs a venv previously downgraded to the CPU build", () => {
+    const cpu = createOnnxTar("cpu-bundle", "cpu");
+    writeManifest("cpu-bundle", cpu.tarPath, cpu.sha256, { models: [] });
+    let result = installBundle("cpu-bundle", cpu.tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    const gpu = createOnnxTar("gpu-bundle", "gpu");
+    writeManifest("gpu-bundle", gpu.tarPath, gpu.sha256, { models: [] });
+    result = installBundle("gpu-bundle", gpu.tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    expect(existsSync(cudaLib())).toBe(true);
+    expect(readFileSync(coreLib(), "utf-8")).toBe("gpu");
+    // The stale CPU metadata is cleared so pip metadata matches reality.
+    expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(true);
+  });
+});

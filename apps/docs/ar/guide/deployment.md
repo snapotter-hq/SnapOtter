@@ -1,7 +1,7 @@
 ---
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد وإعداد GPU وإعدادات الوكيل العكسي لـ Nginx و Traefik و Cloudflare."
 i18n_output_hash: 44503f8d944c
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## متطلبات العتاد {#hardware-requirements}
 
 تأتي هذه الأرقام من اختبارات أداء عبر مجموعة من الأنظمة، من محطة عمل amd64 حديثة مزوّدة ببطاقة NVIDIA RTX 4070 وصولًا إلى Raspberry Pi، حيث شُغِّل كامل كتالوج الأدوات على كل منها مع مسح حدود موارد Docker لإيجاد الحد الأدنى الفعلي.
+
+هل تعمل عند الطرف الأدنى من هذه المستويات (جهاز Pi، أو حاسوب محمول قديم، أو VPS بذاكرة 2 جيجابايت)؟ يحوّل [التشغيل على موارد محدودة](/ar/guide/low-resource) هذه الأرقام إلى شرح تطبيقي ملموس بسقوف مضبوطة.
 
 ### مرجع سريع {#quick-reference}
 

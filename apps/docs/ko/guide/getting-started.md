@@ -1,7 +1,7 @@
 ---
 description: "명령 하나로 Docker에 SnapOtter를 설치. Docker Compose 설정, 소스에서 빌드하기, 전체 기능 개요 포함."
 i18n_output_hash: 55c67edda625
-i18n_source_hash: 24724b5595b2
+i18n_source_hash: 68bf7f60b68d
 i18n_provenance: human
 ---
 
@@ -18,6 +18,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 이 단일 컨테이너는 필요한 모든 것을 실행한다. `DATABASE_URL`이 설정되어 있지 않으면, 루프백 인터페이스에서 자체 PostgreSQL과 Redis를 시작하고(임베디드 모드) 모든 데이터를 `SnapOtter-data` 볼륨에 보관한다. SnapOtter를 사용해 보거나 홈랩에서 셀프 호스팅하기에 가장 빠른 방법이다. 프로덕션에서는 PostgreSQL과 Redis를 각자의 컨테이너에 두는 아래의 [Docker Compose](#docker-compose) 스택을 실행하라. 임베디드 모드는 root로 실행되며(기본값), `DATABASE_URL`을 설정하는 즉시 자동으로 꺼진다.
+
+Raspberry Pi나 오래된 노트북, 작은 VPS에 설치할 예정이라면 [저사양 환경 설정](/ko/guide/low-resource)에서 조정된 설치 가이드와 제한된 하드웨어에서 기대할 수 있는 것을 확인하라.
 
 첫 로그인 시 비밀번호 변경을 요청받는다.
 

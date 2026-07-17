@@ -2,6 +2,7 @@
 import { useData } from "vitepress";
 import { computed, ref } from "vue";
 import { normalizeLocale, t } from "../i18n/ui.mjs";
+import { data as sectionCounts } from "./section-counts.data.ts";
 
 const { lang } = useData();
 const locale = computed(() => normalizeLocale(lang.value));
@@ -11,32 +12,32 @@ const command =
   "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
 
 const selfLinks = [
-  { label: "Quick start", href: "/guide/getting-started#quick-start" },
-  { label: "Configuration", href: "/guide/configuration" },
-  { label: "Hardware & sizing", href: "/guide/deployment#hardware-requirements" },
-  { label: "Database & backups", href: "/guide/database" },
-  { label: "Docker tags & GPU", href: "/guide/docker-tags" },
-  { label: "Supported formats", href: "/guide/supported-formats" },
+  { key: "home.link.quickStart", href: "/guide/getting-started#quick-start" },
+  { key: "home.link.configuration", href: "/guide/configuration" },
+  { key: "home.link.hardwareSizing", href: "/guide/deployment#hardware-requirements" },
+  { key: "home.link.databaseBackups", href: "/guide/database" },
+  { key: "home.link.dockerTagsGpu", href: "/guide/docker-tags" },
+  { key: "home.link.supportedFormats", href: "/guide/supported-formats" },
 ];
 const entLinks = [
-  { label: "Architecture", href: "/guide/architecture" },
-  { label: "Security & hardening", href: "/guide/security" },
-  { label: "SSO · SAML · OIDC", href: "/guide/oidc" },
-  { label: "SCIM provisioning", href: "/guide/scim" },
-  { label: "Users, roles & audit", href: "/guide/users-roles" },
-  { label: "Compliance & SBOM", href: "/guide/security#compliance-artifacts" },
+  { key: "home.link.architecture", href: "/guide/architecture" },
+  { key: "home.link.securityHardening", href: "/guide/security" },
+  { key: "home.link.ssoSamlOidc", href: "/guide/oidc" },
+  { key: "home.link.scimProvisioning", href: "/guide/scim" },
+  { key: "home.link.usersRolesAudit", href: "/guide/users-roles" },
+  { key: "home.link.complianceSbom", href: "/guide/security#compliance-artifacts" },
 ];
 const modalities = [
-  { label: "Image", count: 64, href: "/tools/image/resize" },
-  { label: "Video", count: 29, href: "/tools/video/convert-video" },
-  { label: "Audio", count: 17, href: "/tools/audio/convert-audio" },
-  { label: "PDF", count: 37, href: "/tools/pdf/merge-pdf" },
-  { label: "Files", count: 10, href: "/tools/files/chart-maker" },
+  { key: "home.mod.image", count: sectionCounts.image, href: "/tools/image/resize" },
+  { key: "home.mod.video", count: sectionCounts.video, href: "/tools/video/convert-video" },
+  { key: "home.mod.audio", count: sectionCounts.audio, href: "/tools/audio/convert-audio" },
+  { key: "home.mod.pdf", count: sectionCounts.pdf, href: "/tools/pdf/merge-pdf" },
+  { key: "home.mod.files", count: sectionCounts.files, href: "/tools/files/chart-maker" },
 ];
 const shared = [
-  { label: "REST API", sub: "Keys, endpoints & OpenAPI", href: "/api/rest" },
-  { label: "Changelog", sub: "What's new in 2.0", href: "/changelog" },
-  { label: "llms.txt", sub: "AI-friendly docs", href: "/llms.txt" },
+  { key: "home.card.restApi", subKey: "home.card.restApiSub", href: "/api/rest" },
+  { key: "home.card.changelog", subKey: "home.card.changelogSub", href: "/changelog" },
+  { key: "home.card.llmsTxt", subKey: "home.card.llmsTxtSub", href: "/llms.txt" },
 ];
 
 const copyLabel = ref(t(locale.value, "home.copy"));
@@ -53,18 +54,15 @@ function copyCommand() {
   <div class="so-home">
     <section class="hero">
       <h1 class="hero-title">{{ tt("home.title") }}</h1>
-      <p class="hero-sub">
-        Install, operate, and build on your self-hosted file-processing infrastructure. Get running
-        in one command:
-      </p>
-      <div class="cmd" title="Click to copy" @click="copyCommand">
+      <p class="hero-sub">{{ tt("home.heroSub") }}</p>
+      <div class="cmd" :title="tt('home.clickToCopy')" @click="copyCommand">
         <code>$ {{ command }}</code>
-        <button class="copy" type="button" aria-label="Copy command" @click.stop="copyCommand">{{ copyLabel }}</button>
+        <button class="copy" type="button" :aria-label="tt('home.copyCommandAria')" @click.stop="copyCommand">{{ copyLabel }}</button>
       </div>
       <p class="hero-meta">
-        <a href="/guide/getting-started">Full install guide</a> ·
-        <a href="/guide/getting-started#docker-compose">GPU &amp; Compose setup</a> ·
-        <a href="https://demo.snapotter.com">Try the live demo</a>
+        <a href="/guide/getting-started">{{ tt("home.fullInstallGuide") }}</a> ·
+        <a href="/guide/getting-started#docker-compose">{{ tt("home.gpuComposeSetup") }}</a> ·
+        <a href="https://demo.snapotter.com">{{ tt("home.tryDemo") }}</a>
       </p>
     </section>
 
@@ -76,9 +74,9 @@ function copyCommand() {
           </span>
           <h2>{{ tt("home.selfHosting") }}</h2>
         </div>
-        <p class="door-sub">Get SnapOtter running and keep it healthy.</p>
+        <p class="door-sub">{{ tt("home.selfHostingSub") }}</p>
         <ul class="door-links">
-          <li v-for="l in selfLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
+          <li v-for="l in selfLinks" :key="l.href"><a :href="l.href">{{ tt(l.key) }}</a></li>
         </ul>
         <a class="door-cta" href="/guide/getting-started">{{ tt("home.startSelfHosting") }}</a>
       </div>
@@ -90,9 +88,9 @@ function copyCommand() {
           </span>
           <h2>{{ tt("home.enterprise") }}</h2>
         </div>
-        <p class="door-sub">Evaluate, secure &amp; govern your deployment.</p>
+        <p class="door-sub">{{ tt("home.enterpriseSub") }}</p>
         <ul class="door-links">
-          <li v-for="l in entLinks" :key="l.href"><a :href="l.href">{{ l.label }}</a></li>
+          <li v-for="l in entLinks" :key="l.href"><a :href="l.href">{{ tt(l.key) }}</a></li>
         </ul>
         <a class="door-cta" href="https://snapotter.com/enterprise">{{ tt("home.evaluate") }}</a>
       </div>
@@ -102,16 +100,16 @@ function copyCommand() {
       <p class="mod-head"><strong>{{ tt("home.modalities") }}</strong> <span>{{ tt("home.browseByType") }}</span></p>
       <div class="chips">
         <a v-for="m in modalities" :key="m.href" class="chip" :href="m.href">
-          <span class="chip-label">{{ m.label }}</span>
-          <span class="chip-count">{{ m.count }} tools</span>
+          <span class="chip-label">{{ tt(m.key) }}</span>
+          <span class="chip-count">{{ m.count }} {{ tt("home.toolsSuffix") }}</span>
         </a>
       </div>
     </section>
 
     <section class="shared">
       <a v-for="s in shared" :key="s.href" class="scard" :href="s.href">
-        <strong>{{ s.label }}</strong>
-        <span>{{ s.sub }}</span>
+        <strong>{{ tt(s.key) }}</strong>
+        <span>{{ tt(s.subKey) }}</span>
       </a>
     </section>
   </div>

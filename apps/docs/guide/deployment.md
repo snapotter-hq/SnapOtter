@@ -209,6 +209,8 @@ docker logs SnapOtter 2>&1 | head -20
 
 These numbers come from benchmarks across a range of systems, from a modern amd64 workstation with an NVIDIA RTX 4070 down to a Raspberry Pi, running the whole tool catalog on each and sweeping Docker resource limits to find the real floor.
 
+Running at the small end of these tiers (a Pi, an old laptop, a 2 GB VPS)? [Low-Resource Setups](/guide/low-resource) turns these numbers into a concrete walkthrough with tuned caps.
+
 ### Quick Reference {#quick-reference}
 
 | Tier | Use Case | CPU | RAM | GPU | Storage |

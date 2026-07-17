@@ -77,7 +77,28 @@ for bundle_id in ${BUNDLE_IDS}; do
   mkdir -p "${staging}"
   tar -xzf "${archive}" -C "${staging}"
   if [[ -d "${staging}/site-packages" ]]; then
-    cp -a "${staging}/site-packages/." "${SITE_PACKAGES}/"
+    # Layer through the REAL installer merge (reconcile + move_tree), not a raw
+    # cp: install_feature.py reconciles the ONNX Runtime flavor between bundles
+    # (#490), and this script must verify the state users actually end up with.
+    # INSTALL_FEATURE_PY can point at a repo checkout mounted over an older
+    # image (same pattern as the install_runtime.py mounts in ai-bundles.yml).
+    "${VENV}/bin/python3" - "${staging}/site-packages" "${SITE_PACKAGES}" <<'PYMERGE'
+import importlib.util, os, sys
+
+script = os.environ.get("INSTALL_FEATURE_PY", "/app/packages/ai/python/install_feature.py")
+spec = importlib.util.spec_from_file_location("installer_under_verify", script)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+if not hasattr(mod, "reconcile_onnxruntime"):
+    print(f"FAIL: {script} has no reconcile_onnxruntime; mount the current "
+          "packages/ai/python/install_feature.py into the container "
+          "(-v $PWD/packages/ai/python/install_feature.py:/app/packages/ai/python/install_feature.py:ro)",
+          file=sys.stderr)
+    sys.exit(1)
+staging_sp, site_packages = sys.argv[1], sys.argv[2]
+mod.reconcile_onnxruntime(staging_sp, site_packages)
+mod.move_tree(staging_sp, site_packages)
+PYMERGE
   fi
   rm -rf "${staging}"
   echo "  Installed ${bundle_id}"
@@ -165,6 +186,37 @@ print('All constrained packages present in exactly one, correct version.')
 if [[ $? -ne 0 ]]; then
   fail "Constrained-package consistency check failed -- see violations above" 2
 fi
+
+log "Checking ONNX Runtime flavor consistency"
+
+"${VENV}/bin/python3" - "${SITE_PACKAGES}" <<'PYFLAVOR' || fail "ONNX Runtime flavor check failed" 2
+import os, sys
+
+sp = sys.argv[1]
+names = os.listdir(sp)
+cpu = sorted(n for n in names if n.startswith("onnxruntime-") and n.endswith(".dist-info"))
+gpu = sorted(n for n in names if n.startswith("onnxruntime_gpu-") and n.endswith(".dist-info"))
+
+if cpu and gpu:
+    print(f"FAIL: both ONNX Runtime flavors present after layering: {cpu + gpu}. "
+          "A bundle is shipping the CPU build alongside another bundle's GPU build; "
+          "the merged venv's flavor then depends on install order (#490).",
+          file=sys.stderr)
+    sys.exit(1)
+
+if gpu:
+    cuda_lib = os.path.join(sp, "onnxruntime", "capi", "libonnxruntime_providers_cuda.so")
+    if not os.path.exists(cuda_lib):
+        print("FAIL: onnxruntime_gpu metadata is present but the CUDA provider library "
+              "is missing: a CPU build clobbered the GPU build's files (#490).",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"  ONNX Runtime flavor: GPU ({gpu[-1]}), CUDA provider library present")
+elif cpu:
+    print(f"  ONNX Runtime flavor: CPU ({cpu[-1]})")
+else:
+    print("  ONNX Runtime not present in any bundle")
+PYFLAVOR
 
 pass "All bundles for ${ARCH} are mutually compatible"
 log "Done"

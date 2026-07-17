@@ -1,7 +1,7 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production với Docker. Yêu cầu phần cứng, cài đặt GPU, và cấu hình reverse proxy cho Nginx, Traefik, và Cloudflare."
 i18n_output_hash: 80f0326c4672
-i18n_source_hash: e0d8d5f6fc87
+i18n_source_hash: 98172965118b
 i18n_provenance: human
 ---
 
@@ -217,6 +217,8 @@ docker logs SnapOtter 2>&1 | head -20
 ## Yêu cầu phần cứng {#hardware-requirements}
 
 Các con số này đến từ các phép đo hiệu năng trên nhiều hệ thống khác nhau, từ một máy trạm amd64 hiện đại với NVIDIA RTX 4070 xuống đến một Raspberry Pi, chạy toàn bộ danh mục công cụ trên mỗi máy và quét qua các giới hạn tài nguyên Docker để tìm ngưỡng thực tế.
+
+Chạy ở mức thấp nhất của các cấp này (một chiếc Pi, laptop cũ, VPS 2 GB)? [Thiết lập trên phần cứng hạn chế](/vi/guide/low-resource) biến những con số này thành hướng dẫn từng bước cụ thể với các giới hạn đã tinh chỉnh.
 
 ### Tham chiếu nhanh {#quick-reference}
 

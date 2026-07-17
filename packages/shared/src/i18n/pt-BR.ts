@@ -2812,6 +2812,8 @@ export const ptBR: TranslationKeys = {
       signingPercent: "Assinando… {percent}%",
       downloadSigned: "Baixar PDF assinado",
       addFirst: "Adicione pelo menos uma assinatura antes de baixar.",
+      loadFailed:
+        "Não foi possível exibir este PDF. O arquivo pode estar corrompido ou protegido por senha; se estiver criptografado, remova a senha primeiro com a ferramenta Desbloquear PDF.",
       pad: {
         title: "Criar assinatura",
         draw: "Desenhar",

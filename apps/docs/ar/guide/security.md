@@ -1,7 +1,7 @@
 ---
 description: "دليل تعزيز أمان SnapOtter. أمان الحاويات، وعزل الشبكة، وأسرار Docker، ونشر Kubernetes، وأدوات الامتثال."
 i18n_source_hash: 986f7658430c
-i18n_provenance: machine
+i18n_provenance: human
 i18n_output_hash: 41275618e244
 ---
 

@@ -1,7 +1,7 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
 i18n_output_hash: 83a518bd23e4
-i18n_source_hash: 24724b5595b2
+i18n_source_hash: 68bf7f60b68d
 i18n_provenance: human
 ---
 
@@ -18,6 +18,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 تشغّل هذه الحاوية الواحدة كل ما تحتاجه: مع عدم تعيين `DATABASE_URL`، تبدأ PostgreSQL و Redis الخاصين بها على واجهة الاسترجاع (الوضع المدمج) وتحتفظ بجميع البيانات في وحدة التخزين `SnapOtter-data`. إنها أسرع طريقة لتجربة SnapOtter أو الاستضافة الذاتية على مختبر منزلي. لبيئة الإنتاج، شغّل حزمة [Docker Compose](#docker-compose) أدناه، التي تبقي PostgreSQL و Redis في حاوياتهما الخاصة. يعمل الوضع المدمج كـ root (الافتراضي) ويتوقف تلقائيًا بمجرد تعيينك لـ `DATABASE_URL`.
+
+هل تثبّت على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير؟ راجع [التشغيل على موارد محدودة](/ar/guide/low-resource) للاطلاع على شرح تطبيقي مضبوط وما يمكن توقعه من العتاد المحدود.
 
 سيُطلب منك تغيير كلمة مرورك عند أول تسجيل دخول.
 
