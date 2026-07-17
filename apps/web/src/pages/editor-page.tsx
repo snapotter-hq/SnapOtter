@@ -157,7 +157,7 @@ export function EditorPage() {
   }
 
   return (
-    <main className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
+    <main className="flex flex-col h-dvh overflow-hidden bg-background text-foreground">
       <h1 className="sr-only">{t.editor.welcome.heading}</h1>
       <EditorMenuBar
         onNewDocument={() => setShowNewDocument(true)}

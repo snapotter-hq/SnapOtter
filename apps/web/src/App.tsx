@@ -64,7 +64,7 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="flex h-dvh items-center justify-center bg-background text-foreground">
           <div className="text-center space-y-4 max-w-md px-6">
             <h1 className="text-xl font-semibold">{en.common.somethingWentWrong}</h1>
             <p className="text-sm text-muted-foreground">
@@ -108,7 +108,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+      <div className="flex h-dvh items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-3">
           <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-muted-foreground">{en.common.loading}</p>
@@ -132,7 +132,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 // Single page-level loading fallback — shown while JS for a route downloads.
 function PageLoader() {
   return (
-    <div className="flex h-screen items-center justify-center bg-background text-foreground">
+    <div className="flex h-dvh items-center justify-center bg-background text-foreground">
       <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );

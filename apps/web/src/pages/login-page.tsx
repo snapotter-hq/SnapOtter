@@ -246,7 +246,7 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex h-screen bg-background">
+    <main className="flex h-dvh bg-background">
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div>

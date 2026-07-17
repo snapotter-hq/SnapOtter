@@ -35,9 +35,14 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
   }, [fetchSettings]);
 
   return (
+    // h-dvh (dynamic viewport height), not h-screen/100vh: on mobile browsers
+    // 100vh is the *tall* viewport (URL bar retracted), so with overflow-hidden
+    // the fixed bottom nav and the in-flow "Process" peek bar render below the
+    // visible area and can't be scrolled to after a file is uploaded. dvh tracks
+    // the actual visible viewport, keeping the bottom controls reachable.
     <div
       className={cn(
-        "flex flex-col h-screen bg-background text-foreground overflow-hidden",
+        "flex flex-col h-dvh bg-background text-foreground overflow-hidden",
         bannerVisible && "pt-9",
       )}
     >
