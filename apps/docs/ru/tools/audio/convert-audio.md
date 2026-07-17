@@ -1,13 +1,13 @@
 ---
 description: "Преобразование аудио между форматами MP3, WAV, OGG, FLAC и M4A."
-i18n_source_hash: fd02c059e6a9
+i18n_source_hash: 27fd2f49f472
 i18n_provenance: human
 i18n_output_hash: 23fa00361fd5
 ---
 
 # Преобразование аудио {#convert-audio}
 
-Преобразуйте аудиофайлы между распространёнными форматами, включая MP3, WAV, OGG, FLAC и M4A, с настраиваемым выходным битрейтом.
+Преобразуйте аудиофайлы между распространёнными форматами, включая MP3, WAV, OGG, FLAC и M4A, с настраиваемым выходным битрейтом и частотой дискретизации.
 
 ## Конечная точка API {#api-endpoint}
 
@@ -21,6 +21,7 @@ i18n_output_hash: 23fa00361fd5
 |-----------|------|----------|---------|-------------|
 | format | string | Нет | `"mp3"` | Выходной формат: `mp3`, `wav`, `ogg`, `flac`, `m4a` |
 | bitrateKbps | integer | Нет | `192` | Выходной битрейт в кбит/с (от 32 до 320) |
+| sampleRate | integer | Нет | исходная частота | Выходная частота дискретизации в Гц: `8000`, `16000`, `22050`, `32000`, `44100`, `48000` или `96000`. Не указывайте, чтобы сохранить исходную частоту |
 
 ## Пример запроса {#example-request}
 
@@ -28,7 +29,7 @@ i18n_output_hash: 23fa00361fd5
 curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@audio.mp3" \
-  -F 'settings={"format": "flac", "bitrateKbps": 256}'
+  -F 'settings={"format": "mp3", "bitrateKbps": 192, "sampleRate": 44100}'
 ```
 
 ## Пример ответа {#example-response}
@@ -36,9 +37,9 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/audio.flac",
+  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/audio.mp3",
   "originalSize": 4500000,
-  "processedSize": 8200000
+  "processedSize": 2800000
 }
 ```
 
@@ -46,4 +47,6 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
 
 - Поддерживаемые входные форматы включают MP3, WAV, OGG, FLAC, AAC, M4A, WMA, AIFF и OPUS.
 - Битрейт применяется только к форматам с потерями (MP3, OGG, M4A). Форматы без потерь, такие как WAV и FLAC, игнорируют эту настройку.
+- Вывод в MP3 поддерживает частоту дискретизации до 48000 Гц. Значение 96000 Гц применяется только к WAV, OGG, FLAC и M4A.
+- Битрейт MP3 ограничен частотой дискретизации: не более 64 кбит/с при 8000 Гц и 160 кбит/с при 16000 или 22050 Гц. Запросы выше этого ограничения отклоняются, а не понижаются без предупреждения.
 - Имя выходного файла сохраняет исходное имя с новым расширением.

@@ -2319,6 +2319,8 @@ export const hi: TranslationKeys = {
     "convert-audio": {
       format: "आउटपुट फ़ॉर्मैट",
       bitrate: "बिटरेट (kbps)",
+      sampleRate: "सैंपल रेट (Hz)",
+      sampleRatePreserve: "मूल बनाए रखें",
       submit: "कन्वर्ट करें",
       submitBatch: "कन्वर्ट करें ({count} फ़ाइलें)",
       progressLabel: "कन्वर्ट हो रहा है",

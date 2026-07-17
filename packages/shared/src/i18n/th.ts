@@ -2473,6 +2473,8 @@ export const th: TranslationKeys = {
     "convert-audio": {
       format: "รูปแบบเอาต์พุต",
       bitrate: "บิตเรต (kbps)",
+      sampleRate: "อัตราสุ่มตัวอย่าง (Hz)",
+      sampleRatePreserve: "คงค่าเดิม",
       submit: "แปลง",
       submitBatch: "แปลง ({count} ไฟล์)",
       progressLabel: "กำลังแปลง",

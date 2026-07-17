@@ -2442,6 +2442,8 @@ export const ko: TranslationKeys = {
     "convert-audio": {
       format: "출력 형식",
       bitrate: "비트레이트 (kbps)",
+      sampleRate: "샘플 레이트 (Hz)",
+      sampleRatePreserve: "원본 유지",
       submit: "변환",
       submitBatch: "변환 ({count}개 파일)",
       progressLabel: "변환 중",

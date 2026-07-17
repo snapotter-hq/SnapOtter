@@ -2508,6 +2508,8 @@ export const nl: TranslationKeys = {
     "convert-audio": {
       format: "Uitvoerformaat",
       bitrate: "Bitrate (kbps)",
+      sampleRate: "Samplefrequentie (Hz)",
+      sampleRatePreserve: "Origineel behouden",
       submit: "Converteren",
       submitBatch: "Converteren ({count} bestanden)",
       progressLabel: "Converteren",

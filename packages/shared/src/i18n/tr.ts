@@ -2506,6 +2506,8 @@ export const tr: TranslationKeys = {
     "convert-audio": {
       format: "Çıktı formatı",
       bitrate: "Bit hızı (kbps)",
+      sampleRate: "Örnekleme hızı (Hz)",
+      sampleRatePreserve: "Orijinali koru",
       submit: "Dönüştür",
       submitBatch: "Dönüştür ({count} dosya)",
       progressLabel: "Dönüştürülüyor",

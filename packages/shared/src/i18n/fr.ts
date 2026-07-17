@@ -2519,6 +2519,8 @@ export const fr: TranslationKeys = {
     "convert-audio": {
       format: "Format de sortie",
       bitrate: "Débit (kbps)",
+      sampleRate: "Fréquence d'échantillonnage (Hz)",
+      sampleRatePreserve: "Conserver l'originale",
       submit: "Convertir",
       submitBatch: "Convertir ({count} fichiers)",
       progressLabel: "Conversion",

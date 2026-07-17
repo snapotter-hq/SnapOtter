@@ -2462,6 +2462,8 @@ export const ja: TranslationKeys = {
     "convert-audio": {
       format: "出力形式",
       bitrate: "ビットレート (kbps)",
+      sampleRate: "サンプルレート (Hz)",
+      sampleRatePreserve: "元のまま維持",
       submit: "変換",
       submitBatch: "変換 ({count} ファイル)",
       progressLabel: "変換中",

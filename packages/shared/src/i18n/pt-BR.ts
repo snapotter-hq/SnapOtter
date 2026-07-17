@@ -2504,6 +2504,8 @@ export const ptBR: TranslationKeys = {
     "convert-audio": {
       format: "Formato de saída",
       bitrate: "Taxa de bits (kbps)",
+      sampleRate: "Taxa de amostragem (Hz)",
+      sampleRatePreserve: "Manter original",
       submit: "Converter",
       submitBatch: "Converter ({count} arquivos)",
       progressLabel: "Convertendo",

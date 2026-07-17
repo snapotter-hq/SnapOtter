@@ -2261,6 +2261,8 @@ export const zhTW: TranslationKeys = {
     "convert-audio": {
       format: "輸出格式",
       bitrate: "位元率 (kbps)",
+      sampleRate: "取樣率 (Hz)",
+      sampleRatePreserve: "保留原始",
       submit: "轉換",
       submitBatch: "轉換（{count} 個檔案）",
       progressLabel: "正在轉換",

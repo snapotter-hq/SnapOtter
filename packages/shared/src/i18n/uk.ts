@@ -2504,6 +2504,8 @@ export const uk: TranslationKeys = {
     "convert-audio": {
       format: "Вихідний формат",
       bitrate: "Бітрейт (kbps)",
+      sampleRate: "Частота дискретизації (Hz)",
+      sampleRatePreserve: "Зберегти вихідну",
       submit: "Конвертувати",
       submitBatch: "Конвертувати ({count} файлів)",
       progressLabel: "Конвертація",

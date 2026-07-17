@@ -2261,6 +2261,8 @@ export const zhCN: TranslationKeys = {
     "convert-audio": {
       format: "输出格式",
       bitrate: "比特率 (kbps)",
+      sampleRate: "采样率 (Hz)",
+      sampleRatePreserve: "保留原始",
       submit: "转换",
       submitBatch: "转换（{count} 个文件）",
       progressLabel: "正在转换",

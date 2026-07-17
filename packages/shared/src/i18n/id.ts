@@ -2502,6 +2502,8 @@ export const id: TranslationKeys = {
     "convert-audio": {
       format: "Format keluaran",
       bitrate: "Bitrate (kbps)",
+      sampleRate: "Laju sampel (Hz)",
+      sampleRatePreserve: "Pertahankan asli",
       submit: "Konversi",
       submitBatch: "Konversi ({count} file)",
       progressLabel: "Mengonversi",

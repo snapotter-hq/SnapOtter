@@ -2503,6 +2503,8 @@ export const vi: TranslationKeys = {
     "convert-audio": {
       format: "Định dạng đầu ra",
       bitrate: "Tốc độ bit (kbps)",
+      sampleRate: "Tần số lấy mẫu (Hz)",
+      sampleRatePreserve: "Giữ nguyên gốc",
       submit: "Chuyển đổi",
       submitBatch: "Chuyển đổi ({count} tệp)",
       progressLabel: "Đang chuyển đổi",

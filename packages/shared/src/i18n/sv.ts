@@ -2501,6 +2501,8 @@ export const sv: TranslationKeys = {
     "convert-audio": {
       format: "Utdataformat",
       bitrate: "Bithastighet (kbps)",
+      sampleRate: "Samplingsfrekvens (Hz)",
+      sampleRatePreserve: "Behåll original",
       submit: "Konvertera",
       submitBatch: "Konvertera ({count} filer)",
       progressLabel: "Konverterar",

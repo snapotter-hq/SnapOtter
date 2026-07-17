@@ -2453,6 +2453,8 @@ export const en = {
     "convert-audio": {
       format: "Output format",
       bitrate: "Bitrate (kbps)",
+      sampleRate: "Sample rate (Hz)",
+      sampleRatePreserve: "Preserve original",
       submit: "Convert",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",

@@ -2489,6 +2489,8 @@ export const ar: TranslationKeys = {
     "convert-audio": {
       format: "تنسيق الإخراج",
       bitrate: "معدل البت (kbps)",
+      sampleRate: "معدل أخذ العينات (Hz)",
+      sampleRatePreserve: "الاحتفاظ بالأصلي",
       submit: "تحويل",
       submitBatch: "تحويل ({count} ملفات)",
       progressLabel: "جارٍ التحويل",
