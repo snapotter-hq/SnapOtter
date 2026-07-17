@@ -84,7 +84,7 @@ Alla tak är miljövariabler och dokumenteras fullständigt i [Konfiguration](/s
 
 | Variabel | Förslag för små maskiner | Vad den skyddar |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Hur många jobb som körs parallellt. Autodetekteringen använder antalet CPU-kärnor minus en, vilket är bra på stora maskiner och för ivrigt på en 2-kärnig låda under minnestryck. |
+| `CONCURRENT_JOBS` | `1` | Hur många jobb som körs parallellt. Autodetekteringen använder antalet CPU-kärnor minus en, vilket är bra på stora maskiner och för ivrigt på en 2-kärnig maskin under minnestryck. |
 | `MAX_WORKER_THREADS` | `2` | Trådpool för bildbehandling. |
 | `MAX_BATCH_SIZE` | `5` | Batchar är där maskiner med 1-2 GB får slut på minne först. |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Hindrar en enda enorm fil från att uppta hela arbetsytan. |

@@ -9,8 +9,8 @@ SnapOtter küçük donanımda iyi çalışır: bir Raspberry Pi 4 veya 5, eski b
 
 Baştan iki kesin kısıt:
 
-- **Yalnızca 64 bit.** İmaj `linux/amd64` ve `linux/arm64` için derlenir. 32 bit ARM (`armv7`/`armhf`) desteklenmez; bu yüzden birinci nesil Pi'ler ve Pi Zero ailesi devre dışıdır.
-- **2 GB bellek tabanı.** 512 MB yığını başlatamaz, 1 GB ise çok dosyalı toplu işlerde başarısız olur. Rahat çalışan en küçük yapılandırma 2 çekirdekli 2 GB'dir.
+- **Yalnızca 64 bit.** İmaj `linux/amd64` ve `linux/arm64` için oluşturulur. 32 bit ARM (`armv7`/`armhf`) desteklenmez; bu yüzden birinci nesil Pi'ler ve Pi Zero ailesi devre dışıdır.
+- **2 GB bellek alt sınırı.** 512 MB yığını başlatamaz, 1 GB ise çok dosyalı toplu işlerde başarısız olur. Rahat çalışan en küçük yapılandırma 2 çekirdekli 2 GB'dir.
 
 ## Küçük donanımda neler iyi çalışır {#what-runs-well}
 
@@ -19,7 +19,7 @@ AI olmayan her araç 2 GB / 2 çekirdekli bir makinede çalışır: Görsel ve D
 İki iş yükü istisnadır:
 
 - **Videoyu yeniden kodlama** (codec'ler arasında dönüştürme) CPU'ya bağlıdır. Hızlı bir masaüstü CPU'sunda ~40 sn süren bir 1080p klip, Pi sınıfı bir CPU'da birkaç dakika sürebilir. Stream copy işlemleri anlık kalır.
-- **AI araçları** RAM (4 GB önerilir) ve disk ister (büyük paketlerin her biri 4-5 GB'dir) ve ağır olanlar (ölçeklendirme, fotoğraf restorasyonu, arka plan kaldırma) Pi sınıfı CPU'larda pratik değildir. Yüz algılama ve OCR gibi hafif AI, belleğiniz yetiyorsa kullanılabilir.
+- **AI araçları** RAM (4 GB önerilir) ve disk ister (büyük paketlerin her biri 4-5 GB'dir) ve ağır olanlar (ölçek büyütme, fotoğraf restorasyonu, arka plan kaldırma) Pi sınıfı CPU'larda pratik değildir. Yüz algılama ve OCR gibi hafif AI, belleğiniz yetiyorsa kullanılabilir.
 
 İkisi de siz kullanmadıkça kurulmaz ve çalışmaz: hiçbir AI paketi kurulu değilken uygulama boşta yaklaşık 360 MB kullanır ve AI paketleri yalnızca bir yönetici etkinleştirdiğinde indirilir.
 
@@ -84,7 +84,7 @@ Tüm sınırlar ortam değişkenleridir ve [Yapılandırma](/tr/guide/configurat
 
 | Değişken | Küçük makine önerisi | Neyi korur |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Kaç işin paralel çalıştığı. Otomatik algılama CPU çekirdek sayısının bir eksiğini kullanır; bu büyük makinelerde iyidir, bellek baskısı altındaki 2 çekirdekli bir kutuda ise fazla isteklidir. |
+| `CONCURRENT_JOBS` | `1` | Kaç işin paralel çalıştığı. Otomatik algılama CPU çekirdek sayısının bir eksiğini kullanır; bu büyük makinelerde iyidir, bellek baskısı altındaki 2 çekirdekli bir makinede ise fazla isteklidir. |
 | `MAX_WORKER_THREADS` | `2` | Görüntü işleme iş parçacığı havuzu. |
 | `MAX_BATCH_SIZE` | `5` | 1-2 GB'lık makinelerin belleği ilk önce toplu işlerde tükenir. |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Tek bir devasa dosyanın tüm çalışma alanını kaplamasını önler. |
@@ -96,7 +96,7 @@ Bu sınırlar sunucunun neyi kabul ettiğini belirler; bu yüzden onları olabil
 
 ## Nelerden vazgeçmeli {#what-to-skip}
 
-- **Ağır AI paketleri.** Ölçeklendirme, fotoğraf restorasyonu ve arka plan kaldırma bir GPU veya çok çekirdekli hızlı bir CPU ister ve her paket 4-5 GB disk kaplar. Küçük bir makinede bunları kurmamanız yeterlidir; paketi eksik olan araçlar çalışmak yerine bir kurulum istemi gösterir.
+- **Ağır AI paketleri.** Ölçek büyütme, fotoğraf restorasyonu ve arka plan kaldırma bir GPU veya çok çekirdekli hızlı bir CPU ister ve her paket 4-5 GB disk kaplar. Küçük bir makinede bunları kurmamanız yeterlidir; paketi eksik olan araçlar çalışmak yerine bir kurulum istemi gösterir.
 - **Rutin iş yükü olarak video yeniden kodlama.** Ara sıra dönüştürme sorun değildir (yalnızca yavaştır); sürekli bir dönüştürme kuyruğu CPU çekirdeği ister, Pi değil.
 - **Genel olarak kullanılmayan araçlar.** Bir yönetici Settings içinden tek tek araçları kapatabilir; bu, onları arayüzden kaldırır ve API rotalarının kaydını durdurur. Bu tek başına bellek kazandırmaz, ancak paylaşılan küçük bir örneğin donanımın kaldıramayacağı o tek iş yükü için kullanılmasını engeller.
 

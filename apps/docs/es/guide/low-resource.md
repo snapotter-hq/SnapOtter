@@ -84,7 +84,7 @@ Todos los topes son variables de entorno, documentadas al completo en [Configura
 
 | Variable | Sugerencia para máquinas pequeñas | Qué protege |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Cuántos jobs se ejecutan en paralelo. La autodetección usa los núcleos de CPU menos uno, lo cual va bien en máquinas grandes y es demasiado agresivo en una caja de 2 núcleos con presión de memoria. |
+| `CONCURRENT_JOBS` | `1` | Cuántos jobs se ejecutan en paralelo. La autodetección usa los núcleos de CPU menos uno, lo cual va bien en máquinas grandes y es demasiado agresivo en una máquina de 2 núcleos con presión de memoria. |
 | `MAX_WORKER_THREADS` | `2` | Grupo de hilos del procesamiento de imágenes. |
 | `MAX_BATCH_SIZE` | `5` | Los lotes son donde las máquinas de 1-2 GB se quedan sin memoria primero. |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Evita que un solo archivo enorme ocupe todo el espacio de trabajo. |

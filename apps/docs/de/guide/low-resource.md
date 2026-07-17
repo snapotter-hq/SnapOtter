@@ -18,7 +18,7 @@ Jedes Nicht-KI-Tool funktioniert auf einer Maschine mit 2 GB und 2 Kernen: die B
 
 Zwei Workloads sind die Ausnahme:
 
-- **Video-Neukodierung** (Konvertieren zwischen Codecs) ist CPU-gebunden. Ein 1080p-Clip, der auf einer schnellen Desktop-CPU ~40 s braucht, kann auf einer CPU der Pi-Klasse mehrere Minuten dauern. Stream-Copy-Operationen bleiben sofort fertig.
+- **Video-Neukodierung** (Konvertieren zwischen Codecs) ist CPU-gebunden. Ein 1080p-Clip, der auf einer schnellen Desktop-CPU ~40 s braucht, kann auf einer CPU der Pi-Klasse mehrere Minuten dauern. Stream-Copy-Operationen sind weiterhin sofort erledigt.
 - **KI-Tools** brauchen RAM (4 GB empfohlen) und Festplattenplatz (die größeren Bundles sind je 4-5 GB groß), und die schweren (Hochskalierung, Foto-Wiederherstellung, Hintergrundentfernung) sind auf CPUs der Pi-Klasse nicht praktikabel. Leichte KI wie Gesichtserkennung und OCR ist nutzbar, wenn der Speicher dafür reicht.
 
 Beides ist weder installiert noch aktiv, solange du es nicht benutzt: Ohne installierte KI-Bundles braucht die App im Leerlauf rund 360 MB, und KI-Bundles werden erst heruntergeladen, wenn ein Admin sie aktiviert.
@@ -76,7 +76,7 @@ Hinweise für Maschinen der Pi-Klasse:
 - **Nimm lieber eine USB-SSD statt einer SD-Karte** für das Daten-Volume und Postgres. Job-Workspaces erzeugen echtes Disk-IO, und SD-Karten sind langsam und schnell verschlissen.
 - **Der All-in-One-Einzelcontainer funktioniert hier ebenfalls** (eingebettetes Postgres und Redis, wenn `DATABASE_URL`/`REDIS_URL` nicht gesetzt sind). Auf einem Host mit knappem Speicher solltest du das Limit seines eingebetteten Redis mit `REDIS_MAXMEMORY` senken (siehe [Konfiguration](/de/guide/configuration)). Compose gibt dir feinere Kontrolle pro Service, deshalb nutzt diese Anleitung Compose.
 - **Richte auf 2-GB-Geräten Swap ein.** Das verhindert, dass die gelegentliche Spitze (ein großes PDF, ein Stapel, den du zu begrenzen vergessen hast) in einem Out-of-Memory-Kill endet. zram ist die SD-Karten-freundliche Variante.
-- Das arm64-Image ist reine CPU; auf ARM-Boards gibt es kein CUDA.
+- Das arm64-Image läuft nur auf der CPU; auf ARM-Boards gibt es kein CUDA.
 
 ## Die Stellschrauben {#tuning-knobs}
 

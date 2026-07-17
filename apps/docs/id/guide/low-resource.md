@@ -96,7 +96,7 @@ Batas-batas ini berlaku pada apa yang diterima server, jadi aturlah agar sesuai 
 
 ## Apa yang sebaiknya dilewati {#what-to-skip}
 
-- **Bundel AI berat.** Peningkatan skala, pemulihan foto, dan penghapusan latar belakang membutuhkan GPU atau CPU banyak-core yang cepat, dan setiap bundel memakan 4-5 GB disk. Di mesin kecil, cukup jangan pasang bundel tersebut; perkakas yang bundelnya tidak ada akan menampilkan ajakan pemasangan alih-alih berjalan.
+- **Bundel AI berat.** Peningkatan skala, pemulihan foto, dan penghapusan latar belakang membutuhkan GPU atau CPU banyak-core yang cepat, dan setiap bundel memakan 4-5 GB disk. Di mesin kecil, cukup jangan pasang bundel tersebut; perkakas yang bundelnya tidak ada akan menampilkan prompt pemasangan alih-alih berjalan.
 - **Re-encoding video sebagai beban kerja rutin.** Transcode sesekali tidak masalah (hanya lambat); antrean transcode yang terus-menerus membutuhkan core CPU, bukan Pi.
 - **Perkakas yang tidak terpakai secara umum.** Admin dapat mematikan perkakas satu per satu di Settings, yang menghapusnya dari UI dan menghentikan pendaftaran rute API-nya. Itu sendiri tidak menghemat memori, tetapi mencegah instance kecil yang dipakai bersama digunakan untuk satu-satunya beban kerja yang tidak sanggup ditangani perangkat kerasnya.
 

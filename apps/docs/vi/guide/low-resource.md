@@ -74,7 +74,7 @@ services:
 Lưu ý cho các máy cỡ Pi:
 
 - **Ưu tiên SSD USB thay vì thẻ SD** cho volume dữ liệu và Postgres. Không gian làm việc của các job tạo ra IO đĩa thực sự, còn thẻ SD vừa chậm vừa nhanh hỏng.
-- **Container đơn tất-cả-trong-một cũng hoạt động ở đây** (Postgres và Redis nhúng khi `DATABASE_URL`/`REDIS_URL` không được đặt), và trên máy chủ hạn chế bộ nhớ, bạn nên hạ mức trần của Redis nhúng bằng `REDIS_MAXMEMORY` (xem [Cấu hình](/vi/guide/configuration)). Compose cho bạn quyền kiểm soát chi tiết hơn theo từng dịch vụ, đó là lý do hướng dẫn này dùng nó.
+- **Container đơn tất cả trong một cũng hoạt động ở đây** (Postgres và Redis nhúng khi `DATABASE_URL`/`REDIS_URL` không được đặt), và trên máy chủ hạn chế bộ nhớ, bạn nên hạ mức trần của Redis nhúng bằng `REDIS_MAXMEMORY` (xem [Cấu hình](/vi/guide/configuration)). Compose cho bạn quyền kiểm soát chi tiết hơn theo từng dịch vụ, đó là lý do hướng dẫn này dùng nó.
 - **Thêm swap trên các thiết bị 2 GB.** Nó giúp những đợt tăng đột biến thi thoảng (một PDF lớn, một lô bạn quên giới hạn) không kết thúc bằng việc bị kill do hết bộ nhớ. zram là lựa chọn thân thiện với thẻ SD.
 - Image arm64 chỉ chạy CPU; không có CUDA trên các bo mạch ARM.
 
