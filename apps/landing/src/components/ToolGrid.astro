@@ -4,7 +4,7 @@
 import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
 import * as lucideIcons from "lucide";
 import { t } from "@/i18n";
-import { localizeHref } from "@/lib/i18n-page";
+import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 import { loadToolStrings } from "@/lib/tool-strings";
 import type { ModalityFilter, ToolSearchItem } from "../lib/tool-search";
 import SectionHeading from "./SectionHeading.astro";
@@ -169,7 +169,7 @@ function toToolSearchItem(tool: (typeof TOOLS)[number]): ToolSearchItem {
     description: toolStrings[tool.id]?.description ?? tool.description,
     modality: tool.modality as ToolModality,
     category: tool.category,
-    url: localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`),
+    url: enOnlyHref(`/tools/${toolSection(tool)}/${tool.id}/`),
     icon: tool.icon,
     iconSvg: renderIcon(tool.icon),
     color: category?.color ?? "#E07832",

@@ -19,6 +19,16 @@ export function localizeHref(locale: string, path: string): string {
   return `${getRelativeLocaleUrl(locale, clean)}${hash}`;
 }
 
+/**
+ * Href for a page that is built ONLY in English: the individual tool-detail pages
+ * under /tools/<section>/<tool> and the /self-hosted pages. These have no per-locale
+ * route, so a locale-prefixed URL would 404. Always emit the un-prefixed English URL
+ * so localized pages link to the page that actually exists.
+ */
+export function enOnlyHref(path: string): string {
+  return localizeHref("en", path);
+}
+
 /** Direction attribute for the current locale. */
 export function dirFor(locale: string): "ltr" | "rtl" {
   return isRtl(locale) ? "rtl" : "ltr";

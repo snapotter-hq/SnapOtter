@@ -1,7 +1,7 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { t } from "@/i18n";
-import { localizeHref } from "@/lib/i18n-page";
+import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 import { formatCompact, getStarCount } from "@/lib/stats";
 
 interface Props {
@@ -16,12 +16,12 @@ type NavItem = { label: string; href: string; external?: boolean; desc?: string 
 const productLinks: NavItem[] = [
   {
     label: t(locale, "nav.product.developers.label"),
-    href: localizeHref(locale, "/self-hosted/file-conversion-api"),
+    href: enOnlyHref("/self-hosted/file-conversion-api"),
     desc: t(locale, "nav.product.developers.desc"),
   },
   {
     label: t(locale, "nav.product.selfHosted.label"),
-    href: localizeHref(locale, "/self-hosted"),
+    href: enOnlyHref("/self-hosted"),
     desc: t(locale, "nav.product.selfHosted.desc"),
   },
   {

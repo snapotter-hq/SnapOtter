@@ -3,7 +3,7 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import LanguageSwitcher from "@/components/LanguageSwitcher.astro";
 import { t } from "@/i18n";
-import { localizeHref } from "@/lib/i18n-page";
+import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 
 interface Props {
   locale?: string;
@@ -29,7 +29,7 @@ const columns = [
     title: t(locale, "footer.col.solutions"),
     links: [
       { label: t(locale, "footer.link.enterprise"), href: localizeHref(locale, "/#enterprise") },
-      { label: t(locale, "footer.link.selfHosted"), href: localizeHref(locale, "/self-hosted") },
+      { label: t(locale, "footer.link.selfHosted"), href: enOnlyHref("/self-hosted") },
       { label: t(locale, "footer.link.openSource"), href: localizeHref(locale, "/#open-source") },
       { label: t(locale, "footer.link.alternatives"), href: localizeHref(locale, "/alternatives") },
       { label: t(locale, "footer.link.pricing"), href: localizeHref(locale, "/#pricing") },
