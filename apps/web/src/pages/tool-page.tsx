@@ -913,7 +913,7 @@ export function ToolPage() {
             <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
             <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
             {processedSize != null && (
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground">
                 {processedFileType} &middot; {formatFileSize(processedSize)}
               </p>
             )}
@@ -1014,7 +1014,7 @@ export function ToolPage() {
               <p className="text-sm text-muted-foreground mb-1">
                 {ext} &middot; {formatFileSize(fsize)}
               </p>
-              <p className="text-xs text-muted-foreground/60">{t.toolPage.previewUnavailable}</p>
+              <p className="text-xs text-muted-foreground">{t.toolPage.previewUnavailable}</p>
             </div>
           </div>
         );

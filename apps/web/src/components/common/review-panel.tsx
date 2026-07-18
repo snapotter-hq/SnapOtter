@@ -256,7 +256,7 @@ export function ReviewPanel({
       <div className="flex justify-center">
         <Link
           to="/"
-          className="text-xs text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1"
+          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
         >
           <ArrowLeft className="h-3 w-3" />
           {t.toolPage.backToTools}

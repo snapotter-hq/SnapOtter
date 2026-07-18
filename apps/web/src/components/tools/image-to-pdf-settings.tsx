@@ -97,7 +97,7 @@ function PdfPagePreview({
           {/* Empty state placeholder */}
           {!imgUrl && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] text-muted-foreground/40">No image</span>
+              <span className="text-[10px] text-muted-foreground">No image</span>
             </div>
           )}
         </div>

@@ -210,7 +210,7 @@ export function HistoryPanel() {
               className={cn(
                 "flex items-center gap-2 w-full px-2 py-1.5 text-start text-xs transition-colors",
                 isCurrent && "bg-primary/10 text-foreground font-medium",
-                isFuture && "text-muted-foreground/40",
+                isFuture && "text-muted-foreground",
                 !isCurrent &&
                   !isFuture &&
                   "text-muted-foreground hover:bg-muted hover:text-foreground",

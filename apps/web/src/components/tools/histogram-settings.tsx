@@ -199,7 +199,7 @@ export function HistogramSettings() {
                   </span>
                 </div>
               ))}
-              <p className="col-span-2 text-[9px] text-muted-foreground/60 mt-0.5">
+              <p className="col-span-2 text-[9px] text-muted-foreground mt-0.5">
                 mean / median / stdev
               </p>
             </div>

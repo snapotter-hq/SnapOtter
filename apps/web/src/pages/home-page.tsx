@@ -250,7 +250,7 @@ function HomeSearchBar({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full ps-11 pe-20 py-2.5 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-shadow"
+        className="w-full ps-11 pe-20 py-2.5 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-shadow"
       />
       {value ? (
         <button
@@ -478,7 +478,7 @@ function AllTabContent({
       {/* Pinned */}
       {pinnedTools.length > 0 && (
         <section>
-          <h2 className="text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-widest mb-2">
+          <h2 className="text-[11px] font-semibold uppercase text-muted-foreground tracking-widest mb-2">
             {t.homePage.pinned}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -492,7 +492,7 @@ function AllTabContent({
       {/* Recent */}
       {recentTools.length > 0 && (
         <section>
-          <h2 className="text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-widest mb-2">
+          <h2 className="text-[11px] font-semibold uppercase text-muted-foreground tracking-widest mb-2">
             {t.homePage.recent}
           </h2>
           <div className="flex flex-wrap gap-1.5">
@@ -555,7 +555,7 @@ function AllTabContent({
                   const tools = categoryMap.get(category.id) ?? [];
                   return (
                     <div key={category.id}>
-                      <h3 className="text-[11px] font-semibold uppercase text-muted-foreground/50 tracking-widest mb-1.5">
+                      <h3 className="text-[11px] font-semibold uppercase text-muted-foreground tracking-widest mb-1.5">
                         {getCategoryName(t, category.id, category.name)}
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -592,7 +592,7 @@ function CategoryGrid({ groupedTools }: { groupedTools: Map<string, Tool[]> }) {
         const tools = groupedTools.get(category.id) ?? [];
         return (
           <section key={category.id}>
-            <h2 className="text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-widest mb-2 pb-1.5 border-b border-border/40">
+            <h2 className="text-[11px] font-semibold uppercase text-muted-foreground tracking-widest mb-2 pb-1.5 border-b border-border/40">
               {getCategoryName(t, category.id, category.name)}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
