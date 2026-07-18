@@ -200,7 +200,7 @@ export function ReviewPanel({
       {/* Result already auto-saved to the library: show where it went
           instead of the manual save link (avoids duplicate saves). */}
       {!isDataOutput && savedLibraryFileId && (
-        <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+        <div className="flex items-center justify-center gap-1.5 text-xs text-success-ink">
           <CheckCircle2 className="h-3 w-3" />
           {t.toolPage.savedToFiles}
           <Link to="/files" className="underline underline-offset-2 hover:text-foreground">
