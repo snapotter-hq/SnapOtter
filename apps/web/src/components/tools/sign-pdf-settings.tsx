@@ -186,8 +186,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     form.append("placements", JSON.stringify(placements));
     form.append("clientJobId", clientJobId);
     // Forward the library file id (when the PDF came from the library) so the
-    // worker auto-saves the signed result as a new version.
-    if (currentEntry?.serverFileId) form.append("fileId", currentEntry.serverFileId);
+    // worker auto-saves the signed result, honoring the chosen save mode
+    // (new file by default, overwrite on request).
+    if (currentEntry?.serverFileId) {
+      form.append("fileId", currentEntry.serverFileId);
+      form.append("saveMode", useFileStore.getState().librarySaveMode);
+    }
     pngs.forEach((png, i) => {
       form.append(`sig${i}`, new File([png], `sig${i}.png`, { type: "image/png" }));
     });

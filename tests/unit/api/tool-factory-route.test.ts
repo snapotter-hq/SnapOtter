@@ -220,6 +220,7 @@ function createMockRequest(opts: {
   filename?: string;
   settings?: string;
   fileId?: string;
+  saveMode?: string;
   clientJobId?: string;
   fileCount?: number;
 }) {
@@ -256,6 +257,15 @@ function createMockRequest(opts: {
       type: "field",
       fieldname: "fileId",
       value: opts.fileId,
+      file: (async function* () {})(),
+    });
+  }
+
+  if (opts.saveMode) {
+    parts.push({
+      type: "field",
+      fieldname: "saveMode",
+      value: opts.saveMode,
       file: (async function* () {})(),
     });
   }
@@ -408,6 +418,65 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({ error: "Invalid settings" }),
       );
+    });
+
+    it("returns 400 for an invalid saveMode field", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        fileId: "lib-1",
+        saveMode: "bogus",
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.stringContaining("saveMode") }),
+      );
+    });
+
+    it("passes a valid saveMode through to the enqueued job", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        fileId: "lib-1",
+        saveMode: "overwrite",
+      });
+
+      await handler(req, reply);
+
+      expect(vi.mocked(enqueueToolJob).mock.calls[0][0]).toMatchObject({
+        fileId: "lib-1",
+        saveMode: "overwrite",
+      });
+    });
+
+    it("enqueues no saveMode when the field is absent", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        fileId: "lib-1",
+      });
+
+      await handler(req, reply);
+
+      expect(vi.mocked(enqueueToolJob).mock.calls[0][0].saveMode).toBeUndefined();
     });
 
     it("returns 501 when AI feature bundle is not installed", async () => {

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
+import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -132,6 +133,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
       let fileId: string | null = null;
+      let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
       let bgBuffer: Buffer | null = null;
       let bgName = "background";
@@ -157,6 +159,8 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
             }
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
+          } else if (part.fieldname === "saveMode") {
+            saveModeRaw = part.value as string;
           }
         }
       } catch (err) {
@@ -164,6 +168,11 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           error: "Failed to parse multipart request",
           details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
+      }
+
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
       }
 
       if (!inputKey) {
@@ -247,6 +256,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
         dbSettings: settings, // keep the internal bgImageKey out of the audit row
         clientJobId: clientJobId ?? undefined,
         fileId: fileId ?? undefined,
+        saveMode,
         kind: "ai-tool",
       });
 

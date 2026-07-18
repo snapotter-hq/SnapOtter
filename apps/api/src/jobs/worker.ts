@@ -417,12 +417,14 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Generate preview for non-browser-previewable formats
       const previewRef = await generatePreview(resultBuffer, resultContentType, jobId, inputBuffer);
 
-      // Auto-save a new version when the input came from the user's library
-      // (data.fileId is set by tool-factory when the upload referenced a
-      // library file). Without a fileId this is a no-op, so tool-first uploads
-      // are not auto-saved.
+      // Auto-save when the input came from the user's library (data.fileId is
+      // set by the route when the upload referenced a library file). saveMode
+      // picks between an independent new file (default) and a superseding
+      // version. Without a fileId this is a no-op, so tool-first uploads are
+      // not auto-saved.
       const savedFileId = await autoSaveToLibrary({
         fileId: data.fileId,
+        saveMode: data.saveMode,
         userId: data.userId,
         buffer: resultBuffer,
         outName,

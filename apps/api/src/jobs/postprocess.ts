@@ -11,6 +11,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
+import type { LibrarySaveMode } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
@@ -173,6 +174,8 @@ export async function generatePreview(
 
 export interface AutoSaveOpts {
   fileId?: string;
+  /** "overwrite" supersedes the original with a linked version; "new" (default) keeps it. */
+  saveMode?: LibrarySaveMode;
   userId: string | null;
   buffer: Buffer;
   outName: string;
@@ -182,8 +185,12 @@ export interface AutoSaveOpts {
 
 /**
  * Auto-save a processed output to the persistent user file library when a
- * fileId is provided. Creates a new version linked to the parent file with
- * the tool appended to the toolChain.
+ * fileId is provided. The tool is appended to the parent's toolChain either
+ * way; saveMode decides the linkage (issue #495):
+ *   - "new" (default): independent root row (version 1, no parentId), so the
+ *     original stays visible in the leaf-only library list.
+ *   - "overwrite": new version linked to the parent (version + 1, parentId),
+ *     which supersedes the original in the list.
  *
  * Returns the new file ID on success, undefined when no fileId or on error.
  */
@@ -201,7 +208,7 @@ export async function autoSaveToLibrary(opts: AutoSaveOpts): Promise<string | un
     // another user's file via a known fileId.
     if (parent.userId !== opts.userId) return undefined;
 
-    const newVersion = parent.version + 1;
+    const overwrite = opts.saveMode === "overwrite";
     const parentChain: string[] = parent.toolChain ?? [];
     const newToolChain = [...parentChain, opts.toolId];
     const storedName = await saveFile(opts.buffer, opts.outName);
@@ -245,8 +252,8 @@ export async function autoSaveToLibrary(opts: AutoSaveOpts): Promise<string | un
       size: opts.buffer.length,
       width,
       height,
-      version: newVersion,
-      parentId: opts.fileId,
+      version: overwrite ? parent.version + 1 : 1,
+      parentId: overwrite ? opts.fileId : null,
       toolChain: newToolChain,
     });
     return newId;
