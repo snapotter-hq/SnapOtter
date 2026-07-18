@@ -37,11 +37,12 @@ describe("Feature manifest structure", () => {
     expect(manifest.basePackages).toBeInstanceOf(Array);
   });
 
-  it("all 7 bundles are defined", () => {
-    expect(Object.keys(bundles)).toHaveLength(7);
+  it("all 8 bundles are defined", () => {
+    expect(Object.keys(bundles)).toHaveLength(8);
     expect(bundles["background-removal"]).toBeDefined();
     expect(bundles["face-detection"]).toBeDefined();
     expect(bundles["object-eraser-colorize"]).toBeDefined();
+    expect(bundles["inpaint-hq"]).toBeDefined();
     expect(bundles["upscale-enhance"]).toBeDefined();
     expect(bundles["photo-restoration"]).toBeDefined();
     expect(bundles.ocr).toBeDefined();

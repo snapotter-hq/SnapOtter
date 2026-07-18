@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { inpaint } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { FEATURE_BUNDLES, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { stripInternalPaths } from "../../lib/errors.js";
-import { isToolInstalled } from "../../lib/feature-status.js";
+import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
@@ -23,7 +23,11 @@ const settingsSchema = z.object({
     .enum(["auto", "png", "jpg", "jpeg", "webp", "tiff", "gif", "avif", "heic", "heif", "jxl"])
     .default("auto"),
   quality: z.number().int().min(1).max(100).default(95),
+  // "fast" = LaMa (always available); "hq" = diffusion, gated behind inpaint-hq.
+  qualityMode: z.enum(["fast", "hq"]).default("fast"),
 });
+
+const HQ_BUNDLE_ID = "inpaint-hq";
 
 /**
  * Object eraser / inpainting route.
@@ -58,6 +62,7 @@ export function registerEraseObject(app: FastifyInstance) {
       let fileId: string | null = null;
       let format = "png";
       let quality = 95;
+      let qualityMode = "fast";
       let imageKey: string | null = null;
       let maskKey: string | null = null;
 
@@ -84,6 +89,8 @@ export function registerEraseObject(app: FastifyInstance) {
             format = (part.value as string) || "png";
           } else if (part.fieldname === "quality") {
             quality = Number(part.value) || 95;
+          } else if (part.fieldname === "qualityMode") {
+            qualityMode = (part.value as string) || "fast";
           }
         }
       } catch (err) {
@@ -114,8 +121,8 @@ export function registerEraseObject(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
       }
 
-      // Validate format and quality via Zod
-      const settingsResult = settingsSchema.safeParse({ format, quality });
+      // Validate format, quality, and quality mode via Zod
+      const settingsResult = settingsSchema.safeParse({ format, quality, qualityMode });
       if (!settingsResult.success) {
         return reply.status(400).send({
           error: "Invalid settings",
@@ -126,6 +133,21 @@ export function registerEraseObject(app: FastifyInstance) {
       }
       format = settingsResult.data.format;
       quality = settingsResult.data.quality;
+      qualityMode = settingsResult.data.qualityMode;
+
+      // High-Quality mode needs the optional diffusion bundle on top of the base
+      // (LaMa) bundle already checked above. Fail loud with the standard install
+      // contract; never silently downgrade HQ to the fast path.
+      if (qualityMode === "hq" && !isFeatureInstalled(HQ_BUNDLE_ID)) {
+        const hqBundle = FEATURE_BUNDLES[HQ_BUNDLE_ID];
+        return reply.status(501).send({
+          error: "Feature not installed",
+          code: "FEATURE_NOT_INSTALLED",
+          feature: HQ_BUNDLE_ID,
+          featureName: hqBundle?.name ?? "High-Quality Inpainting",
+          estimatedSize: hqBundle?.estimatedSize ?? "unknown",
+        });
+      }
 
       if (format === "auto") {
         const detected = await resolveOutputFormat(imageBuffer, filename);
@@ -167,7 +189,7 @@ export function registerEraseObject(app: FastifyInstance) {
         pool: "ai",
         inputRefs: [imageKey, maskKey],
         filename,
-        settings: { format, quality },
+        settings: { format, quality, qualityMode },
         clientJobId: clientJobId ?? undefined,
         fileId: fileId ?? undefined,
         kind: "ai-tool",
@@ -188,8 +210,12 @@ registerAiJobHandler("erase-object", async (input, data, ctx) => {
   const format = settings.format;
   const quality = settings.quality;
 
-  const resultBuffer = await inpaint(input, maskBuffer, ctx.scratchDir, (percent, stage) =>
-    ctx.report(percent, stage),
+  const resultBuffer = await inpaint(
+    input,
+    maskBuffer,
+    ctx.scratchDir,
+    (percent, stage) => ctx.report(percent, stage),
+    settings.qualityMode,
   );
 
   // Convert to requested output format

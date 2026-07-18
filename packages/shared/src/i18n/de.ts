@@ -1575,6 +1575,9 @@ export const de: TranslationKeys = {
       progressLabelBatch: "{count} Bilder werden hochskaliert",
     },
     "erase-object": {
+      qualityFast: "Schnell",
+      qualityHq: "Hohe Qualität",
+      qualityHint: "Hohe Qualität nutzt ein Diffusionsmodell für große Objekte und feine Texturen.",
       brushMode: "Pinsel",
       lassoMode: "Lasso",
       brushSize: "Pinselgröße",

@@ -1530,6 +1530,9 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像をアップスケール中",
     },
     "erase-object": {
+      qualityFast: "高速",
+      qualityHq: "高品質",
+      qualityHint: "高品質は大きなオブジェクトや細かいテクスチャに拡散モデルを使用します。",
       brushMode: "ブラシ",
       lassoMode: "投げ縄",
       brushSize: "ブラシサイズ",

@@ -1336,6 +1336,9 @@ export const zhCN: TranslationKeys = {
       progressLabelBatch: "正在放大 {count} 张图片",
     },
     "erase-object": {
+      qualityFast: "快速",
+      qualityHq: "高质量",
+      qualityHint: "高质量使用扩散模型处理大型物体和精细纹理。",
       brushMode: "画笔",
       lassoMode: "套索",
       brushSize: "画笔大小",

@@ -1571,6 +1571,9 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang phóng to {count} ảnh",
     },
     "erase-object": {
+      qualityFast: "Nhanh",
+      qualityHq: "Chất lượng cao",
+      qualityHint: "Chất lượng cao dùng mô hình khuếch tán cho vật thể lớn và kết cấu chi tiết.",
       brushMode: "Cọ",
       lassoMode: "Lasso",
       brushSize: "Kích thước cọ",

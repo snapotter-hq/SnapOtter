@@ -1388,6 +1388,9 @@ export const hi: TranslationKeys = {
       progressLabelBatch: "{count} इमेज अपस्केल हो रही हैं",
     },
     "erase-object": {
+      qualityFast: "तेज़",
+      qualityHq: "उच्च गुणवत्ता",
+      qualityHint: "उच्च गुणवत्ता बड़ी वस्तुओं और विस्तृत बनावट के लिए डिफ्यूज़न मॉडल का उपयोग करती है।",
       brushMode: "ब्रश",
       lassoMode: "लासो",
       brushSize: "ब्रश साइज़",

@@ -129,12 +129,13 @@ test.describe("Feature listing baseline", () => {
     const res = await request.get(`${API}/api/v1/features`, { headers });
     expect(res.ok()).toBeTruthy();
     const data = (await res.json()) as FeatureResponse;
-    expect(data.bundles).toHaveLength(7);
+    expect(data.bundles).toHaveLength(8);
 
     const expectedIds = [
       "background-removal",
       "face-detection",
       "object-eraser-colorize",
+      "inpaint-hq",
       "upscale-enhance",
       "photo-restoration",
       "ocr",

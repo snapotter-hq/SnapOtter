@@ -1568,6 +1568,10 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Uppskalar {count} bilder",
     },
     "erase-object": {
+      qualityFast: "Snabb",
+      qualityHq: "Hög kvalitet",
+      qualityHint:
+        "Hög kvalitet använder en diffusionsmodell för stora objekt och detaljerade texturer.",
       brushMode: "Pensel",
       lassoMode: "Lasso",
       brushSize: "Penselstorlek",

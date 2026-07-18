@@ -1336,6 +1336,9 @@ export const zhTW: TranslationKeys = {
       progressLabelBatch: "正在放大{count}張影像",
     },
     "erase-object": {
+      qualityFast: "快速",
+      qualityHq: "高品質",
+      qualityHint: "高品質使用擴散模型處理大型物件與精細紋理。",
       brushMode: "筆刷",
       lassoMode: "套索",
       brushSize: "筆刷大小",

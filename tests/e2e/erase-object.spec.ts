@@ -231,4 +231,42 @@ test.describe("Erase Object tool", () => {
     // Both files now have masks -> batch submit button.
     await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
   });
+
+  test("High Quality mode is gated on the inpaint-hq pack and blocks submit until installed", async ({
+    loggedInPage: page,
+  }) => {
+    // gotoEraser mocks only object-eraser-colorize as installed, so the optional
+    // inpaint-hq (diffusion) pack reads as missing.
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+
+    // The Fast/High-Quality toggle is present; Fast is the default.
+    await expect(page.getByTestId("eraser-quality-fast")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("eraser-quality-hq")).toBeVisible();
+
+    // Paint a stroke so the ONLY thing gating submit is the quality mode.
+    const canvas = page.locator("canvas");
+    await canvas.waitFor({ state: "visible", timeout: 5_000 });
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("Canvas not found");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2);
+    await page.mouse.up();
+
+    // Fast mode with a stroke: submit is enabled.
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+
+    // Switch to High Quality: the pack is missing, so submit is blocked (never a
+    // silent downgrade to the fast path) and the install prompt appears.
+    await page.getByTestId("eraser-quality-hq").click();
+    await expect(page.getByTestId("eraser-quality-hq")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("erase-object-submit")).toBeDisabled();
+    await expect(page.getByTestId("eraser-install-hq")).toBeVisible();
+
+    // Back to Fast: submit re-enables and the prompt is gone.
+    await page.getByTestId("eraser-quality-fast").click();
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+    await expect(page.getByTestId("eraser-install-hq")).toHaveCount(0);
+  });
 });

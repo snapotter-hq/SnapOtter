@@ -7,6 +7,7 @@ import {
   PYTHON_SIDECAR_TOOLS,
   TOOL_BUNDLE_MAP,
   TOOL_EXTRA_BUNDLES,
+  TOOL_OPTIONAL_BUNDLE_MAP,
 } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
@@ -30,39 +31,58 @@ describe("Feature bundles", () => {
     expect(tools).not.toContain("upscale");
   });
 
-  it("all 7 bundles are defined", () => {
-    expect(Object.keys(FEATURE_BUNDLES)).toHaveLength(7);
+  it("all 8 bundles are defined", () => {
+    expect(Object.keys(FEATURE_BUNDLES)).toHaveLength(8);
     expect(FEATURE_BUNDLES["background-removal"]).toBeDefined();
     expect(FEATURE_BUNDLES["face-detection"]).toBeDefined();
     expect(FEATURE_BUNDLES["object-eraser-colorize"]).toBeDefined();
+    expect(FEATURE_BUNDLES["inpaint-hq"]).toBeDefined();
     expect(FEATURE_BUNDLES["upscale-enhance"]).toBeDefined();
     expect(FEATURE_BUNDLES["photo-restoration"]).toBeDefined();
     expect(FEATURE_BUNDLES.ocr).toBeDefined();
     expect(FEATURE_BUNDLES.transcription).toBeDefined();
   });
 
-  it("TOOL_BUNDLE_MAP covers sidecar tools without an optional capability pack", () => {
+  it("every sidecar tool is reachable; only built-in-fast tools skip the required map", () => {
     const mappedTools = Object.keys(TOOL_BUNDLE_MAP);
     for (const toolId of PYTHON_SIDECAR_TOOLS) {
-      if (getOptionalBundleForTool(toolId)) {
+      // Reachable via a required primary and/or an optional upgrade pack.
+      expect(
+        getBundleForTool(toolId) !== null || getOptionalBundleForTool(toolId) !== null,
+        `${toolId} has no bundle at all`,
+      ).toBe(true);
+      // A tool ABSENT from TOOL_BUNDLE_MAP must be a built-in-fast tool whose only
+      // bundle is an optional pack (e.g. OCR's Fast tier + accurate pack). A tool
+      // with a required base stays mapped even if it also has an optional upgrade
+      // pack (e.g. erase-object's LaMa base + inpaint-hq diffusion pack).
+      if (!mappedTools.includes(toolId)) {
         expect(
-          mappedTools,
-          `${toolId} must remain available without its optional pack`,
-        ).not.toContain(toolId);
-      } else {
-        expect(mappedTools, `${toolId} missing from TOOL_BUNDLE_MAP`).toContain(toolId);
+          getOptionalBundleForTool(toolId),
+          `${toolId} is neither required-mapped nor a built-in-fast optional-pack tool`,
+        ).not.toBeNull();
       }
     }
   });
 });
 
 describe("Feature bundle edge cases", () => {
-  it("no duplicate tools across bundles", () => {
-    const allTools: string[] = [];
+  it("no tool appears in two non-optional bundles (an optional pack may re-list its tool)", () => {
+    const firstBundle = new Map<string, string>();
     for (const bundle of Object.values(FEATURE_BUNDLES)) {
       for (const tool of bundle.enablesTools) {
-        expect(allTools, `Tool ${tool} appears in multiple bundles`).not.toContain(tool);
-        allTools.push(tool);
+        const prior = firstBundle.get(tool);
+        if (prior === undefined) {
+          firstBundle.set(tool, bundle.id);
+          continue;
+        }
+        // The only allowed overlap: a tool's optional upgrade pack re-lists a
+        // tool its primary bundle already enables (e.g. inpaint-hq over
+        // erase-object). Any other pairing is an accidental duplicate.
+        const optional = TOOL_OPTIONAL_BUNDLE_MAP[tool];
+        expect(
+          optional !== undefined && (prior === optional || bundle.id === optional),
+          `Tool ${tool} appears in two non-optional bundles (${prior}, ${bundle.id})`,
+        ).toBe(true);
       }
     }
   });
@@ -156,5 +176,21 @@ describe("TOOL_EXTRA_BUNDLES", () => {
         expect(bundleId, `${toolId} lists its primary bundle as an extra`).not.toBe(primary);
       }
     }
+  });
+});
+
+describe("inpaint-hq optional upgrade for erase-object", () => {
+  it("keeps object-eraser-colorize as the required primary; inpaint-hq stays optional", () => {
+    // The HQ diffusion pack upgrades Object Eraser but must not gate it: the base
+    // LaMa bundle remains the tool's required primary, and HQ is a separate,
+    // explicit install check (mirrors OCR's Fast tier + optional accurate pack).
+    expect(FEATURE_BUNDLES["inpaint-hq"]).toBeDefined();
+    expect(TOOL_BUNDLE_MAP["erase-object"]).toBe("object-eraser-colorize");
+    expect(TOOL_OPTIONAL_BUNDLE_MAP["erase-object"]).toBe("inpaint-hq");
+    expect(getBundleForTool("erase-object")?.id).toBe("object-eraser-colorize");
+    expect(getOptionalBundleForTool("erase-object")?.id).toBe("inpaint-hq");
+    // erase-object must NOT require inpaint-hq (fast path works without it).
+    expect(getRequiredBundlesForTool("erase-object")).toEqual(["object-eraser-colorize"]);
+    expect(getRequiredBundlesForTool("erase-object")).not.toContain("inpaint-hq");
   });
 });

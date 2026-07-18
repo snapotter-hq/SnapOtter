@@ -1568,6 +1568,10 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Memperbesar {count} gambar",
     },
     "erase-object": {
+      qualityFast: "Cepat",
+      qualityHq: "Kualitas tinggi",
+      qualityHint:
+        "Kualitas tinggi menggunakan model difusi untuk objek besar dan tekstur mendetail.",
       brushMode: "Kuas",
       lassoMode: "Laso",
       brushSize: "Ukuran Kuas",

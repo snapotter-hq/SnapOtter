@@ -1522,6 +1522,9 @@ export const en = {
       progressLabelBatch: "Upscaling {count} images",
     },
     "erase-object": {
+      qualityFast: "Fast",
+      qualityHq: "High quality",
+      qualityHint: "High quality uses a diffusion model for large objects and detailed textures.",
       brushMode: "Brush",
       lassoMode: "Lasso",
       brushSize: "Brush Size",

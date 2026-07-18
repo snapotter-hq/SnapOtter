@@ -283,7 +283,7 @@ describe("custom async AI image routes", () => {
           expect.stringContaining("subject.png"),
           expect.stringContaining("mask.png"),
         ]),
-        settings: { format: "webp", quality: 72 },
+        settings: { format: "webp", quality: 72, qualityMode: "fast" },
         kind: "ai-tool",
       }),
     );

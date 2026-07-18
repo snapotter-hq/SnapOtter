@@ -69,6 +69,14 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     estimatedSize: "1-2 GB",
     enablesTools: ["erase-object", "colorize", "ai-canvas-expand"],
   },
+  "inpaint-hq": {
+    id: "inpaint-hq",
+    name: "High-Quality Inpainting",
+    description:
+      "Diffusion-based object removal for large objects, detailed textures, and structured backgrounds",
+    estimatedSize: "5-7 GB",
+    enablesTools: ["erase-object"],
+  },
   "upscale-enhance": {
     id: "upscale-enhance",
     name: "Upscale & Enhance",
@@ -107,14 +115,22 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
 export const TOOL_OPTIONAL_BUNDLE_MAP: Readonly<Record<string, string>> = {
   ocr: "ocr",
   "ocr-pdf": "ocr",
+  // High-Quality (diffusion) inpainting upgrades Object Eraser without gating
+  // it: the base LaMa model in `object-eraser-colorize` stays the tool's
+  // required primary. `getRequiredBundlesForTool("erase-object")` is unchanged;
+  // HQ availability is a separate, explicit `inpaint-hq` install check.
+  "erase-object": "inpaint-hq",
 };
 
 export const TOOL_BUNDLE_MAP: Record<string, string> = {};
 for (const [bundleId, bundle] of Object.entries(FEATURE_BUNDLES)) {
   for (const toolId of bundle.enablesTools) {
-    if (!TOOL_OPTIONAL_BUNDLE_MAP[toolId]) {
-      TOOL_BUNDLE_MAP[toolId] = bundleId;
-    }
+    // An optional pack must never claim a tool's required-primary slot, but a
+    // different, non-optional bundle still can. Skip only when THIS bundle is
+    // the tool's optional pack; the first non-optional bundle to list the tool
+    // wins. This is behavior-identical for every tool that has no optional pack.
+    if (TOOL_OPTIONAL_BUNDLE_MAP[toolId] === bundleId) continue;
+    if (!TOOL_BUNDLE_MAP[toolId]) TOOL_BUNDLE_MAP[toolId] = bundleId;
   }
 }
 

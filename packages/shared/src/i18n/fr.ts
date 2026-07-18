@@ -1582,6 +1582,10 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Agrandissement de {count} images",
     },
     "erase-object": {
+      qualityFast: "Rapide",
+      qualityHq: "Haute qualité",
+      qualityHint:
+        "La haute qualité utilise un modèle de diffusion pour les grands objets et les textures détaillées.",
       brushMode: "Pinceau",
       lassoMode: "Lasso",
       brushSize: "Taille du pinceau",

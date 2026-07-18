@@ -1558,6 +1558,10 @@ export const es: TranslationKeys = {
       progressLabelBatch: "Escalando {count} imágenes",
     },
     "erase-object": {
+      qualityFast: "Rápido",
+      qualityHq: "Alta calidad",
+      qualityHint:
+        "La alta calidad usa un modelo de difusión para objetos grandes y texturas detalladas.",
       brushMode: "Pincel",
       lassoMode: "Lazo",
       brushSize: "Tamaño del pincel",

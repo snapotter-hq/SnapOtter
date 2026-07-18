@@ -1571,6 +1571,10 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntü büyütülüyor",
     },
     "erase-object": {
+      qualityFast: "Hızlı",
+      qualityHq: "Yüksek kalite",
+      qualityHint:
+        "Yüksek kalite, büyük nesneler ve ayrıntılı dokular için bir difüzyon modeli kullanır.",
       brushMode: "Fırça",
       lassoMode: "Kement",
       brushSize: "Fırça Boyutu",

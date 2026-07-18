@@ -1558,6 +1558,9 @@ export const ar: TranslationKeys = {
       progressLabelBatch: "جاري تكبير {count} صورة",
     },
     "erase-object": {
+      qualityFast: "سريع",
+      qualityHq: "جودة عالية",
+      qualityHint: "الجودة العالية تستخدم نموذج انتشار للأجسام الكبيرة والقوام التفصيلي.",
       brushMode: "فرشاة",
       lassoMode: "لاسو",
       brushSize: "حجم الفرشاة",

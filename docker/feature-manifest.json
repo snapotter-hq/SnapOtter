@@ -203,6 +203,54 @@
       "smokeImports": ["onnxruntime"],
       "enablesTools": ["erase-object", "colorize", "ai-canvas-expand"]
     },
+    "inpaint-hq": {
+      "name": "High-Quality Inpainting",
+      "description": "Diffusion-based object removal for large objects and detailed textures",
+      "estimatedSize": "5-7 GB",
+      "archives": {
+        "amd64-gpu": {
+          "file": "v2.0.0/inpaint-hq-amd64-gpu.tar.gz",
+          "sha256": "da65c2b7e678b50815c7c2d8ae4594ad7bbf4c1e84682bfc91b46948cdff71de",
+          "compressedSize": 7283076233,
+          "extractedSize": 10745029298
+        },
+        "arm64-cpu": {
+          "file": "v2.0.0/inpaint-hq-arm64-cpu.tar.gz",
+          "sha256": "b854b101a6190dde94d9d0039129941122c62df7c9a6429d425231cf4fa4630f",
+          "compressedSize": 5130985609,
+          "extractedSize": 7159491153
+        }
+      },
+      "packages": {
+        "common": [
+          "diffusers==0.31.0",
+          "transformers==4.46.3",
+          "accelerate==1.2.1",
+          "safetensors==0.4.5",
+          "huggingface-hub[hf_xet]==0.36.2"
+        ],
+        "amd64": [
+          "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126"
+        ],
+        "arm64": [
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu"
+        ]
+      },
+      "pipFlags": {},
+      "postInstall": [],
+      "models": [
+        {
+          "id": "sd15-inpainting",
+          "downloadFn": "hf_snapshot",
+          "args": ["stable-diffusion-v1-5/stable-diffusion-inpainting", "sd15-inpainting"],
+          "allowPatterns": ["*.json", "*.txt", "tokenizer/*", "*.fp16.safetensors"],
+          "path": "sd15-inpainting/unet/diffusion_pytorch_model.fp16.safetensors",
+          "minSize": 1000000000
+        }
+      ],
+      "smokeImports": ["diffusers", "torch"],
+      "enablesTools": ["erase-object"]
+    },
     "upscale-enhance": {
       "name": "Upscale & Enhance",
       "description": "AI upscaling, face enhancement, and noise removal",

@@ -48,12 +48,13 @@ test.describe("Feature API", () => {
     });
     expect(response.ok()).toBeTruthy();
     const data = (await response.json()) as { bundles: BundleInfo[] };
-    expect(data.bundles).toHaveLength(7);
+    expect(data.bundles).toHaveLength(8);
 
     const expectedBundles = [
       "background-removal",
       "face-detection",
       "object-eraser-colorize",
+      "inpaint-hq",
       "upscale-enhance",
       "photo-restoration",
       "ocr",

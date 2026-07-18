@@ -333,9 +333,14 @@ for model in models:
 
         kwargs = {"repo_id": repo_id, "local_dir": local_dir}
 
-        # Only download specific file if specified
+        # Restrict the snapshot when specified. "file" pins one file (single-file
+        # models like an ONNX weight); "allowPatterns" narrows a multi-file model
+        # (e.g. a diffusers pipeline) to the fp16 weight variant + configs so the
+        # bundle does not ship unused fp32/.bin weights.
         if "file" in model:
             kwargs["allow_patterns"] = [model["file"]]
+        elif "allowPatterns" in model:
+            kwargs["allow_patterns"] = model["allowPatterns"]
 
         # Handle non-default repo types (e.g. "space")
         if "repoType" in model:

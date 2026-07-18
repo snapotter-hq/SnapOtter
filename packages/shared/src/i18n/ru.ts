@@ -1571,6 +1571,10 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Увеличение {count} изображений",
     },
     "erase-object": {
+      qualityFast: "Быстро",
+      qualityHq: "Высокое качество",
+      qualityHint:
+        "Высокое качество использует диффузионную модель для больших объектов и детальных текстур.",
       brushMode: "Кисть",
       lassoMode: "Лассо",
       brushSize: "Размер кисти",

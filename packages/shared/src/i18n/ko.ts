@@ -1512,6 +1512,9 @@ export const ko: TranslationKeys = {
       progressLabelBatch: "{count}개 이미지 업스케일 중",
     },
     "erase-object": {
+      qualityFast: "빠름",
+      qualityHq: "고품질",
+      qualityHint: "고품질은 큰 객체와 세밀한 텍스처에 디퓨전 모델을 사용합니다.",
       brushMode: "브러시",
       lassoMode: "올가미",
       brushSize: "브러시 크기",

@@ -17,6 +17,7 @@ export const SCRIPT_BUNDLE_MAP: Record<string, string> = {
   face_landmarks: "face-detection",
   red_eye_removal: "face-detection",
   inpaint: "object-eraser-colorize",
+  inpaint_hq: "inpaint-hq",
   outpaint: "object-eraser-colorize",
   colorize: "object-eraser-colorize",
   upscale: "upscale-enhance",

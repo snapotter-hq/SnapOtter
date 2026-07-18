@@ -1571,6 +1571,10 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Ampliando {count} imagens",
     },
     "erase-object": {
+      qualityFast: "Rápido",
+      qualityHq: "Alta qualidade",
+      qualityHint:
+        "A alta qualidade usa um modelo de difusão para objetos grandes e texturas detalhadas.",
       brushMode: "Pincel",
       lassoMode: "Laço",
       brushSize: "Tamanho do pincel",

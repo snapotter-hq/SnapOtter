@@ -1548,6 +1548,9 @@ export const th: TranslationKeys = {
       progressLabelBatch: "กำลังขยาย {count} ภาพ",
     },
     "erase-object": {
+      qualityFast: "เร็ว",
+      qualityHq: "คุณภาพสูง",
+      qualityHint: "คุณภาพสูงใช้โมเดล diffusion สำหรับวัตถุขนาดใหญ่และพื้นผิวที่มีรายละเอียด",
       brushMode: "แปรง",
       lassoMode: "ลาสโซ",
       brushSize: "ขนาดแปรง",

@@ -1,12 +1,17 @@
-import { Download, Lasso, Paintbrush, Redo, Trash2 } from "lucide-react";
+import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
-import { format } from "@/lib/format";
+import { format, formatFileSize } from "@/lib/format";
 import { generateId } from "@/lib/utils";
+import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
+
+type QualityMode = "fast" | "hq";
+const HQ_BUNDLE_ID = "inpaint-hq";
 
 const OUTPUT_FORMATS = [
   "png",
@@ -160,6 +165,22 @@ export function EraseObjectSettings({
 
   const [outputFormat, setOutputFormat] = useState("png");
   const [quality, setQuality] = useState(95);
+  const [qualityMode, setQualityMode] = useState<QualityMode>("fast");
+
+  // High-Quality (diffusion) mode is backed by the optional inpaint-hq bundle.
+  // Mirrors the OCR quality control: pick the mode, and if the pack is missing
+  // show the standard install prompt instead of silently running the fast path.
+  const { hasPermission } = useAuth();
+  const hqBundle = useFeaturesStore((s) => s.bundles.find((b) => b.id === HQ_BUNDLE_ID));
+  const hqInstalled = hqBundle?.status === "installed";
+  const installBundle = useFeaturesStore((s) => s.installBundle);
+  const hqInstalling = useFeaturesStore((s) => s.installing[HQ_BUNDLE_ID]);
+  const hqQueued = useFeaturesStore((s) => s.queued.includes(HQ_BUNDLE_ID));
+  const hqInstallError = useFeaturesStore((s) => s.errors[HQ_BUNDLE_ID]);
+  const needsHqPack = qualityMode === "hq" && !hqInstalled;
+  const isAdmin = hasPermission("features:manage");
+  const hqSizeBytes = hqBundle?.missingDownloadBytes ?? hqBundle?.downloadBytes;
+  const hqSize = hqSizeBytes ? formatFileSize(hqSizeBytes) : (hqBundle?.estimatedSize ?? "5-7 GB");
 
   const processOneFile = (
     entryIndex: number,
@@ -199,6 +220,7 @@ export function EraseObjectSettings({
       formData.append("clientJobId", clientJobId);
       formData.append("format", outputFormat);
       formData.append("quality", String(quality));
+      formData.append("qualityMode", qualityMode);
 
       const xhr = new XMLHttpRequest();
       xhr.timeout = 600_000;
@@ -323,6 +345,7 @@ export function EraseObjectSettings({
     formData.append("clientJobId", clientJobId);
     formData.append("format", outputFormat);
     formData.append("quality", String(quality));
+    formData.append("qualityMode", qualityMode);
 
     const xhr = new XMLHttpRequest();
     xhr.timeout = 600_000;
@@ -482,6 +505,81 @@ export function EraseObjectSettings({
         </button>
       </div>
 
+      {/* Quality: Fast (LaMa, always available) vs High quality (diffusion, inpaint-hq) */}
+      <div>
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
+          <button
+            type="button"
+            data-testid="eraser-quality-fast"
+            aria-pressed={qualityMode === "fast"}
+            disabled={processing}
+            onClick={() => setQualityMode("fast")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
+              qualityMode === "fast"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            {t.toolSettings["erase-object"].qualityFast}
+          </button>
+          <button
+            type="button"
+            data-testid="eraser-quality-hq"
+            aria-pressed={qualityMode === "hq"}
+            disabled={processing}
+            onClick={() => setQualityMode("hq")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
+              qualityMode === "hq"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {t.toolSettings["erase-object"].qualityHq}
+          </button>
+        </div>
+
+        {qualityMode === "hq" && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {t.toolSettings["erase-object"].qualityHint}
+          </p>
+        )}
+
+        {needsHqPack && (
+          <div className="mt-2 rounded-lg border border-border bg-muted/40 p-3 text-start">
+            <p className="text-xs text-muted-foreground">
+              {format(t.features.requiresDownload, { size: hqSize })}
+            </p>
+            {isAdmin ? (
+              <button
+                type="button"
+                data-testid="eraser-install-hq"
+                onClick={() => installBundle(HQ_BUNDLE_ID)}
+                disabled={!!hqInstalling || hqQueued}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {hqInstalling || hqQueued ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {hqInstalling || hqQueued
+                  ? t.settings.aiFeatures.installing
+                  : format(t.features.enableButton, {
+                      name: hqBundle?.name ?? "High-Quality Inpainting",
+                    })}
+              </button>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t.features.notEnabledDescription}
+              </p>
+            )}
+            {hqInstallError && <p className="mt-1 text-xs text-destructive">{hqInstallError}</p>}
+          </div>
+        )}
+      </div>
+
       {/* Brush size (brush mode only) */}
       {mode === "brush" && (
         <div>
@@ -606,7 +704,7 @@ export function EraseObjectSettings({
           type="button"
           data-testid="erase-object-submit"
           onClick={maskedFileCount > 1 ? handleProcessAll : handleProcess}
-          disabled={!hasFile || (!hasStrokes && maskedFileCount === 0) || processing}
+          disabled={!hasFile || (!hasStrokes && maskedFileCount === 0) || processing || needsHqPack}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {maskedFileCount > 1

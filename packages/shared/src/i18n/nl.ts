@@ -1572,6 +1572,10 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "{count} afbeeldingen opschalen",
     },
     "erase-object": {
+      qualityFast: "Snel",
+      qualityHq: "Hoge kwaliteit",
+      qualityHint:
+        "Hoge kwaliteit gebruikt een diffusiemodel voor grote objecten en gedetailleerde texturen.",
       brushMode: "Penseel",
       lassoMode: "Lasso",
       brushSize: "Penseelgrootte",
