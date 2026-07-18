@@ -775,7 +775,7 @@ export function QrGenerateSettings() {
                   <span
                     className={`block text-[10px] ${
                       store.downloadFormat === value
-                        ? "text-primary-foreground/70"
+                        ? "text-primary-foreground"
                         : "text-muted-foreground"
                     }`}
                   >

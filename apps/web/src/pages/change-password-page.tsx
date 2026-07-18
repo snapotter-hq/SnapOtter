@@ -223,11 +223,11 @@ export function ChangePasswordPage() {
           </form>
         </div>
       </div>
-      <div className="hidden lg:flex flex-1 bg-primary/90 items-center justify-center p-12 text-white rounded-s-3xl">
+      <div className="hidden lg:flex flex-1 bg-primary/90 items-center justify-center p-12 text-primary-foreground rounded-s-3xl">
         <div className="max-w-lg space-y-6 text-center">
           <span className="text-7xl">🦦</span>
           <h2 className="text-3xl font-bold">{t.changePassword.sidebarTitle}</h2>
-          <p className="text-lg text-white/80">{t.changePassword.sidebarDescription}</p>
+          <p className="text-lg text-primary-foreground">{t.changePassword.sidebarDescription}</p>
         </div>
       </div>
     </div>

@@ -520,7 +520,7 @@ function CollageCell({
             className={cn(
               "flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium backdrop-blur-sm transition-colors",
               transform.objectFit === "contain"
-                ? "bg-primary/80 text-white hover:bg-primary/90"
+                ? "bg-primary/80 text-primary-foreground hover:bg-primary/90"
                 : "bg-black/50 text-white hover:bg-black/70",
             )}
             title={transform.objectFit === "cover" ? "Fit entire image" : "Fill cell"}

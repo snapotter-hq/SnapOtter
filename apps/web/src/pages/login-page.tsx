@@ -27,7 +27,7 @@ function RotatingPhrase() {
 
   return (
     <span
-      className="inline-block transition-all duration-300 text-white/90"
+      className="inline-block transition-all duration-300 text-primary-foreground"
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(-8px)",
@@ -260,7 +260,7 @@ export function LoginPage() {
               {oidcEnabled && (
                 <a
                   href="/api/auth/oidc/login"
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-dark transition-colors flex items-center justify-center gap-2.5"
+                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
                   {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
@@ -269,7 +269,7 @@ export function LoginPage() {
               {samlEnabled && (
                 <a
                   href="/api/auth/saml/login"
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-dark transition-colors flex items-center justify-center gap-2.5"
+                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
                   {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
@@ -440,10 +440,10 @@ export function LoginPage() {
           </div>
         </div>
       </div>
-      <div className="hidden lg:flex flex-1 bg-primary/90 items-center justify-center p-12 text-white rounded-s-3xl">
+      <div className="hidden lg:flex flex-1 bg-primary/90 items-center justify-center p-12 text-primary-foreground rounded-s-3xl">
         <div className="max-w-lg space-y-4 text-center">
           <h2 className="text-4xl font-extrabold tracking-tight">{t.auth.heroTitle}</h2>
-          <p className="text-lg text-white/70">{t.auth.heroSubtitle}</p>
+          <p className="text-lg text-primary-foreground">{t.auth.heroSubtitle}</p>
           <p className="text-xl font-medium h-8">
             <RotatingPhrase />
           </p>
