@@ -1,5 +1,6 @@
 // tests/e2e-docs/i18n.spec.ts
 import { expect, test } from "@playwright/test";
+import { openDocsSearch } from "./helpers";
 
 test.describe("docs i18n (English + seeded German locale)", () => {
   test("English home still renders at root", async ({ page }) => {
@@ -50,9 +51,8 @@ test.describe("docs i18n (English + seeded German locale)", () => {
 
   test("pagefind returns results within the German locale", async ({ page }) => {
     await page.goto("/de/guide/getting-started");
-    await page.locator(".blog-search").first().click();
-    const input = page.locator("input[placeholder]").first();
+    const input = await openDocsSearch(page);
     await input.fill("docker");
-    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10_000 });
   });
 });

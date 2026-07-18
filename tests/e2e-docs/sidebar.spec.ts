@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { waitForHydration } from "./helpers";
 
 test.describe("Docs Sidebar - Guide Section", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/guide/getting-started");
+    // Sidebar links route client-side; wait for hydration so the click lands
+    // (otherwise it's swallowed pre-hydration, the #551 race).
+    await waitForHydration(page);
   });
 
   test("sidebar renders all guide links", async ({ page }) => {
@@ -53,6 +57,7 @@ test.describe("Docs Sidebar - Guide Section", () => {
 test.describe("Docs Sidebar - API Reference Section", () => {
   test("clicking REST API navigates correctly", async ({ page }) => {
     await page.goto("/guide/getting-started");
+    await waitForHydration(page);
     await page.locator(".VPSidebar a, aside a").filter({ hasText: "REST API" }).click();
     await expect(page).toHaveURL(/\/api\/rest/);
     await expect(page.getByText("REST API Reference")).toBeVisible();
@@ -60,12 +65,14 @@ test.describe("Docs Sidebar - API Reference Section", () => {
 
   test("clicking Image engine navigates correctly", async ({ page }) => {
     await page.goto("/api/rest");
+    await waitForHydration(page);
     await page.locator(".VPSidebar a, aside a").filter({ hasText: "Image engine" }).click();
     await expect(page).toHaveURL(/\/api\/image-engine/);
   });
 
   test("clicking AI engine navigates correctly", async ({ page }) => {
     await page.goto("/api/rest");
+    await waitForHydration(page);
     await page.locator(".VPSidebar a, aside a").filter({ hasText: "AI engine" }).click();
     await expect(page).toHaveURL(/\/api\/ai/);
   });
