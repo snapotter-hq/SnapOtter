@@ -15,12 +15,12 @@ const { locale = "en" } = Astro.props;
 // Tool name/description come from shared i18n (translated in all 21 langs).
 const toolStrings = await loadToolStrings(locale);
 
-const MODALITY_META: Record<string, { label: string; color: string }> = {
-  image: { label: "Image", color: "#E07832" },
-  video: { label: "Video", color: "#BE4A3C" },
-  audio: { label: "Audio", color: "#2C7A75" },
-  document: { label: "PDF", color: "#44568C" },
-  file: { label: "Files", color: "#5C8642" },
+const MODALITY_META: Record<string, { label: string; color: string; ink: string }> = {
+  image: { label: "Image", color: "#E07832", ink: "#A85518" },
+  video: { label: "Video", color: "#BE4A3C", ink: "#B54639" },
+  audio: { label: "Audio", color: "#2C7A75", ink: "#2B7672" },
+  document: { label: "PDF", color: "#44568C", ink: "#44568C" },
+  file: { label: "Files", color: "#5C8642", ink: "#51763A" },
 };
 
 function renderIcon(iconName: string): string {
@@ -89,7 +89,7 @@ function renderIcon(iconName: string): string {
               <span class="flex-1 text-sm font-medium text-foreground">{toolName}</span>
               <span
                 class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                style={`background-color: ${mod?.color}1a; color: ${mod?.color}`}
+                style={`background-color: ${mod?.color}1a; color: ${mod?.ink}`}
               >
                 {mod?.label}
               </span>

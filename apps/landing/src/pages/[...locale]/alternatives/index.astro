@@ -91,7 +91,7 @@ const formatReviewDate = (date: string) =>
             href={localizeHref(locale, `/alternatives/${alt.slug}`)}
             class="group flex flex-col rounded-xl border border-border bg-surface p-6 transition-all hover:border-primary hover:shadow-md"
           >
-            <span class="text-xs font-semibold text-primary-dark">{alt.category}</span>
+            <span class="text-xs font-semibold text-primary-ink">{alt.category}</span>
             <span class="mt-2 font-display text-lg font-bold tracking-tight">
               {alt.competitorOpenSource
                 ? t(locale, "altIndex.card.versus", { competitor: alt.competitor })
@@ -103,7 +103,7 @@ const formatReviewDate = (date: string) =>
             <span class="mt-4 text-xs text-muted">
               {t(locale, "altIndex.card.reviewed", { date: formatReviewDate(alt.lastReviewed) })}
             </span>
-            <span class="mt-auto inline-flex items-center gap-1 pt-5 text-sm font-medium text-primary transition-all group-hover:gap-2">
+            <span class="mt-auto inline-flex items-center gap-1 pt-5 text-sm font-medium text-primary-ink transition-all group-hover:gap-2">
               {t(locale, "altIndex.card.compare")}
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />

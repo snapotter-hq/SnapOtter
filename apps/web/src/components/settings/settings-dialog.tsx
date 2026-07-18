@@ -3593,7 +3593,7 @@ function AboutSection() {
         <div className="flex items-center gap-3">
           <OtterLogo className="h-8 w-8 text-primary" />
           <div className="text-2xl font-bold text-foreground">
-            <span className="text-primary">SnapOtter</span>
+            <span className="text-primary-ink">SnapOtter</span>
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{t.settings.about.appDescription}</p>

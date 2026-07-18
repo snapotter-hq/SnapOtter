@@ -96,10 +96,10 @@ const permissionMatrix = {
 };
 
 const storageProviders = [
-  { name: t(locale, "enterprise.storage.provider.awsS3"), color: "text-[#FF9900]" },
+  { name: t(locale, "enterprise.storage.provider.awsS3"), color: "text-[#996306]" },
   { name: t(locale, "enterprise.storage.provider.minio"), color: "text-[#C72C48]" },
-  { name: t(locale, "enterprise.storage.provider.r2"), color: "text-[#F6821F]" },
-  { name: t(locale, "enterprise.storage.provider.local"), color: "text-primary" },
+  { name: t(locale, "enterprise.storage.provider.r2"), color: "text-[#B45309]" },
+  { name: t(locale, "enterprise.storage.provider.local"), color: "text-primary-ink" },
 ];
 
 const deploymentTargets = [
@@ -273,10 +273,10 @@ const xSvg =
           </div>
           <div class="md:order-2">
             <div class="rounded-xl border border-border bg-surface p-6">
-              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">{t(locale, "enterprise.identity.supportedProviders")}</span>
+              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary-ink">{t(locale, "enterprise.identity.supportedProviders")}</span>
               <div class="flex flex-wrap gap-2.5">
                 {identityProviders.map((provider) => (
-                  <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary-subtle px-3.5 py-1.5 text-sm font-medium text-primary-dark">
+                  <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary-subtle px-3.5 py-1.5 text-sm font-medium text-primary-ink">
                     <svg class="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     {provider}
                   </span>
@@ -286,7 +286,7 @@ const xSvg =
                 <svg class="h-4 w-4 shrink-0 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <span class="text-xs text-primary-dark">{t(locale, "enterprise.identity.mfaEnforced")}</span>
+                <span class="text-xs text-primary-ink">{t(locale, "enterprise.identity.mfaEnforced")}</span>
               </div>
             </div>
           </div>
@@ -304,7 +304,7 @@ const xSvg =
           </div>
           <div class="md:order-1">
             <div class="rounded-xl border border-border bg-surface p-6 overflow-x-auto">
-              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary">{t(locale, "enterprise.permissions.matrix")}</span>
+              <span class="mb-4 block text-xs font-semibold uppercase tracking-wider text-primary-ink">{t(locale, "enterprise.permissions.matrix")}</span>
               <table class="w-full text-xs">
                 <thead>
                   <tr>
@@ -407,7 +407,7 @@ const xSvg =
               <th class="pb-4 text-start text-sm font-semibold text-muted"></th>
               <th class="pb-4 text-start text-sm font-semibold text-muted">{t(locale, "enterprise.comparison.cloudHeader")}</th>
               <th class="pb-4 text-start text-sm font-semibold">
-                <span class="text-primary">SnapOtter</span> <span class="text-muted font-normal">{t(locale, "enterprise.comparison.selfHostedHeader")}</span>
+                <span class="text-primary-ink">SnapOtter</span> <span class="text-muted font-normal">{t(locale, "enterprise.comparison.selfHostedHeader")}</span>
               </th>
             </tr>
           </thead>

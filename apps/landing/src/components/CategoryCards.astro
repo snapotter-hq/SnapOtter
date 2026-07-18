@@ -62,7 +62,7 @@ const MODALITIES = [
     label: t(locale, "home.categoryCards.file.label"),
     blurb: t(locale, "home.categoryCards.file.blurb"),
     icon: "Database",
-    color: "#5C8642",
+    color: "#51763A",
   },
 ];
 
@@ -77,21 +77,21 @@ const cards = MODALITIES.map((m) => {
     {cards.map((c) => (
       <a
         href={localizeHref(locale, `/tools/${c.section}/`)}
-        class="group flex flex-col rounded-2xl p-4 text-start text-white no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
-        style={`background-color: ${c.color}`}
+        class="group flex flex-col rounded-2xl p-4 text-start no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+        style={`background-color: ${c.color}; color: ${c.id === "image" ? "#1A1814" : "#FFFFFF"}`}
       >
         <div class="flex items-center justify-between">
-          <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
+          <span class={`flex h-9 w-9 items-center justify-center rounded-lg ${c.id === "image" ? "bg-white/20" : "bg-black/20"}`}>
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={renderIcon(c.icon)} />
           </span>
-          <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">{t(locale, "home.categoryCards.toolCount", { count: c.count })}</span>
+          <span class={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.id === "image" ? "bg-white/20" : "bg-black/20"}`}>{t(locale, "home.categoryCards.toolCount", { count: c.count })}</span>
         </div>
 
         <div class="mt-4 flex items-center gap-1.5">
           <p class="font-display text-base font-bold leading-tight">{c.label}</p>
           <svg class="h-4 w-4 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </div>
-        <p class="mt-1 text-xs text-white/80">{c.blurb}</p>
+        <p class="mt-1 text-xs">{c.blurb}</p>
       </a>
     ))}
   </div>

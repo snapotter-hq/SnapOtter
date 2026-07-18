@@ -81,7 +81,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
         <h1 class="font-display text-4xl font-bold tracking-tight md:text-5xl">{uc.h1}</h1>
         <p class="mt-4 text-lg leading-relaxed text-muted md:text-xl">{uc.intro}</p>
         {uc.isAiBundle && (
-          <p class="mt-4 inline-flex rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary-dark">
+          <p class="mt-4 inline-flex rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary-ink">
             Local AI, one-time bundle install
           </p>
         )}
@@ -119,12 +119,12 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
           </div>
           <div class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {uc.toolRoutes.map((route, i) => (
-              <a href={route} class="text-primary transition-colors hover:text-primary-dark">
+              <a href={route} class="text-primary-ink transition-colors hover:text-primary-ink-strong">
                 Open the {uc.toolIds[i]} tool
               </a>
             ))}
             {alt && (
-              <a href={`/alternatives/${alt.slug}`} class="text-primary transition-colors hover:text-primary-dark">
+              <a href={`/alternatives/${alt.slug}`} class="text-primary-ink transition-colors hover:text-primary-ink-strong">
                 Compare with {alt.competitor}
               </a>
             )}
@@ -135,7 +135,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
             {uc.sources.map((s, i) => (
               <Fragment>
                 {i > 0 && ", "}
-                <a href={s.url} target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary-dark">{s.label}</a>
+                <a href={s.url} target="_blank" rel="noopener noreferrer" class="text-primary-ink hover:text-primary-ink-strong">{s.label}</a>
               </Fragment>
             ))}
           </p>

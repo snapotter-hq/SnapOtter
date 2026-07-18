@@ -123,7 +123,7 @@ export function ChangePasswordPage() {
         <div className="w-full max-w-md space-y-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              <span className="text-primary">SnapOtter</span>
+              <span className="text-primary-ink">SnapOtter</span>
             </h1>
             <h2 className="text-2xl font-bold mt-4 text-foreground">{t.changePassword.title}</h2>
             <p className="text-sm text-muted-foreground mt-2">{t.changePassword.description}</p>

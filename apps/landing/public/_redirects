@@ -31,6 +31,8 @@
 /tools/color-blindness /tools/image/color-blindness/ 301
 /tools/remove-background/ /tools/image/remove-background/ 301
 /tools/remove-background /tools/image/remove-background/ 301
+/tools/remove-gif-background/ /tools/image/remove-gif-background/ 301
+/tools/remove-gif-background /tools/image/remove-gif-background/ 301
 /tools/upscale/ /tools/image/upscale/ 301
 /tools/upscale /tools/image/upscale/ 301
 /tools/erase-object/ /tools/image/erase-object/ 301

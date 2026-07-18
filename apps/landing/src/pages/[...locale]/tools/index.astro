@@ -173,7 +173,7 @@ const collectionJsonLd = {
               data-modality={m.id}
               class:list={[
                 "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-                m.id === "all" ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt",
+                m.id === "all" ? "bg-primary text-foreground" : "border border-border bg-surface hover:bg-background-alt",
               ]}
             >
               {m.label} ({m.count})
@@ -263,7 +263,7 @@ const collectionJsonLd = {
                     <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
                       {toolDesc(tool.id, tool.description)}
                     </p>
-                    <span class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary transition-all group-hover:gap-2">
+                    <span class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-ink transition-all group-hover:gap-2">
                       {t(locale, "common.learnMore")}
                       <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
@@ -341,7 +341,7 @@ const collectionJsonLd = {
           const on = b.getAttribute("data-modality") === activeMod;
           b.className =
             "tools-mod-btn shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
-            (on ? "bg-primary text-white" : "border border-border bg-surface hover:bg-background-alt");
+            (on ? "bg-primary text-foreground" : "border border-border bg-surface hover:bg-background-alt");
         }
       };
 
