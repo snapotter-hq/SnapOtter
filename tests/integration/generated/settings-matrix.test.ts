@@ -795,6 +795,13 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "bitrate min", settings: { format: "mp3", bitrateKbps: 32 } },
     { label: "bitrate mid", settings: { format: "mp3", bitrateKbps: 128 } },
     { label: "bitrate max", settings: { format: "mp3", bitrateKbps: 320 } },
+    { label: "sample rate min", settings: { format: "mp3", sampleRate: 8000, bitrateKbps: 64 } },
+    { label: "sample rate 44100", settings: { format: "mp3", sampleRate: 44100 } },
+    { label: "sample rate max mp3", settings: { format: "mp3", sampleRate: 48000 } },
+    { label: "sample rate max wav", settings: { format: "wav", sampleRate: 96000 } },
+    { label: "sample rate ogg", settings: { format: "ogg", sampleRate: 44100 } },
+    { label: "sample rate m4a", settings: { format: "m4a", sampleRate: 96000 } },
+    { label: "sample rate flac", settings: { format: "flac", sampleRate: 48000 } },
   ],
 
   "trim-audio": [

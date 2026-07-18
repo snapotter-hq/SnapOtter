@@ -22,7 +22,7 @@ const e2eDatabaseUrl = (() => {
 // or assert on global lists/timing. These run in the chromium-serial project
 // with --workers=1; everything else parallelizes safely.
 const SERIAL_SPECS =
-  /gui-settings-|settings\.spec|rbac|security|people|api\.spec|state-bleed|full-session|gui-file-carry|i18n|theme|gui-performance/;
+  /gui-settings-|settings\.spec|rbac|security|people|api\.spec|state-bleed|full-session|gui-file-carry|library-save-mode|i18n|theme|gui-performance/;
 
 // Screenshot-comparison specs. Separate project because baselines are
 // platform-specific: they run locally (darwin baselines) and via the

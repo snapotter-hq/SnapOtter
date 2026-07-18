@@ -1,26 +1,17 @@
 <script setup lang="ts">
 import { useData } from "vitepress";
-import { computed, onMounted, ref } from "vue";
+import { computed } from "vue";
 import { normalizeLocale, t } from "../i18n/ui.mjs";
+import { data as githubStars } from "./github-stars.data.ts";
 
 const { lang } = useData();
 const locale = computed(() => normalizeLocale(lang.value));
 const starLabel = computed(() => t(locale.value, "github.star"));
 
-const stars = ref<string | null>(null);
+// Resolved at build time (see github-stars.data.ts), so no per-page request to
+// api.github.com is made from the browser.
+const stars = githubStars.display;
 const repo = "https://github.com/snapotter-hq/snapotter";
-
-onMounted(async () => {
-  try {
-    const res = await fetch("https://api.github.com/repos/snapotter-hq/snapotter");
-    if (!res.ok) return;
-    const data = await res.json();
-    const count = data.stargazers_count;
-    stars.value = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count);
-  } catch {
-    // Stars count won't show if fetch fails
-  }
-});
 </script>
 
 <template>
@@ -33,7 +24,7 @@ onMounted(async () => {
       <span class="github-btn-label">{{ starLabel }}</span>
     </a>
     <a
-      v-if="stars !== null"
+      v-if="stars"
       :href="`${repo}/stargazers`"
       target="_blank"
       rel="noopener"

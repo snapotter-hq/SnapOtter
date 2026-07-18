@@ -11,6 +11,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
+import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { deleteObject } from "../../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
@@ -134,6 +135,7 @@ export function registerOcr(app: FastifyInstance) {
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
     let fileId: string | null = null;
+    let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
 
     try {
@@ -155,6 +157,8 @@ export function registerOcr(app: FastifyInstance) {
           }
         } else if (part.fieldname === "fileId") {
           fileId = part.value as string;
+        } else if (part.fieldname === "saveMode") {
+          saveModeRaw = part.value as string;
         }
       }
     } catch (err) {
@@ -164,6 +168,12 @@ export function registerOcr(app: FastifyInstance) {
         error: ocrUploadErrorMessage(statusCode),
         details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
+    }
+
+    const saveMode = parseSaveModeField(saveModeRaw);
+    if (saveMode === null) {
+      if (inputKey) await deleteObject(inputKey).catch(() => {});
+      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
     }
 
     if (!inputKey) {
@@ -223,6 +233,7 @@ export function registerOcr(app: FastifyInstance) {
         settings: { ...normalizedSettings, quality },
         clientJobId: clientJobId ?? undefined,
         fileId: fileId ?? undefined,
+        saveMode,
         kind: "ai-tool",
         analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
       });

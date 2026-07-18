@@ -1,13 +1,13 @@
 ---
 description: "Chuyển đổi âm thanh giữa các định dạng MP3, WAV, OGG, FLAC và M4A."
-i18n_source_hash: fd02c059e6a9
+i18n_source_hash: 27fd2f49f472
 i18n_provenance: human
 i18n_output_hash: df9906d408e2
 ---
 
 # Chuyển đổi âm thanh {#convert-audio}
 
-Chuyển đổi tệp âm thanh giữa các định dạng phổ biến gồm MP3, WAV, OGG, FLAC và M4A, với bitrate đầu ra có thể cấu hình.
+Chuyển đổi tệp âm thanh giữa các định dạng phổ biến gồm MP3, WAV, OGG, FLAC và M4A, với bitrate và tần số lấy mẫu đầu ra có thể cấu hình.
 
 ## Endpoint API {#api-endpoint}
 
@@ -21,6 +21,7 @@ Chấp nhận dữ liệu form multipart với một tệp âm thanh và một t
 |-----------|------|----------|---------|-------------|
 | format | string | Không | `"mp3"` | Định dạng đầu ra: `mp3`, `wav`, `ogg`, `flac`, `m4a` |
 | bitrateKbps | integer | Không | `192` | Bitrate đầu ra tính bằng kbps (32 đến 320) |
+| sampleRate | integer | Không | tần số gốc | Tần số lấy mẫu đầu ra tính bằng Hz: `8000`, `16000`, `22050`, `32000`, `44100`, `48000` hoặc `96000`. Bỏ qua để giữ nguyên tần số gốc |
 
 ## Yêu cầu ví dụ {#example-request}
 
@@ -28,7 +29,7 @@ Chấp nhận dữ liệu form multipart với một tệp âm thanh và một t
 curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@audio.mp3" \
-  -F 'settings={"format": "flac", "bitrateKbps": 256}'
+  -F 'settings={"format": "mp3", "bitrateKbps": 192, "sampleRate": 44100}'
 ```
 
 ## Phản hồi ví dụ {#example-response}
@@ -36,9 +37,9 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/audio.flac",
+  "downloadUrl": "/api/v1/download/a1b2c3d4-e5f6-7890-abcd-ef1234567890/audio.mp3",
   "originalSize": 4500000,
-  "processedSize": 8200000
+  "processedSize": 2800000
 }
 ```
 
@@ -46,4 +47,6 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/convert-audio \
 
 - Các định dạng đầu vào được hỗ trợ gồm MP3, WAV, OGG, FLAC, AAC, M4A, WMA, AIFF và OPUS.
 - Bitrate chỉ áp dụng cho các định dạng mất dữ liệu (MP3, OGG, M4A). Các định dạng không mất dữ liệu như WAV và FLAC bỏ qua cài đặt này.
+- Đầu ra MP3 hỗ trợ tần số lấy mẫu tối đa 48000 Hz. Tùy chọn 96000 Hz chỉ áp dụng cho WAV, OGG, FLAC và M4A.
+- Bitrate MP3 bị giới hạn bởi tần số lấy mẫu: tối đa 64 kbps ở 8000 Hz và 160 kbps ở 16000 hoặc 22050 Hz. Các yêu cầu vượt quá giới hạn sẽ bị từ chối thay vì bị âm thầm hạ xuống.
 - Tên tệp đầu ra giữ tên gốc với phần mở rộng mới.

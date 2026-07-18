@@ -27,6 +27,7 @@ import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { BottomSheet } from "@/components/common/bottom-sheet";
 import { Dropzone } from "@/components/common/dropzone";
 import { type BgPreviewState, ImageViewer } from "@/components/common/image-viewer";
+import { LibrarySaveModeSelector } from "@/components/common/library-save-mode-selector";
 import { ReviewPanel } from "@/components/common/review-panel";
 import { SideBySideComparison } from "@/components/common/side-by-side-comparison";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
@@ -303,6 +304,7 @@ export function ToolPage() {
     navigateNext,
     navigatePrev,
     currentEntry,
+    lastSavedLibraryFileId,
   } = useFileStore();
   const isMobile = useMobile();
   const hasMultiple = entries.length > 1;
@@ -1115,6 +1117,8 @@ export function ToolPage() {
           </div>
         )}
 
+        <LibrarySaveModeSelector toolId={tool?.id ?? ""} />
+
         <div className="border-t border-border" />
 
         <div className="space-y-2">
@@ -1161,6 +1165,7 @@ export function ToolPage() {
               totalCount={batchTotal}
               successCount={batchSuccess}
               failedCount={batchFailed}
+              savedLibraryFileId={lastSavedLibraryFileId}
             />
           </div>
         )}

@@ -51,6 +51,15 @@ export type ToolCategory =
   | "data"
   | "archives";
 
+/**
+ * How a tool result is saved back to the file library when the input came
+ * from it (issue #495). "new" keeps the original and adds an independent
+ * file; "overwrite" supersedes the original with a linked version. The
+ * default everywhere is "new" so users never lose an original by accident.
+ */
+export const LIBRARY_SAVE_MODES = ["new", "overwrite"] as const;
+export type LibrarySaveMode = (typeof LIBRARY_SAVE_MODES)[number];
+
 export interface CategoryInfo {
   id: ToolCategory;
   name: string;

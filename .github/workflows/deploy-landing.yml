@@ -33,6 +33,34 @@ jobs:
           # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Astro's getRelativeLocaleUrl lowercases locale segments by default, so a
+      # regression could re-emit /zh-cn/ etc. in hrefs and hreflang. Those 404 on
+      # case-sensitive Cloudflare Pages while the built dirs + sitemap keep canonical
+      # mixed case, and the mismatch is invisible on a case-insensitive dev machine.
+      # Fail the deploy if any lowercased variant of a mixed-case locale directory
+      # leaks into the emitted HTML. See #554.
+      - name: Guard against lowercased locale URLs
+        run: |
+          set -uo pipefail
+          dist=apps/landing/dist
+          fail=0
+          for dir in "$dist"/*/; do
+            name=$(basename "$dir")
+            lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+            [ "$name" = "$lower" ] && continue
+            hits=$(grep -rIl --include='*.html' "/$lower/" "$dist" || true)
+            if [ -n "$hits" ]; then
+              echo "::error::Lowercased locale path /$lower/ found in built HTML (canonical is /$name/); it would 404 on Cloudflare Pages. See #554."
+              printf '%s\n' "$hits" | head -5
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Deploy blocked: lowercased locale URLs would 404 on case-sensitive hosting."
+            exit 1
+          fi
+          echo "Locale URL casing OK: no lowercased locale paths in built output."
+
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy apps/landing/dist --project-name snapotter-landing --branch main --commit-dirty=true
         env:

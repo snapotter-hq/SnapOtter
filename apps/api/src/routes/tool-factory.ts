@@ -15,6 +15,7 @@ import type { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
+import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
 import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
@@ -246,6 +247,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let filename = "file";
       let settingsRaw: string | null = null;
       let fileId: string | null = null;
+      let saveModeRaw: string | null = null;
       let clientJobId: string | null = null;
       let fileCount = 0;
       const received: ReceivedUpload[] = [];
@@ -283,6 +285,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             if (part.fieldname === "fileId") {
               fileId = part.value as string;
             }
+            if (part.fieldname === "saveMode") {
+              saveModeRaw = part.value as string;
+            }
             if (part.fieldname === "clientJobId") {
               const raw = part.value as string;
               if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
@@ -302,6 +307,11 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         return reply.status(400).send({
           error: `Too many files (max ${maxInputs})`,
         });
+      }
+
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
       }
 
       // Require at least one file
@@ -522,6 +532,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           settings,
           dbSettings,
           fileId: fileId ?? undefined,
+          saveMode,
           clientJobId: clientJobId ?? undefined,
           kind: "tool",
           analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,

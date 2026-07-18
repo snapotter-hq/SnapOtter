@@ -1,4 +1,9 @@
-import { ANALYTICS_EVENTS, detectModalityFromMime, type Modality } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  detectModalityFromMime,
+  type LibrarySaveMode,
+  type Modality,
+} from "@snapotter/shared";
 import { create } from "zustand";
 import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
 
@@ -118,6 +123,10 @@ interface FileState {
   error: string | null;
   activeJobId: string | null;
   cancelCurrentJob: (() => Promise<void>) | null;
+  /** How library-sourced results are saved (#495): "new" keeps the original. */
+  librarySaveMode: LibrarySaveMode;
+  /** Library file id of the last run's auto-saved result, for the review UI. */
+  lastSavedLibraryFileId: string | null;
 
   // Derived from entries (selected entry fields)
   readonly files: File[];
@@ -142,6 +151,8 @@ interface FileState {
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
   setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
+  setLibrarySaveMode: (mode: LibrarySaveMode) => void;
+  setLastSavedLibraryFileId: (id: string | null) => void;
   setJobId: (id: string) => void;
   setProcessedUrl: (url: string | null, previewUrl?: string | null) => void;
   setSizes: (original: number, processed: number) => void;
@@ -158,6 +169,8 @@ export const useFileStore = create<FileState>((set, get) => ({
   error: null,
   activeJobId: null,
   cancelCurrentJob: null,
+  librarySaveMode: "new",
+  lastSavedLibraryFileId: null,
 
   // Initial derived values (empty state)
   files: [],
@@ -175,6 +188,9 @@ export const useFileStore = create<FileState>((set, get) => ({
       entries,
       selectedIndex: 0,
       error: null,
+      // A fresh file set is a fresh edit: the save-mode choice made for a
+      // previous file must not carry over (#495 defaults to non-destructive).
+      librarySaveMode: "new",
       files: deriveFiles(entries),
       ...deriveSelected(entries, 0),
     });
@@ -347,6 +363,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({ entries: updated, ...deriveSelected(updated, selectedIndex) });
   },
 
+  setLibrarySaveMode: (mode) => set({ librarySaveMode: mode }),
+
+  setLastSavedLibraryFileId: (id) => set({ lastSavedLibraryFileId: id }),
+
   undoProcessing: () => {
     const { entries, selectedIndex } = get();
     for (const entry of entries) {
@@ -370,6 +390,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       error: null,
       activeJobId: null,
       cancelCurrentJob: null,
+      lastSavedLibraryFileId: null,
       files: deriveFiles(resetEntries),
       ...deriveSelected(resetEntries, selectedIndex),
     });
@@ -387,6 +408,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       error: null,
       activeJobId: null,
       cancelCurrentJob: null,
+      librarySaveMode: "new",
+      lastSavedLibraryFileId: null,
       files: [],
       ...deriveSelected([], 0),
     });

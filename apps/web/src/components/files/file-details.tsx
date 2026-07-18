@@ -432,7 +432,9 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
       navigate("/", { state: { fromLibrary: true } });
     }
 
-    // Set serverFileId on each entry so tool processing creates new versions
+    // Set serverFileId on each entry so tool processing auto-saves the result
+    // to the library: an independent new file by default, or a superseding
+    // version when the user picks overwrite (#495)
     setTimeout(() => {
       const store = useFileStore.getState();
       for (let i = 0; i < valid.length; i++) {

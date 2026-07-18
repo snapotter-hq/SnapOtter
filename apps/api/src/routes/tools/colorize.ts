@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
+import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -87,6 +88,7 @@ export function registerColorize(app: FastifyInstance) {
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
     let fileId: string | null = null;
+    let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
 
     try {
@@ -105,6 +107,8 @@ export function registerColorize(app: FastifyInstance) {
           }
         } else if (part.fieldname === "fileId") {
           fileId = part.value as string;
+        } else if (part.fieldname === "saveMode") {
+          saveModeRaw = part.value as string;
         }
       }
     } catch (err) {
@@ -112,6 +116,11 @@ export function registerColorize(app: FastifyInstance) {
         error: "Failed to parse multipart request",
         details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
+    }
+
+    const saveMode = parseSaveModeField(saveModeRaw);
+    if (saveMode === null) {
+      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
     }
 
     if (!inputKey) {
@@ -173,6 +182,7 @@ export function registerColorize(app: FastifyInstance) {
       settings,
       clientJobId: clientJobId ?? undefined,
       fileId: fileId ?? undefined,
+      saveMode,
       kind: "ai-tool",
     });
 

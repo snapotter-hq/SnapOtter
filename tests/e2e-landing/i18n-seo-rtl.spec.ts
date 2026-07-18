@@ -24,6 +24,26 @@ test.describe("landing hreflang, RTL, and banner", () => {
     expect(enFromDe).toBe("https://snapotter.com/faq/");
   });
 
+  // Regression guard for #554. Astro's getRelativeLocaleUrl lowercases the locale
+  // segment by default (normalizeTheLocale: "zh-CN" -> "zh-cn"), but the built
+  // directories and the sitemap keep canonical mixed case. The lowercased links
+  // resolve on case-insensitive local hosting but 404 on Cloudflare Pages. This
+  // reads the emitted href string, so it catches the mismatch regardless of the
+  // local filesystem's case sensitivity (which is why the specs above missed it).
+  test("mixed-case locales keep their exact casing in hreflang links", async ({ page }) => {
+    await page.goto("/faq");
+    for (const code of ["zh-CN", "zh-TW", "pt-BR"]) {
+      const href = await page
+        .locator(`link[rel="alternate"][hreflang="${code}"]`)
+        .getAttribute("href");
+      expect(href, `hreflang ${code} must preserve casing`).toBe(
+        `https://snapotter.com/${code}/faq/`,
+      );
+      // The lowercased path (the bug) must not appear.
+      expect(href).not.toContain(code.toLowerCase());
+    }
+  });
+
   test("Arabic renders dir=rtl on <html>", async ({ page }) => {
     await page.goto("/ar/faq");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");

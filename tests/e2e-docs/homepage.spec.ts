@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { waitForHydration } from "./helpers";
 
 test.describe("docs homepage (Two Doors)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
+    // Some tests click nav/chip links, which route client-side; wait for Vue to
+    // hydrate first so the click isn't swallowed (the #551 pre-hydration race).
+    await waitForHydration(page);
   });
 
   test("title contains SnapOtter", async ({ page }) => {

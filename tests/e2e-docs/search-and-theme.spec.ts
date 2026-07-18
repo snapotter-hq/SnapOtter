@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDocsSearch, waitForHydration } from "./helpers";
 
 test.describe("docs search (Pagefind)", () => {
   test("search button is visible", async ({ page }) => {
@@ -8,16 +9,18 @@ test.describe("docs search (Pagefind)", () => {
 
   test("clicking search opens the dialog with an input", async ({ page }) => {
     await page.goto("/");
-    await page.locator(".blog-search").first().click();
-    await expect(page.locator('input[placeholder="Search Docs"]')).toBeVisible();
+    const input = await openDocsSearch(page);
+    // It's the real search combobox with a (config-driven) placeholder. Don't
+    // assert the exact placeholder copy, just that one is present.
+    await expect(input).toHaveAttribute("role", "combobox");
+    await expect(input).toHaveAttribute("placeholder", /\S/);
   });
 
   test("typing a query shows results", async ({ page }) => {
     await page.goto("/");
-    await page.locator(".blog-search").first().click();
-    const input = page.locator('input[placeholder="Search Docs"]');
+    const input = await openDocsSearch(page);
     await input.fill("docker");
-    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[role="option"]').first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -32,13 +35,16 @@ test.describe("Theme Toggle", () => {
 
   test("clicking theme toggle changes appearance", async ({ page }) => {
     await page.goto("/guide/getting-started");
+    // The appearance switch is a Vue handler, so wait for hydration before the
+    // single click (otherwise the click is swallowed and the class never flips).
+    await waitForHydration(page);
+
     const html = page.locator("html");
-    const initialClass = await html.getAttribute("class");
-    const wasDark = initialClass?.includes("dark") ?? false;
+    const wasDark = ((await html.getAttribute("class")) ?? "").includes("dark");
 
     // Click the visible toggle inside our custom nav area (the hidden default
     // VPNavBarAppearance is first in DOM order, so a bare querySelector would
-    // hit it instead). Playwright's click auto-waits for hydration.
+    // hit it instead).
     await page.locator('.nav-bar-right button[role="switch"]').click();
 
     // Assert the dark class actually toggled

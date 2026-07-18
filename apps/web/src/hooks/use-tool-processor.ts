@@ -91,6 +91,10 @@ export function useToolProcessor(toolId: string) {
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
   const asyncModeRef = useRef(false);
+  // Save mode captured at run start (#495). Only "overwrite" re-anchors
+  // serverFileId to the saved result, so "new" keeps deriving from the
+  // original library file on re-runs.
+  const saveModeRef = useRef<"new" | "overwrite">("new");
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
   const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
@@ -180,6 +184,9 @@ export function useToolProcessor(toolId: string) {
             const result = data.result as ProcessResult;
             setWarning(result.warning ?? null);
             setResultPayload(result as unknown as Record<string, unknown>);
+            if (result.savedFileId) {
+              useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+            }
             const idx = useFileStore.getState().selectedIndex;
             useFileStore.getState().updateEntry(idx, {
               processedUrl: result.downloadUrl,
@@ -188,7 +195,9 @@ export function useToolProcessor(toolId: string) {
               status: "completed",
               originalSize: result.originalSize,
               processedSize: result.processedSize,
-              ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+              ...(result.savedFileId && saveModeRef.current === "overwrite"
+                ? { serverFileId: result.savedFileId }
+                : {}),
             });
             setProcessing(false);
             setProgress(IDLE_PROGRESS);
@@ -275,6 +284,7 @@ export function useToolProcessor(toolId: string) {
       setError(null);
       setWarning(null);
       setResultPayload(null);
+      useFileStore.getState().setLastSavedLibraryFileId(null);
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: null,
         processedPreviewUrl: null,
@@ -353,6 +363,9 @@ export function useToolProcessor(toolId: string) {
               const result = data.result as ProcessResult;
               setWarning(result.warning ?? null);
               setResultPayload(result as unknown as Record<string, unknown>);
+              if (result.savedFileId) {
+                useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+              }
               useFileStore.getState().updateEntry(capturedIndex, {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
@@ -360,7 +373,9 @@ export function useToolProcessor(toolId: string) {
                 status: "completed",
                 originalSize: result.originalSize,
                 processedSize: result.processedSize,
-                ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                ...(result.savedFileId && saveModeRef.current === "overwrite"
+                  ? { serverFileId: result.savedFileId }
+                  : {}),
               });
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -421,8 +436,10 @@ export function useToolProcessor(toolId: string) {
       formData.append("clientJobId", clientJobId);
 
       const capturedEntry = useFileStore.getState().entries[capturedIndex];
+      saveModeRef.current = useFileStore.getState().librarySaveMode;
       if (capturedEntry?.serverFileId) {
         formData.append("fileId", capturedEntry.serverFileId);
+        formData.append("saveMode", saveModeRef.current);
       }
 
       const xhr = new XMLHttpRequest();
@@ -469,6 +486,9 @@ export function useToolProcessor(toolId: string) {
             const result: ProcessResult = JSON.parse(xhr.responseText);
             setWarning(result.warning ?? null);
             setResultPayload(result as unknown as Record<string, unknown>);
+            if (result.savedFileId) {
+              useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+            }
             useFileStore.getState().updateEntry(capturedIndex, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
@@ -476,7 +496,9 @@ export function useToolProcessor(toolId: string) {
               status: "completed",
               originalSize: result.originalSize,
               processedSize: result.processedSize,
-              ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+              ...(result.savedFileId && saveModeRef.current === "overwrite"
+                ? { serverFileId: result.savedFileId }
+                : {}),
             });
           } catch {
             setError("Invalid response from server");
@@ -580,6 +602,9 @@ export function useToolProcessor(toolId: string) {
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
+      // Batch runs never auto-save to the library (no fileId is sent), so a
+      // previous single run's saved indicator must not survive into this one.
+      useFileStore.getState().setLastSavedLibraryFileId(null);
       setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
 

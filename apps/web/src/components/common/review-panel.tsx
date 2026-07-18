@@ -48,6 +48,8 @@ interface ReviewPanelProps {
   totalCount?: number;
   successCount?: number;
   failedCount?: number;
+  /** Library id of the auto-saved result (#495); replaces the manual save link. */
+  savedLibraryFileId?: string | null;
 }
 
 export function ReviewPanel({
@@ -62,6 +64,7 @@ export function ReviewPanel({
   totalCount,
   successCount,
   failedCount,
+  savedLibraryFileId,
 }: ReviewPanelProps) {
   const { t } = useTranslation();
 
@@ -194,8 +197,20 @@ export function ReviewPanel({
         </button>
       )}
 
+      {/* Result already auto-saved to the library: show where it went
+          instead of the manual save link (avoids duplicate saves). */}
+      {!isDataOutput && savedLibraryFileId && (
+        <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-3 w-3" />
+          {t.toolPage.savedToFiles}
+          <Link to="/files" className="underline underline-offset-2 hover:text-foreground">
+            {t.toolPage.viewInFiles}
+          </Link>
+        </div>
+      )}
+
       {/* Save to Files -- subtle text link */}
-      {!isDataOutput && (
+      {!isDataOutput && !savedLibraryFileId && (
         <div className="flex justify-center">
           <button
             type="button"

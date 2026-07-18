@@ -10,13 +10,20 @@ export const SITE = "https://snapotter.com";
  * A trailing "#hash" is split off first and reattached untouched, since
  * Astro's URL builder would otherwise treat it as part of the path and
  * mangle it with a trailing slash (e.g. "/#pricing" -> "/#pricing/").
+ *
+ * `normalizeLocale: false` keeps the locale segment identical to its code.
+ * By default Astro lowercases it (getRelativeLocaleUrl runs normalizeTheLocale,
+ * so "zh-CN" -> "zh-cn", "pt-BR" -> "pt-br"), but our routes are built from the
+ * raw codes (getStaticPaths -> /zh-CN/, /pt-BR/) and the sitemap keeps that same
+ * mixed case. The lowercased links resolve fine on case-insensitive local hosting
+ * but 404 on case-sensitive hosts like Cloudflare Pages, so we pin the casing here.
  */
 export function localizeHref(locale: string, path: string): string {
   const hashIndex = path.indexOf("#");
   const pathname = hashIndex === -1 ? path : path.slice(0, hashIndex);
   const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
   const clean = pathname.startsWith("/") ? pathname.slice(1) : pathname;
-  return `${getRelativeLocaleUrl(locale, clean)}${hash}`;
+  return `${getRelativeLocaleUrl(locale, clean, { normalizeLocale: false })}${hash}`;
 }
 
 /**
