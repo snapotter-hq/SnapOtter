@@ -19,12 +19,20 @@ body {
     "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+/*
+ * Contrast contract (issue #557, guarded by tests/unit/palette-contrast.test.ts):
+ * fills and their -foreground labels are theme-static; text roles use the
+ * theme-aware -ink tokens; vivid primary/accent are fills and graphics, never
+ * small text. Opacity modifiers on text colors blend below AA; don't add them.
+ */
 @theme {
   --color-primary: #E07832;
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: #1A1814;
   --color-primary-light: #F09550;
   --color-primary-dark: #C06520;
   --color-primary-subtle: #FFF5ED;
+  --color-primary-ink: #A85518;
+  --color-primary-ink-strong: #8F4712;
   --color-background: #FAFAF7;
   --color-foreground: #1A1814;
   --color-muted: #F3EEE6;
@@ -35,8 +43,13 @@ body {
   --color-sidebar: #F3EEE6;
   --color-sidebar-foreground: #3D3832;
   --color-accent: #F09550;
-  --color-destructive: #D44C47;
-  --color-success: #2D9D78;
+  --color-accent-foreground: #1A1814;
+  --color-destructive: #BE3A35;
+  --color-destructive-foreground: #ffffff;
+  --color-destructive-ink: #BE3A35;
+  --color-success: #1E7B5C;
+  --color-success-foreground: #ffffff;
+  --color-success-ink: #1E7B5C;
 }
 
 .dark {
@@ -49,6 +62,10 @@ body {
   --color-card-foreground: #F0EBE4;
   --color-sidebar: #262018;
   --color-sidebar-foreground: #C5BAB0;
+  --color-primary-ink: #F0A766;
+  --color-primary-ink-strong: #F09550;
+  --color-destructive-ink: #D9635E;
+  --color-success-ink: #2D9D78;
 }
 
 input[type="range"] {
