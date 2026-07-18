@@ -1,19 +1,40 @@
-/* Hide the three-dots extra menu - its contents are now in the navbar directly */
-.VPNavBarExtra {
-  display: none !important;
-}
-
-/* Also hide the default appearance toggle since we render our own */
-.VPNavBarAppearance {
-  display: none !important;
-}
-
-/* Right side of navbar: toggle + GitHub button */
+/* Right-side custom nav cluster: our own appearance toggle + Fund + GitHub Star.
+   VitePress's default theme collapses appearance/social/translations into a
+   compact three-dots flyout below 1280px and shows them inline at >=1280px, so
+   the stock nav never overflows. Our cluster is wider than that native inline
+   set, so forcing it inline at every width pushed the nav past the viewport: a
+   horizontal page scrollbar in the 768-959px band (the nav is in normal flow
+   there) and off-screen clipping of the buttons on 1280-1366px laptops (the nav
+   is position:fixed at >=960px, so it clips instead of scrolling). Fix: show our
+   cluster only once the layout reaches its max width (1440px), where it fits, and
+   defer to VitePress's native responsive nav below that (three-dots flyout under
+   1280px, inline appearance + social from 1280-1439px). */
 .nav-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: 16px;
+  display: none;
+}
+
+@media (min-width: 1440px) {
+  .nav-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 16px;
+  }
+
+  /* Our cluster carries the appearance toggle at this width, so hide VitePress's
+     own inline toggle to avoid a duplicate. */
+  .VPNavBarAppearance {
+    display: none !important;
+  }
+}
+
+/* VitePress anchors flyout dropdowns with a physical `right: 0`, which does not
+   flip for RTL. In RTL the three-dots menu then opens off-screen to the left and
+   adds horizontal overflow even while closed (it is position:absolute). Anchor it
+   to the start edge so it opens inward instead. */
+:root[dir="rtl"] .VPNavBarExtra .menu {
+  right: auto;
+  left: 0;
 }
 
 /* GitHub button group */
@@ -117,12 +138,4 @@
 .dark .fund-btn:hover {
   background: rgba(244, 114, 182, 0.15);
   border-color: rgba(244, 114, 182, 0.4);
-}
-
-/* Hide stars and fund button on small screens, keep toggle */
-@media (max-width: 640px) {
-  .github-btn-wrapper,
-  .fund-btn {
-    display: none;
-  }
 }

@@ -25,7 +25,6 @@ function prefixLinks(items: any[], locale: string): any[] {
 // with no mapping (e.g. the version item) pass through unchanged. The nav is a
 // flat list, so no recursion is needed here.
 const NAV_KEY: Record<string, string> = {
-  Home: "nav.home",
   Guide: "nav.guide",
   Tools: "nav.tools",
   "API Reference": "nav.apiReference",
@@ -286,7 +285,9 @@ function buildBaseTheme() {
     logo: "/logo.png",
 
     nav: [
-      { text: "Home", link: "/" },
+      // No "Home" item: the logo already links home, and dropping it keeps the
+      // nav within the viewport at 768px (see github-stars.css for the wider
+      // responsive-nav fix).
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Tools", link: "/tools/image/resize" },
       { text: "API Reference", link: "/api/rest" },

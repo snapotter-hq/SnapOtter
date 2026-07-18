@@ -42,10 +42,11 @@ test.describe("Theme Toggle", () => {
     const html = page.locator("html");
     const wasDark = ((await html.getAttribute("class")) ?? "").includes("dark");
 
-    // Click the visible toggle inside our custom nav area (the hidden default
-    // VPNavBarAppearance is first in DOM order, so a bare querySelector would
-    // hit it instead).
-    await page.locator('.nav-bar-right button[role="switch"]').click();
+    // Click whichever theme toggle is actually visible at this viewport: below
+    // 1440px the nav uses VitePress's native inline toggle, at >=1440px our
+    // custom cluster toggle takes over. Filtering to :visible skips the hidden
+    // duplicates that sit earlier in DOM order.
+    await page.locator('button[role="switch"]:visible').first().click();
 
     // Assert the dark class actually toggled
     if (wasDark) {
@@ -57,6 +58,11 @@ test.describe("Theme Toggle", () => {
 });
 
 test.describe("GitHub Stars Component", () => {
+  // The custom nav cluster (toggle + Fund + GitHub Star) only renders at
+  // >=1440px, where it fits without overflowing the nav. Below that the nav
+  // defers to VitePress's native responsive layout, so pin a wide desktop here.
+  test.use({ viewport: { width: 1500, height: 900 } });
+
   test("GitHub star button is visible in navbar", async ({ page }) => {
     await page.goto("/");
     const githubBtn = page.locator(".github-btn, .github-btn-wrapper").first();
@@ -69,4 +75,23 @@ test.describe("GitHub Stars Component", () => {
     await expect(starLink).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
     await expect(starLink).toHaveAttribute("target", "_blank");
   });
+});
+
+// Regression guard for the nav overflow reported in #556. The custom nav cluster
+// used to render inline at every width, pushing the nav past narrow viewports
+// (a horizontal scrollbar at 768-959px, off-screen clipping at 1280-1366px).
+test.describe("Nav has no horizontal overflow", () => {
+  for (const width of [768, 834, 900, 1024, 1280, 1366]) {
+    test(`no horizontal scroll at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/guide/getting-started");
+      await waitForHydration(page);
+      const overflow = await page.evaluate(() => {
+        const de = document.documentElement;
+        return de.scrollWidth - de.clientWidth;
+      });
+      // Allow a 1px sub-pixel rounding margin; the bug produced 300px+ scroll.
+      expect(overflow).toBeLessThanOrEqual(1);
+    });
+  }
 });
