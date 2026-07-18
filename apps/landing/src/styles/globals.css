@@ -35,6 +35,8 @@ html {
   --color-primary-light: #F09550;
   --color-primary-dark: #C06520;
   --color-primary-subtle: #FFF5ED;
+  --color-primary-ink: #A85518;
+  --color-primary-ink-strong: #8F4712;
 
   /* Neutrals -- Warm Cream & Stone (sandy riverbank) */
   --color-background: #FAFAF7;
@@ -59,8 +61,8 @@ html {
   --color-terminal-green: #4ADE80;
 
   /* Semantic */
-  --color-success: #2D9D78;
-  --color-danger: #D44C47;
+  --color-success: #1E7B5C;
+  --color-danger: #BE3A35;
 
   /* Fonts */
   --font-display: "Bricolage Grotesque", system-ui, sans-serif;
@@ -281,7 +283,7 @@ code, pre, kbd {
 /* ─── BUTTONS ─── */
 .btn-primary {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
-  color: white;
+  color: var(--color-foreground);
   transition: box-shadow 0.2s, transform 0.1s;
 }
 .btn-primary:hover {
@@ -318,7 +320,7 @@ code, pre, kbd {
 .code-block .code-string { color: #C3E88D; }
 .code-block .code-flag { color: #82AAFF; }
 .code-block .code-url { color: #89DDFF; }
-.code-block .code-comment { color: #546E7A; }
+.code-block .code-comment { color: #7E99A8; }
 
 /* ─── SECTION DIVIDER ─── */
 .section-divider {
@@ -343,7 +345,7 @@ code, pre, kbd {
   z-index: 100;
   padding: 0.5rem 1rem;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-foreground);
   border-radius: 0 0 0.5rem 0.5rem;
   transition: top 0.2s;
 }
