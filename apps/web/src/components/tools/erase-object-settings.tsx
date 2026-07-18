@@ -580,7 +580,7 @@ export function EraseObjectSettings({
       )}
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Size info */}
       {currentEntry?.originalSize != null &&

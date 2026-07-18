@@ -194,7 +194,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
             </>
           ) : (
             <>
-              <span className="text-amber-500 font-medium">Static image</span>
+              <span className="text-amber-700 dark:text-amber-400 font-medium">Static image</span>
               <span className="text-border">|</span>
               <span>
                 {info.width}x{info.height}
@@ -673,7 +673,7 @@ export function GifToolsSettings() {
     <div className="space-y-4">
       <GifToolsControls onChange={setSettings} />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

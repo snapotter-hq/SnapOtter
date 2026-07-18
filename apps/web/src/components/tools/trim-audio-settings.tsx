@@ -59,11 +59,13 @@ export function TrimAudioSettings() {
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         />
         {!rangeValid && (
-          <p className="text-[10px] text-amber-500 mt-0.5">End time must be after start time</p>
+          <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
+            End time must be after start time
+          </p>
         )}
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

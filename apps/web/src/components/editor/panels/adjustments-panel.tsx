@@ -437,9 +437,9 @@ function LevelsSection() {
 
   const channelColors: Record<LevelsChannel, string> = {
     rgb: "text-foreground",
-    red: "text-red-400",
-    green: "text-green-400",
-    blue: "text-blue-400",
+    red: "text-red-700 dark:text-red-400",
+    green: "text-green-700 dark:text-green-400",
+    blue: "text-blue-700 dark:text-blue-400",
   };
 
   return (

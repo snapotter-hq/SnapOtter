@@ -106,7 +106,7 @@ export function UsageSection() {
                             {row.total}
                           </span>
                         </div>
-                        <span className="w-14 shrink-0 text-end text-green-600 dark:text-green-400">
+                        <span className="w-14 shrink-0 text-end text-success-ink">
                           {row.completed}
                         </span>
                         <span className="w-10 shrink-0 text-end text-destructive">

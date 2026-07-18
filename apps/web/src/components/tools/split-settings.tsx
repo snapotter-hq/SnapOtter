@@ -346,7 +346,9 @@ export function SplitSettings() {
         </div>
       )}
 
-      {tileWarning && <p className="text-[11px] text-amber-500">{tileWarning}</p>}
+      {tileWarning && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">{tileWarning}</p>
+      )}
 
       <CollapsibleSection
         title="Output Format"
@@ -391,7 +393,7 @@ export function SplitSettings() {
         </div>
       </CollapsibleSection>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       <button
         type="button"

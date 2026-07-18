@@ -213,7 +213,7 @@ export function PdfToImageSettings() {
       </div>
 
       {/* Error */}
-      {store.error && <p className="text-xs text-red-500">{store.error}</p>}
+      {store.error && <p className="text-xs text-destructive-ink">{store.error}</p>}
 
       {/* Convert button */}
       <button

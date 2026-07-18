@@ -133,7 +133,7 @@ export function BarcodeGenerateSettings() {
         {ts.includeText}
       </label>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Result preview */}
       {resultUrl && (

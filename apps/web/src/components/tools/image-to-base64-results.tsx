@@ -117,7 +117,9 @@ function FileResult({ result }: { result: Base64Result }) {
           <p className="text-[11px] text-muted-foreground">
             {result.width}x{result.height} &middot; {formatBytes(result.originalSize)} &rarr;{" "}
             {formatBytes(result.encodedSize)}{" "}
-            <span className={result.overheadPercent > 50 ? "text-amber-500" : ""}>
+            <span
+              className={result.overheadPercent > 50 ? "text-amber-700 dark:text-amber-400" : ""}
+            >
               (+{result.overheadPercent}%)
             </span>
           </p>
@@ -308,8 +310,10 @@ export function ImageToBase64Results() {
         ) : currentError ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-sm text-red-500 font-medium mb-1">{currentError.filename}</p>
-              <p className="text-xs text-red-500/80">{currentError.error}</p>
+              <p className="text-sm text-destructive-ink font-medium mb-1">
+                {currentError.filename}
+              </p>
+              <p className="text-xs text-destructive-ink">{currentError.error}</p>
             </div>
           </div>
         ) : (

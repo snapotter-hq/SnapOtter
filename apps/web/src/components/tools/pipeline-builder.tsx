@@ -127,7 +127,7 @@ function SortableStep({
                 expected: warning.expects,
                 received: warning.receives,
               })}
-              className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 ms-1"
+              className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 ms-1"
             >
               <AlertTriangle className="h-3 w-3" />
               {t.automate.modalityWarning}

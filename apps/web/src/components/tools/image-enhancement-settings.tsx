@@ -380,7 +380,7 @@ export function ImageEnhancementControls({
                     onClick={() => toggleKey && toggleCorrection(toggleKey)}
                     className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${
                       isEnabled
-                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
                         : "bg-muted text-muted-foreground line-through"
                     }`}
                   >
@@ -462,7 +462,7 @@ export function ImageEnhancementSettings({
     <form onSubmit={handleSubmit} className="space-y-3">
       <ImageEnhancementControls onChange={setSettings} onPreviewFilter={onPreviewFilter} />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

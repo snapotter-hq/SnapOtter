@@ -51,15 +51,15 @@ export function CompressPdfSettings() {
         <p className="text-[11px] text-muted-foreground">{s.bestEffortHint}</p>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {targetMet === false && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-amber-700 dark:text-amber-400">
           {format(s.targetMissed, { target: targetLabel, size: achievedLabel })}
         </p>
       )}
       {targetMet === true && (
-        <p className="text-xs text-green-600">
+        <p className="text-xs text-success-ink">
           {format(s.targetReached, { target: targetLabel, size: achievedLabel })}
         </p>
       )}

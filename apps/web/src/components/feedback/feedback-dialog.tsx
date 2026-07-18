@@ -248,7 +248,7 @@ export function FeedbackDialog({
               </p>
             ) : (
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-5 w-5 text-success-ink shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">{t.feedback.thanksTitle}</p>
                   <p className="text-sm text-muted-foreground">{t.feedback.thanksDescription}</p>

@@ -91,7 +91,7 @@ export function HistogramSettings() {
         Generates an RGB histogram chart showing the color distribution of the image.
       </p>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

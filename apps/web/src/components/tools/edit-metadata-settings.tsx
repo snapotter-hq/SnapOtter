@@ -587,9 +587,9 @@ export function EditMetadataSettings() {
           <div className="space-y-2.5">
             {gpsCoords && (
               <div className="flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-500/10 border border-amber-500/20">
-                <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <MapPin className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
                     Location data found
                   </p>
                   <p className="text-[10px] text-muted-foreground font-mono">
@@ -665,7 +665,7 @@ export function EditMetadataSettings() {
                     <button
                       type="button"
                       onClick={() => removeKeyword(kw)}
-                      className="hover:text-red-500"
+                      className="hover:text-destructive-ink"
                     >
                       <X className="h-2.5 w-2.5" />
                     </button>
@@ -783,7 +783,7 @@ export function EditMetadataSettings() {
                   <button
                     type="button"
                     onClick={() => deleteTemplate(t.name)}
-                    className="p-1 text-muted-foreground hover:text-red-500"
+                    className="p-1 text-muted-foreground hover:text-destructive-ink"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -820,7 +820,7 @@ export function EditMetadataSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Changes summary */}
       {hasFile && changes.total > 0 && !processing && (

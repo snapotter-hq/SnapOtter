@@ -95,7 +95,7 @@ export function MultiImageViewer() {
           !currentEntry.blobUrl ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-8">
               <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-6 w-6 text-success-ink" />
               </div>
               <p className="text-sm font-medium">{processedFilename}</p>
               <p className="text-xs text-muted-foreground">

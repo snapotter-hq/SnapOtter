@@ -17,7 +17,7 @@ export function CreateZipSettings() {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

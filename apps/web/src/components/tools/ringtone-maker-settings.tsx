@@ -61,7 +61,7 @@ export function RingtoneMakerSettings() {
         <p className="text-[10px] text-muted-foreground mt-0.5">{s["max-hint"]}</p>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

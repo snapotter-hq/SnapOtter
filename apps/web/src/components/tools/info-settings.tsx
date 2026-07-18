@@ -138,7 +138,7 @@ export function InfoSettings() {
         {processing ? ts.reading : ts.readInfo}
       </button>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {info && (
         <div className="space-y-3">

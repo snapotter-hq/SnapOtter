@@ -173,7 +173,7 @@ export function ImageToBase64Settings() {
           : `Convert to Base64${files.length > 1 ? ` (${files.length})` : ""}`}
       </button>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
     </div>
   );
 }

@@ -495,7 +495,7 @@ export function ResizeSettings() {
       <ResizeControls onChange={handleSettingsChange} />
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Process button */}
       {processing ? (

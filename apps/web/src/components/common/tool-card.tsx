@@ -59,6 +59,16 @@ const SECTION_COLOR_MAP: Record<string, string> = Object.fromEntries(
   SECTIONS.map((s) => [s.id, s.color]),
 );
 
+// Darkened per-section text colors: the vivid section colors sit below the
+// WCAG AA 4.5:1 floor as small text on the 12.5% tint chips (issue #557).
+const SECTION_INK_MAP: Record<string, string> = {
+  image: "#0B61ED",
+  video: "#D31212",
+  audio: "#0B7C57",
+  pdf: "#7942F5",
+  files: "#996306",
+};
+
 export function ToolCard({
   tool,
   variant = "compact",
@@ -95,7 +105,7 @@ export function ToolCard({
       className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
       style={{
         backgroundColor: `${sectionColor}20`,
-        color: sectionColor,
+        color: SECTION_INK_MAP[section] ?? "#3D3832",
       }}
     >
       {SECTIONS.find((s) => s.id === section)?.name ?? section}
@@ -139,7 +149,7 @@ export function ToolCard({
             </span>
             {sectionBadge}
             {tool.experimental && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 font-medium">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-subtle text-primary-ink font-medium">
                 {t.common.experimental}
               </span>
             )}
@@ -178,7 +188,7 @@ export function ToolCard({
       </span>
       {sectionBadge}
       {tool.experimental && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 font-medium">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-subtle text-primary-ink font-medium">
           {t.common.experimental}
         </span>
       )}

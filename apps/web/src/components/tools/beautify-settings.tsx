@@ -1374,7 +1374,7 @@ export function BeautifySettings({
         onBackgroundImage={handleBgImageChange}
       />
 
-      {displayError && <p className="text-xs text-red-500">{displayError}</p>}
+      {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
       {processing ? (
         <ProgressCard

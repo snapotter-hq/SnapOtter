@@ -189,7 +189,7 @@ export function TextOverlaySettings() {
     <div className="space-y-4">
       <TextOverlayControls onChange={setSettings} />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

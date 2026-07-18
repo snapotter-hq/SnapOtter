@@ -338,7 +338,7 @@ export function OptimizeForWebSettings() {
           {savings != null && (
             <div
               className={`text-sm font-semibold ${
-                Number(savings) > 0 ? "text-green-500" : "text-red-500"
+                Number(savings) > 0 ? "text-success-ink" : "text-destructive-ink"
               }`}
             >
               {Number(savings) > 0 ? `${savings}% smaller` : `${Math.abs(Number(savings))}% larger`}
@@ -348,7 +348,7 @@ export function OptimizeForWebSettings() {
       )}
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Process / Download */}
       {processing ? (

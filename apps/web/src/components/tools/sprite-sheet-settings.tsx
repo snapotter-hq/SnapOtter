@@ -148,7 +148,7 @@ export function SpriteSheetSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard
@@ -259,7 +259,7 @@ function SpriteOutput({
           data-testid="sprite-sheet-copy-css"
         >
           {copiedExport === "css" ? (
-            <Check className="h-3 w-3 text-green-500" />
+            <Check className="h-3 w-3 text-success-ink" />
           ) : (
             <ClipboardCopy className="h-3 w-3" />
           )}
@@ -272,7 +272,7 @@ function SpriteOutput({
           data-testid="sprite-sheet-copy-json"
         >
           {copiedExport === "json" ? (
-            <Check className="h-3 w-3 text-green-500" />
+            <Check className="h-3 w-3 text-success-ink" />
           ) : (
             <ClipboardCopy className="h-3 w-3" />
           )}

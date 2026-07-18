@@ -27,12 +27,14 @@ function OverviewGrid() {
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Duplicate groups:</span>
-          <span className="text-yellow-500 font-semibold">{results.duplicateGroups.length}</span>
+          <span className="text-amber-700 dark:text-amber-400 font-semibold">
+            {results.duplicateGroups.length}
+          </span>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Unique:</span>
-          <span className="text-green-500 font-semibold">{results.uniqueImages}</span>
+          <span className="text-success-ink font-semibold">{results.uniqueImages}</span>
         </div>
         {results.spaceSaveable > 0 && (
           <>
@@ -50,7 +52,7 @@ function OverviewGrid() {
       {results.duplicateGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-            <Search className="h-6 w-6 text-green-600 dark:text-green-400" />
+            <Search className="h-6 w-6 text-success-ink" />
           </div>
           <p className="text-sm font-medium text-foreground">No duplicates found</p>
           <p className="text-xs text-muted-foreground">
@@ -173,7 +175,7 @@ function DetailComparison() {
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
-        <span className="text-xs font-medium text-yellow-500">
+        <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
           {Math.max(...group.files.map((f) => f.similarity))}% Similar
         </span>
       </div>
@@ -228,7 +230,7 @@ function DetailComparison() {
                   <span className="text-foreground text-end">{file.format.toUpperCase()}</span>
                   <span className="text-muted-foreground">Similarity</span>
                   <span
-                    className={`text-end font-medium ${file.similarity === 100 ? "text-green-500" : "text-yellow-500"}`}
+                    className={`text-end font-medium ${file.similarity === 100 ? "text-success-ink" : "text-amber-700 dark:text-amber-400"}`}
                   >
                     {file.similarity}%
                   </span>

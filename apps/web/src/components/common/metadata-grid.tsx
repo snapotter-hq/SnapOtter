@@ -50,7 +50,7 @@ export function MetadataGrid({
                   <button
                     type="button"
                     onClick={() => onRemove(k)}
-                    className={`p-0.5 rounded hover:bg-muted/50 transition-colors ${isRemoved ? "text-red-500" : "text-muted-foreground hover:text-red-500"}`}
+                    className={`p-0.5 rounded hover:bg-muted/50 transition-colors ${isRemoved ? "text-destructive-ink" : "text-muted-foreground hover:text-destructive-ink"}`}
                     title={
                       isRemoved ? `Restore ${labelMap?.[k] ?? k}` : `Remove ${labelMap?.[k] ?? k}`
                     }

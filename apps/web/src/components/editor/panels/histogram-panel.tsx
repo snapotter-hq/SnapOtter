@@ -187,23 +187,23 @@ export function HistogramPanel({ imageData }: HistogramPanelProps) {
           <div>
             <span className="font-medium">Mean</span>
             <br />
-            <span className="text-red-400">{stats.mean[0]}</span>{" "}
-            <span className="text-green-400">{stats.mean[1]}</span>{" "}
-            <span className="text-blue-400">{stats.mean[2]}</span>
+            <span className="text-red-700 dark:text-red-400">{stats.mean[0]}</span>{" "}
+            <span className="text-green-700 dark:text-green-400">{stats.mean[1]}</span>{" "}
+            <span className="text-blue-700 dark:text-blue-400">{stats.mean[2]}</span>
           </div>
           <div>
             <span className="font-medium">StdDev</span>
             <br />
-            <span className="text-red-400">{stats.stdDev[0]}</span>{" "}
-            <span className="text-green-400">{stats.stdDev[1]}</span>{" "}
-            <span className="text-blue-400">{stats.stdDev[2]}</span>
+            <span className="text-red-700 dark:text-red-400">{stats.stdDev[0]}</span>{" "}
+            <span className="text-green-700 dark:text-green-400">{stats.stdDev[1]}</span>{" "}
+            <span className="text-blue-700 dark:text-blue-400">{stats.stdDev[2]}</span>
           </div>
           <div>
             <span className="font-medium">Median</span>
             <br />
-            <span className="text-red-400">{stats.median[0]}</span>{" "}
-            <span className="text-green-400">{stats.median[1]}</span>{" "}
-            <span className="text-blue-400">{stats.median[2]}</span>
+            <span className="text-red-700 dark:text-red-400">{stats.median[0]}</span>{" "}
+            <span className="text-green-700 dark:text-green-400">{stats.median[1]}</span>{" "}
+            <span className="text-blue-700 dark:text-blue-400">{stats.median[2]}</span>
           </div>
         </div>
       )}

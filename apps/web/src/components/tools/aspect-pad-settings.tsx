@@ -65,7 +65,7 @@ export function AspectPadSettings() {
         <p className="text-[10px] text-muted-foreground mt-0.5">{s.colorHint}</p>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

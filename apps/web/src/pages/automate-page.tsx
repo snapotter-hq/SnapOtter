@@ -475,7 +475,7 @@ export function AutomatePage() {
         <div className="flex items-center justify-center h-full">
           <div className="text-center p-6 max-w-xs">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-3">
-              <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="h-7 w-7 text-success-ink" />
             </div>
             <p className="font-medium text-foreground mb-1">{fname}</p>
             <p className="text-xs text-muted-foreground">
@@ -573,7 +573,7 @@ export function AutomatePage() {
 
             {hasFile && (
               <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-muted/50">
-                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success-ink shrink-0" />
                 <span className="text-sm text-foreground truncate flex-1">
                   {selectedFileName ?? files[0].name}
                 </span>
@@ -624,7 +624,7 @@ export function AutomatePage() {
 
             {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
               <div className="mb-3 rounded-lg border border-border p-3 text-center">
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive-ink">
                   {currentEntry.error ?? t.toolPage.processingFailed}
                 </p>
               </div>
@@ -651,7 +651,7 @@ export function AutomatePage() {
             />
 
             {error && (
-              <div className="mt-3 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5">
+              <div className="mt-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5">
                 <X className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -789,7 +789,7 @@ export function AutomatePage() {
               </button>
             </div>
             {importError && (
-              <div className="text-xs text-red-500 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 mb-1.5 flex items-start gap-1.5">
+              <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 mb-1.5 flex items-start gap-1.5">
                 <X className="h-3 w-3 shrink-0 mt-0.5" />
                 <span>{importError}</span>
               </div>
@@ -894,7 +894,7 @@ export function AutomatePage() {
             {hasFile ? (
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center gap-1.5 text-xs bg-muted rounded-full px-3 py-1">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success-ink" />
                   <span className="text-foreground max-w-[120px] truncate">
                     {files.length > 1
                       ? `${files.length} files`
@@ -949,7 +949,7 @@ export function AutomatePage() {
             {/* Pipeline steps area */}
             <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
               {error && (
-                <div className="mb-3 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                <div className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5">
                   <X className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
@@ -1157,7 +1157,7 @@ export function AutomatePage() {
 
                     {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
                       <div className="flex flex-col items-center justify-center gap-2 h-full text-center px-4">
-                        <p className="text-sm text-red-500">
+                        <p className="text-sm text-destructive-ink">
                           {currentEntry.error ?? t.toolPage.processingFailed}
                         </p>
                       </div>

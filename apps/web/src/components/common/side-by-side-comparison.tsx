@@ -92,7 +92,7 @@ export function SideBySideComparison({
       {/* Size savings */}
       {savingsPercent !== null && (
         <p
-          className={`text-sm font-medium ${Number(savingsPercent) > 0 ? "text-green-600 dark:text-green-400" : "text-red-500"}`}
+          className={`text-sm font-medium ${Number(savingsPercent) > 0 ? "text-success-ink" : "text-destructive-ink"}`}
         >
           {Number(savingsPercent) > 0
             ? format(t.toolSettings["optimize-for-web"].smaller, { percent: savingsPercent })

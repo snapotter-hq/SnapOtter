@@ -405,7 +405,7 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
         <p
           role={feedback.type === "error" ? "alert" : "status"}
           aria-live="polite"
-          className={`text-xs ${feedback.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
+          className={`text-xs ${feedback.type === "success" ? "text-success-ink" : "text-destructive"}`}
         >
           {feedback.message}
         </p>

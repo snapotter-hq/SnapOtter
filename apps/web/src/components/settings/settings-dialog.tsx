@@ -516,9 +516,7 @@ function GeneralSection() {
           <span
             className={cn(
               "text-sm",
-              saveMsg === t.settings.general.saveFailed
-                ? "text-destructive"
-                : "text-green-600 dark:text-green-400",
+              saveMsg === t.settings.general.saveFailed ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg}
@@ -837,9 +835,7 @@ function SystemSection() {
           <span
             className={cn(
               "text-sm",
-              saveMsg === t.settings.system.saveFailed
-                ? "text-destructive"
-                : "text-green-600 dark:text-green-400",
+              saveMsg === t.settings.system.saveFailed ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg}
@@ -1045,9 +1041,7 @@ function SecuritySection() {
               role="alert"
               className={cn(
                 "text-sm",
-                message.type === "error"
-                  ? "text-destructive"
-                  : "text-green-600 dark:text-green-400",
+                message.type === "error" ? "text-destructive" : "text-success-ink",
               )}
             >
               {message.text}
@@ -1347,7 +1341,7 @@ export function AdminSecuritySettings() {
           <span
             className={cn(
               "text-sm",
-              saveMsg.type === "error" ? "text-destructive" : "text-green-600 dark:text-green-400",
+              saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg.text}
@@ -1614,7 +1608,7 @@ function PeopleSection() {
             "text-sm px-3 py-2 rounded-lg",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
-              : "bg-green-500/10 text-green-600 dark:text-green-400",
+              : "bg-green-500/10 text-success-ink",
           )}
         >
           {actionMsg.text}
@@ -1715,7 +1709,7 @@ function PeopleSection() {
                   className={cn(
                     "shrink-0 p-2 rounded-lg border border-border transition-colors",
                     pwCopied
-                      ? "text-green-500 bg-green-500/10"
+                      ? "text-success-ink bg-green-500/10"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                   title={
@@ -1801,7 +1795,7 @@ function PeopleSection() {
             </button>
           </div>
           {showGeneratedPw && !pwCopied && (
-            <p className="text-xs text-amber-500 flex items-center gap-1.5">
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <Key className="h-3.5 w-3.5 shrink-0" />
               {t.settings.people.copyPasswordWarning}
             </p>
@@ -2282,7 +2276,11 @@ function ApiKeysSection() {
               title="Copy"
               aria-label={t.common.copy}
             >
-              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              {copied ? (
+                <Check className="h-4 w-4 text-success-ink" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
             </button>
           </div>
           <p className="text-xs text-muted-foreground">{t.settings.apiKeys.keyWarning}</p>
@@ -2311,7 +2309,7 @@ function ApiKeysSection() {
                   </p>
                 )}
                 {k.expiresAt && (
-                  <span className="text-xs text-amber-500">
+                  <span className="text-xs text-amber-700 dark:text-amber-400">
                     Expires {new Date(k.expiresAt).toLocaleDateString()}
                   </span>
                 )}
@@ -2502,7 +2500,7 @@ function TeamsSection() {
             "text-sm px-3 py-2 rounded-lg",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
-              : "bg-green-500/10 text-green-600 dark:text-green-400",
+              : "bg-green-500/10 text-success-ink",
           )}
         >
           {actionMsg.text}
@@ -2917,7 +2915,7 @@ function RolesSection() {
             "text-sm px-3 py-2 rounded-lg",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
-              : "bg-green-500/10 text-green-600 dark:text-green-400",
+              : "bg-green-500/10 text-success-ink",
           )}
         >
           {actionMsg.text}

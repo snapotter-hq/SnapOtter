@@ -130,7 +130,7 @@ export function ColorPaletteSettings() {
         {processing ? ts.extracting : ts.submit}
       </button>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {colors.length > 0 && (
         <div className="space-y-3">
@@ -157,7 +157,7 @@ export function ColorPaletteSettings() {
                 data-testid="color-palette-copy-css"
               >
                 {copiedExport === "css" ? (
-                  <Check className="h-3 w-3 text-green-500" />
+                  <Check className="h-3 w-3 text-success-ink" />
                 ) : (
                   <ClipboardCopy className="h-3 w-3" />
                 )}
@@ -170,7 +170,7 @@ export function ColorPaletteSettings() {
                 data-testid="color-palette-copy-json"
               >
                 {copiedExport === "json" ? (
-                  <Check className="h-3 w-3 text-green-500" />
+                  <Check className="h-3 w-3 text-success-ink" />
                 ) : (
                   <ClipboardCopy className="h-3 w-3" />
                 )}
@@ -196,7 +196,7 @@ export function ColorPaletteSettings() {
                   {color}
                 </span>
                 {copiedIdx === i ? (
-                  <Check className="h-3 w-3 text-green-500 shrink-0" />
+                  <Check className="h-3 w-3 text-success-ink shrink-0" />
                 ) : (
                   <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
                 )}

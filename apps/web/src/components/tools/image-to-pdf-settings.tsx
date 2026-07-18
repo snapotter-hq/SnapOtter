@@ -365,7 +365,7 @@ export function ImageToPdfSettings() {
         imgUrl={entries[selectedIndex]?.blobUrl ?? entries[0]?.blobUrl ?? null}
       />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {busy ? (
         <ProgressCard
@@ -409,8 +409,8 @@ export function ImageToPdfSettings() {
           data-testid="image-to-pdf-compression-result"
           className={`text-xs px-3 py-2 rounded ${
             compressionResult.targetMet
-              ? "bg-green-500/10 text-green-600"
-              : "bg-amber-500/10 text-amber-600"
+              ? "bg-green-500/10 text-success-ink"
+              : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
           }`}
         >
           {compressionResult.targetMet ? (

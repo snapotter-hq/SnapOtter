@@ -22,7 +22,7 @@ function StatusIcon({ status }: { status: UrlImportEntry["status"] }) {
     case "fetching":
       return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
     case "ready":
-      return <Check className="h-4 w-4 text-emerald-500" />;
+      return <Check className="h-4 w-4 text-success-ink" />;
     case "failed":
       return <AlertCircle className="h-4 w-4 text-destructive" />;
   }

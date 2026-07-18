@@ -38,7 +38,7 @@ export function BurnSubtitlesSettings() {
 
       <p className="text-[10px] text-muted-foreground">{s.hint}</p>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

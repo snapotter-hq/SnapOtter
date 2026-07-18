@@ -114,7 +114,7 @@ const COLLAPSED_LIMIT = 5;
 function FileStatusIcon({ status }: { status: FileEntry["status"] }) {
   switch (status) {
     case "completed":
-      return <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />;
+      return <CheckCircle2 className="h-3 w-3 text-success-ink shrink-0" />;
     case "failed":
       return <XCircle className="h-3 w-3 text-destructive shrink-0" />;
     case "processing":
@@ -908,7 +908,7 @@ export function ToolPage() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-8 max-w-xs">
             <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="h-8 w-8 text-success-ink" />
             </div>
             <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
             <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>

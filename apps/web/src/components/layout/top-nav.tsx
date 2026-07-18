@@ -179,7 +179,7 @@ export function TopNav({
               <ChevronRight
                 className={cn(
                   "h-3.5 w-3.5 shrink-0",
-                  isDark ? "text-[#666]" : "text-muted-foreground",
+                  isDark ? "text-[#8a8a8a]" : "text-muted-foreground",
                 )}
               />
               {breadcrumb.modalityTab ? (
@@ -202,7 +202,10 @@ export function TopNav({
             </>
           )}
           <ChevronRight
-            className={cn("h-3.5 w-3.5 shrink-0", isDark ? "text-[#666]" : "text-muted-foreground")}
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              isDark ? "text-[#8a8a8a]" : "text-muted-foreground",
+            )}
           />
           <span
             className={cn("font-medium truncate", isDark ? "text-[#e0e0e0]" : "text-foreground")}

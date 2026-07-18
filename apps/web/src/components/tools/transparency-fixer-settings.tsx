@@ -143,7 +143,7 @@ export function TransparencyFixerSettings() {
       <TransparencyFixerControls settings={settings} onChange={setSettings} />
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Process button / progress */}
       {processing ? (

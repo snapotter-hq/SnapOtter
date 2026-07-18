@@ -172,7 +172,7 @@ export function RedEyeRemovalSettings() {
       <RedEyeRemovalControls onChange={setSettings} />
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && (

@@ -613,7 +613,7 @@ export function BorderSettings({
     <form onSubmit={handleSubmit} className="space-y-4">
       <BorderControls onChange={handleSettingsChange} onImageStyle={onImageStyle} />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

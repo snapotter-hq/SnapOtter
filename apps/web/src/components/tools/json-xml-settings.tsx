@@ -38,7 +38,7 @@ export function JsonXmlSettings() {
         {s.pretty}
       </label>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard

@@ -120,14 +120,14 @@ export function ReviewPanel({
 
       {/* Success indicator */}
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+        <CheckCircle2 className="h-4 w-4 text-success-ink shrink-0" />
         <span className="text-sm font-medium text-foreground">{t.toolPage.conversionComplete}</span>
       </div>
 
       {/* Batch partial failure summary */}
       {hasBatchStats && failedCount > 0 && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs">
-          <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <AlertCircle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
           <span className="text-amber-800 dark:text-amber-300">
             {format(t.toolPage.batchPartialSuccess, {
               success: successCount,
@@ -154,7 +154,7 @@ export function ReviewPanel({
           {sizeDelta > 0 && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t.toolPage.saved}</span>
-              <span className="tabular-nums font-medium text-emerald-600">{sizeDelta}%</span>
+              <span className="tabular-nums font-medium text-success-ink">{sizeDelta}%</span>
             </div>
           )}
         </div>
@@ -204,7 +204,7 @@ export function ReviewPanel({
             className={cn(
               "text-xs flex items-center gap-1.5 transition-colors",
               saveStatus === "saved"
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-success-ink"
                 : "text-muted-foreground hover:text-foreground disabled:opacity-50",
             )}
           >

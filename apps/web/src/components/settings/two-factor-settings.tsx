@@ -229,9 +229,7 @@ export function TwoFactorSettings() {
             <p
               className={cn(
                 "text-sm",
-                message.type === "error"
-                  ? "text-destructive"
-                  : "text-green-600 dark:text-green-400",
+                message.type === "error" ? "text-destructive" : "text-success-ink",
               )}
             >
               {message.text}
@@ -277,9 +275,7 @@ export function TwoFactorSettings() {
             <p
               className={cn(
                 "text-sm",
-                message.type === "error"
-                  ? "text-destructive"
-                  : "text-green-600 dark:text-green-400",
+                message.type === "error" ? "text-destructive" : "text-success-ink",
               )}
             >
               {message.text}
@@ -311,7 +307,7 @@ export function TwoFactorSettings() {
         <p
           className={cn(
             "text-sm",
-            message.type === "error" ? "text-destructive" : "text-green-600 dark:text-green-400",
+            message.type === "error" ? "text-destructive" : "text-success-ink",
           )}
         >
           {message.text}

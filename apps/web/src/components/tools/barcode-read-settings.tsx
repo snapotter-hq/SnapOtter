@@ -47,9 +47,9 @@ function getBadgeColor(type: string): string {
   if (type.includes("QR") || type === "Aztec" || type === "DataMatrix" || type === "MaxiCode")
     return "bg-primary/15 text-primary-dark dark:text-primary-light";
   if (type.includes("EAN") || type.includes("UPC") || type.includes("DataBar"))
-    return "bg-green-500/15 text-green-600 dark:text-green-400";
+    return "bg-green-500/15 text-success-ink";
   if (type === "PDF417") return "bg-purple-500/15 text-purple-600 dark:text-purple-400";
-  return "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+  return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -264,7 +264,7 @@ export function BarcodeReadSettings() {
       </label>
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Process button / progress */}
       {processing ? (
@@ -360,7 +360,7 @@ export function BarcodeReadSettings() {
                         title="Copy value"
                       >
                         {copiedIndex === idx ? (
-                          <Check className="h-3.5 w-3.5 text-green-500" />
+                          <Check className="h-3.5 w-3.5 text-success-ink" />
                         ) : (
                           <Copy className="h-3.5 w-3.5" />
                         )}

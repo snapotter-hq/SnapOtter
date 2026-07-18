@@ -119,7 +119,7 @@ export function BulkRenameSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       <button
         type="button"
@@ -135,7 +135,7 @@ export function BulkRenameSettings() {
       </button>
 
       {downloadReady && (
-        <p className="text-xs text-green-600 flex items-center gap-1">
+        <p className="text-xs text-success-ink flex items-center gap-1">
           <Download className="h-3 w-3" /> {t.toolSettings["bulk-rename"].zipDownloaded}
         </p>
       )}

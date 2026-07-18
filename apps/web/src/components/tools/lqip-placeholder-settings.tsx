@@ -156,7 +156,7 @@ export function LqipPlaceholderSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (
         <ProgressCard
@@ -267,7 +267,7 @@ function CopyBlock({
           onClick={onCopy}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
-          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          {copied ? <Check className="h-3 w-3 text-success-ink" /> : <Copy className="h-3 w-3" />}
           Copy
         </button>
       </div>

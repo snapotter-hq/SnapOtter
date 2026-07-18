@@ -351,7 +351,7 @@ export function FaviconSettings() {
         </p>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {busy ? (
         <ProgressCard

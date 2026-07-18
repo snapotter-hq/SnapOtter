@@ -194,9 +194,7 @@ export function ToolFeedbackPrompt({
         </div>
       )}
 
-      {thanks && (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400">{t.feedback.quickThanks}</p>
-      )}
+      {thanks && <p className="text-xs text-success-ink">{t.feedback.quickThanks}</p>}
 
       <FeedbackDialog
         open={dialogOpen}

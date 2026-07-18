@@ -906,8 +906,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       <RemoveBgControls settings={settings} onChange={setSettings} />
 
       {/* Errors */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
-      {effectsError && <p className="text-xs text-red-500">{effectsError}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      {effectsError && <p className="text-xs text-destructive-ink">{effectsError}</p>}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && !processing && (

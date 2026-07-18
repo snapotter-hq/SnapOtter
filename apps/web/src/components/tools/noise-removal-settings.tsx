@@ -240,14 +240,14 @@ export function NoiseRemovalSettings() {
 
       {/* GIF + AI tier warning */}
       {isGif && isAiTier && (
-        <p className="text-xs text-amber-500">
+        <p className="text-xs text-amber-700 dark:text-amber-400">
           AI denoising on GIF files processes only the first frame. For animated GIFs, use the Quick
           or Balanced tier.
         </p>
       )}
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && (

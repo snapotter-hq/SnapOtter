@@ -287,7 +287,7 @@ export function ColorControls({
             onChange={setRed}
             min={0}
             max={200}
-            color="text-red-500"
+            color="text-destructive-ink"
           />
           <SliderControl
             label="Green"
@@ -295,7 +295,7 @@ export function ColorControls({
             onChange={setGreen}
             min={0}
             max={200}
-            color="text-green-500"
+            color="text-success-ink"
           />
           <SliderControl
             label="Blue"
@@ -303,7 +303,7 @@ export function ColorControls({
             onChange={setBlue}
             min={0}
             max={200}
-            color="text-blue-500"
+            color="text-blue-700 dark:text-blue-400"
           />
         </div>
       )}
@@ -381,7 +381,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
     <form onSubmit={handleSubmit} className="space-y-3">
       <ColorControls toolId={toolId} onChange={setSettings} onPreviewFilter={onPreviewFilter} />
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

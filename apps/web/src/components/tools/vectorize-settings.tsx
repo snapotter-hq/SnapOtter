@@ -344,7 +344,7 @@ export function VectorizeSettings() {
       <div className="border-t border-border" />
 
       {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {/* Size info */}
       {originalSize != null && processedSize != null && (

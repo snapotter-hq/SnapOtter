@@ -653,7 +653,7 @@ function LayerContextMenu({
             item.disabled
               ? "text-muted-foreground/40 cursor-not-allowed"
               : "text-foreground hover:bg-muted",
-            item.label === "Delete" && !item.disabled && "text-red-500",
+            item.label === "Delete" && !item.disabled && "text-destructive-ink",
           )}
         >
           <item.icon size={14} />

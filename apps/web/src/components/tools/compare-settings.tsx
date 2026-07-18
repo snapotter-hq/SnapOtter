@@ -72,7 +72,7 @@ export function CompareSettings() {
         </button>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {similarity !== null && (
         <div className="p-3 rounded-lg bg-muted">
