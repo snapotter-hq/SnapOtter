@@ -335,7 +335,7 @@ function RequestToolAffordance({
       : t.homePage.requestToolBelowResults;
   const promptVariant: FeedbackPromptVariant =
     variant === "empty" ? "search-empty-v1" : "search-results-v1";
-  const className = "inline-flex items-center gap-1.5 text-sm text-primary hover:underline";
+  const className = "inline-flex items-center gap-1.5 text-sm text-primary-ink hover:underline";
 
   if (analyticsOn) {
     return (
@@ -391,7 +391,11 @@ function SearchResults({
             analyticsOn={analyticsOn}
             onRequest={onRequest}
           />
-          <button type="button" onClick={onClear} className="text-sm text-primary hover:underline">
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-sm text-primary-ink hover:underline"
+          >
             {t.homePage.clearSearch}
           </button>
         </div>

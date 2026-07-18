@@ -326,7 +326,7 @@ export function FindDuplicatesSettings() {
             {results.spaceSaveable > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Space saveable</span>
-                <span className="text-primary font-medium">
+                <span className="text-primary-ink font-medium">
                   {formatFileSize(results.spaceSaveable)}
                 </span>
               </div>
@@ -369,7 +369,7 @@ export function FindDuplicatesSettings() {
               <button
                 type="button"
                 onClick={handleDownloadUnique}
-                className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
+                className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
               >
                 <Download className="h-4 w-4" />
                 Download Unique Only

@@ -334,7 +334,7 @@ export function Dropzone({
                 e.stopPropagation();
                 setShowBulkModal(true);
               }}
-              className="text-xs text-primary hover:text-primary/80"
+              className="text-xs text-primary-ink hover:text-primary-ink-strong"
             >
               {t.dropzone.importMultipleUrls}
             </button>
@@ -343,7 +343,7 @@ export function Dropzone({
 
         {hasMultipleFiles && (
           <div className="flex flex-col items-center gap-2 mt-1">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary-ink text-xs font-medium">
               <FileImage className="h-3.5 w-3.5" />
               {currentFiles.length} files selected
             </span>

@@ -233,7 +233,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
               }}
               className={`flex flex-col items-center gap-1 py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
                 subject === opt.value
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10 text-primary-ink"
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >
@@ -269,7 +269,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             onClick={() => setQuality(opt.value)}
             className={`py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
               effectiveQuality === opt.value
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary/10 text-primary-ink"
                 : "border-border text-muted-foreground hover:border-primary/50"
             }`}
           >
@@ -447,7 +447,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             onClick={() => setOutputFormat(fmt)}
             className={`py-2 px-2 rounded-lg border text-xs font-medium uppercase transition-colors ${
               outputFormat === fmt
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary/10 text-primary-ink"
                 : "border-border text-muted-foreground hover:border-primary/50"
             }`}
           >
@@ -465,7 +465,9 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
         {effectsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         Effects
         {(blurEnabled || shadowEnabled || edgeRefine > 0 || decontaminate) && (
-          <span className="ms-auto text-primary text-[10px] normal-case font-normal">active</span>
+          <span className="ms-auto text-primary-ink text-[10px] normal-case font-normal">
+            active
+          </span>
         )}
       </button>
 
@@ -627,7 +629,7 @@ function BgTypeButton({
       onClick={onClick}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
         active
-          ? "border-primary bg-primary/10 text-primary"
+          ? "border-primary bg-primary/10 text-primary-ink"
           : "border-border text-muted-foreground hover:border-primary/50"
       }`}
     >

@@ -137,7 +137,7 @@ function UploadArea() {
         <button
           type="button"
           onClick={handleClick}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-primary text-primary hover:bg-primary/5 transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-primary text-primary-ink hover:bg-primary/5 transition-colors text-sm font-medium"
         >
           <Upload className="h-4 w-4" />
           Upload images for collage

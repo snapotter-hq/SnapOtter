@@ -92,7 +92,7 @@ export function BlurBackgroundSettings() {
               onClick={() => setOutputFormat(fmt)}
               className={`rounded-lg border py-2 px-2 text-xs font-medium uppercase transition-colors ${
                 outputFormat === fmt
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10 text-primary-ink"
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >

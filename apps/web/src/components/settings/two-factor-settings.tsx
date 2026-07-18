@@ -198,7 +198,7 @@ export function TwoFactorSettings() {
             <button
               type="button"
               onClick={handleCopyCodes}
-              className="mt-2 text-xs text-primary hover:underline"
+              className="mt-2 text-xs text-primary-ink hover:underline"
             >
               {codesCopied
                 ? t.settings.security.twoFactorCodesCopied

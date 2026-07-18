@@ -169,7 +169,7 @@ export function ChangePasswordPage() {
                 <button
                   type="button"
                   onClick={handleGenerate}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary hover:bg-primary/20 font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
                 >
                   <Sparkles className="h-3 w-3" />
                   {t.changePassword.generateButton}

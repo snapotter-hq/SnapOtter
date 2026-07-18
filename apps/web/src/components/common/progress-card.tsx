@@ -43,7 +43,7 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
           <div className="text-sm font-medium text-foreground truncate">{label}</div>
           <div className="text-[11px] text-muted-foreground truncate">{sublabel}</div>
         </div>
-        <span className="text-sm font-semibold text-primary font-mono tabular-nums">
+        <span className="text-sm font-semibold text-primary-ink font-mono tabular-nums">
           {Math.round(percent)}%
         </span>
       </div>

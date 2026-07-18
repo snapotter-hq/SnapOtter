@@ -437,7 +437,7 @@ function GeneralSection() {
       {/* User info */}
       <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary-ink font-semibold">
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -1778,7 +1778,7 @@ function PeopleSection() {
                 setShowGeneratedPw(true);
                 setPwCopied(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary hover:bg-primary/20 font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
             >
               <Sparkles className="h-3 w-3" />
               {t.changePassword.generateButton}
@@ -1942,7 +1942,7 @@ function PeopleSection() {
               {isMobile ? (
                 <>
                   {/* Mobile card layout */}
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary-ink font-semibold text-sm shrink-0">
                     {u.username.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1966,7 +1966,7 @@ function PeopleSection() {
                         className={cn(
                           "inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide",
                           u.role === "admin"
-                            ? "bg-primary/15 text-primary"
+                            ? "bg-primary/15 text-primary-ink"
                             : "bg-muted text-muted-foreground",
                         )}
                       >
@@ -1980,7 +1980,7 @@ function PeopleSection() {
                 <>
                   {/* Desktop row layout */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary-ink font-semibold text-sm shrink-0">
                       {u.username.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-sm font-medium text-foreground truncate">
@@ -2004,7 +2004,7 @@ function PeopleSection() {
                       className={cn(
                         "inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide",
                         u.role === "admin"
-                          ? "bg-primary/15 text-primary"
+                          ? "bg-primary/15 text-primary-ink"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
@@ -2603,7 +2603,7 @@ function TeamsSection() {
                       <button
                         type="button"
                         onClick={() => handleRename(tm.id)}
-                        className="text-xs text-primary hover:underline"
+                        className="text-xs text-primary-ink hover:underline"
                       >
                         {t.common.save}
                       </button>
@@ -3095,7 +3095,7 @@ function RolesSection() {
                       {t.settings.roles.builtInBadge}
                     </span>
                   )}
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-xs font-medium text-primary">
+                  <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-xs font-medium text-primary-ink">
                     {role.userCount} user{role.userCount !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -3620,7 +3620,7 @@ function AboutSection() {
             href="https://github.com/snapotter-hq/snapotter"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary-ink hover:underline"
           >
             {t.settings.about.githubLink}
           </a>
@@ -3628,7 +3628,7 @@ function AboutSection() {
             href="https://docs.snapotter.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary-ink hover:underline"
           >
             {t.settings.about.docsLink}
           </a>
@@ -3636,7 +3636,7 @@ function AboutSection() {
             href="/api/docs"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary-ink hover:underline"
           >
             {t.settings.about.apiRefLink}
           </a>

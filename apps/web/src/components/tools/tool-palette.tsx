@@ -129,7 +129,7 @@ function ToolItem({ tool, onAdd }: ToolItemProps) {
       className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg hover:bg-muted text-start transition-colors group"
     >
       <div className="p-1.5 rounded-md bg-muted group-hover:bg-primary/10 transition-colors shrink-0">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+        <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary-ink transition-colors" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-foreground leading-tight">

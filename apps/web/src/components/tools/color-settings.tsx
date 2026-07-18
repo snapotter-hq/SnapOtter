@@ -275,7 +275,9 @@ export function ColorControls({
       >
         {channelsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         Color Channels
-        {hasChannelChanges && <span className="ms-auto text-primary text-[10px]">modified</span>}
+        {hasChannelChanges && (
+          <span className="ms-auto text-primary-ink text-[10px]">modified</span>
+        )}
       </button>
       {channelsOpen && (
         <div className="space-y-2 ps-1">
@@ -414,7 +416,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
           href={downloadUrl}
           download
           data-testid="adjust-colors-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
+          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
           Download

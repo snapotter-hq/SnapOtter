@@ -118,7 +118,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 href="https://github.com/snapotter-hq/snapotter"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 text-sm text-primary-ink hover:underline"
               >
                 {t.help.resources.githubLink}
                 <ExternalLink className="h-3 w-3" />
@@ -127,7 +127,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 href="https://github.com/snapotter-hq/snapotter/issues"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 text-sm text-primary-ink hover:underline"
               >
                 {t.help.resources.reportIssueLink}
                 <ExternalLink className="h-3 w-3" />
@@ -136,7 +136,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 href="https://docs.snapotter.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 text-sm text-primary-ink hover:underline"
               >
                 {t.help.resources.docsLink}
                 <ExternalLink className="h-3 w-3" />
@@ -145,7 +145,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 href="/api/docs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 text-sm text-primary-ink hover:underline"
               >
                 {t.help.resources.apiRefLink}
                 <ExternalLink className="h-3 w-3" />

@@ -205,7 +205,7 @@ export function UsageSurveyOverlay() {
               className={cn(
                 "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
                 usageType === value
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10 text-primary-ink"
                   : "border-border text-foreground hover:bg-muted",
                 wide && "col-span-2 justify-center",
               )}
@@ -238,7 +238,7 @@ export function UsageSurveyOverlay() {
                 className={cn(
                   "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
                   importantAreas.includes(value)
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary-ink"
                     : "border-border text-foreground hover:bg-muted",
                   wide && "col-span-2 justify-center",
                 )}
@@ -270,7 +270,7 @@ export function UsageSurveyOverlay() {
                 className={cn(
                   "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
                   installMethod === value
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary-ink"
                     : "border-border text-foreground hover:bg-muted",
                 )}
               >

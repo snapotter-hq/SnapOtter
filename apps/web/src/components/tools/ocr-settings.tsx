@@ -333,7 +333,7 @@ export function OcrSettings() {
         >
           {langOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           Language
-          <span className="ms-auto text-primary text-[10px] normal-case font-normal">
+          <span className="ms-auto text-primary-ink text-[10px] normal-case font-normal">
             {langLabel}
           </span>
         </button>

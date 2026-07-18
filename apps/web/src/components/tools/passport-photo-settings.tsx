@@ -320,7 +320,7 @@ function CountryOption({
       type="button"
       onClick={onSelect}
       className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
-        selected ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+        selected ? "bg-primary/10 text-primary-ink" : "text-foreground hover:bg-muted"
       }`}
     >
       <span>{spec.flag}</span>
@@ -622,7 +622,7 @@ export function PassportPhotoSettings() {
                     setSearchQuery("");
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors border-b border-border ${
-                    isCustom ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+                    isCustom ? "bg-primary/10 text-primary-ink" : "text-foreground hover:bg-muted"
                   }`}
                 >
                   <span>{"\u2699\uFE0F"}</span>
@@ -690,7 +690,7 @@ export function PassportPhotoSettings() {
                 onClick={() => setDocumentType(type)}
                 className={`py-2 px-2 rounded-lg border text-xs font-medium transition-colors capitalize ${
                   documentType === type
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary-ink"
                     : "border-border text-muted-foreground hover:border-primary/50"
                 }`}
               >
@@ -803,7 +803,7 @@ export function PassportPhotoSettings() {
               }}
               className={`py-1.5 px-2.5 rounded-lg border text-xs font-medium transition-colors ${
                 maxFileSizeKb === preset.value
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10 text-primary-ink"
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >

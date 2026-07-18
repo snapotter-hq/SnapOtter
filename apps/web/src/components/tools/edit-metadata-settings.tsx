@@ -659,7 +659,7 @@ export function EditMetadataSettings() {
                 {form.keywords.map((kw) => (
                   <span
                     key={kw}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px]"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary-ink text-[11px]"
                   >
                     {kw}
                     <button
@@ -866,7 +866,7 @@ export function EditMetadataSettings() {
           href={downloadUrl}
           download
           data-testid="edit-metadata-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
+          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
           Download

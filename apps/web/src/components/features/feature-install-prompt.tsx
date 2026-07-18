@@ -218,7 +218,7 @@ export function FeatureInstallPrompt({
             const statusClass = isCandidateInstalled
               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               : isCandidateInstalling || isCandidateQueued
-                ? "bg-primary/10 text-primary"
+                ? "bg-primary/10 text-primary-ink"
                 : candidate.status === "error"
                   ? "bg-destructive/10 text-destructive"
                   : "bg-muted text-muted-foreground";

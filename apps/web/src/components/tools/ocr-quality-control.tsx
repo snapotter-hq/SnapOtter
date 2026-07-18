@@ -98,7 +98,7 @@ export function OcrQualityControl({
               onClick={() => onChange(option.value)}
               className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 quality === option.value
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10 text-primary-ink"
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >

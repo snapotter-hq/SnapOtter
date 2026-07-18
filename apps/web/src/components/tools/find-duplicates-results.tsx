@@ -39,7 +39,7 @@ function OverviewGrid() {
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Space saveable:</span>
-              <span className="text-primary font-semibold">
+              <span className="text-primary-ink font-semibold">
                 {formatFileSize(results.spaceSaveable)}
               </span>
             </div>
@@ -147,7 +147,7 @@ function DetailComparison() {
         <button
           type="button"
           onClick={() => setViewMode("overview")}
-          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+          className="flex items-center gap-1 text-xs text-primary-ink hover:text-primary-ink-strong"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to Overview

@@ -302,7 +302,7 @@ export function BeforeAfterSlider({
           <span className="px-2 py-1 rounded bg-muted text-muted-foreground">
             Original: {formatSize(beforeSize)}
           </span>
-          <span className="px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+          <span className="px-2 py-1 rounded bg-primary/10 text-primary-ink font-medium">
             Processed: {formatSize(afterSize)}
             {savingsPercent !== null && Number(savingsPercent) > 0 && (
               <span className="ms-1">({savingsPercent}% smaller)</span>

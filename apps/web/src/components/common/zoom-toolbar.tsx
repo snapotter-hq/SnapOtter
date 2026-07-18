@@ -94,7 +94,7 @@ export function ZoomToolbar({
           title={t.a11y.pan}
           aria-label={t.a11y.pan}
           aria-pressed={handToolActive}
-          className={`${btn} ${handToolActive ? "bg-primary/10 text-primary hover:text-primary" : ""}`}
+          className={`${btn} ${handToolActive ? "bg-primary/10 text-primary-ink hover:text-primary-ink" : ""}`}
         >
           <Hand className="h-4 w-4" />
         </button>

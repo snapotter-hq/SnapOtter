@@ -160,7 +160,7 @@ function FileSelectionInfo({
         <button
           type="button"
           onClick={onAddMore}
-          className="text-xs text-primary hover:text-primary/80"
+          className="text-xs text-primary-ink hover:text-primary-ink-strong"
         >
           + Add more
         </button>
@@ -197,7 +197,7 @@ function FileSelectionInfo({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="text-xs text-primary hover:text-primary/80"
+            className="text-xs text-primary-ink hover:text-primary-ink-strong"
           >
             {expanded ? "Show less" : `Show ${files.length - COLLAPSED_LIMIT} more`}
           </button>
@@ -1140,7 +1140,7 @@ export function ToolPage() {
           <button
             type="button"
             onClick={handleDownloadAll}
-            className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
+            className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
           >
             <Download className="h-4 w-4" />
             {t.toolPage.downloadAllZip}

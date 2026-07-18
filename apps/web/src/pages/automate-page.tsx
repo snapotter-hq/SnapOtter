@@ -563,7 +563,7 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                 >
                   <FolderOpen className="h-4 w-4" />
                   {t.automate.importFromLibrary}
@@ -580,14 +580,14 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={handleAddMore}
-                  className="text-xs text-primary hover:text-primary/80"
+                  className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
                   + Add
                 </button>
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
-                  className="text-xs text-primary hover:text-primary/80"
+                  className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
                   Library
                 </button>
@@ -690,7 +690,7 @@ export function AutomatePage() {
               <button
                 type="button"
                 onClick={handleDownloadAll}
-                className="px-4 py-2.5 rounded-lg border border-primary text-primary"
+                className="px-4 py-2.5 rounded-lg border border-primary text-primary-ink"
               >
                 <Download className="h-4 w-4" />
               </button>
@@ -699,7 +699,7 @@ export function AutomatePage() {
               <button
                 type="button"
                 onClick={handleDownloadSingle}
-                className="px-4 py-2.5 rounded-lg border border-primary text-primary"
+                className="px-4 py-2.5 rounded-lg border border-primary text-primary-ink"
               >
                 <Download className="h-4 w-4" />
               </button>
@@ -782,7 +782,7 @@ export function AutomatePage() {
               <button
                 type="button"
                 onClick={handleImportPipeline}
-                className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                className="text-xs text-muted-foreground hover:text-primary-ink flex items-center gap-1 transition-colors"
               >
                 <Upload className="h-3 w-3" />
                 Import
@@ -803,7 +803,7 @@ export function AutomatePage() {
                     <button
                       type="button"
                       onClick={() => handleLoadPipeline(p)}
-                      className="flex-1 text-start text-xs text-foreground hover:text-primary truncate py-1 px-2 rounded hover:bg-muted"
+                      className="flex-1 text-start text-xs text-foreground hover:text-primary-ink truncate py-1 px-2 rounded hover:bg-muted"
                     >
                       {p.name}
                       <span className="text-muted-foreground ms-1">
@@ -813,7 +813,7 @@ export function AutomatePage() {
                     <button
                       type="button"
                       onClick={() => handleExportPipeline(p)}
-                      className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all shrink-0"
+                      className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary-ink transition-all shrink-0"
                       title="Export pipeline"
                     >
                       <Download className="h-3 w-3" />
@@ -843,7 +843,7 @@ export function AutomatePage() {
                     <button
                       type="button"
                       onClick={() => handleLoadPipeline(p)}
-                      className="flex-1 text-start text-xs text-foreground hover:text-primary truncate py-1 px-2 rounded hover:bg-muted"
+                      className="flex-1 text-start text-xs text-foreground hover:text-primary-ink truncate py-1 px-2 rounded hover:bg-muted"
                     >
                       {p.name}
                       <span className="text-muted-foreground ms-1">
@@ -853,7 +853,7 @@ export function AutomatePage() {
                     <button
                       type="button"
                       onClick={() => handleExportPipeline(p)}
-                      className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all shrink-0"
+                      className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary-ink transition-all shrink-0"
                       title="Export pipeline"
                     >
                       <Download className="h-3 w-3" />
@@ -907,14 +907,14 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={handleAddMore}
-                  className="text-xs text-primary hover:text-primary/80"
+                  className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
                   + Add
                 </button>
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
-                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                  className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
                   Library
@@ -935,7 +935,7 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
-                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                  className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
                   {t.automate.importFromLibrary}
@@ -1001,7 +1001,7 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={handleDownloadAll}
-                  className="px-4 py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center gap-2 hover:bg-primary/5"
+                  className="px-4 py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center gap-2 hover:bg-primary/5"
                 >
                   <Download className="h-4 w-4" />
                   {t.automate.downloadZip}
@@ -1011,7 +1011,7 @@ export function AutomatePage() {
                 <button
                   type="button"
                   onClick={handleDownloadSingle}
-                  className="px-4 py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center gap-2 hover:bg-primary/5"
+                  className="px-4 py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center gap-2 hover:bg-primary/5"
                 >
                   <Download className="h-4 w-4" />
                   {t.common.download}
@@ -1147,7 +1147,7 @@ export function AutomatePage() {
                         <button
                           type="button"
                           onClick={() => setLibraryModalOpen(true)}
-                          className="flex items-center gap-2 px-4 py-1.5 text-sm text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
+                          className="flex items-center gap-2 px-4 py-1.5 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                         >
                           <FolderOpen className="h-4 w-4" />
                           {t.automate.importFromLibrary}

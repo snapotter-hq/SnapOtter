@@ -241,7 +241,7 @@ export function FeedbackDialog({
                   href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+                  className="text-primary-ink hover:underline"
                 >
                   {t.feedback.searchMissDiscussionsFallback}
                 </a>
@@ -313,7 +313,7 @@ export function FeedbackDialog({
                         className={cn(
                           "py-2 rounded-lg border text-sm font-medium transition-colors",
                           sentiment === value
-                            ? "border-primary bg-primary/10 text-primary"
+                            ? "border-primary bg-primary/10 text-primary-ink"
                             : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
                         )}
                       >

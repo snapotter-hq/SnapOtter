@@ -110,7 +110,7 @@ function SortableStep({
           }
 
           {/* Step number badge */}
-          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
+          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-ink text-xs font-semibold flex items-center justify-center shrink-0">
             {index + 1}
           </span>
 

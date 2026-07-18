@@ -170,7 +170,7 @@ export function ReviewPanel({
           <button
             type="button"
             onClick={handleDownload}
-            className="w-full text-center text-xs text-primary hover:text-primary/80 underline underline-offset-2"
+            className="w-full text-center text-xs text-primary-ink hover:text-primary-ink-strong underline underline-offset-2"
           >
             {t.toolPage.downloadAsFile}
           </button>

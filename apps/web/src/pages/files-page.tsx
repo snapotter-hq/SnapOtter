@@ -39,7 +39,7 @@ export function FilesPage() {
               onClick={() => setActiveTab("recent")}
               className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
                 activeTab === "recent"
-                  ? "text-primary border-b-2 border-primary"
+                  ? "text-primary-ink border-b-2 border-primary"
                   : "text-muted-foreground"
               }`}
             >
@@ -50,7 +50,7 @@ export function FilesPage() {
               onClick={() => setActiveTab("upload")}
               className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
                 activeTab === "upload"
-                  ? "text-primary border-b-2 border-primary"
+                  ? "text-primary-ink border-b-2 border-primary"
                   : "text-muted-foreground"
               }`}
             >

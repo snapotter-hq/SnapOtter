@@ -231,7 +231,7 @@ export function TopNav({
               >
                 {link.label}
                 {link.badge && (
-                  <span className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-primary/15 text-primary align-middle">
+                  <span className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-primary/15 text-primary-ink-strong align-middle">
                     {link.badge}
                   </span>
                 )}

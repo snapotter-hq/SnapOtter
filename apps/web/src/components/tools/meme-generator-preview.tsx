@@ -452,7 +452,7 @@ function ErrorView() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary-ink hover:underline"
         >
           Retry
         </button>

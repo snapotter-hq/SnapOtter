@@ -49,7 +49,7 @@ export function FileUploadArea() {
           <div className="flex flex-col items-center gap-2">
             <div className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             {uploadProgress !== null && uploadProgress > 0 && (
-              <span className="text-xs font-medium text-primary">{uploadProgress}%</span>
+              <span className="text-xs font-medium text-primary-ink">{uploadProgress}%</span>
             )}
           </div>
         ) : (

@@ -415,7 +415,7 @@ export function LoginPage() {
                   className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary transition-colors"
+                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
                     aria-hidden="true"
                   />
                   {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
@@ -427,7 +427,7 @@ export function LoginPage() {
                   className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary transition-colors"
+                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
                     aria-hidden="true"
                   />
                   {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}

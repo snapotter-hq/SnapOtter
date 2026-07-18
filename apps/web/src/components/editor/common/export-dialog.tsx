@@ -568,7 +568,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   height: canvasSize.height,
                 }))
               }
-              className="mt-1 text-[10px] text-primary hover:underline"
+              className="mt-1 text-[10px] text-primary-ink hover:underline"
             >
               Reset to original size ({canvasSize.width} x {canvasSize.height})
             </button>

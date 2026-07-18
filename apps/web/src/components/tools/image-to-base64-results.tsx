@@ -133,7 +133,7 @@ function FileResult({ result }: { result: Base64Result }) {
             onClick={() => setActiveTab(t.id)}
             className={`px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
               activeTab === t.id
-                ? "text-primary border-b-2 border-primary font-medium"
+                ? "text-primary-ink border-b-2 border-primary font-medium"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >

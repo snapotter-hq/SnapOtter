@@ -69,7 +69,7 @@ export function FileListItem({ file, disabled }: FileListItemProps) {
 
       {/* Tool chain */}
       {file.toolChain.length > 0 && (
-        <span className="hidden md:block text-xs text-primary shrink-0">
+        <span className="hidden md:block text-xs text-primary-ink shrink-0">
           {file.toolChain.map(toolName).join(" → ")}
         </span>
       )}

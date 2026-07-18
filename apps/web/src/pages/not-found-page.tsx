@@ -7,7 +7,7 @@ export function NotFoundPage() {
   return (
     <div className="flex h-dvh items-center justify-center bg-background text-foreground">
       <div className="text-center space-y-4 max-w-md px-6">
-        <h1 className="text-6xl font-bold text-primary">404</h1>
+        <h1 className="text-6xl font-bold text-primary-ink">404</h1>
         <h2 className="text-xl font-semibold">{t.common.pageNotFound}</h2>
         <p className="text-sm text-muted-foreground">{t.common.pageNotFoundDescription}</p>
         <Link

@@ -163,7 +163,7 @@ export function PdfToImagePreview() {
               <button
                 type="button"
                 onClick={() => store.selectAllPages()}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary-ink hover:underline"
               >
                 Select All
               </button>
@@ -172,7 +172,7 @@ export function PdfToImagePreview() {
               <button
                 type="button"
                 onClick={() => store.deselectAllPages()}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary-ink hover:underline"
               >
                 Deselect All
               </button>

@@ -450,7 +450,7 @@ export function SplitSettings() {
           <button
             type="button"
             onClick={handleDownloadZip}
-            className="w-full py-2.5 rounded-lg border border-primary text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+            className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
           >
             <PackageOpen className="h-4 w-4" />
             Download All as ZIP

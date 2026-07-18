@@ -224,7 +224,7 @@ export function ImageViewer({
         <button
           type="button"
           onClick={fitToContainer}
-          className={`px-2 py-1 rounded text-xs ${fitMode === "fit" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          className={`px-2 py-1 rounded text-xs ${fitMode === "fit" ? "bg-primary/10 text-primary-ink" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
           title="Fit to view"
           aria-label={t.a11y.fitToView}
         >
@@ -233,7 +233,7 @@ export function ImageViewer({
         <button
           type="button"
           onClick={actualSize}
-          className={`px-2 py-1 rounded text-xs ${fitMode === "actual" && zoom === 100 ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          className={`px-2 py-1 rounded text-xs ${fitMode === "actual" && zoom === 100 ? "bg-primary/10 text-primary-ink" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
           title="Actual size (100%)"
           aria-label={t.a11y.actualSize}
         >

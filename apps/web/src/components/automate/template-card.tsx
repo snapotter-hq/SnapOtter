@@ -32,7 +32,7 @@ export function TemplateCard({ template, onUse }: TemplateCardProps) {
         className="text-start"
         data-testid={`template-use-${template.id}`}
       >
-        <span className="text-xs font-medium text-foreground hover:text-primary">{name}</span>
+        <span className="text-xs font-medium text-foreground hover:text-primary-ink">{name}</span>
         {description ? (
           <span className="block text-[11px] text-muted-foreground mt-0.5">{description}</span>
         ) : null}
