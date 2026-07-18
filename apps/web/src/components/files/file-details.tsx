@@ -494,9 +494,7 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
       <div className="flex-1">
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="bg-primary/10 border-b border-border px-3 py-2">
-            <h4 className="text-sm font-semibold text-primary-dark dark:text-primary-light">
-              {t.files.fileDetailsHeading}
-            </h4>
+            <h4 className="text-sm font-semibold text-primary-ink">{t.files.fileDetailsHeading}</h4>
           </div>
           <div className="divide-y divide-border">
             <DetailRow label={t.files.name} value={details.originalName} />

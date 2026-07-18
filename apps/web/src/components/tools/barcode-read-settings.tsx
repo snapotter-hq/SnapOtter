@@ -45,7 +45,7 @@ const FORMAT_LABELS: Record<string, string> = {
 /** Badge colors by barcode family. */
 function getBadgeColor(type: string): string {
   if (type.includes("QR") || type === "Aztec" || type === "DataMatrix" || type === "MaxiCode")
-    return "bg-primary/15 text-primary-dark dark:text-primary-light";
+    return "bg-primary/15 text-primary-ink";
   if (type.includes("EAN") || type.includes("UPC") || type.includes("DataBar"))
     return "bg-green-500/15 text-success-ink";
   if (type === "PDF417") return "bg-purple-500/15 text-purple-600 dark:text-purple-400";

@@ -811,13 +811,6 @@ test.describe("Color Contrast", () => {
     }
   });
 
-  // NOTE: the contrast checks below are deferred via test.fixme, not deleted.
-  // They surface a genuine finding: the Otter Orange brand (--color-primary
-  // #E07832) gives ~3.04:1 for white button text and ~2.91:1 for orange text
-  // on the off-white background, below WCAG AA (4.5:1 normal / 3:1 large). This
-  // needs a product/brand decision (darken the accent for text, or scope these
-  // checks to non-brand elements) rather than a silent test edit. Un-fixme once
-  // the palette decision lands.
   test("button text meets WCAG AA contrast ratio (4.5:1 for normal text)", async ({
     loggedInPage: page,
   }) => {

@@ -1490,7 +1490,7 @@ test.describe("FILE: csv-excel", () => {
     const issues = instrument(page);
     await setupTool(page, "csv-excel", CSV);
     // Process but check for inline errors too (the csv-excel tool surfaces
-    // errors in a <p class="text-red-500"> that waitForResult doesn't catch).
+    // errors in a <p class="text-destructive-ink"> that waitForResult doesn't catch).
     const submit = page.getByTestId("csv-excel-submit");
     await submit.first().click();
     // Wait up to 60s for either download button or an inline error
@@ -1498,7 +1498,7 @@ test.describe("FILE: csv-excel", () => {
     let gotResult = false;
     let inlineError = "";
     while (Date.now() < deadline) {
-      const errEl = page.locator(".text-red-500").first();
+      const errEl = page.locator(".text-destructive-ink, .text-red-500").first();
       if (await errEl.isVisible().catch(() => false)) {
         inlineError = await errEl.innerText().catch(() => "unknown error");
         gotResult = true;

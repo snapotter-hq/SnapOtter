@@ -79,6 +79,7 @@ export function TopNav({
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Link
               to="/"
+              aria-label={t.common.goHome}
               className={cn(
                 "shrink-0",
                 isDark

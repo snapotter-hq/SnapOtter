@@ -117,7 +117,7 @@ test.describe("No data leak when analytics disabled", () => {
     await processBtn.click();
     await waitForProcessingDone(page);
 
-    const error = page.locator(".text-red-500");
+    const error = page.locator(".text-destructive-ink, .text-red-500");
     expect(await error.isVisible({ timeout: 2_000 }).catch(() => false)).toBe(false);
 
     const downloadLink = page.locator(

@@ -305,9 +305,7 @@ function ModalityTabs({
             )}
           >
             {tab.label}
-            <span className={cn("ms-1", activeTab === tab.key ? "opacity-80" : "opacity-50")}>
-              {counts[tab.key] ?? 0}
-            </span>
+            <span className="ms-1">{counts[tab.key] ?? 0}</span>
           </button>
         ))}
       </div>

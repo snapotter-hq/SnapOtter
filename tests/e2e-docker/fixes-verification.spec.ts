@@ -65,7 +65,7 @@ async function verifyAccurateOcrTier(
   await processButton.click();
   await waitForProcessingDone(page, 120_000);
   await expect(page.getByText(/extracted text/i)).toBeVisible({ timeout: 120_000 });
-  await expect(page.locator(".text-red-500")).toHaveCount(0);
+  await expect(page.locator(".text-destructive-ink, .text-red-500")).toHaveCount(0);
 }
 
 // ─── 1. Error messages should never show [object Object] ─────────────
@@ -114,7 +114,7 @@ test.describe("Image-to-PDF", () => {
     await waitForProcessingDone(page);
 
     // Should NOT see "Authentication required"
-    const errorEl = page.locator(".text-red-500, [class*='text-red']");
+    const errorEl = page.locator(".text-destructive-ink, .text-red-500, [class*='text-red']");
     if (await errorEl.isVisible({ timeout: 3000 })) {
       const text = await errorEl.textContent();
       expect(text).not.toContain("Authentication required");
@@ -140,7 +140,7 @@ test.describe("Image-to-PDF", () => {
     await processBtn.click();
     await waitForProcessingDone(page);
 
-    const errorEl = page.locator(".text-red-500, [class*='text-red']");
+    const errorEl = page.locator(".text-destructive-ink, .text-red-500, [class*='text-red']");
     if (await errorEl.isVisible({ timeout: 3000 })) {
       const text = await errorEl.textContent();
       expect(text).not.toContain("Authentication required");
@@ -176,7 +176,7 @@ test.describe("Split tool", () => {
     await expect(page.getByRole("button", { name: /download all/i })).toBeVisible();
 
     // No errors
-    const error = page.locator(".text-red-500");
+    const error = page.locator(".text-destructive-ink, .text-red-500");
     expect(await error.isVisible({ timeout: 1000 }).catch(() => false)).toBe(false);
   });
 
@@ -286,7 +286,9 @@ test.describe("Passport photo", () => {
     await page.waitForTimeout(5000);
 
     // Check for error message
-    const errorEl = page.locator(".text-red-500, [class*='text-red'], [class*='error']");
+    const errorEl = page.locator(
+      ".text-destructive-ink, .text-red-500, [class*='text-red'], [class*='error']",
+    );
     if (await errorEl.isVisible({ timeout: 10_000 })) {
       const text = await errorEl.textContent();
       expect(text).not.toContain("[object Object]");
@@ -309,7 +311,7 @@ test.describe("Passport photo", () => {
 
     // Face detection should succeed — look for the Generate button
     const generateBtn = page.getByRole("button", { name: /generate|create/i });
-    const analyzeError = page.locator("p.text-red-500");
+    const analyzeError = page.locator("p.text-destructive-ink, .text-red-500");
     const gotButton = await generateBtn.isVisible({ timeout: 10_000 }).catch(() => false);
     const gotError = await analyzeError.isVisible({ timeout: 1000 }).catch(() => false);
     if (gotError) {
@@ -343,7 +345,7 @@ test.describe("OCR", () => {
     // this GUI regression must reach the result state, even when the fixture
     // legitimately contains no recognized text.
     await expect(page.getByText(/extracted text/i)).toBeVisible({ timeout: 120_000 });
-    await expect(page.locator("p.text-red-500")).toHaveCount(0);
+    await expect(page.locator("p.text-destructive-ink, .text-red-500")).toHaveCount(0);
     await expect(
       page.getByTestId("ocr-result-text").or(page.getByText(/no text detected/i)),
     ).toBeVisible();
@@ -382,7 +384,7 @@ test.describe("Regression checks", () => {
     await processBtn.click();
     await waitForProcessingDone(page);
 
-    const error = page.locator(".text-red-500");
+    const error = page.locator(".text-destructive-ink, .text-red-500");
     expect(await error.isVisible({ timeout: 2000 }).catch(() => false)).toBe(false);
   });
 
@@ -395,7 +397,7 @@ test.describe("Regression checks", () => {
     await processBtn.click();
     await waitForProcessingDone(page);
 
-    const error = page.locator(".text-red-500");
+    const error = page.locator(".text-destructive-ink, .text-red-500");
     expect(await error.isVisible({ timeout: 2000 }).catch(() => false)).toBe(false);
   });
 

@@ -37,7 +37,7 @@ interface ViolationEntry {
   id: string;
   impact: string | undefined;
   description: string;
-  nodes: { length: number }[];
+  nodes: { target?: unknown[]; failureSummary?: string }[];
 }
 
 function buildKey(pageKey: string, ruleId: string): string {
@@ -48,8 +48,20 @@ async function auditPage(
   page: import("@playwright/test").Page,
   pageKey: string,
   baseline: BaselineFile,
-  newViolations: { key: string; impact: string; description: string; count: number }[],
-  allViolations: { key: string; impact: string; description: string; count: number }[],
+  newViolations: {
+    key: string;
+    impact: string;
+    description: string;
+    count: number;
+    targets: string[];
+  }[],
+  allViolations: {
+    key: string;
+    impact: string;
+    description: string;
+    count: number;
+    targets: string[];
+  }[],
 ) {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "best-practice"])
@@ -62,6 +74,7 @@ async function auditPage(
       impact: v.impact ?? "unknown",
       description: v.description,
       count: v.nodes.length,
+      targets: v.nodes.map((n) => (n.target ?? []).join(" ")),
     };
     allViolations.push(entry);
 
@@ -78,8 +91,8 @@ const PAGES_MOBILE_EN = [
   { key: "mobile-image-resize-en", path: "/image/resize", needsAuth: true },
   { key: "mobile-video-convert-en", path: "/video/convert-video", needsAuth: true },
   { key: "mobile-audio-convert-en", path: "/audio/convert-audio", needsAuth: true },
-  { key: "mobile-document-pdf-to-image-en", path: "/document/pdf-to-image", needsAuth: true },
-  { key: "mobile-data-csv-excel-en", path: "/data/csv-excel", needsAuth: true },
+  { key: "mobile-pdf-pdf-to-image-en", path: "/pdf/pdf-to-image", needsAuth: true },
+  { key: "mobile-files-csv-excel-en", path: "/files/csv-excel", needsAuth: true },
   { key: "mobile-editor-en", path: "/editor", needsAuth: true },
   { key: "mobile-login-en", path: "/login", needsAuth: false },
 ];
@@ -99,8 +112,20 @@ test.describe("@mobile Axe a11y audit -- mobile EN", () => {
     browser,
   }) => {
     const baseline = loadBaseline();
-    const newViolations: { key: string; impact: string; description: string; count: number }[] = [];
-    const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
+    const newViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
+    const allViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
 
     for (const p of PAGES_MOBILE_EN) {
       if (p.needsAuth) {
@@ -153,7 +178,12 @@ test.describe("@mobile Axe a11y audit -- mobile EN", () => {
     expect(
       newCriticalSerious,
       `${newCriticalSerious.length} NEW critical/serious a11y violation(s) on mobile.\n` +
-        newCriticalSerious.map((v) => `  ${v.key} [${v.impact}]: ${v.description}`).join("\n"),
+        newCriticalSerious
+          .map(
+            (v) =>
+              `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,
+          )
+          .join("\n"),
     ).toHaveLength(0);
   });
 });
@@ -165,8 +195,20 @@ test.describe("@mobile Axe a11y audit -- mobile AR (RTL)", () => {
     browser,
   }) => {
     const baseline = loadBaseline();
-    const newViolations: { key: string; impact: string; description: string; count: number }[] = [];
-    const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
+    const newViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
+    const allViolations: {
+      key: string;
+      impact: string;
+      description: string;
+      count: number;
+      targets: string[];
+    }[] = [];
 
     for (const p of PAGES_MOBILE_AR) {
       if (p.needsAuth) {
@@ -223,7 +265,12 @@ test.describe("@mobile Axe a11y audit -- mobile AR (RTL)", () => {
     expect(
       newCriticalSerious,
       `${newCriticalSerious.length} NEW critical/serious a11y violation(s) on mobile AR.\n` +
-        newCriticalSerious.map((v) => `  ${v.key} [${v.impact}]: ${v.description}`).join("\n"),
+        newCriticalSerious
+          .map(
+            (v) =>
+              `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,
+          )
+          .join("\n"),
     ).toHaveLength(0);
   });
 });

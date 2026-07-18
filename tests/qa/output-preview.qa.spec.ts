@@ -398,7 +398,9 @@ test.describe("1: Modality-crossing output previews", () => {
         }
       }
       // Check for error
-      const errorMsg = page.locator(".text-destructive, .text-red-500").first();
+      const errorMsg = page
+        .locator(".text-destructive, .text-destructive-ink, .text-red-500")
+        .first();
       if (await errorMsg.isVisible().catch(() => false)) {
         errorFound = true;
         break;

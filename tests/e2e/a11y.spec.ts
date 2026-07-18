@@ -38,7 +38,7 @@ interface ViolationEntry {
   id: string;
   impact: string | undefined;
   description: string;
-  nodes: { length: number }[];
+  nodes: { target?: unknown[]; failureSummary?: string }[];
 }
 
 function buildKey(pageKey: string, ruleId: string): string {
@@ -53,8 +53,20 @@ async function auditPage(
   page: import("@playwright/test").Page,
   pageKey: string,
   baseline: BaselineFile,
-  newViolations: { key: string; impact: string; description: string; count: number }[],
-  allViolations: { key: string; impact: string; description: string; count: number }[],
+  newViolations: {
+    key: string;
+    impact: string;
+    description: string;
+    count: number;
+    targets: string[];
+  }[],
+  allViolations: {
+    key: string;
+    impact: string;
+    description: string;
+    count: number;
+    targets: string[];
+  }[],
 ) {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "best-practice"])
@@ -67,6 +79,7 @@ async function auditPage(
       impact: v.impact ?? "unknown",
       description: v.description,
       count: v.nodes.length,
+      targets: v.nodes.map((n) => (n.target ?? []).join(" ")),
     };
     allViolations.push(entry);
 
@@ -84,8 +97,8 @@ const PAGES_EN = [
   { key: "image-resize-en", path: "/image/resize", needsAuth: true },
   { key: "video-convert-en", path: "/video/convert-video", needsAuth: true },
   { key: "audio-convert-en", path: "/audio/convert-audio", needsAuth: true },
-  { key: "document-pdf-to-image-en", path: "/document/pdf-to-image", needsAuth: true },
-  { key: "data-csv-excel-en", path: "/data/csv-excel", needsAuth: true },
+  { key: "pdf-pdf-to-image-en", path: "/pdf/pdf-to-image", needsAuth: true },
+  { key: "files-csv-excel-en", path: "/files/csv-excel", needsAuth: true },
   { key: "editor-en", path: "/editor", needsAuth: true },
   { key: "login-en", path: "/login", needsAuth: false },
 ];
@@ -167,7 +180,12 @@ test.describe("Axe a11y audit -- desktop EN", () => {
       newCriticalSerious,
       `${newCriticalSerious.length} NEW critical/serious a11y violation(s) found. ` +
         `Run with A11Y_UPDATE_BASELINE=1 to baseline after review.\n` +
-        newCriticalSerious.map((v) => `  ${v.key} [${v.impact}]: ${v.description}`).join("\n"),
+        newCriticalSerious
+          .map(
+            (v) =>
+              `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,
+          )
+          .join("\n"),
     ).toHaveLength(0);
   });
 });
@@ -248,7 +266,12 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
     expect(
       newCriticalSerious,
       `${newCriticalSerious.length} NEW critical/serious a11y violation(s) in AR locale.\n` +
-        newCriticalSerious.map((v) => `  ${v.key} [${v.impact}]: ${v.description}`).join("\n"),
+        newCriticalSerious
+          .map(
+            (v) =>
+              `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,
+          )
+          .join("\n"),
     ).toHaveLength(0);
   });
 });

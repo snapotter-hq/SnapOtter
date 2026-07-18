@@ -238,7 +238,7 @@ test.describe("A) Multi-input tools", () => {
       // Since merge-audio requires 2+ inputs, each individual file fails, yielding
       // "All files failed processing". This confirms the batch-instead-of-merge bug.
       const errorText = await page
-        .locator("[role='alert'], .text-red-500")
+        .locator("[role='alert'], .text-destructive-ink, .text-red-500")
         .first()
         .innerText()
         .catch(() => "no error visible");
@@ -319,7 +319,7 @@ test.describe("A) Multi-input tools", () => {
       // Same bug as merge-audio: processAllFiles sends each file individually,
       // merge-csvs needs 2+ files, so each individual file fails.
       const errorText = await page
-        .locator("[role='alert'], .text-red-500")
+        .locator("[role='alert'], .text-destructive-ink, .text-red-500")
         .first()
         .innerText()
         .catch(() => "no error visible");
@@ -561,7 +561,7 @@ test.describe("A) Multi-input tools", () => {
         ).toBe(inputFiles.length);
       } else {
         const errorText = await page
-          .locator("[role='alert'], .text-red-500")
+          .locator("[role='alert'], .text-destructive-ink, .text-red-500")
           .first()
           .innerText()
           .catch(() => "no error visible");
@@ -771,7 +771,7 @@ test.describe("C) Edge cases", () => {
     let gotDownload = false;
     while (Date.now() < deadline) {
       const errorRegion = page
-        .locator("[role='alert'], [aria-live='assertive'], .text-red-500")
+        .locator("[role='alert'], [aria-live='assertive'], .text-destructive-ink, .text-red-500")
         .filter({ hasText: /error|failed|too many|maximum|limit|exceeded|invalid/i })
         .first();
       if (await errorRegion.isVisible().catch(() => false)) {

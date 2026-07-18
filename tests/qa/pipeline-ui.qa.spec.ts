@@ -127,7 +127,7 @@ test.describe("Pipeline Builder UI", () => {
 
     if (!hasPreview) {
       // Also check for error
-      const errorEl = page.locator(".text-red-500").first();
+      const errorEl = page.locator(".text-destructive-ink, .text-red-500").first();
       const errorText = await errorEl.textContent().catch(() => null);
       if (errorText) {
         console.log(`Pipeline UI error displayed: ${errorText}`);

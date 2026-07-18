@@ -33,13 +33,13 @@ export function MetadataGrid({
         return (
           <div key={k} className="contents">
             <div
-              className={`text-[10px] text-muted-foreground truncate ${isRemoved ? "line-through opacity-50" : ""}`}
+              className={`text-[10px] text-muted-foreground truncate ${isRemoved ? "line-through" : ""}`}
               title={k}
             >
               {labelMap?.[k] ?? k}
             </div>
             <div
-              className={`text-[10px] text-foreground font-mono truncate ${isRemoved ? "line-through opacity-50" : ""}`}
+              className={`text-[10px] text-foreground font-mono truncate ${isRemoved ? "line-through" : ""}`}
               title={formatExifValue(k, v)}
             >
               {formatExifValue(k, v)}
