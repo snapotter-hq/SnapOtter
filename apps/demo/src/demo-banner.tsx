@@ -14,7 +14,7 @@ export function DemoBanner() {
           href="https://docs.snapotter.com/guide/getting-started"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-semibold underline underline-offset-2 hover:text-primary-subtle"
+          className="font-semibold underline underline-offset-2 hover:no-underline"
         >
           Self-host SnapOtter
         </a>{" "}
@@ -23,7 +23,7 @@ export function DemoBanner() {
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        className="ms-2 shrink-0 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-primary-dark"
+        className="ms-2 shrink-0 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-primary-light"
         aria-label="Dismiss banner"
       >
         Dismiss

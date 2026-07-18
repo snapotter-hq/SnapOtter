@@ -19,8 +19,8 @@ function patchDemoErrors(root: Element) {
       if (!el.textContent?.includes(DEMO_MARKER)) return;
       if (el.dataset.demoPatch) return;
       el.dataset.demoPatch = "1";
-      el.classList.remove("text-red-500");
-      el.style.color = "var(--color-primary)";
+      el.classList.remove("text-red-500", "text-destructive-ink");
+      el.style.color = "var(--color-primary-ink)";
       el.style.fontSize = "13px";
       el.style.lineHeight = "1.5";
 
