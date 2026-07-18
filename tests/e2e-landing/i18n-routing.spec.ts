@@ -26,10 +26,22 @@ test.describe("landing i18n routing", () => {
     await expect(page.locator("[data-mt-banner]")).toBeAttached();
   });
 
-  test("a localized tool page renders with the translated tool name", async ({ page }) => {
-    const res = await page.goto("/de/tools/image/resize/");
-    expect(res?.status()).toBeLessThan(400);
+  test("localized tools section pages render; tool-detail pages stay English-only", async ({
+    page,
+  }) => {
+    // The tools SECTION pages (/tools/<section>/) are localized and render the
+    // translated section title as their heading.
+    const section = await page.goto("/de/tools/image/");
+    expect(section?.status()).toBeLessThan(400);
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    // Tool DETAIL pages (/tools/<section>/<tool>/) are English-only by design, so
+    // a locale-prefixed detail URL has no built page and must not resolve. The
+    // canonical English detail page is the one that exists.
+    const localizedDetail = await page.goto("/de/tools/image/resize/");
+    expect(localizedDetail?.status()).toBe(404);
+    const englishDetail = await page.goto("/tools/image/resize/");
+    expect(englishDetail?.status()).toBeLessThan(400);
   });
 });

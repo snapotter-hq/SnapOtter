@@ -94,38 +94,41 @@ test.describe("Terms Page", () => {
 });
 
 test.describe("Cross-Page Navigation", () => {
-  test("footer Privacy link navigates to /privacy", async ({ page }) => {
+  // Astro's `format: "directory"` emits trailing-slash URLs, and localizeHref
+  // builds hrefs the same way, so navigation lands on "/privacy/" not "/privacy".
+  // This matches the sitemap and canonical URLs.
+  test("footer Privacy link navigates to /privacy/", async ({ page }) => {
     await page.goto("/");
     await page.locator("footer").getByRole("link", { name: "Privacy" }).click();
-    await expect(page).toHaveURL("/privacy");
+    await expect(page).toHaveURL("/privacy/");
     await expect(page.getByText("Privacy Policy").first()).toBeVisible();
   });
 
-  test("footer Terms link navigates to /terms", async ({ page }) => {
+  test("footer Terms link navigates to /terms/", async ({ page }) => {
     await page.goto("/");
     await page.locator("footer").getByRole("link", { name: "Terms" }).click();
-    await expect(page).toHaveURL("/terms");
+    await expect(page).toHaveURL("/terms/");
     await expect(page.getByText("Terms and Conditions").first()).toBeVisible();
   });
 
-  test("footer FAQ link navigates to /faq", async ({ page }) => {
+  test("footer FAQ link navigates to /faq/", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "FAQ" }).click();
-    await expect(page).toHaveURL("/faq");
+    await expect(page).toHaveURL("/faq/");
     await expect(page.getByText("Frequently Asked Questions")).toBeVisible();
   });
 
-  test("navbar Talk to a human link navigates to /contact", async ({ page }) => {
+  test("navbar Talk to a human link navigates to /contact/", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "Talk to a human" }).first().click();
-    await expect(page).toHaveURL("/contact");
+    await expect(page).toHaveURL("/contact/");
     await expect(page.getByText("Get in touch")).toBeVisible();
   });
 
-  test("pricing enterprise CTA links to /contact", async ({ page }) => {
+  test("pricing enterprise CTA links to /contact/", async ({ page }) => {
     await page.goto("/");
     const enterpriseCta = page.getByRole("link", { name: /Let.s talk/ }).first();
-    await expect(enterpriseCta).toHaveAttribute("href", "/contact");
+    await expect(enterpriseCta).toHaveAttribute("href", "/contact/");
   });
 
   test("navbar Pricing link scrolls to the pricing section", async ({ page }) => {
