@@ -58,7 +58,9 @@ const links: NavItem[] = [
           {t(locale, "nav.product")}
           <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div class="absolute left-0 top-full hidden pt-3 group-hover:block group-focus-within:block">
+        <!-- pt clears the button-to-navbar-bottom gap so the panel opens below the
+             navbar's bottom border line instead of overlapping up through it. -->
+        <div class="absolute left-0 top-full hidden pt-8 group-hover:block group-focus-within:block">
           <div class="w-64 rounded-xl border border-border bg-surface p-2 shadow-lg">
             {productLinks.map((item) => (
               <a
