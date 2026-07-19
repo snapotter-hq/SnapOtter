@@ -28,6 +28,7 @@ import {
   downloadVerifiedRuntimeRelease as downloadVerifiedRuntimeReleaseWithLease,
   loadOcrRuntimeTrustKeys,
   OcrRuntimeImportValidationError,
+  OcrRuntimeNotPublishedError,
   type OcrRuntimeTrustKey,
   prepareOfflineRuntimeIndex,
   prepareOfflineRuntimeRelease,
@@ -449,6 +450,64 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(sleep).toHaveBeenCalledExactlyOnceWith(1_000);
     expect(canceled).toHaveBeenCalledOnce();
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports a clear not-published error when the runtime index is absent", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-absent-"));
+    temporaryDirectories.push(directory);
+    const canceled = vi.fn();
+    const missingBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(Buffer.from("Entry not found"));
+      },
+      cancel: canceled,
+    });
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(missingBody, { status: 404 }));
+
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [],
+      fetchImpl,
+    }).then(
+      () => {
+        throw new Error("expected the absent runtime index to reject");
+      },
+      (reason: unknown) => reason,
+    );
+
+    expect(error).toBeInstanceOf(OcrRuntimeNotPublishedError);
+    const message = (error as Error).message;
+    expect(message).toContain("2.1.0");
+    expect(message).toContain("Fast OCR");
+    expect(message).toContain("404");
+    // Absent means absent: this is not a transient failure and must not retry.
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(canceled).toHaveBeenCalledOnce();
+  });
+
+  it("treats a forbidden runtime index as not published rather than a hard error", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-forbidden-"));
+    temporaryDirectories.push(directory);
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("Forbidden", { status: 403 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [],
+        fetchImpl,
+      }),
+    ).rejects.toBeInstanceOf(OcrRuntimeNotPublishedError);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it("does not retry an oversized index and cancels its unconsumed body", async () => {
