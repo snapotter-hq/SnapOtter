@@ -34,28 +34,25 @@ const CONTRIBUTE_URL = "https://docs.snapotter.com/guide/translations";
 )}
 
 <style is:global>
-  /* The banner is a fixed bar stacked directly below the 2.0 launch banner and
-     above the fixed navbar, so it is both visible and its dismiss button is
-     clickable. It drives --mt-h so the navbar and page content shift down by its
-     height; --mt-h collapses to 0 on English pages and after dismissal. The
-     launch banner is temporary, so this composes with --lb-h via calc(). */
+  /* A fixed bar above the fixed navbar, so it is both visible and its dismiss
+     button is clickable. It drives --mt-h so the navbar and page content shift
+     down by its height; --mt-h collapses to 0 on English pages and after
+     dismissal. */
   :root { --mt-h: 0px; }
 
   .mt-banner {
     position: fixed;
-    top: var(--lb-h, 0px);
+    top: 0;
     left: 0;
     right: 0;
-    z-index: 55; /* above the navbar (z-50), below the launch banner (z-60) */
+    z-index: 55; /* above the navbar (z-50) */
   }
 
   html:has(.mt-banner:not([hidden])) { --mt-h: 36px; }
 
-  /* Shift the fixed navbar and page content down by the launch + MT banner
-     heights. These selectors also live in LaunchBanner.astro; the combined
-     calc() here supersedes them without fighting the cascade. */
-  body { padding-top: calc(var(--lb-h, 0px) + var(--mt-h)); }
-  nav.fixed { top: calc(var(--lb-h, 0px) + var(--mt-h)); }
+  /* Shift the fixed navbar and page content down by the banner height. */
+  body { padding-top: var(--mt-h); }
+  nav.fixed { top: var(--mt-h); }
 </style>
 
 <script is:inline>

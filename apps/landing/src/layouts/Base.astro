@@ -3,7 +3,6 @@
 import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import Analytics from "@/components/Analytics.astro";
-import LaunchBanner from "@/components/LaunchBanner.astro";
 import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
 import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
@@ -71,16 +70,6 @@ const htmlDir = dirFor(locale);
       })();
     </script>
 
-    <!-- TEMP: 2.0 launch banner dismissal. Render-blocking so a returning visitor
-         who closed the banner never sees it flash. Remove with the banner. -->
-    <script is:inline>
-      try {
-        if (localStorage.getItem("snapotter-v2-banner") === "dismissed") {
-          document.documentElement.setAttribute("data-lb-dismissed", "");
-        }
-      } catch (e) {}
-    </script>
-
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
@@ -140,7 +129,6 @@ const htmlDir = dirFor(locale);
   <body>
     <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
     <MachineTranslationBanner locale={locale} />
-    <LaunchBanner />
     <slot />
 
     <!-- Scroll-triggered reveal observer -->

@@ -2,14 +2,6 @@
   <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
 </p>
 
-<!-- TEMP: 2.0.0 launch + migration + Discord note. Trim a few weeks after release, once it's old news. -->
-> [!IMPORTANT]
-> **SnapOtter 2.0 is here.** 200+ tools across five modalities (image, video, audio, PDF, and files), durable background jobs, on-demand local AI, and a one-command `docker run`. See the [release notes](https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.0.0).
->
-> **Coming from 1.x?** Many of you have trusted SnapOtter since day one, and your feedback and suggestions shaped everything that followed. 2.0 is a big step, and we worked to make sure it doesn't break what you already depend on. Your accounts, saved files, settings, API keys, and pipelines carry over automatically on first boot, and your old database is never modified. We wrote a full [migration guide](./MIGRATING.md) so the move is safe and boring.
->
-> I'll be on [Discord](https://discord.gg/hr3s7HPUsr) more than usual this week, so if you need a hand with the upgrade or anything else, come say hi and I'll get back to you quickly. Thank you for being here.
-
 <p align="center">
   <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
   <a href="https://github.com/orgs/snapotter-hq/packages/container/package/snapotter"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fsnapotter--hq%2Fsnapotter-blue?logo=github" alt="GHCR"></a>
