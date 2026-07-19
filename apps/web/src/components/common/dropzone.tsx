@@ -312,7 +312,7 @@ export function Dropzone({
                 }}
                 onClick={(e) => e.stopPropagation()}
                 placeholder={t.dropzone.urlPlaceholder}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
                 disabled={urlLoading}
               />
               <button

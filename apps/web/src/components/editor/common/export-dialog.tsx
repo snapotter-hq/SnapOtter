@@ -530,7 +530,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   type="number"
                   value={settings.width}
                   onChange={(e) => handleWidthChange(Number.parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-primary"
+                  className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-ring"
                   min={1}
                 />
                 <span className="text-[10px] text-muted-foreground">Width</span>
@@ -553,7 +553,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   type="number"
                   value={settings.height}
                   onChange={(e) => handleHeightChange(Number.parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-primary"
+                  className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-ring"
                   min={1}
                 />
                 <span className="text-[10px] text-muted-foreground">Height</span>

@@ -52,7 +52,7 @@ export function ColorSwatch({
         "relative rounded transition-shadow shrink-0",
         SIZE_CLASSES[size],
         showBorder && "border border-border",
-        active && "ring-2 ring-primary ring-offset-1 ring-offset-card",
+        active && "ring-2 ring-primary-ink ring-offset-1 ring-offset-card",
         onClick && "cursor-pointer hover:ring-1 hover:ring-primary/50",
         !onClick && "cursor-default",
         className,

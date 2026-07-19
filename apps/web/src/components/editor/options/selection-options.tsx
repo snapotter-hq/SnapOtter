@@ -208,7 +208,7 @@ export function SelectionOptions() {
               onChange={(e) => setMagicWandTolerance(Number(e.target.value))}
               className={cn(
                 "h-6 w-14 rounded border border-border bg-card px-1.5 text-xs text-foreground",
-                "focus:border-primary focus:outline-none",
+                "focus:border-ring focus:outline-none",
               )}
             />
           </div>

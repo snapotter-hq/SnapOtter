@@ -266,7 +266,7 @@ export function CollageSettings() {
                   onClick={() => store.setBgPreset(p.id)}
                   className={cn(
                     "w-7 h-7 rounded-md transition-all",
-                    bgPreset === p.id && "ring-2 ring-primary ring-offset-1",
+                    bgPreset === p.id && "ring-2 ring-primary-ink ring-offset-1",
                     p.border && "border border-border",
                   )}
                   style={{

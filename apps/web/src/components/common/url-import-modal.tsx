@@ -135,7 +135,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
             placeholder={
               "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[My file](https://example.com/recording.mp3)"
             }
-            className="w-full min-h-[120px] max-h-[240px] resize-y rounded-lg border border-border bg-muted px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full min-h-[120px] max-h-[240px] resize-y rounded-lg border border-border bg-muted px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <p className="text-xs text-muted-foreground">{t.urlImport.placeholder}</p>
 

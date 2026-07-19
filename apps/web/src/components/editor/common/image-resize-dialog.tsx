@@ -58,7 +58,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
 
   const inputCn = cn(
     "h-8 w-full rounded border border-border bg-card px-2 text-sm text-foreground",
-    "focus:border-primary focus:outline-none",
+    "focus:border-ring focus:outline-none",
   );
 
   return (

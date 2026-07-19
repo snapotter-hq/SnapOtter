@@ -183,7 +183,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
               placeholder="Search files..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground"
+              className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>

@@ -273,7 +273,7 @@ function BlendModeSelect({ value, onChange }: { value: string; onChange: (mode: 
         id="blend-mode-select"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 min-w-0 h-7 text-xs bg-muted border border-border rounded px-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        className="flex-1 min-w-0 h-7 text-xs bg-muted border border-border rounded px-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         data-testid="blend-mode-select"
       >
         {BLEND_MODES.map((mode) => (
@@ -542,7 +542,7 @@ function LayerRow({
             onBlur={commitRename}
             onKeyDown={handleKeyDown}
             onPointerDown={(e) => e.stopPropagation()}
-            className="w-full text-xs bg-muted border border-border rounded px-1 py-0.5 text-foreground outline-none focus:ring-1 focus:ring-primary"
+            className="w-full text-xs bg-muted border border-border rounded px-1 py-0.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
             data-testid={`layer-name-input-${layer.id}`}
           />
         ) : (
@@ -963,7 +963,7 @@ function StrokeControls({
               position: e.target.value as "inside" | "center" | "outside",
             })
           }
-          className="flex-1 h-6 text-[10px] bg-muted border border-border rounded px-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          className="flex-1 h-6 text-[10px] bg-muted border border-border rounded px-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         >
           <option value="inside">Inside</option>
           <option value="center">Center</option>

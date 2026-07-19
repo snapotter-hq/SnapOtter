@@ -96,7 +96,7 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
             placeholder={t.files.searchPlaceholder}
             value={inputValue}
             onChange={handleSearchChange}
-            className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground"
+            className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -142,7 +142,7 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
         role="listbox"
         tabIndex={0}
         onKeyDown={handleListKeyDown}
-        className="flex-1 overflow-y-auto p-2 space-y-0.5 focus:outline-none"
+        className="flex-1 overflow-y-auto p-2 space-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {loading && (
           <div className="flex items-center justify-center h-32">

@@ -324,7 +324,7 @@ export function LoginPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && mfaCode.length >= 6) handleMfaComplete();
                 }}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
               <button
@@ -369,7 +369,7 @@ export function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder={t.auth.enterUsername}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   required
                 />
               </div>
@@ -388,7 +388,7 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t.auth.enterPassword}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   required
                 />
               </div>

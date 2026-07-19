@@ -162,7 +162,7 @@ export function RotateControls({
                   commitAngleInput();
                 }
               }}
-              className="w-16 text-center text-sm font-mono font-medium tabular-nums py-1.5 rounded-md bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 pe-4"
+              className="w-16 text-center text-sm font-mono font-medium tabular-nums py-1.5 rounded-md bg-background border border-border focus:outline-none focus:ring-2 focus:ring-ring pe-4"
             />
             <span className="absolute right-2 text-sm font-mono text-muted-foreground pointer-events-none">
               °

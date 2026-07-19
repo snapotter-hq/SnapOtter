@@ -128,7 +128,7 @@ function ColorInputFields({
           className={cn(
             "flex-1 px-1.5 py-0.5 text-xs font-mono rounded",
             "bg-muted border border-border text-foreground",
-            "focus:outline-none focus:ring-1 focus:ring-primary",
+            "focus:outline-none focus:ring-1 focus:ring-ring",
           )}
           maxLength={7}
           spellCheck={false}
@@ -160,7 +160,7 @@ function ColorInputFields({
               className={cn(
                 "w-full px-1 py-0.5 text-xs font-mono rounded",
                 "bg-muted border border-border text-foreground",
-                "focus:outline-none focus:ring-1 focus:ring-primary",
+                "focus:outline-none focus:ring-1 focus:ring-ring",
               )}
               aria-label={`${ch.toUpperCase()} color channel`}
               data-testid={`color-${ch}-input`}
@@ -193,7 +193,7 @@ function ColorInputFields({
             className={cn(
               "w-full px-1 py-0.5 text-xs font-mono rounded",
               "bg-muted border border-border text-foreground",
-              "focus:outline-none focus:ring-1 focus:ring-primary",
+              "focus:outline-none focus:ring-1 focus:ring-ring",
             )}
             aria-label={`${ch.toUpperCase()} color channel`}
             data-testid={`color-${ch}-input`}
@@ -362,7 +362,7 @@ export function ColorPanel() {
             onClick={() => setPickerTarget(pickerTarget === "bg" ? null : "bg")}
             className={cn(
               "absolute right-0 bottom-0 w-7 h-7 rounded border-2 transition-shadow",
-              pickerTarget === "bg" ? "border-primary ring-1 ring-primary" : "border-border",
+              pickerTarget === "bg" ? "border-primary ring-1 ring-primary-ink" : "border-border",
             )}
             style={{ backgroundColor: backgroundColor }}
             aria-label={t.a11y.backgroundColor}
@@ -374,7 +374,7 @@ export function ColorPanel() {
             onClick={() => setPickerTarget(pickerTarget === "fg" ? null : "fg")}
             className={cn(
               "absolute left-0 top-0 w-7 h-7 rounded border-2 z-10 transition-shadow",
-              pickerTarget === "fg" ? "border-primary ring-1 ring-primary" : "border-border",
+              pickerTarget === "fg" ? "border-primary ring-1 ring-primary-ink" : "border-border",
             )}
             style={{ backgroundColor: foregroundColor }}
             aria-label={t.a11y.foregroundColor}
@@ -425,7 +425,7 @@ export function ColorPanel() {
             className={cn(
               "w-full px-2 py-1 text-xs font-mono rounded",
               "bg-muted border border-border text-foreground",
-              "focus:outline-none focus:ring-1 focus:ring-primary",
+              "focus:outline-none focus:ring-1 focus:ring-ring",
             )}
             maxLength={7}
             spellCheck={false}

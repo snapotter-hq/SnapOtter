@@ -157,7 +157,7 @@ export function ChangePasswordPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder={t.changePassword.currentPasswordPlaceholder}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 required
               />
             </div>
@@ -185,7 +185,7 @@ export function ChangePasswordPage() {
                   setShowGenerated(false);
                 }}
                 placeholder={t.changePassword.newPasswordPlaceholder}
-                className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${showGenerated ? "font-mono text-sm" : ""}`}
+                className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
                 minLength={8}
               />
@@ -207,7 +207,7 @@ export function ChangePasswordPage() {
                   setShowGenerated(false);
                 }}
                 placeholder={t.changePassword.confirmPasswordPlaceholder}
-                className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${showGenerated ? "font-mono text-sm" : ""}`}
+                className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
                 minLength={8}
               />

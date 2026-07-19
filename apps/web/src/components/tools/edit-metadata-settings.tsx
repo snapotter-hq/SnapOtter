@@ -124,7 +124,7 @@ function LabeledInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full px-2.5 py-1.5 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+        className="w-full px-2.5 py-1.5 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
       />
       {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
     </div>
@@ -510,14 +510,14 @@ export function EditMetadataSettings() {
               <button
                 type="button"
                 onClick={() => setField("dateMode", "edit")}
-                className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "edit" ? "bg-primary text-primary-foreground border-primary" : "border-input text-foreground"}`}
+                className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "edit" ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground"}`}
               >
                 Edit Dates
               </button>
               <button
                 type="button"
                 onClick={() => setField("dateMode", "shift")}
-                className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "shift" ? "bg-primary text-primary-foreground border-primary" : "border-input text-foreground"}`}
+                className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "shift" ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground"}`}
               >
                 Shift All Dates
               </button>
@@ -558,7 +558,7 @@ export function EditMetadataSettings() {
                       id="em-date-shift-direction"
                       value={form.dateShiftDirection}
                       onChange={(e) => setField("dateShiftDirection", e.target.value as "+" | "-")}
-                      className="px-2.5 py-1.5 rounded-md border border-input bg-background text-sm"
+                      className="px-2.5 py-1.5 rounded-md border border-border bg-background text-sm"
                     >
                       <option value="+">+ Forward</option>
                       <option value="-">- Backward</option>
@@ -685,12 +685,12 @@ export function EditMetadataSettings() {
                   }
                 }}
                 placeholder="Add keyword and press Enter"
-                className="flex-1 px-2.5 py-1.5 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex-1 px-2.5 py-1.5 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <button
                 type="button"
                 onClick={addKeyword}
-                className="px-2 py-1.5 rounded-md border border-input hover:bg-muted/50"
+                className="px-2 py-1.5 rounded-md border border-border hover:bg-muted/50"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -776,7 +776,7 @@ export function EditMetadataSettings() {
                   <button
                     type="button"
                     onClick={() => loadTemplate(t.name)}
-                    className="flex-1 text-start text-xs px-2 py-1 rounded-md border border-input hover:bg-muted/50 truncate"
+                    className="flex-1 text-start text-xs px-2 py-1 rounded-md border border-border hover:bg-muted/50 truncate"
                   >
                     {t.name}
                   </button>
@@ -797,13 +797,13 @@ export function EditMetadataSettings() {
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="Template name"
-              className="flex-1 px-2.5 py-1.5 rounded-md border border-input bg-background text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="flex-1 px-2.5 py-1.5 rounded-md border border-border bg-background text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               type="button"
               onClick={saveTemplate}
               disabled={!templateName.trim()}
-              className="px-2 py-1.5 rounded-md border border-input hover:bg-muted/50 disabled:opacity-50"
+              className="px-2 py-1.5 rounded-md border border-border hover:bg-muted/50 disabled:opacity-50"
               title="Save current values as template"
             >
               <BookmarkPlus className="h-3.5 w-3.5" />

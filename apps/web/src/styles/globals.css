@@ -33,6 +33,7 @@ body {
   --color-primary-subtle: #FFF5ED;
   --color-primary-ink: #A85518;
   --color-primary-ink-strong: #8F4712;
+  --color-ring: #A85518;
   --color-background: #FAFAF7;
   --color-foreground: #1A1814;
   --color-muted: #F3EEE6;
@@ -66,6 +67,7 @@ body {
   --color-primary-ink-strong: #F09550;
   --color-destructive-ink: #D9635E;
   --color-success-ink: #2D9D78;
+  --color-ring: #F0A766;
 }
 
 input[type="range"] {
@@ -93,6 +95,12 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.15);
+}
+
+/* The base rule strips the UA outline, so keyboard users need a replacement. */
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }
 
 input[type="range"]::-moz-range-thumb {

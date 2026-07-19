@@ -760,7 +760,7 @@ export function BeautifyControls({
               onClick={() => applyPreset(preset)}
               className={`flex flex-col items-center gap-1 py-1.5 px-1 rounded transition-colors ${
                 selectedPreset === preset.name
-                  ? "bg-primary/10 ring-1 ring-primary"
+                  ? "bg-primary/10 ring-1 ring-primary-ink"
                   : "bg-muted hover:bg-muted/80"
               }`}
             >

@@ -127,6 +127,20 @@ describe("web dark theme", () => {
   });
 });
 
+describe("focus ring (issue #568)", () => {
+  it("ring meets 3:1 non-text contrast (WCAG 1.4.11) on light surfaces", () => {
+    for (const bg of ["background", "card", "muted", "primary-subtle", "sidebar"]) {
+      expectPair(webLight, "ring", bg, 3);
+    }
+  });
+
+  it("ring meets 3:1 non-text contrast on dark surfaces", () => {
+    for (const bg of ["background", "card", "muted", "sidebar"]) {
+      expectPair(webDark, "ring", bg, 3);
+    }
+  });
+});
+
 describe("landing", () => {
   it("ink text passes AA on light surfaces", () => {
     for (const bg of ["background", "surface", "background-alt", "primary-subtle"]) {

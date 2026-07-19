@@ -48,7 +48,7 @@ function NumericInput({
         step={step ?? 1}
         className={cn(
           "h-6 w-16 rounded border border-border bg-card px-1.5 text-xs text-foreground",
-          "focus:border-primary focus:outline-none",
+          "focus:border-ring focus:outline-none",
         )}
       />
     </div>

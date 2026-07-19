@@ -159,7 +159,7 @@ function ColorSwatches({
           onClick={() => onChange(swatch)}
           className={`h-6 w-6 rounded-full border-2 transition-all ${
             value.toUpperCase() === swatch
-              ? "ring-2 ring-primary ring-offset-1 border-transparent"
+              ? "ring-2 ring-primary-ink ring-offset-1 border-transparent"
               : "border-border hover:border-foreground/30"
           }`}
           style={{ backgroundColor: swatch }}

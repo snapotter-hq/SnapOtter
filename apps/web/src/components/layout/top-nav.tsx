@@ -329,7 +329,7 @@ function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?:
       rel="noopener noreferrer"
       onClick={handleClick}
       className={cn(
-        "ms-1 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-1",
+        "ms-1 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-700 dark:focus-visible:ring-pink-300 focus-visible:ring-offset-1",
         isDark
           ? "border-pink-800 bg-pink-950/30 text-pink-300 hover:bg-pink-950/50"
           : "border-pink-200 bg-pink-50 text-pink-700 hover:bg-pink-100",

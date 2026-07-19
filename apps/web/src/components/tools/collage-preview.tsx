@@ -457,8 +457,8 @@ function CollageCell({
       aria-label={`Collage cell ${cellIndex + 1}`}
       className={cn(
         "relative overflow-hidden transition-shadow",
-        isSelected && "ring-2 ring-primary ring-offset-1",
-        isOver && !isSelected && "ring-2 ring-primary",
+        isSelected && "ring-2 ring-primary-ink ring-offset-1",
+        isOver && !isSelected && "ring-2 ring-primary-ink",
         !image && "border-2 border-dashed border-border/50",
         image && !isSelected && "cursor-grab",
         image && isSelected && "cursor-grab active:cursor-grabbing",

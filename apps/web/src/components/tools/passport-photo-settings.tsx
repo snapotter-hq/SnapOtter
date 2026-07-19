@@ -605,7 +605,7 @@ export function PassportPhotoSettings() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search countries..."
-                  className="w-full ps-7 pe-2 py-1.5 rounded border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                  className="w-full ps-7 pe-2 py-1.5 rounded border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
                 />
               </div>
             </div>

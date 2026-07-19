@@ -47,7 +47,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
 
   const inputCn = cn(
     "h-8 w-full rounded border border-border bg-card px-2 text-sm text-foreground",
-    "focus:border-primary focus:outline-none",
+    "focus:border-ring focus:outline-none",
   );
 
   return (
@@ -144,7 +144,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               onChange={(e) => setFill(e.target.value)}
               className={cn(
                 "h-7 w-20 rounded border border-border bg-card px-1.5 text-xs text-foreground",
-                "focus:border-primary focus:outline-none",
+                "focus:border-ring focus:outline-none",
               )}
             />
           </div>

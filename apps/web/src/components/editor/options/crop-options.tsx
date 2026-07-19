@@ -77,7 +77,7 @@ export function CropOptions() {
 
   const inputCn = cn(
     "h-6 w-16 rounded border border-border bg-card px-1.5 text-xs text-foreground",
-    "focus:border-primary focus:outline-none",
+    "focus:border-ring focus:outline-none",
   );
 
   return (
@@ -93,7 +93,7 @@ export function CropOptions() {
           onChange={handleAspectChange}
           className={cn(
             "h-6 rounded border border-border bg-card px-1.5 text-xs text-foreground",
-            "focus:border-primary focus:outline-none",
+            "focus:border-ring focus:outline-none",
           )}
         >
           {ASPECT_RATIOS.map((r) => (

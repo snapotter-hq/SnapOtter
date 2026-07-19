@@ -196,7 +196,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                     type="button"
                     aria-label={`ink ${c}`}
                     onClick={() => setColor(c)}
-                    className={`h-5 w-5 rounded-full ${color === c ? "ring-2 ring-primary ring-offset-1" : ""}`}
+                    className={`h-5 w-5 rounded-full ${color === c ? "ring-2 ring-primary-ink ring-offset-1" : ""}`}
                     style={{ background: c }}
                   />
                 ))}

@@ -106,7 +106,7 @@ export function DuotoneSettings({ onImageStyle, onImageOverlay }: DuotoneSetting
               }}
               className={`flex flex-col items-center gap-1 py-1.5 px-1 rounded transition-colors ${
                 shadow === p.shadow && highlight === p.highlight
-                  ? "bg-primary/10 ring-1 ring-primary"
+                  ? "bg-primary/10 ring-1 ring-primary-ink"
                   : "bg-muted hover:bg-muted/80"
               }`}
             >

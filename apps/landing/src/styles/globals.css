@@ -351,6 +351,8 @@ code, pre, kbd {
 }
 .skip-link:focus {
   top: 0;
+  outline: 2px solid var(--color-primary-ink-strong);
+  outline-offset: 2px;
 }
 
 /* ─── STEP CONNECTOR (How It Works) ─── */
