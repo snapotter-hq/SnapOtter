@@ -1,7 +1,7 @@
 ---
 description: "SnapOtter'ın monorepo yapısı, uygulama ve paket mimarisi, istek yaşam döngüsü ve kaynak ayak izi."
 i18n_output_hash: b03ab6eecf2d
-i18n_source_hash: 733cb3c10884
+i18n_source_hash: a53946e760b0
 i18n_provenance: human
 ---
 
@@ -54,7 +54,7 @@ Hem ön uç hem de arka uç tarafından kullanılan paylaşılan TypeScript tür
 
 Beş modalite (image, video, audio, PDF, file) genelinde 241 araç rotası sunan bir Fastify v5 sunucusu; şunları yönetir:
 - Dosya yüklemeleri, geçici çalışma alanı yönetimi ve kalıcı dosya depolama
-- Versiyon zincirleriyle kullanıcı dosya kütüphanesi (`user_files` tablosu) - işlenmiş her sonuç kaynak dosyasına geri bağlanır ve hangi aracın uygulandığını kaydeder; Files sayfası için otomatik oluşturulan küçük resimlerle
+- Kullanıcı dosya kütüphanesi (`user_files` tablosu): kaydedilen bir düzenleme, varsayılan olarak bağımsız yeni bir dosya olarak veya özgün dosyanın üzerine yazdığınızda üst öğeye bağlı bir sürüm olarak saklanır. Hangi araçların uygulandığını kaydeder (`toolChain`) ve Files sayfası için otomatik oluşturulan bir küçük resim alır
 - Araç yürütme (her araç isteğini görüntü motoruna veya AI köprüsüne yönlendirir)
 - İşlem hattı düzenleme (birden fazla aracı sırayla zincirleme)
 - BullMQ iş kuyrukları aracılığıyla eşzamanlılık denetimli toplu işleme (havuzlar: image, media, ai, docs, system)

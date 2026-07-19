@@ -1,6 +1,6 @@
 ---
 description: "PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: dd3579a83805
 ---
@@ -77,7 +77,7 @@ Gespeicherte Tool-Ketten, die Benutzer in der Oberfläche erstellen.
 
 ### user_files {#user-files}
 
-Persistente Dateibibliothek mit Nachverfolgung der Versionskette. Jeder Verarbeitungsschritt, der ein Ergebnis speichert, erstellt eine neue Zeile, die über `parentId` mit ihrem übergeordneten Element verknüpft ist und so einen Versionsbaum bildet.
+Persistente Dateibibliothek. Ein gespeicherter Edit wird standardmäßig als eigenständige Root-Zeile eingefügt ("Als neu speichern": `version` 1, `parentId` null, sodass das Original weiterhin gelistet bleibt), oder als übergeordnet verknüpfte Version, wenn du das Original überschreibst (`parentId` gesetzt, `version` erhöht, das Original wird abgelöst). Die Spalte `toolChain` erfasst die angewendeten Werkzeuge.
 
 | Spalte | Typ | Beschreibung |
 |--------|------|-------------|

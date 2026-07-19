@@ -1,7 +1,7 @@
 ---
 description: "Monorepo-Struktur, App- und Paketarchitektur, Request-Lebenszyklus und Ressourcen-Footprint von SnapOtter."
 i18n_output_hash: af8ecb20c86e
-i18n_source_hash: 733cb3c10884
+i18n_source_hash: a53946e760b0
 i18n_provenance: human
 ---
 
@@ -54,7 +54,7 @@ Gemeinsam genutzte TypeScript-Typen, Konstanten (wie `APP_VERSION` und Werkzeugd
 
 Ein Fastify-v5-Server, der 241 Werkzeug-Routen über fünf Modalitäten (image, video, audio, PDF, file) bereitstellt und Folgendes übernimmt:
 - Datei-Uploads, Verwaltung des temporären Arbeitsbereichs und persistenter Dateispeicher
-- Benutzer-Dateibibliothek mit Versionsketten (`user_files`-Tabelle) - jedes verarbeitete Ergebnis verweist zurück auf seine Quelldatei und erfasst, welches Werkzeug angewendet wurde, mit automatisch generierten Thumbnails für die Files-Seite
+- Benutzer-Dateibibliothek (`user_files`-Tabelle): Ein gespeicherter Edit wird standardmäßig als eigenständige neue Datei abgelegt, oder als übergeordnet verknüpfte Version, wenn du das Original überschreibst. Sie erfasst, welche Werkzeuge angewendet wurden (`toolChain`), und erhält ein automatisch generiertes Thumbnail für die Files-Seite
 - Werkzeugausführung (leitet jede Werkzeuganfrage an die Image-Engine oder die KI-Brücke weiter)
 - Pipeline-Orchestrierung (das sequenzielle Verketten mehrerer Werkzeuge)
 - Stapelverarbeitung mit Nebenläufigkeitssteuerung über BullMQ-Job-Warteschlangen (Pools: image, media, ai, docs, system)

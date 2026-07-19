@@ -1,7 +1,7 @@
 ---
 description: "Struktura monorepozytorium, architektura aplikacji i pakietów, cykl życia żądania oraz zapotrzebowanie na zasoby w SnapOtter."
 i18n_output_hash: 571d8852f6c2
-i18n_source_hash: 733cb3c10884
+i18n_source_hash: a53946e760b0
 i18n_provenance: human
 ---
 
@@ -54,7 +54,7 @@ Współdzielone typy TypeScript, stałe (takie jak `APP_VERSION` i definicje nar
 
 Serwer Fastify v5 udostępniający 241 tras narzędzi w pięciu modalnościach (image, video, audio, PDF, file), który obsługuje:
 - Przesyłanie plików, zarządzanie tymczasową przestrzenią roboczą oraz trwałe przechowywanie plików
-- Bibliotekę plików użytkownika z łańcuchami wersji (tabela `user_files`) - każdy przetworzony wynik odsyła z powrotem do swojego pliku źródłowego i zapisuje, które narzędzie zostało zastosowane, z automatycznie generowanymi miniaturami dla strony Files
+- Bibliotekę plików użytkownika (tabela `user_files`): zapisana edycja jest domyślnie przechowywana jako niezależny nowy plik albo jako wersja powiązana z rodzicem, gdy nadpisujesz oryginał. Zapisuje, które narzędzia zostały zastosowane (`toolChain`), i otrzymuje automatycznie generowaną miniaturę dla strony Files
 - Wykonywanie narzędzi (kieruje każde żądanie narzędzia do silnika obrazów lub mostu AI)
 - Orkiestrację potoków (sekwencyjne łączenie wielu narzędzi w łańcuch)
 - Przetwarzanie wsadowe z kontrolą współbieżności za pomocą kolejek zadań BullMQ (pule: image, media, ai, docs, system)

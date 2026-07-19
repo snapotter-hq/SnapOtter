@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter için PostgreSQL veritabanı şeması, tablolar, migration'lar ve yedekleme prosedürleri."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 1a738c4f269b
 ---
@@ -77,7 +77,7 @@ Kullanıcıların arayüzde oluşturduğu kaydedilmiş araç zincirleri.
 
 ### user_files {#user-files}
 
-Sürüm zinciri izleme özellikli kalıcı dosya kütüphanesi. Sonucu kaydeden her işleme adımı, `parentId` üzerinden üst öğesine bağlı yeni bir satır oluşturarak bir sürüm ağacı meydana getirir.
+Kalıcı dosya kütüphanesi. Kaydedilen bir düzenleme, varsayılan olarak bağımsız bir kök satır olarak eklenir ("yeni olarak kaydet": `version` 1, `parentId` null, böylece özgün dosya listede kalır) veya özgün dosyanın üzerine yazdığınızda üst öğeye bağlı bir sürüm olarak eklenir (`parentId` ayarlanır, `version` artırılır ve onun yerini alır). `toolChain` sütunu, uygulanan araçları kaydeder.
 
 | Sütun | Tür | Açıklama |
 |--------|------|-------------|

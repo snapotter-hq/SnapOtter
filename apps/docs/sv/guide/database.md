@@ -1,6 +1,6 @@
 ---
 description: "PostgreSQL-databasschema, tabeller, migrationer och säkerhetskopieringsprocedurer för SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 0751b689f6eb
 ---
@@ -77,7 +77,7 @@ Sparade verktygskedjor som användare skapar i användargränssnittet.
 
 ### user_files {#user-files}
 
-Beständigt filbibliotek med spårning av versionskedjor. Varje bearbetningssteg som sparar ett resultat skapar en ny rad länkad till sin förälder via `parentId`, vilket bildar ett versionsträd.
+Beständigt filbibliotek. En sparad ändring infogas som standard som en oberoende rotrad ("spara som ny": `version` 1, `parentId` null, så originalet ligger kvar i listan), eller som en förälderlänkad version när du skriver över originalet (`parentId` satt, `version` uppräknad, vilket ersätter det). Kolumnen `toolChain` registrerar vilka verktyg som tillämpades.
 
 | Kolumn | Typ | Beskrivning |
 |--------|------|-------------|

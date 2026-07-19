@@ -1,6 +1,6 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur pencadangan untuk SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 8a963902d4f7
 ---
@@ -77,7 +77,7 @@ Rangkaian tool tersimpan yang dibuat pengguna di UI.
 
 ### user_files {#user-files}
 
-Pustaka file persisten dengan pelacakan rantai versi. Setiap langkah pemrosesan yang menyimpan hasil membuat baris baru yang tertaut ke induknya melalui `parentId`, membentuk sebuah pohon versi.
+Pustaka file persisten. Secara default, sebuah editan yang disimpan dimasukkan sebagai baris akar independen ("simpan sebagai baru": `version` 1, `parentId` null, sehingga file asli tetap terdaftar), atau sebagai versi yang tertaut ke induk ketika Anda menimpa file asli (`parentId` diisi, `version` dinaikkan, menggantikannya). Kolom `toolChain` mencatat tool yang diterapkan.
 
 | Kolom | Tipe | Deskripsi |
 |--------|------|-------------|

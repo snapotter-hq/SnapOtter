@@ -1,6 +1,6 @@
 ---
 description: "Lược đồ cơ sở dữ liệu PostgreSQL, bảng, di trú và quy trình sao lưu cho SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 6c4e1015e3a3
 ---
@@ -77,7 +77,7 @@ Các chuỗi công cụ đã lưu mà người dùng tạo trong giao diện.
 
 ### user_files {#user-files}
 
-Thư viện tệp bền vững với việc theo dõi chuỗi phiên bản. Mỗi bước xử lý lưu một kết quả sẽ tạo một hàng mới liên kết tới hàng cha của nó qua `parentId`, tạo thành một cây phiên bản.
+Thư viện tệp bền vững. Theo mặc định, một chỉnh sửa đã lưu được chèn vào như một hàng gốc độc lập («lưu thành tệp mới»: `version` 1, `parentId` null, nên tệp gốc vẫn được liệt kê), hoặc như một phiên bản liên kết với tệp cha khi bạn ghi đè lên tệp gốc (`parentId` được đặt, `version` tăng lên, thay thế nó). Cột `toolChain` ghi lại các công cụ đã áp dụng.
 
 | Cột | Kiểu | Mô tả |
 |--------|------|-------------|

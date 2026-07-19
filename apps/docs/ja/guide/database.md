@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter の PostgreSQL データベーススキーマ、テーブル、マイグレーション、バックアップ手順。"
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 1113cd0160d9
 ---
@@ -77,7 +77,7 @@ SnapOtter はデータの永続化に PostgreSQL 17 と [Drizzle ORM](https://or
 
 ### user_files {#user-files}
 
-バージョンチェーンの追跡を伴う永続的なファイルライブラリ。結果を保存する各処理ステップは、`parentId` を介して親にリンクされた新しい行を作成し、バージョンツリーを形成します。
+永続的なファイルライブラリ。保存された編集は、デフォルトでは独立したルート行として挿入され（「新規として保存」: `version` 1、`parentId` null なので元のファイルは一覧に残ります）、元のファイルを上書きした場合は親にリンクされたバージョンとして挿入されます（`parentId` が設定され、`version` が増加し、元のファイルを置き換えます）。`toolChain` カラムには適用されたツールが記録されます。
 
 | カラム | 型 | 説明 |
 |--------|------|-------------|

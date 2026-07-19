@@ -1,7 +1,7 @@
 ---
 description: "Monorepo-structuur, app- en package-architectuur, request-levenscyclus en resourcegebruik van SnapOtter."
 i18n_output_hash: 5122b85d1d84
-i18n_source_hash: 733cb3c10884
+i18n_source_hash: a53946e760b0
 i18n_provenance: human
 ---
 
@@ -54,7 +54,7 @@ Gedeelde TypeScript-types, constanten (zoals `APP_VERSION` en tooldefinities) en
 
 Een Fastify v5-server die 241 toolroutes over vijf modaliteiten (image, video, audio, PDF, file) blootstelt en het volgende afhandelt:
 - Bestandsuploads, beheer van tijdelijke werkruimte en persistente bestandsopslag
-- Gebruikersbibliotheek voor bestanden met versieketens (`user_files`-tabel) - elk verwerkt resultaat verwijst terug naar het bronbestand en registreert welke tool is toegepast, met automatisch gegenereerde miniaturen voor de Files-pagina
+- Gebruikersbibliotheek voor bestanden (`user_files`-tabel): een opgeslagen bewerking wordt standaard opgeslagen als een onafhankelijk nieuw bestand, of als een aan de bovenliggende rij gekoppelde versie wanneer je het origineel overschrijft. Ze registreert welke tools zijn toegepast (`toolChain`) en krijgt een automatisch gegenereerde miniatuur voor de Files-pagina
 - Tooluitvoering (routeert elk toolverzoek naar de image-engine of AI-brug)
 - Pijplijnorkestratie (meerdere tools sequentieel aan elkaar koppelen)
 - Batchverwerking met concurrentiebeheer via BullMQ-taakwachtrijen (pools: image, media, ai, docs, system)

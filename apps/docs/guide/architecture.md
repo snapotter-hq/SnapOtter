@@ -51,7 +51,7 @@ Shared TypeScript types, constants (like `APP_VERSION` and tool definitions), an
 
 A Fastify v5 server exposing 242 tool routes across five modalities (image, video, audio, PDF, file) that handles:
 - File uploads, temporary workspace management, and persistent file storage
-- User file library with version chains (`user_files` table) - each processed result links back to its source file and records which tool was applied, with auto-generated thumbnails for the Files page
+- User file library (`user_files` table): a saved edit is stored as an independent new file by default, or as a parent-linked version when you overwrite the original. It records which tools were applied (`toolChain`) and gets an auto-generated thumbnail for the Files page
 - Tool execution (routes each tool request to the image engine or AI bridge)
 - Pipeline orchestration (chaining multiple tools sequentially)
 - Batch processing with concurrency control via BullMQ job queues (pools: image, media, ai, docs, system)

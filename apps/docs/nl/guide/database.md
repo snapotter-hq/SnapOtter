@@ -1,6 +1,6 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: e283a792e124
 ---
@@ -77,7 +77,7 @@ Opgeslagen toolketens die gebruikers in de UI aanmaken.
 
 ### user_files {#user-files}
 
-Persistente bestandsbibliotheek met versieketentracering. Elke verwerkingsstap die een resultaat opslaat, maakt een nieuwe rij aan die via `parentId` aan de bovenliggende rij wordt gekoppeld, wat een versieboom vormt.
+Persistente bestandsbibliotheek. Een opgeslagen bewerking wordt standaard als een onafhankelijke root-rij ingevoegd ("opslaan als nieuw": `version` 1, `parentId` null, zodat het origineel in de lijst blijft staan), of als een aan de bovenliggende rij gekoppelde versie wanneer je het origineel overschrijft (`parentId` ingesteld, `version` opgehoogd, waarmee het wordt vervangen). De kolom `toolChain` registreert welke tools zijn toegepast.
 
 | Kolom | Type | Beschrijving |
 |--------|------|-------------|

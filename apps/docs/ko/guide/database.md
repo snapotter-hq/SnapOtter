@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter의 PostgreSQL 데이터베이스 스키마, 테이블, 마이그레이션, 백업 절차."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 4616baed29d0
 ---
@@ -77,7 +77,7 @@ SnapOtter는 데이터 영속성을 위해 PostgreSQL 17과 [Drizzle ORM](https:
 
 ### user_files {#user-files}
 
-버전 체인 추적 기능이 있는 영속 파일 라이브러리. 결과를 저장하는 각 처리 단계는 `parentId`를 통해 부모와 연결된 새 행을 생성하여 버전 트리를 형성합니다.
+영속 파일 라이브러리. 저장된 편집본은 기본적으로 독립적인 루트 행으로 삽입되거나("새 파일로 저장": `version`은 1, `parentId`는 null이므로 원본이 목록에 그대로 남습니다), 원본을 덮어쓸 때는 부모와 연결된 버전으로 삽입됩니다(`parentId`가 설정되고 `version`이 증가하여 원본을 대체합니다). `toolChain` 컬럼은 적용된 도구를 기록합니다.
 
 | 컬럼 | 타입 | 설명 |
 |--------|------|-------------|

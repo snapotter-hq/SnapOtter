@@ -1,7 +1,7 @@
 ---
 description: "Struktur monorepo, arsitektur aplikasi dan paket, siklus hidup permintaan, dan jejak sumber daya SnapOtter."
 i18n_output_hash: d4bd8ceef301
-i18n_source_hash: 733cb3c10884
+i18n_source_hash: a53946e760b0
 i18n_provenance: human
 ---
 
@@ -54,7 +54,7 @@ Tipe TypeScript bersama, konstanta (seperti `APP_VERSION` dan definisi tool), da
 
 Server Fastify v5 yang mengekspos 241 route tool di lima modalitas (image, video, audio, PDF, file) yang menangani:
 - Unggahan file, manajemen workspace sementara, dan penyimpanan file persisten
-- Pustaka file pengguna dengan rantai versi (tabel `user_files`) - setiap hasil yang diproses tertaut kembali ke file sumbernya dan mencatat tool mana yang diterapkan, dengan thumbnail yang dibuat otomatis untuk halaman Files
+- Pustaka file pengguna (tabel `user_files`): secara default, sebuah editan yang disimpan disimpan sebagai file baru yang independen, atau sebagai versi yang tertaut ke induk ketika Anda menimpa file asli. Ia mencatat tool mana yang diterapkan (`toolChain`) dan mendapatkan thumbnail yang dibuat otomatis untuk halaman Files
 - Eksekusi tool (mengarahkan setiap permintaan tool ke image engine atau AI bridge)
 - Orkestrasi pipeline (merangkai beberapa tool secara berurutan)
 - Pemrosesan batch dengan kontrol konkurensi melalui antrean job BullMQ (pool: image, media, ai, docs, system)

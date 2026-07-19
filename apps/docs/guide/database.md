@@ -74,7 +74,7 @@ Saved tool chains that users create in the UI.
 
 ### user_files {#user-files}
 
-Persistent file library with version chain tracking. Each processing step that saves a result creates a new row linked to its parent via `parentId`, forming a version tree.
+Persistent file library. A saved edit is inserted as an independent root row by default ("save as new": `version` 1, `parentId` null, so the original stays listed), or as a parent-linked version when you overwrite the original (`parentId` set, `version` incremented, superseding it). The `toolChain` column records the tools applied.
 
 | Column | Type | Description |
 |--------|------|-------------|

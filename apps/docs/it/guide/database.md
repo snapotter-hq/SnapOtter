@@ -1,6 +1,6 @@
 ---
 description: "Schema del database PostgreSQL, tabelle, migrazioni e procedure di backup per SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 6498644e25e3
 ---
@@ -77,7 +77,7 @@ Catene di strumenti salvate che gli utenti creano nell'interfaccia.
 
 ### user_files {#user-files}
 
-Libreria di file persistente con tracciamento della catena delle versioni. Ogni passaggio di elaborazione che salva un risultato crea una nuova riga collegata al suo genitore tramite `parentId`, formando un albero delle versioni.
+Libreria di file persistente. Per impostazione predefinita, una modifica salvata viene inserita come riga radice indipendente ("salva come nuovo": `version` 1, `parentId` null, così l'originale resta elencato), oppure come versione collegata al genitore quando sovrascrivi l'originale (`parentId` impostato, `version` incrementata, sostituendolo). La colonna `toolChain` registra gli strumenti applicati.
 
 | Colonna | Tipo | Descrizione |
 |--------|------|-------------|

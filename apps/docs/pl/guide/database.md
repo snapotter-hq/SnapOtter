@@ -1,6 +1,6 @@
 ---
 description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych w SnapOtter."
-i18n_source_hash: b37398ae91a3
+i18n_source_hash: 50d5d4f220cf
 i18n_provenance: human
 i18n_output_hash: 3c05e8b14f7d
 ---
@@ -77,7 +77,7 @@ Zapisane łańcuchy narzędzi, które użytkownicy tworzą w interfejsie.
 
 ### user_files {#user-files}
 
-Trwała biblioteka plików ze śledzeniem łańcucha wersji. Każdy krok przetwarzania, który zapisuje wynik, tworzy nowy wiersz powiązany z rodzicem przez `parentId`, tworząc drzewo wersji.
+Trwała biblioteka plików. Zapisana edycja jest domyślnie wstawiana jako niezależny wiersz główny („zapisz jako nowy": `version` 1, `parentId` null, więc oryginał pozostaje na liście) albo jako wersja powiązana z rodzicem, gdy nadpisujesz oryginał (`parentId` ustawiony, `version` zwiększony, zastępując go). Kolumna `toolChain` zapisuje zastosowane narzędzia.
 
 | Kolumna | Typ | Opis |
 |--------|------|-------------|
