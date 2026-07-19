@@ -33,6 +33,7 @@ import {
   prepareOfflineRuntimeIndex,
   prepareOfflineRuntimeRelease,
   purgeOcrRuntimeDownloads as purgeOcrRuntimeDownloadsWithLease,
+  remainingInstallerTimeoutMs,
   verifyRuntimeIndex,
   writeBufferFully,
 } from "../../../apps/api/src/lib/ocr-runtime-install.js";
@@ -157,6 +158,28 @@ function signedIndex(
   };
   return { artifact, index, raw: Buffer.from(canonicalRuntimeJson(index)), trustKey };
 }
+
+describe("remainingInstallerTimeoutMs", () => {
+  it("floors a fractional remaining budget to the safe integer the installer requires", () => {
+    // The deadline is set at one performance.now() read and the remaining time is
+    // computed at a later read, so `deadline - later` is fractional in practice.
+    const started = 1_000.4269;
+    const deadline = started + 7_200_000;
+    const later = 1_500.8731;
+    // The old caller passed this raw float; runOcrRuntimeInstaller rejected it as
+    // a non-integer timeout, which broke every default-config install.
+    expect(Number.isSafeInteger(deadline - later)).toBe(false);
+    const remaining = remainingInstallerTimeoutMs(deadline, later);
+    expect(Number.isSafeInteger(remaining)).toBe(true);
+    expect(remaining).toBe(Math.floor(deadline - later));
+  });
+
+  it("returns 0 when there is no deadline and clamps a passed deadline to at least 1ms", () => {
+    expect(remainingInstallerTimeoutMs(undefined, 5)).toBe(0);
+    expect(remainingInstallerTimeoutMs(10.9, 10.1)).toBe(1);
+    expect(remainingInstallerTimeoutMs(5, 999.7)).toBe(1);
+  });
+});
 
 describe("verifyRuntimeIndex", () => {
   it("loads the independently pinned release key from the official image environment", () => {

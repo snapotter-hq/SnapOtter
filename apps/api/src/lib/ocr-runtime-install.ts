@@ -2002,6 +2002,17 @@ async function purgeOcrRuntimeDownloadsUnderLease(aiDataDir: string): Promise<vo
   }
 }
 
+/**
+ * Remaining installer time budget from an optional deadline. `performance.now()`
+ * is fractional, so a raw `deadline - now` is a float that `runOcrRuntimeInstaller`
+ * rejects as a non-integer timeout. Floor it to a safe integer and keep at least
+ * 1ms so a live install always receives a positive, valid timeout.
+ */
+export function remainingInstallerTimeoutMs(deadlineMs: number | undefined, nowMs: number): number {
+  if (deadlineMs === undefined) return 0;
+  return Math.max(1, Math.floor(deadlineMs - nowMs));
+}
+
 export function buildOcrRuntimeInstallerCommand(
   options: RunOcrRuntimeInstallerOptions,
 ): OcrRuntimeInstallerCommand {

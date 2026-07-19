@@ -89,6 +89,7 @@ import {
   prepareOfflineRuntimeIndex,
   prepareOfflineRuntimeRelease,
   purgeOcrRuntimeDownloads,
+  remainingInstallerTimeoutMs,
   runOcrRuntimeInstaller,
   runOcrRuntimeMaintenance,
   waitWithOcrRuntimeHeartbeat,
@@ -227,7 +228,7 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
           release,
           aiDataDir: getAiDir(),
           installLockFd,
-          timeoutMs: installDeadline ? Math.max(1, installDeadline - performance.now()) : 0,
+          timeoutMs: remainingInstallerTimeoutMs(installDeadline, performance.now()),
         }),
         reportActivation,
       );
