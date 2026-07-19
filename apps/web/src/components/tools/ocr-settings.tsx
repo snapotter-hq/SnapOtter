@@ -1,5 +1,7 @@
-import { Check, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
+import type { LibrarySaveMode } from "@snapotter/shared";
+import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
@@ -50,7 +52,10 @@ export function ocrOneFile(
     networkError?: string;
     processingFailed?: string;
   } = {},
-): Promise<string> {
+  // When the file came from the library, forward the save choice so the
+  // extracted-text artifact auto-saves (#565). Only sent for single-file runs.
+  library?: { fileId: string; saveMode: LibrarySaveMode },
+): Promise<{ text: string; savedFileId?: string }> {
   return new Promise((resolve, reject) => {
     const clientJobId = generateId();
     let settled = false;
@@ -65,11 +70,11 @@ export function ocrOneFile(
       es = null;
     };
 
-    const resolveOnce = (text: string) => {
+    const resolveOnce = (result: { text: string; savedFileId?: string }) => {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve(text);
+      resolve(result);
     };
 
     const rejectOnce = (error: Error) => {
@@ -107,7 +112,11 @@ export function ocrOneFile(
         if (data.type !== "single") return;
         armStallTimer();
         if (data.phase === "complete" && data.result) {
-          resolveOnce(typeof data.result.text === "string" ? data.result.text : "");
+          resolveOnce({
+            text: typeof data.result.text === "string" ? data.result.text : "",
+            savedFileId:
+              typeof data.result.savedFileId === "string" ? data.result.savedFileId : undefined,
+          });
           return;
         }
         if (data.phase === "failed") {
@@ -127,6 +136,10 @@ export function ocrOneFile(
     formData.append("file", file);
     formData.append("settings", JSON.stringify(settings));
     formData.append("clientJobId", clientJobId);
+    if (library) {
+      formData.append("fileId", library.fileId);
+      formData.append("saveMode", library.saveMode);
+    }
 
     const xhr = new XMLHttpRequest();
     xhr.timeout = 600_000;
@@ -144,7 +157,10 @@ export function ocrOneFile(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const body = JSON.parse(xhr.responseText);
-          resolveOnce(typeof body.text === "string" ? body.text : "");
+          resolveOnce({
+            text: typeof body.text === "string" ? body.text : "",
+            savedFileId: typeof body.savedFileId === "string" ? body.savedFileId : undefined,
+          });
         } catch {
           rejectOnce(new Error(messages.processingFailed ?? "Invalid response"));
         }
@@ -179,6 +195,10 @@ export function OcrSettings() {
   const [langOpen, setLangOpen] = useState(false);
 
   const [text, setText] = useState<string | null>(null);
+  // Library file id the extracted text was auto-saved as (single-file runs from
+  // the library only). OCR renders its own text result, not the shared
+  // ReviewPanel, so it surfaces the "saved to Files" confirmation inline (#565).
+  const [savedLibraryFileId, setSavedLibraryFileId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -205,6 +225,7 @@ export function OcrSettings() {
 
     setError(null);
     setText(null);
+    setSavedLibraryFileId(null);
     setProcessing(true);
     setProgressPhase("uploading");
     setProgressPercent(0);
@@ -228,8 +249,16 @@ export function OcrSettings() {
       const fileBase = (i / total) * 100;
       const fileShare = 100 / total;
 
+      // Only a single-file run auto-saves to the library; a multi-file batch
+      // never sends a fileId (matching the standard batch processor).
+      const serverFileId =
+        total === 1 ? useFileStore.getState().entries[i]?.serverFileId : undefined;
+      const library = serverFileId
+        ? { fileId: serverFileId, saveMode: useFileStore.getState().librarySaveMode }
+        : undefined;
+
       try {
-        const text = await ocrOneFile(
+        const { text, savedFileId } = await ocrOneFile(
           file,
           settings,
           {
@@ -249,7 +278,13 @@ export function OcrSettings() {
             networkError: t.errors.networkError,
             processingFailed: t.errors.processingFailed,
           },
+          library,
         );
+        // Only single-file runs send a fileId, so savedFileId is single-file only.
+        if (savedFileId) {
+          setSavedLibraryFileId(savedFileId);
+          useFileStore.getState().setLastSavedLibraryFileId(savedFileId);
+        }
         results.push(total > 1 ? `--- ${file.name} ---\n${text || "(no text detected)"}` : text);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -382,6 +417,15 @@ export function OcrSettings() {
       {/* Result */}
       {text !== null && (
         <div className="space-y-2">
+          {savedLibraryFileId && (
+            <div className="flex items-center gap-1.5 text-xs text-success-ink">
+              <CheckCircle2 className="h-3 w-3" />
+              {t.toolPage.savedToFiles}
+              <Link to="/files" className="underline underline-offset-2 hover:text-foreground">
+                {t.toolPage.viewInFiles}
+              </Link>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">
               {t.toolSettings.ocr.extractedText}

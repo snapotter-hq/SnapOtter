@@ -271,6 +271,11 @@ export function EraseObjectSettings({
     if (files.length === 0 || !eraserRef.current) return;
 
     const capturedIndex = useFileStore.getState().selectedIndex;
+    // Library file this single-file run derives from (#565). Batch runs
+    // (handleProcessAll) never auto-save, matching the standard processor.
+    const capturedEntry = useFileStore.getState().entries[capturedIndex];
+    const saveMode = useFileStore.getState().librarySaveMode;
+    useFileStore.getState().setLastSavedLibraryFileId(null);
 
     const maskBlob = await eraserRef.current.exportMask();
     if (!maskBlob) return;
@@ -295,6 +300,9 @@ export function EraseObjectSettings({
     const clientJobId = generateId();
 
     const applyResult = (r: Record<string, unknown>) => {
+      if (r.savedFileId) {
+        useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
+      }
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: r.downloadUrl as string,
         processedPreviewUrl: (r.previewUrl as string) ?? null,
@@ -302,6 +310,9 @@ export function EraseObjectSettings({
         status: "completed",
         originalSize: r.originalSize as number,
         processedSize: r.processedSize as number,
+        ...(r.savedFileId && saveMode === "overwrite"
+          ? { serverFileId: r.savedFileId as string }
+          : {}),
       });
     };
 
@@ -346,6 +357,10 @@ export function EraseObjectSettings({
     formData.append("format", outputFormat);
     formData.append("quality", String(quality));
     formData.append("qualityMode", qualityMode);
+    if (capturedEntry?.serverFileId) {
+      formData.append("fileId", capturedEntry.serverFileId);
+      formData.append("saveMode", saveMode);
+    }
 
     const xhr = new XMLHttpRequest();
     xhr.timeout = 600_000;

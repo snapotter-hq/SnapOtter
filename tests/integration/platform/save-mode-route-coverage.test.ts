@@ -8,7 +8,7 @@
  * enqueueToolJob mocked so no Python model or worker runs.
  */
 
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath, LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { INVALID_SAVE_MODE_ERROR } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -134,6 +134,122 @@ describe("saveMode is ignored by routes outside the feature", () => {
       expect(error).not.toBe(INVALID_SAVE_MODE_ERROR);
     });
   }
+});
+
+describe("custom-client tools participate in the saveMode feature (#565)", () => {
+  // Wiring their submitters to send fileId/saveMode means the selector must
+  // now show for them, so they must NOT be in the unsupported set.
+  for (const toolId of [
+    "ocr",
+    "erase-object",
+    "remove-background",
+    "background-replace",
+    "blur-background",
+  ]) {
+    it(`${toolId} is not in LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS`, () => {
+      expect(LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS.has(toolId)).toBe(false);
+    });
+  }
+});
+
+describe("custom-client routes forward fileId and saveMode into the job", () => {
+  it("erase-object forwards the pair", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img.png", contentType: "image/png", content: PNG },
+      { name: "mask", filename: "mask.png", contentType: "image/png", content: PNG },
+      { name: "fileId", content: "lib-erase" },
+      { name: "saveMode", content: "overwrite" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("erase-object"),
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueToolJob.mock.calls[0][0]).toMatchObject({
+      toolId: "erase-object",
+      fileId: "lib-erase",
+      saveMode: "overwrite",
+    });
+  });
+
+  it("blur-background forwards the pair", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ intensity: 40 }) },
+      { name: "fileId", content: "lib-blur" },
+      { name: "saveMode", content: "new" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("blur-background"),
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueToolJob.mock.calls[0][0]).toMatchObject({
+      toolId: "blur-background",
+      fileId: "lib-blur",
+      saveMode: "new",
+    });
+  });
+
+  it("background-replace forwards the pair", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ backgroundType: "color", color: "#ffffff" }) },
+      { name: "fileId", content: "lib-bgr" },
+      { name: "saveMode", content: "overwrite" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("background-replace"),
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueToolJob.mock.calls[0][0]).toMatchObject({
+      toolId: "background-replace",
+      fileId: "lib-bgr",
+      saveMode: "overwrite",
+    });
+  });
+
+  it("ocr forwards the pair", async () => {
+    // quality "fast" + a non-Korean language reaches enqueue without any OCR
+    // runtime bundle (resolveOcrIngressSettings short-circuits before the gate).
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "img.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+      { name: "fileId", content: "lib-ocr" },
+      { name: "saveMode", content: "new" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("ocr"),
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueToolJob.mock.calls[0][0]).toMatchObject({
+      toolId: "ocr",
+      fileId: "lib-ocr",
+      saveMode: "new",
+    });
+  });
 });
 
 describe("sign-pdf saveMode pass-through", () => {

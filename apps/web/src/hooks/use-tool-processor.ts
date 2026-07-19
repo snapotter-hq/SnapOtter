@@ -265,7 +265,7 @@ export function useToolProcessor(toolId: string) {
   }, [reconnectSSE]);
 
   const processFiles = useCallback(
-    (files: File[], settings: Record<string, unknown>) => {
+    (files: File[], settings: Record<string, unknown>, opts?: { skipLibrarySave?: boolean }) => {
       if (files.length === 0) {
         setError("No files selected");
         return;
@@ -437,7 +437,10 @@ export function useToolProcessor(toolId: string) {
 
       const capturedEntry = useFileStore.getState().entries[capturedIndex];
       saveModeRef.current = useFileStore.getState().librarySaveMode;
-      if (capturedEntry?.serverFileId) {
+      // skipLibrarySave lets a multi-phase tool suppress auto-saving an
+      // intermediate output (e.g. remove-background's Phase 1 transparent
+      // result) so the final phase owns the library save instead.
+      if (!opts?.skipLibrarySave && capturedEntry?.serverFileId) {
         formData.append("fileId", capturedEntry.serverFileId);
         formData.append("saveMode", saveModeRef.current);
       }

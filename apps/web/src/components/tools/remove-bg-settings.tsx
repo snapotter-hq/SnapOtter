@@ -651,7 +651,7 @@ interface RemoveBgSettingsProps {
 
 export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const { t } = useTranslation();
-  const { files } = useFileStore();
+  const { files, currentEntry } = useFileStore();
   const {
     processFiles,
     processAllFiles,
@@ -721,6 +721,22 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
   const hasFile = files.length > 0;
   const bgRemoved = bgJobId !== null && !processing;
+
+  // Whether the user has configured any compositing effect.
+  const hasEffectsToApply =
+    settings.blurEnabled ||
+    settings.shadowEnabled ||
+    ((settings.backgroundType as string) || "transparent") !== "transparent";
+
+  // The Phase 2 effects request is the single owner of the library save (#565):
+  // it produces the final artifact the user downloads, whether that is the
+  // composite (effects on) or the transparent result (effects off). Route the
+  // download through it whenever effects apply, or whenever the file came from
+  // the library and so needs saving. Phase 1 never saves an intermediate. This
+  // keeps the skip and save decisions reading the same live state at one point,
+  // so toggling effects after Phase 1 can neither drop nor double the save.
+  const fromLibrary = Boolean(currentEntry?.serverFileId);
+  const needsEffectsRequest = Boolean(hasEffectsToApply) || fromLibrary;
 
   // Build CSS preview state from current settings and send to tool-page
   useEffect(() => {
@@ -817,7 +833,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     // Use processFiles for the progress/SSE flow - it handles everything
     // But we need the extended response. Override via a fetch after processFiles completes.
     // Actually, let's use processFiles and then fetch the job info.
-    processFiles(files, { model: settings.model });
+    // Phase 1 is always an intermediate here: the Phase 2 effects request owns
+    // the library save (#565), so never auto-save the transparent result.
+    processFiles(files, { model: settings.model }, { skipLibrarySave: true });
   };
 
   // After processFiles completes, extract jobId from downloadUrl
@@ -842,7 +860,14 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const handleDownloadWithEffects = async () => {
     if (!bgJobId || !bgFilename) return;
 
+    // Library file this run derives from (when opened from the file library):
+    // the effects request is the FINAL step, so it carries the save choice.
+    const { entries, selectedIndex, librarySaveMode } = useFileStore.getState();
+    const capturedEntry = entries[selectedIndex];
+
     setApplyingEffects(true);
+    setEffectsError(null);
+    useFileStore.getState().setLastSavedLibraryFileId(null);
     try {
       const formData = new FormData();
       const effectSettings: Record<string, unknown> = {
@@ -866,6 +891,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         formData.append("backgroundImage", bgImageFile);
       }
 
+      if (capturedEntry?.serverFileId) {
+        formData.append("fileId", capturedEntry.serverFileId);
+        formData.append("saveMode", librarySaveMode);
+      }
+
       const headers = formatHeaders();
       const response = await fetch("/api/v1/tools/image/remove-background/effects", {
         method: "POST",
@@ -882,6 +912,16 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setEffectsDownloadUrl(result.downloadUrl);
       setEffectsError(null);
 
+      // Surface the "saved to your files" indicator and, on overwrite,
+      // re-anchor so a subsequent run derives from the saved version (#565).
+      if (result.savedFileId) {
+        const store = useFileStore.getState();
+        store.setLastSavedLibraryFileId(result.savedFileId as string);
+        if (librarySaveMode === "overwrite") {
+          store.updateEntry(selectedIndex, { serverFileId: result.savedFileId as string });
+        }
+      }
+
       // Auto-trigger download
       const a = document.createElement("a");
       a.href = result.downloadUrl;
@@ -895,11 +935,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setApplyingEffects(false);
     }
   };
-
-  const hasEffectsToApply =
-    settings.blurEnabled ||
-    settings.shadowEnabled ||
-    ((settings.backgroundType as string) || "transparent") !== "transparent";
 
   return (
     <div className="space-y-4">
@@ -941,10 +976,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         </button>
       ) : null}
 
-      {/* Phase 2: Single smart download button */}
+      {/* Phase 2: Single smart download button. Routes through the effects
+          request (which saves) when effects apply or the file came from the
+          library; otherwise a plain instant download with no save needed. */}
       {bgRemoved && files.length <= 1 && (
         <div className="space-y-2">
-          {hasEffectsToApply ? (
+          {needsEffectsRequest ? (
             <button
               type="button"
               data-testid="remove-background-download-effects"

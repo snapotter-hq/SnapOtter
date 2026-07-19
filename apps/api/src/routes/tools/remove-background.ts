@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob } from "../../jobs/enqueue.js";
+import { autoSaveToLibrary } from "../../jobs/postprocess.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
@@ -243,6 +244,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
       let settingsRaw: string | null = null;
       let bgImageBuffer: Buffer | null = null;
       let bgFilename = "background";
+      let fileId: string | null = null;
+      let saveModeRaw: string | null = null;
 
       try {
         const parts = request.parts();
@@ -254,6 +257,10 @@ export function registerRemoveBackground(app: FastifyInstance) {
             bgFilename = sanitizeFilename(part.filename ?? "background");
           } else if (part.type === "field" && part.fieldname === "settings") {
             settingsRaw = part.value as string;
+          } else if (part.type === "field" && part.fieldname === "fileId") {
+            fileId = part.value as string;
+          } else if (part.type === "field" && part.fieldname === "saveMode") {
+            saveModeRaw = part.value as string;
           }
         }
       } catch (err) {
@@ -261,6 +268,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
           error: "Failed to parse request",
           details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
+      }
+
+      // Same 400 gate as the Phase 1 route: this is the FINAL request when the
+      // user applies effects, so it carries the library save choice (#565).
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
       }
 
       if (!settingsRaw) {
@@ -340,10 +354,23 @@ export function registerRemoveBackground(app: FastifyInstance) {
         const outputFilename = `${baseName}_nobg.${fmt}`;
         await putObject(`outputs/${jobId}/${outputFilename}`, resultBuffer);
 
+        // Auto-save the composited result (not the Phase 1 transparent
+        // intermediate) to the library when the run referenced a library file.
+        const savedFileId = await autoSaveToLibrary({
+          fileId: fileId ?? undefined,
+          saveMode,
+          userId: getAuthUser(request)?.id ?? null,
+          buffer: resultBuffer,
+          outName: outputFilename,
+          contentType: BG_FORMAT_CONTENT_TYPES[fmt],
+          toolId: "remove-background",
+        });
+
         return reply.send({
           jobId,
           downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
           processedSize: resultBuffer.length,
+          savedFileId,
         });
       } catch (err) {
         request.log.error({ err }, "Effects processing failed");

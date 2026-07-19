@@ -90,7 +90,7 @@ describe("OCR async response handling", () => {
       result: { text: "queued OCR text", actualQuality: "fast" },
     });
 
-    await expect(promise).resolves.toBe("queued OCR text");
+    await expect(promise).resolves.toMatchObject({ text: "queued OCR text" });
     expect(events.close).toHaveBeenCalledTimes(1);
 
     events.emit({ type: "single", phase: "failed", error: "late duplicate" });
@@ -109,7 +109,7 @@ describe("OCR async response handling", () => {
       phase: "complete",
       result: { text: "fast worker result" },
     });
-    await expect(promise).resolves.toBe("fast worker result");
+    await expect(promise).resolves.toMatchObject({ text: "fast worker result" });
 
     xhr.status = 202;
     xhr.onload?.();
@@ -127,7 +127,24 @@ describe("OCR async response handling", () => {
     xhr.responseText = JSON.stringify({ text: "sync OCR text" });
     xhr.onload?.();
 
-    await expect(promise).resolves.toBe("sync OCR text");
+    await expect(promise).resolves.toMatchObject({ text: "sync OCR text" });
+    expect(events.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the saved library file id from the terminal worker result", async () => {
+    const promise = runOcr();
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.onload?.();
+    events.emit({
+      type: "single",
+      phase: "complete",
+      result: { text: "saved text", savedFileId: "lib-42" },
+    });
+
+    await expect(promise).resolves.toEqual({ text: "saved text", savedFileId: "lib-42" });
     expect(events.close).toHaveBeenCalledTimes(1);
   });
 
@@ -186,6 +203,6 @@ describe("OCR async response handling", () => {
       phase: "complete",
       result: { text: "still queued safely" },
     });
-    await expect(promise).resolves.toBe("still queued safely");
+    await expect(promise).resolves.toMatchObject({ text: "still queued safely" });
   });
 });
