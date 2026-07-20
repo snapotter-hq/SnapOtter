@@ -37,7 +37,7 @@ Add `--gpus all` for NVIDIA CUDA-accelerated background removal, upscaling, face
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU automatically when CUDA is unavailable. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. See [Docker Tags](/guide/docker-tags) for benchmarks.
+Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Falls back to CPU automatically when CUDA is unavailable. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today. See [Docker Tags](/guide/docker-tags) for benchmarks. If AI tools run on CPU despite `--gpus all`, see [Verify GPU acceleration](/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Also on GHCR

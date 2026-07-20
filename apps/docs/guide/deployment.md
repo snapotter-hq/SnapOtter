@@ -198,12 +198,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
+### Verify GPU acceleration {#verify-gpu-acceleration}
+
 Check CUDA detection in the logs:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+If AI tools run on CPU even though `--gpus all` and the NVIDIA Container Toolkit are set up correctly, reinstall the affected bundle (for example Background Removal) from **Settings → AI Features**. The installer restores the GPU build of ONNX Runtime, which a CPU-only build pulled in by another bundle (such as transcription) can otherwise shadow in the shared AI environment. If reinstalling from the UI doesn't restore GPU on an older image, see the manual repair in [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Hardware Requirements {#hardware-requirements}
 
