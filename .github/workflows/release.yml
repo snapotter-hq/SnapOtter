@@ -835,7 +835,7 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v3
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v3
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
