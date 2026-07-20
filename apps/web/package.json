@@ -43,13 +43,13 @@
   },
   "devDependencies": {
     "@sentry/vite-plugin": "^5.4.0",
-    "@tailwindcss/vite": "^4.3.2",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "tailwindcss": "^4.3.2",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.7.0",
-    "vite": "^8.1.4"
+    "vite": "^8.1.5"
   },
   "license": "AGPL-3.0"
 }
