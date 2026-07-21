@@ -1291,6 +1291,7 @@ export const zhCN: TranslationKeys = {
       submit: "移除背景",
       submitBatch: "移除背景（{count} 个文件）",
       progressLabel: "正在移除背景",
+      cpuNote: "使用 AI 模型。若没有 GPU，处理大图可能需要一些时间。",
     },
     "remove-gif-background": {
       quality: "质量",
@@ -1338,6 +1339,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "放大 {scale}x（{count} 个文件）",
       progressLabel: "正在放大图片",
       progressLabelBatch: "正在放大 {count} 张图片",
+      cpuNote: "AI 放大对算力要求很高。若没有 GPU，处理大图可能需要几分钟。",
     },
     "erase-object": {
       qualityFast: "快速",

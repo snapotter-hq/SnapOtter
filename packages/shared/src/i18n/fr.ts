@@ -1533,6 +1533,7 @@ export const fr: TranslationKeys = {
       submit: "Supprimer l'arrière-plan",
       submitBatch: "Supprimer l'arrière-plan ({count} fichiers)",
       progressLabel: "Suppression de l'arrière-plan",
+      cpuNote: "Utilise un modèle d'IA. Sans GPU, une grande image peut prendre un moment.",
     },
     "remove-gif-background": {
       quality: "Qualité",
@@ -1584,6 +1585,8 @@ export const fr: TranslationKeys = {
       submitBatch: "Agrandir {scale}x ({count} fichiers)",
       progressLabel: "Agrandissement de l'image",
       progressLabelBatch: "Agrandissement de {count} images",
+      cpuNote:
+        "L'agrandissement par IA demande beaucoup de calcul. Sans GPU, une grande image peut prendre plusieurs minutes.",
     },
     "erase-object": {
       qualityFast: "Rapide",

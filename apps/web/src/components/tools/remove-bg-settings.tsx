@@ -217,6 +217,9 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted-foreground" data-testid="remove-bg-cpu-note">
+        {t.toolSettings["remove-background"].cpuNote}
+      </p>
       {/* Subject type */}
       <SectionLabel>{t.toolSettings["remove-background"].subject}</SectionLabel>
       <div className="grid grid-cols-3 gap-1.5">

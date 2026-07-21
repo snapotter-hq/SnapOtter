@@ -1525,6 +1525,7 @@ export const pl: TranslationKeys = {
       submit: "Usuń tło",
       submitBatch: "Usuń tło ({count} plików)",
       progressLabel: "Usuwanie tła",
+      cpuNote: "Korzysta z modelu AI. Bez GPU duży obraz może chwilę potrwać.",
     },
     "remove-gif-background": {
       quality: "Jakość",
@@ -1575,6 +1576,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Powiększ {scale}x ({count} plików)",
       progressLabel: "Powiększanie obrazu",
       progressLabelBatch: "Powiększanie {count} obrazów",
+      cpuNote: "Skalowanie AI mocno obciąża procesor. Bez GPU duży obraz może zająć kilka minut.",
     },
     "erase-object": {
       qualityFast: "Szybko",

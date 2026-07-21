@@ -70,6 +70,9 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground" data-testid="upscale-cpu-note">
+        {t.toolSettings.upscale.cpuNote}
+      </p>
       {/* Scale factor */}
       <div>
         <div className="flex justify-between items-center">

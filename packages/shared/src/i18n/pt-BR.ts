@@ -1525,6 +1525,7 @@ export const ptBR: TranslationKeys = {
       submit: "Remover fundo",
       submitBatch: "Remover fundo ({count} arquivos)",
       progressLabel: "Removendo fundo",
+      cpuNote: "Usa um modelo de IA. Sem GPU, uma imagem grande pode demorar um pouco.",
     },
     "remove-gif-background": {
       quality: "Qualidade",
@@ -1574,6 +1575,8 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Ampliar {scale}x ({count} arquivos)",
       progressLabel: "Ampliando imagem",
       progressLabelBatch: "Ampliando {count} imagens",
+      cpuNote:
+        "A ampliação com IA exige muito processamento. Sem GPU, uma imagem grande pode levar vários minutos.",
     },
     "erase-object": {
       qualityFast: "Rápido",

@@ -1475,6 +1475,7 @@ export const en = {
       submit: "Remove Background",
       submitBatch: "Remove Background ({count} files)",
       progressLabel: "Removing background",
+      cpuNote: "Runs an AI model. Without a GPU, a large image can take a while.",
     },
     "remove-gif-background": {
       quality: "Quality",
@@ -1524,6 +1525,8 @@ export const en = {
       submitBatch: "Upscale {scale}x ({count} files)",
       progressLabel: "Upscaling image",
       progressLabelBatch: "Upscaling {count} images",
+      cpuNote:
+        "AI upscaling is compute-heavy. Without a GPU, a large image can take several minutes.",
     },
     "erase-object": {
       qualityFast: "Fast",

@@ -1503,6 +1503,7 @@ export const th: TranslationKeys = {
       submit: "ลบพื้นหลัง",
       submitBatch: "ลบพื้นหลัง ({count} ไฟล์)",
       progressLabel: "กำลังลบพื้นหลัง",
+      cpuNote: "ใช้โมเดล AI หากไม่มี GPU รูปภาพขนาดใหญ่อาจใช้เวลาสักครู่",
     },
     "remove-gif-background": {
       quality: "คุณภาพ",
@@ -1550,6 +1551,7 @@ export const th: TranslationKeys = {
       submitBatch: "ขยาย {scale}x ({count} ไฟล์)",
       progressLabel: "กำลังขยายภาพ",
       progressLabelBatch: "กำลังขยาย {count} ภาพ",
+      cpuNote: "การขยายภาพด้วย AI ใช้พลังประมวลผลสูง หากไม่มี GPU รูปภาพขนาดใหญ่อาจใช้เวลาหลายนาที",
     },
     "erase-object": {
       qualityFast: "เร็ว",

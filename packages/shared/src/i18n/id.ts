@@ -1521,6 +1521,7 @@ export const id: TranslationKeys = {
       submit: "Hapus Latar Belakang",
       submitBatch: "Hapus Latar Belakang ({count} file)",
       progressLabel: "Menghapus latar belakang",
+      cpuNote: "Menjalankan model AI. Tanpa GPU, gambar besar bisa memakan waktu.",
     },
     "remove-gif-background": {
       quality: "Kualitas",
@@ -1570,6 +1571,8 @@ export const id: TranslationKeys = {
       submitBatch: "Perbesar {scale}x ({count} file)",
       progressLabel: "Memperbesar gambar",
       progressLabelBatch: "Memperbesar {count} gambar",
+      cpuNote:
+        "Upscaling AI membutuhkan banyak komputasi. Tanpa GPU, gambar besar bisa memakan waktu beberapa menit.",
     },
     "erase-object": {
       qualityFast: "Cepat",

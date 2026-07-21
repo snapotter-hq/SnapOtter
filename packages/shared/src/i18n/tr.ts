@@ -1524,6 +1524,8 @@ export const tr: TranslationKeys = {
       submit: "Arka Planı Kaldır",
       submitBatch: "Arka Planı Kaldır ({count} dosya)",
       progressLabel: "Arka plan kaldırılıyor",
+      cpuNote:
+        "Bir yapay zeka modeli kullanır. GPU olmadan büyük bir görüntü biraz zaman alabilir.",
     },
     "remove-gif-background": {
       quality: "Kalite",
@@ -1573,6 +1575,8 @@ export const tr: TranslationKeys = {
       submitBatch: "{scale}x Büyüt ({count} dosya)",
       progressLabel: "Görüntü büyütülüyor",
       progressLabelBatch: "{count} görüntü büyütülüyor",
+      cpuNote:
+        "Yapay zeka ile büyütme yoğun işlem gerektirir. GPU olmadan büyük bir görüntü birkaç dakika sürebilir.",
     },
     "erase-object": {
       qualityFast: "Hızlı",

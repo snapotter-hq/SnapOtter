@@ -1528,6 +1528,7 @@ export const de: TranslationKeys = {
       submit: "Hintergrund entfernen",
       submitBatch: "Hintergrund entfernen ({count} Dateien)",
       progressLabel: "Hintergrund wird entfernt",
+      cpuNote: "Nutzt ein KI-Modell. Ohne GPU kann ein großes Bild eine Weile dauern.",
     },
     "remove-gif-background": {
       quality: "Qualität",
@@ -1578,6 +1579,8 @@ export const de: TranslationKeys = {
       submitBatch: "Hochskalieren {scale}x ({count} Dateien)",
       progressLabel: "Bild wird hochskaliert",
       progressLabelBatch: "{count} Bilder werden hochskaliert",
+      cpuNote:
+        "KI-Hochskalierung ist rechenintensiv. Ohne GPU kann ein großes Bild mehrere Minuten dauern.",
     },
     "erase-object": {
       qualityFast: "Schnell",

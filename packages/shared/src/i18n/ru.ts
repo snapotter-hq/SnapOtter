@@ -1524,6 +1524,7 @@ export const ru: TranslationKeys = {
       submit: "Удалить фон",
       submitBatch: "Удалить фон ({count} файлов)",
       progressLabel: "Удаление фона",
+      cpuNote: "Использует модель ИИ. Без GPU обработка большого изображения может занять время.",
     },
     "remove-gif-background": {
       quality: "Качество",
@@ -1573,6 +1574,8 @@ export const ru: TranslationKeys = {
       submitBatch: "Увеличить {scale}x ({count} файлов)",
       progressLabel: "Увеличение изображения",
       progressLabelBatch: "Увеличение {count} изображений",
+      cpuNote:
+        "Масштабирование ИИ требует много ресурсов. Без GPU обработка большого изображения может занять несколько минут.",
     },
     "erase-object": {
       qualityFast: "Быстро",

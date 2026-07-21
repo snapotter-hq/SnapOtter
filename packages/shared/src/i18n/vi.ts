@@ -1524,6 +1524,7 @@ export const vi: TranslationKeys = {
       submit: "Xóa nền",
       submitBatch: "Xóa nền ({count} tệp)",
       progressLabel: "Đang xóa nền",
+      cpuNote: "Sử dụng mô hình AI. Không có GPU, ảnh lớn có thể mất một lúc.",
     },
     "remove-gif-background": {
       quality: "Chất lượng",
@@ -1573,6 +1574,8 @@ export const vi: TranslationKeys = {
       submitBatch: "Phóng to {scale}x ({count} tệp)",
       progressLabel: "Đang phóng to ảnh",
       progressLabelBatch: "Đang phóng to {count} ảnh",
+      cpuNote:
+        "Nâng cấp bằng AI tiêu tốn nhiều tài nguyên tính toán. Không có GPU, ảnh lớn có thể mất vài phút.",
     },
     "erase-object": {
       qualityFast: "Nhanh",

@@ -1511,6 +1511,7 @@ export const es: TranslationKeys = {
       submit: "Eliminar fondo",
       submitBatch: "Eliminar fondo ({count} archivos)",
       progressLabel: "Eliminando fondo",
+      cpuNote: "Usa un modelo de IA. Sin GPU, una imagen grande puede tardar un rato.",
     },
     "remove-gif-background": {
       quality: "Calidad",
@@ -1561,6 +1562,8 @@ export const es: TranslationKeys = {
       submitBatch: "Escalar {scale}x ({count} archivos)",
       progressLabel: "Escalando imagen",
       progressLabelBatch: "Escalando {count} imágenes",
+      cpuNote:
+        "El escalado con IA consume muchos recursos. Sin GPU, una imagen grande puede tardar varios minutos.",
     },
     "erase-object": {
       qualityFast: "Rápido",

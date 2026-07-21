@@ -1520,6 +1520,7 @@ export const sv: TranslationKeys = {
       submit: "Ta bort bakgrund",
       submitBatch: "Ta bort bakgrund ({count} filer)",
       progressLabel: "Tar bort bakgrund",
+      cpuNote: "Använder en AI-modell. Utan GPU kan en stor bild ta en stund.",
     },
     "remove-gif-background": {
       quality: "Kvalitet",
@@ -1570,6 +1571,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Uppskala {scale}x ({count} filer)",
       progressLabel: "Uppskalar bild",
       progressLabelBatch: "Uppskalar {count} bilder",
+      cpuNote: "AI-uppskalning är beräkningsintensiv. Utan GPU kan en stor bild ta flera minuter.",
     },
     "erase-object": {
       qualityFast: "Snabb",

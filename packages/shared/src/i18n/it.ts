@@ -1526,6 +1526,8 @@ export const it: TranslationKeys = {
       submit: "Rimuovi sfondo",
       submitBatch: "Rimuovi sfondo ({count} file)",
       progressLabel: "Rimozione sfondo",
+      cpuNote:
+        "Usa un modello di IA. Senza GPU, un'immagine grande può richiedere un po' di tempo.",
     },
     "remove-gif-background": {
       quality: "Qualità",
@@ -1576,6 +1578,8 @@ export const it: TranslationKeys = {
       submitBatch: "Ingrandisci {scale}x ({count} file)",
       progressLabel: "Ingrandimento immagine",
       progressLabelBatch: "Ingrandimento di {count} immagini",
+      cpuNote:
+        "L'upscaling con IA richiede molte risorse. Senza GPU, un'immagine grande può richiedere diversi minuti.",
     },
     "erase-object": {
       qualityFast: "Veloce",

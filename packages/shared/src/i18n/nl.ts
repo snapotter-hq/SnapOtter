@@ -1526,6 +1526,7 @@ export const nl: TranslationKeys = {
       submit: "Achtergrond verwijderen",
       submitBatch: "Achtergrond verwijderen ({count} bestanden)",
       progressLabel: "Achtergrond verwijderen",
+      cpuNote: "Gebruikt een AI-model. Zonder GPU kan een grote afbeelding even duren.",
     },
     "remove-gif-background": {
       quality: "Kwaliteit",
@@ -1575,6 +1576,8 @@ export const nl: TranslationKeys = {
       submitBatch: "Opschalen {scale}x ({count} bestanden)",
       progressLabel: "Afbeelding opschalen",
       progressLabelBatch: "{count} afbeeldingen opschalen",
+      cpuNote:
+        "AI-opschaling is rekenintensief. Zonder GPU kan een grote afbeelding enkele minuten duren.",
     },
     "erase-object": {
       qualityFast: "Snel",

@@ -1482,6 +1482,7 @@ export const ja: TranslationKeys = {
       submit: "背景を除去",
       submitBatch: "背景を除去（{count}ファイル）",
       progressLabel: "背景を除去中",
+      cpuNote: "AIモデルを使用します。GPUがない場合、大きな画像には時間がかかることがあります。",
     },
     "remove-gif-background": {
       quality: "品質",
@@ -1532,6 +1533,8 @@ export const ja: TranslationKeys = {
       submitBatch: "{scale}倍に拡大（{count}ファイル）",
       progressLabel: "画像をアップスケール中",
       progressLabelBatch: "{count}枚の画像をアップスケール中",
+      cpuNote:
+        "AIアップスケーリングは処理負荷が高い処理です。GPUがない場合、大きな画像には数分かかることがあります。",
     },
     "erase-object": {
       qualityFast: "高速",

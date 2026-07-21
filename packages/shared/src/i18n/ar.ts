@@ -1511,6 +1511,7 @@ export const ar: TranslationKeys = {
       submit: "إزالة الخلفية",
       submitBatch: "إزالة الخلفية ({count} ملف)",
       progressLabel: "جاري إزالة الخلفية",
+      cpuNote: "يستخدم نموذج ذكاء اصطناعي. بدون معالج رسومات، قد تستغرق الصورة الكبيرة بعض الوقت.",
     },
     "remove-gif-background": {
       quality: "الجودة",
@@ -1560,6 +1561,8 @@ export const ar: TranslationKeys = {
       submitBatch: "تكبير {scale}x ({count} ملف)",
       progressLabel: "جاري تكبير الصورة",
       progressLabelBatch: "جاري تكبير {count} صورة",
+      cpuNote:
+        "التكبير بالذكاء الاصطناعي يستهلك موارد حسابية كبيرة. بدون معالج رسومات، قد تستغرق الصورة الكبيرة عدة دقائق.",
     },
     "erase-object": {
       qualityFast: "سريع",

@@ -1466,6 +1466,7 @@ export const ko: TranslationKeys = {
       submit: "배경 제거",
       submitBatch: "배경 제거 ({count}개 파일)",
       progressLabel: "배경 제거 중",
+      cpuNote: "AI 모델을 사용합니다. GPU가 없으면 큰 이미지는 시간이 걸릴 수 있습니다.",
     },
     "remove-gif-background": {
       quality: "품질",
@@ -1514,6 +1515,8 @@ export const ko: TranslationKeys = {
       submitBatch: "{scale}배 확대 ({count}개 파일)",
       progressLabel: "이미지 업스케일 중",
       progressLabelBatch: "{count}개 이미지 업스케일 중",
+      cpuNote:
+        "AI 업스케일링은 연산 부담이 큽니다. GPU가 없으면 큰 이미지는 몇 분이 걸릴 수 있습니다.",
     },
     "erase-object": {
       qualityFast: "빠름",

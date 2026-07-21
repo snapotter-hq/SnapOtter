@@ -1342,6 +1342,7 @@ export const hi: TranslationKeys = {
       submit: "बैकग्राउंड हटाएं",
       submitBatch: "बैकग्राउंड हटाएं ({count} फाइलें)",
       progressLabel: "बैकग्राउंड हटाया जा रहा है",
+      cpuNote: "एक AI मॉडल चलाता है। GPU के बिना, बड़ी इमेज में कुछ समय लग सकता है।",
     },
     "remove-gif-background": {
       quality: "क्वालिटी",
@@ -1390,6 +1391,7 @@ export const hi: TranslationKeys = {
       submitBatch: "{scale}x अपस्केल ({count} फाइलें)",
       progressLabel: "इमेज अपस्केल हो रही है",
       progressLabelBatch: "{count} इमेज अपस्केल हो रही हैं",
+      cpuNote: "AI अपस्केलिंग कंप्यूट-हैवी है। GPU के बिना, बड़ी इमेज में कई मिनट लग सकते हैं।",
     },
     "erase-object": {
       qualityFast: "तेज़",
