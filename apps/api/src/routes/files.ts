@@ -120,6 +120,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // Check Range header before setting content headers (a 416 must not
       // carry the attachment Content-Type that would confuse serialization).
       reply.header("Accept-Ranges", "bytes");
+      // Tell nginx (and compatible reverse proxies) not to buffer the download.
+      // A buffering proxy in front of a self-hosted install is the usual cause
+      // of a download that "starts but never finishes"; the app itself always
+      // delivers exactly Content-Length bytes. Mirrors the SSE route (#590).
+      reply.header("X-Accel-Buffering", "no");
 
       const range = request.headers.range;
       if (range) {
