@@ -144,20 +144,29 @@ def main():
                     img_array = np.array(img.convert("RGB"))
                     emit_progress(30, "Enhancing image with AI")
 
-                    try:
-                        output_array, _ = upsampler.enhance(img_array, outscale=scale)
-                    except RuntimeError as oom_err:
-                        if "out of memory" not in str(oom_err).lower():
-                            raise
-                        torch.cuda.empty_cache()
-                        print(
-                            f"[upscale] OOM with tile={tile_size}, retrying with tile=256",
-                            file=sys.stderr,
-                            flush=True,
-                        )
-                        emit_progress(35, "Retrying with smaller tiles")
-                        upsampler.tile = 256
-                        output_array, _ = upsampler.enhance(img_array, outscale=scale)
+                    # enhance() runs the whole model in one opaque call with no
+                    # per-tile callback, so advance the bar in the background to
+                    # show the job is alive instead of freezing at 30% (#591).
+                    from progress_heartbeat import run_with_heartbeat
+
+                    def _enhance():
+                        try:
+                            return upsampler.enhance(img_array, outscale=scale)
+                        except RuntimeError as oom_err:
+                            if "out of memory" not in str(oom_err).lower():
+                                raise
+                            torch.cuda.empty_cache()
+                            print(
+                                f"[upscale] OOM with tile={tile_size}, retrying with tile=256",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                            upsampler.tile = 256
+                            return upsampler.enhance(img_array, outscale=scale)
+
+                    output_array, _ = run_with_heartbeat(
+                        _enhance, emit_progress, 30, 80, "Enhancing image with AI"
+                    )
 
                     emit_progress(80, "AI enhancement complete")
                     result = Image.fromarray(output_array)

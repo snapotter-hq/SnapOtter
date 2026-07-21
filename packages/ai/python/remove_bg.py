@@ -234,22 +234,27 @@ def main():
 
         emit_progress(30, "Analyzing image")
         use_alpha_matting = device != "cpu"
-        try:
-            output_data = remove(
-                input_data,
-                session=session,
-                alpha_matting=use_alpha_matting,
-                alpha_matting_foreground_threshold=240,
-                alpha_matting_background_threshold=10,
-            )
-        except Exception as e:
-            if use_alpha_matting:
-                emit_progress(35, "Retrying without alpha matting")
-                output_data = remove(input_data, session=session, alpha_matting=False)
-            else:
-                raise RuntimeError(
-                    f"Background removal failed: {e}"
-                ) from e
+
+        # remove() runs the whole model in one opaque call with no per-step
+        # callback, so advance the bar in the background to show the job is
+        # alive instead of freezing at 30% (#591).
+        from progress_heartbeat import run_with_heartbeat
+
+        def _remove():
+            try:
+                return remove(
+                    input_data,
+                    session=session,
+                    alpha_matting=use_alpha_matting,
+                    alpha_matting_foreground_threshold=240,
+                    alpha_matting_background_threshold=10,
+                )
+            except Exception as e:
+                if use_alpha_matting:
+                    return remove(input_data, session=session, alpha_matting=False)
+                raise RuntimeError(f"Background removal failed: {e}") from e
+
+        output_data = run_with_heartbeat(_remove, emit_progress, 30, 80, "Analyzing image")
 
         emit_progress(80, "Background removed")
 
