@@ -15,7 +15,7 @@ export function SplitPdfSettings() {
     useToolProcessor("split-pdf");
 
   const [mode, setMode] = useState<SplitMode>("range");
-  const [range, setRange] = useState("1-3,5");
+  const [range, setRange] = useState("");
   const [everyN, setEveryN] = useState(1);
 
   const hasFile = files.length > 0;
@@ -97,7 +97,7 @@ export function SplitPdfSettings() {
           type="button"
           data-testid="split-pdf-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || (mode === "range" && !range.trim())}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}

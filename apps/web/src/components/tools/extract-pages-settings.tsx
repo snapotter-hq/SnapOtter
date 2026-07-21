@@ -12,7 +12,7 @@ export function ExtractPagesSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("extract-pages");
 
-  const [range, setRange] = useState("1-3");
+  const [range, setRange] = useState("");
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -36,6 +36,7 @@ export function ExtractPagesSettings() {
           id="ep-range"
           type="text"
           value={range}
+          placeholder="1-3"
           onChange={(e) => setRange(e.target.value)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         />
@@ -58,7 +59,7 @@ export function ExtractPagesSettings() {
           type="button"
           data-testid="extract-pages-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !range.trim()}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}

@@ -13,6 +13,7 @@ import {
 
 const PDF = readFixture(fixtures.document.pdf3);
 const PDF_PATH = fixtures.document.pdf3;
+const ENCRYPTED_PDF = readFixture(fixtures.document.encrypted);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -105,6 +106,30 @@ describe.skipIf(!qpdfAvailable())("remove-pages (requires qpdf)", () => {
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
     expect(body.details || body.error || body.message).toMatch(/out of range/i);
+  }, 60_000);
+
+  it("rejects a password-protected PDF up front with a clear message", async () => {
+    // A page tool cannot operate on an encrypted PDF without the password.
+    // The factory must reject it at input validation (400) with guidance to
+    // unlock first, instead of letting qpdf fail cryptically in the worker.
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "encrypted.pdf",
+        contentType: "application/pdf",
+        content: ENCRYPTED_PDF,
+      },
+      { name: "settings", content: JSON.stringify({ pages: "1" }) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/remove-pages",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body);
+    expect(parsed.error).toMatch(/password-protected|unlock/i);
   }, 60_000);
 
   it("removes page 1 from a 96-page pdf (large keepSpec path)", async () => {

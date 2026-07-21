@@ -1948,7 +1948,7 @@ test.describe("DOCUMENT: split-pdf", () => {
   }) => {
     const issues = instrument(page);
     await setupTool(page, "split-pdf", PDF_3PAGE);
-    // Default mode is range, range="1-3,5"
+    // Default mode is range; the range box starts empty (placeholder "1-3,5")
     await fillInput(page, "sp-range", "1-2");
     const dl = await processAndDownload(page, "split-pdf", "long");
     if (!dl.ok) {

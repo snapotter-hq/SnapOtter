@@ -13,6 +13,10 @@ export function registerUnlockPdf(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "unlock-pdf",
     settingsSchema,
+    // unlock-pdf's whole job is to decrypt: its input is an encrypted PDF plus
+    // the password, so it must opt out of the factory's password-protected
+    // rejection that every other document tool gets by default.
+    allowPasswordProtectedPdf: true,
     redactSettingsForAudit: (settings) => {
       const s = settings as z.infer<typeof settingsSchema>;
       return {

@@ -5,6 +5,7 @@ import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from
 
 const PDF = readFixture(fixtures.document.pdf3);
 const SIG = readFixture(fixtures.image.base.png200);
+const ENCRYPTED_PDF = readFixture(fixtures.document.encrypted);
 
 // The stamping test invokes the docs profile's doc_sign script (PyMuPDF) and is
 // gated on fitz so it skips where PyMuPDF is not installed (e.g. CI integration
@@ -134,6 +135,28 @@ describe("sign-pdf", () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body)).toMatchObject({ error: "Invalid PDF" });
+  });
+
+  it("rejects a password-protected PDF before enqueueing work", async () => {
+    // A signature can't be stamped onto an encrypted PDF without the password;
+    // reject it up front (before any Python call) with guidance to unlock first.
+    const res = await postFields([
+      {
+        name: "file",
+        filename: "encrypted.pdf",
+        contentType: "application/pdf",
+        content: ENCRYPTED_PDF,
+      },
+      { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.details || body.error).toMatch(/password-protected|unlock/i);
   });
 
   it("rejects an invalid signature image before enqueueing work", async () => {

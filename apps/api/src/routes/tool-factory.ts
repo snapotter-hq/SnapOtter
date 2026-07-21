@@ -119,6 +119,14 @@ export interface ToolRouteConfig<T> {
    */
   skipStructuralValidation?: boolean;
   /**
+   * When set, the factory does NOT reject password-protected PDFs at input
+   * validation. Only unlock-pdf sets this: it takes an encrypted PDF plus a
+   * password and decrypts it. Every other document tool leaves this off, so
+   * the factory rejects encrypted PDFs up front (400) with guidance to unlock
+   * first, instead of letting qpdf fail cryptically in the worker.
+   */
+  allowPasswordProtectedPdf?: boolean;
+  /**
    * When set, produces a redacted copy of settings for the durable DB
    * row. Passwords and other secrets are replaced so they do not persist
    * in the jobs table (retention keeps rows for days). The BullMQ job
@@ -398,6 +406,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             const prepared = await handlerForPosition(i).prepare(fileBuffer, fname, {
               scratchDir,
               lenient: config.skipStructuralValidation,
+              // Reject encrypted PDFs up front only for PDF-only tools (qpdf
+              // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
+              // flag never forces a %PDF- header on non-PDF document tools
+              // (markdown/epub/docx converters). unlock-pdf opts out.
+              rejectPasswordProtected:
+                modality === "document" &&
+                !config.allowPasswordProtectedPdf &&
+                !!accepted?.length &&
+                accepted.every((e) => e === ".pdf"),
             });
             fileBuffer = prepared.buffer;
             fname = prepared.filename;

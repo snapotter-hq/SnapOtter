@@ -12,7 +12,7 @@ export function RemovePagesSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("remove-pages");
 
-  const [pages, setPages] = useState("2,4-6");
+  const [pages, setPages] = useState("");
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -36,6 +36,7 @@ export function RemovePagesSettings() {
           id="rp-pages"
           type="text"
           value={pages}
+          placeholder="2,4-6"
           onChange={(e) => setPages(e.target.value)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         />
@@ -58,7 +59,7 @@ export function RemovePagesSettings() {
           type="button"
           data-testid="remove-pages-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !pages.trim()}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}

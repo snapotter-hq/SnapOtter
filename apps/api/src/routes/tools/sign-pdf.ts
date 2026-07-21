@@ -123,7 +123,13 @@ export function registerSignPdf(app: FastifyInstance) {
 
     const pdfBuffer = await getObjectBuffer(pdfKey);
     try {
-      await inputHandlerFor("document").prepare(pdfBuffer, filename, { scratchDir: tmpdir() });
+      // Signing needs a readable PDF; reject encrypted ones up front (the
+      // "unlock first" guidance rides in details) with the same policy the
+      // factory gives other PDF-only tools, instead of failing in the worker.
+      await inputHandlerFor("document").prepare(pdfBuffer, filename, {
+        scratchDir: tmpdir(),
+        rejectPasswordProtected: true,
+      });
     } catch (err) {
       return reply.status(400).send({
         error: "Invalid PDF",

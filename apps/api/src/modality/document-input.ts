@@ -43,7 +43,9 @@ export async function validatePdfPath(
   opts.signal?.throwIfAborted();
   if (passwordProtected) {
     if (opts.rejectPasswordProtected) {
-      throw new InputValidationError("Password-protected PDFs cannot be processed by this tool");
+      throw new InputValidationError(
+        "This PDF is password-protected. Unlock it first with the Unlock PDF tool, then try again.",
+      );
     }
     // Without a password qpdf cannot safely inspect the structure or pages.
     return;
