@@ -3,6 +3,15 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { temporal } from "zundo";
 import { create } from "zustand";
+import {
+  type CurvePoint,
+  type CurvesState,
+  defaultCurvesState,
+  defaultLevelsState,
+  type LevelsState,
+  type LevelsValues,
+  type ToneChannel,
+} from "@/components/editor/adjustment-lut";
 import { generateId } from "@/lib/utils";
 import type {
   AdjustmentValues,
@@ -46,12 +55,75 @@ function isCenterBased(obj: CanvasObject): boolean {
   return obj.type === "ellipse" || obj.type === "polygon" || obj.type === "star";
 }
 
+type RasterTransform = "rot90" | "rot180" | "rot270" | "flipH" | "flipV";
+
+// Rebake the source image bitmap through a transformed offscreen canvas so that
+// rotate/flip actually change the pixels (canvas-size + vector objects are
+// transformed separately by the caller). `width`/`height` are the pre-transform
+// canvas dimensions; the source is scaled to them first so a prior Image Size
+// resize is baked in too. Runs async (image decode); `apply` receives the new
+// data URL, and the old blob URL is revoked to avoid leaks.
+function rebakeSourceRaster(
+  url: string,
+  width: number,
+  height: number,
+  transform: RasterTransform,
+  apply: (newUrl: string) => void,
+): void {
+  const img = new Image();
+  img.onload = () => {
+    const swap = transform === "rot90" || transform === "rot270";
+    const cw = swap ? height : width;
+    const ch = swap ? width : height;
+    const off = document.createElement("canvas");
+    off.width = cw;
+    off.height = ch;
+    const ctx = off.getContext("2d");
+    if (!ctx) return;
+    switch (transform) {
+      case "rot90":
+        ctx.translate(cw, 0);
+        ctx.rotate(Math.PI / 2);
+        break;
+      case "rot270":
+        ctx.translate(0, ch);
+        ctx.rotate(-Math.PI / 2);
+        break;
+      case "rot180":
+        ctx.translate(cw, ch);
+        ctx.rotate(Math.PI);
+        break;
+      case "flipH":
+        ctx.translate(cw, 0);
+        ctx.scale(-1, 1);
+        break;
+      case "flipV":
+        ctx.translate(0, ch);
+        ctx.scale(1, -1);
+        break;
+    }
+    ctx.drawImage(img, 0, 0, width, height);
+    // Don't revoke the previous blob URL: it's captured in undo history (partialize
+    // keeps sourceImageUrl), so undo/redo may restore it. Revoking would 404 the reload.
+    apply(off.toDataURL("image/png"));
+  };
+  img.src = url;
+}
+
 // Extended store state with additional fields/methods not yet in the shared interface
 interface EditorStateExtensions {
   canvasBackground: string;
   commitHistory: (action: string) => void;
   batchNudge: (objectIds: string[], dx: number, dy: number) => void;
   updateLayerThumbnail: (layerId: string, thumbnailDataUrl: string) => void;
+  // Levels / Curves tone adjustments (applied to the source image as LUTs)
+  levels: LevelsState;
+  curves: CurvesState;
+  setLevels: (channel: ToneChannel, values: Partial<LevelsValues>) => void;
+  setCurves: (channel: ToneChannel, points: CurvePoint[]) => void;
+  resetLevels: () => void;
+  resetCurves: () => void;
+  resetAllAdjustments: () => void;
 }
 
 const DEFAULT_CANVAS_SIZE = { width: 1920, height: 1080 };
@@ -108,6 +180,18 @@ const DEFAULT_FILTERS: FilterConfig[] = [
     params: { amount: 25, size: 25, roughness: 50 },
   },
 ];
+
+// Filters whose initial param value is a visual no-op (radius 0, size 1, ...). When one of
+// these is enabled (from the Filter menu or the panel checkbox) while still at that no-op
+// value, seed a sensible visible default so the toggle actually does something. A value the
+// user has already tuned is left untouched.
+const FILTER_ENABLE_DEFAULTS: Record<string, { key: string; noop: number; value: number }> = {
+  blur: { key: "radius", noop: 0, value: 8 },
+  sharpen: { key: "amount", noop: 0, value: 50 },
+  noise: { key: "amount", noop: 0, value: 30 },
+  pixelate: { key: "size", noop: 1, value: 10 },
+  emboss: { key: "strength", noop: 0, value: 0.5 },
+};
 
 function createDefaultLayer(id: string, name: string): EditorLayer {
   return {
@@ -175,7 +259,6 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       selectionMode: "new" as SelectionMode,
       magicWandTolerance: 32,
       magicWandContiguous: true,
-      selectionFeather: 0,
 
       // --- Crop ---
       cropState: null,
@@ -187,6 +270,10 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         ...f,
         params: { ...f.params },
       })),
+
+      // --- Levels / Curves (LUT-based tone adjustments) ---
+      levels: defaultLevelsState(),
+      curves: defaultCurvesState(),
 
       // --- Text ---
       editingTextId: null,
@@ -289,10 +376,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       setPanOffset: (offset) => set({ panOffset: offset }),
 
       loadImage: (url, width, height) => {
-        const oldUrl = get().sourceImageUrl;
-        if (oldUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(oldUrl);
-        }
+        // The previous image URL stays in undo history (see partialize), so it must not be
+        // revoked here -- undo/redo could restore it and a revoked blob would fail to reload.
         set({
           sourceImageUrl: url,
           sourceImageSize: { width, height },
@@ -309,6 +394,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             ...f,
             params: { ...f.params },
           })),
+          levels: defaultLevelsState(),
+          curves: defaultCurvesState(),
           clipboard: null,
           editingTextId: null,
           layers: [createDefaultLayer(DEFAULT_LAYER_ID, "Layer 1")],
@@ -411,9 +498,22 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       rotateCanvas: (degrees) => {
-        const { canvasSize, objects } = get();
+        const { canvasSize, objects, sourceImageUrl } = get();
         const newSize =
           degrees === 180 ? canvasSize : { width: canvasSize.height, height: canvasSize.width };
+        // Rebake the source bitmap so the pixels actually rotate. Runs async and
+        // updates sourceImageUrl once ready; canvas-size + objects rotate now.
+        if (sourceImageUrl) {
+          const transform: RasterTransform =
+            degrees === 90 ? "rot90" : degrees === 270 ? "rot270" : "rot180";
+          rebakeSourceRaster(
+            sourceImageUrl,
+            canvasSize.width,
+            canvasSize.height,
+            transform,
+            (newUrl) => set({ sourceImageUrl: newUrl }),
+          );
+        }
         set({
           canvasSize: newSize,
           sourceImageSize: newSize,
@@ -483,7 +583,16 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       flipCanvasHorizontal: () => {
-        const { canvasSize, objects } = get();
+        const { canvasSize, objects, sourceImageUrl } = get();
+        if (sourceImageUrl) {
+          rebakeSourceRaster(
+            sourceImageUrl,
+            canvasSize.width,
+            canvasSize.height,
+            "flipH",
+            (newUrl) => set({ sourceImageUrl: newUrl }),
+          );
+        }
         set({
           objects: objects.map((obj) => {
             const attrs = { ...obj.attrs };
@@ -511,7 +620,16 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       flipCanvasVertical: () => {
-        const { canvasSize, objects } = get();
+        const { canvasSize, objects, sourceImageUrl } = get();
+        if (sourceImageUrl) {
+          rebakeSourceRaster(
+            sourceImageUrl,
+            canvasSize.width,
+            canvasSize.height,
+            "flipV",
+            (newUrl) => set({ sourceImageUrl: newUrl }),
+          );
+        }
         set({
           objects: objects.map((obj) => {
             const attrs = { ...obj.attrs };
@@ -663,8 +781,12 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       // Objects
       addObject: (obj) => {
+        const { layers, activeLayerId } = get();
+        const targetLayerId = obj.layerId || activeLayerId;
+        // A locked layer rejects new content (brush strokes, shapes, text, fills, ...).
+        if (layers.find((l) => l.id === targetLayerId)?.locked) return;
         set({
-          objects: [...get().objects, { ...obj, layerId: obj.layerId || get().activeLayerId }],
+          objects: [...get().objects, { ...obj, layerId: targetLayerId }],
           isDirty: true,
           lastAction: `Add ${obj.type.charAt(0).toUpperCase() + obj.type.slice(1)}`,
           _historyVersion: get()._historyVersion + 1,
@@ -697,10 +819,19 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       removeObjects: (ids) => {
-        const idSet = new Set(ids);
+        const { objects, layers, selectedObjectIds } = get();
+        const lockedLayerIds = new Set(layers.filter((l) => l.locked).map((l) => l.id));
+        // Never delete objects that sit on a locked layer.
+        const idSet = new Set(
+          ids.filter((id) => {
+            const obj = objects.find((o) => o.id === id);
+            return obj && !lockedLayerIds.has(obj.layerId);
+          }),
+        );
+        if (idSet.size === 0) return;
         set({
-          objects: get().objects.filter((obj) => !idSet.has(obj.id)),
-          selectedObjectIds: get().selectedObjectIds.filter((id) => !idSet.has(id)),
+          objects: objects.filter((obj) => !idSet.has(obj.id)),
+          selectedObjectIds: selectedObjectIds.filter((id) => !idSet.has(id)),
           isDirty: true,
           lastAction: "Delete",
           _historyVersion: get()._historyVersion + 1,
@@ -954,9 +1085,68 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           _historyVersion: get()._historyVersion + 1,
         }),
 
-      toggleFilter: (type) => {
+      setLevels: (channel, values) =>
         set({
-          filters: get().filters.map((f) => (f.type === type ? { ...f, enabled: !f.enabled } : f)),
+          levels: {
+            ...get().levels,
+            [channel]: { ...get().levels[channel], ...values },
+          },
+          isDirty: true,
+          lastAction: "Levels",
+          _historyVersion: get()._historyVersion + 1,
+        }),
+
+      setCurves: (channel, points) =>
+        set({
+          curves: { ...get().curves, [channel]: points },
+          isDirty: true,
+          lastAction: "Curves",
+          _historyVersion: get()._historyVersion + 1,
+        }),
+
+      resetLevels: () =>
+        set({
+          levels: defaultLevelsState(),
+          isDirty: true,
+          lastAction: "Reset Levels",
+          _historyVersion: get()._historyVersion + 1,
+        }),
+
+      resetCurves: () =>
+        set({
+          curves: defaultCurvesState(),
+          isDirty: true,
+          lastAction: "Reset Curves",
+          _historyVersion: get()._historyVersion + 1,
+        }),
+
+      // Reset every non-destructive image adjustment in one history step:
+      // slider adjustments, toggled filters, Levels, and Curves.
+      resetAllAdjustments: () =>
+        set({
+          adjustments: { ...DEFAULT_ADJUSTMENTS },
+          filters: get().filters.map((f) => ({ ...f, enabled: false })),
+          levels: defaultLevelsState(),
+          curves: defaultCurvesState(),
+          isDirty: true,
+          lastAction: "Reset All",
+          _historyVersion: get()._historyVersion + 1,
+        }),
+
+      toggleFilter: (type) => {
+        const seed = FILTER_ENABLE_DEFAULTS[type];
+        set({
+          filters: get().filters.map((f) => {
+            if (f.type !== type) return f;
+            const enabled = !f.enabled;
+            // On enable, if a no-op filter is still at its identity value, give it a
+            // visible default so the menu/checkbox produces an immediate effect.
+            const params =
+              enabled && seed && (f.params[seed.key] ?? seed.noop) === seed.noop
+                ? { ...f.params, [seed.key]: seed.value }
+                : f.params;
+            return { ...f, enabled, params };
+          }),
           isDirty: true,
           lastAction: `Toggle ${type.charAt(0).toUpperCase() + type.slice(1)} Filter`,
           _historyVersion: get()._historyVersion + 1,
@@ -979,7 +1169,6 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       setSelectionMode: (mode) => set({ selectionMode: mode }),
       setMagicWandTolerance: (v) => set({ magicWandTolerance: v }),
       setMagicWandContiguous: (v: boolean) => set({ magicWandContiguous: v }),
-      setSelectionFeather: (v) => set({ selectionFeather: v }),
 
       invertSelection: () => {
         const { selection, canvasSize } = get();
@@ -1049,10 +1238,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             if (ctx) {
               ctx.drawImage(img, -cropState.x, -cropState.y);
               const croppedUrl = offscreen.toDataURL("image/png");
-              const oldUrl = get().sourceImageUrl;
-              if (oldUrl?.startsWith("blob:")) {
-                URL.revokeObjectURL(oldUrl);
-              }
+              // Keep the pre-crop blob URL alive -- it's in undo history and revoking it
+              // would break undo (the restored source would fail to reload).
               set({ sourceImageUrl: croppedUrl });
             }
           };
@@ -1241,10 +1428,15 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       // Batch nudge: move multiple objects and create a history entry
       batchNudge: (objectIds, dx, dy) => {
+        const lockedLayerIds = new Set(
+          get()
+            .layers.filter((l) => l.locked)
+            .map((l) => l.id),
+        );
         const idSet = new Set(objectIds);
         set({
           objects: get().objects.map((obj) => {
-            if (!idSet.has(obj.id)) return obj;
+            if (!idSet.has(obj.id) || lockedLayerIds.has(obj.layerId)) return obj;
             const attrs = { ...obj.attrs };
             if (hasPointsArray(obj)) {
               const pts = [...(attrs as { points: number[] }).points];

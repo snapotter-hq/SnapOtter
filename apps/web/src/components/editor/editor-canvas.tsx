@@ -28,11 +28,19 @@ import type {
   ImageAttrs,
   ObjectEffects,
 } from "@/types/editor";
+import {
+  type CurvesState,
+  composeChannelLuts,
+  hasCurvesAdjustments,
+  hasLevelsAdjustments,
+  type LevelsState,
+} from "./adjustment-lut";
 import { ContextMenu, useContextMenu } from "./common/context-menu";
 import { BrushCursorOverlay, useEditorCursor } from "./common/custom-cursor";
 import { LoadingOverlay } from "./common/loading-overlay";
 import { SmartGuidesOverlay } from "./common/smart-guides";
 import {
+  createChannelLutFilter,
   createExposureFilter,
   createGrainFilter,
   createMotionBlurFilter,
@@ -110,10 +118,18 @@ function SourceImage({
   url,
   adjustments,
   filters,
+  levels,
+  curves,
+  canvasWidth,
+  canvasHeight,
 }: {
   url: string;
   adjustments: AdjustmentValues;
   filters: FilterConfig[];
+  levels: LevelsState;
+  curves: CurvesState;
+  canvasWidth: number;
+  canvasHeight: number;
 }) {
   const [image] = useImage(url);
   const imageRef = useRef<Konva.Image>(null);
@@ -121,12 +137,17 @@ function SourceImage({
   // Issue #12: Apply adjustments/filters to the source image node
   const hasActiveAdjustments = Object.values(adjustments).some((v) => v !== 0);
   const hasActiveFilters = filters.some((f) => f.enabled);
+  const hasToneAdjustments = hasLevelsAdjustments(levels) || hasCurvesAdjustments(curves);
 
+  // canvasWidth/canvasHeight are intentional deps: when the canvas is resized the node's
+  // cached filter output must be recomputed to match the new draw size, even though the
+  // effect body reaches those values through JSX rather than referencing them directly.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see note above
   useEffect(() => {
     const node = imageRef.current;
     if (!node || !image) return;
 
-    if (hasActiveAdjustments || hasActiveFilters) {
+    if (hasActiveAdjustments || hasActiveFilters || hasToneAdjustments) {
       const konvaFilters: Array<((this: Konva.Node, imageData: ImageData) => void) | string> = [];
 
       // Built-in Konva adjustment filters
@@ -183,10 +204,15 @@ function SourceImage({
             node.embossWhiteLevel(0.5);
             node.embossBlend(true);
             break;
-          case "posterize":
+          case "posterize": {
             konvaFilters.push(KonvaFilters.Filters.Posterize);
-            node.levels(f.params.levels ?? 8);
+            // Konva's Posterize expects `levels` as a 0..1 fraction and derives the
+            // actual count via round(levels * 254) + 1. The panel exposes a raw count
+            // (2..30), so map it back to the fraction that yields that many levels.
+            const posterizeCount = f.params.levels ?? 8;
+            node.levels(Math.max(0, (posterizeCount - 1) / 254));
             break;
+          }
           case "noise":
             konvaFilters.push(KonvaFilters.Filters.Noise);
             node.noise(f.params.amount ?? 0);
@@ -196,7 +222,10 @@ function SourceImage({
             break;
           case "threshold":
             konvaFilters.push(KonvaFilters.Filters.Threshold);
-            node.threshold((f.params.level ?? 0.5) * 255);
+            // Konva's Threshold multiplies by 255 internally, so pass the 0..1 level
+            // directly. Passing level*255 double-scales it and clears every channel
+            // (including alpha), turning the whole image transparent.
+            node.threshold(f.params.level ?? 0.5);
             break;
           case "kaleidoscope":
             konvaFilters.push(KonvaFilters.Filters.Kaleidoscope);
@@ -256,6 +285,11 @@ function SourceImage({
         }
       }
 
+      // Levels + Curves: apply as a single per-channel LUT filter.
+      if (hasToneAdjustments) {
+        konvaFilters.push(createChannelLutFilter(composeChannelLuts(levels, curves)));
+      }
+
       // FIX 1: Filters must be set BEFORE caching in Konva
       node.clearCache();
       node.filters(konvaFilters);
@@ -266,11 +300,36 @@ function SourceImage({
       node.filters([]);
       node.getLayer()?.batchDraw();
     }
-  }, [image, adjustments, filters, hasActiveAdjustments, hasActiveFilters]);
+  }, [
+    image,
+    adjustments,
+    filters,
+    levels,
+    curves,
+    hasActiveAdjustments,
+    hasActiveFilters,
+    hasToneAdjustments,
+    canvasWidth,
+    canvasHeight,
+  ]);
 
   if (!image) return null;
 
-  return <KonvaImage ref={imageRef} image={image} x={0} y={0} listening={false} />;
+  // Draw the source at the canvas dimensions so an Image Size resize actually
+  // scales the raster instead of leaving it at natural resolution (which would
+  // overflow or crop the canvas). Rotate/flip rebake the bitmap so its natural
+  // dimensions already match the canvas, keeping this a 1:1 draw for them.
+  return (
+    <KonvaImage
+      ref={imageRef}
+      image={image}
+      x={0}
+      y={0}
+      width={canvasWidth}
+      height={canvasHeight}
+      listening={false}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -793,6 +852,8 @@ export function EditorCanvas({
   const setPanOffset = useEditorStore((s) => s.setPanOffset);
   const adjustments = useEditorStore((s) => s.adjustments);
   const filters = useEditorStore((s) => s.filters);
+  const levels = useEditorStore((s) => s.levels);
+  const curves = useEditorStore((s) => s.curves);
 
   // Issue #10: Shortcuts moved to EditorPage, removed from here
   const cursor = useEditorCursor();
@@ -946,7 +1007,15 @@ export function EditorCanvas({
         <Layer ref={selectionLayerRef}>
           {/* Issue #14: Render source image as background */}
           {sourceImageUrl && (
-            <SourceImage url={sourceImageUrl} adjustments={adjustments} filters={filters} />
+            <SourceImage
+              url={sourceImageUrl}
+              adjustments={adjustments}
+              filters={filters}
+              levels={levels}
+              curves={curves}
+              canvasWidth={canvasSize.width}
+              canvasHeight={canvasSize.height}
+            />
           )}
 
           {layers.map((layer) => {
@@ -963,18 +1032,22 @@ export function EditorCanvas({
                 }
                 listening={layer.id === activeLayerId}
               >
-                {layerObjects.map((obj) => (
-                  <CanvasObjectRenderer
-                    key={obj.id}
-                    obj={obj}
-                    isMoveTool={isMoveTool}
-                    onSelect={isMoveTool ? moveTool.onSelect : undefined}
-                    onDragStart={isMoveTool ? moveTool.onDragStart : undefined}
-                    onDragMove={isMoveTool ? moveTool.onDragMove : undefined}
-                    onDragEnd={isMoveTool ? moveTool.onDragEnd : undefined}
-                    onTransformEnd={isMoveTool ? moveTool.onTransformEnd : undefined}
-                  />
-                ))}
+                {layerObjects.map((obj) => {
+                  // A locked layer's objects can't be selected, dragged, or transformed.
+                  const editable = isMoveTool && !layer.locked;
+                  return (
+                    <CanvasObjectRenderer
+                      key={obj.id}
+                      obj={obj}
+                      isMoveTool={editable}
+                      onSelect={editable ? moveTool.onSelect : undefined}
+                      onDragStart={editable ? moveTool.onDragStart : undefined}
+                      onDragMove={editable ? moveTool.onDragMove : undefined}
+                      onDragEnd={editable ? moveTool.onDragEnd : undefined}
+                      onTransformEnd={editable ? moveTool.onTransformEnd : undefined}
+                    />
+                  );
+                })}
               </Group>
             );
           })}

@@ -50,8 +50,6 @@ export function SelectionOptions() {
   const setMagicWandTolerance = useEditorStore((s) => s.setMagicWandTolerance);
   const magicWandContiguous = useEditorStore((s) => s.magicWandContiguous);
   const setMagicWandContiguous = useEditorStore((s) => s.setMagicWandContiguous);
-  const selectionFeather = useEditorStore((s) => s.selectionFeather);
-  const setSelectionFeather = useEditorStore((s) => s.setSelectionFeather);
 
   const selectionType: SelectionType =
     activeTool === "marquee-ellipse"
@@ -168,25 +166,6 @@ export function SelectionOptions() {
             >
               Polygonal
             </ToggleButton>
-          </div>
-        </>
-      )}
-
-      {/* Feather radius */}
-      {(isMarquee || isLasso) && (
-        <>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">Feather:</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={selectionFeather}
-              onChange={(e) => setSelectionFeather(Number(e.target.value))}
-              className="w-14 px-1.5 py-0.5 text-xs rounded border border-border bg-background text-foreground tabular-nums"
-            />
-            <span className="text-xs text-muted-foreground">px</span>
           </div>
         </>
       )}

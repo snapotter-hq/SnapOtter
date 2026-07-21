@@ -406,3 +406,23 @@ export function createSharpenFilter(params: {
     }
   };
 }
+
+/**
+ * Apply per-channel lookup tables (Levels + Curves). Each LUT is a 256-entry
+ * array mapping input intensity to output. Alpha is untouched.
+ */
+export function createChannelLutFilter(luts: {
+  r: number[];
+  g: number[];
+  b: number[];
+}): (imageData: ImageData) => void {
+  return (imageData: ImageData) => {
+    const d = imageData.data;
+    const { r, g, b } = luts;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = r[d[i]];
+      d[i + 1] = g[d[i + 1]];
+      d[i + 2] = b[d[i + 2]];
+    }
+  };
+}

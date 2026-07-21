@@ -2,6 +2,7 @@
 
 import { Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hasCurvesAdjustments, hasLevelsAdjustments } from "@/components/editor/adjustment-lut";
 import { SliderRow } from "@/components/editor/common/slider-row";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { HistogramPanel } from "@/components/editor/panels/histogram-panel";
@@ -202,13 +203,6 @@ const CURVE_PRESETS: Record<string, CurvePoint[]> = {
   ],
 };
 
-const DEFAULT_LEVELS: Record<LevelsChannel, LevelsValues> = {
-  rgb: { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 },
-  red: { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 },
-  green: { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 },
-  blue: { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 },
-};
-
 // ---------------------------------------------------------------------------
 // Cubic spline interpolation for curves
 // ---------------------------------------------------------------------------
@@ -407,33 +401,21 @@ function AdjustmentsSlidersSection() {
 
 function LevelsSection() {
   const [channel, setChannel] = useState<LevelsChannel>("rgb");
-  const [levels, setLevels] = useState<Record<LevelsChannel, LevelsValues>>(() =>
-    JSON.parse(JSON.stringify(DEFAULT_LEVELS)),
-  );
+  const levels = useEditorStore((s) => s.levels);
+  const setStoreLevels = useEditorStore((s) => s.setLevels);
 
   const currentLevels = levels[channel];
 
   const updateLevel = useCallback(
     (key: keyof LevelsValues, value: number) => {
-      setLevels((prev) => ({
-        ...prev,
-        [channel]: { ...prev[channel], [key]: value },
-      }));
+      setStoreLevels(channel, { [key]: value });
     },
-    [channel],
+    [channel, setStoreLevels],
   );
 
   const handleAutoLevels = useCallback(() => {
-    setLevels((prev) => ({
-      ...prev,
-      [channel]: {
-        ...prev[channel],
-        blackPoint: 10,
-        whitePoint: 245,
-        gamma: 1,
-      },
-    }));
-  }, [channel]);
+    setStoreLevels(channel, { blackPoint: 10, whitePoint: 245, gamma: 1 });
+  }, [channel, setStoreLevels]);
 
   const channelColors: Record<LevelsChannel, string> = {
     rgb: "text-foreground",
@@ -616,12 +598,8 @@ function drawTriangle(
 
 function CurvesSection() {
   const [channel, setChannel] = useState<CurveChannel>("rgb");
-  const [curves, setCurves] = useState<Record<CurveChannel, CurvePoint[]>>({
-    rgb: [...CURVE_PRESETS.Linear],
-    red: [...CURVE_PRESETS.Linear],
-    green: [...CURVE_PRESETS.Linear],
-    blue: [...CURVE_PRESETS.Linear],
-  });
+  const curves = useEditorStore((s) => s.curves);
+  const setStoreCurves = useEditorStore((s) => s.setCurves);
   const [preset, setPreset] = useState("Linear");
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
@@ -744,14 +722,14 @@ function CurvesSection() {
       } else {
         // Add new point
         const newPoints = [...currentPoints, pos].sort((a, b) => a.x - b.x);
-        setCurves((prev) => ({ ...prev, [channel]: newPoints }));
+        setStoreCurves(channel, newPoints);
         setPreset("Custom");
         // Find and start dragging the new point
         const newIdx = newPoints.findIndex((p) => p.x === pos.x && p.y === pos.y);
         setDraggingIndex(newIdx);
       }
     },
-    [getCanvasPos, findNearPoint, currentPoints, channel],
+    [getCanvasPos, findNearPoint, currentPoints, channel, setStoreCurves],
   );
 
   const handleMouseMove = useCallback(
@@ -759,16 +737,14 @@ function CurvesSection() {
       if (draggingIndex === null) return;
       const pos = getCanvasPos(e);
 
-      setCurves((prev) => {
-        const pts = [...prev[channel]];
-        pts[draggingIndex] = pos;
-        pts.sort((a, b) => a.x - b.x);
-        const newIndex = pts.findIndex((p) => p.x === pos.x && p.y === pos.y);
-        if (newIndex !== -1) setDraggingIndex(newIndex);
-        return { ...prev, [channel]: pts };
-      });
+      const pts = [...currentPoints];
+      pts[draggingIndex] = pos;
+      pts.sort((a, b) => a.x - b.x);
+      const newIndex = pts.findIndex((p) => p.x === pos.x && p.y === pos.y);
+      if (newIndex !== -1) setDraggingIndex(newIndex);
+      setStoreCurves(channel, pts);
     },
-    [draggingIndex, getCanvasPos, channel],
+    [draggingIndex, getCanvasPos, channel, currentPoints, setStoreCurves],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -782,11 +758,11 @@ function CurvesSection() {
 
       if (idx >= 0 && currentPoints.length > 2) {
         const newPoints = currentPoints.filter((_, i) => i !== idx);
-        setCurves((prev) => ({ ...prev, [channel]: newPoints }));
+        setStoreCurves(channel, newPoints);
         setPreset("Custom");
       }
     },
-    [getCanvasPos, findNearPoint, currentPoints, channel],
+    [getCanvasPos, findNearPoint, currentPoints, channel, setStoreCurves],
   );
 
   const handlePresetChange = useCallback(
@@ -794,13 +770,13 @@ function CurvesSection() {
       setPreset(name);
       const presetPoints = CURVE_PRESETS[name];
       if (presetPoints) {
-        setCurves((prev) => ({
-          ...prev,
-          [channel]: presetPoints.map((p) => ({ ...p })),
-        }));
+        setStoreCurves(
+          channel,
+          presetPoints.map((p) => ({ ...p })),
+        );
       }
     },
-    [channel],
+    [channel, setStoreCurves],
   );
 
   return (
@@ -1038,10 +1014,16 @@ export function AdjustmentsPanel() {
   const filters = useEditorStore((s) => s.filters);
   const resetAdjustments = useEditorStore((s) => s.resetAdjustments);
   const canvasSize = useEditorStore((s) => s.canvasSize);
+  // Recompute the histogram whenever the committed document changes (paint, delete,
+  // adjustments, filters, levels, curves all bump this) so it never shows stale data.
+  const historyVersion = useEditorStore((s) => s._historyVersion);
 
   // Capture imageData from the Konva stage for the histogram
   const [histogramData, setHistogramData] = useState<ImageData | null>(null);
 
+  // historyVersion is an intentional dep: it changes on every committed edit and forces a
+  // fresh capture of the rendered stage even though the effect body doesn't read it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see note above
   useEffect(() => {
     function captureImageData() {
       const stage = editorStageRefHolder.current;
@@ -1059,32 +1041,23 @@ export function AdjustmentsPanel() {
 
     const timer = setTimeout(captureImageData, 100);
     return () => clearTimeout(timer);
-  }, [canvasSize]);
+  }, [canvasSize, historyVersion]);
 
+  const levels = useEditorStore((s) => s.levels);
+  const curves = useEditorStore((s) => s.curves);
   const hasChanges = useMemo(() => {
     const hasAdjustmentChanges = Object.values(adjustments).some((v) => v !== 0);
     const hasFilterChanges = filters.some((f) => f.enabled);
-    return hasAdjustmentChanges || hasFilterChanges;
-  }, [adjustments, filters]);
+    return (
+      hasAdjustmentChanges ||
+      hasFilterChanges ||
+      hasLevelsAdjustments(levels) ||
+      hasCurvesAdjustments(curves)
+    );
+  }, [adjustments, filters, levels, curves]);
 
   const handleResetAll = useCallback(() => {
-    const store = useEditorStore.getState();
-    useEditorStore.setState({
-      adjustments: {
-        brightness: 0,
-        contrast: 0,
-        hue: 0,
-        saturation: 0,
-        luminance: 0,
-        exposure: 0,
-        vibrance: 0,
-        warmth: 0,
-      },
-      filters: store.filters.map((f) => ({ ...f, enabled: false })),
-      isDirty: true,
-      lastAction: "Reset All",
-      _historyVersion: store._historyVersion + 1,
-    });
+    useEditorStore.getState().resetAllAdjustments();
   }, []);
 
   const handleApply = useCallback(() => {

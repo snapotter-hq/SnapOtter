@@ -318,7 +318,6 @@ export interface EditorState {
   selectionMode: SelectionMode;
   magicWandTolerance: number;
   magicWandContiguous: boolean;
-  selectionFeather: number;
 
   // Crop
   cropState: CropState | null;
@@ -445,7 +444,6 @@ export interface EditorState {
   setSelectionMode: (mode: SelectionMode) => void;
   setMagicWandTolerance: (v: number) => void;
   setMagicWandContiguous: (v: boolean) => void;
-  setSelectionFeather: (v: number) => void;
   invertSelection: () => void;
 
   // Crop
