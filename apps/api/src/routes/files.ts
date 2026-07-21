@@ -157,7 +157,59 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         )
         .header("Content-Length", String(size));
-      return reply.send(await getObjectStream(key));
+
+      const stream = await getObjectStream(key);
+
+      const INACTIVITY_TIMEOUT_MS = 30000;
+      let bytesStreamed = 0;
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      const resetTimeout = () => {
+        cleanup();
+        timeoutId = setTimeout(() => {
+          cleanup();
+          request.log.error(
+            { key, declaredSize: size, bytesStreamed },
+            "Stream inactivity timeout: no data emitted within timeout window",
+          );
+          reply.raw.destroy();
+        }, INACTIVITY_TIMEOUT_MS);
+      };
+
+      resetTimeout();
+
+      stream.on("data", (chunk: Buffer | string) => {
+        bytesStreamed += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+        resetTimeout();
+      });
+
+      stream.on("end", () => {
+        cleanup();
+        if (bytesStreamed !== size) {
+          request.log.error(
+            { key, declaredSize: size, bytesStreamed },
+            "Stream size mismatch: emitted bytes do not match declared Content-Length",
+          );
+          reply.raw.destroy();
+        }
+      });
+
+      stream.on("error", () => {
+        cleanup();
+      });
+
+      reply.raw.on("close", () => {
+        cleanup();
+      });
+
+      return reply.send(stream);
     },
   );
 

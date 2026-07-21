@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -139,4 +140,29 @@ describe("download endpoint (object storage + Range)", () => {
     expect(res.headers["content-disposition"]).toBeUndefined();
     expect(JSON.parse(res.body)).toEqual({ error: "Range not satisfiable" });
   });
+
+  // ── Stream integrity guard (cause 2: stat/stream mismatch) ──────
+
+  it("aborts response when getObjectSize exceeds actual stream bytes", async () => {
+    await putObject(`outputs/${jobId}/mismatch.txt`, Buffer.from("0123456789"));
+
+    const orig = objectStorage.getObjectSize;
+    const spy = vi.spyOn(objectStorage, "getObjectSize").mockImplementation(async (key: string) => {
+      if (key.includes("mismatch.txt")) {
+        return 1000;
+      }
+      return orig(key);
+    });
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/mismatch.txt`,
+    });
+
+    expect(res.headers["content-length"]).toBe("1000");
+    expect(res.rawPayload.length).toBe(10);
+
+    spy.mockRestore();
+  });
 });
+
