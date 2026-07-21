@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
+import { pipeline, type Readable, Transform } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { readImageDimensions } from "../lib/exiftool.js";
@@ -20,6 +21,62 @@ function isPathTraversal(segment: string): boolean {
     segment.includes("\\") ||
     segment.includes("\0")
   );
+}
+
+/**
+ * Stream a stored object to the client while verifying that the bytes delivered
+ * match the declared Content-Length. When a storage backend's stat() size
+ * disagrees with the bytes its read stream yields (issue #590 "cause 2"), a
+ * stream shorter than the declared length leaves the browser hanging on
+ * keep-alive framing, waiting for a tail that never arrives. That is the
+ * "download starts but never finishes" symptom. Resetting the socket on a
+ * shortfall turns that silent hang into an immediate, logged failure.
+ *
+ * The byte count lives inside a Transform, not a "data" listener on the piped
+ * stream, so it never forces the source into flowing mode and always respects
+ * backpressure: a slow or paused client is never mistaken for a stalled stream.
+ */
+function guardedDownloadStream(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  source: Readable,
+  key: string,
+  expectedBytes: number,
+): Readable {
+  let delivered = 0;
+  const counted = new Transform({
+    transform(chunk, _encoding, callback) {
+      delivered += chunk.length;
+      callback(null, chunk);
+    },
+  });
+  // pipeline() forwards a source read error into `counted` (so Fastify tears the
+  // response down instead of the client hanging on a half-sent body) and
+  // destroys both streams if the client disconnects, so no source handle leaks.
+  pipeline(source, counted, (err) => {
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    // A premature close is the normal shape of a client cancelling a download.
+    // Fastify already resets the response and logs a genuine source error; this
+    // adds the object key it omits, at warn so it stays out of error tracking.
+    if (err && code !== "ERR_STREAM_PREMATURE_CLOSE") {
+      request.log.warn({ key, err }, "Download source stream failed before completing");
+    }
+  });
+  counted.on("end", () => {
+    // A stream that ends short of the declared length is what leaves the client
+    // hanging on keep-alive framing; reset the socket so the download fails at
+    // once instead of waiting for a tail that never arrives. An over-count does
+    // not reach here (Node breaks the response as the extra bytes are written),
+    // and it fails the client on its own, so a shortfall is the only case here.
+    if (delivered < expectedBytes) {
+      request.log.error(
+        { key, declaredSize: expectedBytes, delivered },
+        "Download stream ended short of the declared Content-Length; resetting connection",
+      );
+      reply.raw.destroy();
+    }
+  });
+  return counted;
 }
 
 export async function fileRoutes(app: FastifyInstance): Promise<void> {
@@ -147,7 +204,15 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           )
           .header("Content-Range", `bytes ${start}-${clampedEnd}/${size}`)
           .header("Content-Length", String(clampedEnd - start + 1))
-          .send(await getObjectStream(key, { start, end: clampedEnd }));
+          .send(
+            guardedDownloadStream(
+              request,
+              reply,
+              await getObjectStream(key, { start, end: clampedEnd }),
+              key,
+              clampedEnd - start + 1,
+            ),
+          );
       }
 
       reply
@@ -157,7 +222,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         )
         .header("Content-Length", String(size));
-      return reply.send(await getObjectStream(key));
+      return reply.send(
+        guardedDownloadStream(request, reply, await getObjectStream(key), key, size),
+      );
     },
   );
 
