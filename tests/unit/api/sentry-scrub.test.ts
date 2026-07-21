@@ -133,4 +133,69 @@ describe("buildBeforeSend (api)", () => {
     expect(() => send({} as AnyEvent, {})).not.toThrow();
     expect(() => send(evt({ exception: { values: null } }), {})).not.toThrow();
   });
+
+  // Stackless uncaught errors (a non-Error throw/rejection, or a stripped stack)
+  // arrive as a bare "Error" with no frames, so Sentry collapses every distinct
+  // one into a single ungroupable issue (NODE-1Y). Group them by safe identity.
+  const frameless = (msg: string, hint: AnyEvent, over: AnyEvent = {}) =>
+    send(evt({ exception: { values: [{ type: "Error", value: msg, ...over }] } }), hint)!;
+
+  it("groups stackless errors by a stable fingerprint: same message groups, different separates", () => {
+    const fp = (msg: string) => frameless(msg, { originalException: new Error(msg) }).fingerprint;
+    expect(fp("alpha")).toEqual(fp("alpha"));
+    expect(fp("alpha")).not.toEqual(fp("beta"));
+    // The message itself is never part of the fingerprint (only a one-way hash).
+    expect(JSON.stringify(fp("secret /data/user.png"))).not.toContain("secret");
+    expect(JSON.stringify(fp("secret /data/user.png"))).not.toContain("user.png");
+  });
+  it("fingerprints and tags a stackless error by its safe name and code", () => {
+    const out = frameless("x is not a function", {
+      originalException: Object.assign(new TypeError("x is not a function"), { code: "ERR_X" }),
+    });
+    expect(out.fingerprint[0]).toBe("uncaught");
+    expect(out.fingerprint[1]).toBe("TypeError");
+    expect(out.fingerprint[2]).toBe("ERR_X");
+    expect(out.tags.error_name).toBe("TypeError");
+  });
+  it("leaves framed errors on Sentry's default grouping (no custom fingerprint)", () => {
+    // evt() carries a real frame; those already group well and must be untouched.
+    const out = send(evt(), { originalException: new Error("x") })!;
+    expect(out.fingerprint).toBeUndefined();
+  });
+  it("never overrides a fingerprint already set upstream (e.g. an operational one)", () => {
+    const out = frameless(
+      "x",
+      {
+        originalException: Object.assign(new Error("x"), { code: "ENOSPC" }),
+      },
+      {},
+    );
+    // set it upstream this time:
+    const out2 = send(
+      evt({
+        exception: { values: [{ type: "Error", value: "x" }] },
+        fingerprint: ["operational", "ENOSPC"],
+      }),
+      { originalException: Object.assign(new Error("x"), { code: "ENOSPC" }) },
+    )!;
+    expect(out.fingerprint[0]).toBe("uncaught");
+    expect(out2.fingerprint).toEqual(["operational", "ENOSPC"]);
+  });
+  it("handles non-Error rejections (string, object) without throwing and still groups them", () => {
+    const s = frameless("x", { originalException: "bare string reason" });
+    expect(s.fingerprint[0]).toBe("uncaught");
+    expect(s.tags.error_name).toBe("string");
+    const o = frameless("x", { originalException: { weird: true, code: 500 } });
+    expect(o.fingerprint[0]).toBe("uncaught");
+    expect(o.fingerprint[2]).toBe("500");
+    expect(o.tags.error_name).toBe("Object");
+  });
+  it("treats an empty frames array as stackless too", () => {
+    const out = frameless(
+      "x",
+      { originalException: new Error("x") },
+      { stacktrace: { frames: [] } },
+    );
+    expect(out.fingerprint[0]).toBe("uncaught");
+  });
 });

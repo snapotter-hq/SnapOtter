@@ -84,6 +84,57 @@ function scrubBreadcrumbs(value: unknown): unknown {
   return undefined;
 }
 
+/**
+ * A non-PII type name for grouping a stackless throw. Tolerates non-Error
+ * thrown values (a rejected string or plain object), which is exactly the case
+ * that reaches Sentry frameless.
+ */
+function errorName(err: unknown): string {
+  if (err instanceof Error) return err.name || "Error";
+  if (err === null) return "null";
+  if (typeof err === "object") {
+    const n = (err as { name?: unknown }).name;
+    return typeof n === "string" && n ? n : "Object";
+  }
+  return typeof err;
+}
+
+/** The error `code` as a short safe string (e.g. ERR_FS_FILE_TOO_LARGE), or "-". */
+function errorCode(err: unknown): string {
+  const c = err && typeof err === "object" ? (err as { code?: unknown }).code : undefined;
+  return typeof c === "string" || typeof c === "number" ? String(c) : "-";
+}
+
+/**
+ * FNV-1a 32-bit hex of the error's message (or a structural stand-in for a
+ * non-Error). One-way: it separates distinct crashes for grouping without ever
+ * putting the message (which can carry paths or PII) into the fingerprint.
+ */
+function errorDigest(err: unknown): string {
+  let s = "";
+  try {
+    if (err instanceof Error) s = err.message || "";
+    else if (typeof err === "string") s = err;
+    else if (err && typeof err === "object") {
+      const m = (err as { message?: unknown }).message;
+      s =
+        typeof m === "string"
+          ? m
+          : Object.keys(err as object)
+              .sort()
+              .join(",");
+    } else s = String(err);
+  } catch {
+    s = "";
+  }
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
 export function buildBeforeSend(isActive: () => boolean) {
   let windowStart = 0;
   let sentInWindow = 0;
@@ -152,6 +203,25 @@ export function buildBeforeSend(isActive: () => boolean) {
             frame.vars = undefined;
           }
         }
+      }
+    }
+
+    // Stackless uncaught errors (a non-Error throw/rejection, or a stripped
+    // stack) arrive as a bare "Error" with no frames, so Sentry collapses every
+    // distinct one into a single ungroupable issue (NODE-1Y). When there is
+    // nothing to group on, derive a stable fingerprint from the ORIGINAL error's
+    // safe identity: type name, code, and a one-way hash of the message (never
+    // the message itself). Only frameless events, and never override a
+    // fingerprint an upstream reporter set deliberately.
+    if (Array.isArray(values) && values.length > 0 && !event.fingerprint) {
+      const last = asObj(values[values.length - 1]);
+      const frames = asObj(last?.stacktrace)?.frames;
+      if (last && !(Array.isArray(frames) && frames.length > 0)) {
+        const orig = hint?.originalException;
+        const name = errorName(orig);
+        event.fingerprint = ["uncaught", name, errorCode(orig), errorDigest(orig)];
+        if (!asObj(event.tags)) event.tags = {};
+        (event.tags as AnyEvent).error_name = name;
       }
     }
     return event;
