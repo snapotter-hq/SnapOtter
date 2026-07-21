@@ -30,11 +30,7 @@ import { afterAll } from "vitest";
 import { env } from "../../apps/api/src/config.js";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { runMigrations } from "../../apps/api/src/db/migrate.js";
-import {
-  requestCancel,
-  startCancelListener,
-  stopCancelListener,
-} from "../../apps/api/src/jobs/cancel.js";
+import { startCancelListener, stopCancelListener } from "../../apps/api/src/jobs/cancel.js";
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
@@ -45,7 +41,6 @@ import {
   ensureBuiltinRoles,
   ensureDefaultAdmin,
   ensureDefaultTeam,
-  requireAuth,
 } from "../../apps/api/src/plugins/auth.js";
 import { registerIpAllowlist } from "../../apps/api/src/plugins/ip-allowlist.js";
 import { registerMfa } from "../../apps/api/src/plugins/mfa.js";
@@ -63,6 +58,7 @@ import { registerEnterpriseRoutes } from "../../apps/api/src/routes/enterprise/i
 import { feedbackRoutes } from "../../apps/api/src/routes/feedback.js";
 import { registerFetchUrlsRoute } from "../../apps/api/src/routes/fetch-urls.js";
 import { fileRoutes } from "../../apps/api/src/routes/files.js";
+import { registerJobRoutes } from "../../apps/api/src/routes/jobs.js";
 import { registerMemeTemplates } from "../../apps/api/src/routes/meme-templates.js";
 import { registerPipelineRoutes } from "../../apps/api/src/routes/pipeline.js";
 import { preferencesRoutes } from "../../apps/api/src/routes/preferences.js";
@@ -210,6 +206,10 @@ export async function buildTestApp(): Promise<TestApp> {
   // Progress SSE routes
   await registerProgressRoutes(app);
 
+  // Job control routes (cancel) -- shares the production handler so the
+  // ownership check is exercised by integration tests, not a divergent copy.
+  registerJobRoutes(app);
+
   // API key management routes
   await apiKeyRoutes(app);
 
@@ -306,22 +306,6 @@ export async function buildTestApp(): Promise<TestApp> {
     return reply.code(ok ? 200 : 503).send({ ok, postgres, redis });
   });
 
-  // Cancel a job (authenticated)
-  app.post(
-    "/api/v1/jobs/:jobId/cancel",
-    async (
-      request: import("fastify").FastifyRequest<{ Params: { jobId: string } }>,
-      reply: import("fastify").FastifyReply,
-    ) => {
-      const user = requireAuth(request, reply);
-      if (!user) return;
-
-      const { jobId } = request.params;
-      const canceled = await requestCancel(jobId);
-      return reply.send({ canceled });
-    },
-  );
-
   // Run pre-ready hooks (test files register extra routes here)
   for (const hook of preReadyHooks) {
     await hook(app);
@@ -364,15 +348,21 @@ export async function loginAsAdmin(app: ReturnType<typeof Fastify>): Promise<str
 }
 
 /**
- * Create (idempotently) a non-admin `user`-role account and return its session
- * token. The user is created through the real admin-gated register route
- * (`POST /api/auth/register`, permission `users:manage`), so the helper proves
- * the route shape rather than poking the DB directly. The register route sets
- * `mustChangePassword: true`, which the auth middleware would otherwise turn
- * into a 403 on every non-auth API call (SKIP_MUST_CHANGE_PASSWORD defaults to
- * false in tests), so we clear that flag the same way the admin seed does.
+ * Create (idempotently) a non-admin account with the given role and return its
+ * session token together with its user id. The account is created through the
+ * real admin-gated register route (`POST /api/auth/register`, permission
+ * `users:manage`), so the helper proves the route shape rather than poking the
+ * DB directly. The register route sets `mustChangePassword: true`, which the
+ * auth middleware would otherwise turn into a 403 on every non-auth API call
+ * (SKIP_MUST_CHANGE_PASSWORD defaults to false in tests), so we clear that flag
+ * the same way the admin seed does.
  */
-export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<string> {
+export async function createUserAndLogin(
+  app: ReturnType<typeof Fastify>,
+  username: string,
+  role = "user",
+  password = "Userpass1",
+): Promise<{ token: string; userId: string }> {
   const adminToken = await loginAsAdmin(app);
 
   // Create the user. A 409 means a prior call already created it -- tolerate it.
@@ -380,7 +370,7 @@ export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<stri
     method: "POST",
     url: "/api/auth/register",
     headers: { authorization: `Bearer ${adminToken}` },
-    payload: { username: "plainuser", password: "Userpass1", role: "user" },
+    payload: { username, password, role },
   });
   if (create.statusCode !== 201 && create.statusCode !== 409) {
     throw new Error(`User create failed (${create.statusCode}): ${create.body}`);
@@ -391,18 +381,35 @@ export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<stri
   await db
     .update(schema.users)
     .set({ mustChangePassword: false })
-    .where(eq(schema.users.username, "plainuser"));
+    .where(eq(schema.users.username, username));
+
+  const [row] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.username, username));
+  if (!row) {
+    throw new Error(`User ${username} not found after create`);
+  }
 
   const res = await app.inject({
     method: "POST",
     url: "/api/auth/login",
-    payload: { username: "plainuser", password: "Userpass1" },
+    payload: { username, password },
   });
   const body = JSON.parse(res.body);
   if (!body.token) {
     throw new Error(`User login failed: ${res.body}`);
   }
-  return body.token as string;
+  return { token: body.token as string, userId: row.id };
+}
+
+/**
+ * Log in as a default non-admin `user`-role account, returning its session
+ * token. Thin wrapper over {@link createUserAndLogin} kept for existing callers.
+ */
+export async function loginAsUser(app: ReturnType<typeof Fastify>): Promise<string> {
+  const { token } = await createUserAndLogin(app, "plainuser");
+  return token;
 }
 
 /**

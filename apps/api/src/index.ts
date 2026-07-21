@@ -67,6 +67,7 @@ import { feedbackRoutes } from "./routes/feedback.js";
 import { registerFetchUrlsRoute } from "./routes/fetch-urls.js";
 import { filePreviewRoutes } from "./routes/file-preview.js";
 import { fileRoutes } from "./routes/files.js";
+import { registerJobRoutes } from "./routes/jobs.js";
 import { registerMemeTemplates } from "./routes/meme-templates.js";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { preferencesRoutes } from "./routes/preferences.js";
@@ -706,24 +707,8 @@ app.get("/api/v1/readyz", async (_request, reply) => {
   return reply.code(ok ? 200 : 503).send({ ok, postgres, redis, disk: diskOk, s3: s3Ok });
 });
 
-// Cancel a job (authenticated)
-app.post(
-  "/api/v1/jobs/:jobId/cancel",
-  { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
-  async (
-    request: import("fastify").FastifyRequest<{ Params: { jobId: string } }>,
-    reply: import("fastify").FastifyReply,
-  ) => {
-    const { requireAuth } = await import("./plugins/auth.js");
-    const user = requireAuth(request, reply);
-    if (!user) return;
-
-    const { requestCancel } = await import("./jobs/cancel.js");
-    const { jobId } = request.params;
-    const canceled = await requestCancel(jobId);
-    return reply.send({ canceled });
-  },
-);
+// Cancel a job (authenticated; owner or files:all only)
+registerJobRoutes(app);
 
 // Serve SPA in production
 if (process.env.NODE_ENV === "production") {
