@@ -2,8 +2,8 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 25 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(25);
+  it("has exactly 27 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(27);
   });
 
   it("contains the expected keys", () => {
@@ -32,6 +32,8 @@ describe("ANALYTICS_EVENTS", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("PIPELINE_TEMPLATE_SELECTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("AUTH_LOGIN");
     expect(ANALYTICS_EVENTS).toHaveProperty("AUTH_LOGIN_FAILED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_PROMPT_SHOWN");
+    expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_PROMPT_DISMISSED");
   });
 
   it("all event values are strings", () => {
@@ -66,6 +68,11 @@ describe("ANALYTICS_EVENTS", () => {
 
   it("INSTANCE_STARTED has the correct snake_case value", () => {
     expect(ANALYTICS_EVENTS.INSTANCE_STARTED).toBe("instance_started");
+  });
+
+  it("feedback prompt lifecycle events have the correct snake_case values", () => {
+    expect(ANALYTICS_EVENTS.FEEDBACK_PROMPT_SHOWN).toBe("feedback_prompt_shown");
+    expect(ANALYTICS_EVENTS.FEEDBACK_PROMPT_DISMISSED).toBe("feedback_prompt_dismissed");
   });
 
   it("all values follow snake_case convention", () => {

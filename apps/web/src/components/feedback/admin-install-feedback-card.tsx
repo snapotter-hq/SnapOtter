@@ -1,5 +1,7 @@
 import { MessageSquare } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback";
 
 interface AdminInstallFeedbackCardProps {
   visible: boolean;
@@ -15,6 +17,17 @@ export function AdminInstallFeedbackCard({
   onDismissForever,
 }: AdminInstallFeedbackCardProps) {
   const { t } = useTranslation();
+  const shownTrackedRef = useRef(false);
+
+  // Impression once the card first renders, so the settings-page install
+  // feedback has a shown-vs-acted denominator like the other surfaces.
+  useEffect(() => {
+    if (visible && !shownTrackedRef.current) {
+      shownTrackedRef.current = true;
+      trackFeedbackPromptShown("admin_installer");
+    }
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
@@ -36,14 +49,20 @@ export function AdminInstallFeedbackCard({
         </button>
         <button
           type="button"
-          onClick={onRemindLater}
+          onClick={() => {
+            trackFeedbackPromptDismissed("admin_installer", "snooze");
+            onRemindLater();
+          }}
           className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground"
         >
           {t.feedback.remindLater}
         </button>
         <button
           type="button"
-          onClick={onDismissForever}
+          onClick={() => {
+            trackFeedbackPromptDismissed("admin_installer", "dont_ask_again");
+            onDismissForever();
+          }}
           className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground"
         >
           {t.feedback.dontAskAgain}

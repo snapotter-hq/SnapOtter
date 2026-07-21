@@ -24,6 +24,14 @@ export const FEEDBACK_SURVEY_ID_VALUES = [
 ] as const;
 export type FeedbackSurveyId = (typeof FEEDBACK_SURVEY_ID_VALUES)[number];
 
+/**
+ * Settings key marking the instance's first successful processing. The worker
+ * writes it on the first completed job; the web app gates the onboarding survey
+ * on it so the survey only reaches instances that have produced a real result,
+ * not first-landing visitors. Shared so the worker and web can never drift.
+ */
+export const ONBOARDING_FIRST_PROCESSED_KEY = "onboarding.firstProcessedAt";
+
 export const FEEDBACK_SENTIMENT_VALUES = [
   "great",
   "okay",
@@ -61,6 +69,41 @@ export const FEEDBACK_USAGE_TYPE_VALUES = [
   "evaluating",
 ] as const;
 export type FeedbackUsageType = (typeof FEEDBACK_USAGE_TYPE_VALUES)[number];
+
+// The onboarding survey asks only what telemetry cannot infer. Modality
+// preference (tool_used by category) and install method (instance_started's
+// deploy_mode) are already captured by behavior, so the survey spends its
+// questions on identity, prior tool, motivation, and acquisition channel.
+
+/** "What were you using before SnapOtter?" — competitor / replacement signal. */
+export const FEEDBACK_PRIOR_TOOL_VALUES = [
+  "online_tools",
+  "desktop_apps",
+  "command_line",
+  "self_hosted",
+  "nothing",
+] as const;
+export type FeedbackPriorTool = (typeof FEEDBACK_PRIOR_TOOL_VALUES)[number];
+
+/** "Why self-host it?" — positioning / motivation signal. */
+export const FEEDBACK_SELFHOST_MOTIVATION_VALUES = [
+  "privacy_control",
+  "upload_limits",
+  "cost",
+  "offline",
+  "trying",
+] as const;
+export type FeedbackSelfHostMotivation = (typeof FEEDBACK_SELFHOST_MOTIVATION_VALUES)[number];
+
+/** "How did you hear about us?" — acquisition channel, invisible to analytics. */
+export const FEEDBACK_DISCOVERY_SOURCE_VALUES = [
+  "github",
+  "reddit_hn",
+  "search",
+  "word_of_mouth",
+  "other",
+] as const;
+export type FeedbackDiscoverySource = (typeof FEEDBACK_DISCOVERY_SOURCE_VALUES)[number];
 
 export const FEEDBACK_IMPORTANT_AREA_VALUES = [
   "images",

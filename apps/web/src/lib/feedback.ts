@@ -1,21 +1,29 @@
 import type {
+  FeedbackDiscoverySource,
   FeedbackErrorCategory,
   FeedbackFrictionArea,
   FeedbackImportantArea,
   FeedbackInstallMethod,
+  FeedbackPriorTool,
+  FeedbackSelfHostMotivation,
   FeedbackSentiment,
   FeedbackSource,
   FeedbackSurveyId,
   FeedbackType,
   FeedbackUsageType,
 } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY } from "@snapotter/shared";
+import { track } from "@/lib/analytics";
 import { apiPost } from "@/lib/api";
 
 export type {
+  FeedbackDiscoverySource,
   FeedbackErrorCategory,
   FeedbackFrictionArea,
   FeedbackImportantArea,
   FeedbackInstallMethod,
+  FeedbackPriorTool,
+  FeedbackSelfHostMotivation,
   FeedbackSentiment,
   FeedbackSource,
   FeedbackSurveyId,
@@ -50,6 +58,9 @@ export interface FeedbackPayload {
   usageType?: FeedbackUsageType;
   importantAreas?: FeedbackImportantArea[];
   frictionArea?: FeedbackFrictionArea;
+  priorTool?: FeedbackPriorTool;
+  selfHostMotivation?: FeedbackSelfHostMotivation;
+  discoverySource?: FeedbackDiscoverySource;
   errorCategory?: FeedbackErrorCategory;
 }
 
@@ -100,6 +111,35 @@ export function promptVariantForSource(source: FeedbackSource): FeedbackPromptVa
   }
 }
 
+/** How a feedback prompt was dismissed, for the feedback_prompt_dismissed event. */
+export type FeedbackDismissKind = "close" | "dont_ask_again" | "snooze";
+
+/**
+ * Fire when a feedback surface becomes visible. Paired with
+ * trackFeedbackPromptDismissed and the server-side submit event, this gives skip
+ * and completion rates a denominator instead of counting only submissions.
+ */
+export function trackFeedbackPromptShown(source: FeedbackSource): void {
+  track(ANALYTICS_EVENTS.FEEDBACK_PROMPT_SHOWN, {
+    source,
+    survey_id: surveyIdForSource(source),
+    prompt_variant: promptVariantForSource(source),
+  });
+}
+
+/** Fire when a feedback surface is dismissed without submitting. */
+export function trackFeedbackPromptDismissed(
+  source: FeedbackSource,
+  dismissKind: FeedbackDismissKind,
+): void {
+  track(ANALYTICS_EVENTS.FEEDBACK_PROMPT_DISMISSED, {
+    source,
+    survey_id: surveyIdForSource(source),
+    prompt_variant: promptVariantForSource(source),
+    dismiss_kind: dismissKind,
+  });
+}
+
 export function classifyFeedbackError(message: string | null | undefined): FeedbackErrorCategory {
   const value = (message ?? "").toLowerCase();
   if (!value) return "unknown";
@@ -146,6 +186,11 @@ export function shouldShowUsageSurvey({
   analyticsEnabled,
 }: UsageSurveyVisibilityOptions): boolean {
   if (!analyticsConfigLoaded || !analyticsEnabled || role !== "admin") return false;
+  // Hold the survey until the instance has completed its first processing (the
+  // worker writes this marker on the first successful job). Asking on an empty
+  // first-landing app yields answers from users who haven't used the product;
+  // waiting for one real result reaches an engaged admin instead.
+  if (!settings[ONBOARDING_FIRST_PROCESSED_KEY]) return false;
   return (
     !settings["onboarding.usageSurvey.answeredAt"] &&
     !settings["onboarding.usageSurvey.dismissedAt"]

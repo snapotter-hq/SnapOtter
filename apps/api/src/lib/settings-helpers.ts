@@ -16,6 +16,16 @@ export async function upsertSetting(key: string, value: string): Promise<void> {
 }
 
 /**
+ * Insert a setting only if the key does not already exist (first-write-wins).
+ * Uses ON CONFLICT DO NOTHING, so repeated calls are cheap no-ops after the
+ * first and the original value is preserved. Used for one-time markers like the
+ * instance's first successful processing that gate the onboarding survey.
+ */
+export async function setSettingIfAbsent(key: string, value: string): Promise<void> {
+  await db.insert(schema.settings).values({ key, value }).onConflictDoNothing();
+}
+
+/**
  * Read a numeric setting from the DB `settings` table.
  * Returns `defaultValue` when the key is missing, non-numeric, or on DB error.
  */

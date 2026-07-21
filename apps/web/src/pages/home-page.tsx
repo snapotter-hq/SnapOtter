@@ -11,6 +11,7 @@ import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
 import { useRecentTools } from "@/hooks/use-recent-tools.js";
 import type { FeedbackPromptVariant } from "@/lib/feedback.js";
+import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
 import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
@@ -55,9 +56,14 @@ export function HomePage() {
   const analyticsOn = analyticsConfigLoaded && analyticsConfig?.enabled === true;
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestVariant, setRequestVariant] = useState<FeedbackPromptVariant>("search-empty-v1");
+  // Tracks whether the request dialog was submitted, so closing it counts as a
+  // dismiss only when the admin abandoned it.
+  const requestSubmittedRef = useRef(false);
 
   const openRequest = useCallback((variant: FeedbackPromptVariant) => {
+    requestSubmittedRef.current = false;
     setRequestVariant(variant);
+    trackFeedbackPromptShown("search_miss");
     setRequestOpen(true);
   }, []);
 
@@ -200,7 +206,15 @@ export function HomePage() {
             source="search_miss"
             searchQuery={search}
             promptVariant={requestVariant}
-            onClose={() => setRequestOpen(false)}
+            onSubmitted={() => {
+              requestSubmittedRef.current = true;
+            }}
+            onClose={() => {
+              if (!requestSubmittedRef.current) {
+                trackFeedbackPromptDismissed("search_miss", "close");
+              }
+              setRequestOpen(false);
+            }}
           />
         </div>
       </div>

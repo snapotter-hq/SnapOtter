@@ -2,10 +2,13 @@ import {
   ANALYTICS_BAKED,
   ANALYTICS_EVENTS,
   APP_VERSION,
+  type FeedbackDiscoverySource,
   type FeedbackErrorCategory,
   type FeedbackFrictionArea,
   type FeedbackImportantArea,
   type FeedbackInstallMethod,
+  type FeedbackPriorTool,
+  type FeedbackSelfHostMotivation,
   type FeedbackSentiment,
   type FeedbackSource,
   type FeedbackSurveyId,
@@ -38,6 +41,11 @@ export interface FeedbackEventProperties {
   usage_type?: FeedbackUsageType;
   important_areas?: FeedbackImportantArea[];
   friction_area?: FeedbackFrictionArea;
+  // Onboarding survey (telemetry-blind) answers: what they used before, why they
+  // self-host, and how they found SnapOtter. See analytics/feedback.ts.
+  prior_tool?: FeedbackPriorTool;
+  selfhost_motivation?: FeedbackSelfHostMotivation;
+  discovery_source?: FeedbackDiscoverySource;
   error_category?: FeedbackErrorCategory;
 }
 
@@ -138,6 +146,9 @@ function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<st
   copyString("install_method");
   copyString("usage_type");
   copyString("friction_area");
+  copyString("prior_tool");
+  copyString("selfhost_motivation");
+  copyString("discovery_source");
   copyString("error_category");
 
   if (properties.important_areas?.length) {
