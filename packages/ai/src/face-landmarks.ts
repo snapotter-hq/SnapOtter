@@ -2,7 +2,12 @@ import { unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export interface FaceLandmarkPoint {
   x: number;
@@ -44,7 +49,7 @@ export async function detectFaceLandmarks(
 
     const result = parseStdoutJson(stdout);
     if (!result.success) {
-      throw new Error(result.error || "Face landmark detection failed");
+      throw toSidecarError(result.error, "Face landmark detection failed");
     }
 
     return {

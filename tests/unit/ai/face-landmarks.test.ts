@@ -14,7 +14,8 @@ vi.mock("node:fs/promises", () => ({
   unlink: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
+vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
 }));

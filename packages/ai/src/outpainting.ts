@@ -1,7 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export interface OutpaintOptions {
   extendTop: number;
@@ -39,7 +44,7 @@ export async function outpaint(
 
   const result = parseStdoutJson(stdout);
   if (!result.success) {
-    throw new Error(result.error || "Outpainting failed");
+    throw toSidecarError(result.error, "Outpainting failed");
   }
 
   return readFile(outputPath);

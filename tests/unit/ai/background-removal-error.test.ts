@@ -6,10 +6,14 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // `./bridge.js` import receives these stubs.
 const runPythonWithProgress = vi.fn();
 const parseStdoutJson = vi.fn();
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
-  runPythonWithProgress: (...args: unknown[]) => runPythonWithProgress(...args),
-  parseStdoutJson: (...args: unknown[]) => parseStdoutJson(...args),
-}));
+vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>();
+  return {
+    ...actual,
+    runPythonWithProgress: (...args: unknown[]) => runPythonWithProgress(...args),
+    parseStdoutJson: (...args: unknown[]) => parseStdoutJson(...args),
+  };
+});
 
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { removeBackground } from "../../../packages/ai/src/background-removal.js";

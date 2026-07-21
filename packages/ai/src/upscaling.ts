@@ -6,6 +6,7 @@ import {
   type ProgressCallback,
   parseStdoutJson,
   runPythonWithProgress,
+  toSidecarError,
 } from "./bridge.js";
 
 export interface UpscaleOptions {
@@ -53,7 +54,7 @@ export async function upscale(
 
   const result = parseStdoutJson(stdout);
   if (!result.success) {
-    throw new Error(result.error || "Upscaling failed");
+    throw toSidecarError(result.error, "Upscaling failed");
   }
 
   // Python may write to a different path when the output format changes

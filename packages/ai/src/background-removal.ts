@@ -2,9 +2,13 @@ import { randomUUID } from "node:crypto";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export interface RemoveBackgroundOptions {
   model?: string;
@@ -29,18 +33,8 @@ export function isMemoryAllocError(err: unknown): boolean {
   );
 }
 
-/**
- * Wrap a background-removal failure in a SafeError so its message survives the
- * API's Sentry scrubber, which otherwise reduces a plain Error to "Error:
- * Error". The specific sidecar reason is kept as the message (callers and the
- * existing tests rely on it, matching the ai-bridge behavior); an empty reason
- * falls back to a constant. Errors we already author (the bridge's SafeError
- * timeout/OOM) pass through unchanged so their kind is not masked.
- */
 function toBgRemovalError(reason: unknown): Error {
-  if (isSafeMessageError(reason)) return reason;
-  const message = reason instanceof Error ? reason.message : String(reason ?? "");
-  return new SafeError(message || "Background removal failed", { kind: "bug" });
+  return toSidecarError(reason, "Background removal failed");
 }
 
 export async function removeBackground(
@@ -104,7 +98,7 @@ async function runAndParse(
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {
-      throw new Error(result.error || "Background removal failed");
+      throw toBgRemovalError(result.error || "Background removal failed");
     }
     return readFile(outputPath);
   } catch (err) {

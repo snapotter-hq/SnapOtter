@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export type GifBgFormat = "webp" | "gif" | "apng";
 
@@ -103,7 +108,7 @@ export async function removeBackgroundAnimated(
     const result = parseStdoutJson(stdout);
     if (!result.success) {
       if (result.error === "canceled") throw new AnimatedRemovalCanceledError();
-      throw new Error((result.error as string) || "Animated background removal failed");
+      throw toSidecarError(result.error, "Animated background removal failed");
     }
     const buffer = await readFile(outputPath);
     return { buffer, format, contentType: FORMAT_CONTENT_TYPE[format], ext: FORMAT_EXT[format] };

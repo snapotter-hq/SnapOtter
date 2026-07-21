@@ -23,7 +23,8 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 // Mock the bridge module
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
+vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
   isGpuAvailable: vi.fn(() => false),

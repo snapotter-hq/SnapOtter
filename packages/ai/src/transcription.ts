@@ -1,4 +1,9 @@
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 /**
  * A single timed segment of transcribed speech.
@@ -38,7 +43,7 @@ export async function transcribeAudio(
 
   const result = parseStdoutJson(stdout);
   if (result.error) {
-    throw new Error(result.error);
+    throw toSidecarError(result.error, "Transcription failed");
   }
 
   // Map python segment keys {start, end, text} to {startS, endS, text}.

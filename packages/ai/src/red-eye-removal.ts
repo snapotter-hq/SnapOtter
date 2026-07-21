@@ -1,7 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export interface RedEyeRemovalOptions {
   sensitivity?: number;
@@ -38,7 +43,7 @@ export async function removeRedEye(
 
   const result = parseStdoutJson(stdout);
   if (!result.success) {
-    throw new Error(result.error || "Red eye removal failed");
+    throw toSidecarError(result.error, "Red eye removal failed");
   }
 
   const actualOutputPath = result.output_path || outputPath;

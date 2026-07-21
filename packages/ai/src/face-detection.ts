@@ -2,7 +2,12 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 export interface BlurFacesOptions {
   blurRadius?: number;
@@ -50,7 +55,7 @@ export async function blurFaces(
 
   const result = parseStdoutJson(stdout);
   if (!result.success) {
-    throw new Error(result.error || "Face detection failed");
+    throw toSidecarError(result.error, "Face detection failed");
   }
 
   const buffer = await readFile(outputPath);
@@ -79,7 +84,7 @@ export async function detectFaces(
 
     const result = parseStdoutJson(stdout);
     if (!result.success) {
-      throw new Error(result.error || "Face detection failed");
+      throw toSidecarError(result.error, "Face detection failed");
     }
 
     return {

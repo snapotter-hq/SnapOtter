@@ -27,6 +27,33 @@ describe("scrubBrowserMessage", () => {
   it("drops messages for non-native error names", () => {
     expect(scrubBrowserMessage("CustomerDataError", "contains secret.pdf")).toBeNull();
   });
+
+  // DOMExceptions report their specific name ("NotFoundError"), not
+  // "DOMException", so listing only the base name dropped the diagnostic
+  // browser message for the whole family (WEB-3/4/6 showed as
+  // "NotFoundError: NotFoundError" with no way to tell which DOM call failed).
+  it("keeps messages for specific DOMException names, still redacted", () => {
+    expect(
+      scrubBrowserMessage(
+        "NotFoundError",
+        "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
+      ),
+    ).toBe(
+      "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
+    );
+    expect(scrubBrowserMessage("InvalidStateError", "The object is in an invalid state.")).toBe(
+      "The object is in an invalid state.",
+    );
+    expect(scrubBrowserMessage("NotAllowedError", "Write permission denied.")).toBe(
+      "Write permission denied.",
+    );
+    expect(scrubBrowserMessage("NotReadableError", "error reading /Users/bob/file.png")).toBe(
+      "error reading <path>",
+    );
+    expect(scrubBrowserMessage("DataCloneError", "could not be cloned.")).toBe(
+      "could not be cloned.",
+    );
+  });
 });
 
 describe("static filter lists", () => {

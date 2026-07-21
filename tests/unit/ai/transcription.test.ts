@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
+vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
 }));

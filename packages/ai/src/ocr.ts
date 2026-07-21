@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import sharp from "sharp";
-import type { ProgressCallback } from "./bridge.js";
+import { type ProgressCallback, toSidecarError } from "./bridge.js";
 import { runOcrRuntime } from "./ocr-runtime-dispatcher.js";
 import { runAdaptiveTesseract, type TesseractLanguage } from "./tesseract.js";
 import { preparePdfOcrPages, runTesseractPdf } from "./tesseract-pdf.js";
@@ -71,7 +71,7 @@ function parseAccurateResult(resultValue: unknown, quality: OcrQuality): OcrResu
   }
   const result = resultValue as Record<string, unknown>;
   if (result.success !== true) {
-    throw new Error((result.error as string | undefined) || "OCR failed");
+    throw toSidecarError(result.error, "OCR failed");
   }
 
   const metadataValid =

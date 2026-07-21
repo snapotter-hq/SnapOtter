@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
-import { SafeError } from "@snapotter/shared";
+import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { missingBundleForScript } from "./feature-gate.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
@@ -110,6 +110,24 @@ function pythonExitError(code: number | null, signal: string | null, extracted: 
   return new SafeError(message, {
     kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
     code: `exit-${code ?? "unknown"}`,
+  });
+}
+
+/**
+ * Wrap a sidecar-reported failure (a `{success: false, error}` payload or a
+ * thrown reason) in a SafeError so its message survives the API's Sentry
+ * scrubber, which reduces a plain Error to "Error: Error" (NODE-24, NODE-2N,
+ * NODE-1R). The specific sidecar reason is kept as the message, matching
+ * pythonExitError; an empty reason falls back to the tool's constant message.
+ * Memory-allocation reasons classify as operational (the deployment's
+ * hardware), everything else as a bug. Errors we already author (the bridge's
+ * SafeError timeout/OOM) pass through unchanged so their kind is not masked.
+ */
+export function toSidecarError(reason: unknown, fallback: string): Error {
+  if (isSafeMessageError(reason)) return reason;
+  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  return new SafeError(message || fallback, {
+    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
   });
 }
 
@@ -245,11 +263,17 @@ export class PythonDispatcher {
     );
   }
 
-  /** Reject and drop the pending requests written to one child generation. */
-  private rejectPendingForGeneration(generation: number, message: string): void {
+  /**
+   * Reject and drop the pending requests written to one child generation.
+   * Always rejects with a SafeError: these rejections reach tool wrappers and
+   * (when the per-request retry cannot save them) Sentry, where a plain Error
+   * is scrubbed to "Error: Error". run()'s crash-retry matches on the exact
+   * message, so callers must keep the two dispatcher-crash messages verbatim.
+   */
+  private rejectPendingForGeneration(generation: number, error: Error): void {
     for (const [id, req] of this.pending.entries()) {
       if (req.generation !== generation) continue;
-      req.reject(new Error(message));
+      req.reject(error);
       this.pending.delete(id);
     }
   }
@@ -270,7 +294,13 @@ export class PythonDispatcher {
           console.error(
             `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
           );
-          this.rejectPendingForGeneration(gen, "Python dispatcher stdin closed unexpectedly");
+          this.rejectPendingForGeneration(
+            gen,
+            new SafeError("Python dispatcher stdin closed unexpectedly", {
+              kind: "operational",
+              code: "dispatcher-stdin-closed",
+            }),
+          );
           // An intentional shutdown() ends stdin then SIGTERMs the child,
           // which can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is
           // not a crash: counting it would let repeated legitimate restarts
@@ -387,7 +417,13 @@ export class PythonDispatcher {
           // marks the child stopped before killing it); mirrors "close".
           this.recordCrash();
         }
-        this.rejectPendingForGeneration(gen, extractPythonError(err));
+        this.rejectPendingForGeneration(
+          gen,
+          new SafeError(extractPythonError(err) || "Python dispatcher process error", {
+            kind: "operational",
+            code: err.code ?? "dispatcher-error",
+          }),
+        );
         if (this.child === proc) {
           this.child = null;
           this.childReady = false;
@@ -395,7 +431,13 @@ export class PythonDispatcher {
       });
 
       proc.on("close", (code) => {
-        this.rejectPendingForGeneration(gen, "Python dispatcher exited unexpectedly");
+        this.rejectPendingForGeneration(
+          gen,
+          new SafeError("Python dispatcher exited unexpectedly", {
+            kind: "operational",
+            code: "dispatcher-exit",
+          }),
+        );
         if (code !== 0 && !this.stoppedChildren.has(proc)) {
           this.recordCrash();
         }
@@ -488,7 +530,12 @@ export class PythonDispatcher {
       } catch {
         this.pending.delete(id);
         clearTimeout(timer);
-        rejectPromise(new Error("Python dispatcher stdin closed unexpectedly"));
+        rejectPromise(
+          new SafeError("Python dispatcher stdin closed unexpectedly", {
+            kind: "operational",
+            code: "dispatcher-stdin-closed",
+          }),
+        );
       }
     });
   }
@@ -509,7 +556,12 @@ export class PythonDispatcher {
     // when the dispatcher is down (e.g. right after a model repair). Reject
     // with the same message the dispatcher path surfaces.
     if (missingBundleForScript(scriptName)) {
-      return Promise.reject(new Error("feature_not_installed"));
+      return Promise.reject(
+        new SafeError("feature_not_installed", {
+          kind: "operational",
+          code: "feature_not_installed",
+        }),
+      );
     }
     const scriptPath = resolve(PYTHON_DIR, scriptName);
     const timeout =
@@ -566,7 +618,12 @@ export class PythonDispatcher {
           if (err.code === "ENOENT" && !isFallback) {
             trySpawn("python3", true);
           } else {
-            rejectPromise(new Error(extractPythonError(err)));
+            rejectPromise(
+              new SafeError(extractPythonError(err) || "Failed to start Python process", {
+                kind: "operational",
+                code: err.code ?? "spawn-error",
+              }),
+            );
           }
         });
 
@@ -807,7 +864,11 @@ export function runPythonWithProgress(
 // biome-ignore lint/suspicious/noExplicitAny: matches JSON.parse return type
 export function parseStdoutJson(stdout: string): any {
   const matched = stdout.match(/\{[\s\S]*\}$/);
-  if (!matched) throw new Error("No JSON response from Python script");
+  if (!matched) {
+    // SafeError so the broken-contract reason reaches Sentry instead of the
+    // scrubber's type-only "Error: Error" fallback.
+    throw new SafeError("No JSON response from Python script", { kind: "bug", code: "no-json" });
+  }
   return JSON.parse(matched[0]);
 }
 

@@ -1,7 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ProgressCallback, parseStdoutJson, runPythonWithProgress } from "./bridge.js";
+import {
+  type ProgressCallback,
+  parseStdoutJson,
+  runPythonWithProgress,
+  toSidecarError,
+} from "./bridge.js";
 
 /**
  * Inpainting backend. "fast" is the always-available LaMa ONNX path
@@ -35,7 +40,7 @@ export async function inpaint(
 
   const result = parseStdoutJson(stdout);
   if (!result.success) {
-    throw new Error(result.error || "Inpainting failed");
+    throw toSidecarError(result.error, "Inpainting failed");
   }
 
   return readFile(outputPath);

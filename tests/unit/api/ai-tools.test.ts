@@ -62,7 +62,8 @@ const {
   };
 });
 
-vi.mock("../../../packages/ai/src/bridge.js", () => ({
+vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
   runPythonWithProgress: mockRunPythonWithProgress,
   parseStdoutJson: mockParseStdoutJson,
   isGpuAvailable: mockIsGpuAvailable,
