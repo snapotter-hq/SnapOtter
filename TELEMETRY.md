@@ -41,7 +41,7 @@ Both ride `POST /api/v1/feedback` and go through `cleanFeedbackProperties()`, a 
 | Event | Fires when | Key properties |
 | --- | --- | --- |
 | `feedback_submitted` | A user submits genuine feedback (nav button, tool result, failed job, search miss, admin installer card) | `source`, `sentiment`, `feedback_type`, `message`, `survey_id`, `prompt_variant`, `tool_id`, `search_query`, `job_status`, `error_category`, `contact_ok`, and, only with consent, `contact_email` / `contact_name` / `company` |
-| `onboarding_survey_submitted` | A user completes the onboarding usage survey (`source: onboarding`) | `usage_type`, `important_areas`, `install_method`, `friction_area`, `survey_id`, `prompt_variant` |
+| `onboarding_survey_submitted` | A user completes the onboarding usage survey (`source: onboarding`) | `usage_type`, `prior_tool`, `selfhost_motivation`, `discovery_source`, `survey_id`, `prompt_variant` |
 
 The onboarding survey is a profiling questionnaire, not feedback, so it gets its own event. Splitting the two keeps onboarding responses from swamping feedback metrics.
 
@@ -68,6 +68,8 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `pipeline_saved` | A pipeline is saved | `step_count` |
 | `pipeline_template_selected` | A pipeline template is picked | `template_id` |
 | `sponsor_clicked` | The sponsor link is clicked | none |
+| `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
+| `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |
 
 ### SDK-generated events
 
