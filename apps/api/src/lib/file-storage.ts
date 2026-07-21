@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, readFile, statfs, unlink, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
 import { SafeError } from "@snapotter/shared";
@@ -90,6 +90,39 @@ function generateStoredName(originalName: string): string {
   return `${randomUUID()}${ext}`;
 }
 
+/**
+ * Reject any stored name that could escape FILES_STORAGE_PATH.
+ *
+ * Stored names are generated basenames (a UUID plus a safe extension), so a
+ * real value never contains a path separator, parent reference, NUL byte, or an
+ * absolute path. Checking that before every join keeps file access inside the
+ * storage root even when the name did not come from saveFile. The one way to
+ * plant a hostile name today is the 1.x SQLite import, which copies
+ * user_files.stored_name verbatim; without this guard a crafted name like
+ * "../../../../etc/passwd" would let the library read and delete helpers reach
+ * anything the API process can. The sibling object-storage module already
+ * applies the same containment idea to its keys.
+ */
+function assertSafeStoredName(storedName: string): void {
+  if (
+    typeof storedName !== "string" ||
+    storedName.length === 0 ||
+    storedName === "." ||
+    storedName.includes("\0") ||
+    storedName.includes("/") ||
+    storedName.includes("\\") ||
+    storedName.includes("..") ||
+    isAbsolute(storedName) ||
+    basename(storedName) !== storedName
+  ) {
+    throw new SafeError("Invalid stored file name", {
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+  }
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
 let storageReady = false;
@@ -142,6 +175,7 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
 }
 
 export async function readStoredFile(storedName: string): Promise<Buffer> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getObject(storedName);
@@ -150,6 +184,7 @@ export async function readStoredFile(storedName: string): Promise<Buffer> {
 }
 
 export async function streamStoredFile(storedName: string): Promise<Readable> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getObjectStream(storedName);
@@ -158,6 +193,7 @@ export async function streamStoredFile(storedName: string): Promise<Readable> {
 }
 
 export async function deleteStoredFile(storedName: string): Promise<void> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteObject(storedName);
@@ -171,6 +207,7 @@ export async function deleteStoredFile(storedName: string): Promise<void> {
 }
 
 export function getStoredFilePath(storedName: string): string {
+  assertSafeStoredName(storedName);
   return join(env.FILES_STORAGE_PATH, storedName);
 }
 
@@ -205,6 +242,7 @@ function thumbPath(storedName: string): string {
 }
 
 export async function getCachedThumbnail(storedName: string): Promise<Buffer | null> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getThumbnail(storedName);
@@ -217,6 +255,7 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
 }
 
 export async function saveThumbnail(storedName: string, buffer: Buffer): Promise<void> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.putThumbnail(storedName, buffer);
@@ -227,6 +266,7 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
 }
 
 export async function deleteThumbnail(storedName: string): Promise<void> {
+  assertSafeStoredName(storedName);
   if (isS3Enabled()) {
     const s3 = await getS3();
     await s3.deleteThumbnail(storedName);

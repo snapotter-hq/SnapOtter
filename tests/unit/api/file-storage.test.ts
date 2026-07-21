@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -142,6 +142,79 @@ describe("getStoredFilePath", () => {
     const { getStoredFilePath } = await importModule();
     const result = getStoredFilePath("abc-123.png");
     expect(result).toBe(join(testDir, "abc-123.png"));
+  });
+});
+
+// Regression guard for the path-traversal report: stored names are generated
+// basenames, so any separator/parent-reference/absolute name must be rejected
+// before it is joined onto FILES_STORAGE_PATH. Without the guard a poisoned
+// user_files.stored_name (planted via the 1.x SQLite import, which copies it
+// verbatim) lets these helpers read or delete files anywhere the API user can.
+describe("path traversal containment", () => {
+  const TRAVERSAL_NAMES = [
+    "../escape.txt",
+    "../../../../etc/passwd",
+    "..\\escape.txt",
+    "subdir/escape.txt",
+    "nested/../../escape.txt",
+    "..",
+    ".",
+    "/etc/passwd",
+    "with\0nul.png",
+  ];
+
+  it("readStoredFile refuses to read a file outside the storage root", async () => {
+    const { readStoredFile } = await importModule();
+    // Plant a secret directly in tmpdir, one level above testDir.
+    const secretName = `snapotter-secret-${randomUUID().slice(0, 8)}.txt`;
+    const secretPath = join(tmpdir(), secretName);
+    await writeFile(secretPath, "TOP SECRET");
+    try {
+      await expect(readStoredFile(join("..", secretName))).rejects.toThrow();
+    } finally {
+      await rm(secretPath, { force: true });
+    }
+  });
+
+  it("deleteStoredFile refuses a traversal name and leaves the outside file intact", async () => {
+    const { deleteStoredFile } = await importModule();
+    const secretName = `snapotter-secret-${randomUUID().slice(0, 8)}.txt`;
+    const secretPath = join(tmpdir(), secretName);
+    await writeFile(secretPath, "TOP SECRET");
+    try {
+      await expect(deleteStoredFile(join("..", secretName))).rejects.toThrow();
+      expect(existsSync(secretPath)).toBe(true);
+    } finally {
+      await rm(secretPath, { force: true });
+    }
+  });
+
+  it.each(TRAVERSAL_NAMES)("streamStoredFile rejects %j", async (name) => {
+    const { streamStoredFile } = await importModule();
+    await expect(streamStoredFile(name)).rejects.toThrow();
+  });
+
+  it.each(TRAVERSAL_NAMES)("getStoredFilePath rejects %j", async (name) => {
+    const { getStoredFilePath } = await importModule();
+    expect(() => getStoredFilePath(name)).toThrow();
+  });
+
+  it.each(TRAVERSAL_NAMES)("getCachedThumbnail rejects %j", async (name) => {
+    const { getCachedThumbnail } = await importModule();
+    await expect(getCachedThumbnail(name)).rejects.toThrow();
+  });
+
+  it.each(TRAVERSAL_NAMES)("deleteThumbnail rejects %j", async (name) => {
+    const { deleteThumbnail } = await importModule();
+    await expect(deleteThumbnail(name)).rejects.toThrow();
+  });
+
+  it("still serves and deletes a normally-stored file", async () => {
+    const { saveFile, readStoredFile, deleteStoredFile } = await importModule();
+    const name = await saveFile(Buffer.from("hello"), "photo.png");
+    expect((await readStoredFile(name)).toString()).toBe("hello");
+    await expect(deleteStoredFile(name)).resolves.toBeUndefined();
+    expect(existsSync(join(testDir, name))).toBe(false);
   });
 });
 
