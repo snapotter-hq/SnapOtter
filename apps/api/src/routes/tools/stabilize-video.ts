@@ -47,6 +47,20 @@ function codecForContainer(ext: string): {
   };
 }
 
+/**
+ * mp4/mov muxers write the moov atom at the end of the file by default. A
+ * progressive player (browsers, the in-app player, most mobile players) then
+ * cannot start playback or seek until the whole file is downloaded, so the
+ * stabilized result looks broken or "corrupted" on preview. +faststart moves
+ * the moov atom to the front. Mirrors convert-video / compress-video (#588).
+ */
+function faststartArgs(ext: string): string[] {
+  const lower = ext.toLowerCase();
+  return lower === ".mp4" || lower === ".m4v" || lower === ".mov"
+    ? ["-movflags", "+faststart"]
+    : [];
+}
+
 export function registerStabilizeVideo(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "stabilize-video",
@@ -98,6 +112,7 @@ export function registerStabilizeVideo(app: FastifyInstance) {
           `vidstabtransform=input=${trf}:smoothing=${settings.smoothing}`,
           ...encodeArgs,
           ...audioArgs,
+          ...faststartArgs(origExt),
           outPath,
         ],
         info.durationS,

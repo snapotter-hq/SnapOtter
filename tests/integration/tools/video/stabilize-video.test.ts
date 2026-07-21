@@ -67,7 +67,8 @@ async function resolveResult(res: Awaited<ReturnType<typeof runTool>>): Promise<
     await new Promise((r) => setTimeout(r, 500));
   }
   expect(row?.status).toBe("completed");
-  const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+  if (!row) throw new Error("job row not found after polling");
+  const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
   const dl = await testApp.app.inject({
     method: "GET",
     url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
@@ -88,6 +89,32 @@ describe.skipIf(!ffmpegAvailable())("stabilize-video (requires ffmpeg)", () => {
     const info = await probeMedia(probeFile);
     const v = info.streams.find((s) => s.type === "video");
     expect(v).toBeDefined();
+  }, 120_000);
+
+  it("produces a faststart mp4 with the moov atom before mdat", async () => {
+    const res = await runTool({});
+    const { downloadPayload } = await resolveResult(res);
+
+    const moov = downloadPayload.indexOf("moov");
+    const mdat = downloadPayload.indexOf("mdat");
+    expect(moov).toBeGreaterThanOrEqual(0);
+    expect(mdat).toBeGreaterThanOrEqual(0);
+    // Without -movflags +faststart the moov atom lands after mdat, so browsers
+    // and mobile players cannot start progressive playback and report the file
+    // as broken until it is fully downloaded (issue #588).
+    expect(moov).toBeLessThan(mdat);
+  }, 120_000);
+
+  it("keeps the audio stream intact through stabilization", async () => {
+    const res = await runTool({});
+    const { downloadPayload } = await resolveResult(res);
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "stab-audio-"));
+    const probeFile = join(tmpDir, "stabilized.mp4");
+    writeFileSync(probeFile, downloadPayload);
+    const info = await probeMedia(probeFile);
+    // The tiny fixture carries an audio track; a mux mismatch would drop it.
+    expect(info.streams.some((s) => s.type === "audio")).toBe(true);
   }, 120_000);
 
   it("rejects smoothing out of range with 400", async () => {
