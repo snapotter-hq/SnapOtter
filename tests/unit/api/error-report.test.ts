@@ -99,6 +99,18 @@ describe("classifyError", () => {
     expect(classifyError(e, "http")).toBe("expected");
     expect(classifyError(e)).toBe("expected");
   });
+  it("operational: a BullMQ UnrecoverableError (stalled/lock-lost job) is a strained instance, not our bug", () => {
+    // BullMQ raises UnrecoverableError from its own worker loop when a job loses
+    // its lock (a stall), e.g. a heavy `upscale` under CPU/memory pressure. We
+    // never throw it ourselves, so it always means the instance could not keep
+    // the job's lock alive -- environmental, worth one warning/hour not bug spam
+    // (NODE-27). A ReplyError (a real Redis command failure) stays a bug.
+    const stalled = Object.assign(new Error("Missing lock for job 42. moveToFinished"), {
+      name: "UnrecoverableError",
+    });
+    expect(classifyError(stalled, "worker")).toBe("operational");
+    expect(classifyError(stalled)).toBe("operational");
+  });
 });
 
 describe("throttle", () => {

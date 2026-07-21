@@ -64,6 +64,12 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
     // a worker-side ZodError is schema drift (our bug); only expected on http.
     if (e?.name === "ZodError") return "expected";
   }
+  // BullMQ raises UnrecoverableError from its own worker run loop when a job
+  // loses its lock (a stall), e.g. a heavy upscale under CPU/memory pressure.
+  // We never throw it ourselves, so it always means the instance could not keep
+  // the job's lock alive: an environmental strain, not a defect in our code.
+  // Operational (one warning/hour) instead of bug spam (NODE-27).
+  if (e?.name === "UnrecoverableError") return "operational";
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
