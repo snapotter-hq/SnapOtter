@@ -120,13 +120,13 @@ describe("API docs", () => {
     const deployment = readFileSync(join(root, "apps/docs/guide/deployment.md"), "utf8");
     const architecture = readFileSync(join(root, "apps/docs/guide/architecture.md"), "utf8");
 
-    expect(gettingStarted).toContain("| **Image** | 106 |");
+    expect(gettingStarted).toContain("| **Image** | 107 |");
     expect(gettingStarted).toContain("| **Video** | 57 |");
     expect(gettingStarted).toContain("| **Audio** | 27 |");
     expect(gettingStarted).toContain("| **PDF / Document** | 42 |");
     expect(gettingStarted).toContain("| **Files** | 10 |");
     expect(deployment).not.toContain("All 138 non-AI tools");
-    expect(architecture).toContain("242 tool routes");
+    expect(architecture).toContain("243 tool routes");
   });
 
   it("serves an LLM summary with live catalog tools", async () => {
@@ -136,7 +136,7 @@ describe("API docs", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("## Tools");
-    expect(res.body).toContain("- Image (106 tools)");
+    expect(res.body).toContain("- Image (107 tools)");
     expect(res.body).toContain("Resize Image - Resize by pixels");
     expect(res.body).toContain("Sign PDF -");
   });

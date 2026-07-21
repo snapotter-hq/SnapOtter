@@ -11822,6 +11822,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
+  /api/v1/tools/image/rounded-crop:
+    post:
+      operationId: roundedCrop
+      tags: [Tools]
+      summary: Rounded crop
+      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `shape` (string, default "rounded-square") - "rounded-square" or "squircle"
+                    - `cornerRadius` (number 0-50, default 25) - Corner radius as a percent of the shorter side (rounded-square only)
+                    - `zoom` (number 1-5, default 1) - Zoom factor (>=1 crops tighter)
+                    - `offsetX` (number 0-1, default 0.5) - Horizontal center position
+                    - `offsetY` (number 0-1, default 0.5) - Vertical center position
+                    - `borderWidth` (integer 0-200, default 0) - Border width in pixels
+                    - `borderColor` (string, default "#ffffff") - Border hex color
+                    - `background` (string, default "transparent") - "transparent" or a hex color for corners
+                    - `outputSize` (integer 16-4096, optional) - Final square dimension in pixels
+      responses:
+        "200":
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
   /api/v1/tools/image/duotone:
     post:
       operationId: duotone
