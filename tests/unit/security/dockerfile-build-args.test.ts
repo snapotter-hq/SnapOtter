@@ -150,4 +150,22 @@ describe("Dockerfile build args", () => {
       expect(Number(fallback?.[1])).toBeGreaterThanOrEqual(dockerfileDefault);
     }
   });
+
+  it("targets the app database (not the role) in the compose Postgres healthchecks", () => {
+    // pg_isready with no -d defaults the probe database to the username. When
+    // POSTGRES_USER and POSTGRES_DB differ, the healthcheck silently keeps
+    // reporting healthy while its underlying query fails, and Postgres logs
+    // `FATAL: database "<user>" does not exist` on a loop. Pin the probe to
+    // POSTGRES_DB so it fails loudly when the database is genuinely missing.
+    for (const [name, compose] of [
+      ["docker-compose.yml", composeCpu],
+      ["docker-compose-gpu.yml", composeGpu],
+    ] as const) {
+      const line = compose.split(/\r?\n/).find((l) => l.includes("pg_isready"));
+      expect(line, `${name} should have a pg_isready healthcheck`).toBeDefined();
+      expect(line, `${name} pg_isready must target POSTGRES_DB with -d`).toContain(
+        "-d ${POSTGRES_DB",
+      );
+    }
+  });
 });

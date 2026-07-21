@@ -75,6 +75,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
+      # Change this for any non-local deployment.
       POSTGRES_PASSWORD: snapotter
       POSTGRES_DB: snapotter
     volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]

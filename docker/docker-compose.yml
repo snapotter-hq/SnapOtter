@@ -114,7 +114,7 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-snapotter}
-      # Set a strong password -- CHANGE THIS for any non-local deployment.
+      # Set a strong password. CHANGE THIS for any non-local deployment.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}
       POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
@@ -122,7 +122,7 @@ services:
     restart: unless-stopped
     mem_limit: 1g
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
