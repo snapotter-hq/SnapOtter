@@ -144,4 +144,13 @@ describe("timeoutMessage", () => {
     expect(msg).toMatch(/CPU/);
     expect(msg).toMatch(/GPU/);
   });
+
+  it("survives friendlyError (single line, at most 280 chars)", () => {
+    // friendlyError collapses any message over 280 chars or more than 3 lines
+    // to a generic "Processing failed" sentence, which would hide this guidance.
+    // Use the longest realistic timeout (JOB_TIMEOUT_LONG_S default of 2h).
+    const msg = timeoutMessage(7_200_000);
+    expect(msg.length).toBeLessThanOrEqual(280);
+    expect(msg.split("\n")).toHaveLength(1);
+  });
 });
