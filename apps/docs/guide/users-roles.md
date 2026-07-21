@@ -79,12 +79,12 @@ All 17 permissions. Full control over the instance.
 | `pipelines:all` | View and manage all users' pipelines |
 | `settings:read` | View instance settings |
 | `settings:write` | Modify instance settings |
-| `users:manage` | Create, update, and delete user accounts |
+| `users:manage` | Create and manage user accounts within the actor's authority boundary |
 | `teams:manage` | Create, update, and delete teams |
 | `features:manage` | Install and manage AI feature bundles |
 | `system:health` | Access health and readiness endpoints |
 | `audit:read` | View the audit log and list roles |
-| `compliance:manage` | Manage GDPR lifecycle and compliance features |
+| `compliance:manage` | Manage GDPR lifecycle and compliance features; destructive user operations remain authority-bounded |
 | `webhooks:manage` | Configure outbound webhooks |
 | `security:manage` | Manage security settings (IP allowlist, SSO enforcement) |
 
@@ -107,15 +107,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Role names must be 2-30 characters, lowercase alphanumeric with hyphens and underscores.
 
-### Admin-reserved permissions {#admin-reserved-permissions}
+### Delegated administration boundaries {#delegated-administration-boundaries}
 
-Three permissions are reserved for built-in roles and cannot be assigned to custom roles:
+All 17 permissions can be delegated through custom roles, but an administrative permission does not make that role equivalent to the built-in `admin` role. User mutations authorized by `users:manage`, destructive operations authorized by `compliance:manage`, and custom-role management authorized by `security:manage` are bounded by the actor's current authority:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Built-in roles follow `admin` > `editor` > `user`; custom roles are below built-in roles.
+- The target's permissions must be contained by the actor's **effective** permissions. A scoped API key therefore cannot exercise permissions omitted from its scope.
+- A target role's tool access must be contained by the actor's own tool access.
+- A disabled account is checked against its original role when that role is recorded as `disabled:<original-role>`.
+- Deleting a custom role also requires authority to assign the built-in `user` fallback; disabled members remain disabled as `disabled:user`.
 
-The roles API rejects any request that includes these permissions. Only the built-in `admin` role has access to them.
+Global credentials and configuration are stricter: issuing or revoking the SCIM token and importing instance configuration require the built-in `admin` role with complete effective admin authority.
 
 ### Tool-level permissions {#tool-level-permissions}
 

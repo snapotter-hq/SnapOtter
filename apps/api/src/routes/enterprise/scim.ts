@@ -1,12 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
-import { requirePermission } from "../../permissions.js";
+import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
+
+const SCIM_TOKEN_PREFIX = "so_scim_v2_";
+const SCIM_TOKEN_SUFFIX_PATTERN = /^[0-9a-f]{64}$/;
 
 // ── SCIM Error Format ────────────────────────────────────────────
 
@@ -16,6 +19,45 @@ function scimError(status: number, detail: string) {
     detail,
     status,
   };
+}
+
+async function rejectLastActiveAdminDeactivation(
+  user: { role: string },
+  reply: FastifyReply,
+): Promise<boolean> {
+  if (user.role !== "admin") return false;
+
+  const [result] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.users)
+    .where(eq(schema.users.role, "admin"));
+  if (result && result.count <= 1) {
+    reply.status(409).send(scimError(409, "Cannot deactivate the last active administrator"));
+    return true;
+  }
+
+  return false;
+}
+
+function scimActiveValue(value: unknown): boolean {
+  return value === true || value === "true" || value === "True";
+}
+
+const DISABLED_ROLE_PREFIX = "disabled:";
+
+function restoredScimRole(role: string): string {
+  let restoredRole = role;
+  while (restoredRole.startsWith(DISABLED_ROLE_PREFIX)) {
+    restoredRole = restoredRole.slice(DISABLED_ROLE_PREFIX.length);
+  }
+
+  // Legacy bare or empty disabled markers did not retain an original role.
+  return restoredRole && restoredRole !== "disabled" ? restoredRole : "user";
+}
+
+function canonicalDisabledScimRole(role: string): string {
+  const activeRole = isDisabledRole(role) ? restoredScimRole(role) : role;
+  return `${DISABLED_ROLE_PREFIX}${activeRole || "user"}`;
 }
 
 // ── SCIM Bearer Token Auth ───────────────────────────────────────
@@ -28,6 +70,17 @@ async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<b
   }
 
   const token = authHeader.slice(7);
+  // Tokens issued before the full-admin boundary were unversioned. Reject
+  // them before password verification so upgrading invalidates every legacy
+  // global provisioning credential, even if its hash is still persisted.
+  if (
+    !token.startsWith(SCIM_TOKEN_PREFIX) ||
+    !SCIM_TOKEN_SUFFIX_PATTERN.test(token.slice(SCIM_TOKEN_PREFIX.length))
+  ) {
+    reply.status(401).send(scimError(401, "Invalid token"));
+    return false;
+  }
+
   const tokenHash = await getSettingString("scim_token_hash", "");
   if (!tokenHash) {
     reply.status(401).send(scimError(401, "SCIM not configured"));
@@ -186,11 +239,10 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = await requirePermission("users:manage")(request, reply);
-      if (!user) return;
+      if (!(await requireFullAdmin(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
 
-      const token = randomBytes(32).toString("hex");
+      const token = `${SCIM_TOKEN_PREFIX}${randomBytes(32).toString("hex")}`;
       const hash = await hashPassword(token);
       await upsertSetting("scim_token_hash", hash);
 
@@ -213,8 +265,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = await requirePermission("users:manage")(request, reply);
-      if (!user) return;
+      if (!(await requireFullAdmin(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
 
       await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
@@ -503,6 +554,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const active = body.active !== false;
       const emails = body.emails as Array<{ value: string; primary?: boolean }> | undefined;
 
+      if (!active && (await rejectLastActiveAdminDeactivation(existing, reply))) return;
+
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
       if (userName && userName !== existing.username) {
@@ -527,14 +580,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Handle active/deactivation (preserve original role through disable/enable cycle)
-      if (active && existing.role.startsWith("disabled:")) {
-        updates.role = existing.role.slice("disabled:".length);
-      } else if (active && existing.role === "disabled") {
-        updates.role = "user"; // fallback when no previous role stored
-      } else if (!active && !existing.role.startsWith("disabled")) {
-        updates.role = `disabled:${existing.role}`;
-        // Revoke all sessions on deactivation
-        await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      if (active && isDisabledRole(existing.role)) {
+        updates.role = restoredScimRole(existing.role);
+      } else if (!active) {
+        updates.role = canonicalDisabledScimRole(existing.role);
+        if (!isDisabledRole(existing.role)) {
+          // Revoke all sessions when transitioning from active to disabled.
+          await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+        }
       }
 
       await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
@@ -586,6 +639,19 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       };
 
       const operations = body.Operations ?? [];
+      const deactivatesUser = operations.some((op) => {
+        const opType = op.op.toLowerCase();
+        if (opType !== "replace" && opType !== "add") return false;
+        if (op.path === "active") return !scimActiveValue(op.value);
+        if (!op.path && typeof op.value === "object" && op.value !== null && "active" in op.value) {
+          return !scimActiveValue((op.value as Record<string, unknown>).active);
+        }
+        return false;
+      });
+      if (deactivatesUser && (await rejectLastActiveAdminDeactivation(existing, reply))) {
+        return;
+      }
+
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
       for (const op of operations) {
@@ -601,14 +667,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           ) {
             const activeVal =
               op.path === "active" ? op.value : (op.value as Record<string, unknown>).active;
-            const active = activeVal === true || activeVal === "true" || activeVal === "True";
-            if (active && existing.role.startsWith("disabled:")) {
-              updates.role = existing.role.slice("disabled:".length);
-            } else if (active && existing.role === "disabled") {
-              updates.role = "user"; // fallback when no previous role stored
-            } else if (!active && !existing.role.startsWith("disabled")) {
-              updates.role = `disabled:${existing.role}`;
-              await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+            const active = scimActiveValue(activeVal);
+            if (active && isDisabledRole(existing.role)) {
+              updates.role = restoredScimRole(existing.role);
+            } else if (!active) {
+              updates.role = canonicalDisabledScimRole(existing.role);
+              if (!isDisabledRole(existing.role)) {
+                await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+              }
             }
           }
 
@@ -683,11 +749,13 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "User not found"));
       }
 
+      if (await rejectLastActiveAdminDeactivation(user, reply)) return;
+
       // Soft-delete: preserve original role so reactivation can restore it
       await db
         .update(schema.users)
         .set({
-          role: `disabled:${user.role}`,
+          role: canonicalDisabledScimRole(user.role),
           passwordHash: null,
           updatedAt: new Date(),
         })

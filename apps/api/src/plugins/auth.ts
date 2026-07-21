@@ -13,6 +13,7 @@ import { authAttempts } from "../lib/metrics.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
 import {
   canAssignRole,
+  canManageTargetRole,
   getPermissions,
   isDisabledRole,
   requirePermission,
@@ -760,19 +761,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    // Escalation prevention
-    const roleHierarchy: Record<string, number> = { admin: 3, editor: 2, user: 1 };
-    const actorLevel = roleHierarchy[admin.role] ?? 0;
-    const targetLevel = roleHierarchy[role] ?? 0;
-    if (targetLevel > actorLevel) {
-      return reply.status(403).send({
-        error: "Cannot create a user with a higher role than your own",
-        code: "ESCALATION_DENIED",
-      });
-    }
     if (!(await canAssignRole(admin, role))) {
       return reply.status(403).send({
-        error: "Cannot create a user with permissions you don't have",
+        error: "Cannot create a user beyond your role authority",
         code: "ESCALATION_DENIED",
       });
     }
@@ -880,6 +871,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
       }
 
+      if (!(await canManageTargetRole(admin, user.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
       const updates: { role?: string; team?: string; updatedAt: Date } = {
         updatedAt: new Date(),
       };
@@ -891,18 +889,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           : await db.select().from(schema.roles).where(eq(schema.roles.name, body.role));
         const isValid = validBuiltinRoles.includes(body.role) || customRoleRow;
         if (isValid) {
-          const roleHierarchy: Record<string, number> = { admin: 3, editor: 2, user: 1 };
-          const actorLevel = roleHierarchy[admin.role] ?? 0;
-          const targetLevel = roleHierarchy[body.role] ?? 0;
-          if (targetLevel > actorLevel) {
-            return reply.status(403).send({
-              error: "Cannot assign a role higher than your own",
-              code: "ESCALATION_DENIED",
-            });
-          }
           if (!(await canAssignRole(admin, body.role))) {
             return reply.status(403).send({
-              error: "Cannot assign a role with permissions you don't have",
+              error: "Cannot assign a role beyond your role authority",
               code: "ESCALATION_DENIED",
             });
           }
@@ -1001,6 +990,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
       }
 
+      if (!(await canManageTargetRole(admin, user.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
       if (!user.passwordHash) {
         return reply.status(400).send({
           error: "Cannot reset password for OIDC user.",
@@ -1051,6 +1047,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (!user) {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
+
+      if (!(await canManageTargetRole(admin, user.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
       }
 
       // Delete associated sessions

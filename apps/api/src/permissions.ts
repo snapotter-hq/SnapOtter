@@ -36,23 +36,72 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   user: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
 };
 
-export async function getPermissions(role: Role | string): Promise<Permission[]> {
-  if (typeof role !== "string" || isDisabledRole(role)) return [];
+export const ROLE_HIERARCHY: Record<Role, number> = {
+  admin: 3,
+  editor: 2,
+  user: 1,
+};
+
+export interface RoleToolPermissions {
+  mode: string;
+  allowed: string[];
+}
+
+interface ValidRoleToolPermissions extends RoleToolPermissions {
+  mode: "category" | "tool";
+}
+
+interface RoleDefinition {
+  permissions: Permission[];
+  toolPermissions: ValidRoleToolPermissions | null;
+}
+
+function isValidRoleToolPermissions(value: unknown): value is ValidRoleToolPermissions | null {
+  if (value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.mode === "category" || candidate.mode === "tool") &&
+    Array.isArray(candidate.allowed) &&
+    candidate.allowed.every((allowed) => typeof allowed === "string")
+  );
+}
+
+async function getRoleDefinition(role: string): Promise<RoleDefinition | null> {
+  if (isDisabledRole(role)) return null;
   if (role in ROLE_PERMISSIONS) {
-    return ROLE_PERMISSIONS[role as Role];
+    return {
+      permissions: ROLE_PERMISSIONS[role as Role],
+      toolPermissions: null,
+    };
   }
+
   try {
     const [customRole] = await db
-      .select()
+      .select({
+        permissions: schema.roles.permissions,
+        toolPermissions: schema.roles.toolPermissions,
+      })
       .from(schema.roles)
-      .where(eq(schema.roles.name, role as string));
-    if (customRole) {
-      return customRole.permissions as Permission[];
-    }
+      .where(eq(schema.roles.name, role))
+      .limit(1);
+    if (!customRole) return null;
+    if (!isValidRoleToolPermissions(customRole.toolPermissions)) return null;
+
+    return {
+      permissions: customRole.permissions as Permission[],
+      toolPermissions: customRole.toolPermissions,
+    };
   } catch {
-    // DB not yet available during early startup
+    // Fail closed when role data is unavailable.
+    return null;
   }
-  return [];
+}
+
+export async function getPermissions(role: Role | string): Promise<Permission[]> {
+  if (typeof role !== "string") return [];
+  return (await getRoleDefinition(role))?.permissions ?? [];
 }
 
 export async function hasPermission(role: Role | string, permission: Permission): Promise<boolean> {
@@ -92,13 +141,194 @@ export async function permissionsNotHeldBy(
   );
 }
 
+function getRoleLevel(role: string): number {
+  return ROLE_HIERARCHY[role as Role] ?? 0;
+}
+
+function normalizeManagedRole(role: string): string {
+  let managedRole = role;
+  while (managedRole.startsWith("disabled:")) {
+    managedRole = managedRole.slice("disabled:".length);
+  }
+
+  // Legacy bare markers and malformed empty/nested markers have lost their
+  // original authority context. Treat them as admin so target checks fail
+  // closed for every non-admin actor.
+  return managedRole && managedRole !== "disabled" ? managedRole : "admin";
+}
+
+async function isPerToolPermissionEnforced(): Promise<boolean> {
+  try {
+    const { isFeatureEnabled } = await import("@snapotter/enterprise");
+    return isFeatureEnabled("per_tool_permissions");
+  } catch {
+    return false;
+  }
+}
+
+async function toolPermissionAllows(
+  toolPermissions: RoleToolPermissions | null,
+  toolId: string,
+  perToolPermissionEnforced: boolean,
+): Promise<boolean> {
+  if (!toolPermissions) return true;
+
+  if (toolPermissions.mode === "category") {
+    const { TOOLS } = await import("@snapotter/shared");
+    const tool = TOOLS.find((candidate) => candidate.id === toolId);
+    if (!tool) return false;
+    return toolPermissions.allowed.includes(tool.modality ?? tool.category);
+  }
+
+  if (toolPermissions.mode === "tool") {
+    // Preserve the historical graceful degradation behavior: without the
+    // enterprise feature, per-tool restrictions behave as unrestricted.
+    if (!perToolPermissionEnforced) return true;
+    return toolPermissions.allowed.includes(toolId);
+  }
+
+  return true;
+}
+
+async function isToolScopeContained(
+  actorToolPermissions: RoleToolPermissions | null,
+  targetToolPermissions: RoleToolPermissions | null,
+): Promise<boolean> {
+  if (!actorToolPermissions) return true;
+
+  const perToolPermissionEnforced = await isPerToolPermissionEnforced();
+  if (actorToolPermissions.mode === "tool" && !perToolPermissionEnforced) return true;
+  if (!targetToolPermissions) return false;
+  if (targetToolPermissions.mode === "tool" && !perToolPermissionEnforced) return false;
+
+  const actorMode = actorToolPermissions.mode;
+  const targetMode = targetToolPermissions.mode;
+  const validModes = new Set(["category", "tool"]);
+  if (!validModes.has(actorMode)) return true;
+  if (!validModes.has(targetMode)) return false;
+
+  if (actorMode === targetMode) {
+    const actorAllowed = new Set(actorToolPermissions.allowed);
+    return targetToolPermissions.allowed.every((allowed) => actorAllowed.has(allowed));
+  }
+
+  // A category grant is open-ended: future tools in that category are also
+  // allowed. A finite per-tool allowlist therefore cannot contain it safely.
+  if (targetMode === "category") return false;
+
+  const { TOOLS } = await import("@snapotter/shared");
+  const actorAllowed = new Set(actorToolPermissions.allowed);
+  return targetToolPermissions.allowed.every((toolId) => {
+    const tool = TOOLS.find((candidate) => candidate.id === toolId);
+    return tool ? actorAllowed.has(tool.modality ?? tool.category) : false;
+  });
+}
+
+async function canControlRoleDefinition(
+  actor: AuthUser,
+  targetRole: string,
+  targetDefinition: RoleDefinition,
+): Promise<boolean> {
+  if (isDisabledRole(actor.role)) return false;
+  if (getRoleLevel(targetRole) > getRoleLevel(actor.role)) return false;
+
+  const actorDefinition = await getRoleDefinition(actor.role);
+  if (!actorDefinition) return false;
+
+  const actorPermissions = new Set(
+    actor.apiKeyPermissions
+      ? actorDefinition.permissions.filter((permission) =>
+          actor.apiKeyPermissions?.includes(permission),
+        )
+      : actorDefinition.permissions,
+  );
+  if (!targetDefinition.permissions.every((permission) => actorPermissions.has(permission))) {
+    return false;
+  }
+
+  if (
+    targetDefinition.permissions.includes("tools:use") &&
+    !(await isToolScopeContained(actorDefinition.toolPermissions, targetDefinition.toolPermissions))
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function canAssignRole(actor: AuthUser, targetRole: string): Promise<boolean> {
   if (isDisabledRole(targetRole)) return false;
-  const targetPermissions = await getPermissions(targetRole);
-  if (targetPermissions.length === 0) return false;
+  const targetDefinition = await getRoleDefinition(targetRole);
+  if (!targetDefinition || targetDefinition.permissions.length === 0) return false;
 
-  const actorPermissions = new Set(await getEffectivePermissions(actor));
-  return targetPermissions.every((permission) => actorPermissions.has(permission));
+  return canControlRoleDefinition(actor, targetRole, targetDefinition);
+}
+
+export async function canManageTargetRole(actor: AuthUser, targetRole: string): Promise<boolean> {
+  const managedRole = normalizeManagedRole(targetRole);
+  const targetDefinition = await getRoleDefinition(managedRole);
+  if (!targetDefinition) return false;
+
+  return canManageRoleDefinition(
+    actor,
+    managedRole,
+    targetDefinition.permissions,
+    targetDefinition.toolPermissions,
+  );
+}
+
+export async function canManageRoleDefinition(
+  actor: AuthUser,
+  targetRole: string,
+  permissions: readonly string[],
+  toolPermissions: RoleToolPermissions | null,
+): Promise<boolean> {
+  if (!isValidRoleToolPermissions(toolPermissions)) return false;
+  return canControlRoleDefinition(actor, targetRole, {
+    permissions: permissions as Permission[],
+    toolPermissions,
+  });
+}
+
+export async function canGrantRoleDefinition(
+  actor: AuthUser,
+  permissions: readonly string[],
+  toolPermissions: RoleToolPermissions | null,
+): Promise<boolean> {
+  if (!isValidRoleToolPermissions(toolPermissions)) return false;
+  return canControlRoleDefinition(actor, "custom", {
+    permissions: permissions as Permission[],
+    toolPermissions,
+  });
+}
+
+/**
+ * Global authority is reserved for the built-in admin role with its complete
+ * effective permission set. API-key scopes are part of the containment check,
+ * so a key that omits any admin permission cannot cross this boundary.
+ */
+export async function isFullEffectiveAdmin(actor: AuthUser): Promise<boolean> {
+  if (actor.role !== "admin") return false;
+  return canManageTargetRole(actor, "admin");
+}
+
+export async function requireFullAdmin(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<AuthUser | null> {
+  const user = getAuthUser(request);
+  if (!user) {
+    reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    return null;
+  }
+  if (!(await isFullEffectiveAdmin(user))) {
+    reply.status(403).send({
+      error: "Full administrator authority required",
+      code: "ESCALATION_DENIED",
+    });
+    return null;
+  }
+  return user;
 }
 
 export function requirePermission(
@@ -119,48 +349,15 @@ export function requirePermission(
 }
 
 export async function hasToolAccess(role: string, toolId: string): Promise<boolean> {
-  if (isDisabledRole(role)) return false;
+  const roleDefinition = await getRoleDefinition(role);
+  if (!roleDefinition) return false;
+  if (!roleDefinition.toolPermissions) return true;
 
-  // Built-in roles have no tool restrictions
-  if (role in ROLE_PERMISSIONS) return true;
-
-  try {
-    const [roleRow] = await db
-      .select({ toolPermissions: schema.roles.toolPermissions })
-      .from(schema.roles)
-      .where(eq(schema.roles.name, role))
-      .limit(1);
-
-    // Unknown custom roles do not get implicit access. Known custom roles with
-    // no per-tool restriction keep the historical "all tools" behavior.
-    if (!roleRow) return false;
-    if (!roleRow.toolPermissions) return true;
-
-    const tp = roleRow.toolPermissions;
-
-    if (tp.mode === "category") {
-      const { TOOLS } = await import("@snapotter/shared");
-      const tool = TOOLS.find((t) => t.id === toolId);
-      if (!tool) return false;
-      return tp.allowed.includes(tool.modality ?? tool.category);
-    }
-
-    if (tp.mode === "tool") {
-      // Per-tool mode requires enterprise license
-      let isEnterprise = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        isEnterprise = isFeatureEnabled("per_tool_permissions");
-      } catch {}
-
-      if (!isEnterprise) return true; // Graceful degradation -- no enterprise = allow all
-      return tp.allowed.includes(toolId);
-    }
-
-    return true; // Unknown mode = allow
-  } catch {
-    return false;
-  }
+  return toolPermissionAllows(
+    roleDefinition.toolPermissions,
+    toolId,
+    roleDefinition.toolPermissions.mode === "tool" ? await isPerToolPermissionEnforced() : false,
+  );
 }
 
 export async function hasEffectiveToolAccess(user: AuthUser, toolId: string): Promise<boolean> {

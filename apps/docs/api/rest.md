@@ -57,16 +57,16 @@ Keys are prefixed `si_` and stored as scrypt hashes - the raw key is shown once 
 | `GET` | `/api/auth/session` | Auth | Validate current session |
 | `POST` | `/api/auth/change-password` | Auth | Change own password (invalidates all other sessions + API keys) |
 | `GET` | `/api/auth/users` | Admin | List all users |
-| `POST` | `/api/auth/register` | Admin | Create a new user |
-| `PUT` | `/api/auth/users/:id` | Admin | Update user role or team |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Reset user's password |
-| `DELETE` | `/api/auth/users/:id` | Admin | Delete a user |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; proposed-role authority) | Create a new user |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; target authority) | Update user role or team |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; target authority) | Reset user's password |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; target authority) | Delete a user |
 | `GET` | `/api/v1/config/auth` | Public | Check if authentication is enabled (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Start TOTP MFA enrollment. Requires the enterprise `mfa` feature |
 | `POST` | `/api/auth/mfa/verify` | Auth | Confirm MFA enrollment with a TOTP code |
 | `POST` | `/api/auth/mfa/complete` | Public | Complete a pending MFA login challenge |
 | `POST` | `/api/auth/mfa/disable` | Auth | Disable MFA for the current user |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Reset MFA for a user |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; target authority) | Reset MFA for a user |
 | `GET` | `/api/auth/oidc/login` | Public | Start OIDC login when OIDC is enabled |
 | `GET` | `/api/auth/oidc/callback` | Public | OIDC authorization callback |
 | `GET` | `/api/auth/saml/metadata` | Public | SAML SP metadata XML when SAML is enabled |
@@ -553,6 +553,8 @@ Per-user preferences are separate from instance settings. Any authenticated user
 
 Custom role management with granular permissions.
 
+Role creation and mutation are constrained by authority containment: the proposed or current role cannot outrank the actor, exceed the actor's effective permissions, or broaden the actor's tool scope. API-key scopes participate in this check. Deleting a custom role also requires authority to assign the built-in `user` fallback used for its members.
+
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | List all roles with user counts |
@@ -633,17 +635,19 @@ Operational endpoints for observability, support, usage reporting, and backup st
 
 These routes are license-gated by their related enterprise feature. They still require the listed SnapOtter permission.
 
+**Full built-in admin** means the authenticated actor has the `admin` role and the complete effective admin permission set. An API-key scope that omits any admin permission does not qualify.
+
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Export audit entries as JSON or CSV with filters |
 | `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Export redacted instance config, custom roles, and teams |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Import config, with optional dry run |
+| `POST` | `/api/v1/enterprise/config/import` | Full built-in admin | Import config, with optional dry run |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Read configured CIDR allowlist |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Update CIDR allowlist with self-lockout prevention |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | List user and team legal holds |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Apply or release a legal hold on a user or team |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Generate a SCIM bearer token, returned once |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Revoke the current SCIM bearer token |
+| `POST` | `/api/v1/enterprise/scim/token` | Full built-in admin | Generate a SCIM bearer token, returned once |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Full built-in admin | Revoke the current SCIM bearer token |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Read SIEM forwarding config |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Update SIEM forwarding config |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | List webhook destinations |
@@ -653,15 +657,15 @@ These routes are license-gated by their related enterprise feature. They still r
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Send a test webhook payload |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Start a GDPR user export job |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Read GDPR export status and download URL |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Permanently purge a user's data after confirmation |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Permanently purge a team's data after confirmation |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; target authority) | Permanently purge a user's data after confirmation |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; all-member authority) | Permanently purge a team's data after confirmation |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Read app, build, Node, and schema version metadata |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Compare packaged migrations with applied migrations |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Run upgrade readiness checks |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM discovery endpoints are public. User and group endpoints require the SCIM bearer token generated above.
+SCIM discovery endpoints are public. User and group endpoints require the SCIM bearer token generated above. Legacy unversioned tokens are invalid and must be reissued as `so_scim_v2_...` tokens by a full built-in admin.
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|

@@ -5782,7 +5782,8 @@ paths:
       tags:
         - Auth
       summary: 建立使用者
-      description: 需要 users:manage 權限。
+      description: |
+        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       requestBody:
@@ -5853,7 +5854,8 @@ paths:
       tags:
         - Auth
       summary: 更新使用者
-      description: 需要 users:manage 權限。
+      description: |
+        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -5908,7 +5910,8 @@ paths:
       tags:
         - Auth
       summary: 刪除使用者
-      description: 需要 users:manage 權限。
+      description: |
+        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
       security:
         - bearerAuth: []
       parameters:
@@ -5946,7 +5949,8 @@ paths:
       tags:
         - Auth
       summary: 重設使用者密碼
-      description: 需要 users:manage 權限。
+      description: |
+        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -7113,7 +7117,10 @@ paths:
         - Roles
       summary: 建立自訂角色
       description: |
-        以指定權限建立新的自訂角色。角色名稱須為 2 至 30 個字元，小寫英數字並可含連字號與底線。需要 security:manage 權限。
+        Create a new custom role with specified permissions. Role names must be
+        2-30 characters, lowercase alphanumeric with hyphens and underscores.
+        Requires security:manage permission. The new role's permissions and tool
+        access must be contained by the actor's effective authority.
       security:
         - bearerAuth: []
       requestBody:
@@ -7143,7 +7150,8 @@ paths:
                     Permission strings. Valid values: tools:use, files:own, files:all,
                     apikeys:own, apikeys:all, pipelines:own, pipelines:all,
                     settings:read, settings:write, users:manage, teams:manage,
-                    features:manage, system:health, audit:read, security:manage
+                    features:manage, system:health, audit:read, compliance:manage,
+                    webhooks:manage, security:manage
       responses:
         '201':
           description: Role created
@@ -7196,7 +7204,10 @@ paths:
         - Roles
       summary: 更新自訂角色
       description: |
-        更新自訂角色的名稱、說明或權限。內建角色無法修改。需要 security:manage 權限。
+        Update name, description, or permissions of a custom role. Built-in
+        roles cannot be modified. Requires security:manage permission and
+        authority over the current role; the resulting permissions and tool
+        access must remain contained by the actor's effective authority.
       security:
         - bearerAuth: []
       parameters:
@@ -7270,7 +7281,10 @@ paths:
         - Roles
       summary: 刪除自訂角色
       description: |
-        刪除自訂角色。指派至此角色的使用者會被重新指派至預設的「user」角色。內建角色無法刪除。需要 security:manage 權限。
+        Delete a custom role. Users assigned to this role are reassigned to the
+        default "user" role. Built-in roles cannot be deleted. Requires
+        security:manage permission, authority over the current role, and
+        authority to assign the fallback role.
       security:
         - bearerAuth: []
       parameters:
@@ -12017,6 +12031,60 @@ paths:
                   type: string
                   description: |
                     JSON string with options:
+                    - `zoom` (number 1-5, default 1) - Zoom factor (>=1 crops tighter)
+                    - `offsetX` (number 0-1, default 0.5) - Horizontal center position
+                    - `offsetY` (number 0-1, default 0.5) - Vertical center position
+                    - `borderWidth` (integer 0-200, default 0) - Border width in pixels
+                    - `borderColor` (string, default "#ffffff") - Border hex color
+                    - `background` (string, default "transparent") - "transparent" or a hex color for corners
+                    - `outputSize` (integer 16-4096, optional) - Final square dimension in pixels
+      responses:
+        '200':
+          description: Processed image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/tools/image/rounded-crop:
+    post:
+      operationId: roundedCrop
+      tags:
+        - Tools
+      summary: Rounded crop
+      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `shape` (string, default "rounded-square") - "rounded-square" or "squircle"
+                    - `cornerRadius` (number 0-50, default 25) - Corner radius as a percent of the shorter side (rounded-square only)
                     - `zoom` (number 1-5, default 1) - Zoom factor (>=1 crops tighter)
                     - `offsetX` (number 0-1, default 0.5) - Horizontal center position
                     - `offsetY` (number 0-1, default 0.5) - Vertical center position
@@ -17719,7 +17787,8 @@ paths:
       tags:
         - Auth
       summary: 重設使用者 MFA
-      description: 管理員重設某使用者的 MFA 註冊。需要 users:manage 權限。
+      description: |
+        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -18045,7 +18114,8 @@ paths:
       tags:
         - Enterprise
       summary: 建立 SCIM token
-      description: 產生 SCIM bearer token。需要 users:manage 權限與企業 SCIM 功能。
+      description: |
+        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
       security:
         - bearerAuth: []
       responses:
@@ -18058,7 +18128,8 @@ paths:
       tags:
         - Enterprise
       summary: 撤銷 SCIM token
-      description: 撤銷目前的 SCIM bearer token。需要 users:manage 權限與企業 SCIM 功能。
+      description: |
+        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
       security:
         - bearerAuth: []
       responses:
@@ -18265,7 +18336,8 @@ paths:
       tags:
         - Enterprise
       summary: 匯入設定
-      description: 匯入執行個體設定、自訂角色與團隊。需要 system:health 權限。
+      description: |
+        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
       security:
         - bearerAuth: []
       responses:
@@ -18509,7 +18581,8 @@ paths:
       tags:
         - Enterprise
       summary: 清除使用者資料
-      description: 在明確確認後永久清除某使用者的資料。需要 compliance:manage 權限。
+      description: |
+        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -18523,6 +18596,8 @@ paths:
           description: User purged
         '400':
           description: Confirmation required
+        '403':
+          description: Feature not licensed, insufficient permission, or target role beyond actor authority
         '409':
           description: User or team is under legal hold
   /api/v1/enterprise/teams/{id}/purge:
@@ -18531,7 +18606,8 @@ paths:
       tags:
         - Enterprise
       summary: 清除團隊資料
-      description: 在明確確認後永久清除某團隊的資料。需要 compliance:manage 權限。
+      description: |
+        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
       security:
         - bearerAuth: []
       parameters:
@@ -18545,6 +18621,8 @@ paths:
           description: Team purged
         '400':
           description: Confirmation required
+        '403':
+          description: Feature not licensed, insufficient permission, or a member role beyond actor authority
         '409':
           description: Team is under legal hold
   /api/v1/admin/version:
@@ -19470,34 +19548,18 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: 6bf03b2bea3d
-    paths./api/auth/register.post.description:
-      sourceHash: 34d5a11733bd
-      provenance: machine
-      outputHash: 82f8753ac9c9
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: 9d72b3258b5f
-    paths./api/auth/users/{id}.put.description:
-      sourceHash: 34d5a11733bd
-      provenance: machine
-      outputHash: 82f8753ac9c9
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: 2f145133aee2
-    paths./api/auth/users/{id}.delete.description:
-      sourceHash: 34d5a11733bd
-      provenance: machine
-      outputHash: 82f8753ac9c9
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: 1ddd897b4547
-    paths./api/auth/users/{id}/reset-password.post.description:
-      sourceHash: 34d5a11733bd
-      provenance: machine
-      outputHash: 82f8753ac9c9
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19662,26 +19724,14 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: bd336c413d74
-    paths./api/v1/roles.post.description:
-      sourceHash: d740216038e7
-      provenance: machine
-      outputHash: a98b8935c01b
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: 2ed38e477b15
-    paths./api/v1/roles/{id}.put.description:
-      sourceHash: e06c42a9c3ed
-      provenance: machine
-      outputHash: 10ef82dc5ef2
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: a6a9dc2fa777
-    paths./api/v1/roles/{id}.delete.description:
-      sourceHash: b4c1c8c0c9e0
-      provenance: machine
-      outputHash: 87277f3e9047
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -21262,10 +21312,6 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: ea61f9c66067
-    paths./api/auth/users/{id}/mfa/reset.post.description:
-      sourceHash: 9d650aeb7d10
-      provenance: machine
-      outputHash: bfb2d9a71cc9
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21390,18 +21436,10 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: f5586b9ae7f7
-    paths./api/v1/enterprise/scim/token.post.description:
-      sourceHash: 39d3b5d5066b
-      provenance: machine
-      outputHash: bda5b7dbe629
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: bc0a33556fb8
-    paths./api/v1/enterprise/scim/token.delete.description:
-      sourceHash: 412b38ac0141
-      provenance: machine
-      outputHash: 9f1c85e7cc76
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21526,10 +21564,6 @@ x-i18n:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: f5475897e4a5
-    paths./api/v1/enterprise/config/import.post.description:
-      sourceHash: cf4809a9459d
-      provenance: machine
-      outputHash: ef3016ad3dc7
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine
@@ -21638,18 +21672,10 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: 4656d958bfc7
-    paths./api/v1/enterprise/users/{id}/purge.delete.description:
-      sourceHash: 6db9ed4dabf1
-      provenance: machine
-      outputHash: 4058985ee80b
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: e333ae2d8607
-    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
-      sourceHash: 5bcd69dee315
-      provenance: machine
-      outputHash: bd5d036e75a5
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine

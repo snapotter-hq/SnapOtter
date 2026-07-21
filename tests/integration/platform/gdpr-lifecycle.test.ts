@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -260,5 +261,200 @@ describe("GDPR edge cases", () => {
       payload: { confirm: true },
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("GDPR purge role hierarchy", () => {
+  let licensedApp: TestApp;
+  let licensedAdminToken: string;
+  let complianceManagerToken: string;
+  let complianceRoleId: string;
+  let complianceManagerId: string;
+  let targetSequence = 0;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
+    mockEnterpriseFeatures(["gdpr_lifecycle"]);
+    const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
+    licensedApp = await buildTestApp();
+    licensedAdminToken = await loginAsAdmin(licensedApp.app);
+
+    const suffix = Date.now().toString(36);
+    const roleName = `compliance-${suffix}`;
+    const username = `compliance-manager-${suffix}`;
+    const roleRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+      payload: { name: roleName, permissions: ["compliance:manage"] },
+    });
+    if (roleRes.statusCode !== 201) {
+      throw new Error(`Failed to create compliance manager role: ${roleRes.body}`);
+    }
+    complianceRoleId = JSON.parse(roleRes.body).id as string;
+
+    const registerRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+      payload: { username, password: "TestPass1", role: roleName },
+    });
+    if (registerRes.statusCode !== 201) {
+      throw new Error(`Failed to create compliance manager user: ${registerRes.body}`);
+    }
+    complianceManagerId = JSON.parse(registerRes.body).id as string;
+    await db
+      .update(schema.users)
+      .set({ mustChangePassword: false })
+      .where(eq(schema.users.id, complianceManagerId));
+
+    const loginRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "TestPass1" },
+    });
+    complianceManagerToken = JSON.parse(loginRes.body).token as string;
+  }, 30_000);
+
+  afterAll(async () => {
+    if (complianceManagerId) {
+      await db.delete(schema.users).where(eq(schema.users.id, complianceManagerId));
+    }
+    if (complianceRoleId) {
+      await db.delete(schema.roles).where(eq(schema.roles.id, complianceRoleId));
+    }
+    await licensedApp.cleanup();
+    vi.restoreAllMocks();
+  }, 10_000);
+
+  async function createTarget(role: string, teamId?: string): Promise<string> {
+    targetSequence += 1;
+    const username = `gdpr-target-${role}-${Date.now().toString(36)}-${targetSequence}`;
+    const registerRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${licensedAdminToken}` },
+      payload: { username, password: "TargetPass1", role },
+    });
+    if (registerRes.statusCode !== 201) {
+      throw new Error(`Failed to create GDPR target user: ${registerRes.body}`);
+    }
+    const id = JSON.parse(registerRes.body).id as string;
+    await db
+      .update(schema.users)
+      .set({
+        mustChangePassword: false,
+        ...(teamId ? { team: teamId } : {}),
+      })
+      .where(eq(schema.users.id, id));
+    return id;
+  }
+
+  it("denies direct purge of a disabled administrator and preserves the account", async () => {
+    const targetId = await createTarget("admin");
+    await db
+      .update(schema.users)
+      .set({ role: "disabled:admin" })
+      .where(eq(schema.users.id, targetId));
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/users/${targetId}/purge`,
+        headers: { authorization: `Bearer ${complianceManagerToken}` },
+        payload: { confirm: true },
+      });
+      const body = JSON.parse(res.body);
+      const [remainingTarget] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, targetId));
+
+      expect.soft(res.statusCode).toBe(403);
+      expect.soft(body.code).toBe("ESCALATION_DENIED");
+      expect(remainingTarget?.role).toBe("disabled:admin");
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
+
+  it("preflights a mixed team and preserves subordinate members when a disabled admin is denied", async () => {
+    const teamId = randomUUID();
+    await db.insert(schema.teams).values({
+      id: teamId,
+      name: `GDPR hierarchy ${Date.now().toString(36)}`,
+    });
+    const subordinateId = await createTarget("user", teamId);
+    const disabledAdminId = await createTarget("admin", teamId);
+    await db
+      .update(schema.users)
+      .set({ role: "disabled:admin" })
+      .where(eq(schema.users.id, disabledAdminId));
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/teams/${teamId}/purge`,
+        headers: { authorization: `Bearer ${complianceManagerToken}` },
+        payload: { confirm: true },
+      });
+      const body = JSON.parse(res.body);
+      const [remainingSubordinate] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, subordinateId));
+      const [remainingDisabledAdmin] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, disabledAdminId));
+      const [remainingTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, teamId));
+
+      expect.soft(res.statusCode).toBe(403);
+      expect.soft(body.code).toBe("ESCALATION_DENIED");
+      expect.soft(remainingSubordinate?.role).toBe("user");
+      expect.soft(remainingDisabledAdmin?.role).toBe("disabled:admin");
+      expect(remainingTeam?.id).toBe(teamId);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, subordinateId));
+      await db.delete(schema.users).where(eq(schema.users.id, disabledAdminId));
+      await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
+    }
+  });
+
+  it("allows the full built-in admin to purge a subordinate team", async () => {
+    const teamId = randomUUID();
+    await db.insert(schema.teams).values({
+      id: teamId,
+      name: `GDPR subordinate ${Date.now().toString(36)}`,
+    });
+    const targetId = await createTarget("user", teamId);
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/teams/${teamId}/purge`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+        payload: { confirm: true },
+      });
+      const [remainingTarget] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, targetId));
+      const [remainingTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, teamId));
+
+      expect(res.statusCode).toBe(200);
+      expect(remainingTarget).toBeUndefined();
+      expect(remainingTeam).toBeUndefined();
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+      await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
+    }
   });
 });

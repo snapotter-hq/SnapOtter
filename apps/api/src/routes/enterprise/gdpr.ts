@@ -9,7 +9,7 @@ import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { deleteStoredFile, deleteThumbnail } from "../../lib/file-storage.js";
 import { deletePrefix } from "../../lib/object-storage.js";
-import { requirePermission } from "../../permissions.js";
+import { canManageTargetRole, requirePermission } from "../../permissions.js";
 
 const purgeBodySchema = z.object({
   confirm: z.literal(true),
@@ -253,6 +253,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       const [targetUser] = await db
         .select({
           id: schema.users.id,
+          role: schema.users.role,
           team: schema.users.team,
           legalHold: schema.users.legalHold,
         })
@@ -260,6 +261,13 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.users.id, targetUserId));
       if (!targetUser) {
         return reply.status(404).send({ error: "User not found" });
+      }
+
+      if (!(await canManageTargetRole(user, targetUser.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
       }
 
       // Check legal hold on user
@@ -341,9 +349,26 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
 
       // Get all users in the team
       const teamUsers = await db
-        .select({ id: schema.users.id, legalHold: schema.users.legalHold })
+        .select({
+          id: schema.users.id,
+          role: schema.users.role,
+          legalHold: schema.users.legalHold,
+        })
         .from(schema.users)
         .where(eq(schema.users.team, targetTeamId));
+
+      if (teamUsers.some((member) => member.id === user.id)) {
+        return reply.status(400).send({ error: "Cannot purge a team containing your own account" });
+      }
+
+      for (const member of teamUsers) {
+        if (!(await canManageTargetRole(user, member.role))) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+      }
 
       // Check none of the users have individual legalHold
       const heldUser = teamUsers.find((u) => u.legalHold);

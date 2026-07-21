@@ -5,7 +5,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { permissionsNotHeldBy, requirePermission } from "../permissions.js";
+import {
+  canAssignRole,
+  canGrantRoleDefinition,
+  canManageRoleDefinition,
+  requirePermission,
+} from "../permissions.js";
 
 const ALL_PERMISSIONS: Permission[] = [
   "tools:use",
@@ -114,10 +119,9 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         .status(400)
         .send({ error: `Invalid permissions: ${invalid.join(", ")}`, code: "VALIDATION_ERROR" });
     }
-    const broader = await permissionsNotHeldBy(user, permissions);
-    if (broader.length > 0) {
+    if (!(await canGrantRoleDefinition(user, permissions, toolPermissions ?? null))) {
       return reply.status(403).send({
-        error: `Cannot grant permissions you don't have: ${broader.join(", ")}`,
+        error: "Cannot create a role beyond your role authority",
         code: "ESCALATION_DENIED",
       });
     }
@@ -171,6 +175,14 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           .status(400)
           .send({ error: "Cannot modify built-in roles", code: "VALIDATION_ERROR" });
       }
+      if (
+        !(await canManageRoleDefinition(user, role.name, role.permissions, role.toolPermissions))
+      ) {
+        return reply.status(403).send({
+          error: "Cannot manage a role beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
 
       const parsed = updateRoleSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -200,25 +212,38 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
             code: "VALIDATION_ERROR",
           });
         }
-        const broader = await permissionsNotHeldBy(user, body.permissions);
-        if (broader.length > 0) {
-          return reply.status(403).send({
-            error: `Cannot grant permissions you don't have: ${broader.join(", ")}`,
-            code: "ESCALATION_DENIED",
-          });
-        }
         updates.permissions = body.permissions;
       }
+
+      const prospectivePermissions = body.permissions ?? role.permissions;
+      const prospectiveToolPermissions =
+        body.toolPermissions !== undefined ? (body.toolPermissions ?? null) : role.toolPermissions;
+      if (
+        !(await canGrantRoleDefinition(user, prospectivePermissions, prospectiveToolPermissions))
+      ) {
+        return reply.status(403).send({
+          error: "Cannot update a role beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
       if (body.toolPermissions !== undefined) {
         updates.toolPermissions = body.toolPermissions ?? null;
       }
 
       await db.transaction(async (tx) => {
         if (body.name) {
+          const renamedDisabledRole = `disabled:${body.name}`;
           await tx
             .update(schema.users)
-            .set({ role: body.name })
-            .where(eq(schema.users.role, role.name));
+            .set({
+              role: sql<string>`CASE
+                WHEN ${schema.users.role} = ${role.name} THEN ${body.name}
+                ELSE ${renamedDisabledRole}
+              END`,
+              updatedAt: new Date(),
+            })
+            .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
         }
         await tx.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
       });
@@ -245,12 +270,36 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           .status(400)
           .send({ error: "Cannot delete built-in roles", code: "VALIDATION_ERROR" });
       }
+      if (
+        !(await canManageRoleDefinition(user, role.name, role.permissions, role.toolPermissions))
+      ) {
+        return reply.status(403).send({
+          error: "Cannot manage a role beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
+      // Deletion always has the side effect of assigning the built-in user
+      // fallback. Authorize that transition up front, even when the role is
+      // currently empty, so concurrent membership changes cannot bypass it.
+      if (!(await canAssignRole(user, "user"))) {
+        return reply.status(403).send({
+          error: "Cannot reassign role members beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
 
       await db.transaction(async (tx) => {
         await tx
           .update(schema.users)
-          .set({ role: "user", updatedAt: new Date() })
-          .where(eq(schema.users.role, role.name));
+          .set({
+            role: sql<string>`CASE
+              WHEN ${schema.users.role} = ${role.name} THEN 'user'
+              ELSE 'disabled:user'
+            END`,
+            updatedAt: new Date(),
+          })
+          .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
         await tx.delete(schema.roles).where(eq(schema.roles.id, id));
       });
       await auditFromRequest(request)("ROLE_DELETED", {

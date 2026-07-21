@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { requirePermission } from "../../permissions.js";
+import { requireFullAdmin, requirePermission } from "../../permissions.js";
 
 const CONFIG_SCHEMA_VERSION = 1;
 
@@ -22,21 +22,63 @@ const REDACTED_KEYS = new Set([
   "webhook_destinations",
 ]);
 
+const roleNameField = z
+  .string()
+  .transform((value) => value.trim().toLowerCase())
+  .pipe(
+    z
+      .string()
+      .min(2, "Role name must be 2-30 characters")
+      .max(30, "Role name must be 2-30 characters")
+      .regex(
+        /^[a-z0-9_-]+$/,
+        "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
+      ),
+  );
+
+const permissionField = z.enum([
+  "tools:use",
+  "files:own",
+  "files:all",
+  "apikeys:own",
+  "apikeys:all",
+  "pipelines:own",
+  "pipelines:all",
+  "settings:read",
+  "settings:write",
+  "users:manage",
+  "teams:manage",
+  "features:manage",
+  "system:health",
+  "audit:read",
+  "compliance:manage",
+  "webhooks:manage",
+  "security:manage",
+]);
+
+const importedRoleSchema = z
+  .object({
+    name: roleNameField,
+    description: z.string().max(500).optional(),
+    // Empty permission sets are valid for exported deny-all custom roles.
+    permissions: z.array(permissionField),
+    toolPermissions: z
+      .object({
+        mode: z.enum(["category", "tool"]),
+        allowed: z.array(z.string()),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
 const importSchema = z.object({
   dryRun: z.boolean().default(false),
   config: z.object({
     configSchemaVersion: z.number(),
     settings: z.record(z.string()).optional(),
-    roles: z
-      .array(
-        z.object({
-          name: z.string(),
-          description: z.string().optional(),
-          permissions: z.array(z.string()),
-          toolPermissions: z.any().optional(),
-        }),
-      )
-      .optional(),
+    roles: z.array(importedRoleSchema).optional(),
     teams: z
       .array(
         z.object({
@@ -125,7 +167,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
   app.post(
     "/api/v1/enterprise/config/import",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
-      const user = await requirePermission("system:health")(request, reply);
+      const user = await requireFullAdmin(request, reply);
       if (!user) return;
 
       // Enterprise feature gate

@@ -9,8 +9,13 @@ import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { getSettingString } from "../lib/settings-helpers.js";
-import { getPermissions, isDisabledRole } from "../permissions.js";
-import { createSessionToken, getAuthUser, requireAuth } from "./auth.js";
+import {
+  canManageTargetRole,
+  getPermissions,
+  isDisabledRole,
+  requirePermission,
+} from "../permissions.js";
+import { createSessionToken, requireAuth } from "./auth.js";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -434,22 +439,21 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/users/:id/mfa/reset",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const admin = getAuthUser(request);
-      if (!admin) {
-        return reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
-      }
-
-      // Check users:manage permission
-      const { hasEffectivePermission } = await import("../permissions.js");
-      if (!(await hasEffectivePermission(admin, "users:manage"))) {
-        return reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
-      }
+      const admin = await requirePermission("users:manage")(request, reply);
+      if (!admin) return;
 
       const { id } = request.params;
 
       const [targetUser] = await db.select().from(schema.users).where(eq(schema.users.id, id));
       if (!targetUser) {
         return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
+
+      if (!(await canManageTargetRole(admin, targetUser.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
       }
 
       if (!targetUser.totpEnabled) {

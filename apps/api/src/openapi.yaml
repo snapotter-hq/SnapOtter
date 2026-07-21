@@ -5695,7 +5695,10 @@ paths:
       operationId: createUser
       tags: [Auth]
       summary: Create user
-      description: Requires users:manage permission.
+      description: >
+        Requires users:manage permission. The assigned role must be within the
+        actor's effective role authority, including hierarchy, permissions,
+        tool access, and any API-key scope.
       security:
         - bearerAuth: []
       requestBody:
@@ -5764,7 +5767,10 @@ paths:
       operationId: updateUser
       tags: [Auth]
       summary: Update user
-      description: Requires users:manage permission.
+      description: >
+        Requires users:manage permission and authority over the target's
+        current role. Any newly assigned role must also be within the actor's
+        effective hierarchy, permissions, tool access, and API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -5818,7 +5824,10 @@ paths:
       operationId: deleteUser
       tags: [Auth]
       summary: Delete user
-      description: Requires users:manage permission.
+      description: >
+        Requires users:manage permission and authority over the target's
+        current role, including hierarchy, permissions, tool access, and any
+        API-key scope. Self-deletion is not allowed.
       security:
         - bearerAuth: []
       parameters:
@@ -5856,7 +5865,10 @@ paths:
       operationId: resetUserPassword
       tags: [Auth]
       summary: Reset user password
-      description: Requires users:manage permission.
+      description: >
+        Reset a local user's password. Requires users:manage permission and
+        authority over the target's current role, including hierarchy,
+        permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -6983,7 +6995,8 @@ paths:
       description: |
         Create a new custom role with specified permissions. Role names must be
         2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission.
+        Requires security:manage permission. The new role's permissions and tool
+        access must be contained by the actor's effective authority.
       security:
         - bearerAuth: []
       requestBody:
@@ -7011,7 +7024,8 @@ paths:
                     Permission strings. Valid values: tools:use, files:own, files:all,
                     apikeys:own, apikeys:all, pipelines:own, pipelines:all,
                     settings:read, settings:write, users:manage, teams:manage,
-                    features:manage, system:health, audit:read, security:manage
+                    features:manage, system:health, audit:read, compliance:manage,
+                    webhooks:manage, security:manage
       responses:
         "201":
           description: Role created
@@ -7065,7 +7079,9 @@ paths:
       summary: Update a custom role
       description: |
         Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission.
+        roles cannot be modified. Requires security:manage permission and
+        authority over the current role; the resulting permissions and tool
+        access must remain contained by the actor's effective authority.
       security:
         - bearerAuth: []
       parameters:
@@ -7140,7 +7156,8 @@ paths:
       description: |
         Delete a custom role. Users assigned to this role are reassigned to the
         default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission.
+        security:manage permission, authority over the current role, and
+        authority to assign the fallback role.
       security:
         - bearerAuth: []
       parameters:
@@ -17463,7 +17480,10 @@ paths:
       operationId: resetUserMfa
       tags: [Auth]
       summary: Reset user MFA
-      description: Admin reset of a user's MFA enrollment. Requires users:manage permission.
+      description: >
+        Reset a user's MFA enrollment. Requires users:manage permission and
+        authority over the target's current role, including hierarchy,
+        permissions, tool access, and any API-key scope.
       security:
         - bearerAuth: []
       parameters:
@@ -17775,7 +17795,11 @@ paths:
       operationId: createScimToken
       tags: [Enterprise]
       summary: Create SCIM token
-      description: Generate a SCIM bearer token. Requires users:manage permission and the enterprise SCIM feature.
+      description: >
+        Generate a global SCIM bearer token. Requires the enterprise SCIM
+        feature and full effective built-in administrator authority; custom
+        roles and API keys missing any administrator permission do not qualify.
+        Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
       security:
         - bearerAuth: []
       responses:
@@ -17787,7 +17811,10 @@ paths:
       operationId: revokeScimToken
       tags: [Enterprise]
       summary: Revoke SCIM token
-      description: Revoke the current SCIM bearer token. Requires users:manage permission and the enterprise SCIM feature.
+      description: >
+        Revoke the global SCIM bearer token. Requires the enterprise SCIM
+        feature and full effective built-in administrator authority; custom
+        roles and API keys missing any administrator permission do not qualify.
       security:
         - bearerAuth: []
       responses:
@@ -17988,7 +18015,10 @@ paths:
       operationId: importEnterpriseConfig
       tags: [Enterprise]
       summary: Import configuration
-      description: Import instance configuration, custom roles, and teams. Requires system:health permission.
+      description: >
+        Import instance configuration, custom roles, and teams. Requires full
+        effective built-in administrator authority; custom roles and API keys
+        missing any administrator permission do not qualify.
       security:
         - bearerAuth: []
       responses:
@@ -18227,7 +18257,11 @@ paths:
       operationId: purgeEnterpriseUser
       tags: [Enterprise]
       summary: Purge user data
-      description: Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission.
+      description: >
+        Permanently purge a user's data after explicit confirmation. Requires
+        compliance:manage permission and authority over the target's current
+        role, including hierarchy, permissions, tool access, and any API-key
+        scope.
       security:
         - bearerAuth: []
       parameters:
@@ -18241,6 +18275,8 @@ paths:
           description: User purged
         "400":
           description: Confirmation required
+        "403":
+          description: Feature not licensed, insufficient permission, or target role beyond actor authority
         "409":
           description: User or team is under legal hold
 
@@ -18249,7 +18285,11 @@ paths:
       operationId: purgeEnterpriseTeam
       tags: [Enterprise]
       summary: Purge team data
-      description: Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission.
+      description: >
+        Permanently purge a team's data after explicit confirmation. Requires
+        compliance:manage permission and authority over every member's current
+        role, including hierarchy, permissions, tool access, and any API-key
+        scope. A team containing the actor cannot be purged.
       security:
         - bearerAuth: []
       parameters:
@@ -18263,6 +18303,8 @@ paths:
           description: Team purged
         "400":
           description: Confirmation required
+        "403":
+          description: Feature not licensed, insufficient permission, or a member role beyond actor authority
         "409":
           description: Team is under legal hold
 

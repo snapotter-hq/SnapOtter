@@ -14,7 +14,7 @@ SCIM provisioning requires an **enterprise** license with the `scim` feature. It
 
 - A running SnapOtter instance reachable at a public URL
 - An enterprise license key with the `scim` feature
-- Admin access to SnapOtter (the `users:manage` permission is required to generate or revoke a SCIM token)
+- A built-in SnapOtter `admin` account with its full effective permission set. A delegated custom role or an admin API key missing any admin permission cannot generate or revoke the global SCIM token.
 - Admin access to your identity provider's provisioning settings
 
 ## Quick start {#quick-start}
@@ -31,7 +31,7 @@ The response contains the token. Save it immediately; it cannot be retrieved aga
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -46,15 +46,19 @@ SCIM endpoints use a dedicated Bearer token, separate from user sessions and API
 
 ### Generating a token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` generates a new SCIM token. This endpoint requires a valid session with the `users:manage` permission.
+`POST /api/v1/enterprise/scim/token` generates a new SCIM token. Because the token can provision and mutate users across the instance, this endpoint requires the built-in `admin` role with the complete effective admin permission set. Holding `users:manage` in a custom role is not sufficient.
 
 The token is returned in plaintext exactly once. SnapOtter stores only a scrypt hash. If you lose the token, revoke it and generate a new one.
 
 Only one SCIM token is active at a time. Generating a new token replaces the previous one.
 
+::: warning Token reissue after upgrade
+Legacy unversioned SCIM tokens are rejected. After upgrading to a release that issues `so_scim_v2_...` tokens, generate a new token and update your identity provider before resuming provisioning.
+:::
+
 ### Revoking a token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` revokes the current SCIM token. This endpoint also requires `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` revokes the current SCIM token. It has the same full built-in admin requirement as token generation.
 
 ### Rate limiting {#rate-limiting}
 
@@ -276,7 +280,7 @@ The SCIM request did not include an `Authorization: Bearer <token>` header. Chec
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-The token does not match the stored hash. This happens if the token was revoked and regenerated. Update the token in your IdP's provisioning settings.
+The token is malformed, uses the retired unversioned format, or does not match the stored hash. Generate a current `so_scim_v2_...` token and update the token in your IdP's provisioning settings.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 
