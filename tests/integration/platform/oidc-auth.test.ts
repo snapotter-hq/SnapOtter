@@ -12,10 +12,18 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
+
+// trackEvent is mocked so OIDC failure analytics can be asserted without a
+// baked PostHog client; every other analytics export stays real.
+const trackEventSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return { ...actual, trackEvent: trackEventSpy };
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -616,6 +624,7 @@ describe("OIDC callback edge cases", () => {
     const state = redirectUrl.searchParams.get("state");
 
     // Simulate IdP returning an error
+    trackEventSpy.mockClear();
     const callbackRes = await oidcApp.app.inject({
       method: "GET",
       url: `/api/auth/oidc/callback?error=access_denied&error_description=User+denied&state=${state}`,
@@ -625,6 +634,9 @@ describe("OIDC callback edge cases", () => {
     expect(callbackRes.statusCode).toBe(302);
     const location = callbackRes.headers.location as string;
     expect(location).toContain("/login?error=oidc_auth_failed");
+    // The failed attempt is recorded as auth_login_failed (parity with the
+    // password path) so OIDC failures aren't invisible in analytics.
+    expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
   });
 });
 

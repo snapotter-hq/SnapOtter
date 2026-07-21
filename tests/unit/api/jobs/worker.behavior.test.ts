@@ -252,3 +252,40 @@ describe("worker result payload behavior", () => {
     });
   });
 });
+
+describe("pipelineExecutedProps", () => {
+  it("reports the batch file count for a batch-finalize pipeline", async () => {
+    const { pipelineExecutedProps } = await loadWorker();
+
+    expect(
+      pipelineExecutedProps(
+        { kind: "batch-finalize", totalFiles: 5 },
+        3,
+        ["resize", "compress", "watermark"],
+        1200,
+        "completed",
+      ),
+    ).toEqual({
+      step_count: 3,
+      tool_ids: ["resize", "compress", "watermark"],
+      is_batch: true,
+      file_count: 5,
+      duration_ms: 1200,
+      status: "completed",
+    });
+  });
+
+  it("defaults file_count to 1 for a single-file pipeline-finalize", async () => {
+    const { pipelineExecutedProps } = await loadWorker();
+
+    expect(
+      pipelineExecutedProps(
+        { kind: "pipeline-finalize" },
+        2,
+        ["grayscale", "resize"],
+        800,
+        "failed",
+      ),
+    ).toMatchObject({ is_batch: false, file_count: 1, status: "failed" });
+  });
+});

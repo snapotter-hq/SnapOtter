@@ -102,6 +102,16 @@ function redirectToLogin(reply: FastifyReply, errorCode: string): void {
   reply.redirect(`/login?error=${errorCode}`);
 }
 
+/**
+ * Record a failed OIDC login: bump the Prometheus auth counter and emit the
+ * auth_login_failed analytics event, mirroring the password login path so
+ * OIDC failures are visible in analytics too.
+ */
+function recordOidcFailure(): void {
+  authAttempts.inc({ method: "oidc", result: "failure" });
+  void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "oidc" });
+}
+
 // ── OIDC Routes ───────────────────────────────────────────────────
 
 export async function oidcRoutes(app: FastifyInstance): Promise<void> {
@@ -202,7 +212,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           { error: query.error, description: query.error_description },
           "OIDC IdP returned error",
         );
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", {
           reason: sanitizeAuditInput(String(query.error)),
         });
@@ -233,7 +243,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (err) {
         request.log.error({ err }, "OIDC token exchange failed");
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", { reason: "token_exchange_failed" });
         return redirectToLogin(reply, "oidc_auth_failed");
       }
@@ -242,7 +252,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       const claims = tokenResponse.claims();
       if (!claims) {
         request.log.error("OIDC callback: no ID token claims");
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", { reason: "no_id_token" });
         return redirectToLogin(reply, "oidc_auth_failed");
       }
@@ -270,7 +280,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       });
 
       if (result.action === "denied" || !result.user) {
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         if (result.deniedReason === "user_limit_reached") {
           return redirectToLogin(reply, "oidc_user_limit_reached");
         }
@@ -294,7 +304,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           { err, userId: resolvedUser.id },
           "OIDC callback: failed to read MFA enrollment status",
         );
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", {
           userId: resolvedUser.id,
           username: resolvedUser.username,
@@ -328,7 +338,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (mfaOutcome === "enrollment_required") {
-        authAttempts.inc({ method: "oidc", result: "failure" });
+        recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", {
           userId: resolvedUser.id,
           username: resolvedUser.username,

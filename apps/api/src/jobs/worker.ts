@@ -31,6 +31,7 @@ import {
   getBundleForTool,
   getOptionalBundleForTool,
   isToolInputError,
+  type PipelineExecutedProperties,
   TOOLS,
 } from "@snapotter/shared";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
@@ -750,6 +751,33 @@ function contentTypeForFilename(name: string): string {
   return map[ext] ?? "application/octet-stream";
 }
 
+/**
+ * Build the pipeline_executed analytics payload. Shared by the success and
+ * failure paths so is_batch and file_count are derived in one place. file_count
+ * is the batch size for a batch-finalize job, otherwise 1 for a single-file
+ * pipeline run.
+ */
+export function pipelineExecutedProps(
+  data: Pick<ToolJobData, "kind" | "totalFiles">,
+  totalSteps: number,
+  toolIds: string[],
+  durationMs: number,
+  status: "completed" | "failed",
+) {
+  // `satisfies` (not a return-type annotation) validates the shape against
+  // PipelineExecutedProperties while keeping the inferred anonymous type, which
+  // stays assignable to trackEvent's Record<string, unknown> param (a named
+  // interface would not be).
+  return {
+    step_count: totalSteps,
+    tool_ids: toolIds,
+    is_batch: data.kind === "batch-finalize",
+    file_count: data.totalFiles ?? 1,
+    duration_ms: durationMs,
+    status,
+  } satisfies PipelineExecutedProperties;
+}
+
 async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
   const startTime = Date.now();
@@ -818,13 +846,13 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     if (analyticsEnabled()) {
       void trackEvent(
         ANALYTICS_EVENTS.PIPELINE_EXECUTED,
-        {
-          step_count: totalSteps,
-          tool_ids: steps.map((s) => s.toolId),
-          is_batch: data.kind === "batch-finalize",
-          duration_ms: Date.now() - startTime,
-          status: "failed",
-        },
+        pipelineExecutedProps(
+          data,
+          totalSteps,
+          steps.map((s) => s.toolId),
+          Date.now() - startTime,
+          "failed",
+        ),
         data.analyticsDistinctId,
       );
     }
@@ -905,13 +933,13 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   if (analyticsEnabled()) {
     void trackEvent(
       ANALYTICS_EVENTS.PIPELINE_EXECUTED,
-      {
-        step_count: totalSteps,
-        tool_ids: steps.map((s) => s.toolId),
-        is_batch: data.kind === "batch-finalize",
-        duration_ms: Date.now() - startTime,
-        status: "completed",
-      },
+      pipelineExecutedProps(
+        data,
+        totalSteps,
+        steps.map((s) => s.toolId),
+        Date.now() - startTime,
+        "completed",
+      ),
       data.analyticsDistinctId,
     );
   }
