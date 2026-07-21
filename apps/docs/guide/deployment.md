@@ -480,6 +480,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
 
+Two things matter for every proxy below: allow large request bodies (uploads), and do not buffer responses. A response-buffering proxy breaks SSE progress and, more visibly, makes a large file download "start but never finish", because the proxy holds the whole file before passing it on. SnapOtter sends `X-Accel-Buffering: no` on downloads so nginx streams them even if buffering is left on elsewhere, but proxies other than nginx need response buffering disabled explicitly (shown in each config below). If a download stalls partway, a buffering proxy in front is the first thing to check.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -500,7 +502,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -544,7 +547,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs). The extended timeouts allow large file uploads to complete without Caddy closing the connection early.
+`flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs) and for large file downloads to stream through instead of stalling. The extended timeouts allow large file uploads to complete without Caddy closing the connection early.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
