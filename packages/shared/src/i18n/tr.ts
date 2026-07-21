@@ -748,6 +748,10 @@ export const tr: TranslationKeys = {
       name: "Daire Kırpma",
       description: "Görseli saydam köşelerle ortalanmış daireye kırpın",
     },
+    "rounded-crop": {
+      name: "Yuvarlatılmış Kırpma",
+      description: "Görseli saydam köşelerle yuvarlatılmış kareye veya squircle biçimine kırpın",
+    },
     duotone: {
       name: "Çift Ton",
       description: "Özel gölge ve aydınlık renkleriyle çift tonlu efekt uygula",
@@ -2138,6 +2142,11 @@ export const tr: TranslationKeys = {
       submit: "Daire Kırpma",
       submitBatch: "Daire Kırpma ({count} dosya)",
       progressLabel: "Daire olarak kırpılıyor",
+    },
+    "rounded-crop": {
+      submit: "Yuvarlatılmış Kırpma",
+      submitBatch: "Yuvarlatılmış Kırpma ({count} dosya)",
+      progressLabel: "Yuvarlatılmış şekle kırpılıyor",
     },
     duotone: {
       shadow: "Gölge Rengi",

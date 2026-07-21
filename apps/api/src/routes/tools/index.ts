@@ -124,6 +124,7 @@ import { registerRingtoneMaker } from "./ringtone-maker.js";
 import { registerRotate } from "./rotate.js";
 import { registerRotatePdf } from "./rotate-pdf.js";
 import { registerRotateVideo } from "./rotate-video.js";
+import { registerRoundedCrop } from "./rounded-crop.js";
 import { registerSharpening } from "./sharpening.js";
 import { registerSignPdf } from "./sign-pdf.js";
 import { registerSilenceRemoval } from "./silence-removal.js";
@@ -235,6 +236,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "border", register: registerBorder },
     { id: "beautify", register: registerBeautify },
     { id: "circle-crop", register: registerCircleCrop },
+    { id: "rounded-crop", register: registerRoundedCrop },
     { id: "duotone", register: registerDuotone },
     { id: "histogram", register: registerHistogram },
     { id: "image-pad", register: registerImagePad },

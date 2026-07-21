@@ -845,6 +845,11 @@ const CircleCropSettings = lazy(() =>
     default: m.CircleCropSettings,
   })),
 );
+const RoundedCropSettings = lazy(() =>
+  import("@/components/tools/rounded-crop-settings").then((m) => ({
+    default: m.RoundedCropSettings,
+  })),
+);
 const DuotoneSettings = lazy(() =>
   import("@/components/tools/duotone-settings").then((m) => ({
     default: m.DuotoneSettings,
@@ -969,6 +974,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["border", { livePreview: true, Settings: BorderSettings as never }],
   ["beautify", { livePreview: true, Settings: BeautifySettings as never }],
   ["circle-crop", { livePreview: true, Settings: CircleCropSettings }],
+  ["rounded-crop", { livePreview: true, Settings: RoundedCropSettings }],
   ["duotone", { livePreview: true, Settings: DuotoneSettings }],
   ["image-pad", { livePreview: true, Settings: ImagePadSettings }],
   ["pixelate", { livePreview: true, Settings: PixelateSettings }],

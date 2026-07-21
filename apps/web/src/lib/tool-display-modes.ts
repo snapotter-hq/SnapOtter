@@ -61,6 +61,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   border: "live-preview",
   beautify: "live-preview",
   "circle-crop": "live-preview",
+  "rounded-crop": "live-preview",
   duotone: "live-preview",
   "image-pad": "live-preview",
   pixelate: "live-preview",

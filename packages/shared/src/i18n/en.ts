@@ -706,6 +706,10 @@ export const en = {
       name: "Circle Crop",
       description: "Crop image to a centered circle with transparent corners",
     },
+    "rounded-crop": {
+      name: "Rounded Crop",
+      description: "Crop image to a rounded square or squircle with transparent corners",
+    },
     duotone: {
       name: "Duotone",
       description: "Apply a two-color duotone effect with custom shadow and highlight colors",
@@ -2084,6 +2088,11 @@ export const en = {
       submit: "Circle Crop",
       submitBatch: "Circle Crop ({count} files)",
       progressLabel: "Cropping to circle",
+    },
+    "rounded-crop": {
+      submit: "Rounded Crop",
+      submitBatch: "Rounded Crop ({count} files)",
+      progressLabel: "Cropping to rounded shape",
     },
     duotone: {
       shadow: "Shadow Color",

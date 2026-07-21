@@ -751,6 +751,10 @@ export const ru: TranslationKeys = {
       name: "Круговая обрезка",
       description: "Обрезка изображения по центральному кругу с прозрачными углами",
     },
+    "rounded-crop": {
+      name: "Обрезка со скруглением",
+      description: "Обрезка изображения до скруглённого квадрата или squircle с прозрачными углами",
+    },
     duotone: {
       name: "Дуотон",
       description: "Двухцветный эффект дуотон с настраиваемыми цветами теней и бликов",
@@ -2136,6 +2140,11 @@ export const ru: TranslationKeys = {
       submit: "Круглая обрезка",
       submitBatch: "Круглая обрезка ({count} файлов)",
       progressLabel: "Обрезка по кругу",
+    },
+    "rounded-crop": {
+      submit: "Обрезка со скруглением",
+      submitBatch: "Обрезка со скруглением ({count} файлов)",
+      progressLabel: "Обрезка до скруглённой формы",
     },
     duotone: {
       shadow: "Цвет теней",

@@ -531,6 +531,10 @@ export const zhTW: TranslationKeys = {
       name: "圓形裁切",
       description: "將圖片裁切為置中圓形，四角透明",
     },
+    "rounded-crop": {
+      name: "圓角裁切",
+      description: "將圖片裁切為圓角方形或 squircle，四角透明",
+    },
     duotone: {
       name: "雙色調",
       description: "套用自訂暗部與亮部色彩的雙色調效果",
@@ -1892,6 +1896,11 @@ export const zhTW: TranslationKeys = {
       submit: "圓形裁切",
       submitBatch: "圓形裁切（{count} 個檔案）",
       progressLabel: "正在圓形裁切",
+    },
+    "rounded-crop": {
+      submit: "圓角裁切",
+      submitBatch: "圓角裁切（{count} 個檔案）",
+      progressLabel: "正在裁切為圓角形狀",
     },
     duotone: {
       shadow: "陰影顏色",

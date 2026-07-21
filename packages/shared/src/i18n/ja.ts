@@ -715,6 +715,10 @@ export const ja: TranslationKeys = {
       name: "円形クロップ",
       description: "画像を中央の円形にクロップし、角を透明にする",
     },
+    "rounded-crop": {
+      name: "角丸クロップ",
+      description: "画像を角丸の正方形または squircle にクロップし、角を透明にする",
+    },
     duotone: {
       name: "デュオトーン",
       description: "カスタムのシャドウとハイライト色で2色デュオトーン効果を適用",
@@ -2093,6 +2097,11 @@ export const ja: TranslationKeys = {
       submit: "円形クロップ",
       submitBatch: "円形クロップ ({count} ファイル)",
       progressLabel: "円形にクロップ中",
+    },
+    "rounded-crop": {
+      submit: "角丸クロップ",
+      submitBatch: "角丸クロップ ({count} ファイル)",
+      progressLabel: "角丸にクロップ中",
     },
     duotone: {
       shadow: "シャドウカラー",

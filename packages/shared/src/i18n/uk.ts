@@ -748,6 +748,10 @@ export const uk: TranslationKeys = {
       name: "Кругове обрізання",
       description: "Обрізати зображення до кола по центру з прозорими кутами",
     },
+    "rounded-crop": {
+      name: "Заокруглене обрізання",
+      description: "Обрізати зображення до заокругленого квадрата або squircle з прозорими кутами",
+    },
     duotone: {
       name: "Дуотон",
       description: "Двоколірний ефект дуотону з налаштуванням кольорів тіней та світла",
@@ -2136,6 +2140,11 @@ export const uk: TranslationKeys = {
       submit: "Кругове обрізання",
       submitBatch: "Кругове обрізання ({count} файлів)",
       progressLabel: "Обрізання по колу",
+    },
+    "rounded-crop": {
+      submit: "Заокруглене обрізання",
+      submitBatch: "Заокруглене обрізання ({count} файлів)",
+      progressLabel: "Обрізання до заокругленої форми",
     },
     duotone: {
       shadow: "Колір тіні",

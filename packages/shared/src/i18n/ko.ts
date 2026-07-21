@@ -700,6 +700,10 @@ export const ko: TranslationKeys = {
       name: "원형 크롭",
       description: "이미지를 투명 모서리의 원형으로 크롭",
     },
+    "rounded-crop": {
+      name: "둥근 모서리 크롭",
+      description: "이미지를 투명 모서리의 둥근 사각형 또는 squircle로 크롭",
+    },
     duotone: {
       name: "듀오톤",
       description: "사용자 지정 그림자 및 하이라이트 색상으로 듀오톤 효과 적용",
@@ -2073,6 +2077,11 @@ export const ko: TranslationKeys = {
       submit: "원형 크롭",
       submitBatch: "원형 크롭 ({count}개 파일)",
       progressLabel: "원형으로 크롭 중",
+    },
+    "rounded-crop": {
+      submit: "둥근 모서리 크롭",
+      submitBatch: "둥근 모서리 크롭 ({count}개 파일)",
+      progressLabel: "둥근 모양으로 크롭 중",
     },
     duotone: {
       shadow: "그림자 색상",

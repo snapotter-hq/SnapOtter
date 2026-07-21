@@ -749,6 +749,11 @@ export const nl: TranslationKeys = {
       name: "Cirkel bijsnijden",
       description: "Snijd afbeelding bij tot een gecentreerde cirkel met transparante hoeken",
     },
+    "rounded-crop": {
+      name: "Afgerond bijsnijden",
+      description:
+        "Snijd afbeelding bij tot een afgerond vierkant of squircle met transparante hoeken",
+    },
     duotone: {
       name: "Duotoon",
       description: "Pas een tweekleurig duotoon-effect toe met eigen schaduw- en lichtkleur",
@@ -2140,6 +2145,11 @@ export const nl: TranslationKeys = {
       submit: "Cirkel bijsnijden",
       submitBatch: "Cirkel bijsnijden ({count} bestanden)",
       progressLabel: "Bijsnijden tot cirkel",
+    },
+    "rounded-crop": {
+      submit: "Afgerond bijsnijden",
+      submitBatch: "Afgerond bijsnijden ({count} bestanden)",
+      progressLabel: "Bijsnijden tot afgeronde vorm",
     },
     duotone: {
       shadow: "Schaduwkleur",

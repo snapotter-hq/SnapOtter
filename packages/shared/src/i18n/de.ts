@@ -749,6 +749,11 @@ export const de: TranslationKeys = {
       name: "Kreiszuschnitt",
       description: "Bild auf einen zentrierten Kreis mit transparenten Ecken zuschneiden",
     },
+    "rounded-crop": {
+      name: "Abgerundeter Zuschnitt",
+      description:
+        "Bild auf ein abgerundetes Quadrat oder Squircle mit transparenten Ecken zuschneiden",
+    },
     duotone: {
       name: "Duotone",
       description: "Zweifarbigen Duotone-Effekt mit eigenen Schatten- und Lichtfarben anwenden",
@@ -2143,6 +2148,11 @@ export const de: TranslationKeys = {
       submit: "Kreiszuschnitt",
       submitBatch: "Kreiszuschnitt ({count} Dateien)",
       progressLabel: "Wird kreisförmig zugeschnitten",
+    },
+    "rounded-crop": {
+      submit: "Abgerundeter Zuschnitt",
+      submitBatch: "Abgerundeter Zuschnitt ({count} Dateien)",
+      progressLabel: "Wird abgerundet zugeschnitten",
     },
     duotone: {
       shadow: "Schattenfarbe",

@@ -748,6 +748,10 @@ export const id: TranslationKeys = {
       name: "Potong Lingkaran",
       description: "Potong gambar menjadi lingkaran di tengah dengan sudut transparan",
     },
+    "rounded-crop": {
+      name: "Potong Membulat",
+      description: "Potong gambar menjadi persegi membulat atau squircle dengan sudut transparan",
+    },
     duotone: {
       name: "Duotone",
       description: "Terapkan efek duotone dua warna dengan warna bayangan dan sorotan kustom",
@@ -2134,6 +2138,11 @@ export const id: TranslationKeys = {
       submit: "Crop Lingkaran",
       submitBatch: "Crop Lingkaran ({count} file)",
       progressLabel: "Meng-crop menjadi lingkaran",
+    },
+    "rounded-crop": {
+      submit: "Crop Membulat",
+      submitBatch: "Crop Membulat ({count} file)",
+      progressLabel: "Meng-crop menjadi bentuk membulat",
     },
     duotone: {
       shadow: "Warna Bayangan",

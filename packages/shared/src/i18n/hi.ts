@@ -575,6 +575,10 @@ export const hi: TranslationKeys = {
       name: "गोल क्रॉप",
       description: "इमेज को पारदर्शी कोनों के साथ बीच में गोल क्रॉप करें",
     },
+    "rounded-crop": {
+      name: "गोल कोनों वाला क्रॉप",
+      description: "इमेज को पारदर्शी कोनों के साथ गोल वर्ग या squircle में क्रॉप करें",
+    },
     duotone: {
       name: "डुओटोन",
       description: "कस्टम शैडो और हाइलाइट रंगों के साथ दो-रंगी डुओटोन इफ़ेक्ट लागू करें",
@@ -1950,6 +1954,11 @@ export const hi: TranslationKeys = {
       submit: "सर्कल क्रॉप",
       submitBatch: "सर्कल क्रॉप ({count} फ़ाइलें)",
       progressLabel: "सर्कल में क्रॉप हो रहा है",
+    },
+    "rounded-crop": {
+      submit: "गोल कोनों वाला क्रॉप",
+      submitBatch: "गोल कोनों वाला क्रॉप ({count} फ़ाइलें)",
+      progressLabel: "गोल आकार में क्रॉप हो रहा है",
     },
     duotone: {
       shadow: "शैडो रंग",

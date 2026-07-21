@@ -733,6 +733,11 @@ export const es: TranslationKeys = {
       name: "Recorte circular",
       description: "Recorta la imagen en un círculo centrado con esquinas transparentes",
     },
+    "rounded-crop": {
+      name: "Recorte redondeado",
+      description:
+        "Recorta la imagen en un cuadrado redondeado o squircle con esquinas transparentes",
+    },
     duotone: {
       name: "Duotono",
       description: "Aplica un efecto duotono con colores personalizados de sombra y resaltado",
@@ -2125,6 +2130,11 @@ export const es: TranslationKeys = {
       submit: "Recorte circular",
       submitBatch: "Recorte circular ({count} archivos)",
       progressLabel: "Recortando en círculo",
+    },
+    "rounded-crop": {
+      submit: "Recorte redondeado",
+      submitBatch: "Recorte redondeado ({count} archivos)",
+      progressLabel: "Recortando a forma redondeada",
     },
     duotone: {
       shadow: "Color de sombra",

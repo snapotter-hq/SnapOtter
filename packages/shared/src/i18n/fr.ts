@@ -750,6 +750,10 @@ export const fr: TranslationKeys = {
       name: "Recadrage circulaire",
       description: "Recadrez l’image en cercle centré avec coins transparents",
     },
+    "rounded-crop": {
+      name: "Recadrage arrondi",
+      description: "Recadrez l’image en carré arrondi ou squircle avec coins transparents",
+    },
     duotone: {
       name: "Bichromie",
       description:
@@ -2151,6 +2155,11 @@ export const fr: TranslationKeys = {
       submit: "Recadrage circulaire",
       submitBatch: "Recadrage circulaire ({count} fichiers)",
       progressLabel: "Recadrage en cercle",
+    },
+    "rounded-crop": {
+      submit: "Recadrage arrondi",
+      submitBatch: "Recadrage arrondi ({count} fichiers)",
+      progressLabel: "Recadrage en forme arrondie",
     },
     duotone: {
       shadow: "Couleur des ombres",

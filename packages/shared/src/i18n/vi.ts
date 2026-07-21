@@ -750,6 +750,10 @@ export const vi: TranslationKeys = {
       name: "Cắt hình tròn",
       description: "Cắt hình ảnh thành hình tròn ở giữa với các góc trong suốt",
     },
+    "rounded-crop": {
+      name: "Cắt bo tròn",
+      description: "Cắt hình ảnh thành hình vuông bo tròn hoặc squircle với các góc trong suốt",
+    },
     duotone: {
       name: "Hai tông màu",
       description: "Áp dụng hiệu ứng hai tông màu với màu bóng và màu sáng tùy chỉnh",
@@ -2134,6 +2138,11 @@ export const vi: TranslationKeys = {
       submit: "Cắt tròn",
       submitBatch: "Cắt tròn ({count} tệp)",
       progressLabel: "Đang cắt tròn",
+    },
+    "rounded-crop": {
+      submit: "Cắt bo tròn",
+      submitBatch: "Cắt bo tròn ({count} tệp)",
+      progressLabel: "Đang cắt thành hình bo tròn",
     },
     duotone: {
       shadow: "Màu tối",

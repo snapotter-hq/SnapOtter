@@ -740,6 +740,10 @@ export const th: TranslationKeys = {
       name: "ครอปวงกลม",
       description: "ครอปรูปภาพเป็นวงกลมกึ่งกลางพร้อมมุมโปร่งใส",
     },
+    "rounded-crop": {
+      name: "ครอปมุมมน",
+      description: "ครอปรูปภาพเป็นสี่เหลี่ยมมุมมนหรือ squircle พร้อมมุมโปร่งใส",
+    },
     duotone: {
       name: "ดูโอโทน",
       description: "ใส่เอฟเฟกต์ดูโอโทนสองสีพร้อมกำหนดสีเงาและสีไฮไลต์เอง",
@@ -2104,6 +2108,11 @@ export const th: TranslationKeys = {
       submit: "ครอปวงกลม",
       submitBatch: "ครอปวงกลม ({count} ไฟล์)",
       progressLabel: "กำลังครอปเป็นวงกลม",
+    },
+    "rounded-crop": {
+      submit: "ครอปมุมมน",
+      submitBatch: "ครอปมุมมน ({count} ไฟล์)",
+      progressLabel: "กำลังครอปเป็นรูปทรงมุมมน",
     },
     duotone: {
       shadow: "สีเงา",

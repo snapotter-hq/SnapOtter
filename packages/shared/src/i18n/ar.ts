@@ -741,6 +741,10 @@ export const ar: TranslationKeys = {
       name: "اقتصاص دائري",
       description: "اقتصاص الصورة بشكل دائري في المنتصف مع زوايا شفافة",
     },
+    "rounded-crop": {
+      name: "اقتصاص مستدير",
+      description: "اقتصاص الصورة إلى مربع مستدير أو squircle مع زوايا شفافة",
+    },
     duotone: {
       name: "ثنائي اللون",
       description: "تطبيق تأثير ثنائي اللون مع ألوان ظلال وإبراز مخصصة",
@@ -2120,6 +2124,11 @@ export const ar: TranslationKeys = {
       submit: "اقتصاص دائري",
       submitBatch: "اقتصاص دائري ({count} ملفات)",
       progressLabel: "جارٍ الاقتصاص الدائري",
+    },
+    "rounded-crop": {
+      submit: "اقتصاص مستدير",
+      submitBatch: "اقتصاص مستدير ({count} ملفات)",
+      progressLabel: "جارٍ الاقتصاص إلى شكل مستدير",
     },
     duotone: {
       shadow: "لون الظل",

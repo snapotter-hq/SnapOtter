@@ -747,6 +747,10 @@ export const sv: TranslationKeys = {
       name: "Cirkelbeskärning",
       description: "Beskär bilden till en centrerad cirkel med transparenta hörn",
     },
+    "rounded-crop": {
+      name: "Rundad beskärning",
+      description: "Beskär bilden till en rundad kvadrat eller squircle med transparenta hörn",
+    },
     duotone: {
       name: "Duoton",
       description: "Applicera en tvåfärgseffekt med anpassade skugg- och högdagerfärger",
@@ -2133,6 +2137,11 @@ export const sv: TranslationKeys = {
       submit: "Cirkulär beskärning",
       submitBatch: "Cirkulär beskärning ({count} filer)",
       progressLabel: "Beskär till cirkel",
+    },
+    "rounded-crop": {
+      submit: "Rundad beskärning",
+      submitBatch: "Rundad beskärning ({count} filer)",
+      progressLabel: "Beskär till rundad form",
     },
     duotone: {
       shadow: "Skuggfärg",

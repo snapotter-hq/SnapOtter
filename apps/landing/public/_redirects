@@ -113,6 +113,8 @@
 /tools/beautify /tools/image/beautify/ 301
 /tools/circle-crop/ /tools/image/circle-crop/ 301
 /tools/circle-crop /tools/image/circle-crop/ 301
+/tools/rounded-crop/ /tools/image/rounded-crop/ 301
+/tools/rounded-crop /tools/image/rounded-crop/ 301
 /tools/duotone/ /tools/image/duotone/ 301
 /tools/duotone /tools/image/duotone/ 301
 /tools/image-pad/ /tools/image/image-pad/ 301

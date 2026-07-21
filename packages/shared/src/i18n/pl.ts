@@ -748,6 +748,10 @@ export const pl: TranslationKeys = {
       name: "Kadrowanie do koła",
       description: "Przytnij obraz do koła z przezroczystymi rogami",
     },
+    "rounded-crop": {
+      name: "Kadrowanie zaokrąglone",
+      description: "Przytnij obraz do zaokrąglonego kwadratu lub squircle z przezroczystymi rogami",
+    },
     duotone: {
       name: "Duotone",
       description: "Zastosuj dwukolorowy efekt duotone z wybranymi kolorami cieni i świateł",
@@ -2138,6 +2142,11 @@ export const pl: TranslationKeys = {
       submit: "Przytnij do koła",
       submitBatch: "Przytnij do koła ({count} plików)",
       progressLabel: "Przycinanie do koła",
+    },
+    "rounded-crop": {
+      submit: "Przytnij zaokrąglone",
+      submitBatch: "Przytnij zaokrąglone ({count} plików)",
+      progressLabel: "Przycinanie do zaokrąglonego kształtu",
     },
     duotone: {
       shadow: "Kolor cieni",

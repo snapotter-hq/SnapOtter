@@ -748,6 +748,11 @@ export const it: TranslationKeys = {
       name: "Ritaglio Circolare",
       description: "Ritaglia l'immagine in un cerchio centrato con angoli trasparenti",
     },
+    "rounded-crop": {
+      name: "Ritaglio Arrotondato",
+      description:
+        "Ritaglia l'immagine in un quadrato arrotondato o squircle con angoli trasparenti",
+    },
     duotone: {
       name: "Duotono",
       description: "Applica un effetto duotono a due colori con ombre e luci personalizzate",
@@ -2139,6 +2144,11 @@ export const it: TranslationKeys = {
       submit: "Ritaglio Circolare",
       submitBatch: "Ritaglio Circolare ({count} file)",
       progressLabel: "Ritaglio in cerchio",
+    },
+    "rounded-crop": {
+      submit: "Ritaglio Arrotondato",
+      submitBatch: "Ritaglio Arrotondato ({count} file)",
+      progressLabel: "Ritaglio in forma arrotondata",
     },
     duotone: {
       shadow: "Colore Ombra",

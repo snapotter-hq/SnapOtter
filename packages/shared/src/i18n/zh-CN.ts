@@ -531,6 +531,10 @@ export const zhCN: TranslationKeys = {
       name: "圆形裁剪",
       description: "将图片裁剪为居中圆形，四角透明",
     },
+    "rounded-crop": {
+      name: "圆角裁剪",
+      description: "将图片裁剪为圆角方形或 squircle，四角透明",
+    },
     duotone: {
       name: "双色调",
       description: "应用双色调效果，自定义阴影和高光颜色",
@@ -1892,6 +1896,11 @@ export const zhCN: TranslationKeys = {
       submit: "圆形裁剪",
       submitBatch: "圆形裁剪（{count} 个文件）",
       progressLabel: "正在圆形裁剪",
+    },
+    "rounded-crop": {
+      submit: "圆角裁剪",
+      submitBatch: "圆角裁剪（{count} 个文件）",
+      progressLabel: "正在裁剪为圆角形状",
     },
     duotone: {
       shadow: "阴影颜色",
