@@ -4,7 +4,11 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   env: { PROCESSING_TIMEOUT_S: 0 },
 }));
 
-import { computeExternalToolTimeout, computeTimeout } from "../../../apps/api/src/lib/timeout.js";
+import {
+  computeExternalToolTimeout,
+  computeTimeout,
+  timeoutMessage,
+} from "../../../apps/api/src/lib/timeout.js";
 
 describe("computeTimeout", () => {
   it("returns correct timeout for sharp category", () => {
@@ -120,5 +124,24 @@ describe("computeExternalToolTimeout", () => {
   it("enforces minimum for small megapixel values", () => {
     const result = computeExternalToolTimeout(0.5);
     expect(result).toBe(60_000);
+  });
+});
+
+describe("timeoutMessage", () => {
+  it("reports the elapsed timeout in seconds", () => {
+    expect(timeoutMessage(120_000)).toContain("120s");
+    expect(timeoutMessage(5_000)).toContain("5s");
+  });
+
+  it("is tool-agnostic (no hardcoded background-removal)", () => {
+    // The old copy told every timed-out job a background-removal model was
+    // downloading, which was wrong for AI upscale, video, etc. (#591).
+    expect(timeoutMessage(120_000)).not.toMatch(/background-removal/i);
+  });
+
+  it("sets the CPU-vs-GPU expectation for heavy tools", () => {
+    const msg = timeoutMessage(120_000);
+    expect(msg).toMatch(/CPU/);
+    expect(msg).toMatch(/GPU/);
   });
 });

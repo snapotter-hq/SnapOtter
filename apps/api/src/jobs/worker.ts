@@ -52,6 +52,7 @@ import {
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
+import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
   publishEphemeral,
@@ -508,7 +509,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? `Timed out after ${Math.round(timeoutMs / 1000)}s. On the first run the background-removal model may still be downloading; the image may be too large for CPU inference; or the worker may be busy or unavailable. Retry once the model has downloaded, or try a smaller image.`
+          ? timeoutMessage(timeoutMs)
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see

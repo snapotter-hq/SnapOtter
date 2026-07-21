@@ -147,7 +147,7 @@ export function useToolProcessor(toolId: string) {
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
                 clearActiveJob();
                 setError(
-                  "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
+                  "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
                 );
                 setProcessing(false);
                 setProgress(IDLE_PROGRESS);
@@ -167,7 +167,7 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               clearActiveJob();
               setError(
-                "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
+                "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
               );
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -329,7 +329,7 @@ export function useToolProcessor(toolId: string) {
             error: "Processing timed out",
           });
           setError(
-            "Processing timed out with no progress for 5 minutes. Try again or use a smaller file.",
+            "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
           );
           setProcessing(false);
           setProgress(IDLE_PROGRESS);
