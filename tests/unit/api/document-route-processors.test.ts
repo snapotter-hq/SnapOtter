@@ -31,7 +31,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 vi.mock("@snapotter/doc-engine", () => ({
   htmlToPdfPy: vi.fn(),
   pdfFlattenPy: vi.fn(),
-  pdfTextPy: vi.fn(async () => ({ chars: 12 })),
+  pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
   qpdfAvailable: vi.fn(() => false),
   qpdfCheck: vi.fn(),
   qpdfPageCount: vi.fn(),
@@ -102,6 +102,19 @@ describe("document route processors", () => {
         contentType: "text/plain",
         resultPayload: { chars: 12 },
       });
+    });
+  });
+
+  it("rejects a PDF with no text layer and points the user to OCR", async () => {
+    // A scanned/image-only PDF yields hasText=false; the route must reject with
+    // an OCR handoff instead of returning a silent empty .txt (#589).
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({ chars: 0, hasText: false });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toThrow(/text layer/i);
     });
   });
 

@@ -82,16 +82,24 @@ export async function pdfRedactPy(
 }
 
 /** Extract plain text from a PDF (PyMuPDF get_text). */
-export async function pdfTextPy(inPath: string, outTxtPath: string): Promise<{ chars: number }> {
+export async function pdfTextPy(
+  inPath: string,
+  outTxtPath: string,
+): Promise<{ chars: number; hasText: boolean }> {
   const stdout = await runDocsScript("doc_text", { path: inPath, out: outTxtPath });
-  const parsed = parseDocsJson<{ chars?: number; error?: string }>("doc_text", stdout);
+  const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
+    "doc_text",
+    stdout,
+  );
   if (parsed.error) {
     throw new Error(`doc_text failed: ${parsed.error}`);
   }
   if (typeof parsed.chars !== "number") {
     throw new Error(`doc_text failed: ${stdout.slice(0, 200)}`);
   }
-  return { chars: parsed.chars };
+  // Fall back to a chars>0 heuristic if an older sidecar omits hasText.
+  const hasText = parsed.hasText ?? parsed.chars > 0;
+  return { chars: parsed.chars, hasText };
 }
 
 /** PDF to DOCX conversion (pdf2docx). Long-running: 5 min timeout. */

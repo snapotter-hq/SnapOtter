@@ -22,7 +22,7 @@ function resolvePython(): string | null {
   return null;
 }
 
-const pythonBin = resolvePython();
+export const pythonBin = resolvePython();
 
 /** Check whether a Python module is importable by the resolved interpreter. */
 export function pythonWith(mod: string): boolean {

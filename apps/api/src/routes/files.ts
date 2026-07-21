@@ -227,7 +227,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
   });
 }
 
-function getContentType(ext: string): string {
+export function getContentType(ext: string): string {
   const map: Record<string, string> = {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
@@ -303,5 +303,9 @@ function getContentType(ext: string): string {
     heic: "image/heic",
     heif: "image/heif",
   };
-  return map[ext] ?? "application/octet-stream";
+  const type = map[ext] ?? "application/octet-stream";
+  // Text payloads (extracted text, markdown, CSV, subtitles) are written UTF-8.
+  // Without an explicit charset a browser can sniff a legacy encoding and
+  // mojibake non-Latin scripts like Arabic when the file is viewed inline (#589).
+  return type.startsWith("text/") ? `${type}; charset=utf-8` : type;
 }
