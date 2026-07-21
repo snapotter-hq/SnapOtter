@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMobile } from "@/hooks/use-mobile";
+import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -20,6 +21,9 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Distinguishes an abandoned feedback dialog (dismissed) from one that was
+  // submitted, so the dismissed event does not fire after a real submission.
+  const feedbackSubmittedRef = useRef(false);
   const isMobile = useMobile();
   const connectionStatus = useConnectionStore((s) => s.status);
   const bannerVisible = connectionStatus !== "connected";
@@ -51,7 +55,11 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
         variant={navVariant}
         breadcrumb={breadcrumb}
         onHelpClick={() => setHelpOpen(true)}
-        onFeedbackClick={() => setFeedbackOpen(true)}
+        onFeedbackClick={() => {
+          feedbackSubmittedRef.current = false;
+          trackFeedbackPromptShown("global");
+          setFeedbackOpen(true);
+        }}
         onSettingsClick={() => setSettingsOpen(true)}
       />
 
@@ -74,7 +82,17 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* Feedback dialog */}
-      <FeedbackDialog open={feedbackOpen} source="global" onClose={() => setFeedbackOpen(false)} />
+      <FeedbackDialog
+        open={feedbackOpen}
+        source="global"
+        onSubmitted={() => {
+          feedbackSubmittedRef.current = true;
+        }}
+        onClose={() => {
+          if (!feedbackSubmittedRef.current) trackFeedbackPromptDismissed("global", "close");
+          setFeedbackOpen(false);
+        }}
+      />
 
       {/* Global AI install progress */}
       <AiInstallIndicator />

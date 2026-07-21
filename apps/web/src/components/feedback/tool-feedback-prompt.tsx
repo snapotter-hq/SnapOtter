@@ -7,6 +7,8 @@ import {
   promptVariantForSource,
   submitFeedback,
   surveyIdForSource,
+  trackFeedbackPromptDismissed,
+  trackFeedbackPromptShown,
 } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -96,19 +98,22 @@ export function ToolFeedbackPrompt({
   const [dialogSentiment, setDialogSentiment] = useState<FeedbackSentiment | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [thanks, setThanks] = useState(false);
+  const source = jobStatus === "failed" ? "failed_job" : "tool_result";
 
   useEffect(() => {
     if (!analyticsLoaded || !analyticsConfig?.enabled) return;
     const show = shouldShowPrompt(toolId);
-    if (show) markPromptShown();
+    if (show) {
+      markPromptShown();
+      trackFeedbackPromptShown(source);
+    }
     setVisible(show);
-  }, [analyticsLoaded, analyticsConfig?.enabled, toolId]);
+  }, [analyticsLoaded, analyticsConfig?.enabled, toolId, source]);
 
   if (!analyticsLoaded || !analyticsConfig?.enabled) return null;
   if (!visible && !thanks && !dialogOpen) return null;
 
   async function handleQuickSentiment(sentiment: FeedbackSentiment) {
-    const source = jobStatus === "failed" ? "failed_job" : "tool_result";
     if (sentiment === "great") {
       markPromptHandled(toolId);
       setVisible(false);
@@ -136,11 +141,13 @@ export function ToolFeedbackPrompt({
 
   function handleDismiss() {
     markPromptHandled(toolId);
+    trackFeedbackPromptDismissed(source, "close");
     setVisible(false);
   }
 
   function handleDontAskAgain() {
     disablePrompts();
+    trackFeedbackPromptDismissed(source, "dont_ask_again");
     setVisible(false);
   }
 

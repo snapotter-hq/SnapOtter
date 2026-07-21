@@ -306,6 +306,9 @@ describe("captureFeedback", () => {
         survey_id: "onboarding-usage-v1",
         contact_ok: false,
         usage_type: "personal",
+        prior_tool: "command_line",
+        selfhost_motivation: "privacy_control",
+        discovery_source: "github",
       },
       "distinct-onboarding",
     );
@@ -314,6 +317,12 @@ describe("captureFeedback", () => {
       expect.objectContaining({
         distinctId: "distinct-onboarding",
         event: "onboarding_survey_submitted",
+        properties: expect.objectContaining({
+          usage_type: "personal",
+          prior_tool: "command_line",
+          selfhost_motivation: "privacy_control",
+          discovery_source: "github",
+        }),
       }),
     );
   });

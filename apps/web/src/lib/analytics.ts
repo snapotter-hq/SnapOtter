@@ -25,6 +25,8 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   pipeline_step_added: new Set(["tool_id"]),
   pipeline_saved: new Set(["step_count"]),
   pipeline_template_selected: new Set(["template_id"]),
+  feedback_prompt_shown: new Set(["source", "survey_id", "prompt_variant"]),
+  feedback_prompt_dismissed: new Set(["source", "survey_id", "prompt_variant", "dismiss_kind"]),
 };
 
 function sanitize(event: string, properties?: Record<string, unknown>): Record<string, unknown> {

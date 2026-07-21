@@ -1,8 +1,11 @@
 import {
+  FEEDBACK_DISCOVERY_SOURCE_VALUES,
   FEEDBACK_ERROR_CATEGORY_VALUES,
   FEEDBACK_FRICTION_AREA_VALUES,
   FEEDBACK_IMPORTANT_AREA_VALUES,
   FEEDBACK_INSTALL_METHOD_VALUES,
+  FEEDBACK_PRIOR_TOOL_VALUES,
+  FEEDBACK_SELFHOST_MOTIVATION_VALUES,
   FEEDBACK_SENTIMENT_VALUES,
   FEEDBACK_SOURCE_VALUES,
   FEEDBACK_SURVEY_ID_VALUES,
@@ -58,6 +61,9 @@ const feedbackBodySchema = z
     usageType: z.enum(FEEDBACK_USAGE_TYPE_VALUES).optional(),
     importantAreas: z.array(z.enum(FEEDBACK_IMPORTANT_AREA_VALUES)).max(5).optional(),
     frictionArea: z.enum(FEEDBACK_FRICTION_AREA_VALUES).optional(),
+    priorTool: z.enum(FEEDBACK_PRIOR_TOOL_VALUES).optional(),
+    selfHostMotivation: z.enum(FEEDBACK_SELFHOST_MOTIVATION_VALUES).optional(),
+    discoverySource: z.enum(FEEDBACK_DISCOVERY_SOURCE_VALUES).optional(),
     errorCategory: z.enum(FEEDBACK_ERROR_CATEGORY_VALUES).optional(),
   })
   .superRefine((value, ctx) => {
@@ -97,6 +103,9 @@ function toPostHogProperties(body: z.infer<typeof feedbackBodySchema>): Feedback
     usage_type: body.usageType,
     important_areas: body.importantAreas,
     friction_area: body.frictionArea,
+    prior_tool: body.priorTool,
+    selfhost_motivation: body.selfHostMotivation,
+    discovery_source: body.discoverySource,
     error_category: body.errorCategory,
   };
 }

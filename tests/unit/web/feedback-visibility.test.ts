@@ -97,10 +97,14 @@ describe("shouldShowInstallFeedbackCard", () => {
 });
 
 describe("shouldShowUsageSurvey", () => {
-  it("shows only for admins after analytics config is loaded and enabled", () => {
+  // The survey now waits for the instance's first successful processing so we
+  // ask engaged users, not someone staring at an empty app on first landing.
+  const PROCESSED = { "onboarding.firstProcessedAt": "2026-01-14T00:00:00Z" };
+
+  it("shows only for admins after analytics is loaded and enabled, once a processing has completed", () => {
     expect(
       shouldShowUsageSurvey({
-        settings: {},
+        settings: PROCESSED,
         role: "admin",
         analyticsConfigLoaded: true,
         analyticsEnabled: true,
@@ -109,7 +113,7 @@ describe("shouldShowUsageSurvey", () => {
 
     expect(
       shouldShowUsageSurvey({
-        settings: {},
+        settings: PROCESSED,
         role: "user",
         analyticsConfigLoaded: true,
         analyticsEnabled: true,
@@ -118,7 +122,7 @@ describe("shouldShowUsageSurvey", () => {
 
     expect(
       shouldShowUsageSurvey({
-        settings: {},
+        settings: PROCESSED,
         role: "admin",
         analyticsConfigLoaded: false,
         analyticsEnabled: true,
@@ -127,7 +131,7 @@ describe("shouldShowUsageSurvey", () => {
 
     expect(
       shouldShowUsageSurvey({
-        settings: {},
+        settings: PROCESSED,
         role: "admin",
         analyticsConfigLoaded: true,
         analyticsEnabled: false,
@@ -135,10 +139,21 @@ describe("shouldShowUsageSurvey", () => {
     ).toBe(false);
   });
 
-  it("stays hidden after answering or permanently dismissing", () => {
+  it("stays hidden until the instance's first successful processing", () => {
     expect(
       shouldShowUsageSurvey({
-        settings: { "onboarding.usageSurvey.answeredAt": "2026-01-14T00:00:00Z" },
+        settings: {},
+        role: "admin",
+        analyticsConfigLoaded: true,
+        analyticsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("stays hidden after answering or permanently dismissing, even once processing has happened", () => {
+    expect(
+      shouldShowUsageSurvey({
+        settings: { ...PROCESSED, "onboarding.usageSurvey.answeredAt": "2026-01-14T00:00:00Z" },
         role: "admin",
         analyticsConfigLoaded: true,
         analyticsEnabled: true,
@@ -147,7 +162,7 @@ describe("shouldShowUsageSurvey", () => {
 
     expect(
       shouldShowUsageSurvey({
-        settings: { "onboarding.usageSurvey.dismissedAt": "2026-01-14T00:00:00Z" },
+        settings: { ...PROCESSED, "onboarding.usageSurvey.dismissedAt": "2026-01-14T00:00:00Z" },
         role: "admin",
         analyticsConfigLoaded: true,
         analyticsEnabled: true,

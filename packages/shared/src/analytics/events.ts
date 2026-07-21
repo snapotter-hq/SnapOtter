@@ -27,6 +27,11 @@ export const ANALYTICS_EVENTS = {
   PIPELINE_TEMPLATE_SELECTED: "pipeline_template_selected",
   AUTH_LOGIN: "auth_login",
   AUTH_LOGIN_FAILED: "auth_login_failed",
+  // Feedback prompt lifecycle (client-side). Fired when any feedback surface is
+  // shown to a user and when it is dismissed without submitting, so completion
+  // and skip rates become measurable instead of counting only submissions.
+  FEEDBACK_PROMPT_SHOWN: "feedback_prompt_shown",
+  FEEDBACK_PROMPT_DISMISSED: "feedback_prompt_dismissed",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];

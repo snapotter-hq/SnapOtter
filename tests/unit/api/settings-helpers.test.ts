@@ -5,6 +5,7 @@ import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
   getSettingNumber,
   getSettingString,
+  setSettingIfAbsent,
   upsertSetting,
 } from "../../../apps/api/src/lib/settings-helpers.js";
 
@@ -115,5 +116,30 @@ describe("getSettingString", () => {
     const key = uniqueKey();
     const result = await getSettingString(key);
     expect(result).toBe("");
+  });
+});
+
+describe("setSettingIfAbsent", () => {
+  it("writes the value when the key is absent", async () => {
+    const key = uniqueKey();
+    keysToClean.push(key);
+
+    await setSettingIfAbsent(key, "first");
+
+    const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe("first");
+  });
+
+  it("keeps the first value and ignores later writes (first-write-wins)", async () => {
+    const key = uniqueKey();
+    keysToClean.push(key);
+
+    await setSettingIfAbsent(key, "first");
+    await setSettingIfAbsent(key, "second");
+
+    const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe("first");
   });
 });

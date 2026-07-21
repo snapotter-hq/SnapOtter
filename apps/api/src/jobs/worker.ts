@@ -31,6 +31,7 @@ import {
   getBundleForTool,
   getOptionalBundleForTool,
   isToolInputError,
+  ONBOARDING_FIRST_PROCESSED_KEY,
   type PipelineExecutedProperties,
   TOOLS,
 } from "@snapotter/shared";
@@ -53,6 +54,7 @@ import {
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
+import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
@@ -492,6 +494,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             bytes_out: resultBuffer.length,
           },
           data.analyticsDistinctId,
+        );
+        // Mark the instance's first successful processing so the onboarding
+        // survey only appears once the admin has produced a real result
+        // (shouldShowUsageSurvey gate in web feedback.ts). First-write-wins, so
+        // the timestamp reflects the genuine first job and later jobs no-op.
+        void setSettingIfAbsent(ONBOARDING_FIRST_PROCESSED_KEY, new Date().toISOString()).catch(
+          () => {},
         );
       }
 

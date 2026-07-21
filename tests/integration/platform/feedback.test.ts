@@ -134,7 +134,7 @@ describe("POST /api/v1/feedback", () => {
     );
   });
 
-  it("accepts an onboarding usage-survey submission", async () => {
+  it("accepts an onboarding usage-survey submission with the telemetry-blind answers", async () => {
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
@@ -148,7 +148,9 @@ describe("POST /api/v1/feedback", () => {
         surveyId: "onboarding-usage-v1",
         promptVariant: "onboarding-overlay-v1",
         usageType: "team_internal",
-        importantAreas: ["images", "pdf_docs"],
+        priorTool: "command_line",
+        selfHostMotivation: "privacy_control",
+        discoverySource: "github",
       },
     });
 
@@ -160,13 +162,15 @@ describe("POST /api/v1/feedback", () => {
         survey_id: "onboarding-usage-v1",
         prompt_variant: "onboarding-overlay-v1",
         usage_type: "team_internal",
-        important_areas: ["images", "pdf_docs"],
+        prior_tool: "command_line",
+        selfhost_motivation: "privacy_control",
+        discovery_source: "github",
       }),
       undefined,
     );
   });
 
-  it("accepts a persona-only onboarding submission with no important areas selected", async () => {
+  it("accepts a persona-only onboarding submission with only the usage type", async () => {
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
@@ -180,7 +184,6 @@ describe("POST /api/v1/feedback", () => {
         surveyId: "onboarding-usage-v1",
         promptVariant: "onboarding-overlay-v1",
         usageType: "personal",
-        importantAreas: [],
       },
     });
 
@@ -195,12 +198,26 @@ describe("POST /api/v1/feedback", () => {
       }),
       undefined,
     );
-    // captureFeedback is mocked, so it receives the route's raw properties: the
-    // empty importantAreas array is forwarded as-is. Dropping an empty
-    // important_areas before it reaches PostHog happens inside the real,
-    // unmocked cleanFeedbackProperties (analytics.ts), which this test bypasses.
-    const lastCall = captureFeedback.mock.calls.at(-1);
-    expect(lastCall?.[0].important_areas).toEqual([]);
+  });
+
+  it("rejects invalid onboarding survey answers", async () => {
+    const token = await loginAsAdmin(testApp.app);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/feedback",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        source: "onboarding",
+        surveyId: "onboarding-usage-v1",
+        usageType: "personal",
+        priorTool: "carrier_pigeon",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).details).toContainEqual(
+      expect.objectContaining({ path: "priorTool" }),
+    );
   });
 
   it("drops identifying contact fields when contact consent is not checked", async () => {
