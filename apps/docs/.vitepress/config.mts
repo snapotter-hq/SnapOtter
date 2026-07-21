@@ -117,6 +117,14 @@ export default defineConfig({
   outDir: "./.vitepress/dist",
   ignoreDeadLinks: [/localhost/],
 
+  // Extension-less URLs in both internal links and the sitemap, so they match
+  // the clean canonical/hreflang emitted in transformHead below. Without this
+  // the sitemap listed .html URLs that Cloudflare Pages 308-redirects to the
+  // clean form, so Google indexed the redirecting variant and overrode our
+  // canonical (GSC "Duplicate, Google chose different canonical"). CF Pages
+  // serves the clean URL at 200, so no extra server config is needed.
+  cleanUrls: true,
+
   sitemap: { hostname: "https://docs.snapotter.com" },
 
   head: [

@@ -14,7 +14,9 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://demo.snapotter.com" />
     <meta property="og:image" content="https://snapotter.com/og-image.png" />
-    <meta name="robots" content="index, follow" />
+    <!-- Demo mirrors the real app and lives under the same domain property; keep it
+         out of search to avoid thin/duplicate pages (GSC "Crawled - currently not indexed"). -->
+    <meta name="robots" content="noindex, nofollow" />
   </head>
   <body>
     <div id="root"></div>
