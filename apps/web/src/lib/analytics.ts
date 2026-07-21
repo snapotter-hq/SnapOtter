@@ -89,8 +89,11 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
     // Clear any persisted opt-out from a previous disabled period. opt_out_capturing()
     // writes a localStorage flag that survives reloads, so without this a browser that
     // once opted out would stay silent even after the instance re-enables analytics.
+    // captureEventName: false suppresses posthog-js's default $opt_in event, which
+    // otherwise fires once per page load here (pure noise: analytics is on by
+    // default with an admin opt-out, so there is no per-user consent to record).
     try {
-      posthog.opt_in_capturing();
+      posthog.opt_in_capturing({ captureEventName: false });
     } catch {
       // ignore
     }
@@ -194,7 +197,9 @@ export function optOut(): void {
 export function optIn(): void {
   enabled = true;
   try {
-    posthog?.opt_in_capturing();
+    // captureEventName: false: resuming capture is not a per-user consent signal
+    // in this product, so don't emit a noisy $opt_in event (see initAnalytics).
+    posthog?.opt_in_capturing({ captureEventName: false });
   } catch {
     // ignore
   }

@@ -2,8 +2,8 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 24 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(24);
+  it("has exactly 25 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(25);
   });
 
   it("contains the expected keys", () => {
@@ -20,6 +20,7 @@ describe("ANALYTICS_EVENTS", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("AI_BUNDLE_PROMPTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("BATCH_PROCESSED");
     expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_SUBMITTED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("ONBOARDING_SURVEY_SUBMITTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("SPONSOR_CLICKED");
     expect(ANALYTICS_EVENTS).toHaveProperty("INSTANCE_STARTED");
     expect(ANALYTICS_EVENTS).toHaveProperty("EDITOR_OPENED");
@@ -57,6 +58,10 @@ describe("ANALYTICS_EVENTS", () => {
 
   it("FEEDBACK_SUBMITTED has the correct snake_case value", () => {
     expect(ANALYTICS_EVENTS.FEEDBACK_SUBMITTED).toBe("feedback_submitted");
+  });
+
+  it("ONBOARDING_SURVEY_SUBMITTED has the correct snake_case value", () => {
+    expect(ANALYTICS_EVENTS.ONBOARDING_SURVEY_SUBMITTED).toBe("onboarding_survey_submitted");
   });
 
   it("INSTANCE_STARTED has the correct snake_case value", () => {

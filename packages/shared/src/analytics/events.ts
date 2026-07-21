@@ -12,6 +12,10 @@ export const ANALYTICS_EVENTS = {
   AI_BUNDLE_PROMPTED: "ai_bundle_prompted",
   BATCH_PROCESSED: "batch_processed",
   FEEDBACK_SUBMITTED: "feedback_submitted",
+  // The onboarding usage survey (source: "onboarding") is a profiling survey,
+  // not feedback. It rides the same /v1/feedback endpoint but is emitted under
+  // its own event name so feedback_submitted stays genuine feedback only.
+  ONBOARDING_SURVEY_SUBMITTED: "onboarding_survey_submitted",
   SPONSOR_CLICKED: "sponsor_clicked",
   INSTANCE_STARTED: "instance_started",
   EDITOR_OPENED: "editor_opened",

@@ -4,14 +4,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const mockInit = vi.fn(() => ({
   capture: mockCapture,
   startSessionRecording: vi.fn(),
-  opt_in_capturing: vi.fn(),
+  opt_in_capturing: mockOptInCapturing,
   opt_out_capturing: vi.fn(),
+  has_opted_out_capturing: vi.fn(() => false),
   reset: vi.fn(),
   register: vi.fn(),
   get_distinct_id: vi.fn(() => "test-distinct-id"),
   persistence: { disabled: false },
 }));
 const mockCapture = vi.fn();
+const mockOptInCapturing = vi.fn();
 
 vi.mock("posthog-js", () => ({
   __esModule: true,
@@ -68,6 +70,7 @@ let mod: AnalyticsModule;
 beforeEach(async () => {
   mockInit.mockClear();
   mockCapture.mockClear();
+  mockOptInCapturing.mockClear();
   mockSentryInit.mockClear();
   vi.resetModules();
   mod = await import("../../../apps/web/src/lib/analytics");
@@ -176,6 +179,23 @@ describe("analytics lib (baked model)", () => {
     it("returns distinct ID after initialization", async () => {
       await mod.initAnalytics(enabledConfig);
       expect(mod.getDistinctId()).toBe("test-distinct-id");
+    });
+  });
+
+  describe("opt-in capturing", () => {
+    // opt_in_capturing() clears a stale persisted opt-out flag, but posthog-js
+    // emits a noisy $opt_in event on every call by default. We fire it once per
+    // page load, so it must suppress that event (captureEventName: false).
+    it("suppresses the $opt_in event when clearing a stale opt-out on init", async () => {
+      await mod.initAnalytics(enabledConfig);
+      expect(mockOptInCapturing).toHaveBeenCalledWith({ captureEventName: false });
+    });
+
+    it("suppresses the $opt_in event when resuming capture via optIn()", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mockOptInCapturing.mockClear();
+      mod.optIn();
+      expect(mockOptInCapturing).toHaveBeenCalledWith({ captureEventName: false });
     });
   });
 

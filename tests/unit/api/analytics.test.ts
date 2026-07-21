@@ -295,6 +295,41 @@ describe("captureFeedback", () => {
     });
   });
 
+  it("routes an onboarding survey to its own event, not feedback_submitted", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.captureFeedback(
+      {
+        source: "onboarding",
+        survey_id: "onboarding-usage-v1",
+        contact_ok: false,
+        usage_type: "personal",
+      },
+      "distinct-onboarding",
+    );
+
+    expect(mockCapture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        distinctId: "distinct-onboarding",
+        event: "onboarding_survey_submitted",
+      }),
+    );
+  });
+
+  it("keeps genuine feedback sources on the feedback_submitted event", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.captureFeedback({ source: "global", contact_ok: false, message: "A message" });
+
+    expect(mockCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "feedback_submitted" }),
+    );
+  });
+
   it("drops an empty important_areas array instead of forwarding it", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";

@@ -153,9 +153,15 @@ export async function captureFeedback(
 ): Promise<void> {
   try {
     if (!analyticsEnabled() || !posthogClient) return;
+    // The onboarding usage survey is a profiling questionnaire, not feedback, so
+    // it gets its own event name and feedback_submitted stays genuine feedback.
+    const event =
+      properties.source === "onboarding"
+        ? ANALYTICS_EVENTS.ONBOARDING_SURVEY_SUBMITTED
+        : ANALYTICS_EVENTS.FEEDBACK_SUBMITTED;
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),
-      event: ANALYTICS_EVENTS.FEEDBACK_SUBMITTED,
+      event,
       properties: cleanFeedbackProperties(properties),
     });
   } catch {
