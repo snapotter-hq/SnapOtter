@@ -54,7 +54,7 @@ services:
     image: postgres:17-alpine
     environment:
       - POSTGRES_USER=snapotter
-      - POSTGRES_PASSWORD=snapotter
+      - POSTGRES_PASSWORD=snapotter     # Change this for non-local deployments
       - POSTGRES_DB=snapotter
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
