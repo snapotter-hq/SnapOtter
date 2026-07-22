@@ -86,7 +86,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // PUT /api/v1/settings — Save settings (admin only)
-  app.put("/api/v1/settings", async (request: FastifyRequest, reply: FastifyReply) => {
+  const updateSettings = async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
     if (!admin) return;
 
@@ -224,7 +224,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({ ok: true, updatedCount: entries.length });
-  });
+  };
+  app.put(
+    "/api/v1/settings",
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
+    updateSettings,
+  );
 
   // GET /api/v1/settings/:key — Get a specific setting
   app.get(
