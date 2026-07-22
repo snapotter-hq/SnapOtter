@@ -95,12 +95,14 @@
   "license": "AGPL-3.0",
   "pnpm": {
     "overrides": {
-      "fast-uri": ">=3.1.2",
+      "fast-uri": ">=4.1.1",
+      "astro>sharp": "0.35.3",
+      "astro>svgo": "4.0.2",
       "handlebars": ">=4.7.9",
       "glob": ">=10.5.0",
       "minimatch": ">=9.0.6",
       "picomatch": ">=4.0.4",
-      "tar": ">=7.5.11",
+      "tar": ">=7.5.19",
       "lodash": ">=4.18.0",
       "lodash-es": ">=4.18.0",
       "brace-expansion>minimatch": "^2.0.2",
