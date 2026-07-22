@@ -38,17 +38,20 @@ export function stripControlChars(message: string): string {
 
 /**
  * Unambiguous markers of a raw external-tool failure dump: the
- * `<tool> exited N:` prefix that the media-engine (ffmpeg/ffprobe) and
- * doc-engine (qpdf, gs, pandoc, pdfcpu, LibreOffice) wrappers throw, a Python
- * traceback, or a crash. These are matched precisely (not by content
- * keywords like "pixel format" or "conversion failed", which can appear in
- * legitimate validation messages): the tool name is word-bounded and followed
- * by `exited <token>` so a numeric exit code or a signal name (e.g. SIGKILL)
- * both collapse, while a benign substring like "pngs exited" does not. Longer
- * or multi-line raw dumps are caught separately by the length/line-count check.
+ * `ffmpeg/ffprobe exited N:` prefix that media-engine throws, a Python
+ * traceback, or a crash. Matched precisely (not by content keywords like
+ * "pixel format" or "conversion failed", which appear in legitimate validation
+ * messages); longer or multi-line raw dumps are caught by the length/line-count
+ * check below.
+ *
+ * Doc-engine tools (qpdf, gs, pdfcpu, pandoc, LibreOffice) are deliberately NOT
+ * matched here. Their short stderr is already path-scrubbed and often carries
+ * the actionable reason (qpdf surfaces "invalid password" this way), so
+ * collapsing it to the generic sentence would hide errors users need. The
+ * genuinely verbose dumps are still caught by the length/line-count guard.
  */
 const RAW_TOOL_FAILURE =
-  /\b(?:ff(?:mpeg|probe)|qpdf|gs|gm|magick|pdfcpu|pandoc|libreoffice|soffice) exited \S|traceback \(most recent call|segmentation fault|core dumped/i;
+  /ff(?:mpeg|probe) exited \d|traceback \(most recent call|segmentation fault|core dumped/i;
 
 /**
  * Produce a user-safe error detail. Intentional validation messages (short,

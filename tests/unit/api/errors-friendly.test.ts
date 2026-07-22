@@ -18,27 +18,15 @@ describe("friendlyError", () => {
     expect(friendlyError("ffprobe exited 1: moov atom not found")).toBe(GENERIC);
   });
 
-  it("collapses raw doc-engine stderr dumps (qpdf, gs, pandoc, pdfcpu, LibreOffice)", () => {
-    // These are thrown verbatim by doc-engine wrappers and, unlike ffmpeg, used
-    // to pass through path-scrubbed but otherwise raw when short enough.
-    expect(friendlyError("qpdf exited 2: operation for offset 1234 is invalid")).toBe(GENERIC);
-    expect(friendlyError("gs exited 1: Error: /invalidfileaccess in --.outputpage--")).toBe(
-      GENERIC,
+  it("preserves short doc-engine errors that carry the actionable reason", () => {
+    // qpdf/gs/pdfcpu stderr is already path-scrubbed and often IS the useful
+    // message (e.g. a wrong PDF password), so it must not collapse to generic.
+    // Only genuinely verbose dumps collapse, via the length/line-count guard.
+    expect(friendlyError("qpdf exited 2: invalid password")).toBe(
+      "qpdf exited 2: invalid password",
     );
-    expect(friendlyError("pandoc exited 64: unknown reader")).toBe(GENERIC);
-    expect(friendlyError("pdfcpu exited 1: validation error at object 5")).toBe(GENERIC);
-    expect(friendlyError("LibreOffice exited 81: source file could not be loaded")).toBe(GENERIC);
-  });
-
-  it("collapses tool dumps when killed by signal (no numeric exit code)", () => {
-    expect(friendlyError("gs exited SIGKILL: ")).toBe(GENERIC);
-  });
-
-  it("does NOT collapse benign words that merely contain a tool substring", () => {
-    // "pngs exited the queue" contains the substring "gs exited" but is not a
-    // tool-failure dump; a word boundary before the tool name prevents a false hit.
-    expect(friendlyError("3 pngs exited the pipeline cleanly")).toBe(
-      "3 pngs exited the pipeline cleanly",
+    expect(friendlyError("pdfcpu exited 1: validation error at object 5")).toBe(
+      "pdfcpu exited 1: validation error at object 5",
     );
   });
 
