@@ -10,6 +10,7 @@ import { FlowProducer, type Job, QueueEvents } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -114,6 +115,13 @@ export function injectTraceContext(data: ToolJobData): void {
  * Returns the BullMQ Job instance.
  */
 export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData, ToolJobResult>> {
+  // Per-user concurrency cap for single-file AI jobs (kind "ai-tool"). Checked
+  // before the row insert so a rejected request leaves no job behind. Batch and
+  // pipeline AI use other kinds and are intentionally not capped here.
+  if (data.kind === "ai-tool") {
+    await assertAiJobQuota(data.userId);
+  }
+
   // Insert the durable DB row first (crash-safe: row exists even if
   // Redis add fails and the job is retried on next boot).
   // When dbSettings is provided, persist the redacted version instead of

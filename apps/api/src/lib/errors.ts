@@ -11,7 +11,10 @@ export function formatZodErrors(issues: ZodIssue[]): string {
  * leaking server directory structure to API consumers.
  */
 export function stripInternalPaths(message: string): string {
-  return message.replace(/\/(tmp|data|app|opt|home|workspace)\b[^\s'")}]*/g, "[internal]");
+  return message.replace(
+    /\/(?:tmp|data|app|opt|home|workspace)\b[^\s'")}]*|[A-Za-z]:\\[^\s'")}]*/g,
+    "[internal]",
+  );
 }
 
 // Matching control characters is the entire point of these patterns (we strip
@@ -35,14 +38,17 @@ export function stripControlChars(message: string): string {
 
 /**
  * Unambiguous markers of a raw external-tool failure dump: the
- * `ffmpeg/ffprobe exited N:` prefix that media-engine throws, a Python
+ * `<tool> exited N:` prefix that the media-engine (ffmpeg/ffprobe) and
+ * doc-engine (qpdf, gs, pandoc, pdfcpu, LibreOffice) wrappers throw, a Python
  * traceback, or a crash. These are matched precisely (not by content
  * keywords like "pixel format" or "conversion failed", which can appear in
- * legitimate validation messages) -- longer or multi-line raw dumps are
- * caught separately by the length/line-count check below.
+ * legitimate validation messages): the tool name is word-bounded and followed
+ * by `exited <token>` so a numeric exit code or a signal name (e.g. SIGKILL)
+ * both collapse, while a benign substring like "pngs exited" does not. Longer
+ * or multi-line raw dumps are caught separately by the length/line-count check.
  */
 const RAW_TOOL_FAILURE =
-  /ff(?:mpeg|probe) exited \d|traceback \(most recent call|segmentation fault|core dumped/i;
+  /\b(?:ff(?:mpeg|probe)|qpdf|gs|gm|magick|pdfcpu|pandoc|libreoffice|soffice) exited \S|traceback \(most recent call|segmentation fault|core dumped/i;
 
 /**
  * Produce a user-safe error detail. Intentional validation messages (short,

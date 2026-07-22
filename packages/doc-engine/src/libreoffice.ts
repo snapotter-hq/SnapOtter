@@ -4,6 +4,7 @@ import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
@@ -48,22 +49,19 @@ export async function convertDocument(
   const { ext, convertTo } = parseConvertTarget(target);
   try {
     await new Promise<void>((resolvePromise, reject) => {
-      const child = spawn(
-        bin,
-        [
-          `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
-          "--headless",
-          "--norestore",
-          "--nolockcheck",
-          "--nodefault",
-          "--convert-to",
-          convertTo,
-          "--outdir",
-          outDir,
-          inputPath,
-        ],
-        { stdio: ["ignore", "pipe", "pipe"] },
-      );
+      const [limBin, limArgs] = wrapWithMemoryLimit(bin, [
+        `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
+        "--headless",
+        "--norestore",
+        "--nolockcheck",
+        "--nodefault",
+        "--convert-to",
+        convertTo,
+        "--outdir",
+        outDir,
+        inputPath,
+      ]);
+      const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
       let err = "";
       let settled = false;
       const timer = setTimeout(() => {

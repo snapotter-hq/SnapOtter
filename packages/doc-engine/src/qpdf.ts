@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveQpdf } from "./binaries.js";
 
 /** @internal Shared qpdf CLI runner for doc-engine modules; not part of the public package API. */
@@ -6,7 +7,8 @@ export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
   const bin = resolveQpdf();
   if (!bin) throw new Error("qpdf binary not found (set QPDF_PATH or install qpdf)");
   return new Promise<string>((resolvePromise, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
+    const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
     let settled = false;
@@ -63,7 +65,8 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
   const bin = resolveQpdf();
   if (!bin) throw new Error("qpdf binary not found (set QPDF_PATH or install qpdf)");
   return new Promise<boolean>((resolvePromise, reject) => {
-    const child = spawn(bin, ["--requires-password", filePath], {
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, ["--requires-password", filePath]);
+    const child = spawn(limBin, limArgs, {
       stdio: ["ignore", "ignore", "pipe"],
     });
     let settled = false;

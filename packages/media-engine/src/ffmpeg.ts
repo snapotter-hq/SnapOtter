@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { markToolInputError, SafeError } from "@snapotter/shared";
+import { markToolInputError, SafeError, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 import { type FfmpegProgress, parseProgressBlock } from "./progress.js";
 
@@ -39,7 +39,15 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
   const bin = resolveFfmpeg();
   if (!bin) throw new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)");
   return new Promise<string>((resolvePromise, reject) => {
-    const child = spawn(bin, ["-hide_banner", "-nostdin", "-y", ...args, "-progress", "pipe:1"], {
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, [
+      "-hide_banner",
+      "-nostdin",
+      "-y",
+      ...args,
+      "-progress",
+      "pipe:1",
+    ]);
+    const child = spawn(limBin, limArgs, {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stderrTail = "";

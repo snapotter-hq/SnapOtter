@@ -43,6 +43,13 @@
       "when": 1782266352290,
       "tag": "0005_special_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784729211461,
+      "tag": "0006_majestic_sinister_six",
+      "breakpoints": true
     }
   ]
 }

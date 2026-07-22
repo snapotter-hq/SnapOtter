@@ -120,7 +120,22 @@ services:
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    # --- Security hardening ---
     mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    # The official image starts as root and su-execs down to the postgres user,
+    # so setuid/setgid + chown caps are required. no-new-privileges and a
+    # read-only rootfs are omitted for the same privilege-drop reason as the app.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
@@ -140,7 +155,22 @@ services:
     volumes:
       - SnapOtter-redisdata:/data
     restart: unless-stopped
+    # --- Security hardening ---
     mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    # The official image starts as root and gosu-drops to the redis user, so
+    # setuid/setgid + chown caps are required; no-new-privileges and a read-only
+    # rootfs are omitted for the same privilege-drop reason as the app.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-snapotter}", "--no-auth-warning", "ping"]
       interval: 10s

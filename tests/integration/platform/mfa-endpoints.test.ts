@@ -377,6 +377,36 @@ describe("MFA login flow", () => {
     expect(body.user.username).toBe("admin");
     expect(body.expiresAt).toBeDefined();
   });
+
+  it("burns the challenge after repeated wrong codes so the correct code no longer works", async () => {
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Exhaust the wrong-code budget. Each wrong attempt is a 401.
+    for (let i = 0; i < 5; i++) {
+      const bad = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(bad.statusCode).toBe(401);
+    }
+
+    // The challenge is now burned: even the correct TOTP is rejected as expired,
+    // forcing the attacker back through the login (and its rate limit).
+    const code = generateTotpCode(totpUri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body).code).toBe("MFA_EXPIRED");
+  });
 });
 
 async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Promise<void> {

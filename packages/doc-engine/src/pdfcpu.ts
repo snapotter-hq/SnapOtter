@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolvePdfcpu } from "./binaries.js";
 
 /**
@@ -10,7 +11,8 @@ function runPdfcpu(args: string[], timeoutMs = 60_000): Promise<string> {
   const bin = resolvePdfcpu();
   if (!bin) throw new Error("pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)");
   return new Promise<string>((resolvePromise, reject) => {
-    const child = spawn(bin, ["-c", "disable", ...args], {
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, ["-c", "disable", ...args]);
+    const child = spawn(limBin, limArgs, {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveGs } from "./binaries.js";
 
 export type PdfCompressionPreset = "screen" | "ebook" | "printer";
@@ -8,7 +9,8 @@ function runGs(args: string[], timeoutMs = 120_000): Promise<void> {
   const bin = resolveGs();
   if (!bin) throw new Error("gs binary not found (set GS_PATH or install ghostscript)");
   return new Promise<void>((resolvePromise, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
+    const child = spawn(limBin, limArgs, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     let settled = false;
     const timer = setTimeout(() => {

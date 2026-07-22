@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { parse as parseQs } from "node:querystring";
 import type {} from "@fastify/cookie";
-import { SAML } from "@node-saml/node-saml";
+import { SAML, ValidateInResponseTo } from "@node-saml/node-saml";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
@@ -14,9 +14,15 @@ import {
   sanitizeUsername,
 } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
+import { makeRedisSamlCacheProvider } from "../lib/saml-cache.js";
 import { createSessionToken } from "./auth.js";
 
 // -- SAML instance factory ----------------------------------------------------
+
+// One shared, Redis-backed cache so a request id written during the login
+// redirect is visible to the callback (each handler builds a fresh SAML
+// instance). This is what makes InResponseTo replay protection work.
+const samlCacheProvider = makeRedisSamlCacheProvider();
 
 function getSamlInstance(): SAML {
   return new SAML({
@@ -26,6 +32,12 @@ function getSamlInstance(): SAML {
     idpCert: env.SAML_IDP_CERTIFICATE,
     wantAuthnResponseSigned: true,
     wantAssertionsSigned: true,
+    // Bind each SAML Response to the AuthnRequest we issued and consume that id,
+    // so a captured, still-signed assertion cannot be replayed to mint a second
+    // session. "ifPresent" (not "always") keeps IdP-initiated SSO working, since
+    // those responses carry no InResponseTo.
+    validateInResponseTo: ValidateInResponseTo.ifPresent,
+    cacheProvider: samlCacheProvider,
   });
 }
 

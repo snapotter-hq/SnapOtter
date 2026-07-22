@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveFfprobe } from "./binaries.js";
 import { markIfInputError } from "./ffmpeg.js";
 
@@ -42,7 +43,8 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
   ];
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const stdout = await new Promise<string>((resolvePromise, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
+    const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
     let settled = false;

@@ -73,7 +73,22 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // close tag -- repeating until stable so nested or overlapping tags cannot
   // survive a single pass (foreignObject/iframe/embed can embed HTML; set/animate
   // can inject attributes/URIs at runtime).
-  for (const tag of ["script", "foreignObject", "iframe", "embed", "set", "animate"]) {
+  // animateTransform/animateMotion/animateColor are distinct element names (a
+  // word boundary stops the "animate" pattern from matching them), and <handler>
+  // is the SVG-Tiny event-handler element; all can carry runtime script/URIs.
+  for (const tag of [
+    "script",
+    "foreignObject",
+    "iframe",
+    "embed",
+    "set",
+    "animate",
+    "animateTransform",
+    "animateMotion",
+    "animateColor",
+    "handler",
+    "mpath",
+  ]) {
     svg = stripUntilStable(
       svg,
       new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"),
@@ -97,13 +112,17 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']file:[^"']*["'][^>]*\/?>/gi, "");
   svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']data:[^"']*["'][^>]*\/?>/gi, "");
 
-  // ── Block dangerous URI schemes in href attributes ──
-  svg = svg.replace(/xlink:href\s*=\s*["']https?:\/\//gi, 'xlink:href="data:,');
-  svg = svg.replace(/href\s*=\s*["']https?:\/\//gi, 'href="data:,');
-  svg = svg.replace(/href\s*=\s*["']javascript:/gi, 'href="data:,');
-  // Block ALL data: URIs in href (not just data:text/html)
-  svg = svg.replace(/href\s*=\s*["']data:/gi, 'href="data:,');
-  svg = svg.replace(/href\s*=\s*["']file:/gi, 'href="data:,');
+  // ── Block dangerous URI schemes in href / xlink:href ──
+  // One pass covers javascript:, data:, file:, and http(s): on both `href` and
+  // `xlink:href`, tolerating unquoted values and leading whitespace before the
+  // scheme (browsers trim it) which the older per-scheme patterns missed. The
+  // capture preserves the `xlink:` prefix so the neutralized attribute stays
+  // well-formed. Durable follow-up: replace this regex sanitizer with an XML
+  // parse + allowlist, which is the real fix for regex whack-a-mole.
+  svg = svg.replace(
+    /((?:xlink:)?href)\s*=\s*(?:["']\s*)?(?:javascript|data|file|https?):/gi,
+    '$1="data:,',
+  );
 
   // ── Block dangerous schemes in url() values ──
   svg = svg.replace(/url\s*\(\s*["']?https?:\/\//gi, 'url("data:,');

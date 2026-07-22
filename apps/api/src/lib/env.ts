@@ -59,6 +59,16 @@ const envSchema = z
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),
+    // Max single-file AI jobs one user may have queued/processing at once. The
+    // AI pool runs at concurrency 1, so this stops one user from starving it.
+    // 0 = unlimited. Batch/pipeline AI are bounded separately and not counted.
+    MAX_AI_JOBS_PER_USER: z.coerce.number().default(5),
+    // Optional per-process address-space cap (MB) for the native media/doc
+    // engines (ffmpeg, ghostscript, qpdf, libreoffice, pandoc, pdfcpu). 0 =
+    // disabled (the container memory limit is the primary backstop). Not applied
+    // to the AI sidecar (torch/CUDA reserve huge virtual space). See
+    // packages/shared/src/subprocess-limit.ts.
+    SUBPROCESS_MEMORY_LIMIT_MB: z.coerce.number().default(0),
     MAX_PDF_PAGES: z.coerce.number().default(0),
     MAX_VIDEO_DURATION_S: z.coerce.number().default(0),
     MAX_AUDIO_DURATION_S: z.coerce.number().default(0),

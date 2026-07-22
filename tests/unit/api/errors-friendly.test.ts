@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { friendlyError, stripControlChars } from "../../../apps/api/src/lib/errors.js";
+import {
+  friendlyError,
+  stripControlChars,
+  stripInternalPaths,
+} from "../../../apps/api/src/lib/errors.js";
 
 const GENERIC = "Processing failed. The file may be in an unsupported or corrupted format.";
 
@@ -12,6 +16,30 @@ describe("friendlyError", () => {
 
   it("collapses raw ffprobe stderr dumps", () => {
     expect(friendlyError("ffprobe exited 1: moov atom not found")).toBe(GENERIC);
+  });
+
+  it("collapses raw doc-engine stderr dumps (qpdf, gs, pandoc, pdfcpu, LibreOffice)", () => {
+    // These are thrown verbatim by doc-engine wrappers and, unlike ffmpeg, used
+    // to pass through path-scrubbed but otherwise raw when short enough.
+    expect(friendlyError("qpdf exited 2: operation for offset 1234 is invalid")).toBe(GENERIC);
+    expect(friendlyError("gs exited 1: Error: /invalidfileaccess in --.outputpage--")).toBe(
+      GENERIC,
+    );
+    expect(friendlyError("pandoc exited 64: unknown reader")).toBe(GENERIC);
+    expect(friendlyError("pdfcpu exited 1: validation error at object 5")).toBe(GENERIC);
+    expect(friendlyError("LibreOffice exited 81: source file could not be loaded")).toBe(GENERIC);
+  });
+
+  it("collapses tool dumps when killed by signal (no numeric exit code)", () => {
+    expect(friendlyError("gs exited SIGKILL: ")).toBe(GENERIC);
+  });
+
+  it("does NOT collapse benign words that merely contain a tool substring", () => {
+    // "pngs exited the queue" contains the substring "gs exited" but is not a
+    // tool-failure dump; a word boundary before the tool name prevents a false hit.
+    expect(friendlyError("3 pngs exited the pipeline cleanly")).toBe(
+      "3 pngs exited the pipeline cleanly",
+    );
   });
 
   it("collapses python tracebacks", () => {
@@ -81,5 +109,23 @@ describe("stripControlChars", () => {
 
   it("leaves plain text and accented locale strings untouched", () => {
     expect(stripControlChars("Café déjà vu")).toBe("Café déjà vu");
+  });
+});
+
+describe("stripInternalPaths", () => {
+  it("strips POSIX internal roots", () => {
+    expect(stripInternalPaths("wrote /tmp/workspace/out.mp4 ok")).toBe("wrote [internal] ok");
+    expect(stripInternalPaths("model at /data/ai/models/whisper")).toBe("model at [internal]");
+  });
+
+  it("strips Windows drive-letter paths (native Windows runs)", () => {
+    // Matches sentry-scrub's PATH_RE so client responses and Sentry agree.
+    expect(stripInternalPaths("failed reading C:\\Users\\snap\\secret.pdf")).toBe(
+      "failed reading [internal]",
+    );
+  });
+
+  it("leaves messages with no path untouched", () => {
+    expect(stripInternalPaths("Region exceeds image bounds")).toBe("Region exceeds image bounds");
   });
 });

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 
 /** Resolve the pandoc binary, honoring PANDOC_PATH for parity with the other doc-engine wrappers. */
 function pandocBin(): string {
@@ -69,7 +70,8 @@ export function runPandoc(
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const args = buildPandocArgs(inPath, outPath, opts);
   return new Promise<void>((resolvePromise, reject) => {
-    const child = spawn(pandocBin(), args, { stdio: ["ignore", "pipe", "pipe"] });
+    const [limBin, limArgs] = wrapWithMemoryLimit(pandocBin(), args);
+    const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
     let settled = false;
     const timer = setTimeout(() => {

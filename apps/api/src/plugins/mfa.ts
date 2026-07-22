@@ -21,6 +21,10 @@ import { createSessionToken, requireAuth } from "./auth.js";
 
 const RECOVERY_CODE_COUNT = 8;
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
+/** Wrong-code budget before a pending MFA challenge is burned (forces re-login). */
+const MFA_MAX_FAILED_ATTEMPTS = 5;
+/** Mirrors the 300s TTL set on `mfa:<token>` at login (auth/oidc/saml). */
+const MFA_CHALLENGE_TTL_SECONDS = 300;
 
 // ── Zod schemas ───────────────────────────────────────────────────
 
@@ -329,6 +333,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       if (!verified) {
+        // Burn the challenge after a few wrong codes so an attacker who already
+        // holds valid credentials cannot grind TOTP guesses within the challenge
+        // window. The counter shares the challenge's lifetime.
+        const attemptsKey = `mfa:attempts:${mfaToken}`;
+        const attempts = await redis.incr(attemptsKey);
+        if (attempts === 1) await redis.expire(attemptsKey, MFA_CHALLENGE_TTL_SECONDS);
+        if (attempts >= MFA_MAX_FAILED_ATTEMPTS) {
+          await redis.del(`mfa:${mfaToken}`, attemptsKey);
+        }
         await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
         return reply.status(401).send({
           error: "Invalid TOTP or recovery code",
@@ -336,8 +349,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Delete the challenge token
-      await redis.del(`mfa:${mfaToken}`);
+      // Delete the challenge token and any failed-attempt counter
+      await redis.del(`mfa:${mfaToken}`, `mfa:attempts:${mfaToken}`);
 
       // Create session (same as normal login completion)
       const token = createSessionToken();

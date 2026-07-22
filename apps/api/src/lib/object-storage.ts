@@ -79,6 +79,69 @@ export function isBelowCapacity(freeBytes: number): boolean {
   return freeBytes / 1024 ** 3 < CAPACITY_CRITICAL_GB;
 }
 
+// ── Aggregate workspace-size cap (MAX_WORKSPACE_SIZE_GB) ──────────
+// A free-space floor alone does not stop SnapOtter from filling a large shared
+// volume before that floor trips. The configured cap bounds uploads/ + outputs/
+// regardless of how much room the underlying disk has. The total is cached
+// briefly so a busy instance does not re-walk the tree on every write.
+
+let workspaceSizeCache: { bytes: number; at: number } | null = null;
+const WORKSPACE_SIZE_CACHE_MS = 30_000;
+
+/**
+ * Sum the sizes of every file under `<root>/uploads` and `<root>/outputs`. Keys
+ * are always `<prefix>/<jobId>/<filename>` (two levels), so a shallow job-dir
+ * walk suffices. Missing or unreadable paths contribute 0.
+ */
+export async function computeWorkspaceUsedBytes(root: string): Promise<number> {
+  let total = 0;
+  for (const prefix of ["uploads", "outputs"] as const) {
+    let jobDirs: string[];
+    try {
+      jobDirs = await readdir(join(root, prefix));
+    } catch {
+      continue;
+    }
+    for (const jobDir of jobDirs) {
+      const dir = join(root, prefix, jobDir);
+      let names: string[];
+      try {
+        names = await readdir(dir);
+      } catch {
+        continue;
+      }
+      for (const name of names) {
+        const s = await stat(join(dir, name)).catch(() => null);
+        if (s?.isFile()) total += s.size;
+      }
+    }
+  }
+  return total;
+}
+
+/** Pure threshold check exported for unit testing. maxGb <= 0 disables the cap. */
+export function isOverWorkspaceCap(usedBytes: number, maxGb: number): boolean {
+  return maxGb > 0 && usedBytes / 1024 ** 3 > maxGb;
+}
+
+async function assertWorkspaceSizeCap(root: string): Promise<void> {
+  const maxGb = env.MAX_WORKSPACE_SIZE_GB;
+  if (maxGb <= 0) return;
+  const now = Date.now();
+  let used: number;
+  if (workspaceSizeCache && now - workspaceSizeCache.at < WORKSPACE_SIZE_CACHE_MS) {
+    used = workspaceSizeCache.bytes;
+  } else {
+    used = await computeWorkspaceUsedBytes(root);
+    workspaceSizeCache = { bytes: used, at: now };
+  }
+  if (isOverWorkspaceCap(used, maxGb)) {
+    const error = new Error("Workspace storage limit reached; try again shortly");
+    (error as Error & { statusCode: number }).statusCode = 503;
+    throw error;
+  }
+}
+
 /**
  * Asserts that the local storage volume has enough free space.
  * Called by putObject / putObjectStream for the local backend only.
@@ -87,6 +150,8 @@ export function isBelowCapacity(freeBytes: number): boolean {
 export async function assertLocalCapacity(): Promise<void> {
   const root = env.WORKSPACE_PATH;
   if (!existsSync(root)) return;
+  // Aggregate size cap first: it applies even where statfs is unavailable.
+  await assertWorkspaceSizeCap(root);
   let fsStats: Awaited<ReturnType<typeof statfs>>;
   try {
     fsStats = await statfs(root);

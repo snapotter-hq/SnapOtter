@@ -110,21 +110,28 @@ export const jobs = pgTable(
   ],
 );
 
-export const apiKeys = pgTable("api_keys", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  keyHash: text("key_hash").notNull(),
-  keyPrefix: text("key_prefix"),
-  name: text("name").notNull().default("Default API Key"),
-  permissions: jsonb("permissions").$type<string[]>(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-  expiresAt: timestamp("expires_at", { withTimezone: true }),
-});
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    keyHash: text("key_hash").notNull(),
+    keyPrefix: text("key_prefix"),
+    name: text("name").notNull().default("Default API Key"),
+    permissions: jsonb("permissions").$type<string[]>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  // Prefix lookup runs on every API-key auth; without this index it is a full
+  // table scan. The prefix is a SHA-256 slice (not unique by construction), so
+  // a non-unique index is correct.
+  (table) => [index("api_keys_key_prefix_idx").on(table.keyPrefix)],
+);
 
 export const pipelines = pgTable("pipelines", {
   id: text("id").primaryKey(),

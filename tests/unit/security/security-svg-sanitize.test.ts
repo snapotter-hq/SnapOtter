@@ -312,6 +312,59 @@ describe("SVG sanitizer -- url() scheme blocking", () => {
   });
 });
 
+// ── href scheme obfuscation: whitespace + unquoted (defense-in-depth) ────────
+
+describe("SVG sanitizer -- href scheme whitespace/unquoted bypass", () => {
+  it("blocks an unquoted javascript: URI in href", () => {
+    const svg = wrapSvg("<a href=javascript:alert(1)><text>x</text></a>");
+    const result = sanitize(svg);
+    expect(result).not.toContain("javascript:");
+  });
+
+  it("blocks a javascript: URI with leading whitespace inside quotes", () => {
+    const svg = wrapSvg('<a href="   javascript:alert(1)"><text>x</text></a>');
+    const result = sanitize(svg);
+    expect(result).not.toContain("javascript:");
+  });
+
+  it("blocks javascript: on xlink:href", () => {
+    const svg = wrapSvg(
+      '<a xlink:href="javascript:alert(1)"><text>x</text></a>',
+      'xmlns:xlink="http://www.w3.org/1999/xlink"',
+    );
+    const result = sanitize(svg);
+    expect(result).not.toContain("javascript:");
+  });
+});
+
+// ── Extended animation / event elements ──────────────────────────────────────
+
+describe("SVG sanitizer -- extended animation elements", () => {
+  it("strips <animateTransform> with a javascript: value", () => {
+    const svg = wrapSvg('<animateTransform attributeName="transform" to="javascript:alert(1)"/>');
+    const result = sanitize(svg);
+    expect(result).not.toContain("<animateTransform");
+    expect(result).not.toContain("javascript:");
+  });
+
+  it("strips <animateMotion> and its <mpath>", () => {
+    const svg = wrapSvg('<animateMotion><mpath href="#p"/></animateMotion>');
+    const result = sanitize(svg);
+    expect(result).not.toContain("<animateMotion");
+    expect(result).not.toContain("<mpath");
+  });
+
+  it("strips the <handler> SVG-Tiny event-handler element", () => {
+    const svg = wrapSvg(
+      '<handler ev:event="load">alert(1)</handler>',
+      'xmlns:ev="http://www.w3.org/2001/xml-events"',
+    );
+    const result = sanitize(svg);
+    expect(result).not.toContain("<handler");
+    expect(result).not.toContain("alert(1)");
+  });
+});
+
 // ── Clean SVGs pass through ──────────────────────────────────────────────────
 
 describe("SVG sanitizer -- clean SVGs pass through", () => {
