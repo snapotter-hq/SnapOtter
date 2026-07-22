@@ -6195,7 +6195,7 @@ paths:
       tags:
         - Settings
       summary: Отримати всі налаштування
-      description: Отримати всі системні налаштування як пари ключ-значення. Потребує автентифікації.
+      description: Повертає системні налаштування, дозволені ефективними правами викликувача. Потрібен дозвіл `settings:read`; налаштування безпеки, відповідності та повного адміністратора фільтруються окремо.
       security:
         - bearerAuth: []
       responses:
@@ -6221,7 +6221,7 @@ paths:
       tags:
         - Settings
       summary: Оновити налаштування
-      description: Приймає плоский об'єкт JSON із парами ключ-значення для встановлення. Потребує ролі адміністратора.
+      description: Приймає плоский об'єкт JSON із розпізнаваними ключами налаштувань, доступними для запису. Потрібен дозвіл `settings:write`; ключі безпеки та відповідності також вимагають відповідного ефективного дозволу, секретні налаштування вимагають повноважень повного адміністратора, а спеціалізовані або керовані сервером ключі доступні лише для читання.
       security:
         - bearerAuth: []
       requestBody:
@@ -6268,7 +6268,7 @@ paths:
       tags:
         - Settings
       summary: Отримати одне налаштування
-      description: Отримати значення одного налаштування за іменем ключа. Повертає значення та мітку часу останнього оновлення.
+      description: Повертає розпізнаване налаштування за ключем. Значення та мітка часу останнього оновлення повертаються, якщо викликувач має `settings:read` і додаткові повноваження, необхідні для цього ключа.
       security:
         - bearerAuth: []
       parameters:
@@ -18398,7 +18398,10 @@ paths:
       tags:
         - Enterprise
       summary: Експортувати конфігурацію
-      description: Експортувати приховувану конфігурацію екземпляра, власні ролі та команди. Потребує дозволу system:health.
+      description: >
+        Експортує приховану конфігурацію екземпляра, власні ролі та команди. Потрібні повні
+        фактичні повноваження вбудованого адміністратора. Власні ролі не відповідають цій вимозі;
+        так само їй не відповідають ключі API, у яких відсутній хоча б один дозвіл адміністратора.
       security:
         - bearerAuth: []
       responses:
@@ -18413,7 +18416,7 @@ paths:
         - Enterprise
       summary: Імпортувати конфігурацію
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Імпортує конфігурацію екземпляра, власні ролі та команди. Потрібні повні фактичні повноваження вбудованого адміністратора. Власні ролі не відповідають цій вимозі; так само їй не відповідають ключі API, у яких відсутній хоча б один дозвіл адміністратора.
       security:
         - bearerAuth: []
       responses:
@@ -19665,25 +19668,25 @@ x-i18n:
       provenance: machine
       outputHash: d5a2e5936382
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 5b6a5774bbc9
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: a87bf50bf0c9
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 022d75be8a33
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: 6f8bdc5f2726
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 2dae8e572dfe
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 8d466ef13a3b
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: af91370069b1
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: fb1367bdacbe
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21633,13 +21636,17 @@ x-i18n:
       provenance: machine
       outputHash: aefff1771914
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: cdae7926ad8d
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 6bf7d9f7cd87
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 9913cd1c8f54
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: b5c8cf8a0eb8
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

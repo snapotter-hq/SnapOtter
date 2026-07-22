@@ -328,7 +328,7 @@ base.describe("RBAC Full — Custom Role User", () => {
       const writeRes = await fetch(`${API}/api/v1/settings`, {
         method: "PUT",
         headers: authJson(bearerToken),
-        body: JSON.stringify({ testSetting: "hacked" }),
+        body: JSON.stringify({ defaultTheme: "dark" }),
       });
       expect(writeRes.status).toBe(403);
 

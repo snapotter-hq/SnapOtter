@@ -6195,7 +6195,7 @@ paths:
       tags:
         - Settings
       summary: Dapatkan semua settings
-      description: Ambil semua settings sistem sebagai pasangan key-value. Memerlukan autentikasi.
+      description: Ambil pengaturan sistem yang diizinkan oleh izin efektif pemanggil. Memerlukan `settings:read`; pengaturan keamanan, kepatuhan, dan admin penuh difilter secara terpisah.
       security:
         - bearerAuth: []
       responses:
@@ -6221,7 +6221,7 @@ paths:
       tags:
         - Settings
       summary: Perbarui settings
-      description: Menerima objek JSON datar berisi pasangan key-value untuk diatur. Memerlukan role admin.
+      description: Menerima objek JSON datar yang berisi kunci pengaturan yang dikenali dan dapat ditulis. Memerlukan `settings:write`; kunci keamanan dan kepatuhan juga memerlukan izin efektif yang sesuai, rahasia memerlukan wewenang admin penuh, dan kunci khusus atau yang dikelola server hanya dapat dibaca.
       security:
         - bearerAuth: []
       requestBody:
@@ -6268,7 +6268,7 @@ paths:
       tags:
         - Settings
       summary: Dapatkan satu setting
-      description: Ambil satu nilai setting berdasarkan nama key-nya. Mengembalikan nilai dan timestamp terakhir diperbarui.
+      description: Ambil pengaturan yang dikenali berdasarkan kunci. Mengembalikan nilai dan stempel waktu pembaruan terakhir ketika pemanggil memiliki `settings:read` serta wewenang tambahan untuk kunci tersebut.
       security:
         - bearerAuth: []
       parameters:
@@ -18398,7 +18398,8 @@ paths:
       tags:
         - Enterprise
       summary: Ekspor konfigurasi
-      description: Ekspor konfigurasi instance yang disunting, role kustom, dan teams. Memerlukan permission system:health.
+      description: |
+        Ekspor konfigurasi instans yang disunting, peran kustom, dan tim. Memerlukan kewenangan efektif penuh sebagai administrator bawaan; peran kustom tidak memenuhi syarat, demikian pula kunci API yang tidak mencakup semua izin administrator.
       security:
         - bearerAuth: []
       responses:
@@ -18413,7 +18414,7 @@ paths:
         - Enterprise
       summary: Impor konfigurasi
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Impor konfigurasi instans, peran kustom, dan tim. Memerlukan kewenangan efektif penuh sebagai administrator bawaan; peran kustom tidak memenuhi syarat, demikian pula kunci API yang tidak mencakup semua izin administrator.
       security:
         - bearerAuth: []
       responses:
@@ -19665,25 +19666,25 @@ x-i18n:
       provenance: machine
       outputHash: 1aab5d5325ae
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: e63beb9e2cdc
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 16bc43350f34
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 453963b68132
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: 5a2be16b8683
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 9d7505a0cb61
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 814fbb078520
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 69883260d6ad
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: ef77c0d8af03
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21633,13 +21634,17 @@ x-i18n:
       provenance: machine
       outputHash: 3bb3de7ecbbf
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 643bd277962f
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 03167a2a49ed
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 1f25d439e461
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: 66dd2399c1d1
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
 i18n_output_hash: c43973438a42
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 ## 设置 {#settings}
 
-运行时键值配置（任何已验证用户可读，仅管理员可写）。
+运行时配置仅使用一组封闭的已识别键。读取需要 `settings:read`，写入需要 `settings:write`；安全和合规键还分别需要 `security:manage` 或 `compliance:manage`。机密设置需要完整管理员权限，而由专用端点管理的凭据和状态在此处为只读。批量更新会在写入任何值之前完成验证。
 
 | 方法 | 路径 | 说明 |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `PUT` | `/api/v1/settings` | 批量更新设置（带键值对的 JSON 请求体） |
 | `GET` | `/api/v1/settings/:key` | 按键获取指定设置 |
 
-已知键：`disabledTools`（工具 ID 的 JSON 数组）、`enableExperimentalTools`（bool 字符串）、`loginAttemptLimit`（数字）。
+代表性键包括：`disabledTools`（工具 ID 的 JSON 数组）、`enableExperimentalTools`（布尔值）、`loginAttemptLimit`（安全策略）和 `auditRetentionDays`（合规策略）。未知键会被拒绝。
 
 ## 偏好设置 {#preferences}
 
@@ -636,11 +636,13 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 
 这些路由由其相关的企业版功能进行许可证限制。它们仍需要列出的 SnapOtter 权限。
 
+**拥有完整权限的内置管理员**是指经过身份验证的主体拥有 `admin` 角色以及完整的有效管理员权限集。若 API 密钥的权限范围缺少任何管理员权限，则不符合此要求。
+
 | 方法 | 路径 | 访问权限 | 说明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | 管理员（`audit:read`） | 带过滤器将审计条目导出为 JSON 或 CSV |
-| `GET` | `/api/v1/enterprise/config/export` | 管理员（`system:health`） | 导出已脱敏的实例配置、自定义角色和团队 |
-| `POST` | `/api/v1/enterprise/config/import` | 管理员（`system:health`） | 导入配置，可选试运行 |
+| `GET` | `/api/v1/enterprise/config/export` | 拥有完整权限的内置管理员 | 导出已脱敏的实例配置、自定义角色和团队 |
+| `POST` | `/api/v1/enterprise/config/import` | 拥有完整权限的内置管理员 | 导入配置，可选试运行 |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | 管理员（`security:manage`） | 读取已配置的 CIDR 允许列表 |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | 管理员（`security:manage`） | 更新 CIDR 允许列表，并防止自我锁定 |
 | `GET` | `/api/v1/enterprise/legal-hold` | 管理员（`compliance:manage`） | 列出用户和团队的法律保留 |

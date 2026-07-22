@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
 i18n_output_hash: 9fa4a9a91996
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 ## 設定 {#settings}
 
-執行時的鍵值設定（任何已驗證使用者可讀取，僅管理員可寫入）。
+執行階段設定僅使用一組封閉的已識別 key。讀取需要 `settings:read`，寫入需要 `settings:write`；安全性和合規性 key 還分別需要 `security:manage` 或 `compliance:manage`。機密設定需要完整管理員權限，而由專用端點管理的憑證與狀態在此處為唯讀。系統會先驗證整批更新，再寫入任何值。
 
 | Method | Path | 說明 |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `PUT` | `/api/v1/settings` | 批次更新設定（帶有鍵值對的 JSON 主體） |
 | `GET` | `/api/v1/settings/:key` | 依 key 取得特定設定 |
 
-已知的 key：`disabledTools`（工具 ID 的 JSON 陣列）、`enableExperimentalTools`（bool 字串）、`loginAttemptLimit`（number）。
+代表性 key 包括：`disabledTools`（工具 ID 的 JSON 陣列）、`enableExperimentalTools`（布林值）、`loginAttemptLimit`（安全性政策），以及 `auditRetentionDays`（合規性政策）。未知的 key 會遭到拒絕。
 
 ## 偏好設定 {#preferences}
 
@@ -636,11 +636,13 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 
 這些路由受其相關企業功能的授權控管。它們仍需要所列的 SnapOtter 權限。
 
+**擁有完整權限的內建管理員**是指已驗證的主體具有 `admin` 角色以及完整的有效管理員權限集。若 API 金鑰的權限範圍缺少任何管理員權限，則不符合此要求。
+
 | Method | Path | 存取權限 | 說明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin（`audit:read`） | 以 JSON 或 CSV 匯出稽核項目，可加篩選 |
-| `GET` | `/api/v1/enterprise/config/export` | Admin（`system:health`） | 匯出已遮蔽的執行個體設定、自訂角色與團隊 |
-| `POST` | `/api/v1/enterprise/config/import` | Admin（`system:health`） | 匯入設定，可選乾跑 |
+| `GET` | `/api/v1/enterprise/config/export` | 擁有完整權限的內建管理員 | 匯出已遮蔽的執行個體設定、自訂角色與團隊 |
+| `POST` | `/api/v1/enterprise/config/import` | 擁有完整權限的內建管理員 | 匯入設定，可選乾跑 |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin（`security:manage`） | 讀取已設定的 CIDR 允許清單 |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin（`security:manage`） | 更新 CIDR 允許清單，並防止自我鎖定 |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin（`compliance:manage`） | 列出使用者與團隊的法律保留 |

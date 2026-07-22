@@ -531,7 +531,7 @@ function GeneralSection() {
 
 function SystemSection() {
   const { t } = useTranslation();
-  const { role } = useAuth();
+  const { role, hasPermission } = useAuth();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -686,20 +686,22 @@ function SystemSection() {
         </select>
       </SettingRow>
 
-      <SettingRow
-        label={t.settings.system.loginAttemptLimitLabel}
-        description={t.settings.system.loginAttemptLimitDescription}
-      >
-        <input
-          type="number"
-          value={settings.loginAttemptLimit || "5"}
-          onChange={(e) => updateSetting("loginAttemptLimit", e.target.value)}
-          aria-label={t.settings.system.loginAttemptLimitLabel}
-          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={1}
-          max={100}
-        />
-      </SettingRow>
+      {hasPermission("security:manage") && (
+        <SettingRow
+          label={t.settings.system.loginAttemptLimitLabel}
+          description={t.settings.system.loginAttemptLimitDescription}
+        >
+          <input
+            type="number"
+            value={settings.loginAttemptLimit || "5"}
+            onChange={(e) => updateSetting("loginAttemptLimit", e.target.value)}
+            aria-label={t.settings.system.loginAttemptLimitLabel}
+            className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
+            min={1}
+            max={100}
+          />
+        </SettingRow>
+      )}
 
       <div className="pt-4 border-t border-border">
         <h4 className="text-sm font-semibold text-foreground mb-3">
@@ -807,19 +809,21 @@ function SystemSection() {
           min={0}
         />
       </SettingRow>
-      <SettingRow
-        label={t.settings.dataRetention.auditRetentionDays}
-        description={t.settings.dataRetention.auditRetentionDaysDesc}
-      >
-        <input
-          type="number"
-          value={settings.auditRetentionDays || "0"}
-          onChange={(e) => updateSetting("auditRetentionDays", e.target.value)}
-          aria-label={t.settings.dataRetention.auditRetentionDays}
-          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={0}
-        />
-      </SettingRow>
+      {hasPermission("compliance:manage") && (
+        <SettingRow
+          label={t.settings.dataRetention.auditRetentionDays}
+          description={t.settings.dataRetention.auditRetentionDaysDesc}
+        >
+          <input
+            type="number"
+            value={settings.auditRetentionDays || "0"}
+            onChange={(e) => updateSetting("auditRetentionDays", e.target.value)}
+            aria-label={t.settings.dataRetention.auditRetentionDays}
+            className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
+            min={0}
+          />
+        </SettingRow>
+      )}
 
       <div className="flex items-center gap-3 pt-2">
         <button
@@ -1065,7 +1069,9 @@ function SecuritySection() {
 
       <TwoFactorSettings />
 
-      {hasPermission("settings:write") && <AdminSecuritySettings />}
+      {hasPermission("settings:write") && hasPermission("security:manage") && (
+        <AdminSecuritySettings />
+      )}
     </div>
   );
 }
@@ -1235,7 +1241,7 @@ export function AdminSecuritySettings() {
           onChange={(e) => updateSetting("passwordMinLength", e.target.value)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={1}
+          min={8}
           max={128}
         />
       </SettingRow>
@@ -1276,23 +1282,23 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireNumber !== "false"}
+          aria-checked={settings.passwordRequireDigit !== "false"}
           aria-label={t.settings.security.passwordRequireNumber}
           onClick={() =>
             updateSetting(
-              "passwordRequireNumber",
-              settings.passwordRequireNumber === "false" ? "true" : "false",
+              "passwordRequireDigit",
+              settings.passwordRequireDigit === "false" ? "true" : "false",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireNumber !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            settings.passwordRequireDigit !== "false" ? "bg-primary" : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireNumber !== "false" ? "translate-x-6" : "translate-x-1",
+              settings.passwordRequireDigit !== "false" ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>

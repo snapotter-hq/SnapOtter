@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
 i18n_output_hash: 89f2ba5743eb
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 ## الإعدادات {#settings}
 
-تهيئة مفتاح-قيمة أثناء التشغيل (يقرؤها أي مستخدم مصادَق، ويكتبها المسؤول فقط).
+يستخدم تكوين وقت التشغيل مجموعة مغلقة من المفاتيح المعروفة. تتطلب القراءة `settings:read` وتتطلب الكتابة `settings:write`؛ كما تتطلب مفاتيح الأمان والامتثال على التوالي `security:manage` أو `compliance:manage`. تتطلب الإعدادات السرية صلاحية مسؤول كاملة، بينما تكون بيانات الاعتماد والحالة التي تديرها نقاط نهاية مخصصة للقراءة فقط هنا. يتم التحقق من صحة التحديثات المجمّعة قبل كتابة أي قيمة.
 
 | الطريقة | المسار | الوصف |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `PUT` | `/api/v1/settings` | تحديث الإعدادات جماعيًا (نص JSON مع أزواج مفتاح-قيمة) |
 | `GET` | `/api/v1/settings/:key` | الحصول على إعداد محدد بالمفتاح |
 
-المفاتيح المعروفة: `disabledTools` (مصفوفة JSON من معرّفات الأدوات)، `enableExperimentalTools` (سلسلة منطقية)، `loginAttemptLimit` (رقم).
+مفاتيح نموذجية: `disabledTools` (مصفوفة JSON من معرّفات الأدوات)، و`enableExperimentalTools` (قيمة منطقية)، و`loginAttemptLimit` (سياسة أمان)، و`auditRetentionDays` (سياسة امتثال). تُرفض المفاتيح غير المعروفة.
 
 ## التفضيلات {#preferences}
 
@@ -636,11 +636,13 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 
 هذه المسارات مقيَّدة بالترخيص عبر ميزة المؤسسة المرتبطة بها. وما زالت تتطلب إذن SnapOtter المُدرَج.
 
+**المسؤول المضمّن بكامل الصلاحيات** يعني أن الجهة المصادق عليها تحمل دور `admin` وتمتلك مجموعة أذونات المسؤول الفعّالة بالكامل. لا يتأهل نطاق مفتاح API إذا أغفل أي إذن من أذونات المسؤول.
+
 | الطريقة | المسار | الوصول | الوصف |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | مسؤول (`audit:read`) | تصدير مدخلات التدقيق كـ JSON أو CSV مع مرشحات |
-| `GET` | `/api/v1/enterprise/config/export` | مسؤول (`system:health`) | تصدير تهيئة مثيل الخادم المُنقَّحة والأدوار المخصصة والفرق |
-| `POST` | `/api/v1/enterprise/config/import` | مسؤول (`system:health`) | استيراد التهيئة، مع تشغيل تجريبي اختياري |
+| `GET` | `/api/v1/enterprise/config/export` | مسؤول مضمّن بكامل الصلاحيات | تصدير تهيئة مثيل الخادم المُنقَّحة والأدوار المخصصة والفرق |
+| `POST` | `/api/v1/enterprise/config/import` | مسؤول مضمّن بكامل الصلاحيات | استيراد التهيئة، مع تشغيل تجريبي اختياري |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | مسؤول (`security:manage`) | قراءة قائمة CIDR المسموح بها المهيَّأة |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | مسؤول (`security:manage`) | تحديث قائمة CIDR المسموح بها مع منع الإقفال الذاتي |
 | `GET` | `/api/v1/enterprise/legal-hold` | مسؤول (`compliance:manage`) | سرد الحجوزات القانونية للمستخدمين والفرق |

@@ -6160,7 +6160,7 @@ paths:
       tags:
         - Settings
       summary: すべての設定の取得
-      description: すべてのシステム設定をキーと値のペアとして取得します。認証が必要です。
+      description: 呼び出し元の有効な権限で許可されたシステム設定を取得します。`settings:read` が必要です。セキュリティ、コンプライアンス、完全な管理者向けの設定は、それぞれ個別にフィルタリングされます。
       security:
         - bearerAuth: []
       responses:
@@ -6186,7 +6186,7 @@ paths:
       tags:
         - Settings
       summary: 設定の更新
-      description: 設定するキーと値のペアのフラットな JSON オブジェクトを受け付けます。管理者ロールが必要です。
+      description: 認識済みで書き込み可能な設定キーを含むフラットな JSON オブジェクトを受け付けます。`settings:write` が必要です。セキュリティおよびコンプライアンスのキーには対応する有効な権限も、秘密情報には完全な管理者権限も必要で、専用またはサーバー管理のキーは読み取り専用です。
       security:
         - bearerAuth: []
       requestBody:
@@ -6233,7 +6233,7 @@ paths:
       tags:
         - Settings
       summary: 単一設定の取得
-      description: キー名で単一の設定値を取得します。値と最終更新タイムスタンプを返します。
+      description: 認識済みの設定をキーで取得します。呼び出し元が `settings:read` とそのキーに必要な追加権限の両方を持つ場合に、値と最終更新タイムスタンプを返します。
       security:
         - bearerAuth: []
       parameters:
@@ -18327,7 +18327,8 @@ paths:
       tags:
         - Enterprise
       summary: 設定のエクスポート
-      description: 編集除去済みのインスタンス設定、カスタムロール、チームをエクスポートします。system:health 権限が必要です。
+      description: |
+        秘匿化されたインスタンス設定、カスタムロール、チームをエクスポートします。完全かつ実効的な組み込み管理者権限が必要です。カスタムロールは対象外であり、管理者権限が一つでも欠けている API キーも対象外です。
       security:
         - bearerAuth: []
       responses:
@@ -18342,7 +18343,7 @@ paths:
         - Enterprise
       summary: 設定のインポート
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        インスタンス設定、カスタムロール、チームをインポートします。完全かつ実効的な組み込み管理者権限が必要です。カスタムロールは対象外であり、管理者権限が一つでも欠けている API キーも対象外です。
       security:
         - bearerAuth: []
       responses:
@@ -19594,25 +19595,25 @@ x-i18n:
       provenance: machine
       outputHash: 2d107a5eb4f3
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 307ae971697e
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 9a58dcc21002
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 98cfb65d08f6
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: d5c6d2ccac83
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 9bcfba34c986
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 48db6298cef0
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 4fa6b2c77ee2
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: 6fa9dce31531
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21562,13 +21563,17 @@ x-i18n:
       provenance: machine
       outputHash: efea2136bc64
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: cf999b06bf18
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: a2674017cc21
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 9658e7ae2aa5
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: a56e90fb33e9
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

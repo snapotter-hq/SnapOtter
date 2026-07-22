@@ -530,7 +530,7 @@ To auto-save a tool result to the library, include `fileId` as a multipart form 
 
 ## Settings {#settings}
 
-Runtime key-value configuration (read by any authenticated user, write by admin only).
+Runtime configuration uses a closed set of recognized keys. Reading requires `settings:read` and writing requires `settings:write`; security and compliance keys additionally require `security:manage` or `compliance:manage`. Secret settings require full-administrator authority, while credentials and state owned by dedicated endpoints are read-only here. Bulk updates are validated before any value is written.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -538,7 +538,7 @@ Runtime key-value configuration (read by any authenticated user, write by admin 
 | `PUT` | `/api/v1/settings` | Bulk update settings (JSON body with key-value pairs) |
 | `GET` | `/api/v1/settings/:key` | Get a specific setting by key |
 
-Known keys: `disabledTools` (JSON array of tool IDs), `enableExperimentalTools` (bool string), `loginAttemptLimit` (number).
+Representative keys: `disabledTools` (JSON array of tool IDs), `enableExperimentalTools` (boolean), `loginAttemptLimit` (security policy), and `auditRetentionDays` (compliance policy). Unknown keys are rejected.
 
 ## Preferences {#preferences}
 
@@ -640,7 +640,7 @@ These routes are license-gated by their related enterprise feature. They still r
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Export audit entries as JSON or CSV with filters |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Export redacted instance config, custom roles, and teams |
+| `GET` | `/api/v1/enterprise/config/export` | Full built-in admin | Export redacted instance config, custom roles, and teams |
 | `POST` | `/api/v1/enterprise/config/import` | Full built-in admin | Import config, with optional dry run |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Read configured CIDR allowlist |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Update CIDR allowlist with self-lockout prevention |

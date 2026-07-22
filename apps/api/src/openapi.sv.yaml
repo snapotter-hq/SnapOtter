@@ -6195,7 +6195,7 @@ paths:
       tags:
         - Settings
       summary: Haamta alla installningar
-      description: Haamta alla systeminstallningar som nyckel-vardepar. Kraver autentisering.
+      description: Hämtar de systeminställningar som anroparens effektiva behörigheter medger. Kräver `settings:read`; säkerhets-, efterlevnads- och fullständiga administratörsinställningar filtreras separat.
       security:
         - bearerAuth: []
       responses:
@@ -6221,7 +6221,7 @@ paths:
       tags:
         - Settings
       summary: Uppdatera installningar
-      description: Tar emot ett platt JSON-objekt av nyckel-vardepar att stalla in. Kraver admin-roll.
+      description: Tar emot ett platt JSON-objekt med kända, skrivbara inställningsnycklar. Kräver `settings:write`; säkerhets- och efterlevnadsnycklar kräver dessutom motsvarande effektiv behörighet, hemliga inställningar kräver fullständig administratörsbehörighet och särskilda eller serverhanterade nycklar är skrivskyddade.
       security:
         - bearerAuth: []
       requestBody:
@@ -6268,7 +6268,7 @@ paths:
       tags:
         - Settings
       summary: Haamta en enskild installning
-      description: Haamta ett enskilt installningsvarde via dess nyckelnamn. Returnerar vardet och tidsstampeln for senaste uppdatering.
+      description: Hämtar en känd inställning via nyckel. Returnerar värdet och tidsstämpeln för den senaste uppdateringen när anroparen har både `settings:read` och nyckelns ytterligare behörighet.
       security:
         - bearerAuth: []
       parameters:
@@ -18397,7 +18397,10 @@ paths:
       tags:
         - Enterprise
       summary: Exportera konfiguration
-      description: Exportera redigerad instanskonfiguration, anpassade roller och team. Kraver behorigheten system:health.
+      description: >
+        Exporterar redigerad instanskonfiguration, anpassade roller och team. Kräver fullständig
+        faktisk behörighet som inbyggd administratör. Anpassade roller kvalificerar inte, och inte
+        heller API-nycklar som saknar någon administratörsbehörighet.
       security:
         - bearerAuth: []
       responses:
@@ -18412,7 +18415,7 @@ paths:
         - Enterprise
       summary: Importera konfiguration
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Importerar instanskonfiguration, anpassade roller och team. Kräver fullständig faktisk behörighet som inbyggd administratör. Anpassade roller kvalificerar inte, och inte heller API-nycklar som saknar någon administratörsbehörighet.
       security:
         - bearerAuth: []
       responses:
@@ -19664,25 +19667,25 @@ x-i18n:
       provenance: machine
       outputHash: 682cc2c07112
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 40689398e10e
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 798934885bfb
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 29711c3c4044
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: 1763022012df
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: a1c1c1598466
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: f4542877281b
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 582bf0445c23
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: 2d888ca899a8
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21632,13 +21635,17 @@ x-i18n:
       provenance: machine
       outputHash: b0d69bc545d5
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 0df30ed01216
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 7cde619401b4
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 44be217903e1
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: d6f32546d706
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

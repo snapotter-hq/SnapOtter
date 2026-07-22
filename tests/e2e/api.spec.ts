@@ -274,23 +274,39 @@ test.describe("API Endpoints", () => {
   });
 
   test("PUT /api/v1/settings saves and retrieves settings", async () => {
-    const key = `test_${Date.now()}`;
-    const res = await fetch(`${API}/api/v1/settings`, {
-      method: "PUT",
-      headers: {
-        ...authHeaders(token),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ [key]: "hello" }),
-    });
-    expect(res.status).toBe(200);
-
-    // Verify
-    const getRes = await fetch(`${API}/api/v1/settings`, {
+    const initialRes = await fetch(`${API}/api/v1/settings`, {
       headers: authHeaders(token),
     });
-    const data = await getRes.json();
-    expect(data.settings[key]).toBe("hello");
+    const initial = await initialRes.json();
+    const originalTheme = initial.settings.defaultTheme ?? "system";
+    const nextTheme = originalTheme === "dark" ? "light" : "dark";
+
+    try {
+      const res = await fetch(`${API}/api/v1/settings`, {
+        method: "PUT",
+        headers: {
+          ...authHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ defaultTheme: nextTheme }),
+      });
+      expect(res.status).toBe(200);
+
+      const getRes = await fetch(`${API}/api/v1/settings`, {
+        headers: authHeaders(token),
+      });
+      const data = await getRes.json();
+      expect(data.settings.defaultTheme).toBe(nextTheme);
+    } finally {
+      await fetch(`${API}/api/v1/settings`, {
+        method: "PUT",
+        headers: {
+          ...authHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ defaultTheme: originalTheme }),
+      });
+    }
   });
 
   // ── API Keys ───────────────────────────────────────────────────────

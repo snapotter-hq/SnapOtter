@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
 i18n_output_hash: a9129e12a29c
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Para guardar automáticamente el resultado de una herramienta en la biblioteca, 
 
 ## Ajustes {#settings}
 
-Configuración clave-valor en tiempo de ejecución (legible por cualquier usuario autenticado, escribible solo por el administrador).
+La configuración en tiempo de ejecución utiliza un conjunto cerrado de claves reconocidas. La lectura requiere `settings:read` y la escritura, `settings:write`; las claves de seguridad y cumplimiento requieren además `security:manage` o `compliance:manage`, respectivamente. Los ajustes secretos requieren autoridad de administrador pleno, mientras que las credenciales y el estado gestionados por endpoints específicos son aquí de solo lectura. Las actualizaciones en bloque se validan antes de escribir cualquier valor.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Configuración clave-valor en tiempo de ejecución (legible por cualquier usuari
 | `PUT` | `/api/v1/settings` | Actualizar ajustes en bloque (cuerpo JSON con pares clave-valor) |
 | `GET` | `/api/v1/settings/:key` | Obtener un ajuste específico por clave |
 
-Claves conocidas: `disabledTools` (array JSON de ID de herramienta), `enableExperimentalTools` (cadena bool), `loginAttemptLimit` (número).
+Claves representativas: `disabledTools` (array JSON de ID de herramientas), `enableExperimentalTools` (booleano), `loginAttemptLimit` (política de seguridad) y `auditRetentionDays` (política de cumplimiento). Las claves desconocidas se rechazan.
 
 ## Preferencias {#preferences}
 
@@ -636,11 +636,13 @@ Endpoints operativos para observabilidad, soporte, informes de uso y estado de l
 
 Estas rutas están limitadas por licencia según su función enterprise relacionada. Aun así requieren el permiso de SnapOtter indicado.
 
+**Administrador integrado completo** significa que el actor autenticado tiene el rol `admin` y el conjunto efectivo completo de permisos de administrador. Un ámbito de clave de API que omita cualquier permiso de administrador no cumple el requisito.
+
 | Método | Ruta | Acceso | Descripción |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Exportar entradas de auditoría como JSON o CSV con filtros |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Exportar la configuración de instancia censurada, los roles personalizados y los equipos |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Importar configuración, con ejecución de prueba opcional |
+| `GET` | `/api/v1/enterprise/config/export` | Administrador integrado completo | Exportar la configuración de instancia censurada, los roles personalizados y los equipos |
+| `POST` | `/api/v1/enterprise/config/import` | Administrador integrado completo | Importar configuración, con ejecución de prueba opcional |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Leer la lista de permitidos CIDR configurada |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Actualizar la lista de permitidos CIDR con prevención de autobloqueo |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Listar las retenciones legales de usuarios y equipos |

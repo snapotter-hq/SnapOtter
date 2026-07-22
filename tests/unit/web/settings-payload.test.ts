@@ -4,7 +4,16 @@ import { changedSettings, writableSettings } from "@/lib/settings-payload";
 describe("writableSettings", () => {
   it("strips server-managed read-only keys that the PUT rejects", () => {
     expect(
-      writableSettings({ instance_id: "abc", cookie_secret: "shh", defaultTheme: "dark" }),
+      writableSettings({
+        instance_id: "abc",
+        cookie_secret: "shh",
+        scim_token_hash: "hash",
+        siem_config: "{}",
+        webhook_destinations: "[]",
+        ipAllowlist: "[]",
+        audit_archival_state: "state",
+        defaultTheme: "dark",
+      }),
     ).toEqual({ defaultTheme: "dark" });
   });
 

@@ -33,12 +33,12 @@ describe("AdminSecuritySettings save errors", () => {
     expect(message).toHaveClass("text-destructive");
   });
 
-  it("lets admins relax the minimum password length down to 1", async () => {
+  it("enforces the API minimum password length of 8", async () => {
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
     const input = screen.getByLabelText("Minimum Password Length");
-    expect(input).toHaveAttribute("min", "1");
+    expect(input).toHaveAttribute("min", "8");
   });
 
   it("falls back to a generic message when the save rejects with a non-Error value", async () => {

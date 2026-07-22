@@ -6195,7 +6195,7 @@ paths:
       tags:
         - Settings
       summary: Obtener todos los ajustes
-      description: Recupera todos los ajustes del sistema como pares clave-valor. Requiere autenticación.
+      description: Recupera los ajustes del sistema autorizados por los permisos efectivos del solicitante. Requiere `settings:read`; los ajustes de seguridad, cumplimiento y administrador pleno se filtran por separado.
       security:
         - bearerAuth: []
       responses:
@@ -6221,7 +6221,7 @@ paths:
       tags:
         - Settings
       summary: Actualizar ajustes
-      description: Acepta un objeto JSON plano de pares clave-valor para establecer. Requiere el rol de administrador.
+      description: Acepta un objeto JSON plano que contiene claves de ajustes reconocidas y escribibles. Requiere `settings:write`; las claves de seguridad y cumplimiento requieren además su permiso efectivo correspondiente, los secretos requieren autoridad de administrador pleno y las claves específicas o gestionadas por el servidor son de solo lectura.
       security:
         - bearerAuth: []
       requestBody:
@@ -6268,7 +6268,7 @@ paths:
       tags:
         - Settings
       summary: Obtener un solo ajuste
-      description: Recupera el valor de un solo ajuste por su nombre de clave. Devuelve el valor y la marca de tiempo de la última actualización.
+      description: Recupera un ajuste reconocido por clave. Devuelve el valor y la marca de tiempo de la última actualización cuando el solicitante tiene tanto `settings:read` como la autoridad adicional de la clave.
       security:
         - bearerAuth: []
       parameters:
@@ -18398,7 +18398,8 @@ paths:
       tags:
         - Enterprise
       summary: Exportar configuración
-      description: Exporta la configuración de instancia, los roles personalizados y los equipos con datos ocultos. Requiere el permiso system:health.
+      description: |
+        Exporta la configuración de instancia, los roles personalizados y los equipos con datos ocultos. Requiere autoridad efectiva completa de administrador integrado; los roles personalizados no cumplen el requisito, ni tampoco las claves de API a las que les falte cualquier permiso de administrador.
       security:
         - bearerAuth: []
       responses:
@@ -18413,7 +18414,7 @@ paths:
         - Enterprise
       summary: Importar configuración
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Importa la configuración de instancia, los roles personalizados y los equipos. Requiere autoridad efectiva completa de administrador integrado; los roles personalizados no cumplen el requisito, ni tampoco las claves de API a las que les falte cualquier permiso de administrador.
       security:
         - bearerAuth: []
       responses:
@@ -19665,25 +19666,25 @@ x-i18n:
       provenance: machine
       outputHash: 862c4c5821b7
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 09a24816393d
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 5944419bed64
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 3cc6d401df39
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: 2f17092c37cc
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 598c9c86bd29
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 7dfd64b62ef9
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: bd49c5e3c701
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: c80feeaf5943
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21633,13 +21634,17 @@ x-i18n:
       provenance: machine
       outputHash: 9b4ebaabe258
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: c707b400987f
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: a8568826d1ae
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: b6274c66f0c5
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: e166fcc46360
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

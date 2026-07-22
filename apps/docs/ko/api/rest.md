@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
 i18n_output_hash: a4289adc1b56
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 ## 설정 {#settings}
 
-런타임 키-값 구성(인증된 모든 사용자가 읽기, 관리자만 쓰기).
+런타임 구성은 인식된 키의 닫힌 집합을 사용합니다. 읽기에는 `settings:read`, 쓰기에는 `settings:write`가 필요하며, 보안 및 규정 준수 키에는 각각 `security:manage` 또는 `compliance:manage`도 필요합니다. 비밀 설정에는 전체 관리자 권한이 필요하고, 전용 엔드포인트가 관리하는 자격 증명과 상태는 여기서 읽기 전용입니다. 일괄 업데이트는 값을 쓰기 전에 검증됩니다.
 
 | 메서드 | 경로 | 설명 |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 | `PUT` | `/api/v1/settings` | 설정 일괄 업데이트(키-값 쌍을 담은 JSON 본문) |
 | `GET` | `/api/v1/settings/:key` | 키로 특정 설정 획득 |
 
-알려진 키: `disabledTools`(도구 ID의 JSON 배열), `enableExperimentalTools`(bool 문자열), `loginAttemptLimit`(number).
+대표 키: `disabledTools`(도구 ID의 JSON 배열), `enableExperimentalTools`(불리언), `loginAttemptLimit`(보안 정책), `auditRetentionDays`(규정 준수 정책). 알 수 없는 키는 거부됩니다.
 
 ## 환경설정 {#preferences}
 
@@ -636,11 +636,13 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 
 이 경로들은 관련 엔터프라이즈 기능에 의해 라이선스 게이트가 적용됩니다. 여전히 나열된 SnapOtter 권한이 필요합니다.
 
+**전체 권한의 기본 제공 관리자**는 인증된 주체가 `admin` 역할과 전체 유효 관리자 권한 집합을 보유함을 의미합니다. 관리자 권한이 하나라도 누락된 API 키 범위는 자격이 없습니다.
+
 | 메서드 | 경로 | 접근 권한 | 설명 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | 관리자(`audit:read`) | 필터와 함께 감사 항목을 JSON 또는 CSV로 내보내기 |
-| `GET` | `/api/v1/enterprise/config/export` | 관리자(`system:health`) | 편집된 인스턴스 구성, 커스텀 역할, 팀 내보내기 |
-| `POST` | `/api/v1/enterprise/config/import` | 관리자(`system:health`) | 선택적 드라이런과 함께 구성 가져오기 |
+| `GET` | `/api/v1/enterprise/config/export` | 전체 권한의 기본 제공 관리자 | 편집된 인스턴스 구성, 커스텀 역할, 팀 내보내기 |
+| `POST` | `/api/v1/enterprise/config/import` | 전체 권한의 기본 제공 관리자 | 선택적 드라이런과 함께 구성 가져오기 |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | 관리자(`security:manage`) | 구성된 CIDR 허용 목록 읽기 |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | 관리자(`security:manage`) | 자기 잠금 방지와 함께 CIDR 허용 목록 업데이트 |
 | `GET` | `/api/v1/enterprise/legal-hold` | 관리자(`compliance:manage`) | 사용자 및 팀 법적 보존 목록 |

@@ -6194,7 +6194,7 @@ paths:
       tags:
         - Settings
       summary: الحصول على جميع الإعدادات
-      description: استرداد جميع إعدادات النظام كأزواج مفتاح-قيمة. يتطلب المصادقة.
+      description: استرداد إعدادات النظام التي تسمح بها الصلاحيات الفعلية للمتصل. يتطلب `settings:read`؛ وتُرشَّح إعدادات الأمان والامتثال والمسؤول الكامل كلٌّ على حدة.
       security:
         - bearerAuth: []
       responses:
@@ -6220,7 +6220,7 @@ paths:
       tags:
         - Settings
       summary: تحديث الإعدادات
-      description: يقبل كائن JSON مسطّح من أزواج مفتاح-قيمة لضبطها. يتطلب دور المسؤول.
+      description: يقبل كائن JSON مسطّحًا يحتوي على مفاتيح إعدادات معروفة وقابلة للكتابة. يتطلب `settings:write`؛ وتتطلب مفاتيح الأمان والامتثال أيضًا الصلاحية الفعلية المطابقة، وتتطلب الإعدادات السرية صلاحية مسؤول كاملة، أما المفاتيح المخصصة أو التي يديرها الخادم فهي للقراءة فقط.
       security:
         - bearerAuth: []
       requestBody:
@@ -6267,7 +6267,7 @@ paths:
       tags:
         - Settings
       summary: الحصول على إعداد واحد
-      description: استرداد قيمة إعداد واحد بواسطة اسم مفتاحه. يُرجع القيمة والطابع الزمني لآخر تحديث.
+      description: استرداد إعداد معروف حسب المفتاح. يُرجع القيمة والطابع الزمني لآخر تحديث عندما يمتلك المتصل كلًا من `settings:read` والصلاحية الإضافية للمفتاح.
       security:
         - bearerAuth: []
       parameters:
@@ -18397,7 +18397,8 @@ paths:
       tags:
         - Enterprise
       summary: تصدير الإعدادات
-      description: تصدير إعدادات المثيل المنقّحة والأدوار المخصصة والفرق. يتطلب إذن system:health.
+      description: |
+        تصدير إعدادات المثيل المنقّحة والأدوار المخصصة والفرق. يتطلب صلاحيات فعّالة وكاملة لمسؤول مضمّن؛ لا تتأهل الأدوار المخصصة، ولا مفاتيح API التي ينقصها أي إذن من أذونات المسؤول.
       security:
         - bearerAuth: []
       responses:
@@ -18412,7 +18413,7 @@ paths:
         - Enterprise
       summary: استيراد الإعدادات
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        استيراد إعدادات المثيل والأدوار المخصصة والفرق. يتطلب صلاحيات فعّالة وكاملة لمسؤول مضمّن؛ لا تتأهل الأدوار المخصصة، ولا مفاتيح API التي ينقصها أي إذن من أذونات المسؤول.
       security:
         - bearerAuth: []
       responses:
@@ -19664,25 +19665,25 @@ x-i18n:
       provenance: machine
       outputHash: 1262280f9c6e
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: e1ec683f5e5c
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 4cfe8f3730f8
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 0023629c3617
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: c77d7bec978d
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: b76279ea2d3f
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 5fcf8f2d6008
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 11dbe8b156b5
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: 095b505c1779
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21632,13 +21633,17 @@ x-i18n:
       provenance: machine
       outputHash: 9f53f3a2841a
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: cacf92da7e22
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: b83bec75dec4
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: cb053b845a9d
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: c660c73729fb
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

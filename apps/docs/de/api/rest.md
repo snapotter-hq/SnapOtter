@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
 i18n_output_hash: 8efd33eca67a
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Um ein Tool-Ergebnis automatisch in der Bibliothek zu speichern, fügen Sie `fil
 
 ## Einstellungen {#settings}
 
-Laufzeit-Schlüssel-Wert-Konfiguration (von jedem authentifizierten Benutzer lesbar, nur vom Admin schreibbar).
+Die Laufzeitkonfiguration verwendet eine geschlossene Menge erkannter Schlüssel. Zum Lesen ist `settings:read` und zum Schreiben `settings:write` erforderlich; Sicherheits- und Compliance-Schlüssel erfordern zusätzlich `security:manage` bzw. `compliance:manage`. Geheime Einstellungen erfordern die vollständige Administratorberechtigung, während Zugangsdaten und Zustände, die von dedizierten Endpunkten verwaltet werden, hier schreibgeschützt sind. Massenaktualisierungen werden vollständig validiert, bevor ein Wert geschrieben wird.
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Laufzeit-Schlüssel-Wert-Konfiguration (von jedem authentifizierten Benutzer les
 | `PUT` | `/api/v1/settings` | Einstellungen massenhaft aktualisieren (JSON-Body mit Schlüssel-Wert-Paaren) |
 | `GET` | `/api/v1/settings/:key` | Eine bestimmte Einstellung nach Schlüssel abrufen |
 
-Bekannte Schlüssel: `disabledTools` (JSON-Array von Tool-IDs), `enableExperimentalTools` (bool-String), `loginAttemptLimit` (Zahl).
+Beispielschlüssel: `disabledTools` (JSON-Array von Tool-IDs), `enableExperimentalTools` (boolescher Wert), `loginAttemptLimit` (Sicherheitsrichtlinie) und `auditRetentionDays` (Compliance-Richtlinie). Unbekannte Schlüssel werden abgelehnt.
 
 ## Einstellungen (Preferences) {#preferences}
 
@@ -636,11 +636,13 @@ Operative Endpunkte für Observability, Support, Nutzungsberichte und Backup-Sta
 
 Diese Routen sind durch das zugehörige Enterprise-Feature lizenzgesteuert. Sie erfordern weiterhin die aufgeführte SnapOtter-Berechtigung.
 
+**Vollständiger integrierter Admin** bedeutet, dass der authentifizierte Akteur die Rolle `admin` und den vollständigen effektiven Satz von Admin-Berechtigungen besitzt. Ein API-Schlüsselbereich, der auch nur eine Admin-Berechtigung auslässt, erfüllt die Anforderungen nicht.
+
 | Methode | Pfad | Zugriff | Beschreibung |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Audit-Einträge als JSON oder CSV mit Filtern exportieren |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Redigierte Instanzkonfiguration, benutzerdefinierte Rollen und Teams exportieren |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Konfiguration importieren, mit optionalem Probelauf |
+| `GET` | `/api/v1/enterprise/config/export` | Vollständiger integrierter Admin | Redigierte Instanzkonfiguration, benutzerdefinierte Rollen und Teams exportieren |
+| `POST` | `/api/v1/enterprise/config/import` | Vollständiger integrierter Admin | Konfiguration importieren, mit optionalem Probelauf |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Konfigurierte CIDR-Erlaubnisliste lesen |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | CIDR-Erlaubnisliste mit Selbstsperrungs-Prävention aktualisieren |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Legal Holds für Benutzer und Teams auflisten |

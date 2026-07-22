@@ -467,7 +467,7 @@ const db: {
     ssoBreakGlassUsername: "",
     passwordMinLength: "8",
     passwordRequireUppercase: "true",
-    passwordRequireNumber: "true",
+    passwordRequireDigit: "true",
     passwordRequireSpecial: "false",
     disabledTools: "[]",
     enableExperimentalTools: "false",

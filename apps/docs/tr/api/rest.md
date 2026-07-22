@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
 i18n_output_hash: 4ae115bf377e
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Bir araç sonucunu kitaplığa otomatik kaydetmek için, mevcut bir kitaplık do
 
 ## Ayarlar {#settings}
 
-Çalışma zamanı anahtar-değer yapılandırması (kimliği doğrulanmış herhangi bir kullanıcı okur, yalnızca yönetici yazar).
+Çalışma zamanı yapılandırması, tanınan anahtarlardan oluşan kapalı bir küme kullanır. Okuma `settings:read`, yazma ise `settings:write` gerektirir; güvenlik ve uyumluluk anahtarları ayrıca `security:manage` veya `compliance:manage` gerektirir. Gizli ayarlar tam yönetici yetkisi gerektirirken özel uç noktaların yönettiği kimlik bilgileri ve durum burada salt okunurdur. Toplu güncellemeler herhangi bir değer yazılmadan önce doğrulanır.
 
 | Yöntem | Yol | Açıklama |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Bir araç sonucunu kitaplığa otomatik kaydetmek için, mevcut bir kitaplık do
 | `PUT` | `/api/v1/settings` | Ayarları toplu güncelle (anahtar-değer çiftleriyle JSON gövdesi) |
 | `GET` | `/api/v1/settings/:key` | Anahtara göre belirli bir ayarı al |
 
-Bilinen anahtarlar: `disabledTools` (araç kimliklerinin JSON dizisi), `enableExperimentalTools` (bool dizesi), `loginAttemptLimit` (sayı).
+Temsili anahtarlar: `disabledTools` (araç kimliklerinden oluşan JSON dizisi), `enableExperimentalTools` (boole değeri), `loginAttemptLimit` (güvenlik politikası) ve `auditRetentionDays` (uyumluluk politikası). Bilinmeyen anahtarlar reddedilir.
 
 ## Tercihler {#preferences}
 
@@ -636,11 +636,13 @@ Gözlemlenebilirlik, destek, kullanım raporlama ve yedekleme durumu için opera
 
 Bu yollar, ilgili kurumsal özellikleri tarafından lisans kapılıdır. Yine de listelenen SnapOtter iznini gerektirirler.
 
+**Tam yetkili yerleşik yönetici**, kimliği doğrulanmış aktörün `admin` rolüne ve etkin yönetici izinlerinin tamamına sahip olduğu anlamına gelir. Herhangi bir yönetici iznini içermeyen API anahtarı kapsamı bu koşulu sağlamaz.
+
 | Yöntem | Yol | Erişim | Açıklama |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Yönetici (`audit:read`) | Denetim girdilerini filtrelerle JSON veya CSV olarak dışa aktar |
-| `GET` | `/api/v1/enterprise/config/export` | Yönetici (`system:health`) | Redakte edilmiş örnek yapılandırmasını, özel rolleri ve ekipleri dışa aktar |
-| `POST` | `/api/v1/enterprise/config/import` | Yönetici (`system:health`) | Yapılandırmayı içe aktar, isteğe bağlı deneme çalışmasıyla |
+| `GET` | `/api/v1/enterprise/config/export` | Tam yetkili yerleşik yönetici | Redakte edilmiş örnek yapılandırmasını, özel rolleri ve ekipleri dışa aktar |
+| `POST` | `/api/v1/enterprise/config/import` | Tam yetkili yerleşik yönetici | Yapılandırmayı içe aktar, isteğe bağlı deneme çalışmasıyla |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Yönetici (`security:manage`) | Yapılandırılmış CIDR izin listesini oku |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Yönetici (`security:manage`) | CIDR izin listesini kendini kilitleme önlemesiyle güncelle |
 | `GET` | `/api/v1/enterprise/legal-hold` | Yönetici (`compliance:manage`) | Kullanıcı ve ekip yasal saklamalarını listele |

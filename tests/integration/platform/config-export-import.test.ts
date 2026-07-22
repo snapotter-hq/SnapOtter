@@ -144,6 +144,7 @@ describe("config export with enterprise license", () => {
       "scim_token_hash",
       "oidc_client_secret",
       "saml_idp_certificate",
+      "siem_webhook_auth",
       "siem_last_forwarded_at",
       "siem_consecutive_failures",
       "audit_archival_state",
@@ -165,6 +166,122 @@ describe("config export with enterprise license", () => {
     for (const key of redactedKeys) {
       expect(body.settings[key]).toBeUndefined();
     }
+  });
+
+  it("exports the canonical password-digit key without its legacy alias", async () => {
+    const keys = ["passwordRequireDigit", "passwordRequireNumber"];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    try {
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireDigit", value: "false" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "false" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireNumber", value: "true" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${licensedToken}` },
+      });
+      const body = JSON.parse(res.body);
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(body.settings.passwordRequireDigit).toBe("false");
+      expect(body.settings.passwordRequireNumber).toBeUndefined();
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .update(schema.settings)
+            .set({ value: original })
+            .where(eq(schema.settings.key, key));
+        }
+      }
+    }
+  });
+
+  it("denies config export to a custom role even with every admin permission", async () => {
+    const suffix = Date.now().toString(36);
+    const roleName = `config-export-${suffix}`;
+    const username = `config-export-user-${suffix}`;
+    let roleId: string | undefined;
+    let userId: string | undefined;
+
+    try {
+      const roleRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/roles",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: { name: roleName, permissions: ADMIN_PERMISSIONS },
+      });
+      expect(roleRes.statusCode, roleRes.body).toBe(201);
+      roleId = JSON.parse(roleRes.body).id as string;
+
+      const registerRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: { username, password: "TestPass1", role: roleName },
+      });
+      expect(registerRes.statusCode, registerRes.body).toBe(201);
+      userId = JSON.parse(registerRes.body).id as string;
+      await db
+        .update(schema.users)
+        .set({ mustChangePassword: false })
+        .where(eq(schema.users.id, userId));
+
+      const loginRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password: "TestPass1" },
+      });
+      const actorToken = JSON.parse(loginRes.body).token as string;
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${actorToken}` },
+      });
+
+      expect.soft(res.statusCode, res.body).toBe(403);
+      expect(JSON.parse(res.body).code).toBe("ESCALATION_DENIED");
+    } finally {
+      if (userId) await db.delete(schema.users).where(eq(schema.users.id, userId));
+      if (roleId) await db.delete(schema.roles).where(eq(schema.roles.id, roleId));
+    }
+  });
+
+  it("denies config export through a permission-scoped built-in admin API key", async () => {
+    const suffix = Date.now().toString(36);
+    const keyRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        name: `config-export-scoped-${suffix}`,
+        permissions: ["system:health"],
+      },
+    });
+    expect(keyRes.statusCode, keyRes.body).toBe(201);
+    const scopedKey = JSON.parse(keyRes.body).key as string;
+
+    const res = await licensedApp.app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/config/export",
+      headers: { authorization: `Bearer ${scopedKey}` },
+    });
+
+    expect.soft(res.statusCode, res.body).toBe(403);
+    expect(JSON.parse(res.body).code).toBe("ESCALATION_DENIED");
   });
 });
 
@@ -399,9 +516,10 @@ describe("config import with enterprise license", () => {
 
   it("dry-run reports setting, role, and team changes without mutating them", async () => {
     const suffix = Date.now().toString(36);
-    const settingKey = `configDryRunSetting${suffix}`;
+    const settingKey = "defaultToolView";
     const roleName = `config-dry-run-role-${suffix}`;
     const teamName = `config-dry-run-team-${suffix}`;
+    await db.delete(schema.settings).where(eq(schema.settings.key, settingKey));
 
     const res = await licensedApp.app.inject({
       method: "POST",
@@ -411,7 +529,7 @@ describe("config import with enterprise license", () => {
         dryRun: true,
         config: {
           configSchemaVersion: 1,
-          settings: { [settingKey]: "hello" },
+          settings: { [settingKey]: "fullscreen" },
           roles: [{ name: roleName, permissions: ["settings:read"] }],
           teams: [{ name: teamName }],
         },
@@ -438,6 +556,35 @@ describe("config import with enterprise license", () => {
     expect.soft(setting).toBeUndefined();
     expect.soft(role).toBeUndefined();
     expect(team).toBeUndefined();
+  });
+
+  it.each([
+    { field: "retentionHours", value: 2_147_483_648 },
+    { field: "storageQuota", value: Number.MAX_SAFE_INTEGER + 1 },
+  ])("rejects out-of-range team $field during dry-run and apply", async ({ field, value }) => {
+    const teamName = `config-out-of-range-${field}-${Date.now().toString(36)}`;
+    const config = {
+      configSchemaVersion: 1,
+      teams: [{ name: teamName, [field]: value }],
+    };
+
+    try {
+      for (const dryRun of [true, false]) {
+        const res = await licensedApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/config/import",
+          headers: { authorization: `Bearer ${licensedToken}` },
+          payload: { dryRun, config },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+      }
+
+      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.name, teamName));
+      expect(team).toBeUndefined();
+    } finally {
+      await db.delete(schema.teams).where(eq(schema.teams.name, teamName));
+    }
   });
 
   it("rejects future schema versions", async () => {
@@ -473,9 +620,258 @@ describe("config import with enterprise license", () => {
     expect(body.changes.teams).toBe(0);
   });
 
+  it("rejects an unlicensed MFA policy atomically during config import", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "optional" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "optional" } });
+
+    const res = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: {
+          configSchemaVersion: 1,
+          settings: { defaultTheme: "dark", mfaPolicy: "required" },
+        },
+      },
+    });
+    const [theme] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "defaultTheme"));
+    const [mfaPolicy] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "mfaPolicy"));
+
+    expect.soft(res.statusCode, res.body).toBe(403);
+    expect.soft(JSON.parse(res.body).code).toBe("FEATURE_NOT_LICENSED");
+    expect.soft(theme?.value).toBe("system");
+    expect(mfaPolicy?.value).toBe("optional");
+  });
+
+  it("rejects SSO enforcement without a configured provider atomically", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+    await db
+      .insert(schema.settings)
+      .values({ key: "ssoEnforcement", value: "false" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "false" } });
+
+    const res = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: {
+          configSchemaVersion: 1,
+          settings: { defaultTheme: "dark", ssoEnforcement: "true" },
+        },
+      },
+    });
+    const [theme] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "defaultTheme"));
+    const [ssoEnforcement] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "ssoEnforcement"));
+
+    expect.soft(res.statusCode, res.body).toBe(400);
+    expect.soft(JSON.parse(res.body).code).toBe("DEPENDENCY_VALIDATION_FAILED");
+    expect.soft(theme?.value).toBe("system");
+    expect(ssoEnforcement?.value).toBe("false");
+  });
+
+  it("rejects duplicate imported roles without partially applying settings", async () => {
+    const roleName = `config-duplicate-role-${Date.now().toString(36)}`;
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { defaultTheme: "dark" },
+            roles: [
+              { name: roleName, permissions: ["settings:read"] },
+              { name: roleName, permissions: ["settings:read"] },
+            ],
+          },
+        },
+      });
+      const [theme] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "defaultTheme"));
+      const [role] = await db.select().from(schema.roles).where(eq(schema.roles.name, roleName));
+
+      expect.soft(res.statusCode, res.body).toBe(400);
+      expect.soft(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+      expect.soft(theme?.value).toBe("system");
+      expect(role).toBeUndefined();
+    } finally {
+      await db.delete(schema.roles).where(eq(schema.roles.name, roleName));
+    }
+  });
+
+  it("rejects built-in role names without partially applying settings", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+
+    const res = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: {
+          configSchemaVersion: 1,
+          settings: { defaultTheme: "dark" },
+          roles: [{ name: "admin", permissions: ["settings:read"] }],
+        },
+      },
+    });
+    const [theme] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "defaultTheme"));
+    const [adminRole] = await db.select().from(schema.roles).where(eq(schema.roles.name, "admin"));
+
+    expect.soft(res.statusCode, res.body).toBe(400);
+    expect.soft(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect.soft(theme?.value).toBe("system");
+    expect(adminRole?.isBuiltin).toBe(true);
+  });
+
+  it("rejects duplicate imported teams without partially applying settings", async () => {
+    const teamName = `Config Duplicate Team ${Date.now().toString(36)}`;
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { defaultTheme: "dark" },
+            teams: [{ name: teamName }, { name: teamName }],
+          },
+        },
+      });
+      const [theme] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "defaultTheme"));
+      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.name, teamName));
+
+      expect.soft(res.statusCode, res.body).toBe(400);
+      expect.soft(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+      expect.soft(theme?.value).toBe("system");
+      expect(team).toBeUndefined();
+    } finally {
+      await db.delete(schema.teams).where(eq(schema.teams.name, teamName));
+    }
+  });
+
+  it("rejects dedicated settings atomically during config import", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "defaultTheme", value: "system" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "system" } });
+    await db
+      .insert(schema.settings)
+      .values({ key: "ipAllowlist", value: "[]" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "[]" } });
+
+    const res = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: {
+          configSchemaVersion: 1,
+          settings: { defaultTheme: "dark", ipAllowlist: '["0.0.0.0/0"]' },
+        },
+      },
+    });
+    const [theme] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "defaultTheme"));
+    const [allowlist] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "ipAllowlist"));
+
+    expect.soft(res.statusCode, res.body).toBe(400);
+    expect.soft(JSON.parse(res.body).code).toBe("READONLY_SETTING");
+    expect.soft(theme?.value).toBe("system");
+    expect(allowlist?.value).toBe("[]");
+  });
+
+  it("rejects unknown and malformed setting keys during config import", async () => {
+    const unknownKey = `config_unknown_${Date.now().toString(36)}`;
+    const unknownRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: { configSchemaVersion: 1, settings: { [unknownKey]: "value" } },
+      },
+    });
+    const malformedRes = await licensedApp.app.inject({
+      method: "POST",
+      url: "/api/v1/enterprise/config/import",
+      headers: { authorization: `Bearer ${licensedToken}` },
+      payload: {
+        dryRun: false,
+        config: { configSchemaVersion: 1, settings: { loginAttemptLimit: "0" } },
+      },
+    });
+    const [unknownSetting] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, unknownKey));
+
+    expect.soft(unknownRes.statusCode, unknownRes.body).toBe(400);
+    expect.soft(JSON.parse(unknownRes.body).code).toBe("UNKNOWN_SETTING");
+    expect.soft(malformedRes.statusCode, malformedRes.body).toBe(400);
+    expect.soft(JSON.parse(malformedRes.body).code).toBe("VALIDATION_ERROR");
+    expect(unknownSetting).toBeUndefined();
+  });
+
   it("import with valid settings applies them", async () => {
-    const settingKey = "configImportTestKey";
-    const settingValue = "configImportTestValue";
+    const settingKey = "defaultLocale";
+    const settingValue = "fr";
 
     const res = await licensedApp.app.inject({
       method: "POST",
@@ -521,7 +917,7 @@ describe("config round-trip", () => {
     vi.restoreAllMocks();
   }, 10_000);
 
-  it("export then dry-run import reports 0 changes", async () => {
+  it("export then dry-run import classifies existing records as updates", async () => {
     const exportRes = await licensedApp.app.inject({
       method: "GET",
       url: "/api/v1/enterprise/config/export",

@@ -6191,7 +6191,7 @@ paths:
       tags:
         - Settings
       summary: Alle Einstellungen abrufen
-      description: Alle Systemeinstellungen als Schlüssel-Wert-Paare abrufen. Erfordert Authentifizierung.
+      description: Ruft die Systemeinstellungen ab, zu denen die effektiven Berechtigungen des Aufrufers berechtigen. Erfordert `settings:read`; Sicherheits-, Compliance- und vollständige Administratoreinstellungen werden jeweils separat gefiltert.
       security:
         - bearerAuth: []
       responses:
@@ -6217,7 +6217,7 @@ paths:
       tags:
         - Settings
       summary: Einstellungen aktualisieren
-      description: Akzeptiert ein flaches JSON-Objekt aus Schlüssel-Wert-Paaren zum Setzen. Erfordert die Admin-Rolle.
+      description: Akzeptiert ein flaches JSON-Objekt mit erkannten, beschreibbaren Einstellungsschlüsseln. Erfordert `settings:write`; Sicherheits- und Compliance-Schlüssel erfordern zusätzlich die jeweils passende effektive Berechtigung, Geheimnisse erfordern die vollständige Administratorberechtigung und dedizierte oder serververwaltete Schlüssel sind schreibgeschützt.
       security:
         - bearerAuth: []
       requestBody:
@@ -6264,7 +6264,7 @@ paths:
       tags:
         - Settings
       summary: Eine einzelne Einstellung abrufen
-      description: Einen einzelnen Einstellungswert anhand seines Schlüsselnamens abrufen. Gibt den Wert und den Zeitstempel der letzten Aktualisierung zurück.
+      description: Ruft eine erkannte Einstellung anhand ihres Schlüssels ab. Gibt den Wert und den Zeitstempel der letzten Aktualisierung zurück, wenn der Aufrufer sowohl `settings:read` als auch die zusätzliche Berechtigung des Schlüssels besitzt.
       security:
         - bearerAuth: []
       parameters:
@@ -18394,7 +18394,8 @@ paths:
       tags:
         - Enterprise
       summary: Konfiguration exportieren
-      description: Geschwärzte Instanzkonfiguration, benutzerdefinierte Rollen und Teams exportieren. Erfordert die Berechtigung system:health.
+      description: |
+        Geschwärzte Instanzkonfiguration, benutzerdefinierte Rollen und Teams exportieren. Erfordert die vollständige effektive Berechtigung eines integrierten Administrators; benutzerdefinierte Rollen sind nicht zulässig, ebenso wenig API-Schlüssel, denen auch nur eine Administratorberechtigung fehlt.
       security:
         - bearerAuth: []
       responses:
@@ -18409,7 +18410,7 @@ paths:
         - Enterprise
       summary: Konfiguration importieren
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Instanzkonfiguration, benutzerdefinierte Rollen und Teams importieren. Erfordert die vollständige effektive Berechtigung eines integrierten Administrators; benutzerdefinierte Rollen sind nicht zulässig, ebenso wenig API-Schlüssel, denen auch nur eine Administratorberechtigung fehlt.
       security:
         - bearerAuth: []
       responses:
@@ -19661,25 +19662,25 @@ x-i18n:
       provenance: machine
       outputHash: e8795091074e
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 370caf182a66
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: f104c8a3fe10
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: ae9fe22e7c45
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: ed77431f7a09
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: c8e069512be0
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 3c0291a04d61
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 1066c0dd57dd
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: 28ce113c2055
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21629,13 +21630,17 @@ x-i18n:
       provenance: machine
       outputHash: f3710da98e9d
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 614419e41180
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: aaea0072c382
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 690fb30ee112
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: f353b61c4566
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

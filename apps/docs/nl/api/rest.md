@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
 i18n_output_hash: 8f6eabc592c0
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Om een tool-resultaat automatisch op te slaan in de bibliotheek, voeg je `fileId
 
 ## Instellingen {#settings}
 
-Runtime key-value-configuratie (leesbaar door elke geauthenticeerde gebruiker, alleen schrijfbaar door admin).
+De runtimeconfiguratie gebruikt een gesloten verzameling herkende sleutels. Lezen vereist `settings:read` en schrijven vereist `settings:write`; beveiligings- en compliancesleutels vereisen daarnaast respectievelijk `security:manage` of `compliance:manage`. Geheime instellingen vereisen volledige beheerdersbevoegdheid, terwijl referenties en status die door specifieke endpoints worden beheerd hier alleen-lezen zijn. Bulkwijzigingen worden gevalideerd voordat een waarde wordt geschreven.
 
 | Methode | Pad | Beschrijving |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Runtime key-value-configuratie (leesbaar door elke geauthenticeerde gebruiker, a
 | `PUT` | `/api/v1/settings` | Instellingen in bulk bijwerken (JSON-body met key-value-paren) |
 | `GET` | `/api/v1/settings/:key` | Een specifieke instelling ophalen op sleutel |
 
-Bekende sleutels: `disabledTools` (JSON-array van tool-ID's), `enableExperimentalTools` (bool-string), `loginAttemptLimit` (getal).
+Representatieve sleutels: `disabledTools` (JSON-array van tool-ID's), `enableExperimentalTools` (booleaanse waarde), `loginAttemptLimit` (beveiligingsbeleid) en `auditRetentionDays` (compliancebeleid). Onbekende sleutels worden geweigerd.
 
 ## Voorkeuren {#preferences}
 
@@ -636,11 +636,13 @@ Operationele endpoints voor observability, support, gebruiksrapportage en backup
 
 Deze routes zijn licentiegebonden door de bijbehorende enterprise-functie. Ze vereisen nog steeds de vermelde SnapOtter-permissie.
 
+**Volledige ingebouwde beheerder** betekent dat de geauthenticeerde actor de rol `admin` en de volledige effectieve set beheerderspermissies heeft. Een API-sleutelbereik dat ook maar één beheerderspermissie weglaat, komt niet in aanmerking.
+
 | Methode | Pad | Toegang | Beschrijving |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Auditvermeldingen exporteren als JSON of CSV met filters |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Geredigeerde instance-configuratie, aangepaste rollen en teams exporteren |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Configuratie importeren, met optionele dry run |
+| `GET` | `/api/v1/enterprise/config/export` | Volledige ingebouwde beheerder | Geredigeerde instance-configuratie, aangepaste rollen en teams exporteren |
+| `POST` | `/api/v1/enterprise/config/import` | Volledige ingebouwde beheerder | Configuratie importeren, met optionele dry run |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Geconfigureerde CIDR-allowlist lezen |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | CIDR-allowlist bijwerken met bescherming tegen zelf-buitensluiting |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Legal holds voor gebruikers en teams weergeven |

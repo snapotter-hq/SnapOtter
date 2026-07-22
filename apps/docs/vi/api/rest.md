@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
 i18n_output_hash: a2d3795ef769
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Lưu trữ tệp bền vững kèm lịch sử phiên bản.
 
 ## Cài đặt {#settings}
 
-Cấu hình khóa-giá trị lúc chạy (bất kỳ người dùng đã xác thực nào cũng đọc được, chỉ admin ghi được).
+Cấu hình thời gian chạy sử dụng một tập hợp đóng gồm các khóa được nhận dạng. Việc đọc yêu cầu `settings:read` và việc ghi yêu cầu `settings:write`; các khóa bảo mật và tuân thủ còn yêu cầu `security:manage` hoặc `compliance:manage`. Cài đặt bí mật yêu cầu quyền quản trị viên đầy đủ, còn thông tin xác thực và trạng thái do các điểm cuối chuyên biệt quản lý chỉ có thể đọc tại đây. Các bản cập nhật hàng loạt được xác thực trước khi ghi bất kỳ giá trị nào.
 
 | Phương thức | Đường dẫn | Mô tả |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Cấu hình khóa-giá trị lúc chạy (bất kỳ người dùng đã xác th
 | `PUT` | `/api/v1/settings` | Cập nhật hàng loạt cài đặt (thân JSON với các cặp khóa-giá trị) |
 | `GET` | `/api/v1/settings/:key` | Lấy một cài đặt cụ thể theo khóa |
 
-Các khóa đã biết: `disabledTools` (mảng JSON gồm các ID công cụ), `enableExperimentalTools` (chuỗi bool), `loginAttemptLimit` (số).
+Các khóa tiêu biểu: `disabledTools` (mảng JSON gồm các ID công cụ), `enableExperimentalTools` (giá trị boolean), `loginAttemptLimit` (chính sách bảo mật) và `auditRetentionDays` (chính sách tuân thủ). Các khóa không xác định sẽ bị từ chối.
 
 ## Tùy chọn {#preferences}
 
@@ -636,11 +636,13 @@ Các endpoint vận hành cho quan sát, hỗ trợ, báo cáo sử dụng và t
 
 Các route này bị khóa theo giấy phép của tính năng enterprise liên quan. Chúng vẫn yêu cầu quyền hạn SnapOtter được liệt kê.
 
+**Quản trị viên tích hợp sẵn có đầy đủ quyền** nghĩa là chủ thể đã xác thực có vai trò `admin` và toàn bộ tập quyền quản trị viên có hiệu lực. Phạm vi khóa API thiếu bất kỳ quyền quản trị viên nào sẽ không đủ điều kiện.
+
 | Phương thức | Đường dẫn | Quyền truy cập | Mô tả |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Xuất các mục kiểm toán dưới dạng JSON hoặc CSV với bộ lọc |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Xuất cấu hình instance, vai trò tùy chỉnh và nhóm đã ẩn thông tin |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Nhập cấu hình, với chạy thử tùy chọn |
+| `GET` | `/api/v1/enterprise/config/export` | Quản trị viên tích hợp sẵn có đầy đủ quyền | Xuất cấu hình instance, vai trò tùy chỉnh và nhóm đã ẩn thông tin |
+| `POST` | `/api/v1/enterprise/config/import` | Quản trị viên tích hợp sẵn có đầy đủ quyền | Nhập cấu hình, với chạy thử tùy chọn |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Đọc danh sách cho phép CIDR đã cấu hình |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Cập nhật danh sách cho phép CIDR với cơ chế ngăn tự khóa mình ra ngoài |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Liệt kê các lệnh giữ pháp lý của người dùng và nhóm |

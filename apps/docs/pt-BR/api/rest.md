@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
 i18n_output_hash: cf7876adfe84
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Para salvar automaticamente o resultado de uma ferramenta na biblioteca, inclua 
 
 ## Configurações {#settings}
 
-Configuração de tempo de execução em pares chave-valor (leitura por qualquer usuário autenticado, gravação apenas por admin).
+A configuração de execução usa um conjunto fechado de chaves reconhecidas. A leitura exige `settings:read` e a gravação exige `settings:write`; as chaves de segurança e conformidade também exigem `security:manage` ou `compliance:manage`. Configurações secretas exigem autoridade de administrador completo, enquanto credenciais e estados controlados por endpoints dedicados são somente leitura aqui. As atualizações em massa são validadas antes que qualquer valor seja gravado.
 
 | Método | Caminho | Descrição |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Configuração de tempo de execução em pares chave-valor (leitura por qualquer
 | `PUT` | `/api/v1/settings` | Atualiza configurações em massa (corpo JSON com pares chave-valor) |
 | `GET` | `/api/v1/settings/:key` | Obtém uma configuração específica pela chave |
 
-Chaves conhecidas: `disabledTools` (array JSON de IDs de ferramentas), `enableExperimentalTools` (string bool), `loginAttemptLimit` (número).
+Chaves representativas: `disabledTools` (array JSON de IDs de ferramentas), `enableExperimentalTools` (booleano), `loginAttemptLimit` (política de segurança) e `auditRetentionDays` (política de conformidade). Chaves desconhecidas são rejeitadas.
 
 ## Preferências {#preferences}
 
@@ -636,11 +636,13 @@ Endpoints operacionais para observabilidade, suporte, relatório de uso e status
 
 Essas rotas são restritas por licença de acordo com o recurso enterprise relacionado. Elas ainda exigem a permissão SnapOtter listada.
 
+**Administrador integrado com autoridade total** significa que a identidade autenticada possui o papel `admin` e o conjunto completo de permissões efetivas de administrador. Um escopo de chave de API que omita qualquer permissão de administrador não se qualifica.
+
 | Método | Caminho | Acesso | Descrição |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Exporta entradas de auditoria como JSON ou CSV com filtros |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Exporta a configuração da instância redigida, os papéis personalizados e os times |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Importa a configuração, com dry run opcional |
+| `GET` | `/api/v1/enterprise/config/export` | Administrador integrado com autoridade total | Exporta a configuração da instância redigida, os papéis personalizados e os times |
+| `POST` | `/api/v1/enterprise/config/import` | Administrador integrado com autoridade total | Importa a configuração, com dry run opcional |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Lê a lista de permissões CIDR configurada |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Atualiza a lista de permissões CIDR com prevenção de autobloqueio |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Lista as retenções legais de usuários e times |

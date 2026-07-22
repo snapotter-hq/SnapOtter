@@ -77,7 +77,7 @@ describe("API key permission scoping", () => {
       method: "PUT",
       url: "/api/v1/settings",
       headers: { authorization: `Bearer ${apiKey}` },
-      payload: { testSetting: "hacked" },
+      payload: { defaultTheme: "dark" },
     });
     expect(writeRes.statusCode).toBe(403);
   });
@@ -96,7 +96,7 @@ describe("API key permission scoping", () => {
       method: "PUT",
       url: "/api/v1/settings",
       headers: { authorization: `Bearer ${body.key}` },
-      payload: { testSetting: "value" },
+      payload: { defaultTheme: "dark" },
     });
     expect(writeRes.statusCode).toBe(200);
   });

@@ -1,8 +1,20 @@
-// PUT /v1/settings rejects server-managed read-only keys (instance_id, cookie_secret)
-// with 400 READONLY_SETTING, and GET returns redacted secrets as the literal "********".
-// Echoing either back breaks the save or overwrites a real secret with the mask, so strip
-// both before any bulk save.
-const READONLY_SETTING_KEYS = new Set(["instance_id", "cookie_secret"]);
+// PUT /v1/settings rejects server-managed and dedicated-endpoint keys. GET can still
+// return some of them to a full administrator for status display, so strip them from
+// every generic bulk save along with redacted secret masks.
+const READONLY_SETTING_KEYS = new Set([
+  "instance_id",
+  "cookie_secret",
+  "sqlite_import",
+  "onboarding.firstProcessedAt",
+  "scim_token_hash",
+  "siem_config",
+  "webhook_destinations",
+  "ipAllowlist",
+  "backup_last_completed",
+  "audit_archival_state",
+  "siem_last_forwarded_at",
+  "siem_consecutive_failures",
+]);
 
 export function writableSettings(settings: Record<string, string>): Record<string, string> {
   return Object.fromEntries(

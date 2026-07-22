@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
 i18n_output_hash: 450fd529e479
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Pour enregistrer automatiquement le résultat d'un outil dans la bibliothèque, 
 
 ## Paramètres {#settings}
 
-Configuration clé-valeur d'exécution (lecture par tout utilisateur authentifié, écriture par l'administrateur uniquement).
+La configuration d'exécution utilise un ensemble fermé de clés reconnues. La lecture nécessite `settings:read` et l'écriture `settings:write` ; les clés de sécurité et de conformité nécessitent en plus, respectivement, `security:manage` ou `compliance:manage`. Les paramètres secrets nécessitent les droits d'un administrateur complet, tandis que les identifiants et l'état gérés par des endpoints dédiés sont ici en lecture seule. Les mises à jour groupées sont validées avant l'écriture de toute valeur.
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Configuration clé-valeur d'exécution (lecture par tout utilisateur authentifi�
 | `PUT` | `/api/v1/settings` | Met à jour en masse les paramètres (corps JSON avec des paires clé-valeur) |
 | `GET` | `/api/v1/settings/:key` | Récupère un paramètre spécifique par clé |
 
-Clés connues : `disabledTools` (tableau JSON d'ID d'outils), `enableExperimentalTools` (chaîne booléenne), `loginAttemptLimit` (nombre).
+Clés représentatives : `disabledTools` (tableau JSON d'ID d'outils), `enableExperimentalTools` (booléen), `loginAttemptLimit` (politique de sécurité) et `auditRetentionDays` (politique de conformité). Les clés inconnues sont rejetées.
 
 ## Préférences {#preferences}
 
@@ -636,11 +636,13 @@ Points de terminaison opérationnels pour l'observabilité, l'assistance, les ra
 
 Ces routes sont verrouillées par licence selon leur fonctionnalité d'entreprise associée. Elles exigent toujours l'autorisation SnapOtter indiquée.
 
+**Administrateur intégré complet** signifie que l'acteur authentifié possède le rôle `admin` et l'ensemble complet des permissions d'administrateur effectives. Une portée de clé API qui omet une permission d'administrateur n'est pas admissible.
+
 | Méthode | Chemin | Accès | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Exporte les entrées d'audit au format JSON ou CSV avec des filtres |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Exporte la configuration d'instance caviardée, les rôles personnalisés et les équipes |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Importe une configuration, avec exécution à blanc optionnelle |
+| `GET` | `/api/v1/enterprise/config/export` | Administrateur intégré complet | Exporte la configuration d'instance caviardée, les rôles personnalisés et les équipes |
+| `POST` | `/api/v1/enterprise/config/import` | Administrateur intégré complet | Importe une configuration, avec exécution à blanc optionnelle |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Lit la liste d'autorisation CIDR configurée |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Met à jour la liste d'autorisation CIDR avec prévention de l'auto-verrouillage |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Liste les blocages juridiques des utilisateurs et des équipes |

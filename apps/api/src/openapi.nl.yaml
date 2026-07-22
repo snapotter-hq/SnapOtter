@@ -6160,7 +6160,7 @@ paths:
       tags:
         - Settings
       summary: Alle instellingen ophalen
-      description: Haal alle systeeminstellingen op als sleutel-waardeparen. Vereist authenticatie.
+      description: Haalt de systeeminstellingen op waarvoor de effectieve machtigingen van de aanroeper toestemming geven. Vereist `settings:read`; beveiligings-, compliance- en volledige beheerdersinstellingen worden afzonderlijk gefilterd.
       security:
         - bearerAuth: []
       responses:
@@ -6186,7 +6186,7 @@ paths:
       tags:
         - Settings
       summary: Instellingen bijwerken
-      description: Accepteert een plat JSON-object met sleutel-waardeparen om in te stellen. Vereist de admin-rol.
+      description: Accepteert een plat JSON-object met herkende, beschrijfbare instellingssleutels. Vereist `settings:write`; beveiligings- en compliancesleutels vereisen daarnaast de bijbehorende effectieve machtiging, geheimen vereisen volledige beheerdersbevoegdheid en specifieke of door de server beheerde sleutels zijn alleen-lezen.
       security:
         - bearerAuth: []
       requestBody:
@@ -6233,7 +6233,7 @@ paths:
       tags:
         - Settings
       summary: Een enkele instelling ophalen
-      description: Haal een enkele instellingswaarde op via de sleutelnaam. Geeft de waarde en het tijdstip van laatste wijziging terug.
+      description: Haalt een herkende instelling op via de sleutel. Geeft de waarde en het tijdstip van de laatste wijziging terug wanneer de aanroeper zowel `settings:read` als de aanvullende bevoegdheid voor de sleutel bezit.
       security:
         - bearerAuth: []
       parameters:
@@ -18326,7 +18326,8 @@ paths:
       tags:
         - Enterprise
       summary: Configuratie exporteren
-      description: Exporteer geredigeerde instanceconfiguratie, aangepaste rollen en teams. Vereist de permissie system:health.
+      description: |
+        Exporteer geredigeerde instanceconfiguratie, aangepaste rollen en teams. Vereist volledige effectieve bevoegdheid van een ingebouwde beheerder; aangepaste rollen komen niet in aanmerking, evenmin als API-sleutels waaraan een beheerderspermissie ontbreekt.
       security:
         - bearerAuth: []
       responses:
@@ -18341,7 +18342,7 @@ paths:
         - Enterprise
       summary: Configuratie importeren
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Importeer instanceconfiguratie, aangepaste rollen en teams. Vereist volledige effectieve bevoegdheid van een ingebouwde beheerder; aangepaste rollen komen niet in aanmerking, evenmin als API-sleutels waaraan een beheerderspermissie ontbreekt.
       security:
         - bearerAuth: []
       responses:
@@ -19593,25 +19594,25 @@ x-i18n:
       provenance: machine
       outputHash: 666c293de44a
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 78d23fe3574e
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: a121e623e4a5
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: a8d44c68e07a
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: b2df9ad7451d
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 813e87bcde6a
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 42ada4bb9e65
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 700218f9c448
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: 05c0b7d34d3b
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21561,13 +21562,17 @@ x-i18n:
       provenance: machine
       outputHash: 483802d6d88b
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 273e5733e90b
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 549dae89e5db
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: e879e533fcf9
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: 0057af9b7cd9
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

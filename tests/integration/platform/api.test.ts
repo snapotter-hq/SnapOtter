@@ -1315,7 +1315,7 @@ describe("Auth middleware", () => {
     const res = await app.inject({
       method: "PUT",
       url: "/api/v1/settings",
-      payload: { theme: "dark" },
+      payload: { defaultTheme: "dark" },
     });
     expect(res.statusCode).toBe(401);
   });
@@ -1364,7 +1364,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { theme: "dark", locale: "en" },
+        payload: { defaultTheme: "dark", defaultLocale: "en" },
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -1378,19 +1378,19 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { testKey: "testValue" },
+        payload: { defaultToolView: "fullscreen" },
       });
 
       // Retrieve
       const res = await app.inject({
         method: "GET",
-        url: "/api/v1/settings/testKey",
+        url: "/api/v1/settings/defaultToolView",
         headers: { authorization: `Bearer ${adminToken}` },
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
-      expect(body.key).toBe("testKey");
-      expect(body.value).toBe("testValue");
+      expect(body.key).toBe("defaultToolView");
+      expect(body.value).toBe("fullscreen");
     });
 
     it("treats a redacted secret mask as a no-op instead of overwriting the secret", async () => {
@@ -1414,7 +1414,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { oidc_client_secret: "********", theme: "dark" },
+        payload: { oidc_client_secret: "********", defaultTheme: "dark" },
       });
       expect(putRes.statusCode).toBe(200);
       expect(JSON.parse(putRes.body).updatedCount).toBe(1);
@@ -1439,7 +1439,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${userToken}` },
-        payload: { theme: "hacked" },
+        payload: { defaultTheme: "dark" },
       });
       expect(res.statusCode).toBe(403);
     });
@@ -1463,7 +1463,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { upsertKey: "original" },
+        payload: { defaultTheme: "system" },
       });
 
       // Update
@@ -1471,16 +1471,16 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { upsertKey: "updated" },
+        payload: { defaultTheme: "light" },
       });
 
       // Verify
       const res = await app.inject({
         method: "GET",
-        url: "/api/v1/settings/upsertKey",
+        url: "/api/v1/settings/defaultTheme",
         headers: { authorization: `Bearer ${adminToken}` },
       });
-      expect(JSON.parse(res.body).value).toBe("updated");
+      expect(JSON.parse(res.body).value).toBe("light");
     });
 
     it("rejects HTML tags in setting values", async () => {
@@ -1488,7 +1488,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { test_setting: "<script>alert('xss')</script>" },
+        payload: { defaultTheme: "<script>alert('xss')</script>" },
       });
       expect(res.statusCode).toBe(400);
       const body = JSON.parse(res.body);
@@ -1508,13 +1508,18 @@ describe("Settings", () => {
     });
 
     it("does not partially write entries when a later entry contains HTML tags", async () => {
-      const cleanKey = `atomicity_test_clean_${Date.now()}`;
+      await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { defaultTheme: "system" },
+      });
       const res = await app.inject({
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
         payload: {
-          [cleanKey]: "safe_value",
+          defaultTheme: "dark",
           "<script>xss</script>": "evil",
         },
       });
@@ -1525,10 +1530,11 @@ describe("Settings", () => {
       // The clean entry must NOT have been written
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/v1/settings/${cleanKey}`,
+        url: "/api/v1/settings/defaultTheme",
         headers: { authorization: `Bearer ${adminToken}` },
       });
-      expect(getRes.statusCode).toBe(404);
+      expect(getRes.statusCode).toBe(200);
+      expect(JSON.parse(getRes.body).value).toBe("system");
     });
 
     it("allows normal setting values without HTML", async () => {
@@ -1536,7 +1542,7 @@ describe("Settings", () => {
         method: "PUT",
         url: "/api/v1/settings",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { test_setting: "My App (v2.0) - Production" },
+        payload: { defaultTheme: "system" },
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);

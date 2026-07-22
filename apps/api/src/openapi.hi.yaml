@@ -6193,7 +6193,7 @@ paths:
       tags:
         - Settings
       summary: सभी settings प्राप्त करें
-      description: सभी सिस्टम settings को key-value जोड़े के रूप में पुनर्प्राप्त करें। authentication आवश्यक है।
+      description: कॉलर की प्रभावी अनुमतियों द्वारा अधिकृत सिस्टम सेटिंग्स प्राप्त करें। `settings:read` आवश्यक है; सुरक्षा, अनुपालन और पूर्ण-एडमिन सेटिंग्स को अलग-अलग फ़िल्टर किया जाता है।
       security:
         - bearerAuth: []
       responses:
@@ -6219,7 +6219,7 @@ paths:
       tags:
         - Settings
       summary: settings अपडेट करें
-      description: सेट करने के लिए key-value जोड़ों का एक फ़्लैट JSON object स्वीकार करता है। admin role आवश्यक है।
+      description: मान्य और लिखने योग्य सेटिंग कीज़ वाला एक फ़्लैट JSON ऑब्जेक्ट स्वीकार करता है। `settings:write` आवश्यक है; सुरक्षा और अनुपालन कीज़ के लिए उनकी संबंधित प्रभावी अनुमति भी आवश्यक है, गोपनीय मानों के लिए पूर्ण-एडमिन अधिकार आवश्यक हैं, और समर्पित या सर्वर-प्रबंधित कीज़ केवल पढ़ने योग्य हैं।
       security:
         - bearerAuth: []
       requestBody:
@@ -6266,7 +6266,7 @@ paths:
       tags:
         - Settings
       summary: एकल setting प्राप्त करें
-      description: एक एकल setting मान को उसके key नाम से पुनर्प्राप्त करें। मान और अंतिम-अपडेट टाइमस्टैम्प लौटाता है।
+      description: की द्वारा एक मान्य सेटिंग प्राप्त करें। जब कॉलर के पास `settings:read` और उस की का अतिरिक्त अधिकार दोनों हों, तब मान और अंतिम-अपडेट टाइमस्टैम्प लौटाता है।
       security:
         - bearerAuth: []
       parameters:
@@ -18393,7 +18393,8 @@ paths:
       tags:
         - Enterprise
       summary: configuration निर्यात करें
-      description: redacted instance configuration, कस्टम roles, और teams निर्यात करें। system:health permission आवश्यक है।
+      description: |
+        संशोधित इंस्टेंस कॉन्फ़िगरेशन, कस्टम भूमिकाएँ और टीमें निर्यात करें। पूर्ण प्रभावी अंतर्निहित एडमिन अधिकार आवश्यक है; कस्टम भूमिकाएँ योग्य नहीं हैं और वे API कुंजियाँ भी योग्य नहीं हैं जिनमें एडमिन की कोई अनुमति अनुपलब्ध है।
       security:
         - bearerAuth: []
       responses:
@@ -18408,7 +18409,7 @@ paths:
         - Enterprise
       summary: configuration आयात करें
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        इंस्टेंस कॉन्फ़िगरेशन, कस्टम भूमिकाएँ और टीमें आयात करें। पूर्ण प्रभावी अंतर्निहित एडमिन अधिकार आवश्यक है; कस्टम भूमिकाएँ योग्य नहीं हैं और वे API कुंजियाँ भी योग्य नहीं हैं जिनमें एडमिन की कोई अनुमति अनुपलब्ध है।
       security:
         - bearerAuth: []
       responses:
@@ -19660,25 +19661,25 @@ x-i18n:
       provenance: machine
       outputHash: c6fdce15d344
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: d3e94911b256
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 970c5299cc14
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: 072888ed4abc
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: b02ca90edfb4
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: aab6513a2028
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 4dde6655440e
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 9317b165aad6
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: b6fec86f5f9e
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21628,13 +21629,17 @@ x-i18n:
       provenance: machine
       outputHash: 90c5442816d3
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 95221fc9e75c
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 67b7c13336de
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: a35b2c408440
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: 941451f40982
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

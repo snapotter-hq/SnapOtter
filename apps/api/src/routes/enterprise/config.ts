@@ -4,23 +4,16 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { requireFullAdmin, requirePermission } from "../../permissions.js";
+import {
+  getSettingPolicy,
+  isConfigExportableSetting,
+  prepareSetting,
+  validateSettingsRuntimeConstraints,
+} from "../../lib/settings-policy.js";
+import { requireFullAdmin } from "../../permissions.js";
 
 const CONFIG_SCHEMA_VERSION = 1;
-
-const REDACTED_KEYS = new Set([
-  "cookie_secret",
-  "instance_id",
-  "siem_config",
-  "scim_token_hash",
-  "oidc_client_secret",
-  "saml_idp_certificate",
-  "siem_last_forwarded_at",
-  "siem_consecutive_failures",
-  "audit_archival_state",
-  "backup_last_completed",
-  "webhook_destinations",
-]);
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
 const roleNameField = z
   .string()
@@ -73,21 +66,36 @@ const importedRoleSchema = z
   })
   .strict();
 
+const importedTeamSchema = z
+  .object({
+    name: z
+      .string()
+      .transform((value) => value.trim())
+      .pipe(z.string().min(1).max(50)),
+    storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+    retentionHours: z.number().int().positive().max(POSTGRES_INTEGER_MAX).nullable().optional(),
+  })
+  .strict();
+
+const BUILTIN_ROLE_NAMES = new Set(["admin", "editor", "user", "disabled"]);
+
+function findDuplicateName(names: readonly string[], caseInsensitive = false): string | undefined {
+  const seen = new Set<string>();
+  for (const name of names) {
+    const identity = caseInsensitive ? name.toLowerCase() : name;
+    if (seen.has(identity)) return name;
+    seen.add(identity);
+  }
+  return undefined;
+}
+
 const importSchema = z.object({
   dryRun: z.boolean().default(false),
   config: z.object({
     configSchemaVersion: z.number(),
     settings: z.record(z.string()).optional(),
     roles: z.array(importedRoleSchema).optional(),
-    teams: z
-      .array(
-        z.object({
-          name: z.string(),
-          storageQuota: z.number().nullable().optional(),
-          retentionHours: z.number().nullable().optional(),
-        }),
-      )
-      .optional(),
+    teams: z.array(importedTeamSchema).optional(),
   }),
 });
 
@@ -96,7 +104,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
   app.get(
     "/api/v1/enterprise/config/export",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = await requirePermission("system:health")(request, reply);
+      const user = await requireFullAdmin(request, reply);
       if (!user) return;
 
       // Enterprise feature gate
@@ -127,7 +135,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       const allSettings = await db.select().from(schema.settings);
       const settingsMap = config.settings as Record<string, string>;
       for (const s of allSettings) {
-        if (!REDACTED_KEYS.has(s.key)) {
+        if (isConfigExportableSetting(s.key)) {
           settingsMap[s.key] = s.value;
         }
       }
@@ -201,38 +209,83 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         });
       }
 
-      // Dependency validation
-      const validationErrors: string[] = [];
+      const duplicateRoleName = findDuplicateName(config.roles?.map((role) => role.name) ?? []);
+      if (duplicateRoleName) {
+        return reply.status(400).send({
+          error: `Duplicate role name "${duplicateRoleName}" in config import`,
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const reservedRoleName = config.roles?.find((role) =>
+        BUILTIN_ROLE_NAMES.has(role.name),
+      )?.name;
+      if (reservedRoleName) {
+        return reply.status(400).send({
+          error: `Built-in role "${reservedRoleName}" cannot be imported as a custom role`,
+          code: "VALIDATION_ERROR",
+        });
+      }
 
+      const duplicateTeamName = findDuplicateName(
+        config.teams?.map((team) => team.name) ?? [],
+        true,
+      );
+      if (duplicateTeamName) {
+        return reply.status(400).send({
+          error: `Duplicate team name "${duplicateTeamName}" in config import`,
+          code: "VALIDATION_ERROR",
+        });
+      }
+
+      const preparedSettings: Array<{ key: string; value: string }> = [];
+      const preparedKeys = new Set<string>();
       if (config.settings) {
-        // SSO enforcement requires OIDC or SAML to be configured
-        if (config.settings.ssoEnforcement === "true") {
-          const hasOidc = config.settings.oidcIssuer || config.settings.oidcClientId;
-          const hasSaml = config.settings.samlIdpUrl || config.settings.samlEntityId;
-          if (!hasOidc && !hasSaml) {
-            validationErrors.push(
-              "ssoEnforcement is enabled but no OIDC or SAML provider is configured in the import",
-            );
+        for (const [requestedKey, value] of Object.entries(config.settings)) {
+          const policy = getSettingPolicy(requestedKey);
+          if (!policy) {
+            return reply.status(400).send({
+              error: `Unknown setting "${requestedKey}"`,
+              code: "UNKNOWN_SETTING",
+            });
           }
-        }
+          if (policy.write === "none") {
+            return reply.status(400).send({
+              error: `Setting "${requestedKey}" cannot be modified through config import`,
+              code: "READONLY_SETTING",
+            });
+          }
 
-        // IP allowlist must have at least one CIDR
-        if (config.settings.ipAllowlist) {
-          try {
-            const cidrs = JSON.parse(config.settings.ipAllowlist);
-            if (!Array.isArray(cidrs) || cidrs.length === 0) {
-              validationErrors.push("ipAllowlist is set but contains no CIDR entries");
-            }
-          } catch {
-            validationErrors.push("ipAllowlist contains invalid JSON");
+          // Exported secrets are omitted and older exports may still contain a
+          // redaction placeholder. Preserve the established skip behavior.
+          if (policy.redacted) continue;
+
+          const prepared = prepareSetting(requestedKey, value);
+          if (!prepared.success) {
+            return reply.status(400).send({
+              error: prepared.error,
+              code: prepared.code,
+              ...(prepared.details ? { details: prepared.details } : {}),
+            });
           }
+          if (preparedKeys.has(prepared.key)) {
+            return reply.status(400).send({
+              error: `Setting "${requestedKey}" duplicates "${prepared.key}" in the same import`,
+              code: "VALIDATION_ERROR",
+            });
+          }
+          preparedKeys.add(prepared.key);
+          preparedSettings.push({ key: prepared.key, value: prepared.value });
         }
       }
 
-      if (validationErrors.length > 0) {
-        return reply.status(400).send({
-          error: "Dependency validation failed",
-          validationErrors,
+      const runtimeValidation = await validateSettingsRuntimeConstraints(preparedSettings);
+      if (!runtimeValidation.success) {
+        return reply.status(runtimeValidation.statusCode).send({
+          error: runtimeValidation.error,
+          code: runtimeValidation.code,
+          ...(runtimeValidation.validationErrors
+            ? { validationErrors: runtimeValidation.validationErrors }
+            : {}),
         });
       }
 
@@ -248,13 +301,11 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       const rolesToUpsert: Array<{ name: string; action: string }> = [];
       const teamsToUpsert: Array<{ name: string; action: string }> = [];
 
-      if (config.settings) {
+      if (preparedSettings.length > 0) {
         const existingSettings = await db.select().from(schema.settings);
         const existingKeys = new Set(existingSettings.map((s) => s.key));
 
-        for (const key of Object.keys(config.settings)) {
-          // Skip redacted keys in import as well
-          if (REDACTED_KEYS.has(key)) continue;
+        for (const { key } of preparedSettings) {
           settingsToUpdate.push({
             key,
             action: existingKeys.has(key) ? "update" : "create",
@@ -281,12 +332,12 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
 
       if (config.teams) {
         const existingTeams = await db.select().from(schema.teams);
-        const existingTeamNames = new Set(existingTeams.map((t) => t.name));
+        const existingTeamNames = new Set(existingTeams.map((team) => team.name.toLowerCase()));
 
         for (const team of config.teams) {
           teamsToUpsert.push({
             name: team.name,
-            action: existingTeamNames.has(team.name) ? "update" : "create",
+            action: existingTeamNames.has(team.name.toLowerCase()) ? "update" : "create",
           });
         }
         changes.teams = teamsToUpsert.length;
@@ -307,85 +358,86 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       // Apply changes
       const now = new Date();
 
-      // Upsert settings
-      if (config.settings) {
-        const existingSettings = await db.select().from(schema.settings);
-        const existingKeys = new Set(existingSettings.map((s) => s.key));
+      await db.transaction(async (tx) => {
+        // Keep settings, roles, and teams in one transaction so any database
+        // conflict rolls back the complete imported configuration.
+        if (preparedSettings.length > 0) {
+          const existingSettings = await tx.select().from(schema.settings);
+          const existingKeys = new Set(existingSettings.map((setting) => setting.key));
 
-        for (const [key, value] of Object.entries(config.settings)) {
-          if (REDACTED_KEYS.has(key)) continue;
-
-          if (existingKeys.has(key)) {
-            await db
-              .update(schema.settings)
-              .set({ value, updatedAt: now })
-              .where(eq(schema.settings.key, key));
-          } else {
-            await db.insert(schema.settings).values({ key, value });
+          for (const { key, value } of preparedSettings) {
+            if (existingKeys.has(key)) {
+              await tx
+                .update(schema.settings)
+                .set({ value, updatedAt: now })
+                .where(eq(schema.settings.key, key));
+            } else {
+              await tx.insert(schema.settings).values({ key, value });
+            }
           }
         }
-      }
 
-      // Upsert custom roles
-      if (config.roles) {
-        const existingRoles = await db
-          .select()
-          .from(schema.roles)
-          .where(eq(schema.roles.isBuiltin, false));
-        const existingRoleMap = new Map(existingRoles.map((r) => [r.name, r]));
+        if (config.roles) {
+          const existingRoles = await tx
+            .select()
+            .from(schema.roles)
+            .where(eq(schema.roles.isBuiltin, false));
+          const existingRoleMap = new Map(existingRoles.map((role) => [role.name, role]));
 
-        for (const role of config.roles) {
-          const existing = existingRoleMap.get(role.name);
-          if (existing) {
-            await db
-              .update(schema.roles)
-              .set({
+          for (const role of config.roles) {
+            const existing = existingRoleMap.get(role.name);
+            if (existing) {
+              await tx
+                .update(schema.roles)
+                .set({
+                  description: role.description ?? "",
+                  permissions: role.permissions,
+                  toolPermissions: role.toolPermissions ?? null,
+                  updatedAt: now,
+                })
+                .where(eq(schema.roles.id, existing.id));
+            } else {
+              await tx.insert(schema.roles).values({
+                id: randomUUID(),
+                name: role.name,
                 description: role.description ?? "",
                 permissions: role.permissions,
                 toolPermissions: role.toolPermissions ?? null,
+                isBuiltin: false,
+                createdAt: now,
                 updatedAt: now,
-              })
-              .where(eq(schema.roles.id, existing.id));
-          } else {
-            await db.insert(schema.roles).values({
-              id: randomUUID(),
-              name: role.name,
-              description: role.description ?? "",
-              permissions: role.permissions,
-              toolPermissions: role.toolPermissions ?? null,
-              isBuiltin: false,
-              createdAt: now,
-              updatedAt: now,
-            });
+              });
+            }
           }
         }
-      }
 
-      // Upsert teams
-      if (config.teams) {
-        const existingTeams = await db.select().from(schema.teams);
-        const existingTeamMap = new Map(existingTeams.map((t) => [t.name, t]));
+        if (config.teams) {
+          const existingTeams = await tx.select().from(schema.teams);
+          const existingTeamMap = new Map(
+            existingTeams.map((team) => [team.name.toLowerCase(), team]),
+          );
 
-        for (const team of config.teams) {
-          const existing = existingTeamMap.get(team.name);
-          if (existing) {
-            await db
-              .update(schema.teams)
-              .set({
+          for (const team of config.teams) {
+            const existing = existingTeamMap.get(team.name.toLowerCase());
+            if (existing) {
+              await tx
+                .update(schema.teams)
+                .set({
+                  storageQuota: team.storageQuota ?? null,
+                  retentionHours: team.retentionHours ?? null,
+                })
+                .where(eq(schema.teams.id, existing.id));
+            } else {
+              await tx.insert(schema.teams).values({
+                id: randomUUID(),
+                name: team.name,
                 storageQuota: team.storageQuota ?? null,
                 retentionHours: team.retentionHours ?? null,
-              })
-              .where(eq(schema.teams.id, existing.id));
-          } else {
-            await db.insert(schema.teams).values({
-              id: randomUUID(),
-              name: team.name,
-              storageQuota: team.storageQuota ?? null,
-              retentionHours: team.retentionHours ?? null,
-            });
+              });
+            }
           }
         }
-      }
+      });
 
       await auditFromRequest(request)("CONFIG_IMPORTED", {
         adminId: user.id,

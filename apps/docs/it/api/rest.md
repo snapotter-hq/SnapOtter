@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
 i18n_output_hash: 1fa1fec30f47
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Per salvare automaticamente il risultato di uno strumento nella libreria, includ
 
 ## Impostazioni {#settings}
 
-Configurazione runtime a coppie chiave-valore (letta da qualsiasi utente autenticato, scritta solo dagli amministratori).
+La configurazione di runtime usa un insieme chiuso di chiavi riconosciute. La lettura richiede `settings:read` e la scrittura `settings:write`; le chiavi di sicurezza e conformità richiedono inoltre, rispettivamente, `security:manage` o `compliance:manage`. Le impostazioni segrete richiedono l'autorità di amministratore completo, mentre le credenziali e lo stato gestiti da endpoint dedicati sono qui di sola lettura. Gli aggiornamenti in blocco vengono convalidati prima che sia scritto qualsiasi valore.
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Configurazione runtime a coppie chiave-valore (letta da qualsiasi utente autenti
 | `PUT` | `/api/v1/settings` | Aggiorna in blocco le impostazioni (corpo JSON con coppie chiave-valore) |
 | `GET` | `/api/v1/settings/:key` | Ottiene un'impostazione specifica per chiave |
 
-Chiavi note: `disabledTools` (array JSON di ID degli strumenti), `enableExperimentalTools` (stringa bool), `loginAttemptLimit` (numero).
+Chiavi rappresentative: `disabledTools` (array JSON di ID degli strumenti), `enableExperimentalTools` (booleano), `loginAttemptLimit` (criterio di sicurezza) e `auditRetentionDays` (criterio di conformità). Le chiavi sconosciute vengono rifiutate.
 
 ## Preferenze {#preferences}
 
@@ -636,11 +636,13 @@ Endpoint operativi per l'osservabilità, il supporto, la reportistica sull'utili
 
 Queste route sono soggette a licenza in base alla loro funzionalità enterprise correlata. Richiedono comunque il permesso SnapOtter elencato.
 
+**Amministratore integrato completo** significa che l'attore autenticato ha il ruolo `admin` e l'intero insieme effettivo di autorizzazioni amministrative. Un ambito di chiave API che omette anche una sola autorizzazione amministrativa non è idoneo.
+
 | Metodo | Percorso | Accesso | Descrizione |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Esporta le voci del registro di controllo come JSON o CSV con filtri |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Esporta la configurazione dell'istanza oscurata, i ruoli personalizzati e i team |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Importa la configurazione, con esecuzione a vuoto facoltativa |
+| `GET` | `/api/v1/enterprise/config/export` | Amministratore integrato completo | Esporta la configurazione dell'istanza oscurata, i ruoli personalizzati e i team |
+| `POST` | `/api/v1/enterprise/config/import` | Amministratore integrato completo | Importa la configurazione, con esecuzione a vuoto facoltativa |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Legge l'allowlist CIDR configurata |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Aggiorna l'allowlist CIDR con prevenzione dell'autoesclusione |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Elenca i blocchi legali di utenti e team |

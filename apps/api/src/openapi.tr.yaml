@@ -6195,7 +6195,7 @@ paths:
       tags:
         - Settings
       summary: Tüm ayarları al
-      description: Tüm sistem ayarlarını anahtar-değer çiftleri olarak alın. Kimlik doğrulama gerektirir.
+      description: Çağıranın etkin izinlerinin yetkilendirdiği sistem ayarlarını getirir. `settings:read` gerektirir; güvenlik, uyumluluk ve tam yönetici ayarları ayrı ayrı filtrelenir.
       security:
         - bearerAuth: []
       responses:
@@ -6221,7 +6221,7 @@ paths:
       tags:
         - Settings
       summary: Ayarları güncelle
-      description: Ayarlanacak anahtar-değer çiftlerinin düz bir JSON nesnesini kabul eder. Yönetici rolü gerektirir.
+      description: Tanınan ve yazılabilir ayar anahtarlarını içeren düz bir JSON nesnesini kabul eder. `settings:write` gerektirir; güvenlik ve uyumluluk anahtarları ayrıca karşılık gelen etkin izni, gizli ayarlar tam yönetici yetkisini gerektirir; özel veya sunucu tarafından yönetilen anahtarlar ise salt okunurdur.
       security:
         - bearerAuth: []
       requestBody:
@@ -6268,7 +6268,7 @@ paths:
       tags:
         - Settings
       summary: Tek bir ayarı al
-      description: Tek bir ayar değerini anahtar adına göre alın. Değeri ve son güncelleme zaman damgasını döndürür.
+      description: Tanınan bir ayarı anahtarına göre getirir. Çağıran hem `settings:read` hem de anahtarın ek yetkisine sahip olduğunda değeri ve son güncelleme zaman damgasını döndürür.
       security:
         - bearerAuth: []
       parameters:
@@ -18397,7 +18397,10 @@ paths:
       tags:
         - Enterprise
       summary: Yapılandırmayı dışa aktar
-      description: Redakte edilmiş örnek yapılandırmasını, özel rolleri ve ekipleri dışa aktarın. system:health iznini gerektirir.
+      description: >
+        Redakte edilmiş örnek yapılandırmasını, özel rolleri ve ekipleri dışa aktarır. Tam etkin
+        yerleşik yönetici yetkisi gerektirir. Özel roller ve herhangi bir yönetici izni eksik olan
+        API anahtarları uygun değildir.
       security:
         - bearerAuth: []
       responses:
@@ -18412,7 +18415,7 @@ paths:
         - Enterprise
       summary: Yapılandırmayı içe aktar
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Örnek yapılandırmasını, özel rolleri ve ekipleri içe aktarır. Tam etkin yerleşik yönetici yetkisi gerektirir. Özel roller ve herhangi bir yönetici izni eksik olan API anahtarları uygun değildir.
       security:
         - bearerAuth: []
       responses:
@@ -19664,25 +19667,25 @@ x-i18n:
       provenance: machine
       outputHash: a32e241d07b6
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 3edd8247aa35
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 217e7761a265
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: ec872d75e4b1
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: 20bdc243879a
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: 7e7097fbe6ae
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 92329e85bfdc
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 93bf784f2848
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: b3576633b872
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21632,13 +21635,17 @@ x-i18n:
       provenance: machine
       outputHash: 78b131e59df9
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: fe29b94fea16
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: fefe5ebfe202
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: 3c49ebff8d5c
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: e5a410562089
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

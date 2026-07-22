@@ -6070,7 +6070,7 @@ paths:
       operationId: getSettings
       tags: [Settings]
       summary: Get all settings
-      description: Retrieve all system settings as key-value pairs. Requires authentication.
+      description: Retrieve the system settings authorized by the caller's effective permissions. Requires `settings:read`; security, compliance, and full-administrator settings are filtered separately.
       security:
         - bearerAuth: []
       responses:
@@ -6095,7 +6095,7 @@ paths:
       operationId: updateSettings
       tags: [Settings]
       summary: Update settings
-      description: Accepts a flat JSON object of key-value pairs to set. Requires admin role.
+      description: Accepts a flat JSON object containing recognized, writable setting keys. Requires `settings:write`; security and compliance keys additionally require their matching effective permission, secrets require full-administrator authority, and dedicated or server-managed keys are read-only.
       security:
         - bearerAuth: []
       requestBody:
@@ -6142,7 +6142,7 @@ paths:
       operationId: getSetting
       tags: [Settings]
       summary: Get a single setting
-      description: Retrieve a single setting value by its key name. Returns the value and last-updated timestamp.
+      description: Retrieve a recognized setting by key. Returns the value and last-updated timestamp when the caller has both `settings:read` and the key's additional authority.
       security:
         - bearerAuth: []
       parameters:
@@ -18001,7 +18001,10 @@ paths:
       operationId: exportEnterpriseConfig
       tags: [Enterprise]
       summary: Export configuration
-      description: Export redacted instance configuration, custom roles, and teams. Requires system:health permission.
+      description: >
+        Export redacted instance configuration, custom roles, and teams. Requires
+        full effective built-in administrator authority; custom roles and API
+        keys missing any administrator permission do not qualify.
       security:
         - bearerAuth: []
       responses:

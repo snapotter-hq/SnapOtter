@@ -1,7 +1,7 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
 i18n_output_hash: 4b25a4ffd694
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Aby automatycznie zapisać wynik narzędzia w bibliotece, dołącz `fileId` jako
 
 ## Ustawienia {#settings}
 
-Konfiguracja klucz-wartość w czasie działania (odczyt przez każdego uwierzytelnionego użytkownika, zapis tylko przez administratora).
+Konfiguracja środowiska uruchomieniowego używa zamkniętego zbioru rozpoznawanych kluczy. Odczyt wymaga uprawnienia `settings:read`, a zapis — `settings:write`; klucze zabezpieczeń i zgodności dodatkowo wymagają uprawnienia `security:manage` lub `compliance:manage`. Ustawienia tajne wymagają uprawnień pełnego administratora, natomiast poświadczenia i stan zarządzane przez dedykowane punkty końcowe są tutaj tylko do odczytu. Aktualizacje zbiorcze są weryfikowane przed zapisaniem jakiejkolwiek wartości.
 
 | Metoda | Ścieżka | Opis |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Konfiguracja klucz-wartość w czasie działania (odczyt przez każdego uwierzyt
 | `PUT` | `/api/v1/settings` | Zbiorczo zaktualizuj ustawienia (treść JSON z parami klucz-wartość) |
 | `GET` | `/api/v1/settings/:key` | Pobierz konkretne ustawienie według klucza |
 
-Znane klucze: `disabledTools` (tablica JSON identyfikatorów narzędzi), `enableExperimentalTools` (ciąg bool), `loginAttemptLimit` (liczba).
+Przykładowe klucze: `disabledTools` (tablica JSON identyfikatorów narzędzi), `enableExperimentalTools` (wartość logiczna), `loginAttemptLimit` (zasady zabezpieczeń) oraz `auditRetentionDays` (zasady zgodności). Nieznane klucze są odrzucane.
 
 ## Preferencje {#preferences}
 
@@ -636,11 +636,13 @@ Operacyjne punkty końcowe do obserwowalności, wsparcia, raportowania użycia i
 
 Te trasy są bramkowane licencją przez powiązaną z nimi funkcję enterprise. Nadal wymagają wymienionego uprawnienia SnapOtter.
 
+**Wbudowany administrator z pełnymi uprawnieniami** oznacza uwierzytelnionego użytkownika z rolą `admin` i pełnym zestawem efektywnych uprawnień administratora. Klucz API, któremu brakuje choć jednego uprawnienia administratora, nie spełnia tego wymagania.
+
 | Metoda | Ścieżka | Dostęp | Opis |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Administrator (`audit:read`) | Eksportuj wpisy audytu jako JSON lub CSV z filtrami |
-| `GET` | `/api/v1/enterprise/config/export` | Administrator (`system:health`) | Eksportuj zredagowaną konfigurację instancji, niestandardowe role i zespoły |
-| `POST` | `/api/v1/enterprise/config/import` | Administrator (`system:health`) | Zaimportuj konfigurację, z opcjonalnym przebiegiem próbnym |
+| `GET` | `/api/v1/enterprise/config/export` | Wbudowany administrator z pełnymi uprawnieniami | Eksportuj zredagowaną konfigurację instancji, niestandardowe role i zespoły |
+| `POST` | `/api/v1/enterprise/config/import` | Wbudowany administrator z pełnymi uprawnieniami | Zaimportuj konfigurację, z opcjonalnym przebiegiem próbnym |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Administrator (`security:manage`) | Odczytaj skonfigurowaną listę dozwolonych CIDR |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Administrator (`security:manage`) | Zaktualizuj listę dozwolonych CIDR z ochroną przed zablokowaniem samego siebie |
 | `GET` | `/api/v1/enterprise/legal-hold` | Administrator (`compliance:manage`) | Lista blokad prawnych użytkowników i zespołów |

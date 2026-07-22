@@ -13,47 +13,35 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
-import { requirePermission } from "../permissions.js";
+import {
+  getSettingPolicy,
+  prepareSetting,
+  type SettingAuthority,
+  validateSettingsRuntimeConstraints,
+} from "../lib/settings-policy.js";
+import {
+  getEffectivePermissions,
+  isFullEffectiveAdmin,
+  requirePermission,
+} from "../permissions.js";
 
 const settingsBodySchema = z.record(z.string().min(1), z.unknown());
 
 const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
 
-const SENSITIVE_KEYS = new Set([
-  "cookie_secret",
-  "instance_id",
-  "oidc_client_secret",
-  "saml_idp_certificate",
-  "scim_token_hash",
-  "siem_config",
-  "siem_webhook_auth",
-  "sqlite_import",
-  "webhook_destinations",
-]);
-
-const ENCRYPTED_KEYS = new Set([
-  "cookie_secret",
-  "oidc_client_secret",
-  "saml_idp_certificate",
-  "scim_token_hash",
-  "siem_webhook_auth",
-]);
-
-const REDACTED_KEYS = new Set([
-  "cookie_secret",
-  "oidc_client_secret",
-  "saml_idp_certificate",
-  "scim_token_hash",
-  "siem_config",
-  "siem_webhook_auth",
-  "webhook_destinations",
-]);
-
-const READONLY_KEYS = new Set(["cookie_secret", "instance_id"]);
-
 async function encryptIfSensitive(key: string, value: string): Promise<string> {
-  if (!env.DATA_ENCRYPTION_KEY || !ENCRYPTED_KEYS.has(key)) return value;
+  if (!env.DATA_ENCRYPTION_KEY || !getSettingPolicy(key)?.encrypted) return value;
   return encrypt(value, env.DATA_ENCRYPTION_KEY);
+}
+
+function hasSettingAuthority(
+  authority: SettingAuthority,
+  effectivePermissions: ReadonlySet<string>,
+  fullAdmin: boolean,
+): boolean {
+  if (authority === "none") return false;
+  if (authority === "full-admin") return fullAdmin;
+  return effectivePermissions.has(authority);
 }
 
 async function decryptIfNeeded(value: string): Promise<string> {
@@ -77,13 +65,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       const user = await requirePermission("settings:read")(request, reply);
       if (!user) return;
 
-      const isAdmin = user.role === "admin";
+      const effectivePermissions = new Set<string>(await getEffectivePermissions(user));
+      const fullAdmin = await isFullEffectiveAdmin(user);
       const rows = await db.select().from(schema.settings);
 
       const settings: Record<string, string> = {};
       for (const row of rows) {
-        if (!isAdmin && SENSITIVE_KEYS.has(row.key)) continue;
-        if (REDACTED_KEYS.has(row.key)) {
+        const policy = getSettingPolicy(row.key);
+        if (!policy || !hasSettingAuthority(policy.read, effectivePermissions, fullAdmin)) continue;
+        if (policy.storageKey && policy.storageKey !== row.key) continue;
+        if (policy.redacted) {
           settings[row.key] = "********";
           continue;
         }
@@ -107,19 +98,49 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       });
     }
     const body = parsed.data;
+    const effectivePermissions = new Set<string>(await getEffectivePermissions(admin));
+    const fullAdmin = await isFullEffectiveAdmin(admin);
 
     // Pass 1: validate all entries before writing any
     const entries: Array<{ key: string; strValue: string }> = [];
+    const canonicalKeys = new Set<string>();
 
-    for (const [key, value] of Object.entries(body)) {
-      if (typeof key !== "string" || key.length === 0) continue;
+    for (const [requestedKey, value] of Object.entries(body)) {
+      if (typeof requestedKey !== "string" || requestedKey.length === 0) continue;
+      const rawValue = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
 
-      const strValue = typeof value === "string" ? value : JSON.stringify(value);
-
-      if (HTML_TAG_PATTERN.test(key) || HTML_TAG_PATTERN.test(strValue)) {
+      if (HTML_TAG_PATTERN.test(requestedKey) || HTML_TAG_PATTERN.test(rawValue)) {
         return reply.status(400).send({
           error: "Settings keys and values must not contain HTML tags",
           code: "VALIDATION_ERROR",
+        });
+      }
+
+      const prepared = prepareSetting(requestedKey, value);
+      if (!prepared.success) {
+        return reply.status(400).send({
+          error: prepared.error,
+          code: prepared.code,
+          ...(prepared.details ? { details: prepared.details } : {}),
+        });
+      }
+
+      const { key, value: strValue, policy } = prepared;
+
+      if (policy.write === "none") {
+        return reply.status(400).send({
+          error: `Setting "${requestedKey}" cannot be modified via the API`,
+          code: "READONLY_SETTING",
+        });
+      }
+
+      if (!hasSettingAuthority(policy.write, effectivePermissions, fullAdmin)) {
+        const fullAdminRequired = policy.write === "full-admin";
+        return reply.status(403).send({
+          error: fullAdminRequired
+            ? "Full administrator authority required"
+            : `Setting "${requestedKey}" requires ${policy.write}`,
+          code: fullAdminRequired ? "ESCALATION_DENIED" : "FORBIDDEN",
         });
       }
 
@@ -128,37 +149,34 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       // back. Treat the mask as "leave this secret unchanged" instead of encrypting
       // and persisting "********", which would destroy the real secret (e.g. the OIDC
       // client secret or SIEM webhook auth, neither of which is read-only).
-      if (REDACTED_KEYS.has(key) && strValue === "********") {
+      if (policy.redacted && strValue === "********") {
         continue;
       }
 
-      if (READONLY_KEYS.has(key)) {
+      if (canonicalKeys.has(key)) {
         return reply.status(400).send({
-          error: `Setting "${key}" cannot be modified via the API`,
-          code: "READONLY_SETTING",
+          error: `Setting "${requestedKey}" duplicates "${key}" in the same request`,
+          code: "VALIDATION_ERROR",
         });
       }
-
-      // Enforcing MFA requires a way to actually enroll, which is gated behind
-      // the "mfa" enterprise feature. Letting this save through on an unlicensed
-      // instance creates a login rule nobody can satisfy (snapotter-hq/SnapOtter#515).
-      if (key === "mfaPolicy" && (strValue === "admins_only" || strValue === "required")) {
-        let mfaLicensed = false;
-        try {
-          const { isFeatureEnabled } = await import("@snapotter/enterprise");
-          mfaLicensed = isFeatureEnabled("mfa");
-        } catch {
-          // Enterprise package not available
-        }
-        if (!mfaLicensed) {
-          return reply.status(403).send({
-            error: "MFA requires an enterprise license",
-            code: "FEATURE_NOT_LICENSED",
-          });
-        }
-      }
+      canonicalKeys.add(key);
 
       entries.push({ key, strValue });
+    }
+
+    // Enforcing MFA requires a licensed enrollment path. Keep this shared with
+    // config import so no settings write path can create an unsatisfiable login rule.
+    const runtimeValidation = await validateSettingsRuntimeConstraints(
+      entries.map(({ key, strValue }) => ({ key, value: strValue })),
+    );
+    if (!runtimeValidation.success) {
+      return reply.status(runtimeValidation.statusCode).send({
+        error: runtimeValidation.error,
+        code: runtimeValidation.code,
+        ...(runtimeValidation.validationErrors
+          ? { validationErrors: runtimeValidation.validationErrors }
+          : {}),
+      });
     }
 
     // Pass 2: write all entries now that all have passed validation
@@ -217,12 +235,24 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       const { key } = request.params;
-
-      if (SENSITIVE_KEYS.has(key) && user.role !== "admin") {
+      const policy = getSettingPolicy(key);
+      if (!policy) {
+        return reply.status(404).send({
+          error: `Setting "${key}" not found`,
+          code: "NOT_FOUND",
+        });
+      }
+      const effectivePermissions = new Set<string>(await getEffectivePermissions(user));
+      const fullAdmin = await isFullEffectiveAdmin(user);
+      if (!hasSettingAuthority(policy.read, effectivePermissions, fullAdmin)) {
         return reply.status(403).send({ error: "Forbidden", code: "FORBIDDEN" });
       }
 
-      const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
+      const storageKey = policy.storageKey ?? key;
+      const [row] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, storageKey));
 
       if (!row) {
         return reply.status(404).send({
@@ -232,8 +262,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return reply.send({
-        key: row.key,
-        value: REDACTED_KEYS.has(row.key) ? "********" : await decryptIfNeeded(row.value),
+        key: storageKey,
+        value: policy.redacted ? "********" : await decryptIfNeeded(row.value),
         updatedAt: row.updatedAt.toISOString(),
       });
     },

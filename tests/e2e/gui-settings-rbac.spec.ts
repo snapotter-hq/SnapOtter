@@ -325,7 +325,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
         Authorization: `Bearer ${bearerToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ testSetting: "hacked" }),
+      body: JSON.stringify({ defaultTheme: "dark" }),
     });
     expect(settingsRes.status).toBe(403);
 
@@ -445,7 +445,7 @@ base.describe("RBAC Settings Visibility - User", () => {
         Authorization: `Bearer ${bearerToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ testSetting: "hacked" }),
+      body: JSON.stringify({ defaultTheme: "dark" }),
     });
     expect(settingsRes.status).toBe(403);
 

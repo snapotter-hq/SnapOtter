@@ -6159,7 +6159,7 @@ paths:
       tags:
         - Settings
       summary: 获取所有设置
-      description: 以键值对形式检索所有系统设置。需要身份验证。
+      description: 获取调用方有效权限所允许的系统设置。需要 `settings:read`；安全、合规和完整管理员设置会分别进行筛选。
       security:
         - bearerAuth: []
       responses:
@@ -6185,7 +6185,7 @@ paths:
       tags:
         - Settings
       summary: 更新设置
-      description: 接受一个扁平的键值对 JSON 对象进行设置。需要管理员角色。
+      description: 接受包含已识别且可写设置键的扁平 JSON 对象。需要 `settings:write`；安全和合规键还需要相应的有效权限，机密设置需要完整管理员权限，专用键或服务器管理的键则为只读。
       security:
         - bearerAuth: []
       requestBody:
@@ -6232,7 +6232,7 @@ paths:
       tags:
         - Settings
       summary: 获取单个设置
-      description: 按键名检索单个设置值。返回该值和最后更新时间戳。
+      description: 按键获取已识别的设置。当调用方同时拥有 `settings:read` 和该键所需的额外权限时，返回设置值和最后更新时间戳。
       security:
         - bearerAuth: []
       parameters:
@@ -18322,7 +18322,7 @@ paths:
       tags:
         - Enterprise
       summary: 导出配置
-      description: 导出已脱敏的实例配置、自定义角色和团队。需要 system:health 权限。
+      description: 导出已脱敏的实例配置、自定义角色和团队。仅限拥有完整有效权限的内置管理员；自定义角色不符合要求，缺少任何管理员权限的 API 密钥也不符合要求。
       security:
         - bearerAuth: []
       responses:
@@ -18337,7 +18337,7 @@ paths:
         - Enterprise
       summary: 导入配置
       description: |
-        Import instance configuration, custom roles, and teams. Requires full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        导入实例配置、自定义角色和团队。仅限拥有完整有效权限的内置管理员；自定义角色不符合要求，缺少任何管理员权限的 API 密钥也不符合要求。
       security:
         - bearerAuth: []
       responses:
@@ -19589,25 +19589,25 @@ x-i18n:
       provenance: machine
       outputHash: 34f14c11223a
     paths./api/v1/settings.get.description:
-      sourceHash: 65d8ff0f5873
-      provenance: machine
-      outputHash: 6dfb9d60666b
+      sourceHash: 57a4d7da3780
+      provenance: human
+      outputHash: 3e1f6ee5b1d7
     paths./api/v1/settings.put.summary:
       sourceHash: 46ed69579c39
       provenance: machine
       outputHash: cb2bec93a8f8
     paths./api/v1/settings.put.description:
-      sourceHash: 887f8facdd94
-      provenance: machine
-      outputHash: e3da0c2e704d
+      sourceHash: 0ad5adfe3216
+      provenance: human
+      outputHash: bdd5282d17d9
     paths./api/v1/settings/{key}.get.summary:
       sourceHash: 186add054525
       provenance: machine
       outputHash: 18771b9d6912
     paths./api/v1/settings/{key}.get.description:
-      sourceHash: 962db9ab06a3
-      provenance: machine
-      outputHash: 102be9d181fe
+      sourceHash: ffbf8af128f0
+      provenance: human
+      outputHash: d8add1498f34
     paths./api/v1/teams.get.summary:
       sourceHash: 863546c57b78
       provenance: machine
@@ -21557,13 +21557,17 @@ x-i18n:
       provenance: machine
       outputHash: 429ea3af443d
     paths./api/v1/enterprise/config/export.get.description:
-      sourceHash: 8e3ce9c435f5
-      provenance: machine
-      outputHash: 845a7336b6b8
+      sourceHash: 78e6cca796a5
+      provenance: human
+      outputHash: 075f120a03fa
     paths./api/v1/enterprise/config/import.post.summary:
       sourceHash: 8a507f40b80f
       provenance: machine
       outputHash: b48b6518293a
+    paths./api/v1/enterprise/config/import.post.description:
+      sourceHash: 21367e8b3579
+      provenance: human
+      outputHash: 0a961b761696
     paths./api/v1/enterprise/ip-allowlist.get.summary:
       sourceHash: 8756df674b27
       provenance: machine

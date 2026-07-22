@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
 i18n_output_hash: 4756237a0bdc
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ För att automatiskt spara ett verktygsresultat till biblioteket, inkludera `fil
 
 ## Inställningar {#settings}
 
-Körtidskonfiguration i nyckel-värde-format (läses av alla autentiserade användare, skrivs endast av admin).
+Körtidskonfigurationen använder en sluten uppsättning kända nycklar. Läsning kräver `settings:read` och skrivning kräver `settings:write`; säkerhets- och efterlevnadsnycklar kräver dessutom `security:manage` eller `compliance:manage`. Hemliga inställningar kräver fullständig administratörsbehörighet, medan autentiseringsuppgifter och tillstånd som hanteras av särskilda slutpunkter är skrivskyddade här. Massuppdateringar valideras innan något värde skrivs.
 
 | Metod | Sökväg | Beskrivning |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Körtidskonfiguration i nyckel-värde-format (läses av alla autentiserade anvä
 | `PUT` | `/api/v1/settings` | Massuppdatera inställningar (JSON-kropp med nyckel-värde-par) |
 | `GET` | `/api/v1/settings/:key` | Hämta en specifik inställning via nyckel |
 
-Kända nycklar: `disabledTools` (JSON-array av verktygs-ID:n), `enableExperimentalTools` (bool-sträng), `loginAttemptLimit` (nummer).
+Representativa nycklar: `disabledTools` (JSON-array med verktygs-ID:n), `enableExperimentalTools` (booleskt värde), `loginAttemptLimit` (säkerhetspolicy) och `auditRetentionDays` (efterlevnadspolicy). Okända nycklar avvisas.
 
 ## Inställningar (per användare) {#preferences}
 
@@ -636,11 +636,13 @@ Driftsslutpunkter för observerbarhet, support, användningsrapportering och bac
 
 Dessa rutter är licensgrindade av sin relaterade enterprise-funktion. De kräver fortfarande den angivna SnapOtter-behörigheten.
 
+**Inbyggd administratör med full behörighet** betyder att den autentiserade aktören har rollen `admin` och hela den effektiva uppsättningen administratörsbehörigheter. Ett API-nyckelomfång som saknar någon administratörsbehörighet kvalificerar inte.
+
 | Metod | Sökväg | Åtkomst | Beskrivning |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Exportera granskningsposter som JSON eller CSV med filter |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Exportera redigerad instanskonfiguration, anpassade roller och team |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Importera konfiguration, med valfri torrkörning |
+| `GET` | `/api/v1/enterprise/config/export` | Inbyggd administratör med full behörighet | Exportera redigerad instanskonfiguration, anpassade roller och team |
+| `POST` | `/api/v1/enterprise/config/import` | Inbyggd administratör med full behörighet | Importera konfiguration, med valfri torrkörning |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Läs konfigurerad CIDR-tillåtningslista |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Uppdatera CIDR-tillåtningslista med förhindrande av självutlåsning |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Lista rättsliga spärrar för användare och team |

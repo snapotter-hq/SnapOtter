@@ -145,7 +145,7 @@ describe("permission enforcement on routes", () => {
       method: "PUT",
       url: "/api/v1/settings",
       headers: { authorization: `Bearer ${userToken}` },
-      payload: { appTitle: "Hacked" },
+      payload: { defaultTheme: "dark" },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -220,7 +220,7 @@ describe("permission enforcement on routes", () => {
       method: "PUT",
       url: "/api/v1/settings",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { appTitle: "Test Title" },
+      payload: { defaultTheme: "dark" },
     });
     expect(res.statusCode).toBe(200);
   });
@@ -239,7 +239,7 @@ describe("permission enforcement on routes", () => {
     const res = await testApp.app.inject({
       method: "PUT",
       url: "/api/v1/settings",
-      payload: { appTitle: "Hacked" },
+      payload: { defaultTheme: "dark" },
     });
     expect(res.statusCode).toBe(401);
   });

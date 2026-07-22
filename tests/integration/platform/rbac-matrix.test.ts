@@ -69,7 +69,7 @@ const routes: RouteTest[] = [
   {
     method: "PUT",
     url: "/api/v1/settings",
-    payload: { _test: "v" },
+    payload: { defaultTheme: "dark" },
     admin: 200,
     editor: 403,
     user: 403,

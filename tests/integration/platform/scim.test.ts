@@ -506,6 +506,47 @@ describe("SCIM global token administration", () => {
     expect(storedToken?.value).toBe(originalHash);
   });
 
+  it("prevents a settings manager from replacing the global SCIM credential", async () => {
+    const attackerToken = `so_scim_v2_${"b".repeat(64)}`;
+    const originalHash = await hashPassword(SCIM_TOKEN);
+    const attackerHash = await hashPassword(attackerToken);
+    await db
+      .insert(schema.settings)
+      .values({ key: "scim_token_hash", value: originalHash })
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: originalHash },
+      });
+
+    try {
+      const settingsRes = await licensedApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { scim_token_hash: attackerHash },
+      });
+      const [storedToken] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "scim_token_hash"));
+      const scimRes = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: { authorization: `Bearer ${attackerToken}` },
+      });
+
+      expect.soft(settingsRes.statusCode).toBe(400);
+      expect.soft(JSON.parse(settingsRes.body).code).toBe("READONLY_SETTING");
+      expect.soft(storedToken?.value).toBe(originalHash);
+      expect(scimRes.statusCode).toBe(401);
+    } finally {
+      await db
+        .update(schema.settings)
+        .set({ value: originalHash })
+        .where(eq(schema.settings.key, "scim_token_hash"));
+    }
+  });
+
   it.each([
     { method: "POST" as const, operation: "issuance" },
     { method: "DELETE" as const, operation: "revocation" },

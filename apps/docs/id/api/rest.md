@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
 i18n_output_hash: 7793faea1aad
-i18n_source_hash: b89b5df16af5
+i18n_source_hash: 7e0a0db4abe0
 i18n_provenance: human
 ---
 
@@ -533,7 +533,7 @@ Untuk menyimpan otomatis hasil tool ke pustaka, sertakan `fileId` sebagai field 
 
 ## Pengaturan {#settings}
 
-Konfigurasi kunci-nilai runtime (dibaca oleh pengguna terautentikasi mana pun, ditulis hanya oleh admin).
+Konfigurasi runtime menggunakan kumpulan tertutup kunci yang dikenali. Pembacaan memerlukan `settings:read` dan penulisan memerlukan `settings:write`; kunci keamanan dan kepatuhan juga masing-masing memerlukan `security:manage` atau `compliance:manage`. Pengaturan rahasia memerlukan wewenang admin penuh, sedangkan kredensial dan status yang dikelola endpoint khusus hanya dapat dibaca di sini. Pembaruan massal divalidasi sebelum nilai apa pun ditulis.
 
 | Method | Path | Deskripsi |
 |--------|------|-------------|
@@ -541,7 +541,7 @@ Konfigurasi kunci-nilai runtime (dibaca oleh pengguna terautentikasi mana pun, d
 | `PUT` | `/api/v1/settings` | Perbarui pengaturan secara massal (body JSON dengan pasangan kunci-nilai) |
 | `GET` | `/api/v1/settings/:key` | Dapatkan pengaturan tertentu berdasarkan kunci |
 
-Kunci yang diketahui: `disabledTools` (array JSON dari ID tool), `enableExperimentalTools` (string bool), `loginAttemptLimit` (number).
+Kunci representatif: `disabledTools` (array JSON berisi ID alat), `enableExperimentalTools` (boolean), `loginAttemptLimit` (kebijakan keamanan), dan `auditRetentionDays` (kebijakan kepatuhan). Kunci yang tidak dikenal ditolak.
 
 ## Preferensi {#preferences}
 
@@ -636,11 +636,13 @@ Endpoint operasional untuk observabilitas, dukungan, pelaporan penggunaan, dan s
 
 Rute ini dibatasi lisensi oleh fitur enterprise terkaitnya. Rute ini tetap memerlukan izin SnapOtter yang tercantum.
 
+**Admin bawaan penuh** berarti aktor yang diautentikasi memiliki peran `admin` dan seluruh rangkaian izin admin yang efektif. Cakupan kunci API yang tidak mencakup semua izin admin tidak memenuhi syarat.
+
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/enterprise/audit/export` | Admin (`audit:read`) | Ekspor entri audit sebagai JSON atau CSV dengan filter |
-| `GET` | `/api/v1/enterprise/config/export` | Admin (`system:health`) | Ekspor konfigurasi instans, peran kustom, dan tim yang disunting |
-| `POST` | `/api/v1/enterprise/config/import` | Admin (`system:health`) | Impor konfigurasi, dengan dry run opsional |
+| `GET` | `/api/v1/enterprise/config/export` | Admin bawaan penuh | Ekspor konfigurasi instans, peran kustom, dan tim yang disunting |
+| `POST` | `/api/v1/enterprise/config/import` | Admin bawaan penuh | Impor konfigurasi, dengan dry run opsional |
 | `GET` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Baca allowlist CIDR yang dikonfigurasi |
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Perbarui allowlist CIDR dengan pencegahan penguncian diri |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Daftar legal hold pengguna dan tim |
