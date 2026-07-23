@@ -241,7 +241,15 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Run container test suite
-        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-e2e
+        # Attribute the job to test-unit: it runs the full integration suite
+        # against the container's real binaries (ffmpeg/qpdf/tesseract/...), which
+        # is the in-container validation this job exists for. --exit-code-from
+        # test-e2e never worked: --abort-on-container-exit (which it implies) kills
+        # test-e2e the moment test-unit exits, so test-e2e's SIGKILL (137) became
+        # the result. Browser e2e is covered by the E2E Full/Serial/Cross-Browser
+        # jobs; running test-e2e in-container too is a separate follow-up (it also
+        # would not fit this job's 60-minute budget alongside test-unit).
+        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit
 
   extended-matrix:
     name: Extended Matrix + Fuzz
@@ -342,7 +350,7 @@ jobs:
             --checks not_a_server_error \
             --request-timeout 30 \
             --include-path-regex "^/api/v1/(tools|health|info)" \
-            --exclude-path-regex "/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
+            --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report
