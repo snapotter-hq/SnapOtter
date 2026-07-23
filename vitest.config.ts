@@ -54,6 +54,7 @@ export default defineConfig({
     setupFiles: ["tests/setup/per-fork-env.ts"],
     exclude: [
       "tests/e2e/**",
+      "tests/e2e-demo/**",
       "tests/e2e-docs/**",
       "tests/e2e-editor/**",
       "tests/e2e-landing/**",
