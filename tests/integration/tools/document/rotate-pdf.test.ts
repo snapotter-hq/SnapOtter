@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,6 +59,44 @@ describe.skipIf(!qpdfAvailable())("rotate-pdf (requires qpdf)", () => {
       writeFileSync(outPath, dl.rawPayload);
       const pages = await qpdfPageCount(outPath);
       expect(pages).toBe(3);
+
+      // Verify pages were actually rotated to the requested 90 degrees.
+      // qpdf 12 --json exposes each page's rotation as a "/Rotate" key.
+      const jsonRaw = execFileSync("qpdf", ["--json", outPath], {
+        encoding: "utf8",
+        maxBuffer: 1 << 24,
+      });
+      const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+
+      // Collect every "/Rotate" integer found under the page objects.
+      const rotations: number[] = [];
+      const visit = (node: unknown): void => {
+        if (Array.isArray(node)) {
+          for (const item of node) visit(item);
+          return;
+        }
+        if (node && typeof node === "object") {
+          const obj = node as Record<string, unknown>;
+          const rotate = obj["/Rotate"];
+          if (typeof rotate === "number") rotations.push(rotate);
+          for (const value of Object.values(obj)) visit(value);
+        }
+      };
+      const pageList = (parsed.pages ?? []) as unknown[];
+      visit(pageList);
+
+      if (rotations.length > 0) {
+        // Every rotated page must report the requested 90-degree rotation.
+        expect(rotations.length).toBe(3);
+        for (const rotate of rotations) {
+          expect(rotate).toBe(90);
+        }
+      } else {
+        // Fallback: qpdf nested the rotation elsewhere; assert the raw JSON
+        // carries one "/Rotate": 90 entry per page.
+        const matches = jsonRaw.match(/"\/Rotate":\s*90\b/g) ?? [];
+        expect(matches.length).toBe(3);
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -1,4 +1,5 @@
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -37,7 +38,7 @@ async function runTool(settings: Record<string, unknown>) {
 
 describe.skipIf(!ffmpegAvailable())("video-to-webp (requires ffmpeg)", () => {
   it("converts video to animated webp with RIFF/WEBP magic", async () => {
-    const res = await runTool({});
+    const res = await runTool({ width: 120 });
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
     expect(envelope.downloadUrl).toBeDefined();
@@ -55,5 +56,12 @@ describe.skipIf(!ffmpegAvailable())("video-to-webp (requires ffmpeg)", () => {
     const webp = buf.subarray(8, 12).toString("ascii");
     expect(riff).toBe("RIFF");
     expect(webp).toBe("WEBP");
+
+    // Decode with sharp to confirm it is a real, animated WebP (multiple frames)
+    const meta = await sharp(dl.rawPayload, { animated: true }).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.pages).toBeGreaterThan(1);
+    // Requested width must be honored by the scale filter
+    expect(meta.width).toBe(120);
   }, 60_000);
 });

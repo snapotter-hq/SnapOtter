@@ -1,4 +1,5 @@
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -50,7 +51,8 @@ describe.skipIf(!ffmpegAvailable())("video-to-gif (requires ffmpeg)", () => {
     const { jobId } = JSON.parse(res.body);
     const row = await pollJob(jobId);
     expect(row?.status).toBe("completed");
-    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    const outputRefs = (row?.outputRefs ?? []) as string[];
+    const outName = outputRefs[0].split("/").pop() as string;
     expect(outName.endsWith(".gif")).toBe(true);
     const dl = await testApp.app.inject({
       method: "GET",
@@ -60,5 +62,10 @@ describe.skipIf(!ffmpegAvailable())("video-to-gif (requires ffmpeg)", () => {
     // GIF files start with GIF8 magic bytes
     const magic = dl.rawPayload.subarray(0, 4).toString("ascii");
     expect(magic).toBe("GIF8");
+    // Decode the payload and confirm it is an animated GIF at the requested width.
+    const meta = await sharp(dl.rawPayload, { animated: true }).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.width).toBe(120);
+    expect((meta.pages ?? 1) > 1).toBe(true);
   }, 90_000);
 });
