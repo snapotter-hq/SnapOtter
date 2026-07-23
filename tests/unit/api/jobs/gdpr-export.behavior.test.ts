@@ -141,4 +141,115 @@ describe("GDPR export job behavior", () => {
     expect(zip.readAsText("library-files/file-1_a.txt")).toBe("file contents");
     expect(zip.getEntry("library-files/file-2_missing.txt")).toBeNull();
   });
+
+  it("serializes null/undefined date fields as null across every export section", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "user-2",
+            email: "grace@example.test",
+            passwordHash: "secret",
+            createdAt: new Date("2026-06-10T00:00:00.000Z"),
+          },
+        ]),
+      )
+      // File with a null createdAt exercises the falsy side of f.createdAt?.
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "file-9",
+            userId: "user-2",
+            storedName: "stored/x",
+            originalName: "x.bin",
+            createdAt: null,
+          },
+        ]),
+      )
+      // Job where createdAt and completedAt are null (the two date branches the
+      // first test left truthy), startedAt/deleteAfter undefined.
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "job-b",
+            userId: "user-2",
+            createdAt: null,
+            startedAt: undefined,
+            completedAt: null,
+            deleteAfter: undefined,
+          },
+        ]),
+      )
+      // Audit entry with a null createdAt exercises the falsy side of a.createdAt?.
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "audit-9",
+            actorId: "user-2",
+            action: "EXPORT",
+            createdAt: null,
+          },
+        ]),
+      );
+    // Stored file read succeeds so the library-copy append path still runs.
+    readStoredFileMock.mockResolvedValueOnce(Buffer.from("bin"));
+
+    await expect(gdprExportJob("user-2", "export-null")).resolves.toEqual({
+      outputRef: "outputs/export-null/gdpr-export.zip",
+    });
+
+    expect(putObjectMock).toHaveBeenCalledTimes(1);
+    const zipBuffer = putObjectMock.mock.calls[0][1];
+    const zip = new AdmZip(zipBuffer);
+
+    const files = JSON.parse(zip.readAsText("files.json"));
+    const jobs = JSON.parse(zip.readAsText("jobs.json"));
+    const audit = JSON.parse(zip.readAsText("audit-log.json"));
+
+    // A null date passes through `?.toISOString()` as undefined, so JSON.stringify
+    // drops the key entirely rather than serializing it as null.
+    expect(files[0]).not.toHaveProperty("createdAt");
+    expect(jobs[0]).not.toHaveProperty("createdAt");
+    expect(jobs[0]).not.toHaveProperty("completedAt");
+    expect(jobs[0]).not.toHaveProperty("startedAt");
+    expect(jobs[0]).not.toHaveProperty("deleteAfter");
+    expect(audit[0]).not.toHaveProperty("createdAt");
+    expect(zip.readAsText("library-files/file-9_x.bin")).toBe("bin");
+  });
+
+  it("produces empty JSON collections when the user has no files, jobs, or audit entries", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "user-3",
+            email: "empty@example.test",
+            passwordHash: "secret",
+            createdAt: new Date("2026-06-20T00:00:00.000Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await expect(gdprExportJob("user-3", "export-empty")).resolves.toEqual({
+      outputRef: "outputs/export-empty/gdpr-export.zip",
+    });
+
+    // With no files, the library-copy loop never runs, so readStoredFile is untouched.
+    expect(readStoredFileMock).not.toHaveBeenCalled();
+    expect(putObjectMock).toHaveBeenCalledTimes(1);
+
+    const zipBuffer = putObjectMock.mock.calls[0][1];
+    const zip = new AdmZip(zipBuffer);
+    expect(JSON.parse(zip.readAsText("files.json"))).toEqual([]);
+    expect(JSON.parse(zip.readAsText("jobs.json"))).toEqual([]);
+    expect(JSON.parse(zip.readAsText("audit-log.json"))).toEqual([]);
+    const profile = JSON.parse(zip.readAsText("profile.json"));
+    expect(profile).toMatchObject({ id: "user-3", email: "empty@example.test" });
+    expect(profile).not.toHaveProperty("passwordHash");
+  });
 });

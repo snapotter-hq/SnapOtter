@@ -112,4 +112,91 @@ describe("job queues", () => {
     expect(queueInstances[1].close).toHaveBeenCalledTimes(1);
     await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 0 });
   });
+
+  it("treats missing count keys as zero when aggregating queueCounts", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("image");
+
+    // BullMQ can return a counts object that omits states with zero jobs;
+    // every field must fall through the ?? 0 branch.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({});
+
+    await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 0 });
+  });
+
+  it("treats missing count keys as zero in perPoolCounts", async () => {
+    const { getQueue, perPoolCounts } = await loadQueuesModule();
+    getQueue("system");
+
+    // active present, waiting omitted: exercises both sides of the ?? 0 pair.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 9 });
+
+    await expect(perPoolCounts()).resolves.toMatchObject({
+      system: { active: 9, waiting: 0 },
+      image: { active: 0, waiting: 0 },
+    });
+  });
+
+  it("returns oldestWaitingMs null in perPoolHealth when waiting count is missing", async () => {
+    const { getQueue, perPoolHealth } = await loadQueuesModule();
+    getQueue("docs");
+
+    // No waiting/active/failed keys: (counts.waiting ?? 0) > 0 is false, so
+    // getJobs is never consulted and every field falls back to zero/null.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({});
+
+    await expect(perPoolHealth()).resolves.toMatchObject({
+      docs: { active: 0, waiting: 0, failed: 0, oldestWaitingMs: null },
+    });
+    expect(queueInstances[0].getJobs).not.toHaveBeenCalled();
+  });
+
+  it("keeps oldestWaitingMs null when waiting is reported but no waiting jobs are returned", async () => {
+    const { getQueue, perPoolHealth } = await loadQueuesModule();
+    getQueue("media");
+
+    // Count claims a waiting job, but getJobs returns an empty page: the
+    // jobs.length > 0 guard must short-circuit and leave oldestWaitingMs null.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 1, failed: 0 });
+    queueInstances[0].getJobs.mockResolvedValueOnce([]);
+
+    await expect(perPoolHealth()).resolves.toMatchObject({
+      media: { active: 0, waiting: 1, failed: 0, oldestWaitingMs: null },
+    });
+    expect(queueInstances[0].getJobs).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps oldestWaitingMs null when the returned waiting job slot is empty", async () => {
+    const { getQueue, perPoolHealth } = await loadQueuesModule();
+    getQueue("image");
+
+    // getJobs returns a page whose first slot is undefined (BullMQ can hand
+    // back holes for expired jobs): the jobs[0] guard must reject it.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 1, failed: 0 });
+    queueInstances[0].getJobs.mockResolvedValueOnce([undefined]);
+
+    await expect(perPoolHealth()).resolves.toMatchObject({
+      image: { active: 0, waiting: 1, failed: 0, oldestWaitingMs: null },
+    });
+    expect(queueInstances[0].getJobs).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults missing active and failed counts to zero in perPoolHealth", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-29T12:00:00.000Z"));
+
+    const { getQueue, perPoolHealth } = await loadQueuesModule();
+    getQueue("ai");
+
+    // Only waiting is present; active and failed exercise their ?? 0 branches
+    // while a real waiting job still resolves oldestWaitingMs.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ waiting: 1 });
+    queueInstances[0].getJobs.mockResolvedValueOnce([
+      { timestamp: new Date("2026-06-29T11:59:55.000Z").getTime() },
+    ]);
+
+    await expect(perPoolHealth()).resolves.toMatchObject({
+      ai: { active: 0, waiting: 1, failed: 0, oldestWaitingMs: 5_000 },
+    });
+  });
 });

@@ -13,6 +13,10 @@ import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const JPG = readFixture(fixtures.image.base.jpg100);
 const TIFF = readFixture(fixtures.image.formats("tiff"));
+// PSD passes validateImageBuffer (CLI-decoded format, no Sharp dimension
+// check) but Sharp cannot re-encode it to webp, so the route's preview
+// generation catch block fires while the result still succeeds.
+const PSD = readFixture(fixtures.image.formats("psd"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -65,6 +69,39 @@ function createMockFetch() {
       case "/slow-close":
         return mockResponse(null, {
           headers: { "Content-Type": "image/jpeg", "Content-Length": "0" },
+        });
+      // A path whose basename has no extension: filenameFromUrl cannot derive
+      // a name and falls back to a UUID-based "file-xxxxxxxx".
+      case "/gallery/12345":
+        return mockResponse(JPG, { headers: { "Content-Type": "image/jpeg" } });
+      // Basename contains a stray percent sign that is not valid percent-
+      // encoding, so decodeURIComponent throws and filenameFromUrl falls back.
+      case "/bad%name.jpg":
+        return mockResponse(JPG, { headers: { "Content-Type": "image/jpeg" } });
+      // PSD validates as an image but is not browser-previewable and Sharp
+      // cannot encode it -> preview generation catch block, success stays true.
+      case "/layers.psd":
+        return mockResponse(PSD, { headers: { "Content-Type": "image/vnd.adobe.photoshop" } });
+      // Non-image body with NO content-type header at all: contentType falls
+      // back to application/octet-stream.
+      case "/blob.bin":
+        return mockResponse("just some opaque bytes, definitely not an image");
+      // Non-image body with a parameterized content-type: the "; charset=..."
+      // suffix is stripped and trimmed to the bare media type.
+      case "/report.dat":
+        return mockResponse("PLAIN NON IMAGE PAYLOAD", {
+          headers: { "Content-Type": "application/pdf; charset=binary" },
+        });
+      // 3xx redirect that omits the Location header -> safeFetch throws and the
+      // route surfaces it as a failure result.
+      case "/redirect-no-location":
+        return mockResponse(null, { status: 302 });
+      // Open-redirect attempt: the redirect target is a private/loopback IP.
+      // safeFetch re-validates the hop and rejects it before any second fetch.
+      case "/redirect-to-private":
+        return mockResponse(null, {
+          status: 302,
+          headers: { Location: "http://127.0.0.1/secret.jpg" },
         });
       default:
         return mockResponse("Not Found", { status: 404 });
@@ -371,5 +408,244 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(body.results).toHaveLength(1);
     expect(body.results[0].success).toBe(false);
     expect(body.results[0].error).toContain("Empty");
+  });
+
+  it("falls back to a UUID filename when the URL path has no extension", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/gallery/12345`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    // filenameFromUrl fallback: "file-" + 8 hex chars, no extension.
+    expect(result.filename).toMatch(/^file-[0-9a-f]{8}$/);
+    // The image itself still validates and reports its true dimensions.
+    expect(result.width).toBe(100);
+    expect(result.height).toBe(100);
+  });
+
+  it("falls back to a UUID filename when the basename cannot be URL-decoded", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      // "%na" is not a valid percent-escape, so decodeURIComponent throws
+      // inside filenameFromUrl and the catch branch returns the fallback.
+      payload: { urls: [`${MOCK_ORIGIN}/bad%name.jpg`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    expect(result.filename).toMatch(/^file-[0-9a-f]{8}$/);
+  });
+
+  it("succeeds without a preview when preview generation fails (PSD)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/layers.psd`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    expect(result.filename).toBe("layers.psd");
+    // MIME comes from the detected format, not the response header.
+    expect(result.contentType).toBe("image/vnd.adobe.photoshop");
+    // CLI-decoded format: dimensions are reported as 0, not undefined.
+    expect(result.width).toBe(0);
+    expect(result.height).toBe(0);
+    // Sharp cannot encode PSD to webp, so the preview catch swallowed the
+    // error and left previewUrl null. The file itself is still saved.
+    expect(result.previewUrl).toBeNull();
+
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBe(PSD.length);
+  });
+
+  it("defaults contentType to application/octet-stream when no header is present", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/blob.bin`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    expect(result.filename).toBe("blob.bin");
+    // Non-image body + missing content-type header -> octet-stream fallback.
+    expect(result.contentType).toBe("application/octet-stream");
+    // No image validation, so no dimensions and no preview.
+    expect(result.width).toBeUndefined();
+    expect(result.height).toBeUndefined();
+    expect(result.previewUrl).toBeNull();
+  });
+
+  it("strips content-type parameters down to the bare media type", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/report.dat`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    // "application/pdf; charset=binary" -> "application/pdf".
+    expect(result.contentType).toBe("application/pdf");
+  });
+
+  it("returns failure for a redirect without a Location header", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/redirect-no-location`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/[Ll]ocation/);
+  });
+
+  it("rejects a URL that resolves to a loopback IP (SSRF)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: ["http://127.0.0.1/internal.jpg"] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/private or reserved/i);
+    // The SSRF guard rejects before any network call is made.
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a URL that resolves to an RFC1918 private IP (SSRF)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: ["http://10.0.0.1/admin.png"] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/private or reserved/i);
+  });
+
+  it("rejects an IPv6 loopback URL (SSRF)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: ["http://[::1]/internal.jpg"] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/private or reserved/i);
+  });
+
+  it("rejects a non-HTTP(S) protocol", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: ["ftp://files.example.com/archive.jpg"] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/HTTP and HTTPS/i);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an open redirect whose target is a private IP (SSRF via redirect)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/redirect-to-private`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].success).toBe(false);
+    expect(body.results[0].error).toMatch(/private or reserved/i);
+    // The first (public) hop is fetched; the private hop is never fetched.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves result order across concurrent fetches", async () => {
+    // More URLs than URL_FETCH_CONCURRENCY (4) so the queue actually schedules
+    // in waves; results must still line up with the input order.
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [
+          `${MOCK_ORIGIN}/photo.jpg`,
+          `${MOCK_ORIGIN}/missing.jpg`,
+          `${MOCK_ORIGIN}/photo.tiff`,
+          `${MOCK_ORIGIN}/not-image.txt`,
+          `${MOCK_ORIGIN}/server-error`,
+          `${MOCK_ORIGIN}/empty`,
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(6);
+    expect(body.results[0].filename).toBe("photo.jpg");
+    expect(body.results[1].success).toBe(false);
+    expect(body.results[1].error).toContain("404");
+    expect(body.results[2].filename).toBe("photo.tiff");
+    expect(body.results[3].success).toBe(true);
+    expect(body.results[4].success).toBe(false);
+    expect(body.results[4].error).toContain("500");
+    expect(body.results[5].success).toBe(false);
+    expect(body.results[5].error).toContain("Empty");
   });
 });
