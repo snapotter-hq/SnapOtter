@@ -353,12 +353,20 @@ jobs:
           echo "API failed to start"; exit 1
       - name: Fuzz tool endpoints from the OpenAPI spec
         run: |
+          # This fuzz targets the async tool-factory endpoints: they validate the
+          # request, enqueue a job, and return 202 immediately (the server is
+          # started above with SYNC_WAIT_MS=0). Excluded are the feature-gated
+          # AI/media tools and the handful of tools with bespoke handlers that
+          # process synchronously in-request (meme-generator, collage, stitch,
+          # compose, beautify, vectorize, ...). On adversarial input that
+          # in-request work is unbounded and trips the request timeout, so those
+          # tools are fuzzed by the integration and e2e suites instead.
           schemathesis run http://localhost:13490/api/v1/openapi.yaml \
             --url http://localhost:13490 \
             --checks not_a_server_error \
             --request-timeout 120 \
             --include-path-regex "^/api/v1/(tools|health|info)" \
-            --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
+            --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background|meme-generator|compare|stitch|collage|bulk-rename|watermark-image|vectorize|find-duplicates|split|sign-pdf|beautify|favicon|color-palette|compose)(/[a-z-]+)?$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report
