@@ -1,0 +1,13 @@
+# Branch-coverage config for the Python sidecar test lane. `source` is the set
+# of pure/protocol modules with durable direct tests; extend it as the lane
+# grows. Heavy model-runtime modules stay out of this gate and are proven in
+# the real-runtime Docker lane instead.
+[run]
+branch = True
+source =
+    offline_guard
+    progress_heartbeat
+
+[report]
+show_missing = True
+fail_under = 80

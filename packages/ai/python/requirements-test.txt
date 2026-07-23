@@ -1,0 +1,6 @@
+# Test-only dependencies for the Python sidecar lane. Runtime/model deps live
+# in requirements.txt and requirements-gpu.txt. Pinned for reproducibility.
+# The CI/Docker lane targets the shipped Python 3.11 ABI; the pure and
+# protocol-level tests here also run unchanged on 3.12+ (verified on 3.14).
+pytest==9.1.0
+coverage==7.10.7
