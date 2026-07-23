@@ -1,4 +1,7 @@
-import { pdfcpuAvailable } from "@snapotter/doc-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pdfcpuAvailable, qpdfPageCount } from "@snapotter/doc-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -48,6 +51,26 @@ describe.skipIf(!pdfcpuAvailable())("booklet-pdf (requires pdfcpu)", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+
+    // Semantic oracle: verify the booklet was actually imposed, not passed through.
+    // The fixture is a 3-page PDF. A perSheet:2 booklet pads the source up to the
+    // next multiple of 4 (3 -> 4 logical pages), then images them 2-up, so the
+    // output holds 4 / 2 = 2 physical sheet-faces. Asserting the exact count also
+    // proves it differs from a no-op (which would keep the original 3 pages).
+    const dir = mkdtempSync(join(tmpdir(), "booklet-pdf-"));
+    try {
+      const outPath = join(dir, "out.pdf");
+      writeFileSync(outPath, dl.rawPayload);
+
+      const inputPages = await qpdfPageCount(fixtures.document.pdf3);
+      expect(inputPages).toBe(3);
+
+      const outputPages = await qpdfPageCount(outPath);
+      expect(outputPages).toBe(2);
+      expect(outputPages).not.toBe(inputPages);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 60_000);
 });
 

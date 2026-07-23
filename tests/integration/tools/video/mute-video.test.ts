@@ -1,4 +1,7 @@
-import { ffmpegAvailable } from "@snapotter/media-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -43,6 +46,20 @@ describe.skipIf(!ffmpegAvailable())("mute-video (requires ffmpeg)", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.length).toBeGreaterThan(100);
+
+    // The whole point of the tool: the audio track is gone while the video
+    // stream survives. The tiny.mp4 fixture ships with both a video and an
+    // audio stream, so a genuine mute must drop audio and keep video.
+    const tmpDir = mkdtempSync(join(tmpdir(), "mute-test-"));
+    try {
+      const probeFile = join(tmpDir, "muted.mp4");
+      writeFileSync(probeFile, dl.rawPayload);
+      const info = await probeMedia(probeFile);
+      expect(info.streams.some((s) => s.type === "video")).toBe(true);
+      expect(info.streams.every((s) => s.type !== "audio")).toBe(true);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it("also works with explicit empty settings", async () => {

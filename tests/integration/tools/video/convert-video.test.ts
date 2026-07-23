@@ -1,4 +1,7 @@
-import { ffmpegAvailable } from "@snapotter/media-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -50,7 +53,8 @@ describe.skipIf(!ffmpegAvailable())("convert-video (requires ffmpeg)", () => {
       await new Promise((r) => setTimeout(r, 500));
     }
     expect(row?.status).toBe("completed");
-    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    const outputRefs = (row?.outputRefs ?? []) as string[];
+    const outName = outputRefs[0].split("/").pop() as string;
     const dl = await testApp.app.inject({
       method: "GET",
       url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
@@ -58,6 +62,24 @@ describe.skipIf(!ffmpegAvailable())("convert-video (requires ffmpeg)", () => {
     expect(dl.statusCode).toBe(200);
     expect(outName.endsWith(".webm")).toBe(true);
     expect(dl.rawPayload.length).toBeGreaterThan(100);
+
+    // Semantic check: a real mp4 -> webm conversion must re-encode the video to
+    // a VP-family codec inside a webm container. The input fixture is h264 in an
+    // mp4 container, so an h264 stream here means the container was renamed
+    // without transcoding (the tool asks for resolveEncoder("vp9") -> libvpx-vp9).
+    const dir = mkdtempSync(join(tmpdir(), "convert-webm-"));
+    try {
+      const outPath = join(dir, outName);
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      expect(info.container).toContain("webm");
+      const video = info.streams.find((s) => s.type === "video");
+      expect(video).toBeDefined();
+      expect(video?.codec).toMatch(/^vp[89]$/);
+      expect(video?.codec).not.toBe("h264");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 90_000);
 
   it("converts to mp4 (default settings)", async () => {
@@ -73,8 +95,31 @@ describe.skipIf(!ffmpegAvailable())("convert-video (requires ffmpeg)", () => {
       await new Promise((r) => setTimeout(r, 500));
     }
     expect(row?.status).toBe("completed");
-    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    const outputRefs = (row?.outputRefs ?? []) as string[];
+    const outName = outputRefs[0].split("/").pop() as string;
     expect(outName.endsWith(".mp4")).toBe(true);
+
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    // Semantic check: the mp4 target encodes video with resolveEncoder("h264")
+    // into the mp4 (mov/mp4/m4a) container family. ffprobe reports the container
+    // as a comma list ("mov,mp4,m4a,3gp,3g2,mj2"), so match on the mp4 member.
+    const dir = mkdtempSync(join(tmpdir(), "convert-mp4-"));
+    try {
+      const outPath = join(dir, outName);
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      expect(info.container).toContain("mp4");
+      const video = info.streams.find((s) => s.type === "video");
+      expect(video).toBeDefined();
+      expect(video?.codec).toBe("h264");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 90_000);
 
   it("rejects a non-video upload", async () => {

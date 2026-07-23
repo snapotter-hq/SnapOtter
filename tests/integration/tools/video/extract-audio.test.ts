@@ -1,4 +1,7 @@
-import { ffmpegAvailable } from "@snapotter/media-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -49,6 +52,22 @@ describe.skipIf(!ffmpegAvailable())("extract-audio (requires ffmpeg)", () => {
     expect(dl.rawPayload.length).toBeGreaterThan(100);
     const outName = envelope.downloadUrl.split("/").pop() as string;
     expect(outName.endsWith(".mp3")).toBe(true);
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "extract-audio-mp3-"));
+    try {
+      const outPath = join(tmpDir, "out.mp3");
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      // Extract-audio must strip video entirely and keep exactly one audio track.
+      expect(info.streams.filter((s) => s.type === "video")).toHaveLength(0);
+      expect(info.streams.filter((s) => s.type === "audio")).toHaveLength(1);
+      // libmp3lame in an mp3 container: codec_name "mp3", format_name "mp3".
+      const audio = info.streams.find((s) => s.type === "audio");
+      expect(audio?.codec).toBe("mp3");
+      expect(info.container).toContain("mp3");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it("extracts audio from mp4 as wav and returns 200", async () => {
@@ -64,5 +83,21 @@ describe.skipIf(!ffmpegAvailable())("extract-audio (requires ffmpeg)", () => {
     expect(dl.rawPayload.length).toBeGreaterThan(100);
     const outName = envelope.downloadUrl.split("/").pop() as string;
     expect(outName.endsWith(".wav")).toBe(true);
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "extract-audio-wav-"));
+    try {
+      const outPath = join(tmpDir, "out.wav");
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      // Extract-audio must strip video entirely and keep exactly one audio track.
+      expect(info.streams.filter((s) => s.type === "video")).toHaveLength(0);
+      expect(info.streams.filter((s) => s.type === "audio")).toHaveLength(1);
+      // pcm_s16le in a wav container.
+      const audio = info.streams.find((s) => s.type === "audio");
+      expect(audio?.codec).toBe("pcm_s16le");
+      expect(info.container).toContain("wav");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   }, 60_000);
 });

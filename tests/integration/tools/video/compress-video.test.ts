@@ -1,4 +1,7 @@
-import { ffmpegAvailable } from "@snapotter/media-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -9,6 +12,11 @@ import {
 } from "../../test-server.js";
 
 const MP4 = readFixture(fixtures.video.tiny("mp4"));
+// A genuinely compressible clip (480x270, ~30s). The tiny fixture is already so
+// small that re-encoding cannot beat MP4 container overhead, so the "output is
+// smaller than input" invariant is only meaningful on a source with real
+// bitrate slack.
+const COMPRESSIBLE_MP4 = readFixture(fixtures.video.hero.mp4);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -34,9 +42,9 @@ async function pollJob(jobId: string) {
   return row;
 }
 
-async function runTool(settings: Record<string, unknown>) {
+async function runTool(settings: Record<string, unknown>, content: Buffer = MP4) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
@@ -49,12 +57,13 @@ async function runTool(settings: Record<string, unknown>) {
 
 describe.skipIf(!ffmpegAvailable())("compress-video (requires ffmpeg)", () => {
   it("returns 202 and produces a compressed mp4", async () => {
-    const res = await runTool({ quality: "balanced" });
+    const res = await runTool({ quality: "balanced" }, COMPRESSIBLE_MP4);
     expect(res.statusCode).toBe(202);
     const { jobId } = JSON.parse(res.body);
     const row = await pollJob(jobId);
     expect(row?.status).toBe("completed");
-    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    const outputRefs = (row?.outputRefs ?? []) as string[];
+    const outName = outputRefs[0].split("/").pop() as string;
     expect(outName).toContain("_compressed.mp4");
     const dl = await testApp.app.inject({
       method: "GET",
@@ -62,6 +71,23 @@ describe.skipIf(!ffmpegAvailable())("compress-video (requires ffmpeg)", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.length).toBeGreaterThan(100);
+
+    // The entire point of compress-video is to shrink the file: the output must
+    // be strictly smaller than the input it was handed. Assert the RELATIVE
+    // change against the measured input fixture, not a hard-coded byte count.
+    expect(dl.rawPayload.length).toBeLessThan(COMPRESSIBLE_MP4.length);
+
+    // Whatever it shrinks to must still decode as a real video, not a stub or a
+    // silent audio-only remux.
+    const dir = mkdtempSync(join(tmpdir(), "compress-video-"));
+    try {
+      const outPath = join(dir, outName);
+      writeFileSync(outPath, dl.rawPayload);
+      const info = await probeMedia(outPath);
+      expect(info.streams.some((s) => s.type === "video")).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 90_000);
 
   it("compresses with 480p resolution", async () => {
