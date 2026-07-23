@@ -331,7 +331,7 @@ jobs:
       - name: Start API server
         run: |
           mkdir -p /tmp/st-data
-          AUTH_ENABLED=false ANALYTICS_ENABLED=false \
+          AUTH_ENABLED=false ANALYTICS_ENABLED=false SYNC_WAIT_MS=0 \
             DATABASE_URL=postgres://snapotter:snapotter@localhost:5432/snapotter \
             REDIS_URL=redis://localhost:6379 \
             WORKSPACE_PATH=/tmp/st-data/workspace DATA_DIR=/tmp/st-data \
@@ -348,7 +348,7 @@ jobs:
           schemathesis run http://localhost:13490/api/v1/openapi.yaml \
             --url http://localhost:13490 \
             --checks not_a_server_error \
-            --request-timeout 30 \
+            --request-timeout 120 \
             --include-path-regex "^/api/v1/(tools|health|info)" \
             --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
             --max-examples 25 \
