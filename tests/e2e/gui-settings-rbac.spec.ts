@@ -95,7 +95,7 @@ async function deleteUser(adminToken: string, username: string): Promise<void> {
 //   usage          - audit:read (Usage analytics dashboard, admin-only)
 //   api-keys       - none
 //   ai-features    - settings:write
-//   tools          - none
+//   tools          - settings:write
 //   about          - none
 
 base.describe("RBAC Settings Visibility - Admin", () => {
@@ -228,7 +228,7 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await deleteUser(adminToken, EDITOR_USER);
   });
 
-  base.test("editor sees general, security, api-keys, tools, about", async ({ page }) => {
+  base.test("editor sees general, security, api-keys, about", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
 
@@ -236,12 +236,11 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
   });
 
   base.test(
-    "editor does NOT see system settings, people, teams, roles, audit log, usage, ai features",
+    "editor does NOT see system settings, people, teams, roles, audit log, usage, ai features, tools",
     async ({ page }) => {
       await login(page, EDITOR_USER, EDITOR_PASS);
       await openSettings(page);
@@ -249,7 +248,8 @@ base.describe("RBAC Settings Visibility - Editor", () => {
       // Wait for dialog to fully render
       await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
-      // Should NOT see admin-only tabs (usage requires audit:read)
+      // Should NOT see admin-only tabs (usage requires audit:read; tools and
+      // ai features require settings:write)
       await expect(page.getByRole("button", { name: /system settings/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /people/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
@@ -257,17 +257,18 @@ base.describe("RBAC Settings Visibility - Editor", () => {
       await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
     },
   );
 
-  base.test("editor sees exactly 5 nav items", async ({ page }) => {
+  base.test("editor sees exactly 4 nav items", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
     const navButtons = page.locator(".w-48 button");
     const count = await navButtons.count();
-    expect(count).toBe(5);
+    expect(count).toBe(4);
   });
 
   base.test("editor can access Security tab and see change password form", async ({ page }) => {
@@ -287,13 +288,13 @@ base.describe("RBAC Settings Visibility - Editor", () => {
     await expect(page.getByRole("button", { name: /generate api key/i })).toBeVisible();
   });
 
-  base.test("editor can access Tools tab and see tool toggles", async ({ page }) => {
+  base.test("editor cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, EDITOR_USER, EDITOR_PASS);
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
-    await expect(page.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    // The Tools tab is gated behind settings:write, which editors lack.
+    await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
   base.test("editor General tab shows correct username and role", async ({ page }) => {
@@ -349,19 +350,18 @@ base.describe("RBAC Settings Visibility - User", () => {
     await deleteUser(adminToken, USER_USER);
   });
 
-  base.test("user sees general, security, api-keys, tools, about", async ({ page }) => {
+  base.test("user sees general, security, api-keys, about", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
 
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
   });
 
   base.test(
-    "user does NOT see system settings, people, teams, roles, audit log, usage, ai features",
+    "user does NOT see system settings, people, teams, roles, audit log, usage, ai features, tools",
     async ({ page }) => {
       await login(page, USER_USER, USER_PASS);
       await openSettings(page);
@@ -376,17 +376,18 @@ base.describe("RBAC Settings Visibility - User", () => {
       await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
     },
   );
 
-  base.test("user sees exactly 5 nav items", async ({ page }) => {
+  base.test("user sees exactly 4 nav items", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
     const navButtons = page.locator(".w-48 button");
     const count = await navButtons.count();
-    expect(count).toBe(5);
+    expect(count).toBe(4);
   });
 
   base.test("user can access About tab and see version", async ({ page }) => {
@@ -407,13 +408,13 @@ base.describe("RBAC Settings Visibility - User", () => {
     await expect(page.getByText("user").first()).toBeVisible();
   });
 
-  base.test("user can access Tools tab and see tool toggles", async ({ page }) => {
+  base.test("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, USER_USER, USER_PASS);
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
-    await expect(page.locator("h3").filter({ hasText: "Tools" }).first()).toBeVisible();
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
+    // The Tools tab is gated behind settings:write, which the user role lacks.
+    await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
   base.test("user can access Security tab and change password form", async ({ page }) => {
@@ -680,7 +681,7 @@ base.describe("RBAC -- Editor and User see identical tabs (intentional)", () => 
   });
 
   base.test(
-    "editor and user see the same 5 tabs (correct behavior, not a bug)",
+    "editor and user see the same 4 tabs (correct behavior, not a bug)",
     async ({ page }) => {
       // Verify editor tab count
       await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);
@@ -698,15 +699,15 @@ base.describe("RBAC -- Editor and User see identical tabs (intentional)", () => 
       const userNavButtons = page.locator(".w-48 button");
       const userCount = await userNavButtons.count();
 
-      // Both should see exactly 5 tabs
-      expect(editorCount).toBe(5);
-      expect(userCount).toBe(5);
+      // Both should see exactly 4 tabs
+      expect(editorCount).toBe(4);
+      expect(userCount).toBe(4);
       expect(editorCount).toBe(userCount);
     },
   );
 
   base.test("editor and user both see the same set of tab labels", async ({ page }) => {
-    const expectedTabs = ["General", "Security", "API Keys", "Tools", "About"];
+    const expectedTabs = ["General", "Security", "API Keys", "About"];
 
     // Check editor
     await login(page, RBAC_EDITOR, RBAC_EDITOR_PASS);

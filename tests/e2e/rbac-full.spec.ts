@@ -285,12 +285,11 @@ base.describe("RBAC Full — Custom Role User", () => {
 
     await openSettings(page);
 
-    // Should see these 5 tabs. The custom role only has settings:read and
+    // Should see these 4 tabs. The custom role only has settings:read and
     // tools:use, so it sees the same set as the built-in "user" role.
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
 
     // Should NOT see admin-only tabs (requires users:manage, teams:manage,
@@ -300,12 +299,13 @@ base.describe("RBAC Full — Custom Role User", () => {
     await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /^roles$/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
-    // Usage requires audit:read, AI Features requires settings:write.
+    // Usage requires audit:read, AI Features and Tools require settings:write.
     await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
 
-    // Exactly 5 nav buttons for this custom role.
-    expect(await page.locator(".w-48 button").count()).toBe(5);
+    // Exactly 4 nav buttons for this custom role.
+    expect(await page.locator(".w-48 button").count()).toBe(4);
   });
 
   base.test(

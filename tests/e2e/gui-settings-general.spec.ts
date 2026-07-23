@@ -427,7 +427,9 @@ test.describe("GUI Settings - About Tab", () => {
     // SnapOtter branding
     await expect(page.getByText("SnapOtter").first()).toBeVisible();
     // Description text
-    await expect(page.getByText(/self-hosted.*privacy/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/self-hosted.*without sending data to the cloud/i).first(),
+    ).toBeVisible();
     // Version label and value
     await expect(page.getByText("Version:")).toBeVisible();
   });

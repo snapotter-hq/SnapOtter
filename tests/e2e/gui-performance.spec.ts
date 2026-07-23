@@ -1457,9 +1457,11 @@ test.describe("Network Request Budget", () => {
     await page.goto("/image/resize");
     await page.waitForLoadState("networkidle");
 
-    // Tool page should not make excessive API calls on load (health, session,
-    // settings for the disabled-tools gate, features, locale: no more than 10).
-    expect(apiRequests.length).toBeLessThanOrEqual(10);
+    // Tool page should not make excessive API calls on load. Naming the paths in
+    // the message makes a real regression (a duplicate/unnecessary fetch) visible
+    // rather than an opaque count bump.
+    const paths = apiRequests.map((u) => new URL(u).pathname).sort();
+    expect(apiRequests.length, `API calls on load: ${paths.join(", ")}`).toBeLessThanOrEqual(10);
   });
 });
 

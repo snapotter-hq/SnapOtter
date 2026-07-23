@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 env:
-  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf
+  # Keep in sync with ci.yml's install step. tesseract-ocr + language packs are
+  # required by the built-in Fast OCR tier: without them the OCR integration
+  # tests throw "spawn tesseract ENOENT" and fail the coverage/matrix jobs.
+  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn
   # See ci.yml: ryuk's Docker Hub pull is a recurring flake source; disable the reaper
   # (tests/global-setup.ts stops its containers explicitly; runners are ephemeral).
   TESTCONTAINERS_RYUK_DISABLED: "true"
@@ -338,7 +341,7 @@ jobs:
             --url http://localhost:13490 \
             --checks not_a_server_error \
             --include-path-regex "^/api/v1/(tools|health|info)" \
-            --exclude-path-regex "/(remove-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
+            --exclude-path-regex "/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report

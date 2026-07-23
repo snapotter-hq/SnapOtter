@@ -11,8 +11,15 @@ const MOD = process.platform === "darwin" ? "Meta" : "Control";
 async function uploadImage(page: Page) {
   const testImagePath = getTestImagePath();
   const fileChooserPromise = page.waitForEvent("filechooser");
-  const dropzone = page.locator("[class*='border-dashed']").first();
-  await dropzone.click();
+  // Click the dropzone's "Upload from computer" button (t.common.upload), which
+  // owns the file-picker trigger, rather than the surrounding <section> (which
+  // has no click handler). On /automate the dropzone renders compact and clipped,
+  // so a center-click on the section misses the button in Firefox/WebKit; the
+  // button itself is reliable across engines. Same selector the passing
+  // gui-multi-file-workflows automate upload uses.
+  const uploadButton = page.getByRole("button", { name: /upload from computer/i }).first();
+  await uploadButton.scrollIntoViewIfNeeded();
+  await uploadButton.click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(testImagePath);
   await page.waitForTimeout(500);

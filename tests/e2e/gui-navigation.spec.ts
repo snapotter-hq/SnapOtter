@@ -280,7 +280,7 @@ const DROPZONE_TOOLS = [
   { id: "remove-background", name: "Remove Background" },
   { id: "upscale", name: "Image Upscaling" },
   { id: "erase-object", name: "Object Eraser" },
-  { id: "ocr", name: "OCR / Text Extraction" },
+  { id: "ocr", name: "Extract Text from Image (OCR)" },
   { id: "blur-faces", name: "Blur Faces & PII" },
   { id: "smart-crop", name: "Smart Crop" },
   { id: "image-enhancement", name: "Image Enhancement" },
@@ -776,13 +776,13 @@ test.describe("Routing Edge Cases", () => {
     await page.goto("/privacy");
 
     await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
-    await expect(page.getByText("Back")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back" })).toBeVisible();
   });
 
   test("/privacy Back link navigates home", async ({ loggedInPage: page }) => {
     await page.goto("/privacy");
 
-    await page.getByText("Back").click();
+    await page.getByRole("link", { name: "Back" }).click();
     await expect(page).toHaveURL("/");
   });
 
