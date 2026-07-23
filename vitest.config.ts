@@ -158,6 +158,7 @@ export default defineConfig({
       bullmq: path.join(apiNodeModules, "bullmq"),
       otpauth: path.join(apiNodeModules, "otpauth"),
       "openid-client": path.join(apiNodeModules, "openid-client"),
+      "@node-saml/node-saml": path.join(apiNodeModules, "@node-saml/node-saml"),
       "opentype.js": path.join(apiNodeModules, "opentype.js"),
       "posthog-node": path.join(apiNodeModules, "posthog-node"),
       "@sentry/node": path.join(apiNodeModules, "@sentry/node"),
