@@ -1,4 +1,7 @@
-import { pdfcpuAvailable } from "@snapotter/doc-engine";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pdfcpuAvailable, qpdfPageCount } from "@snapotter/doc-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -36,7 +39,7 @@ async function runTool(settings: Record<string, unknown>) {
 }
 
 describe.skipIf(!pdfcpuAvailable())("nup-pdf (requires pdfcpu)", () => {
-  it("arranges pages n-up and produces a valid output", async () => {
+  it("arranges pages 2-up, collapsing a 3-page PDF to 2 sheets", async () => {
     const res = await runTool({ perSheet: 2 });
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
@@ -48,6 +51,20 @@ describe.skipIf(!pdfcpuAvailable())("nup-pdf (requires pdfcpu)", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+
+    // Semantic oracle: 2-up imposition must collapse the 3-page fixture to
+    // ceil(3/2) = 2 sheets. A no-op passthrough would leave 3 pages and still
+    // pass the %PDF- magic check, so assert the actual output page count.
+    const dir = mkdtempSync(join(tmpdir(), "nup-pdf-test-"));
+    try {
+      const outPath = join(dir, "nup.pdf");
+      writeFileSync(outPath, dl.rawPayload);
+      const pages = await qpdfPageCount(outPath);
+      expect(pages).toBe(2);
+      expect(pages).toBeLessThan(3); // fewer sheets than the 3 input pages
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 60_000);
 });
 
