@@ -252,9 +252,17 @@ jobs:
         run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit
 
   extended-matrix:
-    name: Extended Matrix + Fuzz
+    name: Extended Matrix + Fuzz (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # The full format x tool matrix plus property fuzz overran a single 90-min
+    # job. Shard it four ways (mirroring E2E Full) so each runner takes a quarter
+    # of the integration files; the generous per-shard ceiling absorbs the fact
+    # that the heavy format-matrix-* files cluster onto one shard.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
@@ -279,7 +287,7 @@ jobs:
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
       - name: Run integration suite with full matrix and fuzz enabled
-        run: pnpm vitest run tests/integration/ --reporter=verbose
+        run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/4
         env:
           FULL_MATRIX: "1"
           FUZZ: "1"
