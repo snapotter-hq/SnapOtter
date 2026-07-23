@@ -361,9 +361,16 @@ jobs:
           # compose, beautify, vectorize, ...). On adversarial input that
           # in-request work is unbounded and trips the request timeout, so those
           # tools are fuzzed by the integration and e2e suites instead.
+          #
+          # --suppress-health-check all: the tool endpoints need a real uploaded
+          # file, so the fuzzer's random bytes get rejected (404) and Hypothesis's
+          # filter_too_much check would fail the run. Those checks grade data
+          # generation quality, not API correctness; not_a_server_error still runs
+          # on every generated case (5000+ per run).
           schemathesis run http://localhost:13490/api/v1/openapi.yaml \
             --url http://localhost:13490 \
             --checks not_a_server_error \
+            --suppress-health-check all \
             --request-timeout 120 \
             --include-path-regex "^/api/v1/(tools|health|info)" \
             --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background|meme-generator|compare|stitch|collage|bulk-rename|watermark-image|vectorize|find-duplicates|split|sign-pdf|beautify|favicon|color-palette|compose)(/[a-z-]+)?$" \
