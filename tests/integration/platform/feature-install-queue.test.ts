@@ -39,6 +39,7 @@ const hoisted = vi.hoisted(() => {
     spawnOptions: { stdio?: unknown[] };
     stdout: ReturnType<typeof makeEmitter>;
     stderr: ReturnType<typeof makeEmitter>;
+    kill: ReturnType<typeof vi.fn>;
     on: (event: string, cb: (...a: unknown[]) => void) => unknown;
     emit: (event: string, ...args: unknown[]) => void;
   }
@@ -50,6 +51,7 @@ const hoisted = vi.hoisted(() => {
     base.spawnOptions = options;
     base.stdout = makeEmitter();
     base.stderr = makeEmitter();
+    base.kill = vi.fn();
     spawnCalls.push(base);
     return base;
   });
@@ -768,5 +770,200 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
 
     await waitFor(() => queue.peekQueue() === null, 3_000);
     expect(hoisted.spawnCalls).toHaveLength(0);
+  });
+
+  // ── Installer child output and failure surfaces ──────────────────
+
+  interface FeatureDetail {
+    id: string;
+    status: string;
+    progress: { percent: number; stage: string } | null;
+    error: string | null;
+  }
+
+  async function getFeatureDetail(bundleId: string): Promise<FeatureDetail | undefined> {
+    const res = await app.inject({ method: "GET", url: "/api/v1/features", headers: auth() });
+    const bundles = JSON.parse(res.body).bundles as FeatureDetail[];
+    return bundles.find((b) => b.id === bundleId);
+  }
+
+  it("returns 404 for an install of an unknown bundle id", async () => {
+    const res = await postInstall("definitely-not-a-bundle");
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe("Unknown bundle: definitely-not-a-bundle");
+    expect(hoisted.spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a tool install when the tool needs no bundles", async () => {
+    const res = await postToolInstall("not-a-real-tool");
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe(
+      "No feature bundles required for tool: not-a-real-tool",
+    );
+  });
+
+  it("surfaces JSON progress frames from the installer's stderr", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    child.stderr.emit(
+      "data",
+      Buffer.from('{"progress": 42, "stage": "Downloading weights"}\nplain pip noise\n'),
+    );
+    let detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("installing");
+    expect(detail?.progress).toEqual({ percent: 42, stage: "Downloading weights" });
+
+    // A frame split across two chunks only applies once its newline arrives,
+    // and a frame without a stage falls back to an empty string.
+    child.stderr.emit("data", Buffer.from('{"progress": 7'));
+    detail = await getFeatureDetail("transcription");
+    expect(detail?.progress).toEqual({ percent: 42, stage: "Downloading weights" });
+    child.stderr.emit("data", Buffer.from("1}\n"));
+    detail = await getFeatureDetail("transcription");
+    expect(detail?.progress).toEqual({ percent: 71, stage: "" });
+
+    child.emit("close", 0);
+    await waitFor(() => queue.getActiveBundleId() === null);
+  });
+
+  it("prefers the installer's structured JSON error over raw stderr on failure", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    child.stderr.emit(
+      "data",
+      Buffer.from('Collecting torch\n{"error": "No matching distribution found for torch"}\n'),
+    );
+    child.emit("close", 1);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toBe("No matching distribution found for torch");
+  });
+
+  it("maps exit code 137 to an out-of-memory explanation", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+
+    hoisted.spawnCalls[0].emit("close", 137);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toMatch(/insufficient memory/i);
+    expect(detail?.error).toMatch(/mem_limit/);
+  });
+
+  it("filters progress-bar noise out of the reported failure lines", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    const stderrDump = [
+      "\u001b[31mcolored progress bar\u001b[0m",
+      "━━━━━━━━━━━━━━━━━━",
+      " 45%|#########                ",
+      "pthread_setaffinity_np failed",
+      "ERROR: pip install crashed",
+      "OSError: [Errno 28] No space left on device",
+      "",
+    ].join("\n");
+    child.stderr.emit("data", Buffer.from(stderrDump));
+    child.emit("close", 1);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toBe(
+      "ERROR: pip install crashed\nOSError: [Errno 28] No space left on device",
+    );
+  });
+
+  it("falls back to the installer's stdout when stderr has no usable lines", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    child.stdout.emit("data", Buffer.from("bootstrap failed before pip started\n"));
+    child.emit("close", 2);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("bootstrap failed before pip started");
+  });
+
+  it("reports the bare exit code when the installer dies silently", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+
+    hoisted.spawnCalls[0].emit("close", 5);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("Install failed with exit code 5");
+  });
+
+  it("keeps the spawn-failure error when the duplicate close event follows", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    child.emit("error", new Error("ENOENT"));
+    await waitFor(() => queue.getActiveBundleId() === null);
+    let detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("Failed to spawn install process: ENOENT");
+
+    // A failed spawn fires BOTH error and close; the once-guard must ignore
+    // the second event instead of rewriting the error or double-releasing.
+    child.emit("close", 1);
+    detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("Failed to spawn install process: ENOENT");
+  });
+
+  it("watchdog kills a silent installer and reports a retryable stall error", async () => {
+    const originalStall = env.INSTALL_STALL_MS;
+    const originalMax = env.INSTALL_MAX_MS;
+    env.INSTALL_STALL_MS = 1;
+    env.INSTALL_MAX_MS = 0;
+    const intervalCallbacks: Array<() => void> = [];
+    const fakeTimer = { ref: () => {}, unref: () => {} } as unknown as NodeJS.Timeout;
+    // Capture periodic callbacks (install-lock heartbeat + watchdog) so the
+    // 30s watchdog tick can be driven synchronously instead of waited on.
+    vi.stubGlobal("setInterval", (handler: () => void): NodeJS.Timeout => {
+      intervalCallbacks.push(handler);
+      return fakeTimer;
+    });
+
+    try {
+      const res = await postInstall("transcription");
+      expect(res.statusCode).toBe(202);
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+
+      // Let the 1ms stall budget lapse, then run every captured tick.
+      await tick();
+      for (const callback of intervalCallbacks) callback();
+
+      expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+      let detail = await getFeatureDetail("transcription");
+      expect(detail?.status).toBe("error");
+      expect(detail?.error).toMatch(/no progress/i);
+
+      // When the kill lands, the close handler must keep the watchdog's
+      // reason rather than reporting a generic signal death.
+      child.emit("close", 1);
+      await waitFor(() => queue.getActiveBundleId() === null);
+      detail = await getFeatureDetail("transcription");
+      expect(detail?.status).toBe("error");
+      expect(detail?.error).toMatch(/no progress/i);
+    } finally {
+      vi.unstubAllGlobals();
+      env.INSTALL_STALL_MS = originalStall;
+      env.INSTALL_MAX_MS = originalMax;
+    }
   });
 });
