@@ -22,6 +22,14 @@ export default defineConfig({
     exclude: [
       "tests/unit/api/settings-helpers.test.ts",
       "tests/unit/api/tool-routes-boot-log.test.ts",
+      // Source-drift guards that readFileSync a source file and regex its text.
+      // Stryker instruments the source, changing its text, so those assertions
+      // fail under mutation. They stay in the normal suite; behavioral coverage
+      // of these modules comes from their sibling *.behavior / kill tests.
+      "tests/unit/api/compute-delete-after.test.ts",
+      "tests/unit/api/siem-forward.test.ts",
+      "tests/unit/api/alert-evaluator.test.ts",
+      "tests/unit/api/storage-reconciliation.test.ts",
     ],
     setupFiles: ["tests/setup/stryker-api-env.ts"],
     pool: "forks",
