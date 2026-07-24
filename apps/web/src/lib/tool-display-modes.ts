@@ -227,9 +227,15 @@ for (const preset of CONVERSION_PRESETS) {
 
 /**
  * Tools whose selected files all post in ONE request as repeated "file" parts.
- * Consumed by use-tool-processor; backend routes declare maxInputs.
+ * Consumed by use-tool-processor and ConversionPresetSettings; backend routes
+ * declare maxInputs, or (image-to-pdf group) loop over every uploaded file
+ * with no cap. Conversion presets built on a combining base are added below
+ * from BASE_CONFIG so a future image-to-pdf-group preset can't drift out of
+ * sync the way jpg-to-pdf did (issue #627): registerImageToPdfRoute never
+ * registers into the createToolRoute/registerToolProcessFn registry that the
+ * generic per-file /batch route depends on, so those tools 404 there.
  */
-export const MULTI_FILE_TOOLS: ReadonlySet<string> = new Set([
+const multiFileTools = new Set<string>([
   "create-zip",
   "merge-audio",
   "merge-csvs",
@@ -241,3 +247,9 @@ export const MULTI_FILE_TOOLS: ReadonlySet<string> = new Set([
   "images-to-video",
   "sprite-sheet",
 ]);
+for (const preset of CONVERSION_PRESETS) {
+  if (BASE_CONFIG[preset.base].group === "image-to-pdf") {
+    multiFileTools.add(preset.id);
+  }
+}
+export const MULTI_FILE_TOOLS: ReadonlySet<string> = multiFileTools;

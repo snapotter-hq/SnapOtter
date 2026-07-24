@@ -6,6 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
+import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { useFileStore } from "@/stores/file-store";
 
 /** Target formats that honor a quality knob (lossy raster encodings). */
@@ -46,8 +47,14 @@ export function ConversionPresetSettings() {
 
   const handleProcess = () => {
     const settings = buildSettings();
-    if (files.length > 1) processAllFiles(files, settings);
-    else processFiles(files, settings);
+    // image-to-pdf-group presets combine every file into one request (same as
+    // the base tool), so they must skip the generic per-file /batch endpoint
+    // that MULTI_FILE_TOOLS-gated tools never register into (issue #627).
+    if (MULTI_FILE_TOOLS.has(toolId) || files.length <= 1) {
+      processFiles(files, settings);
+    } else {
+      processAllFiles(files, settings);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
