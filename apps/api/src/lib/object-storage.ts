@@ -1,7 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync } from "node:fs";
-import { mkdir, readdir, rename, rm, stat, statfs, unlink, writeFile } from "node:fs/promises";
-import { dirname, join, normalize, sep } from "node:path";
+import {
+  mkdir,
+  readdir,
+  rename,
+  rm,
+  rmdir,
+  stat,
+  statfs,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, join, normalize, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { env } from "../config.js";
@@ -193,7 +203,6 @@ export async function putObjectStream(
         : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
     source.destroy(reason);
   };
-  opts.signal?.addEventListener("abort", abortSource, { once: true });
   let written = 0;
   const counter = async function* (src: AsyncIterable<Buffer>) {
     for await (const chunk of src) {
@@ -205,9 +214,11 @@ export async function putObjectStream(
       yield chunk;
     }
   };
-  try {
-    if (isS3Enabled()) {
-      const s3 = await getS3();
+  if (isS3Enabled()) {
+    const s3 = await getS3();
+    opts.signal?.throwIfAborted();
+    opts.signal?.addEventListener("abort", abortSource, { once: true });
+    try {
       try {
         await s3.putGenericObjectStream(key, counter(source), opts.signal);
         opts.signal?.throwIfAborted();
@@ -216,26 +227,36 @@ export async function putObjectStream(
         await s3.deleteGenericObject(key).catch(() => {});
         throw error;
       }
+    } finally {
+      opts.signal?.removeEventListener("abort", abortSource);
     }
-    const p = localPath(key);
-    const stagingPath = `${p}.${randomUUID()}.partial`;
-    try {
-      await assertLocalCapacity();
-      await mkdir(dirname(p), { recursive: true });
-      await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
-      await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
-        signal: opts.signal,
-      });
-      opts.signal?.throwIfAborted();
-      await rename(stagingPath, p);
-    } catch (err) {
-      await unlink(stagingPath).catch(() => {});
-      throw normalizeOperationalWriteError(err);
-    }
-    return written;
-  } finally {
-    opts.signal?.removeEventListener("abort", abortSource);
   }
+  const p = localPath(key);
+  const stagingDir = join(dirname(p), ".snapotter-staging");
+  const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
+  let stagingOwned = false;
+  try {
+    await assertLocalCapacity();
+    opts.signal?.throwIfAborted();
+    await mkdir(dirname(p), { recursive: true });
+    opts.signal?.throwIfAborted();
+    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+    opts.signal?.throwIfAborted();
+    await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
+    stagingOwned = true;
+    opts.signal?.throwIfAborted();
+    await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
+      signal: opts.signal,
+    });
+    opts.signal?.throwIfAborted();
+    await rename(stagingPath, p);
+    await rmdir(stagingDir).catch(() => {});
+  } catch (err) {
+    if (stagingOwned) await unlink(stagingPath).catch(() => {});
+    await rmdir(stagingDir).catch(() => {});
+    throw normalizeOperationalWriteError(err);
+  }
+  return written;
 }
 
 export async function getObjectStream(
@@ -317,6 +338,7 @@ export async function copyReadableToFile(
   }
   opts.signal?.throwIfAborted();
   const stagingPath = `${destination}.${randomUUID()}.partial`;
+  let stagingOwned = false;
   let written = 0;
   const countAndLimit = async function* (chunks: AsyncIterable<Buffer | Uint8Array | string>) {
     for await (const chunk of chunks) {
@@ -332,12 +354,15 @@ export async function copyReadableToFile(
 
   try {
     await mkdir(dirname(destination), { recursive: true });
+    opts.signal?.throwIfAborted();
     // Create the staging inode before constructing the stream. A write stream
     // opened with `wx` may fail the pipeline before its asynchronous open has
     // completed; cleanup can then observe ENOENT and the delayed open can leave
     // an orphan behind. Opening the already-created file with `r+` cannot
     // recreate it after cleanup.
     await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
+    stagingOwned = true;
+    opts.signal?.throwIfAborted();
     await pipeline(countAndLimit(source), createWriteStream(stagingPath, { flags: "r+" }), {
       signal: opts.signal,
     });
@@ -345,7 +370,7 @@ export async function copyReadableToFile(
     await rename(stagingPath, destination);
     return written;
   } catch (error) {
-    await unlink(stagingPath).catch(() => {});
+    if (stagingOwned) await unlink(stagingPath).catch(() => {});
     throw normalizeOperationalWriteError(error);
   }
 }

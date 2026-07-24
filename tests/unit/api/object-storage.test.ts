@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
   computeWorkspaceUsedBytes,
@@ -25,12 +26,30 @@ describe("object-storage (local backend)", () => {
   const key = `outputs/test-${process.pid}/hello.txt`;
   const copyKey = `outputs/test-${process.pid}/copy-source.bin`;
   const unavailableKey = `outputs/test-${process.pid}/unavailable.bin`;
+  const abortSetupJobId = `abort-setup-${process.pid}`;
+  const visibilityJobId = `stream-visibility-${process.pid}`;
+  const failureJobId = `stream-failure-${process.pid}`;
+  const semanticsJobId = `stream-semantics-${process.pid}`;
+  const collisionJobId = `stream-collision-${process.pid}`;
   const copyDir = mkdtempSync(join(tmpdir(), "snapotter-object-copy-"));
+
+  const jobEntries = (jobId: string): string[] => {
+    try {
+      return readdirSync(join(env.WORKSPACE_PATH, "outputs", jobId)).sort();
+    } catch {
+      return [];
+    }
+  };
 
   afterAll(async () => {
     await deleteObject(key).catch(() => {});
     await deleteObject(copyKey).catch(() => {});
     await deleteObject(unavailableKey).catch(() => {});
+    await deletePrefix(`outputs/${abortSetupJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${visibilityJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${failureJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${semanticsJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${collisionJobId}`).catch(() => {});
     rmSync(copyDir, { recursive: true, force: true });
   });
 
@@ -85,10 +104,86 @@ describe("object-storage (local backend)", () => {
     await expect(objectExists(unavailableKey)).resolves.toBe(false);
   });
 
+  it("rejects a pre-pipeline abort without emitting an unhandled source error", () => {
+    const objectStoragePath = join(process.cwd(), "apps/api/src/lib/object-storage.ts");
+    const tsxPath = join(process.cwd(), "apps/api/node_modules/.bin/tsx");
+    const childScript = `
+      import { PassThrough } from "node:stream";
+      import { putObjectStream } from ${JSON.stringify(objectStoragePath)};
+
+      void (async () => {
+        const source = new PassThrough();
+        const controller = new AbortController();
+        const observed = putObjectStream(
+          ${JSON.stringify(`outputs/${abortSetupJobId}/target.bin`)},
+          source,
+          { signal: controller.signal },
+        ).then(
+          () => ({ resolved: true }),
+          (error) => ({ error }),
+        );
+        source.write(Buffer.from("partial"));
+        await new Promise((resolve) => setImmediate(resolve));
+        controller.abort();
+        const result = await observed;
+        if (!("error" in result) || result.error?.name !== "AbortError") {
+          process.exitCode = 2;
+          return;
+        }
+        process.stdout.write("clean-abort");
+      })();
+    `;
+
+    const result = spawnSync(tsxPath, ["--eval", childScript], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, MAX_WORKSPACE_SIZE_GB: "0" },
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("clean-abort");
+  });
+
+  it("does not expose an in-flight object or its staging file through listing", async () => {
+    const inFlightKey = `outputs/${visibilityJobId}/target.bin`;
+    let releaseSource!: () => void;
+    const sourceReleased = new Promise<void>((resolve) => {
+      releaseSource = resolve;
+    });
+    let markFirstChunkConsumed!: () => void;
+    const firstChunkConsumed = new Promise<void>((resolve) => {
+      markFirstChunkConsumed = resolve;
+    });
+    const source = Readable.from(
+      (async function* () {
+        yield Buffer.from("partial");
+        markFirstChunkConsumed();
+        await sourceReleased;
+        yield Buffer.from(" complete");
+      })(),
+    );
+    const pendingWrite = putObjectStream(inFlightKey, source);
+
+    let duringWrite: Awaited<ReturnType<typeof listObjects>> = [];
+    try {
+      await firstChunkConsumed;
+      duringWrite = await listObjects(`outputs/${visibilityJobId}`);
+    } finally {
+      releaseSource();
+    }
+    await expect(pendingWrite).resolves.toBe(16);
+
+    expect(duringWrite).toEqual([]);
+    await expect(listObjects(`outputs/${visibilityJobId}`)).resolves.toMatchObject([
+      { key: inFlightKey, size: 16 },
+    ]);
+  });
+
   it("does not leave an object after a streaming source fails", async () => {
     let orphaned = false;
     for (let i = 0; i < 500; i += 1) {
-      const failedKey = `outputs/stream-failure-${process.pid}/${i}.bin`;
+      const failedKey = `outputs/${failureJobId}/${i}.bin`;
       const source = Readable.from(
         (async function* () {
           yield Buffer.from("partial");
@@ -107,6 +202,135 @@ describe("object-storage (local backend)", () => {
     }
 
     expect(orphaned).toBe(false);
+  });
+
+  it("preserves a committed object and removes staging after a source failure", async () => {
+    const destinationKey = `outputs/${semanticsJobId}/source-failure.bin`;
+    await putObject(destinationKey, Buffer.from("committed"));
+    const source = Readable.from(
+      (async function* () {
+        yield Buffer.from("partial");
+        throw Object.assign(new Error("disk quota exhausted"), { code: "EDQUOT" });
+      })(),
+    );
+
+    await expect(putObjectStream(destinationKey, source)).rejects.toMatchObject({
+      code: "EDQUOT",
+      statusCode: 503,
+    });
+
+    await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("committed"));
+    expect(jobEntries(semanticsJobId)).toEqual(["source-failure.bin"]);
+  });
+
+  it("preserves a committed object and removes staging after maxBytes rejection", async () => {
+    const destinationKey = `outputs/${semanticsJobId}/too-large.bin`;
+    await putObject(destinationKey, Buffer.from("committed"));
+
+    await expect(
+      putObjectStream(destinationKey, Readable.from([Buffer.alloc(16, 1)]), { maxBytes: 8 }),
+    ).rejects.toMatchObject({ statusCode: 413 });
+
+    await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("committed"));
+    expect(jobEntries(semanticsJobId)).toEqual(["source-failure.bin", "too-large.bin"]);
+  });
+
+  it("preserves a committed object and removes staging after an in-flight abort", async () => {
+    const destinationKey = `outputs/${semanticsJobId}/aborted.bin`;
+    await putObject(destinationKey, Buffer.from("committed"));
+    const controller = new AbortController();
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const aborted = new Promise<void>((resolve) => {
+      controller.signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    const source = Readable.from(
+      (async function* () {
+        yield Buffer.from("partial");
+        markStarted();
+        await aborted;
+      })(),
+    );
+    const pendingWrite = putObjectStream(destinationKey, source, { signal: controller.signal });
+    await started;
+    controller.abort();
+
+    await expect(pendingWrite).rejects.toMatchObject({ name: "AbortError" });
+    await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("committed"));
+    expect(jobEntries(semanticsJobId)).toEqual([
+      "aborted.bin",
+      "source-failure.bin",
+      "too-large.bin",
+    ]);
+  });
+
+  it("keeps the committed object visible until success atomically replaces it", async () => {
+    const destinationKey = `outputs/${semanticsJobId}/replacement.bin`;
+    await putObject(destinationKey, Buffer.from("committed"));
+    let releaseSource!: () => void;
+    const sourceReleased = new Promise<void>((resolve) => {
+      releaseSource = resolve;
+    });
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const source = Readable.from(
+      (async function* () {
+        yield Buffer.from("fresh ");
+        markStarted();
+        await sourceReleased;
+        yield Buffer.from("bytes");
+      })(),
+    );
+    const pendingWrite = putObjectStream(destinationKey, source);
+
+    await started;
+    await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("committed"));
+    const listedKeys = (await listObjects(`outputs/${semanticsJobId}`)).map((object) => object.key);
+    expect(listedKeys.some((listedKey) => listedKey.includes(".partial"))).toBe(false);
+    releaseSource();
+
+    await expect(pendingWrite).resolves.toBe(11);
+    await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("fresh bytes"));
+    expect(jobEntries(semanticsJobId)).toEqual([
+      "aborted.bin",
+      "replacement.bin",
+      "source-failure.bin",
+      "too-large.bin",
+    ]);
+  });
+
+  it("does not delete an unowned object staging file after an exclusive-create collision", async () => {
+    const collisionId = "00000000-0000-4000-8000-000000000000";
+    const destinationKey = `outputs/${collisionJobId}/target.bin`;
+    const stagingDir = join(env.WORKSPACE_PATH, "outputs", collisionJobId, ".snapotter-staging");
+    const stagingPath = join(stagingDir, `target.bin.${collisionId}.partial`);
+    await putObject(destinationKey, Buffer.from("committed"));
+    await mkdir(stagingDir, { recursive: true });
+    await writeFile(stagingPath, Buffer.from("owned by another writer"));
+    vi.resetModules();
+    vi.doMock("node:crypto", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:crypto")>();
+      return { ...actual, randomUUID: () => collisionId };
+    });
+
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(
+        isolatedStorage.putObjectStream(destinationKey, Readable.from([Buffer.from("fresh")])),
+      ).rejects.toMatchObject({ code: "EEXIST" });
+      expect(readFileSync(stagingPath).toString()).toBe("owned by another writer");
+      await expect(isolatedStorage.getObjectBuffer(destinationKey)).resolves.toEqual(
+        Buffer.from("committed"),
+      );
+    } finally {
+      vi.doUnmock("node:crypto");
+      vi.resetModules();
+      await deletePrefix(`outputs/${collisionJobId}`).catch(() => {});
+    }
   });
 
   it("streams an object to a file without exceeding the hard byte cap", async () => {
@@ -202,6 +426,30 @@ describe("object-storage (local backend)", () => {
       copyReadableToFile(Readable.from([Buffer.alloc(16, 1)]), destination, { maxBytes: 8 }),
     ).rejects.toMatchObject({ statusCode: 413 });
     expect(existsSync(destination)).toBe(false);
+  });
+
+  it("does not delete an unowned copy staging file after an exclusive-create collision", async () => {
+    const collisionId = "00000000-0000-4000-8000-000000000001";
+    const destination = join(copyDir, "copy-collision.bin");
+    const stagingPath = `${destination}.${collisionId}.partial`;
+    writeFileSync(stagingPath, "owned by another copy");
+    vi.resetModules();
+    vi.doMock("node:crypto", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:crypto")>();
+      return { ...actual, randomUUID: () => collisionId };
+    });
+
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(
+        isolatedStorage.copyReadableToFile(Readable.from([Buffer.from("fresh")]), destination),
+      ).rejects.toMatchObject({ code: "EEXIST" });
+      expect(readFileSync(stagingPath).toString()).toBe("owned by another copy");
+    } finally {
+      vi.doUnmock("node:crypto");
+      vi.resetModules();
+      rmSync(stagingPath, { force: true });
+    }
   });
 });
 
