@@ -123,7 +123,8 @@
       "uuid": ">=11.1.1",
       "yaml": ">=2.8.3",
       "dompurify": ">=3.4.11",
-      "nanoid@4": ">=5.0.9"
+      "nanoid@4": ">=5.0.9",
+      "find-my-way": "9.7.0"
     },
     "patchedDependencies": {
       "gray-matter@4.0.3": "patches/gray-matter@4.0.3.patch"
