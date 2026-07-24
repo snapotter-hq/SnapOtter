@@ -113,7 +113,7 @@
       "postcss": ">=8.5.10",
       "vite": ">=6.4.2",
       "esbuild": ">=0.28.1",
-      "@babel/core": ">=7.29.6",
+      "@babel/core": "^7.29.6",
       "@opentelemetry/core": ">=2.8.0",
       "js-yaml": "^4.2.0",
       "qs": ">=6.15.2",
