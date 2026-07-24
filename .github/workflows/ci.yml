@@ -95,6 +95,8 @@ jobs:
       - run: pnpm lint
       - name: License boundary check (D15)
         run: pnpm check:license-boundary
+      - name: Production dependency license and notices check
+        run: pnpm check:production-licenses
 
   typecheck:
     name: Typecheck
