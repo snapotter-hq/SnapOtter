@@ -24,6 +24,11 @@ const samlMock = vi.hoisted(() => ({
   generateServiceProviderMetadata: vi.fn(),
 }));
 const mfaOutcomeMock = vi.hoisted(() => vi.fn(() => "proceed"));
+// A controllable handle for getMfaPolicy so a single test can make the MFA
+// policy lookup reject and drive saml.ts's `catch { /* MFA plugin not loaded */ }`
+// branch (the whole MFA block is best-effort: a policy-lookup failure must fall
+// back to "proceed", not fail the login).
+const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 vi.mock("@node-saml/node-saml", () => ({
   ValidateInResponseTo: { ifPresent: "ifPresent", always: "always", never: "never" },
@@ -38,7 +43,7 @@ vi.mock("../../../apps/api/src/plugins/mfa.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    getMfaPolicy: vi.fn().mockResolvedValue({}),
+    getMfaPolicy: (...a: unknown[]) => getMfaPolicyMock(...a),
     resolveExternalLoginMfaOutcome: (...a: unknown[]) => mfaOutcomeMock(...a),
   };
 });
@@ -217,5 +222,109 @@ describe("SAML callback", () => {
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/login?error=mfa_enrollment_required");
     mfaOutcomeMock.mockReturnValue("proceed");
+  });
+
+  it("redirects to a distinct error when the user limit is reached", async () => {
+    // Drive the REAL external-auth resolver into its user_limit_reached branch
+    // (autoCreate on, MAX_USERS exceeded by the accounts other tests already
+    // seeded) so saml.ts maps deniedReason -> `saml_user_limit_reached` rather
+    // than the generic `saml_user_not_authorized`. A brand-new nameID/email
+    // guarantees the resolver misses both the externalId match and the
+    // auto-link-by-email step and falls through to the auto-create limit check.
+    const origMaxUsers = (env as Record<string, unknown>).MAX_USERS;
+    (env as Record<string, unknown>).MAX_USERS = 1;
+    try {
+      const email = `overlimit-${randomUUID().slice(0, 8)}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+      mfaOutcomeMock.mockReturnValue("proceed");
+
+      const res = await postCallback();
+
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe("/login?error=saml_user_limit_reached");
+
+      // The limit was enforced: no user was created for this assertion.
+      const [created] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, email));
+      expect(created).toBeUndefined();
+    } finally {
+      (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
+    }
+  });
+
+  it("fails the login closed when the MFA enrollment-status read throws", async () => {
+    // The users read that decides whether MFA is checked is intentionally
+    // unguarded in saml.ts: a DB error there must fail the login, never
+    // silently skip MFA for an enrolled user. Spy only the totpEnabled select
+    // (the same shape saml.ts issues) so provisioning/session selects still hit
+    // the real DB. Mirrors the OIDC-callback fail-closed test.
+    const email = `dberr-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValue("proceed");
+
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "totpEnabled" in selection) {
+        throw new Error("simulated DB failure");
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+
+    try {
+      const res = await postCallback();
+
+      // Must NOT proceed to a session and must NOT issue an MFA challenge:
+      // a broken enrollment-status read means the login fails, full stop.
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+      const setCookie = res.headers["set-cookie"];
+      expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+
+      // No session row was minted for the resolved user.
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.externalId, email));
+      expect(user).toBeDefined();
+      const sessions = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, user?.id as string));
+      expect(sessions.length).toBe(0);
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  it("still logs in when the MFA policy lookup fails (best-effort MFA block)", async () => {
+    // saml.ts wraps the getMfaPolicy/resolveExternalLoginMfaOutcome lookup in a
+    // try/catch that swallows failures and leaves the outcome at "proceed" (the
+    // MFA plugin may not be loaded). Make the policy lookup reject once and
+    // confirm the login still completes: session created, redirect to `/`.
+    const email = `mfaerr-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    getMfaPolicyMock.mockRejectedValueOnce(new Error("mfa policy store unavailable"));
+
+    try {
+      const res = await postCallback();
+
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe("/");
+      const setCookie = res.headers["set-cookie"];
+      const cookieStr = Array.isArray(setCookie) ? setCookie.join("; ") : setCookie || "";
+      expect(cookieStr).toContain("snapotter-session=");
+
+      // A real session was still created despite the MFA lookup throwing.
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.externalId, email));
+      expect(user).toBeDefined();
+      const sessions = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, user?.id as string));
+      expect(sessions.length).toBeGreaterThan(0);
+    } finally {
+      getMfaPolicyMock.mockResolvedValue({});
+    }
   });
 });

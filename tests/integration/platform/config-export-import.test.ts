@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -207,6 +208,48 @@ describe("config export with enterprise license", () => {
             .where(eq(schema.settings.key, key));
         }
       }
+    }
+  });
+
+  it("exports custom roles with their permissions but omits built-in roles", async () => {
+    const suffix = Date.now().toString(36);
+    const roleName = `config-export-role-${suffix}`;
+    const roleId = randomUUID();
+    const permissions = ["settings:read", "audit:read"];
+    const toolPermissions = { mode: "tool", allowed: ["compress-image"] };
+
+    try {
+      await db.insert(schema.roles).values({
+        id: roleId,
+        name: roleName,
+        description: "exported custom role",
+        permissions,
+        toolPermissions,
+        isBuiltin: false,
+      });
+
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${licensedToken}` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = JSON.parse(res.body);
+
+      const exportedRoles = (body.roles ?? []) as Array<Record<string, unknown>>;
+      const exported = exportedRoles.find((role) => role.name === roleName);
+      expect(exported).toBeDefined();
+      expect(exported?.description).toBe("exported custom role");
+      expect(exported?.permissions).toEqual(permissions);
+      expect(exported?.toolPermissions).toEqual(toolPermissions);
+
+      // Built-in roles must never leak into the export.
+      const builtinNames = exportedRoles.map((role) => role.name);
+      expect(builtinNames).not.toContain("admin");
+      expect(builtinNames).not.toContain("user");
+      expect(builtinNames).not.toContain("editor");
+    } finally {
+      await db.delete(schema.roles).where(eq(schema.roles.id, roleId));
     }
   });
 
@@ -896,6 +939,186 @@ describe("config import with enterprise license", () => {
       .where(eq(schema.settings.key, settingKey));
     expect(row).toBeDefined();
     expect(row.value).toBe(settingValue);
+  });
+
+  it("rejects two aliased setting keys that collapse to the same storage key", async () => {
+    // passwordRequireNumber has storageKey "passwordRequireDigit"; importing both
+    // in one payload must be rejected as a same-import duplicate, not silently merged.
+    const originalRows = await db.select().from(schema.settings);
+    const keys = ["passwordRequireDigit", "passwordRequireNumber"];
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+    await db
+      .insert(schema.settings)
+      .values({ key: "passwordRequireDigit", value: "true" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { passwordRequireDigit: "false", passwordRequireNumber: "false" },
+          },
+        },
+      });
+
+      expect.soft(res.statusCode, res.body).toBe(400);
+      const body = JSON.parse(res.body);
+      expect.soft(body.code).toBe("VALIDATION_ERROR");
+      expect.soft(body.error).toContain("duplicates");
+
+      // The rejected import must not have mutated the seeded digit value.
+      const [digit] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "passwordRequireDigit"));
+      expect(digit?.value).toBe("true");
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .update(schema.settings)
+            .set({ value: original })
+            .where(eq(schema.settings.key, key));
+        }
+      }
+    }
+  });
+
+  it("applies settings, roles, and teams, both updating existing rows and inserting new ones", async () => {
+    const suffix = Date.now().toString(36);
+    const updateSettingKey = "defaultToolView";
+    const insertSettingKey = "defaultLocale";
+    const updateRoleName = `cfg-upd-${suffix}`;
+    const insertRoleName = `cfg-ins-${suffix}`;
+    const updateTeamName = `Config Apply Update Team ${suffix}`;
+    const insertTeamName = `Config Apply Insert Team ${suffix}`;
+    const updateRoleId = randomUUID();
+    const updateTeamId = randomUUID();
+
+    // Seed the pre-existing rows the apply path should UPDATE (not INSERT).
+    await db
+      .insert(schema.settings)
+      .values({ key: updateSettingKey, value: "sidebar" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "sidebar" } });
+    await db
+      .insert(schema.settings)
+      .values({ key: insertSettingKey, value: "en" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "en" } });
+    await db.insert(schema.roles).values({
+      id: updateRoleId,
+      name: updateRoleName,
+      description: "before",
+      permissions: ["settings:read"],
+      toolPermissions: null,
+      isBuiltin: false,
+    });
+    await db.insert(schema.teams).values({
+      id: updateTeamId,
+      name: updateTeamName,
+      storageQuota: 100,
+      retentionHours: 24,
+    });
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { [updateSettingKey]: "fullscreen", [insertSettingKey]: "de" },
+            roles: [
+              {
+                name: updateRoleName,
+                description: "after",
+                permissions: ["settings:read", "audit:read"],
+                toolPermissions: { mode: "category", allowed: ["image"] },
+              },
+              { name: insertRoleName, permissions: ["files:own"] },
+            ],
+            teams: [
+              { name: updateTeamName, storageQuota: 200, retentionHours: 48 },
+              { name: insertTeamName, storageQuota: 500 },
+            ],
+          },
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.applied).toBe(true);
+      expect(body.changes).toEqual({ settings: 2, roles: 2, teams: 2 });
+
+      // Settings: one updated, one updated-from-existing (both existed, so both update).
+      const [updatedSetting] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, updateSettingKey));
+      const [otherSetting] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, insertSettingKey));
+      expect(updatedSetting?.value).toBe("fullscreen");
+      expect(otherSetting?.value).toBe("de");
+
+      // Role UPDATE branch: same id, new description/permissions/toolPermissions.
+      const [updatedRole] = await db
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.name, updateRoleName));
+      expect(updatedRole?.id).toBe(updateRoleId);
+      expect(updatedRole?.description).toBe("after");
+      expect(updatedRole?.permissions).toEqual(["settings:read", "audit:read"]);
+      expect(updatedRole?.toolPermissions).toEqual({ mode: "category", allowed: ["image"] });
+      expect(updatedRole?.isBuiltin).toBe(false);
+
+      // Role INSERT branch: brand-new custom role.
+      const [insertedRole] = await db
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.name, insertRoleName));
+      expect(insertedRole).toBeDefined();
+      expect(insertedRole?.permissions).toEqual(["files:own"]);
+      expect(insertedRole?.description).toBe("");
+      expect(insertedRole?.toolPermissions).toBeNull();
+      expect(insertedRole?.isBuiltin).toBe(false);
+
+      // Team UPDATE branch: same id, new quotas.
+      const [updatedTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, updateTeamName));
+      expect(updatedTeam?.id).toBe(updateTeamId);
+      expect(updatedTeam?.storageQuota).toBe(200);
+      expect(updatedTeam?.retentionHours).toBe(48);
+
+      // Team INSERT branch: brand-new team, unspecified retentionHours defaults to null.
+      const [insertedTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, insertTeamName));
+      expect(insertedTeam).toBeDefined();
+      expect(insertedTeam?.storageQuota).toBe(500);
+      expect(insertedTeam?.retentionHours).toBeNull();
+    } finally {
+      await db.delete(schema.roles).where(eq(schema.roles.name, updateRoleName));
+      await db.delete(schema.roles).where(eq(schema.roles.name, insertRoleName));
+      await db.delete(schema.teams).where(eq(schema.teams.name, updateTeamName));
+      await db.delete(schema.teams).where(eq(schema.teams.name, insertTeamName));
+      await db.delete(schema.settings).where(eq(schema.settings.key, insertSettingKey));
+    }
   });
 });
 

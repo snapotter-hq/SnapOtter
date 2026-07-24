@@ -223,3 +223,78 @@ describe("API key delete behavior", () => {
     expect(afterRes.statusCode).toBe(401);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auth-middleware API-key resolution branches
+// ═══════════════════════════════════════════════════════════════════════════
+describe("API key auth middleware", () => {
+  it("resolves a legacy key with no keyPrefix via full scan and backfills the prefix", async () => {
+    const createRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: "legacy-key" },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const { id: keyId, key: rawKey } = JSON.parse(createRes.body);
+
+    // Emulate a pre-prefix (1.x) key by clearing the stored prefix. The next
+    // auth then misses the prefix index and hits the bounded full-scan fallback.
+    await db.update(schema.apiKeys).set({ keyPrefix: null }).where(eq(schema.apiKeys.id, keyId));
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${rawKey}` },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // The middleware backfills the prefix so the next lookup is O(1).
+    const [row] = await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.id, keyId));
+    expect(row.keyPrefix).toBeTruthy();
+    expect(row.keyPrefix).toHaveLength(16);
+
+    // A follow-up request now succeeds through the fast prefix path.
+    const again = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${rawKey}` },
+    });
+    expect(again.statusCode).toBe(200);
+  });
+
+  it("rejects an API key whose owning user has been disabled", async () => {
+    const owner = await createUserAndLogin({ role: "user" });
+
+    const createRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { name: "disabled-owner-key" },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const rawKey = JSON.parse(createRes.body).key;
+
+    // Key works while the owner is active.
+    const before = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${rawKey}` },
+    });
+    expect(before.statusCode).toBe(200);
+
+    // Disable the owner: the middleware matches the key but must refuse a
+    // disabled principal, falling through to a 401.
+    await db
+      .update(schema.users)
+      .set({ role: "disabled:user" })
+      .where(eq(schema.users.id, owner.id));
+
+    const after = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${rawKey}` },
+    });
+    expect(after.statusCode).toBe(401);
+  });
+});
