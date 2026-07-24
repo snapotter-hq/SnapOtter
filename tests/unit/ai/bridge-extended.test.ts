@@ -1134,6 +1134,36 @@ describe("bridge - per-request ENOENT retry with non-ENOENT fallback error", () 
 
     await expect(promise).rejects.toThrow("Permission denied");
   });
+
+  it("ignores the missing venv child's close after the python3 fallback starts", async () => {
+    const mockDisp = createMockProcess();
+    const mockVenv = createMockProcess();
+    const mockFallback = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      if (callCount === 2) return mockVenv.process;
+      return mockFallback.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    const dispatcherError = new Error("ENOENT") as NodeJS.ErrnoException;
+    dispatcherError.code = "ENOENT";
+    mockDisp.emitEvent("error", dispatcherError);
+
+    const venvError = new Error("ENOENT") as NodeJS.ErrnoException;
+    venvError.code = "ENOENT";
+    mockVenv.emitEvent("error", venvError);
+    mockVenv.emitEvent("close", -2, null);
+
+    mockFallback.stdout.emit("data", Buffer.from('{"ok":true}\n'));
+    mockFallback.emitEvent("close", 0, null);
+
+    await expect(promise).resolves.toEqual({ stdout: '{"ok":true}', stderr: "" });
+  });
 });
 
 // ── Dispatcher error event rejects pending with extractPythonError ──

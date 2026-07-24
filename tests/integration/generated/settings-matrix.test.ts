@@ -5,6 +5,7 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
 } from "../../helpers/generated-case-accounting.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
@@ -1157,12 +1158,29 @@ describe("settings variation matrix", () => {
   }, 10_000);
 
   for (const [toolId, variations] of Object.entries(SETTINGS_VARIATIONS)) {
+    const runnableVariations = variations.filter(
+      ({ settings }) => !findMissingGeneratedPythonPrerequisite(toolId, settings),
+    );
+    if (runnableVariations.length === 0) {
+      const missingPython = findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings);
+      if (missingPython) {
+        describe.skip(`${toolId} -- ${missingPython}`, () => {});
+        continue;
+      }
+    }
+
     describe.skipIf(AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES)(toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {
-        expectedAttempts: variations.length,
+        expectedAttempts: runnableVariations.length,
       });
 
       for (const { label, settings } of variations) {
+        const missingPython = findMissingGeneratedPythonPrerequisite(toolId, settings);
+        if (missingPython) {
+          it.skip(`${label} -- ${missingPython}`, () => {});
+          continue;
+        }
+
         it(label, async () => {
           const fixture = TOOL_FIXTURE[toolId];
           expect(fixture, `${toolId}: no canonical settings fixture`).toBeDefined();

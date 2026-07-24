@@ -10,6 +10,7 @@ import {
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
 import { pairwise } from "../../helpers/pairwise.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
@@ -71,6 +72,8 @@ describe("pairwise settings matrix", () => {
         expect(process.env.FULL_MATRIX, `core tool "${toolId}" is not registered`).toBeTruthy();
         return context.skip(`${toolId}: no standard tool config`);
       }
+      const missingPython = findMissingGeneratedPythonPrerequisite(toolId, undefined);
+      if (missingPython) return context.skip(`${toolId}: ${missingPython}`);
 
       const tool = TOOLS.find((candidate) => candidate.id === toolId);
       if (!tool) return context.skip(`${toolId}: missing shared tool metadata`);
@@ -100,6 +103,11 @@ describe("pairwise settings matrix", () => {
       });
       for (const parsed of cases) {
         accounting.attempt();
+        const missingCasePython = findMissingGeneratedPythonPrerequisite(toolId, parsed.data);
+        if (missingCasePython) {
+          accounting.skip("optional-feature", missingCasePython);
+          continue;
+        }
         try {
           const result = await config.process(input, parsed.data, fixture.filename);
           expect(

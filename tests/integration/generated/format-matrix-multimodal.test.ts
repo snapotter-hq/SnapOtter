@@ -12,6 +12,7 @@ import {
   generatedFixtureDirectories,
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
@@ -139,6 +140,15 @@ describe("multi-modality tool x format matrix", () => {
 
     if (effectiveFixtures.length === 0) {
       it.skip(`${toolId} -- no fixtures available`, () => {});
+      continue;
+    }
+
+    const missingPython = findMissingGeneratedPythonPrerequisite(
+      toolId,
+      defaultSettingsFor(toolId),
+    );
+    if (missingPython) {
+      it.skip(`${toolId} -- ${missingPython}`, () => {});
       continue;
     }
 

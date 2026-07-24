@@ -567,7 +567,9 @@ export class PythonDispatcher {
         : 600000);
 
     return new Promise((resolvePromise, rejectPromise) => {
+      let activeAttempt = 0;
       const trySpawn = (pythonBin: string, isFallback: boolean) => {
+        const attempt = ++activeAttempt;
         const proc = spawn(pythonBin, [scriptPath, ...args], {
           stdio: ["ignore", "pipe", "pipe"],
           env: this.buildEnv(),
@@ -579,6 +581,7 @@ export class PythonDispatcher {
         let timedOut = false;
 
         const timer = setTimeout(() => {
+          if (attempt !== activeAttempt) return;
           timedOut = true;
           proc.kill("SIGTERM");
         }, timeout);
@@ -611,6 +614,7 @@ export class PythonDispatcher {
 
         proc.on("error", (err: NodeJS.ErrnoException) => {
           clearTimeout(timer);
+          if (attempt !== activeAttempt) return;
           if (err.code === "ENOENT" && !isFallback) {
             trySpawn("python3", true);
           } else {
@@ -625,6 +629,7 @@ export class PythonDispatcher {
 
         proc.on("close", (code, signal) => {
           clearTimeout(timer);
+          if (attempt !== activeAttempt) return;
 
           if (stderrBuffer.trim()) {
             stderrLines.push(stderrBuffer.trim());

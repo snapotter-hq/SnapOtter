@@ -12,6 +12,7 @@ import {
   generatedFixtureDirectories,
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { collectRegexStringSchemas } from "../../helpers/zod-pict.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -54,6 +55,8 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       }
       const config = getToolConfig(toolId);
       if (!config) return context.skip(`${toolId}: no standard tool config`);
+      const missingPython = findMissingGeneratedPythonPrerequisite(toolId, undefined);
+      if (missingPython) return context.skip(`${toolId}: ${missingPython}`);
 
       const fixture = selectFixturesForTool(FIXTURE_INDEX, tool)[0];
       if (!fixture) return context.skip(`${toolId}: no compatible generated fixture`);
@@ -89,6 +92,11 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
             const parsed = config.settingsSchema.safeParse(settings);
             fc.pre(parsed.success);
             accounting.attempt();
+            const missingCasePython = findMissingGeneratedPythonPrerequisite(toolId, parsed.data);
+            if (missingCasePython) {
+              accounting.skip("optional-feature", missingCasePython);
+              return;
+            }
             try {
               const result = await config.process(input, parsed.data, fixture.filename);
               expect(
