@@ -21,7 +21,7 @@ function appendEnvPath(base: string, suffix: string): string {
  * package resolution, and locale -- avoids leaking secrets or
  * application config from the parent process.
  */
-function buildMinimalEnv(): Record<string, string> {
+export function buildMinimalEnv(): Record<string, string> {
   const env: Record<string, string> = {
     PYTHONUNBUFFERED: "1",
     LANG: process.env.LANG || "C.UTF-8",
@@ -54,17 +54,13 @@ function buildMinimalEnv(): Record<string, string> {
   env.DATA_DIR ??= "./data";
   env.MODELS_PATH ??= appendEnvPath(env.DATA_DIR, "ai/models");
 
-  // Runtime model downloads are allowed by default (public model weights
-  // only, never user data). SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict
-  // offline mode for airgapped deployments: the sidecar then gets the
-  // Hugging Face offline flags and every download fallback raises an
-  // actionable error instead of fetching. Bundle installs stay exempt
-  // because install_feature.py lifts the flags in its own process.
-  const allowModelDownload = process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD;
-  if (allowModelDownload !== undefined) {
-    env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = allowModelDownload;
-  }
-  if (allowModelDownload === "0" || allowModelDownload?.toLowerCase() === "false") {
+  // Runtime downloads require an explicit opt-in. Feature bundle installs are
+  // unaffected: install_feature.py intentionally lifts Hugging Face's offline
+  // flags in its own process while it installs the signed bundle.
+  const allowModelDownload = process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD?.toLowerCase();
+  const modelDownloadsEnabled = allowModelDownload === "1" || allowModelDownload === "true";
+  env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = modelDownloadsEnabled ? "1" : "0";
+  if (!modelDownloadsEnabled) {
     env.HF_HUB_OFFLINE = "1";
     env.TRANSFORMERS_OFFLINE = "1";
   }

@@ -46,42 +46,50 @@
         {
           "id": "rembg-u2net",
           "downloadFn": "rembg_session",
-          "args": ["u2net"]
+          "args": ["u2net"],
+          "sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491"
         },
         {
           "id": "rembg-isnet-general-use",
           "downloadFn": "rembg_session",
-          "args": ["isnet-general-use"]
+          "args": ["isnet-general-use"],
+          "sha256": "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a"
         },
         {
           "id": "rembg-bria-rmbg",
           "downloadFn": "rembg_session",
-          "args": ["bria-rmbg"]
+          "args": ["bria-rmbg"],
+          "sha256": "5b486f08200f513f460da46dd701db5fbb47d79b4be4b708a19444bcd4e79958"
         },
         {
           "id": "rembg-birefnet-general-lite",
           "downloadFn": "rembg_session",
-          "args": ["birefnet-general-lite"]
+          "args": ["birefnet-general-lite"],
+          "sha256": "5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333"
         },
         {
           "id": "rembg-birefnet-portrait",
           "downloadFn": "rembg_session",
-          "args": ["birefnet-portrait"]
+          "args": ["birefnet-portrait"],
+          "sha256": "1ba1c8ff5a7bbfadc8d8d13fb11d7be793f91f23d9d466549e37a854f6668f99"
         },
         {
           "id": "rembg-birefnet-general",
           "downloadFn": "rembg_session",
-          "args": ["birefnet-general"]
+          "args": ["birefnet-general"],
+          "sha256": "58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c"
         },
         {
           "id": "rembg-birefnet-matting",
           "downloadFn": "rembg_session",
-          "args": ["birefnet-matting"]
+          "args": ["birefnet-matting"],
+          "sha256": "6065d27c615ea27308f5b88598dd8db116eb07436c7a323ca40d13b2866c309e"
         },
         {
           "id": "rembg-birefnet-hr-matting",
           "downloadFn": "rembg_session",
-          "args": ["birefnet-hr-matting"]
+          "args": ["birefnet-hr-matting"],
+          "sha256": "45b7d92ce0e2e75e1c8a564a9e84c87ac9da7f4315d2deeef3674864e809aef3"
         }
       ],
       "smokeImports": ["rembg", "onnxruntime"],
@@ -123,12 +131,14 @@
         {
           "id": "mediapipe-face-detector",
           "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite",
+          "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
           "path": "mediapipe/blaze_face_short_range.tflite",
           "minSize": 100000
         },
         {
           "id": "mediapipe-face-landmarker",
           "url": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+          "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
           "path": "mediapipe/face_landmarker.task",
           "minSize": 1000000
         }
@@ -166,6 +176,7 @@
           "id": "lama-onnx",
           "downloadFn": "hf_snapshot",
           "args": ["Carve/LaMa-ONNX", "lama"],
+          "revision": "c3c0c9e468934d62e79c329e35d82dd09ff8c444",
           "file": "lama_fp32.onnx",
           "path": "lama/lama_fp32.onnx",
           "minSize": 100000000
@@ -174,6 +185,7 @@
           "id": "ddcolor-onnx",
           "downloadFn": "hf_snapshot",
           "args": ["facefusion/models-3.0.0", "ddcolor"],
+          "revision": "728b9659bd9691bf32cbf7f61af478d94b7ba81e",
           "file": "ddcolor.onnx",
           "path": "ddcolor/ddcolor.onnx",
           "minSize": 50000000
@@ -181,6 +193,7 @@
         {
           "id": "opencv-colorize-prototxt",
           "url": "https://raw.githubusercontent.com/richzhang/colorization/caffe/colorization/models/colorization_deploy_v2.prototxt",
+          "sha256": "d16418cef8df4ccd703a55ae0ef3960861d5010418f77c90d0a47689998a7169",
           "path": "colorize-opencv/colorization_deploy_v2.prototxt",
           "minSize": 0
         },
@@ -188,6 +201,7 @@
           "id": "opencv-colorize-caffemodel",
           "downloadFn": "hf_snapshot",
           "args": ["BilalSardar/Black-N-White-To-Color", "colorize-opencv"],
+          "revision": "41c04215906bbd3d8e2a09c07b3e76f42f0cd65e",
           "file": "colorization_release_v2.caffemodel",
           "path": "colorize-opencv/colorization_release_v2.caffemodel",
           "minSize": 100000000,
@@ -196,6 +210,7 @@
         {
           "id": "opencv-colorize-points",
           "url": "https://raw.githubusercontent.com/richzhang/colorization/caffe/colorization/resources/pts_in_hull.npy",
+          "sha256": "b5dec01315c34f43f1c8c089e84c45ae35d1838d8e77ed0e7ca930f79ffa450e",
           "path": "colorize-opencv/pts_in_hull.npy",
           "minSize": 0
         }
@@ -243,6 +258,7 @@
           "id": "sd15-inpainting",
           "downloadFn": "hf_snapshot",
           "args": ["stable-diffusion-v1-5/stable-diffusion-inpainting", "sd15-inpainting"],
+          "revision": "8a4288a76071f7280aedbdb3253bdb9e9d5d84bb",
           "allowPatterns": ["*.json", "*.txt", "tokenizer/*", "*.fp16.safetensors"],
           "path": "sd15-inpainting/unet/diffusion_pytorch_model.fp16.safetensors",
           "minSize": 1000000000
@@ -300,24 +316,28 @@
         {
           "id": "realesrgan-x4plus",
           "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+          "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
           "path": "realesrgan/RealESRGAN_x4plus.pth",
           "minSize": 60000000
         },
         {
           "id": "realesrgan-x2plus",
           "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+          "sha256": "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb",
           "path": "realesrgan/RealESRGAN_x2plus.pth",
           "minSize": 60000000
         },
         {
           "id": "gfpgan-v1.3",
           "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
+          "sha256": "c953a88f2727c85c3d9ae72e2bd4846bbaf59fe6972ad94130e23e7017524a70",
           "path": "gfpgan/GFPGANv1.3.pth",
           "minSize": 300000000
         },
         {
           "id": "codeformer-pth",
           "url": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
+          "sha256": "1009e537e0c2a07d4cabce6355f53cb66767cd4b4297ec7a4a64ca4b8a5684b7",
           "path": "codeformer/codeformer.pth",
           "minSize": 350000000
         },
@@ -325,6 +345,7 @@
           "id": "codeformer-onnx",
           "downloadFn": "hf_snapshot",
           "args": ["facefusion/models-3.0.0", "codeformer"],
+          "revision": "728b9659bd9691bf32cbf7f61af478d94b7ba81e",
           "file": "codeformer.onnx",
           "path": "codeformer/codeformer.onnx",
           "minSize": 100000000
@@ -332,18 +353,21 @@
         {
           "id": "facexlib-detection",
           "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+          "sha256": "6d1de9c2944f2ccddca5f5e010ea5ae64a39845a86311af6fdf30841b0a5a16d",
           "path": "gfpgan/facelib/detection_Resnet50_Final.pth",
           "minSize": 100000000
         },
         {
           "id": "facexlib-parsing",
           "url": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+          "sha256": "3d558d8d0e42c20224f13cf5a29c79eba2d59913419f945545d8cf7b72920de2",
           "path": "gfpgan/facelib/parsing_parsenet.pth",
           "minSize": 80000000
         },
         {
           "id": "scunet-color-real",
           "url": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
+          "sha256": "fa78899ba2caec9d235a900e91d96c689da71c42029230c2028b00f09f809c2e",
           "path": "scunet/scunet_color_real_psnr.pth",
           "minSize": 3000000
         },
@@ -351,6 +375,7 @@
           "id": "nafnet-sidd",
           "downloadFn": "hf_snapshot",
           "args": ["mikestealth/nafnet-models", "nafnet"],
+          "revision": "cd3a91ddc41c9c3a53ee809b3ddd5263c9e94e51",
           "file": "NAFNet-SIDD-width64.pth",
           "path": "nafnet/NAFNet-SIDD-width64.pth",
           "minSize": 60000000
@@ -413,6 +438,7 @@
           "id": "lama-onnx",
           "downloadFn": "hf_snapshot",
           "args": ["Carve/LaMa-ONNX", "lama"],
+          "revision": "c3c0c9e468934d62e79c329e35d82dd09ff8c444",
           "file": "lama_fp32.onnx",
           "path": "lama/lama_fp32.onnx",
           "minSize": 100000000
@@ -421,6 +447,7 @@
           "id": "codeformer-onnx",
           "downloadFn": "hf_snapshot",
           "args": ["facefusion/models-3.0.0", "codeformer"],
+          "revision": "728b9659bd9691bf32cbf7f61af478d94b7ba81e",
           "file": "codeformer.onnx",
           "path": "codeformer/codeformer.onnx",
           "minSize": 100000000
@@ -428,36 +455,42 @@
         {
           "id": "realesrgan-x4plus",
           "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+          "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
           "path": "realesrgan/RealESRGAN_x4plus.pth",
           "minSize": 60000000
         },
         {
           "id": "facexlib-detection",
           "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+          "sha256": "6d1de9c2944f2ccddca5f5e010ea5ae64a39845a86311af6fdf30841b0a5a16d",
           "path": "gfpgan/facelib/detection_Resnet50_Final.pth",
           "minSize": 100000000
         },
         {
           "id": "facexlib-parsing",
           "url": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+          "sha256": "3d558d8d0e42c20224f13cf5a29c79eba2d59913419f945545d8cf7b72920de2",
           "path": "gfpgan/facelib/parsing_parsenet.pth",
           "minSize": 80000000
         },
         {
           "id": "mediapipe-face-detector",
           "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite",
+          "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
           "path": "mediapipe/blaze_face_short_range.tflite",
           "minSize": 100000
         },
         {
           "id": "mediapipe-face-landmarker",
           "url": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+          "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
           "path": "mediapipe/face_landmarker.task",
           "minSize": 1000000
         },
         {
           "id": "scunet-color-real",
           "url": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
+          "sha256": "fa78899ba2caec9d235a900e91d96c689da71c42029230c2028b00f09f809c2e",
           "path": "scunet/scunet_color_real_psnr.pth",
           "minSize": 3000000
         }
@@ -537,7 +570,8 @@
         {
           "id": "faster-whisper-small",
           "downloadFn": "hf_snapshot",
-          "args": ["Systran/faster-whisper-small", "faster-whisper-small"]
+          "args": ["Systran/faster-whisper-small", "faster-whisper-small"],
+          "revision": "536b0662742c02347bc0e980a01041f333bce120"
         }
       ],
       "smokeImports": ["faster_whisper", "ctranslate2"],

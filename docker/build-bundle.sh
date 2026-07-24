@@ -287,7 +287,7 @@ PYONNX
 # ── Step 5: Download models ──────────────────────────────────────────────
 echo "=== Downloading models ==="
 python3 << 'PYMODELS'
-import json, os, sys, urllib.request, pathlib
+import hashlib, hmac, json, os, re, sys, urllib.request
 
 with open("/app/docker/feature-manifest.json") as f:
     manifest = json.load(f)
@@ -308,21 +308,51 @@ if not models:
 
 print(f"  Downloading {len(models)} model(s)")
 
+SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+REVISION_RE = re.compile(r"^[a-f0-9]{40}$")
+
+
+def verify_sha256(path, expected, model_id):
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if hmac.compare_digest(actual, expected):
+        return
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    raise RuntimeError(
+        f"{model_id} SHA-256 mismatch: expected {expected}, got {actual}"
+    )
+
+
+def verify_min_size(path, min_size, model_id):
+    size = os.path.getsize(path)
+    if min_size and size < min_size:
+        raise RuntimeError(
+            f"{model_id} is {size:,} bytes, expected at least {min_size:,}"
+        )
+    return size
+
 for model in models:
     model_id = model["id"]
     download_fn = model.get("downloadFn")
     url = model.get("url")
+    expected_sha256 = model.get("sha256")
 
     if url:
+        if not isinstance(expected_sha256, str) or not SHA256_RE.fullmatch(expected_sha256):
+            raise RuntimeError(f"{model_id} must declare a lowercase SHA-256 digest")
         # Direct URL download via urllib
         dest = os.path.join(models_dir, model["path"])
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         print(f"  [{model_id}] URL -> {model['path']}", flush=True)
         urllib.request.urlretrieve(url, dest)
-        size = os.path.getsize(dest)
-        min_size = model.get("minSize", 0)
-        if min_size and size < min_size:
-            print(f"  WARNING: {model_id} is {size:,} bytes, expected >= {min_size:,}", file=sys.stderr)
+        size = verify_min_size(dest, model.get("minSize", 0), model_id)
+        verify_sha256(dest, expected_sha256, model_id)
         print(f"  [{model_id}] Done ({size:,} bytes)")
 
     elif download_fn == "hf_snapshot":
@@ -330,8 +360,12 @@ for model in models:
         args = model["args"]
         repo_id = args[0]
         local_dir = os.path.join(models_dir, args[1])
+        revision = model.get("revision")
+        if not isinstance(revision, str) or not REVISION_RE.fullmatch(revision):
+            raise RuntimeError(f"{model_id} must pin a 40-character Hugging Face commit")
 
         kwargs = {"repo_id": repo_id, "local_dir": local_dir}
+        kwargs["revision"] = revision
 
         # Restrict the snapshot when specified. "file" pins one file (single-file
         # models like an ONNX weight); "allowPatterns" narrows a multi-file model
@@ -348,11 +382,21 @@ for model in models:
 
         print(f"  [{model_id}] HF snapshot: {repo_id} -> {args[1]}", flush=True)
         snapshot_download(**kwargs)
+        expected_path = model.get("path")
+        if expected_path:
+            verify_min_size(
+                os.path.join(models_dir, expected_path),
+                model.get("minSize", 0),
+                model_id,
+            )
         print(f"  [{model_id}] Done")
 
     elif download_fn == "rembg_session":
+        if not isinstance(expected_sha256, str) or not SHA256_RE.fullmatch(expected_sha256):
+            raise RuntimeError(f"{model_id} must declare a lowercase SHA-256 digest")
         args = model["args"]
         session_name = args[0]
+        dest = os.path.join(rembg_home, f"{session_name}.onnx")
         print(f"  [{model_id}] rembg session: {session_name}", flush=True)
 
         # birefnet-matting and birefnet-hr-matting are custom sessions
@@ -365,21 +409,20 @@ for model in models:
             "birefnet-hr-matting": "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_HR-matting-epoch_135.onnx",
         }
         if session_name in CUSTOM_BIREFNET:
-            dest = os.path.join(models_dir, "rembg", f"{session_name}.onnx")
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             print(f"  [{model_id}] Custom BiRefNet -> rembg/{session_name}.onnx", flush=True)
             urllib.request.urlretrieve(CUSTOM_BIREFNET[session_name], dest)
-            size = os.path.getsize(dest)
-            print(f"  [{model_id}] Done ({size:,} bytes)")
         else:
             from rembg import new_session
             # Force CPU-only provider: onnxruntime-gpu segfaults trying to load
             # TensorRT libs that aren't present in build containers (no GPU).
             new_session(session_name, providers=["CPUExecutionProvider"])
-            print(f"  [{model_id}] Done")
+        size = os.path.getsize(dest)
+        verify_sha256(dest, expected_sha256, model_id)
+        print(f"  [{model_id}] Done ({size:,} bytes)")
 
     else:
-        print(f"  WARNING: Unknown download method for {model_id}", file=sys.stderr)
+        raise RuntimeError(f"Unknown download method for {model_id}")
 
 print("  Model downloads complete")
 PYMODELS

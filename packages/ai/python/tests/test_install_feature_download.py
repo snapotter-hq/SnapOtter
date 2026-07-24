@@ -13,6 +13,26 @@ def load_installer():
     return module
 
 
+def test_main_temporarily_lifts_hugging_face_offline_flags(monkeypatch):
+    """An explicit bundle install stays online while runtime remains fail-closed."""
+    installer = load_installer()
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    observed = {}
+
+    def fake_install():
+        observed["hf"] = os.environ["HF_HUB_OFFLINE"]
+        observed["transformers"] = os.environ["TRANSFORMERS_OFFLINE"]
+
+    monkeypatch.setattr(installer, "_install", fake_install)
+
+    installer.main()
+
+    assert observed == {"hf": "0", "transformers": "0"}
+    assert os.environ["HF_HUB_OFFLINE"] == "1"
+    assert os.environ["TRANSFORMERS_OFFLINE"] == "1"
+
+
 def test_download_with_hf_hub_uses_accelerated_client(monkeypatch, tmp_path):
     installer = load_installer()
     downloaded = tmp_path / "hf-cache" / "bundle.tar.gz"

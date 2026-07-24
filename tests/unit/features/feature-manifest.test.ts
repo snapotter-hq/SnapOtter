@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 const manifestPath = join(import.meta.dirname, "../../../docker/feature-manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 const bundles = manifest.bundles;
+const bundleBuilder = readFileSync(
+  join(import.meta.dirname, "../../../docker/build-bundle.sh"),
+  "utf-8",
+);
 
 function getAllPackages(bundleId: string): string[] {
   const bundle = bundles[bundleId];
@@ -341,5 +345,63 @@ describe("Manifest v2 archive fields", () => {
         ).toContain(`v${version}/`);
       }
     }
+  });
+});
+
+describe("Feature bundle model provenance", () => {
+  const modelEntries = Object.entries<{
+    models?: Array<{
+      id: string;
+      url?: string;
+      downloadFn?: string;
+      revision?: string;
+      sha256?: string;
+    }>;
+  }>(bundles).flatMap(([bundleId, bundle]) =>
+    (bundle.models ?? []).map((model) => ({ bundleId, ...model })),
+  );
+
+  it("binds every direct and rembg model to an exact SHA-256 digest", () => {
+    for (const model of modelEntries) {
+      if (!model.url && model.downloadFn !== "rembg_session") continue;
+      expect(
+        model.sha256,
+        `${model.bundleId}/${model.id} must declare its authoritative SHA-256`,
+      ).toMatch(/^[a-f0-9]{64}$/);
+    }
+  });
+
+  it("pins every Hugging Face snapshot to an immutable commit revision", () => {
+    for (const model of modelEntries) {
+      if (model.downloadFn !== "hf_snapshot") continue;
+      expect(
+        model.revision,
+        `${model.bundleId}/${model.id} must pin a Hugging Face commit`,
+      ).toMatch(/^[a-f0-9]{40}$/);
+    }
+  });
+
+  it("keeps duplicate model provenance identical between bundles", () => {
+    const provenance = new Map<string, string>();
+    for (const model of modelEntries) {
+      const value = JSON.stringify({
+        url: model.url,
+        downloadFn: model.downloadFn,
+        revision: model.revision,
+        sha256: model.sha256,
+      });
+      const existing = provenance.get(model.id);
+      if (existing) expect(value, `${model.id} provenance drifted between bundles`).toBe(existing);
+      else provenance.set(model.id, value);
+    }
+  });
+
+  it("makes bundle model acquisition fail closed", () => {
+    expect(bundleBuilder).toContain("def verify_sha256(path, expected, model_id):");
+    expect(bundleBuilder).toContain('expected_sha256 = model.get("sha256")');
+    expect(bundleBuilder).toContain('kwargs["revision"] = revision');
+    expect(bundleBuilder).toContain("raise RuntimeError(");
+    expect(bundleBuilder).toContain("verify_sha256(dest, expected_sha256, model_id)");
+    expect(bundleBuilder).not.toContain("WARNING: {model_id} is {size:,} bytes");
   });
 });

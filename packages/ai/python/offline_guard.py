@@ -1,37 +1,31 @@
-"""Gate for runtime model downloads, with an optional strict offline mode.
+"""Gate runtime model downloads behind an explicit opt-in.
 
 Models normally arrive through user-initiated feature bundle installs
 (install_feature.py), and the resolvers in the AI scripts always prefer those
-bundled files. When a model is missing, scripts may fetch the public model
-weights as a fallback so tools work out of the box; that fallback only ever
-downloads public model files, never user data.
-
-Setting SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 enables strict offline mode for
-airgapped or locked-down deployments: every script calls
-ensure_download_allowed() immediately before any download fallback, so a
-missing file then surfaces as an actionable error instead of an outbound
-fetch.
+bundled files. If a model is missing, the runtime fails closed instead of
+fetching mutable content. Operators may explicitly opt into public model
+fallback downloads with SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1.
 """
 import os
 
 
 def downloads_allowed():
-    """True unless strict offline mode is explicitly enabled.
+    """Return True only when runtime downloads are explicitly enabled.
 
-    Runtime model downloads are allowed by default; only an explicit
-    SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0 (or "false") blocks them.
+    Unknown values remain fail-closed to avoid enabling network access through
+    a typo or an inherited environment setting.
     """
-    return os.environ.get("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", "1").lower() not in ("0", "false")
+    return os.environ.get("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", "0").lower() in ("1", "true")
 
 
 def ensure_download_allowed(what):
-    """Raise a clear, actionable error when strict offline mode blocks a fetch."""
+    """Raise a clear, actionable error when runtime downloads are disabled."""
     if downloads_allowed():
         return
     raise RuntimeError(
-        f"{what} is missing and automatic downloads are disabled by "
-        "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0. Reinstall the feature bundle from "
-        "Settings, or unset SNAPOTTER_ALLOW_MODEL_DOWNLOAD to permit downloads."
+        f"{what} is missing and automatic downloads are disabled. Reinstall "
+        "the feature bundle from Settings, or explicitly set "
+        "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 to permit runtime downloads."
     )
 
 

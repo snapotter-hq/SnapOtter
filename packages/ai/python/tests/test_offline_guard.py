@@ -13,19 +13,19 @@ import offline_guard  # noqa: E402
 # --- downloads_allowed ------------------------------------------------------
 
 
-def test_downloads_allowed_default_true(monkeypatch):
+def test_downloads_blocked_by_default(monkeypatch):
     monkeypatch.delenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", raising=False)
-    assert offline_guard.downloads_allowed() is True
+    assert offline_guard.downloads_allowed() is False
 
 
-@pytest.mark.parametrize("value", ["0", "false", "FALSE", "False"])
-def test_downloads_blocked_by_explicit_off(monkeypatch, value):
+@pytest.mark.parametrize("value", ["0", "false", "FALSE", "False", "yes", "anything"])
+def test_downloads_blocked_without_explicit_opt_in(monkeypatch, value):
     monkeypatch.setenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", value)
     assert offline_guard.downloads_allowed() is False
 
 
-@pytest.mark.parametrize("value", ["1", "true", "yes", "anything"])
-def test_downloads_allowed_for_non_off_values(monkeypatch, value):
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "True"])
+def test_downloads_allowed_for_explicit_opt_in(monkeypatch, value):
     monkeypatch.setenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", value)
     assert offline_guard.downloads_allowed() is True
 
@@ -33,9 +33,16 @@ def test_downloads_allowed_for_non_off_values(monkeypatch, value):
 # --- ensure_download_allowed ------------------------------------------------
 
 
-def test_ensure_noop_when_allowed(monkeypatch):
-    monkeypatch.delenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", raising=False)
+def test_ensure_noop_when_explicitly_allowed(monkeypatch):
+    monkeypatch.setenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", "1")
     assert offline_guard.ensure_download_allowed("thing") is None
+
+
+def test_ensure_raises_actionable_error_by_default(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", raising=False)
+    with pytest.raises(RuntimeError) as exc:
+        offline_guard.ensure_download_allowed("MyModel weight")
+    assert "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1" in str(exc.value)
 
 
 def test_ensure_raises_actionable_error_when_blocked(monkeypatch):
