@@ -51,10 +51,11 @@ export function validateInventory(inventory, policy) {
 
 export function renderNotices(inventory) {
   const lines = [
-    "# Third-Party Production Dependency Notices",
+    "# Third-Party Production Node Dependency Notices",
     "",
     "This file is generated from the frozen pnpm production dependency graph.",
-    "Run `pnpm check:production-licenses -- --write-notices` after an intentional dependency change.",
+    "This inventory covers Node packages only; exact release artifacts publish separate full SBOMs.",
+    "Run `pnpm check:production-node-licenses -- --write-notices` after an intentional dependency change.",
     "Package authors retain all rights granted by their respective licenses.",
     "",
   ];
@@ -115,14 +116,14 @@ function main() {
 
   if (!existsSync(noticesPath) || readFileSync(noticesPath, "utf8") !== expectedNotices) {
     console.error(
-      "ERROR: THIRD_PARTY_NOTICES.md is stale; review the dependency change, then run pnpm check:production-licenses -- --write-notices",
+      "ERROR: THIRD_PARTY_NOTICES.md is stale; review the dependency change, then run pnpm check:production-node-licenses -- --write-notices",
     );
     process.exitCode = 1;
     return;
   }
   const packageCount = Object.values(inventory).reduce((sum, entries) => sum + entries.length, 0);
   console.log(
-    `Production license policy passed: ${packageCount} packages across ${Object.keys(inventory).length} expressions`,
+    `Production Node license policy passed: ${packageCount} packages across ${Object.keys(inventory).length} expressions`,
   );
 }
 

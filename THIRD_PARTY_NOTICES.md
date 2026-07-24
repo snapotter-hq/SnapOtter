@@ -1,7 +1,8 @@
-# Third-Party Production Dependency Notices
+# Third-Party Production Node Dependency Notices
 
 This file is generated from the frozen pnpm production dependency graph.
-Run `pnpm check:production-licenses -- --write-notices` after an intentional dependency change.
+This inventory covers Node packages only; exact release artifacts publish separate full SBOMs.
+Run `pnpm check:production-node-licenses -- --write-notices` after an intentional dependency change.
 Package authors retain all rights granted by their respective licenses.
 
 ## (Apache-2.0 AND MIT)

@@ -53,8 +53,8 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      - name: Verify production dependency licenses and notices
-        run: pnpm check:production-licenses
+      - name: Verify production Node dependency licenses and notices
+        run: pnpm check:production-node-licenses
 
       - name: Save release notes
         id: notes

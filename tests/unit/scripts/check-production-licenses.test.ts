@@ -27,7 +27,7 @@ async function loadChecker(): Promise<{
   return import(pathToFileURL(scriptPath).href);
 }
 
-describe("production license policy", () => {
+describe("production Node dependency license policy", () => {
   it("rejects unknown and explicitly denied license expressions", async () => {
     const { validateInventory } = await loadChecker();
     const policy = { allowedExpressions: ["MIT"], deniedExpressions: ["BUSL-1.1"] };
@@ -78,7 +78,7 @@ describe("production license policy", () => {
     };
 
     const notices = renderNotices(inventory);
-    expect(notices).toContain("# Third-Party Production Dependency Notices");
+    expect(notices).toContain("# Third-Party Production Node Dependency Notices");
     expect(notices).toContain("## MIT");
     expect(notices.indexOf("a-package@1.0.0")).toBeLessThan(
       notices.indexOf("z-package@1.0.0,2.0.0"),
@@ -92,21 +92,24 @@ describe("production license policy", () => {
     expect(existsSync(noticesPath), "production third-party notices are missing").toBe(true);
 
     const packageJson = JSON.parse(readFileSync(path.resolve(root, "package.json"), "utf8"));
-    expect(packageJson.scripts["check:production-licenses"]).toBe(
+    expect(packageJson.scripts["check:production-node-licenses"]).toBe(
       "node scripts/check-production-licenses.mjs",
+    );
+    expect(packageJson.scripts["check:production-licenses"]).toContain(
+      "check:production-node-licenses",
     );
     expect(packageJson.pnpm.overrides["exceljs>unzipper"]).toBe("0.12.5");
 
     const ci = readFileSync(path.resolve(root, ".github/workflows/ci.yml"), "utf8");
     const release = readFileSync(path.resolve(root, ".github/workflows/release.yml"), "utf8");
-    expect(ci).toContain("pnpm check:production-licenses");
-    expect(release).toContain("pnpm check:production-licenses");
-    expect(release.indexOf("pnpm check:production-licenses")).toBeLessThan(
+    expect(ci).toContain("pnpm check:production-node-licenses");
+    expect(release).toContain("pnpm check:production-node-licenses");
+    expect(release.indexOf("pnpm check:production-node-licenses")).toBeLessThan(
       release.indexOf("Run semantic-release"),
     );
 
     expect(() =>
-      execFileSync("pnpm", ["check:production-licenses"], {
+      execFileSync("pnpm", ["check:production-node-licenses"], {
         cwd: root,
         encoding: "utf8",
         stdio: "pipe",
