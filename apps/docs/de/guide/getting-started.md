@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter mit Docker in einem einzigen Befehl installieren. Enthält Docker-Compose-Einrichtung, Bauen aus dem Quellcode und eine vollständige Funktionsübersicht."
-i18n_output_hash: 14356fc91e39
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 47cb2b512343
+i18n_hash_version: 2
 ---
 
 # Erste Schritte {#getting-started}
@@ -40,7 +41,7 @@ Fügen Sie `--gpus all` für NVIDIA CUDA-beschleunigte Hintergrundentfernung, Ho
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Erfordert das [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Fällt automatisch auf die CPU zurück, wenn CUDA nicht verfügbar ist. Intel/AMD-iGPU-Beschleunigung über VA-API, Quick Sync oder OpenCL wird für KI-Inferenz derzeit nicht unterstützt. Siehe [Docker-Tags](/de/guide/docker-tags) für Benchmarks.
+Erfordert das [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Fällt automatisch auf die CPU zurück, wenn CUDA nicht verfügbar ist. Die Intel/AMD iGPU-Beschleunigung über VA-API, Quick Sync oder OpenCL wird derzeit für KI-Inferenz nicht unterstützt. Benchmarks finden Sie unter [Docker-Tags](/de/guide/docker-tags). Wenn KI-Tools trotz `--gpus all` auf der CPU laufen, siehe [GPU-Beschleunigung überprüfen](/de/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Auch auf GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ändern Sie dies für nicht lokale Bereitstellungen
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalität | Anzahl | Beispiel-Tools |
 |----------|-------|---------------|
-| **Bild** | 105 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
+| **Bild** | 107 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
 | **Video** | 57 | Trimmen, zuschneiden, komprimieren, konvertieren, zusammenführen, Audio extrahieren, Auto-Untertitel, Video zu GIF, Größe ändern, stabilisieren, Format-Vorlagen |
 | **Audio** | 27 | Trimmen, zusammenführen, konvertieren, normalisieren, Rauschunterdrückung, transkribieren, Tonhöhenverschiebung, Ein-/Ausblenden, Klingelton-Ersteller, Format-Vorlagen |
 | **PDF / Dokument** | 42 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |

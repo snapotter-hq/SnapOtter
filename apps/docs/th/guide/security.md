@@ -1,8 +1,9 @@
 ---
 description: "คู่มือการเสริมความแข็งแกร่งด้านความปลอดภัยสำหรับ SnapOtter ความปลอดภัยของคอนเทนเนอร์ การแยกเครือข่าย Docker secrets การปรับใช้ Kubernetes และอาร์ทิแฟกต์ด้านการปฏิบัติตามข้อกำหนด"
-i18n_source_hash: 986f7658430c
+i18n_source_hash: 9d021c1ceb40
 i18n_provenance: human
-i18n_output_hash: 3c4f44580e5e
+i18n_output_hash: 67df4d15ca38
+i18n_hash_version: 2
 ---
 
 # Security & Hardening {#security-hardening}
@@ -75,13 +76,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # เปลี่ยนสิ่งนี้สำหรับการปรับใช้ที่ไม่ใช่ภายในเครื่อง
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

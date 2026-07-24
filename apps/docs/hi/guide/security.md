@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter के लिए सुरक्षा हार्डनिंग गाइड। कंटेनर सुरक्षा, नेटवर्क आइसोलेशन, Docker secrets, Kubernetes डिप्लॉयमेंट, और अनुपालन आर्टिफ़ैक्ट।"
-i18n_source_hash: 986f7658430c
+i18n_source_hash: 9d021c1ceb40
 i18n_provenance: human
-i18n_output_hash: cc08062b0496
+i18n_output_hash: 20693578a27d
+i18n_hash_version: 2
 ---
 
 # Security & Hardening {#security-hardening}
@@ -75,13 +76,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

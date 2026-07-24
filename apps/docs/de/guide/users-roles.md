@@ -1,8 +1,9 @@
 ---
 description: "Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 5794e14e4e84
+i18n_output_hash: d773a75e3981
+i18n_hash_version: 2
 ---
 
 # Benutzer, Rollen & Berechtigungen {#users-roles-permissions}
@@ -82,12 +83,12 @@ Alle 17 Berechtigungen. Volle Kontrolle über die Instanz.
 | `pipelines:all` | Pipelines aller Benutzer ansehen und verwalten |
 | `settings:read` | Instanzeinstellungen ansehen |
 | `settings:write` | Instanzeinstellungen ändern |
-| `users:manage` | Benutzerkonten erstellen, aktualisieren und löschen |
+| `users:manage` | Erstellen und verwalten Sie Benutzerkonten innerhalb der Autoritätsgrenzen des Akteurs |
 | `teams:manage` | Teams erstellen, aktualisieren und löschen |
 | `features:manage` | KI-Feature-Bundles installieren und verwalten |
 | `system:health` | Auf Health- und Readiness-Endpunkte zugreifen |
 | `audit:read` | Das Audit-Log ansehen und Rollen auflisten |
-| `compliance:manage` | DSGVO-Lebenszyklus und Compliance-Funktionen verwalten |
+| `compliance:manage` | Verwalten Sie den DSGVO-Lebenszyklus und die Compliance-Funktionen. Zerstörerische Benutzeroperationen bleiben autoritätsgebunden |
 | `webhooks:manage` | Ausgehende Webhooks konfigurieren |
 | `security:manage` | Sicherheitseinstellungen verwalten (IP-Zulassungsliste, SSO-Erzwingung) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Rollennamen müssen 2 bis 30 Zeichen lang sein, kleingeschrieben alphanumerisch mit Bindestrichen und Unterstrichen.
 
-### Für Administratoren reservierte Berechtigungen {#admin-reserved-permissions}
+### Delegierte Verwaltungsgrenzen {#delegated-administration-boundaries}
 
-Drei Berechtigungen sind für integrierte Rollen reserviert und können benutzerdefinierten Rollen nicht zugewiesen werden:
+Alle 17 Berechtigungen können über benutzerdefinierte Rollen delegiert werden, aber eine Administratorberechtigung macht diese Rolle nicht gleichwertig mit der integrierten `admin`-Rolle. Von `users:manage` autorisierte Benutzermutationen, von `compliance:manage` autorisierte destruktive Operationen und von `security:manage` autorisierte benutzerdefinierte Rollenverwaltung unterliegen den aktuellen Berechtigungen des Akteurs:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Integrierte Rollen folgen `admin` > `editor` > `user`; Benutzerdefinierte Rollen sind unterhalb der integrierten Rollen aufgeführt.
+- Die Berechtigungen des Ziels müssen in den **wirksamen** Berechtigungen des Akteurs enthalten sein. Ein bereichsbezogener API-Schlüssel kann daher keine Berechtigungen ausüben, die in seinem Bereich fehlen.
+- Der Tool-Zugriff einer Zielrolle muss durch den eigenen Tool-Zugriff des Akteurs begrenzt sein.
+- Ein deaktiviertes Konto wird mit seiner ursprünglichen Rolle verglichen, wenn diese Rolle als `disabled:<original-role>` aufgezeichnet ist.
+- Zum Löschen einer benutzerdefinierten Rolle ist außerdem die Berechtigung zum Zuweisen des integrierten `user`-Fallbacks erforderlich. deaktivierte Mitglieder bleiben als `disabled:user` deaktiviert.
 
-Die Rollen-API weist jede Anfrage ab, die diese Berechtigungen enthält. Nur die integrierte Rolle `admin` hat Zugriff darauf.
+Globale Anmeldeinformationen und Konfiguration sind strenger: Das Ausstellen oder Widerrufen des SCIM-Tokens und das Importieren der Instanzkonfiguration erfordern die integrierte `admin`-Rolle mit vollständiger effektiver Administratorberechtigung.
 
 ### Berechtigungen auf Werkzeugebene {#tool-level-permissions}
 

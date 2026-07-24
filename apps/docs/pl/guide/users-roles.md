@@ -1,8 +1,9 @@
 ---
 description: "Zarządzaj użytkownikami, wbudowanymi i niestandardowymi rolami, uprawnieniami, kluczami API, zespołami, sesjami i dziennikiem audytu w SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: a027a7b88d46
+i18n_output_hash: 0757cfbfa40d
+i18n_hash_version: 2
 ---
 
 # Użytkownicy, role i uprawnienia {#users-roles-permissions}
@@ -82,12 +83,12 @@ Wszystkie 17 uprawnień. Pełna kontrola nad instancją.
 | `pipelines:all` | Przeglądanie i zarządzanie potokami wszystkich użytkowników |
 | `settings:read` | Przeglądanie ustawień instancji |
 | `settings:write` | Modyfikowanie ustawień instancji |
-| `users:manage` | Tworzenie, aktualizowanie i usuwanie kont użytkowników |
+| `users:manage` | Twórz konta użytkowników i zarządzaj nimi w granicach uprawnień aktora |
 | `teams:manage` | Tworzenie, aktualizowanie i usuwanie zespołów |
 | `features:manage` | Instalowanie i zarządzanie pakietami funkcji AI |
 | `system:health` | Dostęp do punktów końcowych kondycji i gotowości |
 | `audit:read` | Przeglądanie dziennika audytu i listowanie ról |
-| `compliance:manage` | Zarządzanie cyklem życia RODO i funkcjami zgodności |
+| `compliance:manage` | Zarządzaj cyklem życia RODO i funkcjami zgodności; destrukcyjne działania użytkownika pozostają ograniczone uprawnieniami |
 | `webhooks:manage` | Konfigurowanie wychodzących webhooków |
 | `security:manage` | Zarządzanie ustawieniami bezpieczeństwa (lista dozwolonych adresów IP, wymuszanie SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Nazwy ról muszą mieć 2-30 znaków, składać się z małych liter i cyfr z myślnikami i podkreśleniami.
 
-### Uprawnienia zastrzeżone dla administratora {#admin-reserved-permissions}
+### Delegowane granice administracyjne {#delegated-administration-boundaries}
 
-Trzy uprawnienia są zastrzeżone dla wbudowanych ról i nie można ich przypisać rolom niestandardowym:
+Wszystkie 17 uprawnień można delegować za pośrednictwem ról niestandardowych, ale uprawnienie administracyjne nie czyni tej roli równoważną wbudowanej roli `admin`. Mutacje użytkowników autoryzowane przez `users:manage`, destrukcyjne operacje autoryzowane przez `compliance:manage` i niestandardowe zarządzanie rolami autoryzowane przez `security:manage` są ograniczone bieżącymi uprawnieniami aktora:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Wbudowane role podążają za `admin` > `editor` > `user`; role niestandardowe znajdują się poniżej ról wbudowanych.
+- Uprawnienia celu muszą być zawarte w **efektywnych** uprawnieniach aktora. Dlatego klucz API o ograniczonym zakresie nie może wykonywać uprawnień pominiętych w jego zakresie.
+- Dostęp do narzędzi roli docelowej musi być ograniczony dostępem do narzędzi aktora.
+- Wyłączone konto jest sprawdzane pod kątem jego pierwotnej roli, gdy ta rola jest rejestrowana jako `disabled:<original-role>`.
+- Usunięcie roli niestandardowej wymaga również uprawnień do przypisania wbudowanej funkcji zastępczej `user`; niepełnosprawni członkowie pozostają wyłączeni jako `disabled:user`.
 
-API ról odrzuca każde żądanie zawierające te uprawnienia. Dostęp do nich ma tylko wbudowana rola `admin`.
+Globalne dane uwierzytelniające i konfiguracja są bardziej rygorystyczne: wydawanie lub unieważnianie tokena SCIM oraz importowanie konfiguracji instancji wymagają wbudowanej roli `admin` z pełnymi skutecznymi uprawnieniami administratora.
 
 ### Uprawnienia na poziomie narzędzi {#tool-level-permissions}
 

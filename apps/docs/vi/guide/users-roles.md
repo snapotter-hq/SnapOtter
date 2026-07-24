@@ -1,8 +1,9 @@
 ---
 description: "Quản lý người dùng, vai trò tích hợp sẵn và tùy chỉnh, quyền, khóa API, nhóm, phiên và nhật ký kiểm toán trong SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: e8d2b2c5dd61
+i18n_output_hash: efe6a520c09f
+i18n_hash_version: 2
 ---
 
 # Người dùng, Vai trò & Quyền {#users-roles-permissions}
@@ -82,12 +83,12 @@ Cả 17 quyền. Toàn quyền kiểm soát phiên bản.
 | `pipelines:all` | Xem và quản lý pipeline của mọi người dùng |
 | `settings:read` | Xem cài đặt phiên bản |
 | `settings:write` | Sửa đổi cài đặt phiên bản |
-| `users:manage` | Tạo, cập nhật và xóa tài khoản người dùng |
+| `users:manage` | Tạo và quản lý tài khoản người dùng trong phạm vi quyền hạn của tác nhân |
 | `teams:manage` | Tạo, cập nhật và xóa nhóm |
 | `features:manage` | Cài đặt và quản lý các gói tính năng AI |
 | `system:health` | Truy cập các endpoint kiểm tra sức khỏe và sẵn sàng |
 | `audit:read` | Xem nhật ký kiểm toán và liệt kê vai trò |
-| `compliance:manage` | Quản lý vòng đời GDPR và các tính năng tuân thủ |
+| `compliance:manage` | Quản lý các tính năng tuân thủ và vòng đời GDPR; hoạt động phá hoại của người dùng vẫn bị giới hạn bởi thẩm quyền |
 | `webhooks:manage` | Cấu hình webhook đi ra |
 | `security:manage` | Quản lý cài đặt bảo mật (danh sách IP cho phép, ép buộc SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Tên vai trò phải dài 2-30 ký tự, chữ và số viết thường kèm dấu gạch nối và gạch dưới.
 
-### Các quyền dành riêng cho admin {#admin-reserved-permissions}
+### Ranh giới quản lý được ủy quyền {#delegated-administration-boundaries}
 
-Ba quyền được dành riêng cho các vai trò tích hợp sẵn và không thể được gán cho vai trò tùy chỉnh:
+Tất cả 17 quyền có thể được ủy quyền thông qua các vai trò tùy chỉnh, nhưng quyền quản trị không làm cho vai trò đó tương đương với vai trò `admin` tích hợp sẵn. Các đột biến người dùng được `users:manage` ủy quyền, các hoạt động phá hoại được `compliance:manage` ủy quyền và quản lý vai trò tùy chỉnh được `security:manage` ủy quyền đều bị giới hạn bởi quyền hạn hiện tại của tác nhân:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Các vai trò tích hợp theo `admin` > `editor` > `user`; vai trò tùy chỉnh nằm bên dưới vai trò tích hợp.
+- Các quyền của mục tiêu phải được bao gồm bởi các quyền **có hiệu lực** của tác nhân. Do đó, khóa API có phạm vi không thể thực hiện các quyền bị bỏ qua trong phạm vi của nó.
+- Quyền truy cập công cụ của vai trò mục tiêu phải được bao hàm bởi quyền truy cập công cụ của chính tác nhân.
+- Tài khoản bị vô hiệu hóa được kiểm tra dựa trên vai trò ban đầu khi vai trò đó được ghi là `disabled:<original-role>`.
+- Việc xóa vai trò tùy chỉnh cũng yêu cầu có quyền chỉ định dự phòng `user` tích hợp sẵn; thành viên bị khuyết tật vẫn bị vô hiệu hóa dưới dạng `disabled:user`.
 
-API vai trò từ chối bất kỳ yêu cầu nào chứa các quyền này. Chỉ vai trò `admin` tích hợp sẵn mới có quyền truy cập chúng.
+Thông tin xác thực và cấu hình toàn cầu chặt chẽ hơn: việc phát hành hoặc thu hồi mã thông báo SCIM và nhập cấu hình phiên bản yêu cầu vai trò `admin` tích hợp sẵn với toàn quyền quản trị hiệu quả.
 
 ### Quyền ở cấp công cụ {#tool-level-permissions}
 

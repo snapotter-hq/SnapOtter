@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter için güvenlik sıkılaştırma kılavuzu. Konteyner güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk yapıtları."
-i18n_source_hash: 986f7658430c
+i18n_source_hash: 9d021c1ceb40
 i18n_provenance: human
-i18n_output_hash: 06ae3b36d6e3
+i18n_output_hash: 26dc43e34a87
+i18n_hash_version: 2
 ---
 
 # Güvenlik ve Sıkılaştırma {#security-hardening}
@@ -75,13 +76,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

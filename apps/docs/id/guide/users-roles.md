@@ -1,8 +1,9 @@
 ---
 description: "Kelola pengguna, peran bawaan dan kustom, izin, kunci API, tim, sesi, dan log audit di SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 1ffa8126804f
+i18n_output_hash: a3c1ebf9d9e0
+i18n_hash_version: 2
 ---
 
 # Pengguna, Peran & Izin {#users-roles-permissions}
@@ -82,12 +83,12 @@ Semua 17 izin. Kontrol penuh atas instans.
 | `pipelines:all` | Melihat dan mengelola pipeline semua pengguna |
 | `settings:read` | Melihat pengaturan instans |
 | `settings:write` | Mengubah pengaturan instans |
-| `users:manage` | Membuat, memperbarui, dan menghapus akun pengguna |
+| `users:manage` | Membuat dan mengelola akun pengguna dalam batas otoritas aktor |
 | `teams:manage` | Membuat, memperbarui, dan menghapus tim |
 | `features:manage` | Menginstal dan mengelola bundel fitur AI |
 | `system:health` | Mengakses endpoint health dan readiness |
 | `audit:read` | Melihat log audit dan mendaftar peran |
-| `compliance:manage` | Mengelola siklus hidup GDPR dan fitur kepatuhan |
+| `compliance:manage` | Kelola siklus hidup GDPR dan fitur kepatuhan; operasi pengguna yang merusak tetap dibatasi oleh otoritas |
 | `webhooks:manage` | Mengonfigurasi webhook keluar |
 | `security:manage` | Mengelola pengaturan keamanan (daftar izin IP, penegakan SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Nama peran harus 2-30 karakter, alfanumerik huruf kecil dengan tanda hubung dan garis bawah.
 
-### Izin yang dicadangkan untuk admin {#admin-reserved-permissions}
+### Batasan administrasi yang didelegasikan {#delegated-administration-boundaries}
 
-Tiga izin dicadangkan untuk peran bawaan dan tidak dapat diberikan ke peran kustom:
+Ke-17 izin tersebut dapat didelegasikan melalui peran khusus, namun izin administratif tidak membuat peran tersebut setara dengan peran `admin` bawaan. Mutasi pengguna diotorisasi oleh `users:manage`, operasi destruktif diotorisasi oleh `compliance:manage`, dan manajemen peran khusus diotorisasi oleh `security:manage` dibatasi oleh otoritas aktor saat ini:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Peran bawaan mengikuti `admin` > `editor` > `user`; peran khusus berada di bawah peran bawaan.
+- Izin target harus terkandung dalam izin **efektif** aktor. Oleh karena itu, kunci API yang tercakup tidak dapat menggunakan izin yang dihilangkan dari cakupannya.
+- Akses alat peran target harus ditampung oleh akses alat milik aktor itu sendiri.
+- Akun yang dinonaktifkan diperiksa berdasarkan peran aslinya ketika peran tersebut dicatat sebagai `disabled:<original-role>`.
+- Menghapus peran khusus juga memerlukan otoritas untuk menetapkan fallback `user` bawaan; anggota yang dinonaktifkan tetap dinonaktifkan sebagai `disabled:user`.
 
-API peran menolak permintaan apa pun yang menyertakan izin-izin ini. Hanya peran `admin` bawaan yang memiliki akses ke izin-izin tersebut.
+Kredensial dan konfigurasi global lebih ketat: menerbitkan atau mencabut token SCIM dan mengimpor konfigurasi instans memerlukan peran `admin` bawaan dengan otoritas admin lengkap yang efektif.
 
 ### Izin tingkat alat {#tool-level-permissions}
 

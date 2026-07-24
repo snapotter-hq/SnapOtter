@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter Docker image टैग, GPU बेंचमार्क, वर्शन पिनिंग, और AMD64 तथा ARM64 के लिए मल्टी-प्लेटफ़ॉर्म समर्थन।"
-i18n_output_hash: 5b607c2591dd
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: 44c09e47365d
+i18n_hash_version: 2
 ---
 
 # Docker Image {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

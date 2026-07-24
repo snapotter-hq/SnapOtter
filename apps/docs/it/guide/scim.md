@@ -1,8 +1,9 @@
 ---
 description: "Configura il provisioning SCIM 2.0 per sincronizzare utenti e gruppi dal tuo provider di identità a SnapOtter. Copre Okta, Azure AD / Entra ID e integrazioni personalizzate."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 6322df68028d
+i18n_output_hash: d6bde5a4dbac
+i18n_hash_version: 2
 ---
 
 # Provisioning SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ Il provisioning SCIM richiede una licenza **enterprise** con la funzionalità `s
 
 - Un'istanza SnapOtter in esecuzione raggiungibile a un URL pubblico
 - Una chiave di licenza enterprise con la funzionalità `scim`
-- Accesso admin a SnapOtter (è richiesto il permesso `users:manage` per generare o revocare un token SCIM)
+- Un account SnapOtter `admin` integrato con il suo set di autorizzazioni completo ed efficace. Un ruolo personalizzato delegato o una chiave API di amministrazione priva di autorizzazioni di amministratore non può generare o revocare il token SCIM globale.
 - Accesso admin alle impostazioni di provisioning del tuo provider di identità
 
 ## Avvio rapido {#quick-start}
@@ -34,7 +35,7 @@ La risposta contiene il token. Salvalo subito; non può essere recuperato di nuo
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ Gli endpoint SCIM usano un token bearer dedicato, separato dalle sessioni utente
 
 ### Generare un token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` genera un nuovo token SCIM. Questo endpoint richiede una sessione valida con il permesso `users:manage`.
+`POST /api/v1/enterprise/scim/token` genera un nuovo token SCIM. Poiché il token può eseguire il provisioning e modificare gli utenti nell'istanza, questo endpoint richiede il ruolo `admin` integrato con il set completo di autorizzazioni di amministratore effettive. Mantenere `users:manage` in un ruolo personalizzato non è sufficiente.
 
 Il token viene restituito in chiaro esattamente una volta. SnapOtter memorizza solo un hash scrypt. Se perdi il token, revocalo e generane uno nuovo.
 
 È attivo un solo token SCIM alla volta. La generazione di un nuovo token sostituisce quello precedente.
 
+::: warning Riemissione del token dopo l'aggiornamento
+I token SCIM legacy senza versione vengono rifiutati. Dopo l'aggiornamento a una versione che emette token `so_scim_v2_...`, genera un nuovo token e aggiorna il tuo provider di identità prima di riprendere il provisioning.
+:::
+
 ### Revocare un token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` revoca il token SCIM corrente. Anche questo endpoint richiede `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` revoca l'attuale token SCIM. Ha gli stessi requisiti amministrativi integrati completi della generazione di token.
 
 ### Limitazione della frequenza {#rate-limiting}
 
@@ -279,7 +284,7 @@ La richiesta SCIM non includeva un header `Authorization: Bearer <token>`. Contr
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Il token non corrisponde all'hash memorizzato. Questo accade se il token è stato revocato e rigenerato. Aggiorna il token nelle impostazioni di provisioning del tuo IdP.
+Il token non ha un formato corretto, utilizza il formato ritirato senza versione o non corrisponde all'hash archiviato. Genera un token `so_scim_v2_...` corrente e aggiorna il token nelle impostazioni di provisioning del tuo IdP.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

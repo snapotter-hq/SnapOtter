@@ -1,8 +1,9 @@
 ---
 description: "Siapkan provisioning SCIM 2.0 untuk menyinkronkan pengguna dan grup dari penyedia identitas Anda ke SnapOtter. Mencakup Okta, Azure AD / Entra ID, dan integrasi kustom."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: a7f596c5fea9
+i18n_output_hash: a8677d4dd025
+i18n_hash_version: 2
 ---
 
 # Provisioning SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ Provisioning SCIM memerlukan lisensi **enterprise** dengan fitur `scim`. Fitur i
 
 - Sebuah instance SnapOtter yang berjalan dan dapat dijangkau melalui URL publik
 - Kunci lisensi enterprise dengan fitur `scim`
-- Akses admin ke SnapOtter (izin `users:manage` diperlukan untuk membuat atau mencabut token SCIM)
+- Akun SnapOtter `admin` bawaan dengan set izin efektif penuh. Peran khusus yang didelegasikan atau kunci API admin yang tidak memiliki izin admin tidak dapat membuat atau mencabut token SCIM global.
 - Akses admin ke pengaturan provisioning penyedia identitas Anda
 
 ## Mulai cepat {#quick-start}
@@ -34,7 +35,7 @@ Respons berisi token tersebut. Simpan segera; token tidak dapat diambil kembali.
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ Endpoint SCIM menggunakan Bearer token khusus, terpisah dari sesi pengguna dan A
 
 ### Membuat token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` membuat token SCIM baru. Endpoint ini memerlukan sesi valid dengan izin `users:manage`.
+`POST /api/v1/enterprise/scim/token` menghasilkan token SCIM baru. Karena token dapat menyediakan dan mengubah pengguna di seluruh instans, titik akhir ini memerlukan peran `admin` bawaan dengan kumpulan izin admin efektif yang lengkap. Memegang `users:manage` dalam peran khusus saja tidak cukup.
 
 Token dikembalikan dalam bentuk teks biasa tepat satu kali. SnapOtter hanya menyimpan hash scrypt. Jika Anda kehilangan token, cabut token tersebut dan buat yang baru.
 
 Hanya satu token SCIM yang aktif pada satu waktu. Membuat token baru akan menggantikan token sebelumnya.
 
+::: warning Penerbitan ulang token setelah peningkatan
+Token SCIM lama yang tidak berversi ditolak. Setelah meningkatkan ke rilis yang menerbitkan token `so_scim_v2_...`, buat token baru dan perbarui penyedia identitas Anda sebelum melanjutkan penyediaan.
+:::
+
 ### Mencabut token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` mencabut token SCIM saat ini. Endpoint ini juga memerlukan `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` mencabut token SCIM saat ini. Ini memiliki persyaratan admin bawaan yang sama dengan pembuatan token.
 
 ### Pembatasan laju {#rate-limiting}
 
@@ -279,7 +284,7 @@ Permintaan SCIM tidak menyertakan header `Authorization: Bearer <token>`. Periks
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token tidak cocok dengan hash yang tersimpan. Ini terjadi jika token dicabut dan dibuat ulang. Perbarui token di pengaturan provisioning IdP Anda.
+Format token salah, menggunakan format tidak berversi yang sudah tidak digunakan lagi, atau tidak cocok dengan hash yang disimpan. Hasilkan token `so_scim_v2_...` saat ini dan perbarui token di pengaturan penyediaan IdP Anda.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

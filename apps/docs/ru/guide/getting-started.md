@@ -1,8 +1,9 @@
 ---
 description: "Установите SnapOtter с помощью Docker одной командой. Включает настройку Docker Compose, сборку из исходников и полный обзор функций."
-i18n_output_hash: 92434430b233
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: fd51d5b4d939
+i18n_hash_version: 2
 ---
 
 # Начало работы {#getting-started}
@@ -40,7 +41,7 @@ SnapOtter по умолчанию включает анонимную проду
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Требует [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматически переходит на CPU, когда CUDA недоступна. Ускорение через iGPU Intel/AMD посредством VA-API, Quick Sync или OpenCL для ИИ-инференса сегодня не поддерживается. См. [Docker Tags](/ru/guide/docker-tags) для бенчмарков.
+Требуется [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматически переключается на процессор, когда CUDA недоступна. Ускорение Intel/AMD iGPU через VA-API, Quick Sync или OpenCL сегодня не поддерживается для вывода AI. См. [Docker Tags](/ru/guide/docker-tags) для ознакомления с тестами. Если инструменты ИИ работают на ЦП, несмотря на `--gpus all`, см. [Проверка ускорения графического процессора] (/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Также на GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Измените это для нелокальных развертываний.
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Модальность | Количество | Примеры инструментов |
 |----------|-------|---------------|
-| **Изображения** | 105 | Изменение размера, Обрезка, Сжатие, Конвертация, Удаление фона, Апскейл, OCR, Водяной знак, Коллаж, Раскрашивание, Инструменты GIF, пресеты форматов |
+| **Изображения** | 107 | Изменение размера, Обрезка, Сжатие, Конвертация, Удаление фона, Апскейл, OCR, Водяной знак, Коллаж, Раскрашивание, Инструменты GIF, пресеты форматов |
 | **Видео** | 57 | Обрезка, Кадрирование, Сжатие, Конвертация, Объединение, Извлечение аудио, Авто-субтитры, Видео в GIF, Изменение размера, Стабилизация, пресеты форматов |
 | **Аудио** | 27 | Обрезка, Объединение, Конвертация, Нормализация, Шумоподавление, Транскрипция, Сдвиг высоты тона, Затухание, Создание рингтона, пресеты форматов |
 | **PDF / Документы** | 42 | Объединение, Разделение, Сжатие, OCR, Водяной знак, Редактирование, Word в PDF, Excel в PDF, Поворот, Защита, Восстановление |

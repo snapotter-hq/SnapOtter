@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter Docker 이미지 태그, GPU 벤치마크, 버전 고정, AMD64 및 ARM64 멀티 플랫폼 지원."
-i18n_output_hash: 50cb8fc63997
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: a8e816e1ba1b
+i18n_hash_version: 2
 ---
 
 # Docker Image {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 로컬이 아닌 배포의 경우 이를 변경합니다.
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

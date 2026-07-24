@@ -1,7 +1,8 @@
 ---
-i18n_source_hash: f5de74aee1b9
+i18n_source_hash: 521c03a6416c
 i18n_provenance: machine
-i18n_output_hash: 4ad5655688ed
+i18n_output_hash: 7bd6ac68fdb5
+i18n_hash_version: 2
 ---
 # Resurssnåla installationer {#low-resource-setups}
 
@@ -59,7 +60,7 @@ services:
     image: postgres:17-alpine
     environment:
       - POSTGRES_USER=snapotter
-      - POSTGRES_PASSWORD=snapotter
+      - POSTGRES_PASSWORD=snapotter     # Ändra detta för icke-lokala distributioner
       - POSTGRES_DB=snapotter
     volumes:
       - ./postgres-data:/var/lib/postgresql/data

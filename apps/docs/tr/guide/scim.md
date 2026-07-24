@@ -1,8 +1,9 @@
 ---
 description: "Kullanıcıları ve grupları kimlik sağlayıcınızdan SnapOtter'a senkronize etmek için SCIM 2.0 sağlamayı kurun. Okta, Azure AD / Entra ID ve özel entegrasyonları kapsar."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: b966d13d06fc
+i18n_output_hash: 5a0157d3e079
+i18n_hash_version: 2
 ---
 
 # SCIM Sağlama {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM sağlaması, `scim` özelliğine sahip bir **enterprise** lisansı gerektir
 
 - Genel bir URL üzerinden erişilebilen, çalışan bir SnapOtter örneği
 - `scim` özelliğine sahip bir enterprise lisans anahtarı
-- SnapOtter'a admin erişimi (SCIM token oluşturmak veya iptal etmek için `users:manage` izni gerekir)
+- Tam etkili izin setine sahip yerleşik bir SnapOtter `admin` hesabı. Yetki verilen özel bir rol veya herhangi bir yönetici izninin eksik olduğu bir yönetici API anahtarı, genel SCIM belirtecini oluşturamaz veya iptal edemez.
 - Kimlik sağlayıcınızın sağlama ayarlarına admin erişimi
 
 ## Hızlı başlangıç {#quick-start}
@@ -34,7 +35,7 @@ Yanıt token'ı içerir. Hemen kaydedin; bir daha alınamaz.
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM uç noktaları, kullanıcı oturumlarından ve API anahtarlarından ayrı, 
 
 ### Token oluşturma {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` yeni bir SCIM token oluşturur. Bu uç nokta, `users:manage` iznine sahip geçerli bir oturum gerektirir.
+`POST /api/v1/enterprise/scim/token` yeni bir SCIM belirteci oluşturur. Belirteç, örnekteki kullanıcıların temel hazırlığını yapıp değiştirebildiğinden, bu uç nokta, tam etkin yönetici izin kümesiyle birlikte yerleşik `admin` rolünü gerektirir. `users:manage`'yi özel bir rolde tutmak yeterli değildir.
 
 Token düz metin olarak yalnızca bir kez döndürülür. SnapOtter yalnızca bir scrypt karması saklar. Token'ı kaybederseniz iptal edin ve yeni bir tane oluşturun.
 
 Aynı anda yalnızca bir SCIM token etkindir. Yeni bir token oluşturmak öncekinin yerini alır.
 
+::: warning Yükseltme sonrasında jetonun yeniden düzenlenmesi
+Eski sürümlenmemiş SCIM belirteçleri reddedilir. `so_scim_v2_...` belirteçleri veren bir sürüme yükselttikten sonra, yeni bir belirteç oluşturun ve tedariği sürdürmeye devam etmeden önce kimlik sağlayıcınızı güncelleyin.
+:::
+
 ### Token iptali {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` mevcut SCIM token'ını iptal eder. Bu uç nokta da `users:manage` gerektirir.
+`DELETE /api/v1/enterprise/scim/token`, mevcut SCIM belirtecini iptal eder. Belirteç oluşturmayla aynı tam yerleşik yönetici gereksinimine sahiptir.
 
 ### Hız sınırlama {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM isteği bir `Authorization: Bearer <token>` başlığı içermiyordu. IdP'n
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token, saklanan karmayla eşleşmiyor. Bu, token iptal edilip yeniden oluşturulduğunda olur. IdP'nizin sağlama ayarlarındaki token'ı güncelleyin.
+Belirteç hatalı biçimlendirilmiş, kullanımdan kaldırılmış sürümsüz biçimi kullanıyor veya depolanan karma ile eşleşmiyor. Geçerli bir `so_scim_v2_...` belirteci oluşturun ve belirteci IdP'nizin sağlama ayarlarınızda güncelleyin.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

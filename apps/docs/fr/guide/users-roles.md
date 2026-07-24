@@ -1,8 +1,9 @@
 ---
 description: "Gérez les utilisateurs, les rôles intégrés et personnalisés, les permissions, les clés API, les équipes, les sessions et le journal d'audit dans SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 0ef660e3c9b1
+i18n_output_hash: 500026917981
+i18n_hash_version: 2
 ---
 
 # Utilisateurs, rôles et permissions {#users-roles-permissions}
@@ -82,12 +83,12 @@ Les 17 permissions. Contrôle total sur l'instance.
 | `pipelines:all` | Consulter et gérer les pipelines de tous les utilisateurs |
 | `settings:read` | Consulter les paramètres de l'instance |
 | `settings:write` | Modifier les paramètres de l'instance |
-| `users:manage` | Créer, mettre à jour et supprimer des comptes utilisateur |
+| `users:manage` | Créer et gérer des comptes d'utilisateurs dans les limites d'autorité de l'acteur |
 | `teams:manage` | Créer, mettre à jour et supprimer des équipes |
 | `features:manage` | Installer et gérer les bundles de fonctionnalités IA |
 | `system:health` | Accéder aux points de terminaison de santé et de disponibilité |
 | `audit:read` | Consulter le journal d'audit et lister les rôles |
-| `compliance:manage` | Gérer le cycle de vie RGPD et les fonctionnalités de conformité |
+| `compliance:manage` | Gérer le cycle de vie et les fonctionnalités de conformité du RGPD ; les opérations destructrices des utilisateurs restent limitées à l’autorité |
 | `webhooks:manage` | Configurer les webhooks sortants |
 | `security:manage` | Gérer les paramètres de sécurité (liste d'autorisation d'IP, application du SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Les noms de rôle doivent comporter de 2 à 30 caractères, en minuscules alphanumériques avec des tirets et des traits de soulignement.
 
-### Permissions réservées aux administrateurs {#admin-reserved-permissions}
+### Limites de l'administration déléguée {#delegated-administration-boundaries}
 
-Trois permissions sont réservées aux rôles intégrés et ne peuvent pas être attribuées à des rôles personnalisés :
+Les 17 autorisations peuvent être déléguées via des rôles personnalisés, mais une autorisation administrative ne rend pas ce rôle équivalent au rôle `admin` intégré. Les mutations utilisateur autorisées par `users:manage`, les opérations destructrices autorisées par `compliance:manage` et la gestion des rôles personnalisés autorisées par `security:manage` sont limitées par l'autorité actuelle de l'acteur :
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Les rôles intégrés suivent `admin` > `editor` > `user` ; les rôles personnalisés se trouvent sous les rôles intégrés.
+- Les autorisations de la cible doivent être contenues dans les autorisations **efficaces** de l'acteur. Une clé API étendue ne peut donc pas exercer d'autorisations omises de sa portée.
+- L'accès aux outils d'un rôle cible doit être contenu par le propre accès aux outils de l'acteur.
+- Un compte désactivé est comparé à son rôle d'origine lorsque ce rôle est enregistré sous la forme `disabled:<original-role>`.
+- La suppression d'un rôle personnalisé nécessite également l'autorisation d'attribuer la solution de secours intégrée `user` ; les membres désactivés restent désactivés sous le nom `disabled:user`.
 
-L'API des rôles rejette toute requête qui inclut ces permissions. Seul le rôle intégré `admin` y a accès.
+Les informations d'identification et la configuration globales sont plus strictes : l'émission ou la révocation du jeton SCIM et l'importation de la configuration de l'instance nécessitent le rôle `admin` intégré avec une autorité d'administration effective complète.
 
 ### Permissions au niveau des outils {#tool-level-permissions}
 

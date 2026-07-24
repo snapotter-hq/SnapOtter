@@ -1,8 +1,9 @@
 ---
 description: "アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。"
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 0918605decee
+i18n_output_hash: ed7b44a3f0db
+i18n_hash_version: 2
 ---
 
 # SCIMプロビジョニング {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIMプロビジョニングには、`scim`機能を含む**エンタープラ�
 
 - 公開URLで到達可能な、稼働中のSnapOtterインスタンス
 - `scim`機能を含むエンタープライズライセンスキー
-- SnapOtterへの管理者アクセス(SCIMトークンの生成または失効には`users:manage`権限が必要)
+- 完全に有効な権限セットを備えた組み込み SnapOtter `admin` アカウント。委任されたカスタム ロールまたは管理者権限が不足している管理者 API キーは、グローバル SCIM トークンを生成または取り消すことができません。
 - アイデンティティプロバイダーのプロビジョニング設定への管理者アクセス
 
 ## クイックスタート {#quick-start}
@@ -34,7 +35,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIMエンドポイントは、ユーザーセッションやAPIキーとは別�
 
 ### トークンの生成 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token`は新しいSCIMトークンを生成します。このエンドポイントには`users:manage`権限を持つ有効なセッションが必要です。
+`POST /api/v1/enterprise/scim/token` は新しい SCIM トークンを生成します。トークンはインスタンス全体でユーザーをプロビジョニングおよび変更できるため、このエンドポイントには、完全な有効な管理者権限セットを持つ組み込みの `admin` ロールが必要です。 `users:manage` をカスタム ロールで保持するだけでは十分ではありません。
 
 トークンは平文で一度だけ返されます。SnapOtterはscryptハッシュのみを保存します。トークンを紛失した場合は、失効させて新しく生成してください。
 
 同時に有効なSCIMトークンは1つだけです。新しいトークンを生成すると、以前のものが置き換えられます。
 
+::: warning アップグレード後のトークン再発行
+従来のバージョン管理されていない SCIM トークンは拒否されます。 `so_scim_v2_...` トークンを発行するリリースにアップグレードした後、プロビジョニングを再開する前に、新しいトークンを生成し、アイデンティティ プロバイダーを更新します。
+:::
+
 ### トークンの失効 {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token`は現在のSCIMトークンを失効させます。このエンドポイントにも`users:manage`が必要です。
+`DELETE /api/v1/enterprise/scim/token` は、現在の SCIM トークンを取り消します。これには、トークン生成と同じ完全な組み込みの管理要件があります。
 
 ### レート制限 {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIMリクエストに`Authorization: Bearer <token>`ヘッダーが含まれて
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-トークンが保存されたハッシュと一致しません。トークンが失効して再生成された場合に発生します。IdPのプロビジョニング設定でトークンを更新してください。
+トークンの形式が不正であるか、廃止されたバージョン管理されていない形式を使用しているか、保存されているハッシュと一致しません。現在の `so_scim_v2_...` トークンを生成し、IdP のプロビジョニング設定でトークンを更新します。
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

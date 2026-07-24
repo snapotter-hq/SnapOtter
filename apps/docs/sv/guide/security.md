@@ -1,8 +1,9 @@
 ---
 description: "Guide för säkerhetshärdning för SnapOtter. Containersäkerhet, nätverksisolering, Docker-hemligheter, Kubernetes-distribution och efterlevnadsartefakter."
-i18n_source_hash: 986f7658430c
+i18n_source_hash: 9d021c1ceb40
 i18n_provenance: human
-i18n_output_hash: a8e16c353a09
+i18n_output_hash: 02458bd1339c
+i18n_hash_version: 2
 ---
 
 # Säkerhet och härdning {#security-hardening}
@@ -75,13 +76,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ändra detta för icke-lokala distributioner
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

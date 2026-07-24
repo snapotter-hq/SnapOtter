@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik, तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
-i18n_output_hash: 23f4f331a239
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 839d9fc77083
+i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-लॉग में CUDA डिटेक्शन की जाँच करें:
+### GPU त्वरण सत्यापित करें {#verify-gpu-acceleration}
+
+लॉग में CUDA पहचान की जाँच करें:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+यदि `--gpus all` और NVIDIA कंटेनर टूलकिट सही तरीके से सेट होने के बावजूद AI उपकरण CPU पर चलते हैं, तो **सेटिंग्स → AI फीचर्स** से प्रभावित बंडल (उदाहरण के लिए बैकग्राउंड रिमूवल) को फिर से इंस्टॉल करें। इंस्टॉलर ONNX रनटाइम के GPU बिल्ड को पुनर्स्थापित करता है, जिसे केवल CPU बिल्ड किसी अन्य बंडल (जैसे ट्रांसक्रिप्शन) द्वारा खींचा जाता है अन्यथा साझा AI वातावरण में छाया कर सकता है। यदि यूआई से पुनः इंस्टॉल करने से पुरानी छवि पर जीपीयू बहाल नहीं होता है, तो [अंक #490](https://github.com/snapotter-hq/SnapOtter/issues/490) में मैन्युअल मरम्मत देखें।
 
 ## Hardware Requirements {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter डिफ़ॉल्ट रूप से `TRUST_PROXY=true` सेट करता है ताकि रेट लिमिटिंग और लॉगिंग `X-Forwarded-For` हेडर से असली क्लाइंट IP का उपयोग करें।
 
+नीचे दी गई प्रत्येक प्रॉक्सी के लिए दो चीजें मायने रखती हैं: बड़े अनुरोध निकायों (अपलोड) की अनुमति दें, और प्रतिक्रियाओं को बफर न करें। एक प्रतिक्रिया-बफ़रिंग प्रॉक्सी SSE प्रगति को तोड़ देती है और, अधिक स्पष्ट रूप से, एक बड़ी फ़ाइल डाउनलोड को "शुरू लेकिन कभी ख़त्म नहीं" करती है, क्योंकि प्रॉक्सी इसे आगे बढ़ाने से पहले पूरी फ़ाइल को रखती है। SnapOtter डाउनलोड पर `X-Accel-Buffering: no` भेजता है इसलिए nginx उन्हें स्ट्रीम करता है, भले ही बफ़रिंग कहीं और छोड़ दी गई हो, लेकिन nginx के अलावा अन्य प्रॉक्सी को प्रतिक्रिया बफ़रिंग को स्पष्ट रूप से अक्षम करने की आवश्यकता होती है (नीचे प्रत्येक कॉन्फ़िगरेशन में दिखाया गया है)। यदि कोई डाउनलोड आंशिक रूप से रुक जाता है, तो सामने एक बफ़रिंग प्रॉक्सी जांचने वाली पहली चीज़ है।
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # बफ़रिंग के बजाय स्ट्रीम प्रतिक्रियाएँ: SSE प्रगति (बैच, AI, फ़ीचर इंस्टॉल) और बड़ी फ़ाइल डाउनलोड के लिए आवश्यक।
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` रिस्पॉन्स बफ़रिंग को अक्षम करता है, जो SSE प्रगति इवेंट (बैच प्रोसेसिंग, AI टूल, फ़ीचर इंस्टॉल) के लिए आवश्यक है। विस्तारित टाइमआउट बड़ी फ़ाइल अपलोड को Caddy द्वारा कनेक्शन जल्दी बंद किए बिना पूरा होने देते हैं।
+`flush_interval -1` प्रतिक्रिया बफरिंग को अक्षम कर देता है, जो SSE प्रगति घटनाओं (बैच प्रोसेसिंग, एआई टूल्स, फीचर इंस्टॉल) और बड़ी फ़ाइल डाउनलोड को रोकने के बजाय स्ट्रीम करने के लिए आवश्यक है। विस्तारित टाइमआउट Caddy कनेक्शन को जल्दी बंद किए बिना बड़ी फ़ाइल अपलोड को पूरा करने की अनुमति देता है।
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

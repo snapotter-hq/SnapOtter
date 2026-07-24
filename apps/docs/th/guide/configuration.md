@@ -1,8 +1,9 @@
 ---
 description: "ตัวแปรสภาพแวดล้อมทั้งหมดของ SnapOtter พร้อมค่าเริ่มต้น กำหนดค่าการยืนยันตัวตน, ที่จัดเก็บ, โมเดล AI, การวิเคราะห์ข้อมูล และอื่น ๆ"
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: 891bad80245a
+i18n_output_hash: 9a6f66699ce0
+i18n_hash_version: 2
 ---
 
 # Configuration {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # เปลี่ยนสิ่งนี้สำหรับการปรับใช้ที่ไม่ใช่ภายในเครื่อง
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

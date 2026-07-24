@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter को एक ही कमांड में Docker के साथ इंस्टॉल करें। इसमें Docker Compose सेटअप, सोर्स से बिल्ड करना, और एक पूर्ण फ़ीचर अवलोकन शामिल है।"
-i18n_output_hash: bc1ecfa22bef
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 2990278c7570
+i18n_hash_version: 2
 ---
 
 # Getting Started {#getting-started}
@@ -40,7 +41,7 @@ NVIDIA CUDA-त्वरित पृष्ठभूमि हटाने, अ�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) आवश्यक है। CUDA अनुपलब्ध होने पर स्वचालित रूप से CPU पर फ़ॉलबैक करता है। VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGPU त्वरण आज AI इन्फ़रेंस के लिए सपोर्ट नहीं किया जाता। बेंचमार्क के लिए [Docker Tags](/hi/guide/docker-tags) देखें।
+[NVIDIA कंटेनर टूलकिट](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) की आवश्यकता है। CUDA अनुपलब्ध होने पर स्वचालित रूप से CPU पर वापस आ जाता है। वीए-एपीआई, क्विक सिंक या ओपनसीएल के माध्यम से इंटेल/एएमडी आईजीपीयू त्वरण आज एआई अनुमान के लिए समर्थित नहीं है। बेंचमार्क के लिए [डॉकर टैग](/hi/guide/docker-tags) देखें। यदि `--gpus all` के बावजूद AI उपकरण CPU पर चलते हैं, तो [GPU त्वरण सत्यापित करें](/hi/guide/deployment#verify-gpu-acceleration) देखें।
 :::
 
 ::: details GHCR पर भी
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | मोडैलिटी | संख्या | उदाहरण टूल |
 |----------|-------|---------------|
-| **Image** | 105 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
+| **Image** | 107 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
 | **PDF / Document** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |

@@ -1,8 +1,9 @@
 ---
 description: "使用 Docker 將 SnapOtter 部署到正式環境。硬體需求、GPU 設定，以及 Nginx、Traefik 和 Cloudflare 的反向代理設定。"
-i18n_output_hash: d1dc1e293c3a
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 97aa47ef2602
+i18n_hash_version: 2
 ---
 
 # 部署 {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 針對非本地部署更改此設置
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-在記錄中確認 CUDA 是否偵測到：
+### 驗證 GPU 加速 {#verify-gpu-acceleration}
+
+檢查日誌中的 CUDA 檢測：
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+如果 AI 工具在 CPU 上運行，即使 `--gpus all` 和 NVIDIA Container Toolkit 設定正確，請從 **設定 → AI 功能** 重新安裝受影響的捆綁包（例如背景刪除）。安裝程式會恢復 ONNX 運行時的 GPU 版本，而由另一個捆綁包（例如轉錄）引入的僅 CPU 版本可能會在共享 AI 環境中隱藏。如果從 UI 重新安裝無法恢復舊映像上的 GPU，請參閱 [問題 #490](https://github.com/snapotter-hq/SnapOtter/issues/490) 中的手動修復。
 
 ## 硬體需求 {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter 預設會設定 `TRUST_PROXY=true`，使速率限制與記錄使用來自 `X-Forwarded-For` 標頭的真實用戶端 IP。
 
+對於下面的每個代理來說，有兩件事很重要：允許大型請求正文（上傳），並且不緩衝回應。響應緩衝代理會破壞 SSE 進度，更明顯的是，使大文件下載“開始但永遠不會完成”，因為代理在傳遞之前保存整個文件。 SnapOtter 在下載時發送 `X-Accel-Buffering: no`，因此即使在其他地方保留緩衝，nginx 也會對它們進行串流傳輸，但除 nginx 之外的代理需要明確停用回應緩衝（如下面的每個配置所示）。如果下載中途停止，首先要檢查前面的緩衝代理。
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # 串流響應而不是緩衝：SSE 進度（批次、AI、功能安裝）和大檔案下載需要。
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` 會停用回應緩衝，這是 SSE 進度事件（批次處理、AI 工具、功能安裝）所必需的。延長的逾時允許大型檔案上傳在 Caddy 提早關閉連線之前完成。
+`flush_interval -1` 停用回應緩衝，這是 SSE 進度事件（批次、AI 工具、功能安裝）以及大檔案下載串流（而不是停滯）所必需的。延長的逾時允許完成大檔案上傳，而無需 Caddy 提前關閉連線。
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

@@ -1,8 +1,9 @@
 ---
 description: "Wdroż SnapOtter na produkcję za pomocą Dockera. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
-i18n_output_hash: 20b2807dca9c
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: e3ddacd91df0
+i18n_hash_version: 2
 ---
 
 # Wdrożenie {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Zmień to w przypadku wdrożeń nielokalnych
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
+### Sprawdź przyspieszenie GPU {#verify-gpu-acceleration}
+
 Sprawdź wykrywanie CUDA w logach:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Jeśli narzędzia AI działają na procesorze, mimo że `--gpus all` i NVIDIA Container Toolkit są poprawnie skonfigurowane, zainstaluj ponownie pakiet, którego dotyczy problem (na przykład usuwanie tła) z **Ustawienia → Funkcje AI**. Instalator przywraca kompilację GPU ONNX Runtime, która w przeciwnym razie kompilacja oparta wyłącznie na procesorze pobrana przez inny pakiet (np. transkrypcja) może być cieniem we współdzielonym środowisku AI. Jeśli ponowna instalacja z interfejsu użytkownika nie przywróci GPU na starszym obrazie, zobacz ręczną naprawę w [problem #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Wymagania sprzętowe {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter domyślnie ustawia `TRUST_PROXY=true`, aby ograniczanie szybkości i logowanie używały rzeczywistego adresu IP klienta z nagłówków `X-Forwarded-For`.
 
+Dla każdego serwera proxy poniżej ważne są dwie rzeczy: zezwalaj na duże treści żądań (przesyłanie) i nie buforuj odpowiedzi. Serwer proxy buforujący odpowiedzi przerywa postęp SSE i, co bardziej widoczne, powoduje, że pobieranie dużego pliku „rozpoczyna się, ale nigdy nie kończy”, ponieważ serwer proxy przechowuje cały plik przed przekazaniem go dalej. SnapOtter wysyła `X-Accel-Buffering: no` podczas pobierania, więc nginx przesyła je strumieniowo, nawet jeśli buforowanie jest włączone gdzie indziej, ale serwery proxy inne niż nginx wymagają jawnego wyłączenia buforowania odpowiedzi (pokazane w każdej konfiguracji poniżej). Jeśli pobieranie zostanie wstrzymane, pierwszą rzeczą do sprawdzenia jest buforujący serwer proxy z przodu.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Przesyłaj strumieniowo odpowiedzi zamiast buforowania: potrzebne do postępu SSE (wsadowe, AI, instalacje funkcji) i do pobierania dużych plików.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` wyłącza buforowanie odpowiedzi, które jest wymagane dla zdarzeń postępu SSE (przetwarzanie wsadowe, narzędzia AI, instalacje funkcji). Wydłużone limity czasu pozwalają dużym przesłaniom plików ukończyć się bez wcześniejszego zamknięcia połączenia przez Caddy.
+`flush_interval -1` wyłącza buforowanie odpowiedzi, które jest wymagane w przypadku zdarzeń postępu SSE (przetwarzanie wsadowe, narzędzia AI, instalacje funkcji) oraz w przypadku pobierania dużych plików w celu przesyłania strumieniowego zamiast zatrzymywania. Wydłużone limity czasu pozwalają na zakończenie przesyłania dużych plików bez wcześniejszego zamykania połączenia przez Caddy.
 
 ### Tunele Cloudflare {#cloudflare-tunnels}
 

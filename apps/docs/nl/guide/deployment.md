@@ -1,8 +1,9 @@
 ---
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse-proxyconfiguraties voor Nginx, Traefik en Cloudflare."
-i18n_output_hash: 21ff542fcb0c
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 65686fc8753a
+i18n_hash_version: 2
 ---
 
 # Implementatie {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Wijzig dit voor niet-lokale implementaties
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Controleer de CUDA-detectie in de logs:
+### Controleer GPU-versnelling {#verify-gpu-acceleration}
+
+Controleer CUDA-detectie in de logboeken:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Als AI-tools op de CPU draaien, ook al zijn `--gpus all` en de NVIDIA Container Toolkit correct ingesteld, installeer dan de betreffende bundel opnieuw (bijvoorbeeld Achtergrondverwijdering) via **Instellingen → AI-functies**. Het installatieprogramma herstelt de GPU-build van ONNX Runtime, die een build met alleen CPU die door een andere bundel (zoals transcriptie) wordt binnengehaald, anders in de gedeelde AI-omgeving kan overschaduwen. Als het opnieuw installeren via de gebruikersinterface de GPU op een oudere image niet herstelt, raadpleeg dan de handmatige reparatie in [probleem #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Hardwarevereisten {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter stelt `TRUST_PROXY=true` standaard in zodat ratelimiting en logging het echte client-IP uit de `X-Forwarded-For`-headers gebruiken.
 
+Voor elke onderstaande proxy zijn twee dingen van belang: sta grote verzoekinstanties (uploads) toe en buffer geen antwoorden. Een proxy die antwoorden buffert, onderbreekt de SSE-voortgang en, beter zichtbaar, zorgt ervoor dat het downloaden van grote bestanden "start maar nooit eindigt", omdat de proxy het hele bestand vasthoudt voordat het wordt doorgegeven. SnapOtter verzendt `X-Accel-Buffering: no` bij downloads, zodat nginx deze streamt, zelfs als de buffering elders is ingeschakeld, maar voor andere proxy's dan nginx moet de responsbuffering expliciet zijn uitgeschakeld (weergegeven in elke configuratie hieronder). Als een download halverwege vastloopt, is een bufferproxy ervoor het eerste wat u moet controleren.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Reacties streamen in plaats van bufferen: nodig voor SSE-voortgang (batch, AI, installatie van functies) en voor het downloaden van grote bestanden.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` schakelt responsbuffering uit, wat vereist is voor SSE-voortgangsgebeurtenissen (batchverwerking, AI-tools, feature-installaties). De verlengde time-outs laten grote bestandsuploads voltooien zonder dat Caddy de verbinding vroegtijdig sluit.
+`flush_interval -1` schakelt responsbuffering uit, wat nodig is voor SSE-voortgangsgebeurtenissen (batchverwerking, AI-tools, functie-installaties) en voor het downloaden van grote bestanden om door te streamen in plaats van te vertragen. Dankzij de verlengde time-outs kunnen grote bestandsuploads worden voltooid zonder dat Caddy de verbinding vroegtijdig verbreekt.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

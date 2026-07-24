@@ -1,8 +1,9 @@
 ---
 description: "Installera SnapOtter med Docker i ett enda kommando. Inkluderar Docker Compose-konfiguration, byggande från källkod och en fullständig funktionsöversikt."
-i18n_output_hash: 4b247783a830
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 3f00cee83d94
+i18n_hash_version: 2
 ---
 
 # Kom igång {#getting-started}
@@ -40,7 +41,7 @@ Lägg till `--gpus all` för NVIDIA CUDA-accelererad bakgrundsborttagning, uppsk
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Kräver [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Faller tillbaka till CPU automatiskt när CUDA inte är tillgängligt. Intel/AMD iGPU-acceleration via VA-API, Quick Sync eller OpenCL stöds inte för AI-inferens i dagsläget. Se [Docker-taggar](/sv/guide/docker-tags) för benchmarktester.
+Kräver [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Faller tillbaka till CPU automatiskt när CUDA inte är tillgänglig. Intel/AMD iGPU-acceleration genom VA-API, Quick Sync eller OpenCL stöds inte för AI-inferens idag. Se [Docker Tags](/sv/guide/docker-tags) för riktmärken. Om AI-verktyg körs på CPU trots `--gpus all`, se [Verifiera GPU-acceleration](/sv/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Även på GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ändra detta för icke-lokala distributioner
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalitet | Antal | Exempelverktyg |
 |----------|-------|---------------|
-| **Bild** | 105 | Ändra storlek, beskär, komprimera, konvertera, ta bort bakgrund, uppskala, OCR, vattenmärke, collage, färglägg, GIF-verktyg, formatförinställningar |
+| **Bild** | 107 | Ändra storlek, beskär, komprimera, konvertera, ta bort bakgrund, uppskala, OCR, vattenmärke, collage, färglägg, GIF-verktyg, formatförinställningar |
 | **Video** | 57 | Klipp, beskär, komprimera, konvertera, slå samman, extrahera ljud, autotextning, video till GIF, ändra storlek, stabilisera, formatförinställningar |
 | **Ljud** | 27 | Klipp, slå samman, konvertera, normalisera, brusreducering, transkribera, tonhöjdsskift, tona, ringsignalsskapare, formatförinställningar |
 | **PDF / dokument** | 42 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |

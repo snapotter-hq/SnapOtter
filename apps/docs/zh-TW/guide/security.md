@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 的安全強化指南。容器安全、網路隔離、Docker secrets、Kubernetes 部署與合規產出物。"
-i18n_source_hash: 986f7658430c
+i18n_source_hash: 9d021c1ceb40
 i18n_provenance: human
-i18n_output_hash: c7ac676acc59
+i18n_output_hash: d8f7e207287e
+i18n_hash_version: 2
 ---
 
 # 安全與強化 {#security-hardening}
@@ -75,13 +76,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 針對非本地部署更改此設置
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

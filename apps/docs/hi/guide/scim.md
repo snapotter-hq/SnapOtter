@@ -1,8 +1,9 @@
 ---
 description: "अपने identity provider से SnapOtter में users और groups को sync करने के लिए SCIM 2.0 provisioning सेट करें। Okta, Azure AD / Entra ID, और custom integrations को कवर करता है।"
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: cec58a6b3f0c
+i18n_output_hash: 83a5e7e5383c
+i18n_hash_version: 2
 ---
 
 # SCIM Provisioning {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM provisioning के लिए `scim` feature वाली एक **enterpri
 
 - एक चालू SnapOtter instance जो एक public URL पर पहुँच योग्य हो
 - `scim` feature वाली एक enterprise license key
-- SnapOtter तक admin access (SCIM token जनरेट या रद्द करने के लिए `users:manage` permission आवश्यक है)
+- पूर्ण प्रभावी अनुमति सेट के साथ एक अंतर्निहित SnapOtter `admin` खाता। एक प्रत्यायोजित कस्टम भूमिका या एक व्यवस्थापक एपीआई कुंजी जिसमें कोई व्यवस्थापक अनुमति नहीं है, वैश्विक SCIM टोकन उत्पन्न या निरस्त नहीं कर सकता है।
 - आपके identity provider की provisioning settings तक admin access
 
 ## Quick start {#quick-start}
@@ -34,7 +35,7 @@ Response में token होता है। इसे तुरंत सह
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM endpoints एक समर्पित Bearer token का उपयोग 
 
 ### Generating a token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` एक नया SCIM token जनरेट करता है। इस endpoint के लिए `users:manage` permission वाला एक वैध session आवश्यक है।
+`POST /api/v1/enterprise/scim/token` एक नया SCIM टोकन उत्पन्न करता है। क्योंकि टोकन पूरे इंस्टेंस में उपयोगकर्ताओं को प्रावधानित और परिवर्तित कर सकता है, इस एंडपॉइंट के लिए संपूर्ण प्रभावी व्यवस्थापक अनुमति सेट के साथ अंतर्निहित `admin` भूमिका की आवश्यकता होती है। `users:manage` को कस्टम भूमिका में रखना पर्याप्त नहीं है।
 
 Token plaintext में ठीक एक बार लौटाया जाता है। SnapOtter केवल एक scrypt hash संग्रहीत करता है। यदि आप token खो देते हैं, तो उसे रद्द करें और एक नया जनरेट करें।
 
 एक समय में केवल एक SCIM token सक्रिय रहता है। एक नया token जनरेट करने से पिछला token बदल जाता है।
 
+::: warning अपग्रेड के बाद टोकन पुनः जारी करना
+लीगेसी अपरिवर्तित SCIM टोकन अस्वीकार कर दिए गए हैं। `so_scim_v2_...` टोकन जारी करने वाली रिलीज़ में अपग्रेड करने के बाद, एक नया टोकन जेनरेट करें और प्रावधान फिर से शुरू करने से पहले अपने पहचान प्रदाता को अपडेट करें।
+:::
+
 ### Revoking a token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` वर्तमान SCIM token को रद्द करता है। इस endpoint के लिए भी `users:manage` आवश्यक है।
+`DELETE /api/v1/enterprise/scim/token` वर्तमान SCIM टोकन को रद्द कर देता है। इसमें टोकन जेनरेशन के समान पूर्ण अंतर्निहित व्यवस्थापक आवश्यकता है।
 
 ### Rate limiting {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM request में एक `Authorization: Bearer <token>` header शाम�
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token संग्रहीत hash से मेल नहीं खाता। यह तब होता है जब token रद्द कर दिया गया और फिर से जनरेट किया गया। अपने IdP की provisioning settings में token अपडेट करें।
+टोकन विकृत है, सेवानिवृत्त अपरिवर्तित प्रारूप का उपयोग करता है, या संग्रहीत हैश से मेल नहीं खाता है। एक मौजूदा `so_scim_v2_...` टोकन जेनरेट करें और अपने IdP की प्रोविजनिंग सेटिंग्स में टोकन को अपडेट करें।
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

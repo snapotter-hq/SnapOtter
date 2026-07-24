@@ -1,8 +1,9 @@
 ---
 description: "إعداد توفير SCIM 2.0 لمزامنة المستخدمين والمجموعات من موفّر الهوية لديك إلى SnapOtter. يغطي Okta وAzure AD / Entra ID والتكاملات المخصّصة."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 34bda4e59c79
+i18n_output_hash: 4e8347dee40e
+i18n_hash_version: 2
 ---
 
 # توفير SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ i18n_output_hash: 34bda4e59c79
 
 - مثيل SnapOtter قيد التشغيل يمكن الوصول إليه عبر عنوان URL عام
 - مفتاح ترخيص enterprise مع ميزة `scim`
-- وصول المسؤول إلى SnapOtter (يلزم الإذن `users:manage` لإنشاء رمز SCIM أو إبطاله)
+- حساب SnapOtter `admin` مدمج مع مجموعة الأذونات الفعالة الكاملة الخاصة به. لا يمكن لدور مخصص مفوض أو مفتاح API للمشرف الذي يفتقد أي إذن مسؤول إنشاء أو إبطال الرمز المميز SCIM.
 - وصول المسؤول إلى إعدادات التوفير لدى موفّر الهوية
 
 ## بداية سريعة {#quick-start}
@@ -34,7 +35,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ### إنشاء رمز {#generating-a-token}
 
-يُنشئ `POST /api/v1/enterprise/scim/token` رمز SCIM جديداً. تتطلّب نقطة النهاية هذه جلسة صالحة مع الإذن `users:manage`.
+يقوم `POST /api/v1/enterprise/scim/token` بإنشاء رمز SCIM جديد. نظرًا لأن الرمز المميز يمكنه توفير المستخدمين وتغييرهم عبر المثيل، فإن نقطة النهاية هذه تتطلب دور `admin` المدمج مع مجموعة أذونات المسؤول الفعالة الكاملة. إن الاحتفاظ بـ `users:manage` في دور مخصص ليس كافيًا.
 
 يُعاد الرمز بنصّ صريح مرة واحدة فقط. يخزّن SnapOtter تجزئة scrypt فقط. إذا فقدت الرمز، فأبطِله وأنشئ رمزاً جديداً.
 
 لا يكون سوى رمز SCIM واحد نشطاً في كل مرة. يؤدّي إنشاء رمز جديد إلى استبدال الرمز السابق.
 
+::: warning إعادة إصدار الرمز المميز بعد الترقية
+يتم رفض الرموز المميزة SCIM القديمة التي لم يتم إصدارها. بعد الترقية إلى إصدار يُصدر رموز `so_scim_v2_...`، قم بإنشاء رمز مميز جديد وقم بتحديث موفر الهوية الخاص بك قبل استئناف التزويد.
+:::
+
 ### إبطال رمز {#revoking-a-token}
 
-يبطل `DELETE /api/v1/enterprise/scim/token` رمز SCIM الحالي. تتطلّب نقطة النهاية هذه أيضاً `users:manage`.
+يقوم `DELETE /api/v1/enterprise/scim/token` بإلغاء الرمز المميز SCIM الحالي. لديه نفس متطلبات المسؤول المضمنة الكاملة مثل إنشاء الرمز المميز.
 
 ### تحديد المعدّل {#rate-limiting}
 
@@ -279,7 +284,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-لا يطابق الرمز التجزئة المخزّنة. يحدث هذا إذا أُبطِل الرمز وأُعيد إنشاؤه. حدّث الرمز في إعدادات التوفير لدى موفّر الهوية.
+الرمز مميز بشكل غير صحيح، أو يستخدم التنسيق الذي لم يتم إصداره، أو لا يتطابق مع التجزئة المخزنة. أنشئ رمز `so_scim_v2_...` الحالي وقم بتحديث الرمز المميز في إعدادات توفير IdP.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

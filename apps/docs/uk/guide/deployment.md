@@ -1,8 +1,9 @@
 ---
 description: "Розгорніть SnapOtter у продакшені за допомогою Docker. Вимоги до апаратного забезпечення, налаштування GPU та конфігурації зворотного проксі для Nginx, Traefik і Cloudflare."
-i18n_output_hash: 4d221e5eaf97
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: a466f9f8a47f
+i18n_hash_version: 2
 ---
 
 # Розгортання {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Змініть це для нелокальних розгортань
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Перевірте виявлення CUDA у логах:
+### Перевірте прискорення GPU {#verify-gpu-acceleration}
+
+Перевірте виявлення CUDA в журналах:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Якщо інструменти штучного інтелекту працюють на ЦП, навіть якщо `--gpus all` і NVIDIA Container Toolkit налаштовано правильно, переінсталюйте відповідний комплект (наприклад, Background Removal) із **Налаштування → Функції штучного інтелекту**. Інсталятор відновлює збірку графічного процесора ONNX Runtime, яку збірка лише для центрального процесора, залучена іншим пакетом (наприклад, транскрипцією), інакше може затіняти в спільному середовищі ШІ. Якщо перевстановлення з інтерфейсу користувача не відновлює GPU на старішому образі, перегляньте посібник із відновлення в [випуск №490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Вимоги до апаратного забезпечення {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter встановлює `TRUST_PROXY=true` за замовчуванням, тож обмеження швидкості й логування використовують реальний IP клієнта із заголовків `X-Forwarded-For`.
 
+Дві речі важливі для кожного проксі нижче: дозволити великі тіла запитів (завантаження) і не буферизувати відповіді. Проксі-сервер із буферизацією відповідей порушує прогрес SSE і, що більш помітно, робить завантаження великого файлу «початком, але ніколи не завершенням», оскільки проксі-сервер зберігає весь файл перед його передачею. SnapOtter надсилає `X-Accel-Buffering: no` під час завантажень, тому nginx транслює їх, навіть якщо буферизація залишилася в іншому місці, але проксі, крім nginx, потребують явного вимкнення буферизації відповіді (показано в кожній конфігурації нижче). Якщо завантаження частково зупиняється, перше, що потрібно перевірити — буферизаційний проксі-сервер.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Потокові відповіді замість буферизації: необхідні для прогресу SSE (пакети, штучний інтелект, встановлення функцій) і для завантаження великих файлів.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` вимикає буферизацію відповідей, що потрібно для подій прогресу SSE (пакетна обробка, AI-інструменти, встановлення функцій). Продовжені таймаути дозволяють завершити завантаження великих файлів без того, щоб Caddy передчасно закривав з'єднання.
+`flush_interval -1` вимикає буферизацію відповіді, необхідну для подій прогресу SSE (пакетна обробка, інструменти штучного інтелекту, встановлення функцій) і для потокового передавання великих файлів замість зупинки. Розширені тайм-аути дозволяють завершити завантаження великих файлів без передчасного закриття з’єднання Caddy.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

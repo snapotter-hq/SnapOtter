@@ -1,8 +1,9 @@
 ---
 description: "ปรับใช้ SnapOtter สู่โปรดักชันด้วย Docker ความต้องการฮาร์ดแวร์ การตั้งค่า GPU และคอนฟิก reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_output_hash: d21da61a4516
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: ba36e2dd62d1
+i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # เปลี่ยนสิ่งนี้สำหรับการปรับใช้ที่ไม่ใช่ภายในเครื่อง
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-ตรวจสอบการตรวจพบ CUDA ในบันทึกล็อก:
+### ตรวจสอบการเร่งความเร็ว GPU {#verify-gpu-acceleration}
+
+ตรวจสอบการตรวจจับ CUDA ในบันทึก:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+หากเครื่องมือ AI ทำงานบน CPU แม้ว่า `--gpus all` และ NVIDIA Container Toolkit ได้รับการตั้งค่าอย่างถูกต้อง ให้ติดตั้งบันเดิลที่ได้รับผลกระทบอีกครั้ง (เช่น การลบพื้นหลัง) จาก **การตั้งค่า → คุณสมบัติ AI** โปรแกรมติดตั้งจะกู้คืนโครงสร้าง GPU ของรันไทม์ ONNX ซึ่งโครงสร้างเฉพาะ CPU ที่ดึงเข้ามาโดยบันเดิลอื่น (เช่น การถอดเสียง) อาจเกิดเงาในสภาพแวดล้อม AI ที่ใช้ร่วมกัน หากการติดตั้งใหม่จาก UI ไม่สามารถกู้คืน GPU บนอิมเมจเก่าได้ โปรดดูการซ่อมแซมด้วยตนเองใน [ปัญหา #490](https://github.com/snapotter-hq/SnapOtter/issues/490)
 
 ## Hardware Requirements {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter ตั้งค่า `TRUST_PROXY=true` โดยค่าเริ่มต้น เพื่อให้การจำกัดอัตราและการบันทึกล็อกใช้ IP จริงของไคลเอนต์จากส่วนหัว `X-Forwarded-For`
 
+สองสิ่งที่สำคัญสำหรับทุกพร็อกซีด้านล่าง: อนุญาตเนื้อหาคำขอขนาดใหญ่ (อัปโหลด) และไม่บัฟเฟอร์การตอบสนอง พร็อกซีบัฟเฟอร์การตอบสนองจะทำลายความคืบหน้าของ SSE และทำให้การดาวน์โหลดไฟล์ขนาดใหญ่ "เริ่มต้นแต่ไม่สิ้นสุด" อย่างเห็นได้ชัด เนื่องจากพร็อกซีจะเก็บไฟล์ทั้งหมดก่อนที่จะส่งต่อ SnapOtter ส่ง `X-Accel-Buffering: no` ในการดาวน์โหลด ดังนั้น nginx สตรีมสิ่งเหล่านั้นแม้ว่าการบัฟเฟอร์จะถูกทิ้งไว้ที่อื่น แต่พรอกซีอื่นที่ไม่ใช่ nginx จำเป็นต้องปิดใช้งานการบัฟเฟอร์การตอบสนองอย่างชัดเจน (แสดงอยู่ในการกำหนดค่าแต่ละรายการด้านล่าง) หากการดาวน์โหลดค้างกลางคัน พร็อกซีการบัฟเฟอร์ที่อยู่ด้านหน้าคือสิ่งแรกที่ต้องตรวจสอบ
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # สตรีมการตอบสนองแทนการบัฟเฟอร์: จำเป็นสำหรับความคืบหน้าของ SSE (แบทช์, AI, การติดตั้งฟีเจอร์) และสำหรับการดาวน์โหลดไฟล์ขนาดใหญ่
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` ปิดการบัฟเฟอร์การตอบสนอง ซึ่งจำเป็นสำหรับเหตุการณ์ความคืบหน้า SSE (การประมวลผลชุด, เครื่องมือ AI, การติดตั้งฟีเจอร์) การหมดเวลาที่ยืดออกช่วยให้การอัปโหลดไฟล์ขนาดใหญ่เสร็จสมบูรณ์โดยที่ Caddy ไม่ปิดการเชื่อมต่อก่อนกำหนด
+`flush_interval -1` ปิดใช้งานการบัฟเฟอร์การตอบสนอง ซึ่งจำเป็นสำหรับเหตุการณ์ความคืบหน้าของ SSE (การประมวลผลเป็นชุด เครื่องมือ AI การติดตั้งคุณสมบัติ) และสำหรับการดาวน์โหลดไฟล์ขนาดใหญ่เพื่อสตรีมผ่านแทนที่จะหยุดชะงัก การหมดเวลาแบบขยายทำให้การอัพโหลดไฟล์ขนาดใหญ่เสร็จสิ้นโดยไม่ต้อง Caddy ปิดการเชื่อมต่อก่อนกำหนด
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

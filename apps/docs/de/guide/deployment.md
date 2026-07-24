@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter mit Docker in die Produktion bringen. Hardware-Anforderungen, GPU-Einrichtung und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare."
-i18n_output_hash: 0ea42bb214de
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 8af3dc6a0ca9
+i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ändern Sie dies für nicht lokale Bereitstellungen
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Prüfe die CUDA-Erkennung in den Logs:
+### Überprüfen Sie die GPU-Beschleunigung {#verify-gpu-acceleration}
+
+Überprüfen Sie die CUDA-Erkennung in den Protokollen:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Wenn KI-Tools auf der CPU ausgeführt werden, obwohl `--gpus all` und das NVIDIA Container Toolkit korrekt eingerichtet sind, installieren Sie das betroffene Bundle (z. B. Hintergrundentfernung) über **Einstellungen → KI-Funktionen** neu. Das Installationsprogramm stellt den GPU-Build von ONNX Runtime wieder her, den ein reiner CPU-Build, der von einem anderen Bundle (z. B. Transkription) abgerufen wird, andernfalls in der gemeinsam genutzten KI-Umgebung abbilden kann. Wenn die Neuinstallation über die Benutzeroberfläche die GPU auf einem älteren Image nicht wiederherstellt, lesen Sie die manuelle Reparatur in [Problem Nr. 490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Hardware-Anforderungen {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter setzt `TRUST_PROXY=true` standardmäßig, sodass Ratenbegrenzung und Protokollierung die echte Client-IP aus den `X-Forwarded-For`-Headern verwenden.
 
+Für jeden unten aufgeführten Proxy sind zwei Dinge wichtig: Erlauben Sie große Anforderungstexte (Uploads) und puffern Sie keine Antworten. Ein antwortpuffernder Proxy unterbricht den SSE-Fortschritt und führt, was sichtbarer ist, dazu, dass der Download einer großen Datei „startet, aber nie beendet“ wird, da der Proxy die gesamte Datei speichert, bevor er sie weitergibt. SnapOtter sendet `X-Accel-Buffering: no` bei Downloads, sodass nginx sie streamt, auch wenn die Pufferung an anderer Stelle beibehalten wird. Bei anderen Proxys als nginx muss die Antwortpufferung jedoch explizit deaktiviert werden (siehe unten in jeder Konfiguration). Wenn ein Download teilweise ins Stocken gerät, ist als erstes zu überprüfen, ob ein Puffer-Proxy vorgeschaltet ist.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Antworten streamen statt puffern: Wird für den SSE-Fortschritt (Batch, KI, Feature-Installationen) und für das Herunterladen großer Dateien benötigt.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` deaktiviert die Antwort-Pufferung, was für SSE-Fortschrittsereignisse (Stapelverarbeitung, KI-Tools, Feature-Installationen) erforderlich ist. Die verlängerten Zeitüberschreitungen erlauben es, große Datei-Uploads abzuschließen, ohne dass Caddy die Verbindung vorzeitig schließt.
+`flush_interval -1` deaktiviert die Antwortpufferung, die für SSE-Fortschrittsereignisse (Stapelverarbeitung, KI-Tools, Funktionsinstallationen) und für das Durchströmen großer Dateidownloads erforderlich ist, anstatt zum Stillstand zu kommen. Durch die verlängerten Zeitüberschreitungen können große Datei-Uploads abgeschlossen werden, ohne dass Caddy die Verbindung vorzeitig schließt.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

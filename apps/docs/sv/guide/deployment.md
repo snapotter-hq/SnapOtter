@@ -1,8 +1,9 @@
 ---
 description: "Distribuera SnapOtter till produktion med Docker. Hårdvarukrav, GPU-konfiguration och konfigurationer för omvänd proxy för Nginx, Traefik och Cloudflare."
-i18n_output_hash: c280952d9d27
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 9438460845c1
+i18n_hash_version: 2
 ---
 
 # Distribution {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ändra detta för icke-lokala distributioner
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Kontrollera CUDA-identifiering i loggarna:
+### Verifiera GPU-acceleration {#verify-gpu-acceleration}
+
+Kontrollera CUDA-detektering i loggarna:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Om AI-verktyg körs på CPU trots att `--gpus all` och NVIDIA Container Toolkit är korrekt konfigurerade, installera om det berörda paketet (till exempel bakgrundsborttagning) från **Inställningar → AI-funktioner**. Installationsprogrammet återställer GPU-bygget av ONNX Runtime, vilket enbart CPU-bygge som dras in av ett annat paket (som transkription) annars kan skugga i den delade AI-miljön. Om ominstallation från användargränssnittet inte återställer GPU på en äldre bild, se den manuella reparationen i [utgåva #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Hårdvarukrav {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter anger `TRUST_PROXY=true` som standard så att hastighetsbegränsning och loggning använder den verkliga klient-IP:n från `X-Forwarded-For`-huvuden.
 
+Två saker spelar roll för varje proxy nedan: tillåt stora begäranden (uppladdningar) och buffra inte svar. En svarsbuffrande proxy bryter SSE-förloppet och, mer synligt, gör att en stor filnedladdning "startar men slutar aldrig", eftersom proxyn håller hela filen innan den skickas vidare. SnapOtter skickar `X-Accel-Buffering: no` vid nedladdningar så nginx streamar dem även om buffring lämnas på någon annanstans, men andra proxyservrar än nginx behöver explicit inaktivera svarsbuffring (visas i varje konfiguration nedan). Om en nedladdning stannar halvvägs är en buffrande proxy framför det första att kontrollera.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Strömma svar istället för buffring: behövs för SSE-förlopp (batch, AI, funktionsinstallationer) och för stora filnedladdningar.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` inaktiverar svarsbuffring, vilket krävs för SSE-förloppshändelser (batchbearbetning, AI-verktyg, funktionsinstallationer). De utökade timeouterna gör att stora filuppladdningar kan slutföras utan att Caddy stänger anslutningen för tidigt.
+`flush_interval -1` inaktiverar svarsbuffring, vilket krävs för SSE-förloppshändelser (batchbearbetning, AI-verktyg, funktionsinstallationer) och för att ladda ner stora filer att strömma igenom istället för att stanna. De utökade tidsgränserna gör att uppladdningar av stora filer kan slutföras utan att Caddy stänger anslutningen i förtid.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

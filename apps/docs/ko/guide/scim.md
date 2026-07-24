@@ -1,8 +1,9 @@
 ---
 description: "SCIM 2.0 프로비저닝을 설정하여 사용자와 그룹을 아이덴티티 공급자에서 SnapOtter로 동기화합니다. Okta, Azure AD / Entra ID, 사용자 지정 통합을 다룹니다."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: c1a55eda8da8
+i18n_output_hash: 1f563c92cdba
+i18n_hash_version: 2
 ---
 
 # SCIM 프로비저닝 {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM 프로비저닝에는 `scim` 기능이 포함된 **엔터프라이즈** 라
 
 - 공개 URL에서 접근할 수 있는 실행 중인 SnapOtter 인스턴스
 - `scim` 기능이 포함된 엔터프라이즈 라이선스 키
-- SnapOtter에 대한 관리자 접근 권한(SCIM 토큰을 생성하거나 취소하려면 `users:manage` 권한이 필요합니다)
+- 전체 유효 권한 집합이 포함된 SnapOtter `admin` 계정이 내장되어 있습니다. 위임된 사용자 정의 역할 또는 관리 권한이 누락된 관리 API 키는 전역 SCIM 토큰을 생성하거나 취소할 수 없습니다.
 - 아이덴티티 공급자의 프로비저닝 설정에 대한 관리자 접근 권한
 
 ## 빠른 시작 {#quick-start}
@@ -34,7 +35,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM 엔드포인트는 사용자 세션 및 API 키와는 별도인 전용 베�
 
 ### 토큰 생성 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` 는 새 SCIM 토큰을 생성합니다. 이 엔드포인트에는 `users:manage` 권한이 있는 유효한 세션이 필요합니다.
+`POST /api/v1/enterprise/scim/token`는 새로운 SCIM 토큰을 생성합니다. 토큰은 인스턴스 전체에서 사용자를 프로비저닝하고 변경할 수 있으므로 이 엔드포인트에는 완전한 유효 관리자 권한 집합을 갖춘 기본 제공 `admin` 역할이 필요합니다. `users:manage`를 사용자 지정 역할로 보유하는 것만으로는 충분하지 않습니다.
 
 토큰은 정확히 한 번만 평문으로 반환됩니다. SnapOtter는 scrypt 해시만 저장합니다. 토큰을 분실하면 취소하고 새로 생성하세요.
 
 한 번에 하나의 SCIM 토큰만 활성화됩니다. 새 토큰을 생성하면 이전 토큰이 대체됩니다.
 
+::: warning 업그레이드 후 토큰 재발행
+버전이 지정되지 않은 레거시 SCIM 토큰은 거부됩니다. `so_scim_v2_...` 토큰을 발급하는 릴리스로 업그레이드한 후 프로비저닝을 재개하기 전에 새 토큰을 생성하고 ID 공급자를 업데이트하세요.
+:::
+
 ### 토큰 취소 {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` 는 현재 SCIM 토큰을 취소합니다. 이 엔드포인트에도 `users:manage` 권한이 필요합니다.
+`DELETE /api/v1/enterprise/scim/token`는 현재 SCIM 토큰을 취소합니다. 토큰 생성과 동일한 전체 내장 관리 요구 사항이 있습니다.
 
 ### 속도 제한 {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM 요청에 `Authorization: Bearer <token>` 헤더가 포함되지 않았습�
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-토큰이 저장된 해시와 일치하지 않습니다. 토큰이 취소되고 다시 생성된 경우 발생합니다. IdP의 프로비저닝 설정에서 토큰을 업데이트하세요.
+토큰의 형식이 잘못되었거나, 폐기된 버전 없는 형식을 사용하거나, 저장된 해시와 일치하지 않습니다. 현재 `so_scim_v2_...` 토큰을 생성하고 IdP의 프로비저닝 설정에서 토큰을 업데이트하세요.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

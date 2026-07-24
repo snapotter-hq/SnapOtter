@@ -1,8 +1,9 @@
 ---
 description: "علامات صورة SnapOtter على Docker، ومقاييس أداء GPU، وتثبيت الإصدارات، ودعم المنصات المتعددة لـ AMD64 وARM64."
-i18n_output_hash: 4ff4ffa4056a
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: 869e3732ed43
+i18n_hash_version: 2
 ---
 
 # صورة Docker {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

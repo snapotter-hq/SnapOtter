@@ -1,8 +1,9 @@
 ---
 description: "用一条 Docker 命令安装 SnapOtter。包含 Docker Compose 配置、从源码构建，以及完整的功能概览。"
-i18n_output_hash: 3da9d8045239
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 6c78c0876383
+i18n_hash_version: 2
 ---
 
 # 快速上手 {#getting-started}
@@ -40,7 +41,7 @@ SnapOtter 默认包含匿名产品分析。要关闭它，请打开 **Settings �
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-需要 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。当 CUDA 不可用时会自动回退到 CPU。目前不支持通过 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 核显加速 AI 推理。基准测试参见 [Docker 标签](/zh-CN/guide/docker-tags)。
+需要 [NVIDIA 容器工具包](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。当 CUDA 不可用时自动回退到 CPU。目前，AI 推理不支持通过 VA-API、Quick Sync 或 OpenCL 进行 Intel/AMD iGPU 加速。请参阅 [Docker 标签](/zh-CN/guide/docker-tags) 了解基准。如果 AI 工具在 CPU 上运行（尽管 `--gpus all`），请参阅[验证 GPU 加速](/zh-CN/guide/deployment#verify-gpu-acceleration)。
 :::
 
 ::: details 也可在 GHCR 获取
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 针对非本地部署更改此设置
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | 模态 | 数量 | 示例工具 |
 |----------|-------|---------------|
-| **图像** | 105 | 缩放、裁剪、压缩、转换、背景移除、放大、OCR、水印、拼贴、上色、GIF 工具、格式预设 |
+| **图像** | 107 | 缩放、裁剪、压缩、转换、背景移除、放大、OCR、水印、拼贴、上色、GIF 工具、格式预设 |
 | **视频** | 57 | 剪辑、裁剪、压缩、转换、合并、提取音频、自动字幕、视频转 GIF、缩放、防抖、格式预设 |
 | **音频** | 27 | 剪辑、合并、转换、归一化、降噪、转录、变调、淡入淡出、铃声制作、格式预设 |
 | **PDF / 文档** | 42 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、加密、修复 |

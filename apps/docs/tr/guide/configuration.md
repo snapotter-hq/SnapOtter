@@ -1,8 +1,9 @@
 ---
 description: "Varsayılanlarıyla birlikte tüm SnapOtter ortam değişkenleri. Kimlik doğrulama, depolama, AI modelleri, analitik ve daha fazlasını yapılandırın."
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: a4cc9d4d0024
+i18n_output_hash: da281dfbf919
+i18n_hash_version: 2
 ---
 
 # Yapılandırma {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

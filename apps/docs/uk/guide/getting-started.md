@@ -1,8 +1,9 @@
 ---
 description: "Встановіть SnapOtter за допомогою Docker однією командою. Включає налаштування Docker Compose, збирання з вихідного коду й повний огляд функцій."
-i18n_output_hash: a97c15d102b5
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 8a07131b1f87
+i18n_hash_version: 2
 ---
 
 # Початок роботи {#getting-started}
@@ -40,7 +41,7 @@ SnapOtter містить анонімну продуктову аналітик�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Потребує [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматично переходить на CPU, коли CUDA недоступний. Прискорення на iGPU Intel/AMD через VA-API, Quick Sync або OpenCL наразі не підтримується для AI-інференсу. Див. [Docker Tags](/uk/guide/docker-tags) щодо бенчмарків.
+Потрібен [NVIDIA Container Toolkit] (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматично повертається до ЦП, коли CUDA недоступна. Прискорення Intel/AMD iGPU через VA-API, Quick Sync або OpenCL на сьогодні не підтримується для висновків ШІ. Див. [Теги Docker](/uk/guide/docker-tags) для тестів. Якщо інструменти штучного інтелекту працюють на ЦП, незважаючи на `--gpus all`, див. [Перевірте прискорення GPU] (/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Також на GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Змініть це для нелокальних розгортань
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Модальність | Кількість | Приклади інструментів |
 |----------|-------|---------------|
-| **Зображення** | 105 | Зміна розміру, Обрізання, Стиснення, Конвертація, Видалення фону, Upscale, OCR, Водяний знак, Колаж, Colorize, Інструменти GIF, пресети форматів |
+| **Зображення** | 107 | Зміна розміру, Обрізання, Стиснення, Конвертація, Видалення фону, Upscale, OCR, Водяний знак, Колаж, Colorize, Інструменти GIF, пресети форматів |
 | **Відео** | 57 | Обрізання, Обрізання за краями, Стиснення, Конвертація, Об'єднання, Витягнення аудіо, Автосубтитри, Відео у GIF, Зміна розміру, Стабілізація, пресети форматів |
 | **Аудіо** | 27 | Обрізання, Об'єднання, Конвертація, Нормалізація, Зменшення шуму, Транскрипція, Зсув висоти тону, Затухання, Створення рингтонів, пресети форматів |
 | **PDF / Документ** | 42 | Об'єднання, Розділення, Стиснення, OCR, Водяний знак, Редагування (redact), Word у PDF, Excel у PDF, Обертання, Захист, Відновлення |

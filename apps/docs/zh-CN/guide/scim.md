@@ -1,8 +1,9 @@
 ---
 description: "设置 SCIM 2.0 预配以将用户和组从你的身份提供商同步到 SnapOtter。涵盖 Okta、Azure AD / Entra ID 以及自定义集成。"
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 70121241a9af
+i18n_output_hash: d318d3799726
+i18n_hash_version: 2
 ---
 
 # SCIM 预配 {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM 预配需要带有 `scim` 功能的 **enterprise** 许可证。它在 team 
 
 - 一个可通过公网 URL 访问的正在运行的 SnapOtter 实例
 - 一个带有 `scim` 功能的 enterprise 许可证密钥
-- SnapOtter 的管理员访问权限（生成或吊销 SCIM 令牌需要 `users:manage` 权限）
+- 内置 SnapOtter `admin` 帐户及其完整的有效权限集。委托的自定义角色或缺少任何管理权限的管理 API 密钥无法生成或撤销全局 SCIM 令牌。
 - 你的身份提供商的预配设置的管理员访问权限
 
 ## 快速开始 {#quick-start}
@@ -34,7 +35,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM 端点使用专用的 Bearer 令牌，与用户会话和 API 密钥分开�
 
 ### 生成令牌 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` 会生成一个新的 SCIM 令牌。此端点需要一个具有 `users:manage` 权限的有效会话。
+`POST /api/v1/enterprise/scim/token` 生成新的 SCIM 代币。由于令牌可以跨实例配置和更改用户，因此此端点需要具有完整有效管理权限集的内置 `admin` 角色。将 `users:manage` 保留在自定义角色中是不够的。
 
 令牌以明文形式仅返回一次。SnapOtter 只存储 scrypt 哈希值。如果你丢失了令牌，请吊销它并生成一个新的。
 
 同一时间只有一个 SCIM 令牌处于活动状态。生成新令牌会替换先前的令牌。
 
+::: warning 升级后重新发行令牌
+旧版未版本控制的 SCIM 令牌将被拒绝。升级到颁发 `so_scim_v2_...` 令牌的版本后，请生成新令牌并更新您的身份提供商，然后再恢复配置。
+:::
+
 ### 吊销令牌 {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` 会吊销当前的 SCIM 令牌。此端点同样需要 `users:manage`。
+`DELETE /api/v1/enterprise/scim/token` 撤销当前的 SCIM 令牌。它具有与令牌生成相同的完整内置管理要求。
 
 ### 速率限制 {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM 请求未包含 `Authorization: Bearer <token>` 标头。请检查你的 Id
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-令牌与存储的哈希值不匹配。如果令牌被吊销并重新生成，就会发生这种情况。请在你的 IdP 的预配设置中更新令牌。
+令牌格式错误、使用已停用的未版本化格式或与存储的哈希不匹配。生成当前的 `so_scim_v2_...` 令牌并在 IdP 的配置设置中更新该令牌。
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

@@ -1,8 +1,9 @@
 ---
 description: "모든 SnapOtter 환경 변수와 기본값. 인증, 스토리지, AI 모델, 분석 등을 구성합니다."
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: 6a94a1e1efe3
+i18n_output_hash: 51e09a535cd4
+i18n_hash_version: 2
 ---
 
 # 구성 {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 로컬이 아닌 배포의 경우 이를 변경합니다.
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

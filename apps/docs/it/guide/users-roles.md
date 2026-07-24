@@ -1,8 +1,9 @@
 ---
 description: "Gestisci utenti, ruoli integrati e personalizzati, permessi, chiavi API, team, sessioni e il log di audit in SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: c77cc53481fb
+i18n_output_hash: 317e535b9400
+i18n_hash_version: 2
 ---
 
 # Utenti, ruoli e permessi {#users-roles-permissions}
@@ -82,12 +83,12 @@ Tutti e 17 i permessi. Controllo completo sull'istanza.
 | `pipelines:all` | Visualizzare e gestire le pipeline di tutti gli utenti |
 | `settings:read` | Visualizzare le impostazioni dell'istanza |
 | `settings:write` | Modificare le impostazioni dell'istanza |
-| `users:manage` | Creare, aggiornare ed eliminare account utente |
+| `users:manage` | Crea e gestisci gli account utente entro i limiti di autorità dell'attore |
 | `teams:manage` | Creare, aggiornare ed eliminare team |
 | `features:manage` | Installare e gestire i bundle di funzionalità AI |
 | `system:health` | Accedere agli endpoint di salute e prontezza |
 | `audit:read` | Visualizzare il log di audit ed elencare i ruoli |
-| `compliance:manage` | Gestire il ciclo di vita GDPR e le funzionalità di conformità |
+| `compliance:manage` | Gestire il ciclo di vita e le funzionalità di conformità del GDPR; le operazioni utente distruttive rimangono limitate all'autorità |
 | `webhooks:manage` | Configurare i webhook in uscita |
 | `security:manage` | Gestire le impostazioni di sicurezza (allowlist IP, imposizione SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 I nomi dei ruoli devono avere da 2 a 30 caratteri, alfanumerici minuscoli con trattini e trattini bassi.
 
-### Permessi riservati agli amministratori {#admin-reserved-permissions}
+### I confini dell'amministrazione delegata {#delegated-administration-boundaries}
 
-Tre permessi sono riservati ai ruoli integrati e non possono essere assegnati ai ruoli personalizzati:
+Tutte le 17 autorizzazioni possono essere delegate tramite ruoli personalizzati, ma un'autorizzazione amministrativa non rende tale ruolo equivalente al ruolo `admin` integrato. Le mutazioni dell'utente autorizzate da `users:manage`, le operazioni distruttive autorizzate da `compliance:manage` e la gestione dei ruoli personalizzati autorizzata da `security:manage` sono vincolate dall'attuale autorità dell'attore:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- I ruoli integrati seguono `admin` > `editor` > `user`; i ruoli personalizzati sono sotto i ruoli integrati.
+- Le autorizzazioni del target devono essere contenute nelle autorizzazioni **effettive** dell'attore. Una chiave API con ambito pertanto non può esercitare le autorizzazioni omesse dal suo ambito.
+- L'accesso allo strumento di un ruolo target deve essere contenuto dall'accesso allo strumento stesso dell'attore.
+- Un account disabilitato viene confrontato con il suo ruolo originale quando tale ruolo viene registrato come `disabled:<original-role>`.
+- L'eliminazione di un ruolo personalizzato richiede anche l'autorizzazione per assegnare il fallback `user` integrato; i membri disabili rimangono disabilitati come `disabled:user`.
 
-L'API dei ruoli rifiuta qualsiasi richiesta che includa questi permessi. Solo il ruolo integrato `admin` vi ha accesso.
+Le credenziali globali e la configurazione sono più rigorose: l'emissione o la revoca del token SCIM e l'importazione della configurazione dell'istanza richiedono il ruolo `admin` integrato con completa autorità di amministrazione effettiva.
 
 ### Permessi a livello di strumento {#tool-level-permissions}
 

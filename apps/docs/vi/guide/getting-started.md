@@ -1,8 +1,9 @@
 ---
 description: "Cài đặt SnapOtter với Docker trong một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn, và tổng quan đầy đủ về tính năng."
-i18n_output_hash: 79eec34684bb
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 77a310799bcf
+i18n_hash_version: 2
 ---
 
 # Bắt đầu {#getting-started}
@@ -40,7 +41,7 @@ Thêm `--gpus all` để loại bỏ nền, nâng cấp, nâng cấp và phục 
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Yêu cầu [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động chuyển về CPU khi CUDA không khả dụng. Việc tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync, hoặc OpenCL hiện chưa được hỗ trợ cho suy luận AI. Xem [Docker Tags](/vi/guide/docker-tags) để biết các phép đo hiệu năng.
+Yêu cầu [Bộ công cụ bộ chứa NVIDIA] (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động quay trở lại CPU khi CUDA không khả dụng. Hiện nay, khả năng tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL không được hỗ trợ cho suy luận AI. Xem [Thẻ Docker](/vi/guide/docker-tags) để biết điểm chuẩn. Nếu các công cụ AI chạy trên CPU mặc dù có `--gpus all`, hãy xem [Xác minh khả năng tăng tốc GPU](/vi/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Cũng có trên GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Phương thức | Số lượng | Công cụ ví dụ |
 |----------|-------|---------------|
-| **Hình ảnh** | 105 | Thay đổi kích thước, Cắt, Nén, Chuyển đổi, Xóa nền, Nâng cấp độ phân giải, OCR, Đóng dấu, Ghép ảnh, Tô màu, Công cụ GIF, preset định dạng |
+| **Hình ảnh** | 107 | Thay đổi kích thước, Cắt, Nén, Chuyển đổi, Xóa nền, Nâng cấp độ phân giải, OCR, Đóng dấu, Ghép ảnh, Tô màu, Công cụ GIF, preset định dạng |
 | **Video** | 57 | Cắt, Cắt khung, Nén, Chuyển đổi, Gộp, Trích xuất âm thanh, Phụ đề tự động, Video sang GIF, Thay đổi kích thước, Ổn định, preset định dạng |
 | **Âm thanh** | 27 | Cắt, Gộp, Chuyển đổi, Chuẩn hóa, Giảm nhiễu, Phiên âm, Dịch cao độ, Fade, Tạo nhạc chuông, preset định dạng |
 | **PDF / Tài liệu** | 42 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |

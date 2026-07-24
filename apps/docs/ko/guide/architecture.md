@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter의 모노레포 구조, 앱 및 패키지 아키텍처, 요청 라이프사이클, 리소스 사용량."
-i18n_output_hash: 90a5f3b46d1e
-i18n_source_hash: a53946e760b0
+i18n_source_hash: 50e076925c4b
 i18n_provenance: human
+i18n_output_hash: 45e8d01172a0
+i18n_hash_version: 2
 ---
 
 # 아키텍처 {#architecture}
@@ -52,7 +53,7 @@ Python 스크립트가 살고 있습니다 `packages/ai/python/`. 대규모 옵�
 
 ### API (`apps/api`) {#api-apps-api}
 
-다섯 가지 모달리티(image, video, audio, PDF, file)에 걸친 241개의 도구 경로를 노출하는 Fastify v5 서버로, 다음을 처리합니다.
+다섯 가지 모달리티(image, video, audio, PDF, file)에 걸친 243개의 도구 경로를 노출하는 Fastify v5 서버로, 다음을 처리합니다.
 - 파일 업로드, 임시 워크스페이스 관리, 영구 파일 저장
 - 사용자 파일 라이브러리(`user_files` 테이블): 저장된 편집본은 기본적으로 독립적인 새 파일로 저장되며, 원본을 덮어쓸 때는 부모와 연결된 버전으로 저장됩니다. 어떤 도구가 적용되었는지(`toolChain`)를 기록하고 Files 페이지를 위한 썸네일이 자동 생성됩니다
 - 도구 실행(각 도구 요청을 이미지 엔진 또는 AI 브리지로 라우팅)

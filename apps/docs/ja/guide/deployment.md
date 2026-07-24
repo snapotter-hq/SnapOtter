@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter を Docker で本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare 向けのリバースプロキシ設定を扱います。"
-i18n_output_hash: 2b65cb4be9d1
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: b3b304700876
+i18n_hash_version: 2
 ---
 
 # デプロイ {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-ログで CUDA の検出を確認します：
+### GPU アクセラレーションを検証する {#verify-gpu-acceleration}
+
+ログで CUDA の検出を確認します。
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+`--gpus all` と NVIDIA Container Toolkit が正しく設定されているにもかかわらず、AI ツールが CPU 上で実行される場合は、**設定 → AI 機能** から影響を受けるバンドル (背景の削除など) を再インストールします。インストーラーは ONNX ランタイムの GPU ビルドを復元します。そうでない場合、別のバンドル (トランスクリプションなど) によって引き込まれた CPU のみのビルドが共有 AI 環境にシャドウされる可能性があります。 UI から再インストールしても古いイメージの GPU が復元されない場合は、[問題 #490](https://github.com/snapotter-hq/SnapOtter/issues/490) の手動修復を参照してください。
 
 ## ハードウェア要件 {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter はデフォルトで `TRUST_PROXY=true` を設定するため、レート制限とロギングは `X-Forwarded-For` ヘッダーの実際のクライアント IP を使用します。
 
+以下のすべてのプロキシについて 2 つのことが重要です。それは、大きなリクエスト本文 (アップロード) を許可することと、応答をバッファリングしないことです。応答バッファリング プロキシは SSE の進行を中断し、より目に見えて大きなファイルのダウンロードが「開始されるが終了しない」ことになります。これは、プロキシがファイル全体を引き渡す前に保持するためです。 SnapOtter はダウンロード時に `X-Accel-Buffering: no` を送信するため、他の場所でバッファリングがオンのままであっても nginx はそれらをストリーミングしますが、nginx 以外のプロキシでは応答バッファリングを明示的に無効にする必要があります (以下の各構成に示されています)。ダウンロードが途中で停止した場合、最初に確認する必要があるのは、前面にあるバッファリング プロキシです。
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # バッファリングの代わりに応答をストリームします。SSE の進行 (バッチ、AI、機能のインストール) や大きなファイルのダウンロードに必要です。
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` はレスポンスのバッファリングを無効にします。これは SSE の進捗イベント（バッチ処理、AI ツール、機能のインストール）に必要です。延長されたタイムアウトにより、Caddy が接続を早期に閉じることなく大きなファイルのアップロードを完了できます。
+`flush_interval -1` は、応答バッファリングを無効にします。これは、SSE の進行状況イベント (バッチ処理、AI ツール、機能のインストール) と、大きなファイルのダウンロードが停止せずにストリーミングするために必要です。タイムアウトを延長すると、Caddy が接続を早期に閉じることなく、大きなファイルのアップロードを完了できます。
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

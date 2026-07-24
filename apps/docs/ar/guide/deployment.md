@@ -1,8 +1,9 @@
 ---
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد وإعداد GPU وإعدادات الوكيل العكسي لـ Nginx و Traefik و Cloudflare."
-i18n_output_hash: 44503f8d944c
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: f61512a98aa3
+i18n_hash_version: 2
 ---
 
 # النشر {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
+### التحقق من تسريع GPU {#verify-gpu-acceleration}
+
 تحقق من اكتشاف CUDA في السجلات:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+إذا تم تشغيل أدوات الذكاء الاصطناعي على وحدة المعالجة المركزية (CPU) على الرغم من إعداد `--gpus all` ومجموعة أدوات حاوية NVIDIA بشكل صحيح، فأعد تثبيت الحزمة المتأثرة (على سبيل المثال إزالة الخلفية) من **الإعدادات → ميزات الذكاء الاصطناعي**. يقوم المثبت باستعادة بنية GPU الخاصة بـ ONNX Runtime، والتي يمكن أن تظل بنية وحدة المعالجة المركزية فقط التي تم سحبها بواسطة حزمة أخرى (مثل النسخ) في بيئة الذكاء الاصطناعي المشتركة. إذا لم تؤدي إعادة التثبيت من واجهة المستخدم إلى استعادة وحدة معالجة الرسومات على صورة قديمة، فراجع الإصلاح اليدوي في [الإصدار رقم 490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## متطلبات العتاد {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 يعيّن SnapOtter `TRUST_PROXY=true` افتراضيًا حتى يستخدم تحديد المعدل والتسجيل عنوان IP الحقيقي للعميل من رؤوس `X-Forwarded-For`.
 
+هناك شيئان مهمان لكل وكيل أدناه: السماح بنصوص الطلبات الكبيرة (التحميلات)، وعدم تخزين الاستجابات مؤقتًا. يعطل وكيل التخزين المؤقت للاستجابة تقدم SSE، وبشكل أكثر وضوحًا، يجعل تنزيل ملف كبير "يبدأ ولكن لا ينتهي أبدًا"، لأن الوكيل يحتفظ بالملف بأكمله قبل تمريره. يرسل SnapOtter `X-Accel-Buffering: no` عند التنزيلات، لذا يقوم nginx ببثها حتى لو تم ترك التخزين المؤقت في مكان آخر، لكن الوكلاء بخلاف nginx يحتاجون إلى تعطيل التخزين المؤقت للاستجابة بشكل صريح (كما هو موضح في كل تكوين أدناه). إذا توقف التنزيل جزئيًا، فإن وكيل التخزين المؤقت الموجود في المقدمة هو أول شيء يجب التحقق منه.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # تدفق الاستجابات بدلاً من التخزين المؤقت: مطلوب لتقدم SSE (الدفعة، الذكاء الاصطناعي، عمليات تثبيت الميزات) ولتنزيلات الملفات الكبيرة.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-يعطّل `flush_interval -1` التخزين المؤقت للاستجابة، وهو مطلوب لأحداث تقدم SSE (المعالجة على دفعات، وأدوات الذكاء الاصطناعي، وتثبيت الميزات). تسمح مهل الانتظار الممتدة لعمليات رفع الملفات الكبيرة بالاكتمال دون أن يغلق Caddy الاتصال مبكرًا.
+يقوم `flush_interval -1` بتعطيل التخزين المؤقت للاستجابة، وهو أمر مطلوب لأحداث تقدم SSE (معالجة الدفعات، وأدوات الذكاء الاصطناعي، وعمليات تثبيت الميزات) ولتنزيلات الملفات الكبيرة للتدفق من خلالها بدلاً من المماطلة. تسمح المهلات الممتدة بإكمال عمليات تحميل الملفات الكبيرة دون إغلاق Caddy الاتصال مبكرًا.
 
 ### أنفاق Cloudflare {#cloudflare-tunnels}
 

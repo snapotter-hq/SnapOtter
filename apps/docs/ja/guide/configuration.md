@@ -1,8 +1,9 @@
 ---
 description: "すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。"
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: 4070dc47c212
+i18n_output_hash: 9823eeb45541
+i18n_hash_version: 2
 ---
 
 # 設定 {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

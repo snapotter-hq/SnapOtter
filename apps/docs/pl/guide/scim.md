@@ -1,8 +1,9 @@
 ---
 description: "Skonfiguruj provisioning SCIM 2.0, aby synchronizować użytkowników i grupy z Twojego dostawcy tożsamości do SnapOtter. Obejmuje Okta, Azure AD / Entra ID oraz integracje niestandardowe."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: aaf894e3748e
+i18n_output_hash: 2c93409c4926
+i18n_hash_version: 2
 ---
 
 # Provisioning SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ Provisioning SCIM wymaga licencji **enterprise** z funkcją `scim`. Nie jest dos
 
 - Działająca instancja SnapOtter dostępna pod publicznym adresem URL
 - Klucz licencji enterprise z funkcją `scim`
-- Dostęp administracyjny do SnapOtter (do wygenerowania lub odwołania tokenu SCIM wymagane jest uprawnienie `users:manage`)
+- Wbudowane konto SnapOtter `admin` z pełnym efektywnym zestawem uprawnień. Delegowana rola niestandardowa lub klucz API administratora, któremu brakuje uprawnień administratora, nie mogą wygenerować ani unieważnić globalnego tokena SCIM.
 - Dostęp administracyjny do ustawień provisioningu Twojego dostawcy tożsamości
 
 ## Szybki start {#quick-start}
@@ -34,7 +35,7 @@ Odpowiedź zawiera token. Zapisz go natychmiast; nie można go pobrać ponownie.
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ Punkty końcowe SCIM używają dedykowanego tokenu Bearer, odrębnego od sesji u
 
 ### Generowanie tokenu {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` generuje nowy token SCIM. Ten punkt końcowy wymaga ważnej sesji z uprawnieniem `users:manage`.
+`POST /api/v1/enterprise/scim/token` generuje nowy token SCIM. Ponieważ token może udostępniać i mutować użytkowników w całej instancji, ten punkt końcowy wymaga wbudowanej roli `admin` z pełnym efektywnym zestawem uprawnień administratora. Trzymanie `users:manage` w roli niestandardowej nie jest wystarczające.
 
 Token jest zwracany w postaci jawnej dokładnie raz. SnapOtter przechowuje tylko hash scrypt. Jeśli utracisz token, odwołaj go i wygeneruj nowy.
 
 Jednocześnie aktywny jest tylko jeden token SCIM. Wygenerowanie nowego tokenu zastępuje poprzedni.
 
+::: warning Ponowne wydanie tokena po aktualizacji
+Starsze, niewersjonowane tokeny SCIM są odrzucane. Po uaktualnieniu do wersji, która wystawia tokeny `so_scim_v2_...`, wygeneruj nowy token i zaktualizuj dostawcę tożsamości przed wznowieniem udostępniania.
+:::
+
 ### Odwoływanie tokenu {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` odwołuje bieżący token SCIM. Ten punkt końcowy również wymaga `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` unieważnia bieżący token SCIM. Ma te same pełne wbudowane wymagania administracyjne, co generowanie tokenów.
 
 ### Ograniczanie liczby żądań {#rate-limiting}
 
@@ -279,7 +284,7 @@ Twoja licencja nie zawiera funkcji `scim` albo nie skonfigurowano żadnej licenc
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token nie pasuje do przechowywanego hasha. Dzieje się tak, jeśli token został odwołany i wygenerowany ponownie. Zaktualizuj token w ustawieniach provisioningu swojego IdP.
+Token jest zniekształcony, używa wycofanego formatu niewersjonowanego lub nie pasuje do zapisanego skrótu. Wygeneruj aktualny token `so_scim_v2_...` i zaktualizuj token w ustawieniach udostępniania IdP.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

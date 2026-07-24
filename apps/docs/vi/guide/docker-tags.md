@@ -1,8 +1,9 @@
 ---
 description: "Các thẻ image Docker của SnapOtter, benchmark GPU, ghim phiên bản và hỗ trợ đa nền tảng cho AMD64 và ARM64."
-i18n_output_hash: ff6684849549
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: 912c4849a48b
+i18n_hash_version: 2
 ---
 
 # Docker Image {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

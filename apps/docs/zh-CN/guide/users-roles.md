@@ -1,8 +1,9 @@
 ---
 description: "在 SnapOtter 中管理用户、内置角色与自定义角色、权限、API 密钥、团队、会话以及审计日志。"
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: db9aecb6141c
+i18n_output_hash: 586307e9d95e
+i18n_hash_version: 2
 ---
 
 # 用户、角色与权限 {#users-roles-permissions}
@@ -82,12 +83,12 @@ SnapOtter 包含三个内置角色。它们无法被修改或删除。
 | `pipelines:all` | 查看和管理所有用户的流水线 |
 | `settings:read` | 查看实例设置 |
 | `settings:write` | 修改实例设置 |
-| `users:manage` | 创建、更新和删除用户账户 |
+| `users:manage` | 在参与者的权限范围内创建和管理用户帐户 |
 | `teams:manage` | 创建、更新和删除团队 |
 | `features:manage` | 安装和管理 AI 功能包 |
 | `system:health` | 访问健康与就绪端点 |
 | `audit:read` | 查看审计日志并列出角色 |
-| `compliance:manage` | 管理 GDPR 生命周期和合规功能 |
+| `compliance:manage` | 管理 GDPR 生命周期和合规性功能；破坏性用户操作仍受权限限制 |
 | `webhooks:manage` | 配置出站 webhook |
 | `security:manage` | 管理安全设置（IP 允许列表、SSO 强制） |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 角色名称必须为 2 到 30 个字符，小写字母数字，可包含连字符和下划线。
 
-### 管理员保留权限 {#admin-reserved-permissions}
+### 委派管理边界 {#delegated-administration-boundaries}
 
-有三项权限保留给内置角色，无法分配给自定义角色：
+所有 17 个权限都可以通过自定义角色委派，但管理权限并不会使该角色等同于内置 `admin` 角色。 `users:manage`授权的用户突变、`compliance:manage`授权的破坏性操作以及`security:manage`授权的自定义角色管理均受参与者当前权限的约束：
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- 内置角色遵循`admin` > `editor` > `user`；自定义角色位于内置角色下方。
+- 目标的权限必须包含在参与者的**有效**权限中。因此，限定范围的 API 密钥无法行使其范围中省略的权限。
+- 目标角色的工具访问权限必须包含在参与者自己的工具访问权限中。
+- 当角色记录为 `disabled:<original-role>` 时，已禁用的帐户将根据其原始角色进行检查。
+- 删除自定义角色还需要分配内置`user`后备的权限；禁用的成员仍然禁用为 `disabled:user`。
 
-角色 API 会拒绝任何包含这些权限的请求。只有内置的 `admin` 角色才能访问它们。
+全局凭证和配置更加严格：颁发或撤销 SCIM 令牌以及导入实例配置需要具有完整有效管理权限的内置 `admin` 角色。
 
 ### 工具级权限 {#tool-level-permissions}
 

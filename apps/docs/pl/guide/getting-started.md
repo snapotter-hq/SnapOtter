@@ -1,8 +1,9 @@
 ---
 description: "Zainstaluj SnapOtter za pomocą Dockera jednym poleceniem. Zawiera konfigurację Docker Compose, budowanie ze źródeł i pełny przegląd funkcji."
-i18n_output_hash: 3d17e456c824
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: e85d00bc1b8b
+i18n_hash_version: 2
 ---
 
 # Pierwsze kroki {#getting-started}
@@ -40,7 +41,7 @@ Dodaj `--gpus all`, aby uzyskać NVIDIA przyspieszane przez CUDA usuwanie tła, 
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Wymaga [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Automatycznie przełącza się na CPU, gdy CUDA jest niedostępne. Przyspieszanie iGPU Intel/AMD przez VA-API, Quick Sync lub OpenCL nie jest obecnie obsługiwane dla wnioskowania AI. Zobacz [Tagi Docker](/pl/guide/docker-tags) po testy wydajności.
+Wymaga [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Automatycznie powraca do procesora, gdy CUDA jest niedostępna. Akceleracja Intel/AMD iGPU poprzez VA-API, Quick Sync lub OpenCL nie jest obecnie obsługiwana w przypadku wnioskowania AI. Zobacz [Tagi Dockera](/pl/guide/docker-tags), aby zapoznać się z testami porównawczymi. Jeśli narzędzia AI działają na procesorze pomimo `--gpus all`, zobacz [Sprawdź przyspieszenie GPU](/pl/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Także na GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Zmień to w przypadku wdrożeń nielokalnych
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalność | Liczba | Przykładowe narzędzia |
 |----------|-------|---------------|
-| **Obraz** | 105 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Skalowanie w górę, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, szablony formatów |
+| **Obraz** | 107 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Skalowanie w górę, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, szablony formatów |
 | **Wideo** | 57 | Przycinanie, Kadrowanie, Kompresja, Konwersja, Łączenie, Wyodrębnianie audio, Automatyczne napisy, Wideo do GIF, Zmiana rozmiaru, Stabilizacja, szablony formatów |
 | **Audio** | 27 | Przycinanie, Łączenie, Konwersja, Normalizacja, Redukcja szumów, Transkrypcja, Zmiana wysokości dźwięku, Wyciszanie, Kreator dzwonków, szablony formatów |
 | **PDF / Dokument** | 42 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redagowanie, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |

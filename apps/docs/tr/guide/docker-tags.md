@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter Docker imaj etiketleri, GPU karşılaştırmaları, sürüm sabitleme ve AMD64 ile ARM64 için çoklu platform desteği."
-i18n_output_hash: ad7046cd45ce
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: fd5ce3bb0f0f
+i18n_hash_version: 2
 ---
 
 # Docker İmajı {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

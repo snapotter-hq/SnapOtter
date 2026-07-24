@@ -1,8 +1,9 @@
 ---
 description: "Hantera användare, inbyggda och anpassade roller, behörigheter, API-nycklar, team, sessioner och granskningsloggen i SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: ce4e3c6f3ee8
+i18n_output_hash: 9af24cfc9c89
+i18n_hash_version: 2
 ---
 
 # Användare, roller och behörigheter {#users-roles-permissions}
@@ -82,12 +83,12 @@ Alla 17 behörigheter. Full kontroll över instansen.
 | `pipelines:all` | Visa och hantera alla användares pipelines |
 | `settings:read` | Visa instansinställningar |
 | `settings:write` | Ändra instansinställningar |
-| `users:manage` | Skapa, uppdatera och radera användarkonton |
+| `users:manage` | Skapa och hantera användarkonton inom aktörens behörighetsgräns |
 | `teams:manage` | Skapa, uppdatera och radera team |
 | `features:manage` | Installera och hantera AI-funktionsbuntar |
 | `system:health` | Åtkomst till health- och readiness-slutpunkter |
 | `audit:read` | Visa granskningsloggen och lista roller |
-| `compliance:manage` | Hantera GDPR-livscykel och efterlevnadsfunktioner |
+| `compliance:manage` | Hantera GDPR-livscykel- och efterlevnadsfunktioner; destruktiva användaroperationer förblir auktoritetsbundna |
 | `webhooks:manage` | Konfigurera utgående webhooks |
 | `security:manage` | Hantera säkerhetsinställningar (IP-tillåtelselista, SSO-tvingande) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Rollnamn måste vara 2-30 tecken, gemena alfanumeriska med bindestreck och understreck.
 
-### Administratörsreserverade behörigheter {#admin-reserved-permissions}
+### Delegerade administrationsgränser {#delegated-administration-boundaries}
 
-Tre behörigheter är reserverade för inbyggda roller och kan inte tilldelas anpassade roller:
+Alla 17 behörigheter kan delegeras genom anpassade roller, men en administrativ behörighet gör inte den rollen likvärdig med den inbyggda `admin`-rollen. Användarmutationer godkända av `users:manage`, destruktiva operationer godkända av `compliance:manage` och anpassade rollhantering auktoriserad av `security:manage` begränsas av skådespelarens nuvarande auktoritet:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Inbyggda roller följer `admin` > `editor` > `user`; anpassade roller är under inbyggda roller.
+- Målets behörigheter måste innehållas av skådespelarens **effektiva** behörigheter. En scoped API-nyckel kan därför inte utöva behörigheter som utelämnas från dess scope.
+- En målrolls verktygsåtkomst ska innehållas av aktörens egen verktygsåtkomst.
+- Ett inaktiverat konto kontrolleras mot sin ursprungliga roll när den rollen registreras som `disabled:<original-role>`.
+- Att ta bort en anpassad roll kräver också behörighet att tilldela den inbyggda `user` reserv; funktionshindrade medlemmar förblir inaktiverade som `disabled:user`.
 
-roles-API:et avvisar varje förfrågan som inkluderar dessa behörigheter. Endast den inbyggda `admin`-rollen har åtkomst till dem.
+Globala autentiseringsuppgifter och konfiguration är strängare: utfärdande eller återkallande av SCIM-token och import av instanskonfiguration kräver den inbyggda `admin`-rollen med fullständig effektiv administratörsbehörighet.
 
 ### Behörigheter på verktygsnivå {#tool-level-permissions}
 

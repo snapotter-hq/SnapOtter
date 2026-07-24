@@ -1,8 +1,9 @@
 ---
 description: "Gerencie usuários, papéis integrados e personalizados, permissões, chaves de API, times, sessões e o log de auditoria no SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 520ee01a5650
+i18n_output_hash: 4146f4acdfc0
+i18n_hash_version: 2
 ---
 
 # Usuários, Papéis e Permissões {#users-roles-permissions}
@@ -82,12 +83,12 @@ Todas as 17 permissões. Controle total sobre a instância.
 | `pipelines:all` | Ver e gerenciar os pipelines de todos os usuários |
 | `settings:read` | Ver as configurações da instância |
 | `settings:write` | Modificar as configurações da instância |
-| `users:manage` | Criar, atualizar e excluir contas de usuário |
+| `users:manage` | Criar e gerenciar contas de usuário dentro dos limites de autoridade do ator |
 | `teams:manage` | Criar, atualizar e excluir times |
 | `features:manage` | Instalar e gerenciar bundles de recursos de IA |
 | `system:health` | Acessar os endpoints de health e readiness |
 | `audit:read` | Ver o log de auditoria e listar papéis |
-| `compliance:manage` | Gerenciar o ciclo de vida de GDPR e recursos de conformidade |
+| `compliance:manage` | Gerenciar o ciclo de vida e os recursos de conformidade do GDPR; operações destrutivas do usuário permanecem limitadas pela autoridade |
 | `webhooks:manage` | Configurar webhooks de saída |
 | `security:manage` | Gerenciar configurações de segurança (lista de IPs permitidos, imposição de SSO) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Os nomes de papéis devem ter de 2 a 30 caracteres, alfanuméricos em minúsculas, com hifens e underscores.
 
-### Permissões reservadas ao admin {#admin-reserved-permissions}
+### Limites de administração delegada {#delegated-administration-boundaries}
 
-Três permissões são reservadas aos papéis integrados e não podem ser atribuídas a papéis personalizados:
+Todas as 17 permissões podem ser delegadas por meio de funções personalizadas, mas uma permissão administrativa não torna essa função equivalente à função `admin` integrada. Mutações de usuário autorizadas por `users:manage`, operações destrutivas autorizadas por `compliance:manage` e gerenciamento de função personalizada autorizada por `security:manage` são limitadas pela autoridade atual do ator:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- As funções integradas seguem `admin` > `editor` > `user`; as funções personalizadas estão abaixo das funções integradas.
+- As permissões do alvo devem estar contidas nas permissões **efetivas** do ator. Uma chave de API com escopo definido, portanto, não pode exercer permissões omitidas de seu escopo.
+- O acesso à ferramenta de uma função alvo deve ser contido pelo acesso à ferramenta do próprio ator.
+- Uma conta desativada é verificada em relação à sua função original quando essa função é registrada como `disabled:<original-role>`.
+- A exclusão de uma função personalizada também requer autoridade para atribuir o substituto `user` integrado; membros desabilitados permanecem desabilitados como `disabled:user`.
 
-A API de papéis rejeita qualquer requisição que inclua essas permissões. Somente o papel integrado `admin` tem acesso a elas.
+As credenciais e a configuração globais são mais rigorosas: a emissão ou revogação do token SCIM e a importação da configuração da instância exigem a função `admin` integrada com autoridade administrativa completa e efetiva.
 
 ### Permissões no nível de ferramenta {#tool-level-permissions}
 

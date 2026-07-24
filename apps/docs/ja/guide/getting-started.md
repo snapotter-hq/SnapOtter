@@ -1,8 +1,9 @@
 ---
 description: "1 つのコマンドで SnapOtter を Docker でインストールします。Docker Compose のセットアップ、ソースからのビルド、機能の全体像を含みます。"
-i18n_output_hash: c84093005283
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 7be2b4a38edd
+i18n_hash_version: 2
 ---
 
 # はじめに {#getting-started}
@@ -40,7 +41,7 @@ NVIDIA CUDA で高速化された背景除去、アップスケーリング、�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) が必要です。CUDA が利用できない場合は自動的に CPU にフォールバックします。VA-API、Quick Sync、OpenCL を介した Intel/AMD iGPU アクセラレーションは、現時点では AI 推論に対応していません。ベンチマークについては [Docker Tags](/ja/guide/docker-tags) を参照してください。
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) が必要です。 CUDA が使用できない場合は、自動的に CPU にフォールバックします。現在、VA-API、Quick Sync、または OpenCL を介した Intel/AMD iGPU アクセラレーションは AI 推論ではサポートされていません。ベンチマークについては、[Docker タグ](/ja/guide/docker-tags) を参照してください。 `--gpus all` にもかかわらず AI ツールが CPU で実行される場合は、[GPU アクセラレーションを検証する](/ja/guide/deployment#verify-gpu-acceleration) を参照してください。
 :::
 
 ::: details GHCR でも利用可能
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | モダリティ | 数 | ツールの例 |
 |----------|-------|---------------|
-| **画像** | 105 | リサイズ、切り抜き、圧縮、変換、背景除去、アップスケール、OCR、透かし、コラージュ、カラー化、GIF ツール、フォーマットプリセット |
+| **画像** | 107 | リサイズ、切り抜き、圧縮、変換、背景除去、アップスケール、OCR、透かし、コラージュ、カラー化、GIF ツール、フォーマットプリセット |
 | **ビデオ** | 57 | トリミング、切り抜き、圧縮、変換、結合、オーディオ抽出、自動字幕、ビデオから GIF、リサイズ、手ブレ補正、フォーマットプリセット |
 | **オーディオ** | 27 | トリミング、結合、変換、正規化、ノイズ低減、文字起こし、ピッチシフト、フェード、着信音メーカー、フォーマットプリセット |
 | **PDF / ドキュメント** | 42 | 結合、分割、圧縮、OCR、透かし、墨消し、Word から PDF、Excel から PDF、回転、保護、修復 |

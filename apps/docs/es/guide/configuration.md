@@ -1,8 +1,9 @@
 ---
 description: "Todas las variables de entorno de SnapOtter con sus valores predeterminados. Configura autenticación, almacenamiento, modelos de IA, analítica y más."
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: e405b8a429bd
+i18n_output_hash: 469f3ab3c81c
+i18n_hash_version: 2
 ---
 
 # Configuración {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Cambie esto para implementaciones no locales
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

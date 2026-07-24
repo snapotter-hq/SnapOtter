@@ -1,8 +1,9 @@
 ---
 description: "Installez SnapOtter avec Docker en une seule commande. Inclut la configuration Docker Compose, la construction depuis les sources et un aperçu complet des fonctionnalités."
-i18n_output_hash: 2c2f3f2e8ae1
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 9bd0adbdc6e9
+i18n_hash_version: 2
 ---
 
 # Prise en main {#getting-started}
@@ -40,7 +41,7 @@ Ajoutez `--gpus all` pour la suppression, la mise à l'échelle, l'amélioration
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Nécessite le [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Se replie automatiquement sur le CPU lorsque CUDA n'est pas disponible. L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas prise en charge pour l'inférence IA aujourd'hui. Consultez [Tags Docker](/fr/guide/docker-tags) pour les tests de performance.
+Nécessite le [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Revient automatiquement au CPU lorsque CUDA n'est pas disponible. L’accélération Intel/AMD iGPU via VA-API, Quick Sync ou OpenCL n’est aujourd’hui pas prise en charge pour l’inférence IA. Voir [Docker Tags](/fr/guide/docker-tags) pour les tests de performance. Si les outils d'IA s'exécutent sur le processeur malgré `--gpus all`, voir [Vérifier l'accélération GPU] (/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Également sur GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Changez ceci pour les déploiements non locaux
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalité | Nombre | Outils d'exemple |
 |----------|-------|---------------|
-| **Image** | 105 | Redimensionner, Rogner, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
+| **Image** | 107 | Redimensionner, Rogner, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
 | **Vidéo** | 57 | Couper, Rogner, Compresser, Convertir, Fusionner, Extraire l'audio, Sous-titres automatiques, Vidéo vers GIF, Redimensionner, Stabiliser, préréglages de format |
 | **Audio** | 27 | Couper, Fusionner, Convertir, Normaliser, Réduction du bruit, Transcrire, Décalage de hauteur, Fondu, Créateur de sonnerie, préréglages de format |
 | **PDF / Document** | 42 | Fusionner, Diviser, Compresser, OCR, Filigrane, Caviarder, Word vers PDF, Excel vers PDF, Pivoter, Protéger, Réparer |

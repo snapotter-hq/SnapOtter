@@ -1,8 +1,9 @@
 ---
 description: "Instale o SnapOtter com Docker em um único comando. Inclui configuração de Docker Compose, build a partir do código-fonte e uma visão geral completa das features."
-i18n_output_hash: 8584b5780f52
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 642e5ada23cd
+i18n_hash_version: 2
 ---
 
 # Primeiros Passos {#getting-started}
@@ -40,7 +41,7 @@ Adicione `--gpus all` para remoção de fundo, aumento de escala, aprimoramento 
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requer o [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Faz fallback para CPU automaticamente quando o CUDA está indisponível. A aceleração por iGPU Intel/AMD através de VA-API, Quick Sync ou OpenCL não é suportada para inferência de IA no momento. Veja [Tags Docker](/pt-BR/guide/docker-tags) para benchmarks.
+Requer o [kit de ferramentas NVIDIA Container](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Volta para a CPU automaticamente quando CUDA não está disponível. A aceleração Intel/AMD iGPU por meio de VA-API, Quick Sync ou OpenCL não é suportada atualmente para inferência de IA. Consulte [Tags Docker](/pt-BR/guide/docker-tags) para benchmarks. Se as ferramentas de IA forem executadas na CPU apesar de `--gpus all`, consulte [Verificar aceleração de GPU](/pt-BR/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Também no GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Altere isso para implantações não locais
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalidade | Contagem | Ferramentas de Exemplo |
 |----------|-------|---------------|
-| **Imagem** | 105 | Redimensionar, Recortar, Comprimir, Converter, Remover Fundo, Upscale, OCR, Marca d'água, Colagem, Colorizar, Ferramentas de GIF, presets de formato |
+| **Imagem** | 107 | Redimensionar, Recortar, Comprimir, Converter, Remover Fundo, Upscale, OCR, Marca d'água, Colagem, Colorizar, Ferramentas de GIF, presets de formato |
 | **Vídeo** | 57 | Cortar, Recortar, Comprimir, Converter, Mesclar, Extrair Áudio, Legendas Automáticas, Vídeo para GIF, Redimensionar, Estabilizar, presets de formato |
 | **Áudio** | 27 | Cortar, Mesclar, Converter, Normalizar, Redução de Ruído, Transcrever, Alteração de Pitch, Fade, Criador de Toques, presets de formato |
 | **PDF / Documento** | 42 | Mesclar, Dividir, Comprimir, OCR, Marca d'água, Ocultar, Word para PDF, Excel para PDF, Girar, Proteger, Reparar |

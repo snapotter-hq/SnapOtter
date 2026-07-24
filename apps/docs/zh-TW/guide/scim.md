@@ -1,8 +1,9 @@
 ---
 description: "設定 SCIM 2.0 佈建，將使用者與群組從您的身分提供者同步至 SnapOtter。涵蓋 Okta、Azure AD / Entra ID 以及自訂整合。"
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 674e1fe7bfc1
+i18n_output_hash: da12b859e973
+i18n_hash_version: 2
 ---
 
 # SCIM 佈建 {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM 佈建需要具備 `scim` 功能的 **enterprise** 授權。team 方案無�
 
 - 一個可透過公開網址存取的執行中 SnapOtter 執行個體
 - 具備 `scim` 功能的企業版授權金鑰
-- SnapOtter 的管理員存取權（產生或撤銷 SCIM 權杖需要 `users:manage` 權限）
+- 內建 SnapOtter `admin` 帳戶及其完整的有效權限集。委託的自訂角色或缺少任何管理權限的管理 API 金鑰無法產生或撤銷全域 SCIM 令牌。
 - 您身分提供者佈建設定的管理員存取權
 
 ## 快速開始 {#quick-start}
@@ -34,7 +35,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM 端點使用專屬的 Bearer 權杖，與使用者工作階段及 API 金�
 
 ### 產生權杖 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` 會產生一個新的 SCIM 權杖。此端點需要具備 `users:manage` 權限的有效工作階段。
+`POST /api/v1/enterprise/scim/token` 產生新的 SCIM 代幣。由於令牌可以跨實例配置和變更用戶，因此此端點需要具有完整有效管理權限集的內建 `admin` 角色。將 `users:manage` 保留在自訂角色中是不夠的。
 
 該權杖以明文回傳，且僅回傳一次。SnapOtter 只儲存 scrypt 雜湊值。若您遺失權杖，請撤銷它並產生新的權杖。
 
 同一時間只有一個 SCIM 權杖處於使用中狀態。產生新權杖會取代先前的權杖。
 
+::: warning 升級後重新發行令牌
+舊版未版本控制的 SCIM 令牌將被拒絕。升級到頒發 `so_scim_v2_...` 令牌的版本後，請產生新令牌並更新您的身分提供者，然後再恢復配置。
+:::
+
 ### 撤銷權杖 {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` 會撤銷目前的 SCIM 權杖。此端點同樣需要 `users:manage`。
+`DELETE /api/v1/enterprise/scim/token` 撤銷目前的 SCIM 令牌。它具有與令牌生成相同的完整內建管理要求。
 
 ### 速率限制 {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM 請求未包含 `Authorization: Bearer <token>` 標頭。請檢查您 IdP �
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-權杖與已儲存的雜湊值不符。這會在權杖已被撤銷並重新產生時發生。請在您 IdP 的佈建設定中更新該權杖。
+令牌格式錯誤、使用已停用的未版本化格式或與儲存的雜湊不符。產生目前的 `so_scim_v2_...` 令牌並在 IdP 的組態設定中更新該令牌。
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

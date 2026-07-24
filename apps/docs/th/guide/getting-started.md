@@ -1,8 +1,9 @@
 ---
 description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว รวมถึงการตั้งค่า Docker Compose การ build จากซอร์ส และภาพรวมฟีเจอร์ทั้งหมด"
-i18n_output_hash: 5353dda97d38
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: ea414a3f9a92
+i18n_hash_version: 2
 ---
 
 # Getting Started {#getting-started}
@@ -40,7 +41,7 @@ SnapOtter มีการวิเคราะห์ผลิตภัณฑ์�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-ต้องใช้ [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) จะสำรองไปใช้ CPU โดยอัตโนมัติเมื่อไม่มี CUDA ปัจจุบันยังไม่รองรับการเร่งความเร็วด้วย iGPU ของ Intel/AMD ผ่าน VA-API, Quick Sync หรือ OpenCL สำหรับการอนุมาน AI ดู [Docker Tags](/th/guide/docker-tags) สำหรับผลการทดสอบประสิทธิภาพ
+ต้องใช้ [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) ถอยกลับไปที่ CPU โดยอัตโนมัติเมื่อ CUDA ไม่พร้อมใช้งาน การเร่งความเร็ว Intel/AMD iGPU ผ่าน VA-API, Quick Sync หรือ OpenCL ไม่รองรับการอนุมาน AI ในปัจจุบัน ดู [แท็กนักเทียบท่า](/th/guide/docker-tags) สำหรับการวัดประสิทธิภาพ หากเครื่องมือ AI ทำงานบน CPU แม้ว่าจะเป็น `--gpus all` โปรดดู [ตรวจสอบการเร่งความเร็ว GPU](/th/guide/deployment#verify-gpu-acceleration)
 :::
 
 ::: details มีบน GHCR ด้วย
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # เปลี่ยนสิ่งนี้สำหรับการปรับใช้ที่ไม่ใช่ภายในเครื่อง
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | โมดัลลิตี | จำนวน | เครื่องมือตัวอย่าง |
 |----------|-------|---------------|
-| **รูปภาพ** | 105 | ปรับขนาด, ครอป, บีบอัด, แปลง, ลบพื้นหลัง, ขยายภาพ, OCR, ลายน้ำ, คอลลาจ, ลงสี, เครื่องมือ GIF, พรีเซ็ตรูปแบบ |
+| **รูปภาพ** | 107 | ปรับขนาด, ครอป, บีบอัด, แปลง, ลบพื้นหลัง, ขยายภาพ, OCR, ลายน้ำ, คอลลาจ, ลงสี, เครื่องมือ GIF, พรีเซ็ตรูปแบบ |
 | **วิดีโอ** | 57 | ตัด, ครอป, บีบอัด, แปลง, รวม, แยกเสียง, คำบรรยายอัตโนมัติ, วิดีโอเป็น GIF, ปรับขนาด, ทำให้ภาพนิ่ง, พรีเซ็ตรูปแบบ |
 | **เสียง** | 27 | ตัด, รวม, แปลง, นอร์มัลไลซ์, ลดสัญญาณรบกวน, ถอดเสียง, ปรับระดับเสียง, เฟด, สร้างริงโทน, พรีเซ็ตรูปแบบ |
 | **PDF / เอกสาร** | 42 | รวม, แยก, บีบอัด, OCR, ลายน้ำ, ปกปิดข้อมูล, Word เป็น PDF, Excel เป็น PDF, หมุน, ป้องกัน, ซ่อมแซม |

@@ -1,8 +1,9 @@
 ---
 description: "Konfigurera SCIM 2.0-provisionering för att synkronisera användare och grupper från din identitetsleverantör till SnapOtter. Täcker Okta, Azure AD / Entra ID och anpassade integrationer."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 17d440079ffa
+i18n_output_hash: c9b3b79e1946
+i18n_hash_version: 2
 ---
 
 # SCIM-provisionering {#scim-provisioning}
@@ -17,7 +18,7 @@ SCIM-provisionering kräver en **enterprise**-licens med funktionen `scim`. Den 
 
 - En körande SnapOtter-instans nåbar på en publik URL
 - En enterprise-licensnyckel med funktionen `scim`
-- Administratörsåtkomst till SnapOtter (behörigheten `users:manage` krävs för att generera eller återkalla en SCIM-token)
+- Ett inbyggt SnapOtter `admin`-konto med dess fulla effektiva behörighetsuppsättning. En delegerad anpassad roll eller en admin API-nyckel som saknar administratörsbehörighet kan inte generera eller återkalla den globala SCIM-tokenen.
 - Administratörsåtkomst till din identitetsleverantörs provisioneringsinställningar
 
 ## Snabbstart {#quick-start}
@@ -34,7 +35,7 @@ Svaret innehåller token. Spara den omedelbart; den kan inte hämtas igen.
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ SCIM-slutpunkter använder en dedikerad Bearer-token, separat från användarses
 
 ### Generera en token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` genererar en ny SCIM-token. Denna slutpunkt kräver en giltig session med behörigheten `users:manage`.
+`POST /api/v1/enterprise/scim/token` genererar en ny SCIM-token. Eftersom token kan tillhandahålla och mutera användare över instansen, kräver denna slutpunkt den inbyggda `admin`-rollen med den fullständiga effektiva administratörsbehörighetsuppsättningen. Att ha `users:manage` i en anpassad roll är inte tillräckligt.
 
 Token returneras i klartext exakt en gång. SnapOtter lagrar endast en scrypt-hash. Om du tappar bort token, återkalla den och generera en ny.
 
 Endast en SCIM-token är aktiv åt gången. Att generera en ny token ersätter den föregående.
 
+::: warning Återutgivning av token efter uppgradering
+Äldre oversionerade SCIM-tokens avvisas. Efter att ha uppgraderat till en version som utfärdar `so_scim_v2_...`-tokens, generera en ny token och uppdatera din identitetsleverantör innan du återupptar provisioneringen.
+:::
+
 ### Återkalla en token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` återkallar den aktuella SCIM-token. Denna slutpunkt kräver också `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` återkallar den aktuella SCIM-tokenen. Den har samma fullständiga inbyggda administratörskrav som tokengenerering.
 
 ### Hastighetsbegränsning {#rate-limiting}
 
@@ -279,7 +284,7 @@ SCIM-förfrågan inkluderade inte en `Authorization: Bearer <token>`-header. Kon
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token matchar inte den lagrade hashen. Detta händer om token återkallades och genererades på nytt. Uppdatera token i din IdP:s provisioneringsinställningar.
+Tokenen är felaktigt formaterad, använder det gamla oversionerade formatet eller matchar inte den lagrade hashen. Generera en aktuell `so_scim_v2_...`-token och uppdatera token i din IdP:s provisioneringsinställningar.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

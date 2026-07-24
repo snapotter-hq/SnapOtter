@@ -1,8 +1,9 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Persyaratan perangkat keras, penyiapan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_output_hash: 5ed614569b73
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 5f4c54af9c3d
+i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
+### Verifikasi akselerasi GPU {#verify-gpu-acceleration}
+
 Periksa deteksi CUDA di log:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Jika alat AI berjalan di CPU meskipun `--gpus all` dan NVIDIA Container Toolkit telah dikonfigurasi dengan benar, instal ulang bundel yang terpengaruh (misalnya Penghapusan Latar Belakang) dari **Pengaturan → Fitur AI**. Penginstal memulihkan build GPU ONNX Runtime, yang mana build khusus CPU yang ditarik oleh bundel lain (seperti transkripsi) dapat membayangi lingkungan AI bersama. Jika menginstal ulang dari UI tidak memulihkan GPU pada image lama, lihat perbaikan manual di [masalah #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Persyaratan Perangkat Keras {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter mengatur `TRUST_PROXY=true` secara default sehingga pembatasan laju dan logging menggunakan IP klien sebenarnya dari header `X-Forwarded-For`.
 
+Ada dua hal yang penting untuk setiap proxy di bawah ini: izinkan badan permintaan yang besar (unggahan), dan jangan melakukan buffering terhadap tanggapan. Proksi buffering respons menghentikan kemajuan SSE dan, yang lebih terlihat, membuat pengunduhan file besar "mulai tetapi tidak pernah selesai", karena proksi menyimpan seluruh file sebelum meneruskannya. SnapOtter mengirimkan `X-Accel-Buffering: no` pada unduhan sehingga nginx mengalirkannya meskipun buffering dibiarkan di tempat lain, namun proxy selain nginx memerlukan buffering respons yang dinonaktifkan secara eksplisit (ditunjukkan pada setiap konfigurasi di bawah). Jika pengunduhan terhenti di tengah jalan, proxy buffering di depan adalah hal pertama yang harus diperiksa.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Respons streaming alih-alih buffering: diperlukan untuk kemajuan SSE (batch, AI, pemasangan fitur) dan untuk download file besar.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` menonaktifkan buffering respons, yang diperlukan untuk event progres SSE (pemrosesan batch, perkakas AI, instalasi fitur). Timeout yang diperpanjang memungkinkan unggahan file besar selesai tanpa Caddy menutup koneksi terlalu dini.
+`flush_interval -1` menonaktifkan buffering respons, yang diperlukan untuk peristiwa kemajuan SSE (pemrosesan batch, alat AI, pemasangan fitur) dan untuk pengunduhan file besar agar dapat dilakukan streaming alih-alih terhenti. Batas waktu yang diperpanjang memungkinkan pengunggahan file besar selesai tanpa Caddy menutup koneksi lebih awal.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

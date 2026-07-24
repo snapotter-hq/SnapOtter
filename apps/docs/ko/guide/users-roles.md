@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter에서 사용자, 기본 및 커스텀 역할, 권한, API 키, 팀, 세션, 감사 로그를 관리합니다."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 85b83db3a06d
+i18n_output_hash: 387e5820c217
+i18n_hash_version: 2
 ---
 
 # 사용자, 역할 및 권한 {#users-roles-permissions}
@@ -82,12 +83,12 @@ SnapOtter에는 기본 역할 3개가 포함됩니다. 이들은 수정하거나
 | `pipelines:all` | 모든 사용자의 파이프라인 조회 및 관리 |
 | `settings:read` | 인스턴스 설정 조회 |
 | `settings:write` | 인스턴스 설정 수정 |
-| `users:manage` | 사용자 계정 생성, 업데이트, 삭제 |
+| `users:manage` | 행위자의 권한 범위 내에서 사용자 계정 생성 및 관리 |
 | `teams:manage` | 팀 생성, 업데이트, 삭제 |
 | `features:manage` | AI 기능 번들 설치 및 관리 |
 | `system:health` | 상태 및 준비 엔드포인트 접근 |
 | `audit:read` | 감사 로그 조회 및 역할 목록 조회 |
-| `compliance:manage` | GDPR 라이프사이클 및 규정 준수 기능 관리 |
+| `compliance:manage` | GDPR 수명주기 및 규정 준수 기능을 관리합니다. 파괴적인 사용자 작업은 여전히 ​​권한 제한을 받습니다. |
 | `webhooks:manage` | 아웃바운드 웹훅 구성 |
 | `security:manage` | 보안 설정 관리(IP 허용 목록, SSO 강제) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 역할 이름은 2~30자여야 하며, 하이픈과 밑줄을 포함한 소문자 영숫자여야 합니다.
 
-### 관리자 전용 예약 권한 {#admin-reserved-permissions}
+### 위임된 관리 경계 {#delegated-administration-boundaries}
 
-세 개의 권한은 기본 역할에 예약되어 있어 커스텀 역할에 할당할 수 없습니다:
+17개 권한 모두 사용자 정의 역할을 통해 위임할 수 있지만 관리 권한이 해당 역할을 기본 제공 `admin` 역할과 동일하게 만들지는 않습니다. `users:manage`에 의해 승인된 사용자 변이, `compliance:manage`에 의해 승인된 파괴적인 작업, `security:manage`에 의해 승인된 사용자 지정 역할 관리는 행위자의 현재 권한에 의해 제한됩니다.
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- 기본 제공 역할은 `admin` > `editor` > `user`를 따릅니다. 사용자 정의 역할은 기본 제공 역할 아래에 있습니다.
+- 대상의 권한은 행위자의 **유효** 권한에 포함되어야 합니다. 따라서 범위가 지정된 API 키는 해당 범위에서 생략된 권한을 행사할 수 없습니다.
+- 대상 역할의 도구 액세스는 행위자 자신의 도구 액세스에 포함되어야 합니다.
+- 비활성화된 계정은 해당 역할이 `disabled:<original-role>`로 기록될 때 원래 역할과 비교하여 확인됩니다.
+- 사용자 정의 역할을 삭제하려면 내장된 `user` 대체를 할당할 권한도 필요합니다. 비활성화된 멤버는 `disabled:user`로 비활성화된 상태로 유지됩니다.
 
-역할 API는 이 권한들을 포함하는 모든 요청을 거부합니다. 기본 `admin` 역할만 이들에 접근할 수 있습니다.
+전역 자격 증명 및 구성이 더 엄격합니다. SCIM 토큰을 발급 또는 취소하고 인스턴스 구성을 가져오려면 완전한 유효 관리 권한이 있는 기본 제공 `admin` 역할이 필요합니다.
 
 ### 도구 수준 권한 {#tool-level-permissions}
 

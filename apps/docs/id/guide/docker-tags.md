@@ -1,8 +1,9 @@
 ---
 description: "Tag image Docker SnapOtter, benchmark GPU, penyematan versi, dan dukungan multi-platform untuk AMD64 dan ARM64."
-i18n_output_hash: 1285488cc707
-i18n_source_hash: fda322e78b4b
+i18n_source_hash: 566e20ca07fc
 i18n_provenance: human
+i18n_output_hash: 30b4ac3f38a5
+i18n_hash_version: 2
 ---
 
 # Image Docker {#docker-image}
@@ -93,13 +94,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

@@ -1,8 +1,9 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_output_hash: 83a518bd23e4
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 239723cdcc17
+i18n_hash_version: 2
 ---
 
 # البدء {#getting-started}
@@ -40,7 +41,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-يتطلب [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). يرجع إلى المعالج المركزي تلقائيًا عندما يكون CUDA غير متاح. تسريع iGPU من Intel/AMD عبر VA-API أو Quick Sync أو OpenCL غير مدعوم لاستدلال الذكاء الاصطناعي حاليًا. راجع [وسوم Docker](/ar/guide/docker-tags) لاختبارات الأداء.
+يتطلب [مجموعة أدوات حاوية NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). يعود إلى وحدة المعالجة المركزية تلقائيًا عندما لا يكون CUDA متاحًا. تسريع Intel/AMD iGPU من خلال VA-API أو Quick Sync أو OpenCL غير مدعوم لاستدلال الذكاء الاصطناعي اليوم. راجع [علامات Docker](/ar/guide/docker-tags) لمعرفة المعايير. إذا كانت أدوات الذكاء الاصطناعي تعمل على وحدة المعالجة المركزية بالرغم من `--gpus all`، فراجع [التحقق من تسريع وحدة معالجة الرسومات](/ar/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details متوفر أيضًا على GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | الوسيط | العدد | أمثلة على الأدوات |
 |----------|-------|---------------|
-| **الصور** | 105 | تغيير الحجم، والاقتصاص، والضغط، والتحويل، وإزالة الخلفية، وتكبير الدقة، و OCR، والعلامة المائية، والملصقة، والتلوين، وأدوات GIF، وإعدادات التنسيق المسبقة |
+| **الصور** | 107 | تغيير الحجم، والاقتصاص، والضغط، والتحويل، وإزالة الخلفية، وتكبير الدقة، و OCR، والعلامة المائية، والملصقة، والتلوين، وأدوات GIF، وإعدادات التنسيق المسبقة |
 | **الفيديو** | 57 | القص، والاقتصاص، والضغط، والتحويل، والدمج، واستخراج الصوت، والترجمات التلقائية، والفيديو إلى GIF، وتغيير الحجم، والتثبيت، وإعدادات التنسيق المسبقة |
 | **الصوت** | 27 | القص، والدمج، والتحويل، والتسوية، وتقليل الضوضاء، والنسخ النصي، وتحويل درجة النغمة، والتلاشي، وصانع نغمات الرنين، وإعدادات التنسيق المسبقة |
 | **PDF / المستندات** | 42 | الدمج، والتقسيم، والضغط، و OCR، والعلامة المائية، والتنقيح، و Word إلى PDF، و Excel إلى PDF، والتدوير، والحماية، والإصلاح |

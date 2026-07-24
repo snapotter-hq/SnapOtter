@@ -1,8 +1,9 @@
 ---
 description: "Estrutura do monorepo, arquitetura de apps e pacotes, ciclo de vida das requisições e uso de recursos do SnapOtter."
-i18n_output_hash: 93555b8e15c0
-i18n_source_hash: a53946e760b0
+i18n_source_hash: 50e076925c4b
 i18n_provenance: human
+i18n_output_hash: e541eef7cbf1
+i18n_hash_version: 2
 ---
 
 # Arquitetura {#architecture}
@@ -52,7 +53,7 @@ Tipos TypeScript compartilhados, constantes (como `APP_VERSION` e as definiçõe
 
 ### API (`apps/api`) {#api-apps-api}
 
-Um servidor Fastify v5 que expõe 241 rotas de ferramentas em cinco modalidades (image, video, audio, PDF, file) e lida com:
+Um servidor Fastify v5 que expõe 243 rotas de ferramentas em cinco modalidades (image, video, audio, PDF, file) e lida com:
 - Uploads de arquivos, gerenciamento de espaço de trabalho temporário e armazenamento persistente de arquivos
 - Biblioteca de arquivos do usuário (tabela `user_files`): uma edição salva é armazenada por padrão como um novo arquivo independente, ou como uma versão vinculada ao pai quando você sobrescreve o original. Ela registra quais ferramentas foram aplicadas (`toolChain`) e recebe uma miniatura gerada automaticamente para a página Files
 - Execução de ferramentas (roteia cada requisição de ferramenta para o motor de imagem ou para a ponte de IA)

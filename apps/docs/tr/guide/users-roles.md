@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter'da kullanıcıları, yerleşik ve özel rolleri, izinleri, API anahtarlarını, ekipleri, oturumları ve denetim günlüğünü yönetin."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: b0ee9c5838b7
+i18n_output_hash: 83a5fd5e9c61
+i18n_hash_version: 2
 ---
 
 # Kullanıcılar, Roller ve İzinler {#users-roles-permissions}
@@ -82,12 +83,12 @@ SnapOtter üç yerleşik rol içerir. Bunlar değiştirilemez veya silinemez.
 | `pipelines:all` | Tüm kullanıcıların işlem hatlarını görüntüle ve yönet |
 | `settings:read` | Örnek ayarlarını görüntüle |
 | `settings:write` | Örnek ayarlarını değiştir |
-| `users:manage` | Kullanıcı hesapları oluştur, güncelle ve sil |
+| `users:manage` | Aktörün yetki sınırları dahilinde kullanıcı hesapları oluşturun ve yönetin |
 | `teams:manage` | Ekipler oluştur, güncelle ve sil |
 | `features:manage` | AI özellik paketlerini yükle ve yönet |
 | `system:health` | Sağlık ve hazırlık uç noktalarına eriş |
 | `audit:read` | Denetim günlüğünü görüntüle ve rolleri listele |
-| `compliance:manage` | GDPR yaşam döngüsünü ve uyumluluk özelliklerini yönet |
+| `compliance:manage` | GDPR yaşam döngüsünü ve uyumluluk özelliklerini yönetin; yıkıcı kullanıcı işlemleri yetkiye bağlı kalır |
 | `webhooks:manage` | Giden web kancalarını (webhook) yapılandır |
 | `security:manage` | Güvenlik ayarlarını yönet (IP izin listesi, SSO zorlaması) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Rol adları 2-30 karakter olmalı, tire ve alt çizgi içeren küçük harfli alfasayısal olmalıdır.
 
-### Yöneticiye ayrılmış izinler {#admin-reserved-permissions}
+### Yetki verilen yönetim sınırları {#delegated-administration-boundaries}
 
-Üç izin yerleşik roller için ayrılmıştır ve özel rollere atanamaz:
+17 iznin tamamı özel roller aracılığıyla devredilebilir ancak yönetim izni, bu rolü yerleşik `admin` rolüne eşdeğer kılmaz. `users:manage` tarafından yetkilendirilen kullanıcı mutasyonları, `compliance:manage` tarafından yetkilendirilen yıkıcı işlemler ve `security:manage` tarafından yetkilendirilen özel rol yönetimi, aktörün mevcut yetkisine tabidir:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Yerleşik roller `admin` > `editor` > `user`'yi takip eder; özel roller yerleşik rollerin altındadır.
+- Hedefin izinleri, aktörün **etkili** izinleri tarafından kapsanmalıdır. Kapsamlı bir API anahtarı bu nedenle kapsamından çıkarılan izinleri kullanamaz.
+- Hedef rolün araç erişimi, aktörün kendi araç erişimi tarafından kapsanmalıdır.
+- Devre dışı bırakılan bir hesap, bu rol `disabled:<original-role>` olarak kaydedildiğinde orijinal rolüne göre kontrol edilir.
+- Özel bir rolü silmek aynı zamanda yerleşik `user` geri dönüşünü atama yetkisini de gerektirir; devre dışı bırakılan üyeler `disabled:user` olarak devre dışı kalır.
 
-Roller API'si, bu izinleri içeren herhangi bir isteği reddeder. Bunlara yalnızca yerleşik `admin` rolü erişebilir.
+Genel kimlik bilgileri ve yapılandırma daha katıdır: SCIM belirtecinin verilmesi veya iptal edilmesi ve örnek yapılandırmasının içe aktarılması, tam etkin yönetici yetkisine sahip yerleşik `admin` rolünü gerektirir.
 
 ### Araç düzeyinde izinler {#tool-level-permissions}
 

@@ -1,8 +1,9 @@
 ---
 description: "Configurez le provisionnement SCIM 2.0 pour synchroniser les utilisateurs et les groupes depuis votre fournisseur d'identité vers SnapOtter. Couvre Okta, Azure AD / Entra ID et les intégrations personnalisées."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: 7bd64dc5c777
+i18n_output_hash: c9b18c251435
+i18n_hash_version: 2
 ---
 
 # Provisionnement SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ Le provisionnement SCIM nécessite une licence **entreprise** avec la fonctionna
 
 - Une instance SnapOtter en cours d'exécution accessible à une URL publique
 - Une clé de licence entreprise avec la fonctionnalité `scim`
-- Un accès administrateur à SnapOtter (la permission `users:manage` est requise pour générer ou révoquer un jeton SCIM)
+- Un compte SnapOtter `admin` intégré avec son ensemble complet d'autorisations effectives. Un rôle personnalisé délégué ou une clé API d'administrateur dépourvue d'autorisation d'administrateur ne peut pas générer ou révoquer le jeton SCIM global.
 - Un accès administrateur aux paramètres de provisionnement de votre fournisseur d'identité
 
 ## Démarrage rapide {#quick-start}
@@ -34,7 +35,7 @@ La réponse contient le jeton. Enregistrez-le immédiatement ; il ne pourra pas 
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ Les points de terminaison SCIM utilisent un jeton bearer dédié, distinct des s
 
 ### Génération d'un jeton {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` génère un nouveau jeton SCIM. Ce point de terminaison nécessite une session valide avec la permission `users:manage`.
+`POST /api/v1/enterprise/scim/token` génère un nouveau jeton SCIM. Étant donné que le jeton peut provisionner et muter les utilisateurs dans l’instance, ce point de terminaison nécessite le rôle `admin` intégré avec l’ensemble complet d’autorisations d’administrateur effectif. Détenir `users:manage` dans un rôle personnalisé n'est pas suffisant.
 
 Le jeton est renvoyé en texte clair une seule fois. SnapOtter ne stocke qu'un hachage scrypt. Si vous perdez le jeton, révoquez-le et générez-en un nouveau.
 
 Un seul jeton SCIM est actif à la fois. Générer un nouveau jeton remplace le précédent.
 
+::: warning Réédition du jeton après la mise à niveau
+Les anciens jetons SCIM non versionnés sont rejetés. Après la mise à niveau vers une version qui émet des jetons `so_scim_v2_...`, générez un nouveau jeton et mettez à jour votre fournisseur d'identité avant de reprendre le provisionnement.
+:::
+
 ### Révocation d'un jeton {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` révoque le jeton SCIM actuel. Ce point de terminaison nécessite également `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` révoque le jeton SCIM actuel. Il a les mêmes exigences d’administration intégrées que la génération de jetons.
 
 ### Limitation de débit {#rate-limiting}
 
@@ -279,7 +284,7 @@ La requête SCIM n'incluait pas d'en-tête `Authorization: Bearer <token>`. Vér
 
 ### 401 « Invalid token » {#_401-invalid-token}
 
-Le jeton ne correspond pas au hachage stocké. Cela se produit si le jeton a été révoqué et régénéré. Mettez à jour le jeton dans les paramètres de provisionnement de votre fournisseur d'identité.
+Le jeton est mal formé, utilise le format sans version retiré ou ne correspond pas au hachage stocké. Générez un jeton `so_scim_v2_...` actuel et mettez à jour le jeton dans les paramètres de provisionnement de votre IdP.
 
 ### 401 « SCIM not configured » {#_401-scim-not-configured}
 

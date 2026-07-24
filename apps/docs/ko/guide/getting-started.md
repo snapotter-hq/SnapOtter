@@ -1,8 +1,9 @@
 ---
 description: "명령 하나로 Docker에 SnapOtter를 설치. Docker Compose 설정, 소스에서 빌드하기, 전체 기능 개요 포함."
-i18n_output_hash: 55c67edda625
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 98ee26ea9a04
+i18n_hash_version: 2
 ---
 
 # 시작하기 {#getting-started}
@@ -40,7 +41,7 @@ SnapOtter에는 익명 제품 애널리틱스가 기본으로 포함되어 있�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)이 필요하다. CUDA를 사용할 수 없으면 자동으로 CPU로 폴백한다. VA-API, Quick Sync, OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론에 지원되지 않는다. 벤치마크는 [Docker 태그](/ko/guide/docker-tags)를 참고하라.
+[NVIDIA 컨테이너 툴킷](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)이 필요합니다. CUDA를 사용할 수 없으면 자동으로 CPU로 대체됩니다. VA-API, Quick Sync 또는 OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론에 지원되지 않습니다. 벤치마크는 [Docker 태그](/ko/guide/docker-tags)를 참조하세요. `--gpus all`에도 불구하고 AI 도구가 CPU에서 실행되는 경우 [GPU 가속 확인](/ko/guide/deployment#verify-gpu-acceleration)을 참조하세요.
 :::
 
 ::: details GHCR에서도 제공
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # 로컬이 아닌 배포의 경우 이를 변경합니다.
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | 모달리티 | 개수 | 예시 도구 |
 |----------|-------|---------------|
-| **이미지** | 105 | 크기 조정, 자르기, 압축, 변환, 배경 제거, 업스케일, OCR, 워터마크, 콜라주, 컬러화, GIF 도구, 형식 프리셋 |
+| **이미지** | 107 | 크기 조정, 자르기, 압축, 변환, 배경 제거, 업스케일, OCR, 워터마크, 콜라주, 컬러화, GIF 도구, 형식 프리셋 |
 | **비디오** | 57 | 트림, 자르기, 압축, 변환, 병합, 오디오 추출, 자동 자막, 비디오→GIF, 크기 조정, 안정화, 형식 프리셋 |
 | **오디오** | 27 | 트림, 병합, 변환, 노멀라이즈, 노이즈 감소, 전사, 피치 시프트, 페이드, 벨소리 제작기, 형식 프리셋 |
 | **PDF / 문서** | 42 | 병합, 분할, 압축, OCR, 워터마크, 편집(리댁트), Word→PDF, Excel→PDF, 회전, 보호, 복구 |

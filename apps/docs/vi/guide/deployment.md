@@ -1,8 +1,9 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production với Docker. Yêu cầu phần cứng, cài đặt GPU, và cấu hình reverse proxy cho Nginx, Traefik, và Cloudflare."
-i18n_output_hash: 80f0326c4672
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 661a8ffded8e
+i18n_hash_version: 2
 ---
 
 # Triển khai {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Kiểm tra việc phát hiện CUDA trong log:
+### Xác minh khả năng tăng tốc GPU {#verify-gpu-acceleration}
+
+Kiểm tra phát hiện CUDA trong nhật ký:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Nếu các công cụ AI chạy trên CPU ngay cả khi `--gpus all` và Bộ công cụ bộ chứa NVIDIA được thiết lập chính xác, hãy cài đặt lại gói bị ảnh hưởng (ví dụ: Xóa nền) từ **Cài đặt → Tính năng AI**. Trình cài đặt khôi phục bản dựng GPU của ONNX Runtime, bản dựng chỉ dành cho CPU được kéo vào bởi một gói khác (chẳng hạn như phiên mã) có thể bị che khuất trong môi trường AI được chia sẻ. Nếu việc cài đặt lại từ giao diện người dùng không khôi phục GPU trên hình ảnh cũ hơn, hãy xem cách sửa chữa thủ công trong [vấn đề #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Yêu cầu phần cứng {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter mặc định đặt `TRUST_PROXY=true` để việc giới hạn tần suất và ghi log sử dụng IP client thực từ các header `X-Forwarded-For`.
 
+Hai điều quan trọng đối với mọi proxy bên dưới: cho phép nội dung yêu cầu lớn (tải lên) và không đệm phản hồi. Proxy đệm phản hồi sẽ phá vỡ tiến trình SSE và rõ ràng hơn là khiến quá trình tải xuống tệp lớn "bắt đầu nhưng không bao giờ kết thúc", vì proxy giữ toàn bộ tệp trước khi chuyển nó đi. SnapOtter gửi `X-Accel-Buffering: no` khi tải xuống để nginx truyền phát chúng ngay cả khi bộ đệm được để ở nơi khác, nhưng các proxy khác ngoài nginx cần tắt bộ đệm phản hồi một cách rõ ràng (hiển thị trong từng cấu hình bên dưới). Nếu quá trình tải xuống bị đình trệ giữa chừng, proxy đệm ở phía trước là điều đầu tiên cần kiểm tra.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Truyền phát phản hồi thay vì lưu vào bộ đệm: cần thiết cho tiến trình SSE (cài đặt hàng loạt, AI, tính năng) và để tải xuống tệp lớn.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` vô hiệu hóa việc đệm phản hồi, vốn cần thiết cho các sự kiện tiến trình SSE (xử lý lô, công cụ AI, cài đặt tính năng). Các thời gian chờ được kéo dài cho phép các tập tin lớn tải lên hoàn tất mà không bị Caddy đóng kết nối sớm.
+`flush_interval -1` vô hiệu hóa bộ đệm phản hồi, cần thiết cho các sự kiện tiến trình SSE (xử lý hàng loạt, công cụ AI, cài đặt tính năng) và để tải xuống tệp lớn để truyền phát thay vì bị đình trệ. Thời gian chờ kéo dài cho phép hoàn tất quá trình tải lên tệp lớn mà không cần Caddy đóng kết nối sớm.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

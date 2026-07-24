@@ -1,8 +1,9 @@
 ---
 description: "Implante o SnapOtter em produção com Docker. Requisitos de hardware, configuração de GPU e configs de proxy reverso para Nginx, Traefik e Cloudflare."
-i18n_output_hash: b3176447b423
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 7829ae611800
+i18n_hash_version: 2
 ---
 
 # Implantação {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Altere isso para implantações não locais
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-Verifique a detecção do CUDA nos logs:
+### Verifique a aceleração da GPU {#verify-gpu-acceleration}
+
+Verifique a detecção de CUDA nos logs:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+Se as ferramentas de IA forem executadas na CPU mesmo que o `--gpus all` e o NVIDIA Container Toolkit estejam configurados corretamente, reinstale o pacote afetado (por exemplo, Remoção de segundo plano) em **Configurações → Recursos de IA**. O instalador restaura a compilação de GPU do ONNX Runtime, que uma compilação somente de CPU extraída por outro pacote (como transcrição) pode, de outra forma, ocultar no ambiente de IA compartilhado. Se a reinstalação a partir da UI não restaurar a GPU em uma imagem mais antiga, consulte o reparo manual no [problema nº 490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Requisitos de Hardware {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 O SnapOtter define `TRUST_PROXY=true` por padrão para que a limitação de taxa e o logging usem o IP real do cliente a partir dos cabeçalhos `X-Forwarded-For`.
 
+Duas coisas são importantes para cada proxy abaixo: permitir grandes corpos de solicitação (uploads) e não armazenar respostas em buffer. Um proxy de buffer de resposta interrompe o progresso do SSE e, mais visivelmente, faz um download de arquivo grande "iniciar, mas nunca terminar", porque o proxy mantém o arquivo inteiro antes de transmiti-lo. SnapOtter envia `X-Accel-Buffering: no` em downloads, então nginx os transmite mesmo se o buffer for deixado em outro lugar, mas proxies diferentes de nginx precisam de buffer de resposta desativado explicitamente (mostrado em cada configuração abaixo). Se um download parar no meio, um proxy de buffer na frente é a primeira coisa a verificar.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Transmita respostas em vez de buffer: necessário para o progresso do SSE (lote, IA, instalações de recursos) e para downloads de arquivos grandes.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` desabilita o buffering de resposta, que é necessário para eventos de progresso SSE (processamento em lote, ferramentas de IA, instalações de features). Os timeouts estendidos permitem que uploads de arquivos grandes sejam concluídos sem que o Caddy encerre a conexão cedo demais.
+`flush_interval -1` desativa o buffer de resposta, que é necessário para eventos de progresso SSE (processamento em lote, ferramentas de IA, instalações de recursos) e para downloads de arquivos grandes para serem transmitidos em vez de paralisados. Os tempos limite estendidos permitem que uploads de arquivos grandes sejam concluídos sem que Caddy feche a conexão antecipadamente.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

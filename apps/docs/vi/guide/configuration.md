@@ -1,8 +1,9 @@
 ---
 description: "Tất cả các biến môi trường của SnapOtter kèm giá trị mặc định. Cấu hình xác thực, lưu trữ, mô hình AI, phân tích và hơn thế."
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: 276f409b7ae6
+i18n_output_hash: 6ca5e3aa0223
+i18n_hash_version: 2
 ---
 
 # Cấu hình {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

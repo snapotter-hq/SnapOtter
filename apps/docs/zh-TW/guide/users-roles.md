@@ -1,8 +1,9 @@
 ---
 description: "在 SnapOtter 中管理使用者、內建與自訂角色、權限、API 金鑰、團隊、工作階段以及稽核日誌。"
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 94865da24af7
+i18n_output_hash: 60d6d4d6367d
+i18n_hash_version: 2
 ---
 
 # 使用者、角色與權限 {#users-roles-permissions}
@@ -82,12 +83,12 @@ SnapOtter 包含三種內建角色。它們無法被修改或刪除。
 | `pipelines:all` | 檢視並管理所有使用者的管線 |
 | `settings:read` | 檢視執行個體設定 |
 | `settings:write` | 修改執行個體設定 |
-| `users:manage` | 建立、更新並刪除使用者帳號 |
+| `users:manage` | 在參與者的權限範圍內建立和管理使用者帳戶 |
 | `teams:manage` | 建立、更新並刪除團隊 |
 | `features:manage` | 安裝並管理 AI 功能套組 |
 | `system:health` | 存取健康檢查與就緒狀態端點 |
 | `audit:read` | 檢視稽核日誌並列出角色 |
-| `compliance:manage` | 管理 GDPR 生命週期與合規功能 |
+| `compliance:manage` | 管理 GDPR 生命週期和合規性功能；破壞性使用者操作仍受權限限制 |
 | `webhooks:manage` | 設定對外 webhook |
 | `security:manage` | 管理安全性設定（IP 允許清單、SSO 強制執行） |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 角色名稱必須為 2 至 30 個字元，小寫英數字並可含連字號與底線。
 
-### 保留給管理員的權限 {#admin-reserved-permissions}
+### 委派管理邊界 {#delegated-administration-boundaries}
 
-有三項權限保留給內建角色，無法指派給自訂角色：
+所有 17 個權限都可以透過自訂角色委派，但管理權限並不會使該角色等同於內建 `admin` 角色。 `users:manage`授權的使用者突變、`compliance:manage`授權的破壞性操作以及`security:manage`授權的自訂角色管理均受參與者目前權限的約束：
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- 內建角色遵循`admin` > `editor` > `user`；自訂角色位於內建角色下方。
+- 目標的權限必須包含在參與者的**有效**權限中。因此，限定範圍的 API 金鑰無法行使其範圍中省略的權限。
+- 目標角色的工具存取權限必須包含在參與者自己的工具存取權限中。
+- 當角色記錄為 `disabled:<original-role>` 時，已停用的帳戶將根據其原始角色進行檢查。
+- 刪除自訂角色也需要指派內建`user`後備的權限；已停用的成員仍停用為 `disabled:user`。
 
-角色 API 會拒絕任何包含這些權限的請求。只有內建的 `admin` 角色能存取它們。
+全域憑證和設定更加嚴格：頒發或撤銷 SCIM 令牌以及匯入實例配置需要具有完整有效管理權限的內建 `admin` 角色。
 
 ### 工具層級權限 {#tool-level-permissions}
 

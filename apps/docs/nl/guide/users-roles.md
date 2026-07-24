@@ -1,8 +1,9 @@
 ---
 description: "Beheer gebruikers, ingebouwde en aangepaste rollen, permissies, API-sleutels, teams, sessies en het auditlogboek in SnapOtter."
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: ddd4d1d21c1b
+i18n_output_hash: cfde44218e7c
+i18n_hash_version: 2
 ---
 
 # Gebruikers, rollen en permissies {#users-roles-permissions}
@@ -82,12 +83,12 @@ Alle 17 permissies. Volledige controle over de instantie.
 | `pipelines:all` | Pipelines van alle gebruikers bekijken en beheren |
 | `settings:read` | Instantie-instellingen bekijken |
 | `settings:write` | Instantie-instellingen wijzigen |
-| `users:manage` | Gebruikersaccounts aanmaken, bijwerken en verwijderen |
+| `users:manage` | Creëer en beheer gebruikersaccounts binnen de bevoegdheidsgrens van de actor |
 | `teams:manage` | Teams aanmaken, bijwerken en verwijderen |
 | `features:manage` | AI-featurebundels installeren en beheren |
 | `system:health` | Toegang tot health- en readiness-endpoints |
 | `audit:read` | Het auditlogboek bekijken en rollen weergeven |
-| `compliance:manage` | GDPR-lifecycle en compliancefuncties beheren |
+| `compliance:manage` | Beheer AVG-levenscyclus- en compliancefuncties; destructieve gebruikersbewerkingen blijven autoriteitsgebonden |
 | `webhooks:manage` | Uitgaande webhooks configureren |
 | `security:manage` | Beveiligingsinstellingen beheren (IP-allowlist, SSO-afdwinging) |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 Rolnamen moeten 2-30 tekens zijn, kleine letters, alfanumeriek met koppeltekens en underscores.
 
-### Voor beheerders gereserveerde permissies {#admin-reserved-permissions}
+### Gedelegeerde bestuursgrenzen {#delegated-administration-boundaries}
 
-Drie permissies zijn gereserveerd voor ingebouwde rollen en kunnen niet aan aangepaste rollen worden toegewezen:
+Alle 17 machtigingen kunnen worden gedelegeerd via aangepaste rollen, maar een beheerdersmachtiging maakt die rol niet gelijkwaardig aan de ingebouwde `admin`-rol. Gebruikersmutaties geautoriseerd door `users:manage`, destructieve bewerkingen geautoriseerd door `compliance:manage`, en beheer van aangepaste rollen geautoriseerd door `security:manage` worden begrensd door de huidige autoriteit van de actor:
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- Ingebouwde rollen volgen `admin` > `editor` > `user`; aangepaste rollen staan ​​onder ingebouwde rollen.
+- De machtigingen van het doelwit moeten worden vastgelegd in de **effectieve** machtigingen van de acteur. Een API-sleutel met een bereik kan daarom geen machtigingen uitoefenen die zijn weggelaten uit het bereik ervan.
+- De tooltoegang van een doelrol moet beperkt zijn tot de tooltoegang van de actor zelf.
+- Een uitgeschakeld account wordt gecontroleerd aan de hand van de oorspronkelijke rol wanneer die rol wordt geregistreerd als `disabled:<original-role>`.
+- Het verwijderen van een aangepaste rol vereist ook de bevoegdheid om de ingebouwde `user`-fallback toe te wijzen; gehandicapte leden blijven uitgeschakeld als `disabled:user`.
 
-De rollen-API weigert elk verzoek dat deze permissies bevat. Alleen de ingebouwde rol `admin` heeft er toegang toe.
+De algemene inloggegevens en configuratie zijn strenger: voor het uitgeven of intrekken van het SCIM-token en het importeren van de instanceconfiguratie is de ingebouwde `admin`-rol met volledige effectieve beheerdersbevoegdheid vereist.
 
 ### Permissies op toolniveau {#tool-level-permissions}
 

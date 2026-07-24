@@ -1,8 +1,9 @@
 ---
 description: "Pasang SnapOtter dengan Docker dalam satu perintah. Termasuk penyiapan Docker Compose, membangun dari sumber, dan gambaran lengkap fitur."
-i18n_output_hash: 6df615cedb03
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: f7965f19fa0c
+i18n_hash_version: 2
 ---
 
 # Memulai {#getting-started}
@@ -40,7 +41,7 @@ Tambahkan `--gpus all` untuk penghapusan latar belakang yang dipercepat NVIDIA C
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Membutuhkan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Otomatis kembali ke CPU ketika CUDA tidak tersedia. Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI. Lihat [Docker Tags](/id/guide/docker-tags) untuk benchmark.
+Membutuhkan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Kembali ke CPU secara otomatis ketika CUDA tidak tersedia. Akselerasi Intel/AMD iGPU melalui VA-API, Quick Sync, atau OpenCL tidak didukung untuk inferensi AI saat ini. Lihat [Tag Docker](/id/guide/docker-tags) untuk tolok ukur. Jika alat AI berjalan pada CPU meskipun `--gpus all`, lihat [Verifikasi akselerasi GPU](/id/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Juga di GHCR
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalitas | Jumlah | Contoh Perkakas |
 |----------|-------|---------------|
-| **Gambar** | 105 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, preset format |
+| **Gambar** | 107 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, preset format |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, preset format |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, preset format |
 | **PDF / Dokumen** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |

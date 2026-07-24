@@ -1,8 +1,9 @@
 ---
 description: "Thiết lập cung cấp tài khoản SCIM 2.0 để đồng bộ người dùng và nhóm từ nhà cung cấp danh tính của bạn sang SnapOtter. Bao gồm Okta, Azure AD / Entra ID, và các tích hợp tùy chỉnh."
-i18n_source_hash: bbd50119ec12
+i18n_source_hash: 06ee702b386e
 i18n_provenance: human
-i18n_output_hash: ee904bcc38be
+i18n_output_hash: cef23f72b1ff
+i18n_hash_version: 2
 ---
 
 # Cung cấp tài khoản SCIM {#scim-provisioning}
@@ -17,7 +18,7 @@ Cung cấp tài khoản SCIM yêu cầu giấy phép **enterprise** với tính 
 
 - Một phiên bản SnapOtter đang chạy, có thể truy cập tại một URL công khai
 - Một khóa giấy phép enterprise với tính năng `scim`
-- Quyền truy cập admin vào SnapOtter (cần quyền `users:manage` để tạo hoặc thu hồi token SCIM)
+- Tài khoản SnapOtter `admin` tích hợp với đầy đủ quyền có hiệu lực. Vai trò tùy chỉnh được ủy quyền hoặc khóa API quản trị viên thiếu bất kỳ quyền quản trị viên nào đều không thể tạo hoặc thu hồi mã thông báo SCIM chung.
 - Quyền truy cập admin vào cài đặt cung cấp tài khoản của nhà cung cấp danh tính của bạn
 
 ## Bắt đầu nhanh {#quick-start}
@@ -34,7 +35,7 @@ Phản hồi chứa token. Hãy lưu lại ngay lập tức; nó không thể đ
 
 ```json
 {
-  "token": "a1b2c3d4e5f6...",
+  "token": "so_scim_v2_a1b2c3d4e5f6...",
   "message": "Save this token - it cannot be retrieved again"
 }
 ```
@@ -49,15 +50,19 @@ Các endpoint SCIM sử dụng một token Bearer chuyên dụng, tách biệt v
 
 ### Tạo một token {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` tạo một token SCIM mới. Endpoint này yêu cầu một phiên hợp lệ với quyền `users:manage`.
+`POST /api/v1/enterprise/scim/token` tạo mã thông báo SCIM mới. Vì mã thông báo có thể cung cấp và thay đổi người dùng trên toàn bộ phiên bản nên điểm cuối này yêu cầu vai trò `admin` tích hợp sẵn với bộ quyền quản trị viên hiệu quả hoàn chỉnh. Giữ `users:manage` trong vai trò tùy chỉnh là không đủ.
 
 Token được trả về ở dạng văn bản thuần túy đúng một lần. SnapOtter chỉ lưu trữ một hash scrypt. Nếu bạn mất token, hãy thu hồi nó và tạo một token mới.
 
 Chỉ có một token SCIM hoạt động tại một thời điểm. Việc tạo một token mới sẽ thay thế token trước đó.
 
+::: warning Phát hành lại mã thông báo sau khi nâng cấp
+Mã thông báo SCIM cũ chưa được phiên bản sẽ bị từ chối. Sau khi nâng cấp lên bản phát hành phát hành mã thông báo `so_scim_v2_...`, hãy tạo mã thông báo mới và cập nhật nhà cung cấp danh tính của bạn trước khi tiếp tục cấp phép.
+:::
+
 ### Thu hồi một token {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` thu hồi token SCIM hiện tại. Endpoint này cũng yêu cầu `users:manage`.
+`DELETE /api/v1/enterprise/scim/token` thu hồi mã thông báo SCIM hiện tại. Nó có yêu cầu quản trị tích hợp đầy đủ giống như việc tạo mã thông báo.
 
 ### Giới hạn tốc độ {#rate-limiting}
 
@@ -279,7 +284,7 @@ Yêu cầu SCIM không bao gồm header `Authorization: Bearer <token>`. Hãy ki
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token không khớp với hash đã lưu. Điều này xảy ra nếu token đã bị thu hồi và tạo lại. Hãy cập nhật token trong cài đặt cung cấp tài khoản của IdP của bạn.
+Mã thông báo không đúng định dạng, sử dụng định dạng không phiên bản đã ngừng hoạt động hoặc không khớp với hàm băm được lưu trữ. Tạo mã thông báo `so_scim_v2_...` hiện tại và cập nhật mã thông báo trong cài đặt cung cấp IdP của bạn.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 

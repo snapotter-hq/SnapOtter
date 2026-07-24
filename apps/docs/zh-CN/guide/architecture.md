@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 的 monorepo 结构、应用与包架构、请求生命周期以及资源占用。"
-i18n_output_hash: bc9e6a754251
-i18n_source_hash: a53946e760b0
+i18n_source_hash: 50e076925c4b
 i18n_provenance: human
+i18n_output_hash: 02e1261334e5
+i18n_hash_version: 2
 ---
 
 # 架构 {#architecture}
@@ -52,7 +53,7 @@ Python 脚本位于 `packages/ai/python/` 中。大型可选模型包根据需�
 
 ### API（`apps/api`） {#api-apps-api}
 
-一个 Fastify v5 服务器，暴露跨五种模态（image、video、audio、PDF、file）的 241 个工具路由，负责处理：
+一个 Fastify v5 服务器，暴露跨五种模态（image、video、audio、PDF、file）的 243 个工具路由，负责处理：
 - 文件上传、临时工作区管理以及持久化文件存储
 - 用户文件库（`user_files` 表）：默认情况下，保存的编辑会存储为一个独立的新文件；而当你覆盖原文件时，则存储为一个与父文件链接的版本。它记录所应用的工具（`toolChain`），并为 Files 页面自动生成缩略图
 - 工具执行（将每个工具请求路由到图像引擎或 AI 桥接层）

@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter でユーザー、組み込みおよびカスタムロール、権限、API キー、チーム、セッション、監査ログを管理します。"
-i18n_source_hash: 5e28af686c96
+i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 4917b71a173c
+i18n_output_hash: 714dea2a8e1f
+i18n_hash_version: 2
 ---
 
 # ユーザー、ロール、権限 {#users-roles-permissions}
@@ -82,12 +83,12 @@ SnapOtter には 3 つの組み込みロールが含まれています。これ�
 | `pipelines:all` | すべてのユーザーのパイプラインを表示・管理する |
 | `settings:read` | インスタンス設定を表示する |
 | `settings:write` | インスタンス設定を変更する |
-| `users:manage` | ユーザーアカウントを作成・更新・削除する |
+| `users:manage` | 攻撃者の権限境界内でユーザー アカウントを作成および管理する |
 | `teams:manage` | チームを作成・更新・削除する |
 | `features:manage` | AI 機能バンドルをインストール・管理する |
 | `system:health` | ヘルスおよびレディネスのエンドポイントにアクセスする |
 | `audit:read` | 監査ログを表示し、ロールを一覧表示する |
-| `compliance:manage` | GDPR ライフサイクルとコンプライアンス機能を管理する |
+| `compliance:manage` | GDPR ライフサイクルとコンプライアンス機能を管理します。破壊的なユーザー操作は依然として権限に制限されています |
 | `webhooks:manage` | アウトバウンドの Webhook を設定する |
 | `security:manage` | セキュリティ設定を管理する（IP 許可リスト、SSO 強制） |
 
@@ -110,15 +111,17 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ロール名は 2〜30 文字で、ハイフンとアンダースコアを含む小文字の英数字にする必要があります。
 
-### 管理者専用の権限 {#admin-reserved-permissions}
+### 委任された管理の境界 {#delegated-administration-boundaries}
 
-3 つの権限は組み込みロール専用で、カスタムロールには割り当てられません:
+17 個のアクセス許可はすべてカスタム ロールを通じて委任できますが、管理アクセス許可によってそのロールが組み込みの `admin` ロールと同等になるわけではありません。 `users:manage` によって承認されたユーザーの変更、`compliance:manage` によって承認された破壊操作、および `security:manage` によって承認されたカスタム ロール管理は、アクターの現在の権限によって制限されます。
 
-- `compliance:manage`
-- `webhooks:manage`
-- `security:manage`
+- 組み込みロールは、`admin` > `editor` > `user` の順に続きます。カスタム ロールは組み込みロールの下にあります。
+- ターゲットの権限は、アクターの**有効な**権限に含まれている必要があります。したがって、スコープ付き API キーは、そのスコープから省略された権限を行使できません。
+- ターゲット ロールのツール アクセスは、アクター自身のツール アクセスに含まれている必要があります。
+- 無効化されたアカウントは、そのロールが `disabled:<original-role>` として記録されている場合、その元のロールに対してチェックされます。
+- カスタム ロールを削除するには、組み込みの `user` フォールバックを割り当てる権限も必要です。無効なメンバーは `disabled:user` として無効のままになります。
 
-ロール API はこれらの権限を含むリクエストを拒否します。組み込みの `admin` ロールのみがこれらにアクセスできます。
+グローバル認証情報と構成はより厳密です。SCIM トークンの発行または取り消し、およびインスタンス構成のインポートには、完全な有効な管理者権限を持つ組み込みの `admin` ロールが必要です。
 
 ### ツールレベルの権限 {#tool-level-permissions}
 

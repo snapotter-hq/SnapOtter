@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ve Cloudflare için ters proxy yapılandırmaları."
-i18n_output_hash: 4fadf7841bd7
-i18n_source_hash: 98172965118b
+i18n_source_hash: 2a722f86da75
 i18n_provenance: human
+i18n_output_hash: 7ba99eabac1c
+i18n_hash_version: 2
 ---
 
 # Dağıtım {#deployment}
@@ -82,7 +83,7 @@ services:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -170,13 +171,13 @@ services:
     container_name: SnapOtter-postgres
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -207,12 +208,16 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
+### GPU hızlandırmayı doğrulayın {#verify-gpu-acceleration}
+
 Günlüklerde CUDA algılamasını kontrol edin:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
+
+`--gpus all` ve NVIDIA Container Toolkit doğru ayarlanmış olmasına rağmen AI araçları CPU'da çalışıyorsa, etkilenen paketi (örneğin Arka Plan Kaldırma) **Ayarlar → AI Özellikleri**'nden yeniden yükleyin. Yükleyici, ONNX Runtime'ın GPU yapısını geri yükler; başka bir paket (transkripsiyon gibi) tarafından çekilen yalnızca CPU içeren bir yapı, aksi takdirde paylaşılan AI ortamında gölge oluşturabilir. Kullanıcı arayüzünden yeniden yükleme eski bir görüntüdeki GPU'yu geri yüklemezse, [sorun #490](https://github.com/snapotter-hq/SnapOtter/issues/490)'daki manuel onarıma bakın.
 
 ## Donanım Gereksinimleri {#hardware-requirements}
 
@@ -485,6 +490,8 @@ curl http://localhost:1349/api/v1/health
 
 SnapOtter, hız sınırlaması ve günlüğe kaydetmenin `X-Forwarded-For` başlıklarından gerçek istemci IP'sini kullanması için varsayılan olarak `TRUST_PROXY=true` ayarlar.
 
+Aşağıdaki her proxy için iki şey önemlidir: büyük istek gövdelerine (yüklemeler) izin verin ve yanıtları ara belleğe almayın. Yanıt arabelleğe alan bir proxy, SSE ilerlemesini keser ve daha görünür bir şekilde büyük bir dosya indirme işlemini "başlatır ancak hiçbir zaman bitirmez" çünkü proxy, aktarmadan önce tüm dosyayı tutar. SnapOtter, indirmelerde `X-Accel-Buffering: no`'yi gönderir, böylece ara belleğe alma başka bir yerde bırakılsa bile nginx bunları akışa alır, ancak nginx dışındaki proxy'lerin yanıt arabelleğe almanın açıkça devre dışı bırakılması gerekir (aşağıdaki her yapılandırmada gösterilmiştir). İndirme işlemi yarıda durursa, kontrol edilecek ilk şey öndeki ara belleğe alma proxy'sidir.
+
 ### Nginx {#nginx}
 
 ```nginx
@@ -505,7 +512,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # SSE support (batch progress, feature install progress)
+        # Ara belleğe alma yerine akış yanıtları: SSE ilerlemesi (toplu, yapay zeka, özellik yüklemeleri) ve büyük dosya indirmeleri için gereklidir.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -549,7 +556,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1`, SSE ilerleme olayları (grup işleme, AI araçları, özellik kurulumları) için gerekli olan yanıt arabelleğe almayı devre dışı bırakır. Uzatılmış zaman aşımları, Caddy'nin bağlantıyı erken kapatmadan büyük dosya yüklemelerinin tamamlanmasına izin verir.
+`flush_interval -1`, SSE ilerleme olayları (toplu işleme, yapay zeka araçları, özellik yüklemeleri) ve büyük dosya indirmelerinin durmak yerine akışa alınması için gerekli olan yanıt arabelleğe almayı devre dışı bırakır. Uzatılmış zaman aşımları, Caddy'nin bağlantıyı erken kapatmasına gerek kalmadan büyük dosya yüklemelerinin tamamlanmasına olanak tanır.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 

@@ -1,8 +1,9 @@
 ---
 description: "جميع متغيّرات بيئة SnapOtter مع قيمها الافتراضية. اضبط المصادقة والتخزين ونماذج الذكاء الاصطناعي والتحليلات وغير ذلك."
-i18n_source_hash: 8e9e9ca2840c
+i18n_source_hash: 25970c776f7c
 i18n_provenance: human
-i18n_output_hash: 52883b691606
+i18n_output_hash: c5d2e7561a15
+i18n_hash_version: 2
 ---
 
 # الإعداد {#configuration}
@@ -124,13 +125,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12

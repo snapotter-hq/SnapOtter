@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutla kurun. Docker Compose kurulumu, kaynaktan derleme ve tam özellik genel bakışı içerir."
-i18n_output_hash: 715756b0b772
-i18n_source_hash: 68bf7f60b68d
+i18n_source_hash: c278dd70d2a2
 i18n_provenance: human
+i18n_output_hash: 9628812bfcb3
+i18n_hash_version: 2
 ---
 
 # Başlarken {#getting-started}
@@ -40,7 +41,7 @@ NVIDIA CUDA ile hızlandırılmış arka plan kaldırma, ölçeklendirme, yüz g
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerektirir. CUDA mevcut olmadığında otomatik olarak CPU'ya geri döner. VA-API, Quick Sync veya OpenCL üzerinden Intel/AMD iGPU hızlandırması şu anda AI çıkarımı için desteklenmemektedir. Kıyaslamalar için [Docker Etiketleri](/tr/guide/docker-tags) bölümüne bakın.
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerektirir. CUDA kullanılamadığında otomatik olarak CPU'ya geri döner. VA-API, Quick Sync veya OpenCL aracılığıyla Intel/AMD iGPU hızlandırma, günümüzde yapay zeka çıkarımı için desteklenmemektedir. Karşılaştırmalar için [Docker Etiketleri](/tr/guide/docker-tags) konusuna bakın. AI araçları `--gpus all`'ye rağmen CPU üzerinde çalışıyorsa, bkz. [GPU hızlandırmasını doğrulama](/tr/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details GHCR'de de mevcut
@@ -78,13 +79,13 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter
+      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -130,7 +131,7 @@ pnpm dev
 
 | Modalite | Sayı | Örnek Araçlar |
 |----------|-------|---------------|
-| **Görsel** | 105 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
+| **Görsel** | 107 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
 | **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazılar, Video'dan GIF'e, Yeniden Boyutlandır, Sabitle, format ön ayarları |
 | **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Transkribe Et, Perde Kaydırma, Kısılma, Zil Sesi Oluşturucu, format ön ayarları |
 | **PDF / Belge** | 42 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Sansürle, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
