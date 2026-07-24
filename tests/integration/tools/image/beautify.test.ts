@@ -948,6 +948,19 @@ describe("Beautify", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("empty custom shadow color returns 400 instead of reaching Sharp", async () => {
+    const payload = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ shadowPreset: "custom", shadowColor: "" }),
+      },
+    ]);
+
+    const res = await post("/api/v1/tools/image/beautify", payload);
+    expect(res.statusCode).toBe(400);
+  });
+
   it("invalid background type returns 400", async () => {
     const payload = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },

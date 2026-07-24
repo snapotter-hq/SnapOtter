@@ -83,6 +83,22 @@ describe.skipIf(!pdfcpuAvailable())("doc-engine pdfcpu (requires pdfcpu binary)"
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it.each(["%", "100%", "%x"])("textStamp safely preserves literal text %j", async (text) => {
+    const dir = mkdtempSync(join(tmpdir(), "pdfcpu-"));
+    try {
+      const out = join(dir, "literal-percent.pdf");
+      await pdfcpuTextStamp(
+        PDF,
+        { text, position: "c", fontSize: 10, opacity: 1, rotation: 0 },
+        out,
+      );
+      const bytes = await readFile(out);
+      expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // --- Ungated validation tests: run without the binary ---

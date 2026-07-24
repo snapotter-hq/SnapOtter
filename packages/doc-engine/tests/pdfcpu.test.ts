@@ -216,6 +216,19 @@ describe("pdfcpuTextStamp", () => {
     expect(args[6]).toBe("pos:br, points:12, op:1, rotation:-90");
   });
 
+  it.each([
+    ["%", "%%"],
+    ["100%", "100%%"],
+    ["%x", "%%x"],
+    ["already %% literal", "already %%%% literal"],
+  ])("escapes literal pdfcpu percent markers in %j", async (text, expected) => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdfcpu.js").then((m) =>
+      m.pdfcpuTextStamp("/in.pdf", { ...validStamp, text }, "/out.pdf"),
+    );
+    expect(h.lastArgs()[5]).toBe(expected);
+  });
+
   it("rejects empty text before spawning", async () => {
     await expect(
       import("../src/pdfcpu.js").then((m) =>

@@ -128,6 +128,15 @@ export interface TextStampOptions {
 }
 
 /**
+ * pdfcpu interprets percent signs as page-template markers and v0.13 panics
+ * on a dangling `%`. Preserve its supported page tokens while doubling every
+ * literal or unsupported marker so user text is rendered verbatim.
+ */
+function escapePdfcpuStampText(text: string): string {
+  return text.replace(/%(?![pP])/g, "%%");
+}
+
+/**
  * Text stamp/watermark on every page. Image stamps deferred to a later wave.
  *
  * Verified CLI shape (pdfcpu v0.13.0):
@@ -169,5 +178,13 @@ export async function pdfcpuTextStamp(
     throw new Error("Rotation must be -180..180");
   }
   const desc = `pos:${opts.position}, points:${opts.fontSize}, op:${opts.opacity}, rotation:${opts.rotation}`;
-  await runPdfcpu(["stamp", "add", "--", opts.text, desc, inputPath, outPath]);
+  await runPdfcpu([
+    "stamp",
+    "add",
+    "--",
+    escapePdfcpuStampText(opts.text),
+    desc,
+    inputPath,
+    outPath,
+  ]);
 }

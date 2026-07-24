@@ -91,6 +91,20 @@ describe("Sharp-backed image settings schemas", () => {
     expect(beautifySettingsSchema.safeParse({ shadowOffsetY: 0.5 }).success).toBe(false);
   });
 
+  it("rejects Beautify colors that Sharp cannot decode", () => {
+    expect(beautifySettingsSchema.safeParse({ backgroundColor: "" }).success).toBe(false);
+    expect(
+      beautifySettingsSchema.safeParse({ shadowPreset: "custom", shadowColor: "" }).success,
+    ).toBe(false);
+    expect(
+      beautifySettingsSchema.safeParse({
+        backgroundColor: "#667eea",
+        shadowPreset: "custom",
+        shadowColor: "#000000",
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts finite large rotation angles for normalization", () => {
     expect(parses("rotate", { angle: 10_000_000.000000002 })).toBe(true);
     expect(parses("rotate", { angle: Number.POSITIVE_INFINITY })).toBe(false);
