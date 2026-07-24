@@ -1,7 +1,7 @@
 [
   {
     "id": "resize",
-    "name": "Resize",
+    "name": "Resize Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -46,7 +46,7 @@
   },
   {
     "id": "crop",
-    "name": "Crop",
+    "name": "Crop Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -91,7 +91,7 @@
   },
   {
     "id": "rotate",
-    "name": "Rotate & Flip",
+    "name": "Rotate & Flip Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -136,7 +136,7 @@
   },
   {
     "id": "convert",
-    "name": "Convert",
+    "name": "Convert Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -181,7 +181,7 @@
   },
   {
     "id": "compress",
-    "name": "Compress",
+    "name": "Compress Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -271,7 +271,7 @@
   },
   {
     "id": "strip-metadata",
-    "name": "Remove Metadata",
+    "name": "Remove Image Metadata",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -316,7 +316,7 @@
   },
   {
     "id": "edit-metadata",
-    "name": "Edit Metadata",
+    "name": "Edit Image Metadata",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -541,7 +541,7 @@
   },
   {
     "id": "sharpening",
-    "name": "Sharpening",
+    "name": "Sharpen Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -720,6 +720,14 @@
     "isAI": true
   },
   {
+    "id": "remove-gif-background",
+    "name": "Remove GIF Background",
+    "modality": "image",
+    "acceptedInputs": [".gif", ".webp", ".apng", ".png"],
+    "executionHint": "long",
+    "isAI": true
+  },
+  {
     "id": "upscale",
     "name": "Image Upscaling",
     "modality": "image",
@@ -864,7 +872,7 @@
   },
   {
     "id": "blur-faces",
-    "name": "Face / PII Blur",
+    "name": "Blur Faces & PII",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -2168,7 +2176,7 @@
   },
   {
     "id": "collage",
-    "name": "Collage / Grid",
+    "name": "Collage & Grid",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -2213,7 +2221,7 @@
   },
   {
     "id": "stitch",
-    "name": "Stitch / Combine",
+    "name": "Stitch Images",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -2258,7 +2266,7 @@
   },
   {
     "id": "split",
-    "name": "Image Splitting",
+    "name": "Split Image",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -2394,6 +2402,51 @@
   {
     "id": "circle-crop",
     "name": "Circle Crop",
+    "modality": "image",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".tif",
+      ".avif",
+      ".heic",
+      ".heif",
+      ".svg",
+      ".svgz",
+      ".ico",
+      ".jxl",
+      ".jp2",
+      ".psd",
+      ".tga",
+      ".exr",
+      ".hdr",
+      ".dng",
+      ".cr2",
+      ".nef",
+      ".arw",
+      ".orf",
+      ".rw2",
+      ".ppm",
+      ".pgm",
+      ".pbm",
+      ".qoi",
+      ".dds",
+      ".fits",
+      ".dpx",
+      ".apng",
+      ".cur",
+      ".eps"
+    ],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "rounded-crop",
+    "name": "Rounded Crop",
     "modality": "image",
     "acceptedInputs": [
       ".jpg",
@@ -3155,7 +3208,7 @@
   },
   {
     "id": "video-loudnorm",
-    "name": "Normalize Audio",
+    "name": "Normalize Video Audio",
     "modality": "video",
     "acceptedInputs": [
       ".mp4",
@@ -3601,7 +3654,7 @@
   },
   {
     "id": "volume-adjust",
-    "name": "Volume Adjust",
+    "name": "Adjust Volume",
     "modality": "audio",
     "acceptedInputs": [
       ".mp3",
@@ -3900,7 +3953,7 @@
     "name": "Compress PDF",
     "modality": "document",
     "acceptedInputs": [".pdf"],
-    "executionHint": "fast",
+    "executionHint": "long",
     "isAI": false
   },
   {
@@ -4017,7 +4070,7 @@
   },
   {
     "id": "pdfa-convert",
-    "name": "PDF/A Convert",
+    "name": "PDF/A Converter",
     "modality": "document",
     "acceptedInputs": [".pdf"],
     "executionHint": "fast",
@@ -4033,7 +4086,7 @@
   },
   {
     "id": "nup-pdf",
-    "name": "N-up PDF",
+    "name": "Pages Per Sheet (N-up)",
     "modality": "document",
     "acceptedInputs": [".pdf"],
     "executionHint": "fast",
@@ -4153,7 +4206,7 @@
   },
   {
     "id": "epub-convert",
-    "name": "Convert EPUB",
+    "name": "Convert from EPUB",
     "modality": "document",
     "acceptedInputs": [".epub"],
     "executionHint": "long",
@@ -4217,7 +4270,7 @@
   },
   {
     "id": "yaml-json",
-    "name": "YAML / JSON",
+    "name": "Convert YAML / JSON",
     "modality": "file",
     "acceptedInputs": [".yaml", ".yml", ".json"],
     "executionHint": "fast",
