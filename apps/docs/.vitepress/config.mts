@@ -4,6 +4,7 @@ import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
+import { pageOnlySidebar } from "./llms-sidebar.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
@@ -224,6 +225,7 @@ export default defineConfig({
       }),
       llmstxt({
         domain: "https://docs.snapotter.com",
+        sidebar: pageOnlySidebar,
         customLLMsTxtTemplate: `# {title}
 
 {description}
