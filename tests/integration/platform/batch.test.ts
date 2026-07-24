@@ -6,12 +6,16 @@
  * non-existent tools, and ZIP response format validation.
  */
 
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import AdmZip from "adm-zip";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
@@ -22,11 +26,98 @@ import {
   type TestApp,
 } from "../test-server.js";
 
+// ── Targeted partial mocks (pass-through unless a test arms them) ──
+//
+// Each mock defaults to the real implementation so the existing tests in this
+// file keep exercising the genuine pipeline. Individual tests flip a hoisted
+// flag inside try/finally to reach branches that are otherwise untestable:
+//  - ocr-limits: the OCR aggregate cap is a hard 512 MB constant; shrinking it
+//    is the only sane way to exercise the enforcement branch (same pattern as
+//    tests/integration/tools/document/ocr-pdf-streaming-ingress.test.ts).
+//  - heic-converter: forces decodeHeic to fail so the route's per-file HEIC
+//    failure handling runs even on hosts where the decoder CLI exists.
+//  - object-storage: poisons getObjectStream for a specific job's outputs/
+//    prefix to exercise the ZIP streaming error paths after headers are sent.
+const ocrLimitsMock = vi.hoisted(() => ({
+  override: null as { fileBytes: number; aggregateBytes: number } | null,
+}));
+
+const heicMock = vi.hoisted(() => ({ failDecode: false }));
+
+const storageMock = vi.hoisted(() => ({
+  poison: new Map<string, "reject" | "stream-error">(),
+}));
+
+vi.mock("../../../apps/api/src/lib/ocr-limits.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/ocr-limits.js")>();
+  return {
+    ...actual,
+    resolveOcrUploadLimits: (maxUploadSizeMb: number) =>
+      ocrLimitsMock.override ?? actual.resolveOcrUploadLimits(maxUploadSizeMb),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/heic-converter.js")>();
+  return {
+    ...actual,
+    decodeHeic: async (...args: Parameters<typeof actual.decodeHeic>) => {
+      if (heicMock.failDecode) throw new Error("Injected HEIC decode failure");
+      return actual.decodeHeic(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  const { Readable } = await import("node:stream");
+  return {
+    ...actual,
+    getObjectStream: async (key: string) => {
+      for (const [prefix, mode] of storageMock.poison) {
+        if (!key.startsWith(prefix)) continue;
+        if (mode === "reject") throw new Error(`test poison: refusing to open ${key}`);
+        // Error only once a consumer reads, so the failure surfaces inside
+        // archiver (which has error listeners attached) instead of as an
+        // unhandled 'error' event on an unowned stream.
+        return new Readable({
+          read() {
+            this.destroy(new Error(`test poison: stream error for ${key}`));
+          },
+        });
+      }
+      return actual.getObjectStream(key);
+    },
+  };
+});
+
 const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
 const WEBP = readFixture(fixtures.image.base.webp50);
 const TINY_MP4 = readFixture(fixtures.video.tiny("mp4"));
 const TINY_MOV = readFixture(fixtures.video.tiny("mov"));
+const HEIC = readFixture(fixtures.image.base.heic200);
+const PDF3 = readFixture(fixtures.document.pdf3);
+
+/** Mirrors findDecodeCmd in heic-converter.ts: --version must succeed. */
+function heifDecoderAvailable(): boolean {
+  for (const cmd of ["heif-convert", "heif-dec"]) {
+    const probe = spawnSync(cmd, ["--version"], { timeout: 5_000 });
+    if (!probe.error && probe.status === 0) return true;
+  }
+  return false;
+}
+const heifDecoderPresent = heifDecoderAvailable();
+
+// validateImageBuffer needs Sharp to read HEIC container metadata before the
+// route ever reaches decodeHeic. Prebuilt Sharp can usually parse the boxes
+// even without an HEVC pixel decoder, but gate on it rather than assume.
+const heicMetadataReadable = await sharp(HEIC)
+  .metadata()
+  .then(() => true)
+  .catch(() => false);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -617,5 +708,299 @@ describe.skipIf(!ffmpegAvailable())("Non-image modality batch", () => {
     const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
     expect(fileResults["0"]).toBeDefined();
     expect(fileResults["1"]).toBeDefined();
+  }, 60_000);
+});
+
+// ── Route lookup edge cases ─────────────────────────────────────
+describe("Batch route lookup", () => {
+  it("returns 404 NOT_FOUND when the tool exists but the section is wrong", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    // resize is an image tool; requesting it under /video must not resolve.
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/video/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(404);
+    const result = JSON.parse(res.body);
+    expect(result.code).toBe("NOT_FOUND");
+    expect(result.error).toBe("Not found");
+  });
+
+  it("returns 404 NOT_FOUND for an unknown toolId on a well-formed batch URL", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/definitely-not-a-tool/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+  });
+
+  it("returns 404 for a real tool that has no process-fn registry entry", async () => {
+    // compare is a catalog tool with a custom multi-file contract; it is in
+    // REGISTRY_EXEMPT and never calls createToolRoute/registerToolProcessFn,
+    // so the batch route must reject it after the catalog lookup succeeds.
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compare/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe('Tool "compare" not found');
+  });
+});
+
+// ── Batch size cap ──────────────────────────────────────────────
+describe("Batch size limit", () => {
+  it.skipIf(!(env.MAX_BATCH_SIZE > 0))(
+    "rejects a batch with more than MAX_BATCH_SIZE files",
+    async () => {
+      const fields: Parameters<typeof createMultipartPayload>[0] = Array.from(
+        { length: env.MAX_BATCH_SIZE + 1 },
+        (_, i) => ({
+          name: "file",
+          filename: `file-${i}.png`,
+          contentType: "image/png",
+          content: PNG,
+        }),
+      );
+      fields.push({ name: "settings", content: JSON.stringify({ width: 50 }) });
+      const { body, contentType } = createMultipartPayload(fields);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(400);
+      const result = JSON.parse(res.body);
+      // The multipart parser's file-count limit rejects before the route's own
+      // "too many files" check, so accept either rejection message.
+      expect(result.error).toMatch(/too many files|failed to parse multipart/i);
+    },
+  );
+});
+
+// ── AI tool without its model bundle ────────────────────────────
+describe("Batch AI tool with missing bundle", () => {
+  it("returns 501 FEATURE_NOT_INSTALLED before touching any file", async () => {
+    // No AI bundles are ever installed in the test environment, so
+    // remove-background (bundle: background-removal) must be refused after
+    // settings validation but before per-file processing.
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "subject.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(501);
+    const result = JSON.parse(res.body);
+    expect(result.error).toBe("Feature not installed");
+    expect(result.code).toBe("FEATURE_NOT_INSTALLED");
+    expect(result.feature).toBe("background-removal");
+    expect(result.featureName).toBeDefined();
+    expect(result.estimatedSize).toBeDefined();
+  });
+});
+
+// ── OCR aggregate ingress cap (buffered path) ───────────────────
+describe("OCR batch aggregate size limit", () => {
+  it("rejects a buffered OCR batch whose bytes cross the aggregate cap", async () => {
+    // The real aggregate cap is a hard 512 MB constant, far beyond what a
+    // test can upload; shrink it through the ocr-limits seam and verify the
+    // route counts streamed chunks and aborts with 413 mid-parse.
+    ocrLimitsMock.override = { fileBytes: 10 * 1024 * 1024, aggregateBytes: 64 };
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/ocr/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(413);
+      const result = JSON.parse(res.body);
+      expect(result.error).toBe("Upload exceeds the allowed size");
+      expect(result.details).toMatch(/aggregate safety limit/);
+    } finally {
+      ocrLimitsMock.override = null;
+    }
+  });
+});
+
+// ── HEIC ingress branches ───────────────────────────────────────
+describe("HEIC batch ingress", () => {
+  it.skipIf(!heicMetadataReadable || !heifDecoderPresent)(
+    "decodes HEIC input and returns a processed ZIP",
+    async () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test-200x150.heic", contentType: "image/heic", content: HEIC },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toBe("application/zip");
+      const zip = new AdmZip(res.rawPayload);
+      expect(zip.getEntries().length).toBe(1);
+      const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+      expect(fileResults["0"]).toBeDefined();
+    },
+    60_000,
+  );
+
+  it.skipIf(!heicMetadataReadable)(
+    "records a per-file failure when HEIC decoding fails",
+    async () => {
+      heicMock.failDecode = true;
+      try {
+        const { body, contentType } = createMultipartPayload([
+          {
+            name: "file",
+            filename: "test-200x150.heic",
+            contentType: "image/heic",
+            content: HEIC,
+          },
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize/batch",
+          headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+          body,
+        });
+
+        // The only file fails pre-validation, so the whole batch is a 422.
+        expect(res.statusCode).toBe(422);
+        const result = JSON.parse(res.body);
+        expect(result.error).toBe("All files failed processing");
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0].filename).toBe("test-200x150.heic");
+        expect(result.errors[0].error).toBe("Failed to decode HEIC file");
+      } finally {
+        heicMock.failDecode = false;
+      }
+    },
+  );
+});
+
+// ── CLI-decode fallback + all-children-failed ───────────────────
+describe("Batch where every worker job fails", () => {
+  it("returns 422 with per-file errors when all enqueued children fail", async () => {
+    // A QOI header with impossible channel/colorspace bytes passes magic-byte
+    // ingress validation (CLI-decoded formats skip the Sharp probe), fails
+    // every decoder in the CLI fallback chain, is uploaded raw, and then
+    // fails in the worker. That drives the post-processing "all files
+    // failed" branch, which is unreachable via ingress validation alone.
+    const garbageQoi = Buffer.concat([
+      Buffer.from("qoif"),
+      // width=1, height=1, channels=0xff (invalid), colorspace=0xff (invalid)
+      Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 0xff, 0xff]),
+      Buffer.alloc(64, 0xab),
+    ]);
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "garbage.qoi",
+        contentType: "application/octet-stream",
+        content: garbageQoi,
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(422);
+    const result = JSON.parse(res.body);
+    expect(result.error).toBe("All files failed processing");
+    expect(result.errors).toHaveLength(1);
+    // The CLI-decode fallback renames the upload to .png before enqueueing.
+    expect(String(result.errors[0].filename)).toMatch(/garbage/);
+    expect(typeof result.errors[0].error).toBe("string");
+    expect(result.errors[0].error.length).toBeGreaterThan(0);
+  }, 60_000);
+});
+
+// ── Non-image modality: partial failure through the document handler ──
+describe.skipIf(!qpdfAvailable())("Document batch partial failure", () => {
+  it("processes the valid PDF and records the invalid one as a per-file error", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "doc-ok.pdf", contentType: "application/pdf", content: PDF3 },
+      {
+        name: "file",
+        filename: "bad.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("this is definitely not a pdf"),
+      },
+      { name: "settings", content: JSON.stringify({ angle: 90 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/rotate-pdf/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries().map((e) => e.entryName);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatch(/doc-ok/);
+
+    // Only the surviving file may appear in the results header, keyed by its
+    // original upload index.
+    const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+    expect(Object.keys(fileResults)).toEqual(["0"]);
+    expect(fileResults["0"]).toMatch(/doc-ok/);
   }, 60_000);
 });
