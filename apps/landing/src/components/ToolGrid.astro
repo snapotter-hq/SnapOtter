@@ -250,6 +250,7 @@ const safeStringsJson = JSON.stringify(toolGridStrings).replace(/</g, "\\u003c")
               <button
                 type="button"
                 data-modality={modality.id}
+                aria-label={`${modality.label} ${t(locale, "home.categoryCards.toolCount", { count: modality.count })}`}
                 aria-pressed={modality.id === "all" ? "true" : "false"}
                 class:list={[
                   "tool-command-modality rounded-md px-3 py-2 text-sm font-semibold transition-colors",
