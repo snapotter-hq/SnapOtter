@@ -2460,6 +2460,15 @@ paths:
                 properties:
                   jobId:
                     type: string
+                  downloadUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  originalSize:
+                    type: integer
+                    description: Input PDF size in bytes
+                  processedSize:
+                    type: integer
+                    description: Output ZIP size in bytes
                   pageCount:
                     type: integer
                     description: Total pages in the PDF
@@ -5817,7 +5826,7 @@ paths:
         - Auth
       summary: user बनाएं
       description: |
-        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
+        users:manage अनुमति की आवश्यकता है. सौंपी गई भूमिका अभिनेता के प्रभावी भूमिका प्राधिकरण के भीतर होनी चाहिए, जिसमें पदानुक्रम, अनुमतियाँ, टूल एक्सेस और कोई API-key दायरा शामिल है।
       security:
         - bearerAuth: []
       requestBody:
@@ -5889,7 +5898,7 @@ paths:
         - Auth
       summary: user अपडेट करें
       description: |
-        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
+        लक्ष्य की वर्तमान भूमिका पर users:manage अनुमति और अधिकार की आवश्यकता है। कोई भी नई सौंपी गई भूमिका अभिनेता के प्रभावी पदानुक्रम, अनुमतियाँ, टूल एक्सेस और API-key दायरे के भीतर होनी चाहिए।
       security:
         - bearerAuth: []
       parameters:
@@ -5945,7 +5954,7 @@ paths:
         - Auth
       summary: user हटाएं
       description: |
-        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
+        पदानुक्रम, अनुमतियाँ, टूल एक्सेस और किसी भी API-key दायरे सहित लक्ष्य की वर्तमान भूमिका पर users:manage अनुमति और अधिकार की आवश्यकता है। स्वयं-विलोपन की अनुमति नहीं है.
       security:
         - bearerAuth: []
       parameters:
@@ -5984,7 +5993,7 @@ paths:
         - Auth
       summary: user password रीसेट करें
       description: |
-        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        स्थानीय उपयोगकर्ता का पासवर्ड रीसेट करें. पदानुक्रम, अनुमतियाँ, टूल एक्सेस और किसी भी API-key दायरे सहित लक्ष्य की वर्तमान भूमिका पर users:manage अनुमति और अधिकार की आवश्यकता है।
       security:
         - bearerAuth: []
       parameters:
@@ -7162,10 +7171,10 @@ paths:
         - Roles
       summary: एक कस्टम role बनाएं
       description: |
-        Create a new custom role with specified permissions. Role names must be
-        2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission. The new role's permissions and tool
-        access must be contained by the actor's effective authority.
+        निर्दिष्ट अनुमतियों के साथ एक नई कस्टम भूमिका बनाएँ। भूमिका नाम अवश्य होने चाहिए
+        2-30 वर्ण, हाइफ़न और अंडरस्कोर के साथ लोअरकेस अल्फ़ान्यूमेरिक।
+        security:manage अनुमति की आवश्यकता है. नई भूमिका की अनुमतियाँ और उपकरण
+        पहुंच को अभिनेता के प्रभावी प्राधिकार द्वारा नियंत्रित किया जाना चाहिए।
       security:
         - bearerAuth: []
       requestBody:
@@ -7249,10 +7258,10 @@ paths:
         - Roles
       summary: एक कस्टम role अपडेट करें
       description: |
-        Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission and
-        authority over the current role; the resulting permissions and tool
-        access must remain contained by the actor's effective authority.
+        किसी कस्टम भूमिका का नाम, विवरण या अनुमतियाँ अपडेट करें। अंतर्निर्मित
+        भूमिकाएँ संशोधित नहीं की जा सकतीं. security:manage अनुमति की आवश्यकता है और
+        वर्तमान भूमिका पर अधिकार; परिणामी अनुमतियाँ और उपकरण
+        पहुंच अभिनेता के प्रभावी प्राधिकार द्वारा नियंत्रित रहनी चाहिए।
       security:
         - bearerAuth: []
       parameters:
@@ -7326,10 +7335,10 @@ paths:
         - Roles
       summary: एक कस्टम role हटाएं
       description: |
-        Delete a custom role. Users assigned to this role are reassigned to the
-        default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission, authority over the current role, and
-        authority to assign the fallback role.
+        एक कस्टम भूमिका हटाएँ. इस भूमिका को सौंपे गए उपयोगकर्ताओं को पुनः सौंपा गया है
+        डिफ़ॉल्ट "उपयोगकर्ता" भूमिका. अंतर्निहित भूमिकाएँ हटाई नहीं जा सकतीं. आवश्यकता है
+        security:manage अनुमति, वर्तमान भूमिका पर अधिकार, और
+        फ़ॉलबैक भूमिका निर्दिष्ट करने का प्राधिकार।
       security:
         - bearerAuth: []
       parameters:
@@ -12124,8 +12133,8 @@ paths:
       operationId: roundedCrop
       tags:
         - Tools
-      summary: Rounded crop
-      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      summary: गोल कोनों वाला क्रॉप
+      description: पारदर्शी कोनों, वैकल्पिक बॉर्डर और समायोज्य ज़ूम/ऑफ़सेट के साथ एक छवि को गोल वर्ग या गोलाकार आकार में काटें।
       security:
         - bearerAuth: []
       requestBody:
@@ -17858,7 +17867,7 @@ paths:
         - Auth
       summary: user MFA रीसेट करें
       description: |
-        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        उपयोगकर्ता का MFA नामांकन रीसेट करें। पदानुक्रम, अनुमतियाँ, टूल एक्सेस और किसी भी API-key दायरे सहित लक्ष्य की वर्तमान भूमिका पर users:manage अनुमति और अधिकार की आवश्यकता है।
       security:
         - bearerAuth: []
       parameters:
@@ -18186,7 +18195,7 @@ paths:
         - Enterprise
       summary: SCIM token बनाएं
       description: |
-        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
+        एक वैश्विक SCIM बियरर टोकन जेनरेट करें। एंटरप्राइज़ SCIM सुविधा और पूर्ण प्रभावी अंतर्निहित व्यवस्थापक प्राधिकरण की आवश्यकता है; कस्टम भूमिकाएँ और API keys में किसी भी व्यवस्थापक की अनुमति का अभाव योग्य नहीं है। लीगेसी अपरिवर्तित टोकन अमान्य हैं और उन्हें v2 टोकन के रूप में फिर से जारी किया जाना चाहिए।
       security:
         - bearerAuth: []
       responses:
@@ -18200,7 +18209,7 @@ paths:
         - Enterprise
       summary: SCIM token रद्द करें
       description: |
-        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        वैश्विक SCIM वाहक टोकन को रद्द करें। एंटरप्राइज़ SCIM सुविधा और पूर्ण प्रभावी अंतर्निहित व्यवस्थापक प्राधिकरण की आवश्यकता है; कस्टम भूमिकाएँ और API keys में किसी भी व्यवस्थापक की अनुमति का अभाव योग्य नहीं है।
       security:
         - bearerAuth: []
       responses:
@@ -18654,7 +18663,7 @@ paths:
         - Enterprise
       summary: user data पर्ज करें
       description: |
-        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        स्पष्ट पुष्टि के बाद उपयोगकर्ता के डेटा को स्थायी रूप से शुद्ध करें। पदानुक्रम, अनुमतियाँ, टूल एक्सेस और किसी भी API-key दायरे सहित लक्ष्य की वर्तमान भूमिका पर compliance:manage अनुमति और अधिकार की आवश्यकता है।
       security:
         - bearerAuth: []
       parameters:
@@ -18679,7 +18688,7 @@ paths:
         - Enterprise
       summary: team data पर्ज करें
       description: |
-        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
+        स्पष्ट पुष्टि के बाद टीम के डेटा को स्थायी रूप से शुद्ध करें। पदानुक्रम, अनुमतियाँ, टूल एक्सेस और किसी भी API-key दायरे सहित प्रत्येक सदस्य की वर्तमान भूमिका पर compliance:manage अनुमति और अधिकार की आवश्यकता है। अभिनेता वाली टीम को शुद्ध नहीं किया जा सकता।
       security:
         - bearerAuth: []
       parameters:
@@ -19620,18 +19629,34 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: ee4fc9fef8a4
+    paths./api/auth/register.post.description:
+      sourceHash: 86d150e370cc
+      provenance: machine
+      outputHash: b2e2f9668c9e
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: a80d88e0b5d2
+    paths./api/auth/users/{id}.put.description:
+      sourceHash: 150d0edee4d5
+      provenance: machine
+      outputHash: 5eb80c343335
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: 83e2cc37a32d
+    paths./api/auth/users/{id}.delete.description:
+      sourceHash: 7c79c060ecbc
+      provenance: machine
+      outputHash: 3c3a42a3fd5a
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: b42e554ee28d
+    paths./api/auth/users/{id}/reset-password.post.description:
+      sourceHash: 6d1bf8229cb6
+      provenance: machine
+      outputHash: de26c6eb8da8
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19796,14 +19821,26 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: 20b639a2c3dc
+    paths./api/v1/roles.post.description:
+      sourceHash: 12c3b80c8afa
+      provenance: machine
+      outputHash: 09b955e8fe95
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: f823846ad3b6
+    paths./api/v1/roles/{id}.put.description:
+      sourceHash: b19380895d3f
+      provenance: machine
+      outputHash: 36d36751149c
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: f038a74fc497
+    paths./api/v1/roles/{id}.delete.description:
+      sourceHash: a748a77794fc
+      provenance: machine
+      outputHash: 92c3c9f78dfc
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -20572,6 +20609,14 @@ x-i18n:
       sourceHash: 3e4d4819d594
       provenance: machine
       outputHash: a8e10ae2bc9c
+    paths./api/v1/tools/image/rounded-crop.post.summary:
+      sourceHash: 423d5a23e5b6
+      provenance: machine
+      outputHash: 94efc71e5b24
+    paths./api/v1/tools/image/rounded-crop.post.description:
+      sourceHash: d2f3f47ba8a5
+      provenance: machine
+      outputHash: 6925e13c32e8
     paths./api/v1/tools/image/duotone.post.summary:
       sourceHash: 27e78e7e8cca
       provenance: machine
@@ -21384,6 +21429,10 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: 885f22649f10
+    paths./api/auth/users/{id}/mfa/reset.post.description:
+      sourceHash: 4c6423b8059e
+      provenance: machine
+      outputHash: bb1cd229d1bf
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21508,10 +21557,18 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: a35ff7a09ebc
+    paths./api/v1/enterprise/scim/token.post.description:
+      sourceHash: c3a0ec224c22
+      provenance: machine
+      outputHash: 7467bce3c4fc
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: 632088aed2e8
+    paths./api/v1/enterprise/scim/token.delete.description:
+      sourceHash: 8a643b00892d
+      provenance: machine
+      outputHash: 61334647d0b9
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21748,10 +21805,18 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: b1d2bfde9537
+    paths./api/v1/enterprise/users/{id}/purge.delete.description:
+      sourceHash: 1fb9bf86180d
+      provenance: machine
+      outputHash: 857ee8fc74af
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: a11ae49bffa6
+    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
+      sourceHash: 54322e34bd5c
+      provenance: machine
+      outputHash: 4f6362529533
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine

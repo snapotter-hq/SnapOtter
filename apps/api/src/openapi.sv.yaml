@@ -2461,6 +2461,15 @@ paths:
                 properties:
                   jobId:
                     type: string
+                  downloadUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  originalSize:
+                    type: integer
+                    description: Input PDF size in bytes
+                  processedSize:
+                    type: integer
+                    description: Output ZIP size in bytes
                   pageCount:
                     type: integer
                     description: Total pages in the PDF
@@ -5819,7 +5828,7 @@ paths:
         - Auth
       summary: Skapa anvandare
       description: |
-        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
+        Kräver users:manage-tillstånd. Den tilldelade rollen måste ligga inom aktörens effektiva rollbefogenhet, inklusive hierarki, behörigheter, verktygsåtkomst och eventuellt API-key-omfång.
       security:
         - bearerAuth: []
       requestBody:
@@ -5891,7 +5900,7 @@ paths:
         - Auth
       summary: Uppdatera anvandare
       description: |
-        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
+        Kräver users:manage-behörighet och auktoritet över målets nuvarande roll. Alla nytilldelade roller måste också ligga inom skådespelarens effektiva hierarki, behörigheter, verktygsåtkomst och API-key räckvidd.
       security:
         - bearerAuth: []
       parameters:
@@ -5947,7 +5956,7 @@ paths:
         - Auth
       summary: Ta bort anvandare
       description: |
-        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
+        Kräver users:manage-behörighet och auktoritet över målets nuvarande roll, inklusive hierarki, behörigheter, verktygsåtkomst och alla API-key-omfång. Självradering är inte tillåten.
       security:
         - bearerAuth: []
       parameters:
@@ -5986,7 +5995,7 @@ paths:
         - Auth
       summary: Aaterstall anvandarlosenord
       description: |
-        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Återställ en lokal användares lösenord. Kräver users:manage-behörighet och auktoritet över målets nuvarande roll, inklusive hierarki, behörigheter, verktygsåtkomst och alla API-key-omfång.
       security:
         - bearerAuth: []
       parameters:
@@ -7164,10 +7173,10 @@ paths:
         - Roles
       summary: Skapa en anpassad roll
       description: |
-        Create a new custom role with specified permissions. Role names must be
-        2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission. The new role's permissions and tool
-        access must be contained by the actor's effective authority.
+        Skapa en ny anpassad roll med angivna behörigheter. Rollnamn måste vara
+        2-30 tecken, alfanumeriska gemener med bindestreck och understreck.
+        Kräver security:manage-tillstånd. Den nya rollens behörigheter och verktyg
+        åtkomst måste innehållas av aktörens effektiva myndighet.
       security:
         - bearerAuth: []
       requestBody:
@@ -7251,10 +7260,10 @@ paths:
         - Roles
       summary: Uppdatera en anpassad roll
       description: |
-        Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission and
-        authority over the current role; the resulting permissions and tool
-        access must remain contained by the actor's effective authority.
+        Uppdatera namn, beskrivning eller behörigheter för en anpassad roll. Inbyggd
+        roller kan inte ändras. Kräver security:manage-tillstånd och
+        auktoritet över den nuvarande rollen; de resulterande behörigheterna och verktyget
+        åtkomst måste förbli innesluten av aktörens effektiva myndighet.
       security:
         - bearerAuth: []
       parameters:
@@ -7328,10 +7337,10 @@ paths:
         - Roles
       summary: Ta bort en anpassad roll
       description: |
-        Delete a custom role. Users assigned to this role are reassigned to the
-        default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission, authority over the current role, and
-        authority to assign the fallback role.
+        Ta bort en anpassad roll. Användare som tilldelats den här rollen tilldelas om till
+        standard "användare" roll. Inbyggda roller kan inte tas bort. Kräver
+        security:manage-behörighet, auktoritet över den aktuella rollen och
+        behörighet att tilldela reservrollen.
       security:
         - bearerAuth: []
       parameters:
@@ -12126,8 +12135,8 @@ paths:
       operationId: roundedCrop
       tags:
         - Tools
-      summary: Rounded crop
-      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      summary: Rundad beskärning
+      description: Beskär en bild till en rundad fyrkant eller squircle med transparenta hörn, valfri kant och justerbar zoom/offset.
       security:
         - bearerAuth: []
       requestBody:
@@ -17862,7 +17871,7 @@ paths:
         - Auth
       summary: Aaterstall anvandarens MFA
       description: |
-        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Återställ en användares MFA-registrering. Kräver users:manage-behörighet och auktoritet över målets nuvarande roll, inklusive hierarki, behörigheter, verktygsåtkomst och alla API-key-omfattningar.
       security:
         - bearerAuth: []
       parameters:
@@ -18190,7 +18199,7 @@ paths:
         - Enterprise
       summary: Skapa SCIM-token
       description: |
-        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
+        Generera en global SCIM bärartoken. Kräver företagets SCIM-funktion och full effektiv inbyggd administratörsbehörighet; anpassade roller och API keys som saknar administratörsbehörighet kvalificerar inte. Äldre oversionerade tokens är ogiltiga och måste återutges som v2-tokens.
       security:
         - bearerAuth: []
       responses:
@@ -18204,7 +18213,7 @@ paths:
         - Enterprise
       summary: Aaterkalla SCIM-token
       description: |
-        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Återkalla den globala SCIM bärartoken. Kräver företagets SCIM-funktion och full effektiv inbyggd administratörsbehörighet; anpassade roller och API keys som saknar administratörsbehörighet kvalificerar inte.
       security:
         - bearerAuth: []
       responses:
@@ -18397,10 +18406,8 @@ paths:
       tags:
         - Enterprise
       summary: Exportera konfiguration
-      description: >
-        Exporterar redigerad instanskonfiguration, anpassade roller och team. Kräver fullständig
-        faktisk behörighet som inbyggd administratör. Anpassade roller kvalificerar inte, och inte
-        heller API-nycklar som saknar någon administratörsbehörighet.
+      description: |
+        Exporterar redigerad instanskonfiguration, anpassade roller och team. Kräver fullständig faktisk behörighet som inbyggd administratör. Anpassade roller kvalificerar inte, och inte heller API-nycklar som saknar någon administratörsbehörighet.
       security:
         - bearerAuth: []
       responses:
@@ -18660,7 +18667,7 @@ paths:
         - Enterprise
       summary: Rensa anvandardata
       description: |
-        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Rensa en användares data permanent efter uttrycklig bekräftelse. Kräver compliance:manage-behörighet och auktoritet över målets nuvarande roll, inklusive hierarki, behörigheter, verktygsåtkomst och alla API-key-omfång.
       security:
         - bearerAuth: []
       parameters:
@@ -18685,7 +18692,7 @@ paths:
         - Enterprise
       summary: Rensa teamdata
       description: |
-        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
+        Rensa ett teams data permanent efter uttrycklig bekräftelse. Kräver compliance:manage-behörighet och auktoritet över varje medlems nuvarande roll, inklusive hierarki, behörigheter, verktygsåtkomst och alla API-key-omfång. Ett lag som innehåller skådespelaren kan inte rensas.
       security:
         - bearerAuth: []
       parameters:
@@ -19626,18 +19633,34 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: d530ca2f130a
+    paths./api/auth/register.post.description:
+      sourceHash: 86d150e370cc
+      provenance: machine
+      outputHash: 2ccebdb1f65a
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: c17ff2c38d74
+    paths./api/auth/users/{id}.put.description:
+      sourceHash: 150d0edee4d5
+      provenance: machine
+      outputHash: 303c697f85a1
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: e81883edd0d7
+    paths./api/auth/users/{id}.delete.description:
+      sourceHash: 7c79c060ecbc
+      provenance: machine
+      outputHash: 64a4842f0f81
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: f675b6a8559a
+    paths./api/auth/users/{id}/reset-password.post.description:
+      sourceHash: 6d1bf8229cb6
+      provenance: machine
+      outputHash: 5ae3be93888d
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19802,14 +19825,26 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: 3675433b4823
+    paths./api/v1/roles.post.description:
+      sourceHash: 12c3b80c8afa
+      provenance: machine
+      outputHash: ed7aa4dfa312
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: 2e2603cebd47
+    paths./api/v1/roles/{id}.put.description:
+      sourceHash: b19380895d3f
+      provenance: machine
+      outputHash: ac970723de6a
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: 014c9d1a1a61
+    paths./api/v1/roles/{id}.delete.description:
+      sourceHash: a748a77794fc
+      provenance: machine
+      outputHash: be4cb1115ef3
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -20578,6 +20613,14 @@ x-i18n:
       sourceHash: 3e4d4819d594
       provenance: machine
       outputHash: 10fdef148f3a
+    paths./api/v1/tools/image/rounded-crop.post.summary:
+      sourceHash: 423d5a23e5b6
+      provenance: machine
+      outputHash: 534af8b0f53c
+    paths./api/v1/tools/image/rounded-crop.post.description:
+      sourceHash: d2f3f47ba8a5
+      provenance: machine
+      outputHash: 1fdc685c3622
     paths./api/v1/tools/image/duotone.post.summary:
       sourceHash: 27e78e7e8cca
       provenance: machine
@@ -21390,6 +21433,10 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: 43c58a9bf9df
+    paths./api/auth/users/{id}/mfa/reset.post.description:
+      sourceHash: 4c6423b8059e
+      provenance: machine
+      outputHash: 787b15ae8935
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21514,10 +21561,18 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: d3b506ae8c46
+    paths./api/v1/enterprise/scim/token.post.description:
+      sourceHash: c3a0ec224c22
+      provenance: machine
+      outputHash: 56b8586e5ec4
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: bc550bee10c1
+    paths./api/v1/enterprise/scim/token.delete.description:
+      sourceHash: 8a643b00892d
+      provenance: machine
+      outputHash: c56908d5293f
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21754,10 +21809,18 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: c0c35851fd99
+    paths./api/v1/enterprise/users/{id}/purge.delete.description:
+      sourceHash: 1fb9bf86180d
+      provenance: machine
+      outputHash: b3c4bd1ce78d
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: 00f4e1a87644
+    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
+      sourceHash: 54322e34bd5c
+      provenance: machine
+      outputHash: 3c921effce7a
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine

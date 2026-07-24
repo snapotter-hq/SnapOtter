@@ -2461,6 +2461,15 @@ paths:
                 properties:
                   jobId:
                     type: string
+                  downloadUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  originalSize:
+                    type: integer
+                    description: Input PDF size in bytes
+                  processedSize:
+                    type: integer
+                    description: Output ZIP size in bytes
                   pageCount:
                     type: integer
                     description: Total pages in the PDF
@@ -5819,7 +5828,7 @@ paths:
         - Auth
       summary: Crear usuario
       description: |
-        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
+        Requiere permiso users:manage. El rol asignado debe estar dentro de la autoridad de rol efectiva del actor, incluida la jerarquía, los permisos, el acceso a las herramientas y cualquier alcance API-key.
       security:
         - bearerAuth: []
       requestBody:
@@ -5891,7 +5900,7 @@ paths:
         - Auth
       summary: Actualizar usuario
       description: |
-        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
+        Requiere permiso y autoridad users:manage sobre la función actual del objetivo. Cualquier rol recién asignado también debe estar dentro de la jerarquía efectiva, los permisos, el acceso a las herramientas y el alcance API-key del actor.
       security:
         - bearerAuth: []
       parameters:
@@ -5947,7 +5956,7 @@ paths:
         - Auth
       summary: Eliminar usuario
       description: |
-        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
+        Requiere permiso users:manage y autoridad sobre la función actual del objetivo, incluida la jerarquía, los permisos, el acceso a herramientas y cualquier alcance API-key. No se permite la autoeliminación.
       security:
         - bearerAuth: []
       parameters:
@@ -5986,7 +5995,7 @@ paths:
         - Auth
       summary: Restablecer la contraseña de un usuario
       description: |
-        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Restablecer la contraseña de un usuario local. Requiere permiso users:manage y autoridad sobre la función actual del objetivo, incluida la jerarquía, los permisos, el acceso a herramientas y cualquier alcance API-key.
       security:
         - bearerAuth: []
       parameters:
@@ -7164,10 +7173,10 @@ paths:
         - Roles
       summary: Crear un rol personalizado
       description: |
-        Create a new custom role with specified permissions. Role names must be
-        2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission. The new role's permissions and tool
-        access must be contained by the actor's effective authority.
+        Cree un nuevo rol personalizado con permisos específicos. Los nombres de los roles deben ser
+        Caracteres 2-30, alfanuméricos en minúscula con guiones y guiones bajos.
+        Requiere permiso security:manage. Los permisos y la herramienta del nuevo rol.
+        el acceso debe estar contenido por la autoridad efectiva del actor.
       security:
         - bearerAuth: []
       requestBody:
@@ -7251,10 +7260,10 @@ paths:
         - Roles
       summary: Actualizar un rol personalizado
       description: |
-        Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission and
-        authority over the current role; the resulting permissions and tool
-        access must remain contained by the actor's effective authority.
+        Actualice el nombre, la descripción o los permisos de un rol personalizado. Incorporado
+        Los roles no se pueden modificar. Requiere permiso security:manage y
+        autoridad sobre el rol actual; los permisos y la herramienta resultantes
+        el acceso debe permanecer contenido por la autoridad efectiva del actor.
       security:
         - bearerAuth: []
       parameters:
@@ -7328,10 +7337,10 @@ paths:
         - Roles
       summary: Eliminar un rol personalizado
       description: |
-        Delete a custom role. Users assigned to this role are reassigned to the
-        default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission, authority over the current role, and
-        authority to assign the fallback role.
+        Eliminar un rol personalizado. Los usuarios asignados a este rol son reasignados al
+        rol predeterminado de "usuario". Los roles integrados no se pueden eliminar. Requiere
+        Permiso security:manage, autoridad sobre el rol actual y
+        autoridad para asignar el rol de reserva.
       security:
         - bearerAuth: []
       parameters:
@@ -12126,8 +12135,8 @@ paths:
       operationId: roundedCrop
       tags:
         - Tools
-      summary: Rounded crop
-      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      summary: Recorte redondeado
+      description: Recorte una imagen en un cuadrado redondeado o una ardilla con esquinas transparentes, borde opcional y zoom/desplazamiento ajustable.
       security:
         - bearerAuth: []
       requestBody:
@@ -17863,7 +17872,7 @@ paths:
         - Auth
       summary: Restablecer MFA de un usuario
       description: |
-        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Restablecer la inscripción MFA de un usuario. Requiere permiso users:manage y autoridad sobre la función actual del objetivo, incluida la jerarquía, los permisos, el acceso a herramientas y cualquier alcance API-key.
       security:
         - bearerAuth: []
       parameters:
@@ -18191,7 +18200,7 @@ paths:
         - Enterprise
       summary: Crear token SCIM
       description: |
-        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
+        Genere un token de portador SCIM global. Requiere la función empresarial SCIM y una autoridad de administrador integrada totalmente efectiva; Los roles personalizados y API keys sin ningún permiso de administrador no califican. Los tokens heredados no versionados no son válidos y deben volver a emitirse como tokens v2.
       security:
         - bearerAuth: []
       responses:
@@ -18205,7 +18214,7 @@ paths:
         - Enterprise
       summary: Revocar token SCIM
       description: |
-        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Revocar el token de portador global SCIM. Requiere la función empresarial SCIM y una autoridad de administrador integrada totalmente efectiva; Los roles personalizados y API keys sin ningún permiso de administrador no califican.
       security:
         - bearerAuth: []
       responses:
@@ -18659,7 +18668,7 @@ paths:
         - Enterprise
       summary: Purgar datos de usuario
       description: |
-        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Purgar permanentemente los datos de un usuario después de una confirmación explícita. Requiere permiso compliance:manage y autoridad sobre la función actual del objetivo, incluida la jerarquía, los permisos, el acceso a herramientas y cualquier alcance API-key.
       security:
         - bearerAuth: []
       parameters:
@@ -18684,7 +18693,7 @@ paths:
         - Enterprise
       summary: Purgar datos de equipo
       description: |
-        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
+        Purgar permanentemente los datos de un equipo después de una confirmación explícita. Requiere permiso y autoridad compliance:manage sobre la función actual de cada miembro, incluida la jerarquía, los permisos, el acceso a herramientas y cualquier alcance de API-key. Un equipo que contenga al actor no puede ser eliminado.
       security:
         - bearerAuth: []
       parameters:
@@ -19625,18 +19634,34 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: 190aba76b8a0
+    paths./api/auth/register.post.description:
+      sourceHash: 86d150e370cc
+      provenance: machine
+      outputHash: 8d86abcb6e26
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: 5738ed1df6b5
+    paths./api/auth/users/{id}.put.description:
+      sourceHash: 150d0edee4d5
+      provenance: machine
+      outputHash: 2ddeb394a771
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: b3f9f6397026
+    paths./api/auth/users/{id}.delete.description:
+      sourceHash: 7c79c060ecbc
+      provenance: machine
+      outputHash: 7764aee676a0
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: 0d30f5a09bc2
+    paths./api/auth/users/{id}/reset-password.post.description:
+      sourceHash: 6d1bf8229cb6
+      provenance: machine
+      outputHash: cb7a20dd4e13
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19801,14 +19826,26 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: 87161c203b8c
+    paths./api/v1/roles.post.description:
+      sourceHash: 12c3b80c8afa
+      provenance: machine
+      outputHash: 7951b1b6305a
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: 62fd08935921
+    paths./api/v1/roles/{id}.put.description:
+      sourceHash: b19380895d3f
+      provenance: machine
+      outputHash: 27d94d7125c5
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: b6c2c533f892
+    paths./api/v1/roles/{id}.delete.description:
+      sourceHash: a748a77794fc
+      provenance: machine
+      outputHash: 2965d4c890f6
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -20577,6 +20614,14 @@ x-i18n:
       sourceHash: 3e4d4819d594
       provenance: machine
       outputHash: 28ae2e0774ac
+    paths./api/v1/tools/image/rounded-crop.post.summary:
+      sourceHash: 423d5a23e5b6
+      provenance: machine
+      outputHash: 4367b501ce09
+    paths./api/v1/tools/image/rounded-crop.post.description:
+      sourceHash: d2f3f47ba8a5
+      provenance: machine
+      outputHash: 0a20a16e5ce8
     paths./api/v1/tools/image/duotone.post.summary:
       sourceHash: 27e78e7e8cca
       provenance: machine
@@ -21389,6 +21434,10 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: 9e838aa8213d
+    paths./api/auth/users/{id}/mfa/reset.post.description:
+      sourceHash: 4c6423b8059e
+      provenance: machine
+      outputHash: 9d8ad6c1ae39
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21513,10 +21562,18 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: feb56ea65892
+    paths./api/v1/enterprise/scim/token.post.description:
+      sourceHash: c3a0ec224c22
+      provenance: machine
+      outputHash: 49a789925dfe
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: 0c003b3c47d6
+    paths./api/v1/enterprise/scim/token.delete.description:
+      sourceHash: 8a643b00892d
+      provenance: machine
+      outputHash: 061556eeea86
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21753,10 +21810,18 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: 78152a7612a8
+    paths./api/v1/enterprise/users/{id}/purge.delete.description:
+      sourceHash: 1fb9bf86180d
+      provenance: machine
+      outputHash: 5ab94b8e7ddd
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: a0432aa852fd
+    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
+      sourceHash: 54322e34bd5c
+      provenance: machine
+      outputHash: 636277a71927
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine

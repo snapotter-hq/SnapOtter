@@ -2461,6 +2461,15 @@ paths:
                 properties:
                   jobId:
                     type: string
+                  downloadUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  originalSize:
+                    type: integer
+                    description: Input PDF size in bytes
+                  processedSize:
+                    type: integer
+                    description: Output ZIP size in bytes
                   pageCount:
                     type: integer
                     description: Total pages in the PDF
@@ -5819,7 +5828,7 @@ paths:
         - Auth
       summary: Buat pengguna
       description: |
-        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
+        Membutuhkan izin users:manage. Peran yang ditetapkan harus berada dalam otoritas peran efektif aktor, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun.
       security:
         - bearerAuth: []
       requestBody:
@@ -5891,7 +5900,7 @@ paths:
         - Auth
       summary: Perbarui pengguna
       description: |
-        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
+        Memerlukan izin dan otoritas users:manage atas peran target saat ini. Setiap peran baru yang ditetapkan juga harus berada dalam hierarki efektif, izin, akses alat, dan cakupan API-key milik aktor.
       security:
         - bearerAuth: []
       parameters:
@@ -5947,7 +5956,7 @@ paths:
         - Auth
       summary: Hapus pengguna
       description: |
-        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
+        Memerlukan izin dan otoritas users:manage atas peran target saat ini, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun. Penghapusan sendiri tidak diperbolehkan.
       security:
         - bearerAuth: []
       parameters:
@@ -5986,7 +5995,7 @@ paths:
         - Auth
       summary: Reset password pengguna
       description: |
-        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Reset kata sandi pengguna lokal. Memerlukan izin dan otoritas users:manage atas peran target saat ini, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun.
       security:
         - bearerAuth: []
       parameters:
@@ -7164,10 +7173,10 @@ paths:
         - Roles
       summary: Buat role kustom
       description: |
-        Create a new custom role with specified permissions. Role names must be
-        2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission. The new role's permissions and tool
-        access must be contained by the actor's effective authority.
+        Buat peran khusus baru dengan izin yang ditentukan. Nama peran harus
+        Karakter 2-30, huruf kecil alfanumerik dengan tanda hubung dan garis bawah.
+        Membutuhkan izin security:manage. Izin dan alat peran baru
+        akses harus dibatasi oleh otoritas efektif aktor.
       security:
         - bearerAuth: []
       requestBody:
@@ -7251,10 +7260,10 @@ paths:
         - Roles
       summary: Perbarui role kustom
       description: |
-        Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission and
-        authority over the current role; the resulting permissions and tool
-        access must remain contained by the actor's effective authority.
+        Perbarui nama, deskripsi, atau izin peran khusus. Bawaan
+        peran tidak dapat diubah. Membutuhkan izin security:manage dan
+        otoritas atas peran saat ini; izin dan alat yang dihasilkan
+        akses harus tetap dibatasi oleh otoritas efektif aktor.
       security:
         - bearerAuth: []
       parameters:
@@ -7328,10 +7337,10 @@ paths:
         - Roles
       summary: Hapus role kustom
       description: |
-        Delete a custom role. Users assigned to this role are reassigned to the
-        default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission, authority over the current role, and
-        authority to assign the fallback role.
+        Hapus peran khusus. Pengguna yang ditetapkan ke peran ini ditugaskan kembali ke
+        peran "pengguna" default. Peran bawaan tidak dapat dihapus. Membutuhkan
+        Izin security:manage, otoritas atas peran saat ini, dan
+        wewenang untuk menetapkan peran cadangan.
       security:
         - bearerAuth: []
       parameters:
@@ -12126,8 +12135,8 @@ paths:
       operationId: roundedCrop
       tags:
         - Tools
-      summary: Rounded crop
-      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      summary: Potong Membulat
+      description: Pangkas gambar menjadi persegi bulat atau persegi dengan sudut transparan, batas opsional, dan zoom/offset yang dapat disesuaikan.
       security:
         - bearerAuth: []
       requestBody:
@@ -17863,7 +17872,7 @@ paths:
         - Auth
       summary: Reset MFA pengguna
       description: |
-        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Reset pendaftaran MFA pengguna. Memerlukan izin dan otoritas users:manage atas peran target saat ini, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun.
       security:
         - bearerAuth: []
       parameters:
@@ -18191,7 +18200,7 @@ paths:
         - Enterprise
       summary: Buat token SCIM
       description: |
-        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
+        Hasilkan token pembawa SCIM global. Memerlukan fitur SCIM perusahaan dan otoritas administrator bawaan yang efektif; peran khusus dan API keys yang tidak memiliki izin administrator tidak memenuhi syarat. Token lama yang tidak berversi tidak valid dan harus diterbitkan ulang sebagai token v2.
       security:
         - bearerAuth: []
       responses:
@@ -18205,7 +18214,7 @@ paths:
         - Enterprise
       summary: Cabut token SCIM
       description: |
-        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        Cabut token pembawa SCIM global. Memerlukan fitur SCIM perusahaan dan otoritas administrator bawaan yang efektif; peran khusus dan API keys yang tidak memiliki izin administrator tidak memenuhi syarat.
       security:
         - bearerAuth: []
       responses:
@@ -18659,7 +18668,7 @@ paths:
         - Enterprise
       summary: Musnahkan data pengguna
       description: |
-        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        Hapus data pengguna secara permanen setelah konfirmasi eksplisit. Memerlukan izin dan otoritas compliance:manage atas peran target saat ini, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun.
       security:
         - bearerAuth: []
       parameters:
@@ -18684,7 +18693,7 @@ paths:
         - Enterprise
       summary: Musnahkan data team
       description: |
-        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
+        Hapus data tim secara permanen setelah konfirmasi eksplisit. Memerlukan izin dan otoritas compliance:manage atas peran setiap anggota saat ini, termasuk hierarki, izin, akses alat, dan cakupan API-key apa pun. Tim yang berisi aktor tidak dapat dihapus.
       security:
         - bearerAuth: []
       parameters:
@@ -19625,18 +19634,34 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: 1d632be8b2f8
+    paths./api/auth/register.post.description:
+      sourceHash: 86d150e370cc
+      provenance: machine
+      outputHash: f65a4d143c60
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: b86ca5298b93
+    paths./api/auth/users/{id}.put.description:
+      sourceHash: 150d0edee4d5
+      provenance: machine
+      outputHash: 7fd4477d4cb7
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: 4e8acd4fab6d
+    paths./api/auth/users/{id}.delete.description:
+      sourceHash: 7c79c060ecbc
+      provenance: machine
+      outputHash: 847f1e784e14
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: 69b19884d8c7
+    paths./api/auth/users/{id}/reset-password.post.description:
+      sourceHash: 6d1bf8229cb6
+      provenance: machine
+      outputHash: 0a087ddea060
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19801,14 +19826,26 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: 5ea110fb8726
+    paths./api/v1/roles.post.description:
+      sourceHash: 12c3b80c8afa
+      provenance: machine
+      outputHash: 273fec666038
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: 5b039120a9f3
+    paths./api/v1/roles/{id}.put.description:
+      sourceHash: b19380895d3f
+      provenance: machine
+      outputHash: 6a0a9dffa0a9
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: 448cbf16bcb3
+    paths./api/v1/roles/{id}.delete.description:
+      sourceHash: a748a77794fc
+      provenance: machine
+      outputHash: efe1651bb872
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -20577,6 +20614,14 @@ x-i18n:
       sourceHash: 3e4d4819d594
       provenance: machine
       outputHash: 7bd56aa1213b
+    paths./api/v1/tools/image/rounded-crop.post.summary:
+      sourceHash: 423d5a23e5b6
+      provenance: machine
+      outputHash: abb789a63e82
+    paths./api/v1/tools/image/rounded-crop.post.description:
+      sourceHash: d2f3f47ba8a5
+      provenance: machine
+      outputHash: edffa2d2c088
     paths./api/v1/tools/image/duotone.post.summary:
       sourceHash: 27e78e7e8cca
       provenance: machine
@@ -21389,6 +21434,10 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: cc7ba13ad8da
+    paths./api/auth/users/{id}/mfa/reset.post.description:
+      sourceHash: 4c6423b8059e
+      provenance: machine
+      outputHash: b049d51a7089
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21513,10 +21562,18 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: 33321fd23a56
+    paths./api/v1/enterprise/scim/token.post.description:
+      sourceHash: c3a0ec224c22
+      provenance: machine
+      outputHash: c8197e321c08
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: 86ecb01e3240
+    paths./api/v1/enterprise/scim/token.delete.description:
+      sourceHash: 8a643b00892d
+      provenance: machine
+      outputHash: cac22f4a8386
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21753,10 +21810,18 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: c7eb7e579da4
+    paths./api/v1/enterprise/users/{id}/purge.delete.description:
+      sourceHash: 1fb9bf86180d
+      provenance: machine
+      outputHash: 5e31cd736db5
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: 153f5f2edd22
+    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
+      sourceHash: 54322e34bd5c
+      provenance: machine
+      outputHash: 39b047352b3b
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine

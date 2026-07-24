@@ -2435,6 +2435,15 @@ paths:
                 properties:
                   jobId:
                     type: string
+                  downloadUrl:
+                    type: string
+                    description: URL to download all pages as ZIP
+                  originalSize:
+                    type: integer
+                    description: Input PDF size in bytes
+                  processedSize:
+                    type: integer
+                    description: Output ZIP size in bytes
                   pageCount:
                     type: integer
                     description: Total pages in the PDF
@@ -5784,7 +5793,7 @@ paths:
         - Auth
       summary: ユーザーの作成
       description: |
-        Requires users:manage permission. The assigned role must be within the actor's effective role authority, including hierarchy, permissions, tool access, and any API-key scope.
+        users:manage 権限が必要です。割り当てられたロールは、階層、権限、ツール アクセス、API-key スコープなど、アクターの実効ロール権限内にある必要があります。
       security:
         - bearerAuth: []
       requestBody:
@@ -5856,7 +5865,7 @@ paths:
         - Auth
       summary: ユーザーの更新
       description: |
-        Requires users:manage permission and authority over the target's current role. Any newly assigned role must also be within the actor's effective hierarchy, permissions, tool access, and API-key scope.
+        users:manage 権限と、ターゲットの現在のロールに対する権限が必要です。新しく割り当てられたロールは、アクターの有効な階層、権限、ツール アクセス、および API-key スコープ内にある必要もあります。
       security:
         - bearerAuth: []
       parameters:
@@ -5912,7 +5921,7 @@ paths:
         - Auth
       summary: ユーザーの削除
       description: |
-        Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope. Self-deletion is not allowed.
+        users:manage 権限と、階層、権限、ツール アクセス、および API-key スコープを含む、ターゲットの現在のロールに対する権限が必要です。自己削除は認められません。
       security:
         - bearerAuth: []
       parameters:
@@ -5951,7 +5960,7 @@ paths:
         - Auth
       summary: ユーザーパスワードのリセット
       description: |
-        Reset a local user's password. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        ローカル ユーザーのパスワードをリセットします。 users:manage 権限と、階層、権限、ツール アクセス、および API-key スコープを含む、ターゲットの現在のロールに対する権限が必要です。
       security:
         - bearerAuth: []
       parameters:
@@ -7121,10 +7130,10 @@ paths:
         - Roles
       summary: カスタムロールの作成
       description: |
-        Create a new custom role with specified permissions. Role names must be
-        2-30 characters, lowercase alphanumeric with hyphens and underscores.
-        Requires security:manage permission. The new role's permissions and tool
-        access must be contained by the actor's effective authority.
+        指定された権限を持つ新しいカスタム ロールを作成します。ロール名は次のようにする必要があります
+        2-30 文字、ハイフンとアンダースコアを含む小文字の英数字。
+        security:manage 権限が必要です。新しい役割の権限とツール
+        アクセスは行為者の有効な権限によって制限されなければなりません。
       security:
         - bearerAuth: []
       requestBody:
@@ -7208,10 +7217,10 @@ paths:
         - Roles
       summary: カスタムロールの更新
       description: |
-        Update name, description, or permissions of a custom role. Built-in
-        roles cannot be modified. Requires security:manage permission and
-        authority over the current role; the resulting permissions and tool
-        access must remain contained by the actor's effective authority.
+        カスタム ロールの名前、説明、または権限を更新します。内蔵
+        役割は変更できません。 security:manage 権限が必要です。
+        現在の役割に対する権限。結果として得られる権限とツール
+        アクセスは行為者の有効な権限によって封じ込められたままでなければなりません。
       security:
         - bearerAuth: []
       parameters:
@@ -7285,10 +7294,10 @@ paths:
         - Roles
       summary: カスタムロールの削除
       description: |
-        Delete a custom role. Users assigned to this role are reassigned to the
-        default "user" role. Built-in roles cannot be deleted. Requires
-        security:manage permission, authority over the current role, and
-        authority to assign the fallback role.
+        カスタムロールを削除します。このロールに割り当てられたユーザーは、
+        デフォルトの「ユーザー」ロール。組み込みの役割は削除できません。必要なもの
+        security:manage 権限、現在のロールに対する権限、および
+        フォールバック役割を割り当てる権限。
       security:
         - bearerAuth: []
       parameters:
@@ -12066,8 +12075,8 @@ paths:
       operationId: roundedCrop
       tags:
         - Tools
-      summary: Rounded crop
-      description: Crop an image to a rounded square or squircle with transparent corners, optional border, and adjustable zoom/offset.
+      summary: 角丸クロップ
+      description: 画像を、透明な角、オプションの境界線、および調整可能なズーム/オフセットを備えた丸い正方形または角形にトリミングします。
       security:
         - bearerAuth: []
       requestBody:
@@ -17792,7 +17801,7 @@ paths:
         - Auth
       summary: ユーザー MFA のリセット
       description: |
-        Reset a user's MFA enrollment. Requires users:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        ユーザーの MFA 登録をリセットします。 users:manage 権限と、階層、権限、ツール アクセス、API-key スコープを含むターゲットの現在のロールに対する権限が必要です。
       security:
         - bearerAuth: []
       parameters:
@@ -18120,7 +18129,7 @@ paths:
         - Enterprise
       summary: SCIM トークンの作成
       description: |
-        Generate a global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify. Legacy unversioned tokens are invalid and must be reissued as v2 tokens.
+        グローバル SCIM ベアラー トークンを生成します。エンタープライズ SCIM 機能と完全な有効な組み込み管理者権限が必要です。カスタム ロールと管理者権限がない API keys は対象外です。従来のバージョン管理されていないトークンは無効であるため、v2 トークンとして再発行する必要があります。
       security:
         - bearerAuth: []
       responses:
@@ -18134,7 +18143,7 @@ paths:
         - Enterprise
       summary: SCIM トークンの失効
       description: |
-        Revoke the global SCIM bearer token. Requires the enterprise SCIM feature and full effective built-in administrator authority; custom roles and API keys missing any administrator permission do not qualify.
+        グローバル SCIM ベアラー トークンを取り消します。エンタープライズ SCIM 機能と完全な有効な組み込み管理者権限が必要です。カスタム ロールと管理者権限がない API keys は対象外です。
       security:
         - bearerAuth: []
       responses:
@@ -18588,7 +18597,7 @@ paths:
         - Enterprise
       summary: ユーザーデータの完全削除
       description: |
-        Permanently purge a user's data after explicit confirmation. Requires compliance:manage permission and authority over the target's current role, including hierarchy, permissions, tool access, and any API-key scope.
+        明示的な確認後にユーザーのデータを永久に削除します。 compliance:manage 権限と、階層、権限、ツール アクセス、および API-key スコープを含む、ターゲットの現在のロールに対する権限が必要です。
       security:
         - bearerAuth: []
       parameters:
@@ -18613,7 +18622,7 @@ paths:
         - Enterprise
       summary: チームデータの完全削除
       description: |
-        Permanently purge a team's data after explicit confirmation. Requires compliance:manage permission and authority over every member's current role, including hierarchy, permissions, tool access, and any API-key scope. A team containing the actor cannot be purged.
+        明示的な確認後にチームのデータを永久に削除します。 compliance:manage 権限と、階層、権限、ツール アクセス、API-key スコープを含むすべてのメンバーの現在のロールに対する権限が必要です。アクターが含まれるチームをパージすることはできません。
       security:
         - bearerAuth: []
       parameters:
@@ -19554,18 +19563,34 @@ x-i18n:
       sourceHash: f06da128c342
       provenance: machine
       outputHash: 62b96d8096f0
+    paths./api/auth/register.post.description:
+      sourceHash: 86d150e370cc
+      provenance: machine
+      outputHash: 3e12a1629f20
     paths./api/auth/users/{id}.put.summary:
       sourceHash: 602b8b1607b0
       provenance: machine
       outputHash: a399c72dbe03
+    paths./api/auth/users/{id}.put.description:
+      sourceHash: 150d0edee4d5
+      provenance: machine
+      outputHash: 59fcd046ef46
     paths./api/auth/users/{id}.delete.summary:
       sourceHash: 58363fd94240
       provenance: machine
       outputHash: 560803f5aa97
+    paths./api/auth/users/{id}.delete.description:
+      sourceHash: 7c79c060ecbc
+      provenance: machine
+      outputHash: bd021ce28dce
     paths./api/auth/users/{id}/reset-password.post.summary:
       sourceHash: aae899c2d3ad
       provenance: machine
       outputHash: 401e65a13a7f
+    paths./api/auth/users/{id}/reset-password.post.description:
+      sourceHash: 6d1bf8229cb6
+      provenance: machine
+      outputHash: a627953b76d6
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -19730,14 +19755,26 @@ x-i18n:
       sourceHash: 6dd06b2529d4
       provenance: machine
       outputHash: 19e49c3dad64
+    paths./api/v1/roles.post.description:
+      sourceHash: 12c3b80c8afa
+      provenance: machine
+      outputHash: 56f658705d20
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
       outputHash: 0d228a56532b
+    paths./api/v1/roles/{id}.put.description:
+      sourceHash: b19380895d3f
+      provenance: machine
+      outputHash: e2f3977e5bd4
     paths./api/v1/roles/{id}.delete.summary:
       sourceHash: d5a3ab01055a
       provenance: machine
       outputHash: 7a00dca6075f
+    paths./api/v1/roles/{id}.delete.description:
+      sourceHash: a748a77794fc
+      provenance: machine
+      outputHash: 402d4276e5d4
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
@@ -20506,6 +20543,14 @@ x-i18n:
       sourceHash: 3e4d4819d594
       provenance: machine
       outputHash: 63930e5fecd8
+    paths./api/v1/tools/image/rounded-crop.post.summary:
+      sourceHash: 423d5a23e5b6
+      provenance: machine
+      outputHash: 7f5ad5bab394
+    paths./api/v1/tools/image/rounded-crop.post.description:
+      sourceHash: d2f3f47ba8a5
+      provenance: machine
+      outputHash: 4fd018d937c2
     paths./api/v1/tools/image/duotone.post.summary:
       sourceHash: 27e78e7e8cca
       provenance: machine
@@ -21318,6 +21363,10 @@ x-i18n:
       sourceHash: c765204eb72c
       provenance: machine
       outputHash: f11fe9de1839
+    paths./api/auth/users/{id}/mfa/reset.post.description:
+      sourceHash: 4c6423b8059e
+      provenance: machine
+      outputHash: 2b1e07c8d3af
     paths./api/auth/oidc/login.get.summary:
       sourceHash: bac046b3ef24
       provenance: machine
@@ -21442,10 +21491,18 @@ x-i18n:
       sourceHash: e550c4aaeecf
       provenance: machine
       outputHash: 554df0aa342c
+    paths./api/v1/enterprise/scim/token.post.description:
+      sourceHash: c3a0ec224c22
+      provenance: machine
+      outputHash: 0dd54a03b03d
     paths./api/v1/enterprise/scim/token.delete.summary:
       sourceHash: e57912d50189
       provenance: machine
       outputHash: f54e7a615d87
+    paths./api/v1/enterprise/scim/token.delete.description:
+      sourceHash: 8a643b00892d
+      provenance: machine
+      outputHash: bab6261147a3
     paths./api/v1/scim/v2/ServiceProviderConfig.get.summary:
       sourceHash: 6d9bb054fb7b
       provenance: machine
@@ -21682,10 +21739,18 @@ x-i18n:
       sourceHash: 09c40d574cc0
       provenance: machine
       outputHash: 7d3d2d0f7f73
+    paths./api/v1/enterprise/users/{id}/purge.delete.description:
+      sourceHash: 1fb9bf86180d
+      provenance: machine
+      outputHash: 10428b067fd4
     paths./api/v1/enterprise/teams/{id}/purge.delete.summary:
       sourceHash: e5f557c6db8b
       provenance: machine
       outputHash: 7928afcd1a35
+    paths./api/v1/enterprise/teams/{id}/purge.delete.description:
+      sourceHash: 54322e34bd5c
+      provenance: machine
+      outputHash: '475054967380'
     paths./api/v1/admin/version.get.summary:
       sourceHash: 1fa5f3f5fa4a
       provenance: machine
