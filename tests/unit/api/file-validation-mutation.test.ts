@@ -430,6 +430,10 @@ describe("validateImageBuffer - ftyp brand verification", () => {
     expectRejected(await validateImageBuffer(buf), "Unrecognized image format");
   });
 
+  // Uses a synthetic buffer, not a real fixture, because sharp's metadata()
+  // reads HEIF dimensions from the box-level `ispe` data and succeeds on real
+  // HEVC-coded fixtures regardless of codec support (only pixel decode needs
+  // it). A real fixture here would pass even without the fix below.
   const heifBrands = ["heic", "heix", "mif1", "msf1", "hevc", "hevx"];
   for (const brand of heifBrands) {
     it(`accepts the heif brand "${brand}" and returns early without a sharp decode`, async () => {
