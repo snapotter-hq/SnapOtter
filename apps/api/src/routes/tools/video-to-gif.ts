@@ -7,7 +7,7 @@ import { createToolRoute } from "../tool-factory.js";
 const settingsSchema = z.object({
   fps: z.number().int().min(1).max(30).default(12),
   width: z.number().int().min(64).max(1280).default(480),
-  startS: z.number().min(0).default(0),
+  startS: z.number().finite().min(0).default(0),
   durationS: z.number().positive().max(60).default(5),
 });
 

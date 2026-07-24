@@ -1,13 +1,14 @@
 import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { audioContentType, runMediaTool } from "../../lib/media-tool.js";
+import { audioContentType, formatFfmpegSeconds, runMediaTool } from "../../lib/media-tool.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z
   .object({
-    startS: z.number().min(0).default(0),
-    endS: z.number().positive(),
+    startS: z.number().finite().min(0).default(0),
+    endS: z.number().finite().min(0.000001),
   })
   .refine((s) => s.endS > s.startS, { message: "End must be after start" });
 
@@ -25,13 +26,20 @@ export function registerTrimAudio(app: FastifyInstance) {
       const outName = `${base}_trimmed${origExt}`;
       const contentType = audioContentType(origExt);
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, out, info) => {
+        if (info.durationS === null) {
+          throw new InputValidationError("Could not determine audio duration");
+        }
+        if (settings.startS >= info.durationS) {
+          throw new InputValidationError("Start is beyond the end of the audio");
+        }
+        const endS = Math.min(settings.endS, info.durationS);
         // Fast seek with stream-copy for audio
         return [
           "-ss",
-          String(settings.startS),
+          formatFfmpegSeconds(settings.startS),
           "-to",
-          String(settings.endS),
+          formatFfmpegSeconds(endS),
           "-i",
           inPath,
           "-c",

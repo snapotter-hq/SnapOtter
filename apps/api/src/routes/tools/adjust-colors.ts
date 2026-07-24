@@ -22,7 +22,7 @@ const settingsSchema = z.object({
   saturation: z.number().min(-100).max(100).default(0),
   temperature: z.number().min(-100).max(100).default(0),
   tint: z.number().min(-100).max(100).default(0),
-  hue: z.number().min(-180).max(180).default(0),
+  hue: z.number().int().min(-180).max(180).default(0),
   // Detail
   sharpness: z.number().min(0).max(100).default(0),
   // Channels

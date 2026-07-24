@@ -5,7 +5,7 @@ import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   width: z.number().int().min(4).max(64).default(16),
-  blur: z.number().min(0).max(20).default(2),
+  blur: z.union([z.literal(0), z.number().min(0.3).max(20)]).default(2),
   strategy: z.enum(["blur", "pixelate", "solid"]).default("blur"),
   format: z.enum(["webp", "png", "jpeg"]).default("webp"),
   quality: z.number().int().min(1).max(100).default(50),

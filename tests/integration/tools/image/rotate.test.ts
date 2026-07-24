@@ -112,6 +112,12 @@ describe("Rotate", () => {
     expect(meta.height).toBe(200);
   });
 
+  it("normalizes large finite angles before passing them to Sharp", async () => {
+    const meta = await rotateAndMeta({ angle: 10_000_000.000000002 });
+    expect(meta.width).toBeGreaterThan(0);
+    expect(meta.height).toBeGreaterThan(0);
+  });
+
   it("rotates 0 degrees (no-op)", async () => {
     const meta = await rotateAndMeta({ angle: 0 });
     expect(meta.width).toBe(200);

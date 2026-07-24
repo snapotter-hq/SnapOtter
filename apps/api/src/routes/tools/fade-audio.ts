@@ -2,7 +2,12 @@ import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { audioOutputFor, runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
+import {
+  audioOutputFor,
+  formatFfmpegSeconds,
+  runFfmpegWithProgress,
+  stageMediaInputs,
+} from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -11,8 +16,8 @@ const settingsSchema = z
     fadeInS: z.number().min(0).max(30).default(1),
     fadeOutS: z.number().min(0).max(30).default(1),
   })
-  .refine((s) => s.fadeInS > 0 || s.fadeOutS > 0, {
-    message: "Set a fade-in or fade-out",
+  .refine((s) => s.fadeInS >= 0.000001 || s.fadeOutS >= 0.000001, {
+    message: "Set a fade-in or fade-out of at least one microsecond",
   });
 
 export function registerFadeAudio(app: FastifyInstance) {
@@ -41,11 +46,16 @@ export function registerFadeAudio(app: FastifyInstance) {
       const fout = Math.min(settings.fadeOutS, d);
 
       const parts: string[] = [];
-      if (fin > 0) {
-        parts.push(`afade=t=in:st=0:d=${fin}`);
+      const finText = formatFfmpegSeconds(fin);
+      const foutText = formatFfmpegSeconds(fout);
+      if (finText !== "0") {
+        parts.push(`afade=t=in:st=0:d=${finText}`);
       }
-      if (fout > 0) {
-        parts.push(`afade=t=out:st=${Math.max(0, d - fout)}:d=${fout}`);
+      if (foutText !== "0") {
+        parts.push(`afade=t=out:st=${formatFfmpegSeconds(Math.max(0, d - fout))}:d=${foutText}`);
+      }
+      if (parts.length === 0) {
+        throw new InputValidationError("Audio is too short for the requested fade");
       }
       const chain = parts.join(",");
 

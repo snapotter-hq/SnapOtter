@@ -6,7 +6,7 @@ import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  angle: z.number().default(0),
+  angle: z.number().finite().default(0),
   horizontal: z.boolean().default(false),
   vertical: z.boolean().default(false),
 });
@@ -21,7 +21,8 @@ export function registerRotate(app: FastifyInstance) {
 
       // Apply rotation first
       if (settings.angle !== 0) {
-        image = await rotate(image, { angle: settings.angle });
+        const angle = ((settings.angle % 360) + 360) % 360;
+        image = await rotate(image, { angle });
       }
 
       // Then apply flip/flop

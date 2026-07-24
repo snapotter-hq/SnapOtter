@@ -25,7 +25,9 @@ const settingsSchema = z.object({
   dateTime: z.string().optional(),
   dateTimeOriginal: z.string().optional(),
   clearGps: z.boolean().default(false),
-  fieldsToRemove: z.array(z.string()).default([]),
+  fieldsToRemove: z
+    .array(z.string().regex(/^[a-zA-Z0-9:_-]+$/, "Invalid metadata field name"))
+    .default([]),
   gpsLatitude: z.number().min(-90).max(90).optional(),
   gpsLongitude: z.number().min(-180).max(180).optional(),
   gpsAltitude: z.number().optional(),

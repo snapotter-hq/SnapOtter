@@ -173,6 +173,11 @@ describe("Field removal", () => {
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
   });
+
+  it("rejects empty and unsafe field names at the API boundary", async () => {
+    expect((await postTool({ fieldsToRemove: [""] })).statusCode).toBe(400);
+    expect((await postTool({ fieldsToRemove: ["bad field"] })).statusCode).toBe(400);
+  });
 });
 
 // ── Keywords ────────────────────────────────────────────────────
