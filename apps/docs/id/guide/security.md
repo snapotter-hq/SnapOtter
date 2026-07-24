@@ -1,8 +1,8 @@
 ---
 description: "Panduan pengerasan keamanan untuk SnapOtter. Keamanan kontainer, isolasi jaringan, Docker secrets, deployment Kubernetes, dan artefak kepatuhan."
-i18n_source_hash: 5eac3327f4fd
+i18n_source_hash: 9ff337fa0417
 i18n_provenance: machine
-i18n_output_hash: abd5d844a19a
+i18n_output_hash: d220b4fcee86
 i18n_hash_version: 2
 ---
 

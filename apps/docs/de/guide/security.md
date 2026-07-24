@@ -1,8 +1,8 @@
 ---
 description: "Leitfaden zur Sicherheitshärtung für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker-Secrets, Kubernetes-Deployment und Compliance-Artefakte."
-i18n_source_hash: 5eac3327f4fd
+i18n_source_hash: 9ff337fa0417
 i18n_provenance: machine
-i18n_output_hash: cb30b9dd00dd
+i18n_output_hash: ec85a2663f1c
 i18n_hash_version: 2
 ---
 

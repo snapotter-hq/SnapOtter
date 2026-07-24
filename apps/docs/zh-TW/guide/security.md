@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的安全強化指南。容器安全、網路隔離、Docker secrets、Kubernetes 部署與合規產出物。"
-i18n_source_hash: 5eac3327f4fd
+i18n_source_hash: 9ff337fa0417
 i18n_provenance: machine
-i18n_output_hash: b7365511fdae
+i18n_output_hash: 0ec192d6b1ef
 i18n_hash_version: 2
 ---
 
