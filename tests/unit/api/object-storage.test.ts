@@ -85,6 +85,30 @@ describe("object-storage (local backend)", () => {
     await expect(objectExists(unavailableKey)).resolves.toBe(false);
   });
 
+  it("does not leave an object after a streaming source fails", async () => {
+    let orphaned = false;
+    for (let i = 0; i < 500; i += 1) {
+      const failedKey = `outputs/stream-failure-${process.pid}/${i}.bin`;
+      const source = Readable.from(
+        (async function* () {
+          yield Buffer.from("partial");
+          throw Object.assign(new Error("disk quota exhausted"), { code: "EDQUOT" });
+        })(),
+      );
+
+      await expect(putObjectStream(failedKey, source)).rejects.toMatchObject({
+        code: "EDQUOT",
+        statusCode: 503,
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      orphaned = await objectExists(failedKey);
+      await deleteObject(failedKey);
+      if (orphaned) break;
+    }
+
+    expect(orphaned).toBe(false);
+  });
+
   it("streams an object to a file without exceeding the hard byte cap", async () => {
     const source = Buffer.alloc(4096, 0x5a);
     const destination = join(copyDir, "bounded.bin");

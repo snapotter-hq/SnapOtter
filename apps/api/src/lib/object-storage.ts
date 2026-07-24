@@ -218,13 +218,18 @@ export async function putObjectStream(
       }
     }
     const p = localPath(key);
+    const stagingPath = `${p}.${randomUUID()}.partial`;
     try {
       await assertLocalCapacity();
       await mkdir(dirname(p), { recursive: true });
-      await pipeline(counter(source), createWriteStream(p), { signal: opts.signal });
+      await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
+      await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
+        signal: opts.signal,
+      });
       opts.signal?.throwIfAborted();
+      await rename(stagingPath, p);
     } catch (err) {
-      await unlink(p).catch(() => {});
+      await unlink(stagingPath).catch(() => {});
       throw normalizeOperationalWriteError(err);
     }
     return written;
