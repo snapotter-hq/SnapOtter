@@ -141,6 +141,12 @@ describe("Resize", () => {
     expect(meta.height).toBe(75);
   });
 
+  it("treats 1000 percent as 10x at the product boundary", async () => {
+    const meta = await resizeAndMeta({ percentage: 1000 }, TINY, "tiny.png", "image/png");
+    expect(meta.width).toBe(10);
+    expect(meta.height).toBe(10);
+  });
+
   it("respects withoutEnlargement flag", async () => {
     const meta = await resizeAndMeta({ width: 400, height: 300, withoutEnlargement: true });
     // Should not enlarge beyond original 200x150
@@ -257,6 +263,52 @@ describe("Resize", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  it("rejects the deterministic oversized percentage before processing", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ percentage: 896202.8004871072 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).details).toMatch(/less than or equal to 1000/i);
+  });
+
+  it("rejects a percentage immediately above the product boundary", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: TINY },
+      {
+        name: "settings",
+        content: JSON.stringify({ percentage: 1000.000001 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).details).toMatch(/less than or equal to 1000/i);
   });
 
   it("rejects unauthenticated requests", async () => {

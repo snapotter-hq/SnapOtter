@@ -1,19 +1,21 @@
-import { resize } from "@snapotter/image-engine";
+import {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_PERCENTAGE,
+  resize,
+} from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
-const MAX_DIMENSION = 16383;
-
 const settingsSchema = z
   .object({
-    width: z.number().int().positive().max(MAX_DIMENSION).optional(),
-    height: z.number().int().positive().max(MAX_DIMENSION).optional(),
+    width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+    height: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
     fit: z.enum(["contain", "cover", "fill", "inside", "outside"]).default("contain"),
     withoutEnlargement: z.boolean().default(false),
-    percentage: z.number().finite().positive().optional(),
+    percentage: z.number().finite().positive().max(MAX_RESIZE_PERCENTAGE).optional(),
   })
   .refine((s) => s.width !== undefined || s.height !== undefined || s.percentage !== undefined, {
     message: "At least one of width, height, or percentage is required",

@@ -15,7 +15,12 @@ export { flip } from "./operations/flip.js";
 export { grayscale } from "./operations/grayscale.js";
 export { invert } from "./operations/invert.js";
 export { optimizeForWeb } from "./operations/optimize-for-web.js";
-export { resize } from "./operations/resize.js";
+export {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  MAX_RESIZE_PERCENTAGE,
+  resize,
+} from "./operations/resize.js";
 export { rotate } from "./operations/rotate.js";
 export { saturation } from "./operations/saturation.js";
 export { sepia } from "./operations/sepia.js";
