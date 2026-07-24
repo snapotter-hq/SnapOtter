@@ -1192,6 +1192,10 @@ export function startInterruptedInstallRecovery(
       );
     }
     if (recovered) {
+      // A fresh native checkout has no AI state to reconcile. Calling the
+      // post-recovery hook here would immediately try to open install.flock in
+      // a directory that intentionally does not exist, then retry forever.
+      if (!existsSync(AI_DIR)) return;
       if (!options.onRecovered) return;
       let postRecovery: boolean | undefined | Promise<boolean | undefined>;
       try {

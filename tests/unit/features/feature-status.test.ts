@@ -1006,6 +1006,15 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     }
   });
 
+  it("skips post-recovery work when the AI data directory does not exist", () => {
+    rmSync(aiDir, { recursive: true, force: true });
+    const recovered = vi.fn();
+
+    mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+
+    expect(recovered).not.toHaveBeenCalled();
+  });
+
   it("retains venv.writing and reports incomplete recovery when Docker reseed fails", () => {
     writeTestManifest({});
     fsFaults.pretendBaseVenvExists = true;
