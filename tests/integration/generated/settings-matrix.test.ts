@@ -1156,15 +1156,14 @@ describe("settings variation matrix", () => {
     const runnableVariations = variations.filter(
       ({ settings }) => !findMissingGeneratedPythonPrerequisite(toolId, settings),
     );
-    if (runnableVariations.length === 0) {
-      const missingPython = findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings);
-      if (missingPython) {
-        describe.skip(`${toolId} -- ${missingPython}`, () => {});
-        continue;
-      }
-    }
+    const allPythonVariationsUnavailable = variations.length > 0 && runnableVariations.length === 0;
+    const missingPython = allPythonVariationsUnavailable
+      ? findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings)
+      : undefined;
+    const skipTool =
+      (AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES) || allPythonVariationsUnavailable;
 
-    describe.skipIf(AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES)(toolId, () => {
+    describe.skipIf(skipTool)(missingPython ? `${toolId} -- ${missingPython}` : toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {
         expectedAttempts: runnableVariations.length,
       });

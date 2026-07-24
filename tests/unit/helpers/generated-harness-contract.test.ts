@@ -64,6 +64,12 @@ describe("generated QA harness contract", () => {
     expect(text).not.toMatch(/\.slice\(0,/);
   });
 
+  it("settings capability gates preserve every collected variation", () => {
+    const text = source("settings-matrix.test.ts");
+    expect(text).toContain("allPythonVariationsUnavailable");
+    expect(text).not.toContain("describe.skip(");
+  });
+
   it("the actual nightly extended lane requires installed AI features", () => {
     const workflow = readFileSync(join(process.cwd(), ".github/workflows/nightly.yml"), "utf8");
     const extendedLane = workflow.slice(
