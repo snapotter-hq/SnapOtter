@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["ANALYTICS_BAKED_OVERRIDE"],
+  "globalEnv": ["ANALYTICS_BAKED_OVERRIDE", "SENTRY_CRON_MONITORS"],
   "tasks": {
     "dev": {
       "cache": false,
