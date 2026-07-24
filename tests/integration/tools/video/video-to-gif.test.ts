@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ffmpegAvailable } from "@snapotter/media-engine";
@@ -41,6 +41,27 @@ async function pollJob(jobId: string) {
 }
 
 describe.skipIf(!ffmpegAvailable())("video-to-gif (requires ffmpeg)", () => {
+  it("normalizes sub-microsecond offsets instead of emitting exponential ffmpeg syntax", async () => {
+    const config = getToolConfig("video-to-gif");
+    if (!config?.processV2) throw new Error("video-to-gif processV2 must be registered");
+    const scratchDir = await mkdtemp(join(tmpdir(), "snapotter-video-to-gif-test-"));
+
+    try {
+      const result = await config.processV2({
+        inputs: [{ buffer: MP4, filename: "tiny.mp4", ref: "test/tiny.mp4" }],
+        settings: { fps: 1, width: 120, startS: Number.MIN_VALUE, durationS: 1 },
+        scratchDir,
+        signal: new AbortController().signal,
+        report: () => undefined,
+      });
+      if (!result.scratchPath) throw new Error("video-to-gif must return a scratch path");
+      const output = await readFile(result.scratchPath);
+      expect(output.subarray(0, 4).toString("ascii")).toBe("GIF8");
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a start time beyond the video instead of running an empty encode", async () => {
     const config = getToolConfig("video-to-gif");
     if (!config?.processV2) throw new Error("video-to-gif processV2 must be registered");

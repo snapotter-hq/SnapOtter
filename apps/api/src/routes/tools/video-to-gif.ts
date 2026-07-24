@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool } from "../../lib/media-tool.js";
+import { formatFfmpegSeconds, runMediaTool } from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -37,9 +37,9 @@ export function registerVideoToGif(app: FastifyInstance) {
           "-i",
           inPath,
           "-ss",
-          String(settings.startS),
+          formatFfmpegSeconds(settings.startS),
           "-t",
-          String(settings.durationS),
+          formatFfmpegSeconds(settings.durationS),
           "-vf",
           `fps=${settings.fps},scale=${settings.width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
           out,
