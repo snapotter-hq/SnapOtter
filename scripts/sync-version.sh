@@ -8,6 +8,10 @@
 set -euo pipefail
 
 VERSION="${1:?Usage: sync-version.sh <version>}"
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+  echo "Invalid semantic version: $VERSION" >&2
+  exit 2
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # All workspace package.json files to sync

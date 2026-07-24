@@ -41,6 +41,18 @@ describe("release version domains", () => {
     }
   });
 
+  it("rejects non-semver input before mutating release metadata", () => {
+    const syncScript = readFileSync(path.resolve(root, "scripts/sync-version.sh"), "utf8");
+    const validation = syncScript.indexOf('if [[ ! "$VERSION" =~');
+    const firstMutation = syncScript.indexOf("PACKAGES=(");
+
+    expect(validation, "sync-version.sh must validate semantic versions").toBeGreaterThan(0);
+    expect(validation, "version validation must run before the mutation list").toBeLessThan(
+      firstMutation,
+    );
+    expect(syncScript).toContain("Invalid semantic version");
+  });
+
   it("keeps the OpenAPI version on the stable API-major domain", () => {
     const { openapiVersion } = releaseVersionPolicy();
     expect(openapiVersion).toMatch(/^[1-9]\d*\.0\.0$/);
