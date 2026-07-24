@@ -34,7 +34,7 @@ Cả hai ngăn xếp đều áp dụng các điều khiển sau:
 
 Quá trình xử lý tệp diễn ra cục bộ nhưng cài đặt mặc định **không phải là hệ thống không có đầu ra**. Phân tích sản phẩm ẩn danh sử dụng PostHog và báo cáo sự cố sử dụng Sentry khi bật tính năng đo từ xa. Đặt `SNAPOTTER_TELEMETRY=0` (hoặc tắt phân tích trong Cài đặt > Hệ thống > Quyền riêng tư) để tắt cả hai. SnapOtter không bao giờ bao gồm các tệp đã tải lên, tên tệp, đầu ra OCR, văn bản tài liệu hoặc nội dung tệp khác trong các sự kiện đó.
 
-Lưu lượng truy cập đi khác được điều khiển theo tính năng: Tải xuống bản cài đặt mô hình/gói AI đã ký các đầu vào phát hành; Nhập URL tìm nạp URL công khai do người dùng yêu cầu; và OIDC, SAML, OpenTelemetry, webhooks, bộ lưu trữ tương thích với S3 hoặc các tích hợp tương tự được định cấu hình rõ ràng sẽ liên hệ với các đích đến do quản trị viên chọn. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` ngăn tải xuống mô hình tự động. [Nhập gói ngoại tuyến](/vi/guide/deployment) có thể cung cấp các tính năng AI mà không cần xuất ra mô hình thời gian chạy.
+Lưu lượng truy cập đi khác được điều khiển theo tính năng: Tải xuống bản cài đặt mô hình/gói AI đã ký các đầu vào phát hành; Nhập URL tìm nạp URL công khai do người dùng yêu cầu; và OIDC, SAML, OpenTelemetry, webhooks, bộ lưu trữ tương thích với S3 hoặc các tích hợp tương tự được định cấu hình rõ ràng sẽ liên hệ với các đích đến do quản trị viên chọn. Tải xuống mô hình trong thời gian chạy bị tắt theo mặc định. Chỉ đặt `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` để bật rõ ràng tính năng tải xuống dự phòng tự động. [Nhập gói ngoại tuyến](/vi/guide/deployment) có thể cung cấp các tính năng AI mà không cần xuất ra mô hình thời gian chạy.
 
 **Khuyến nghị về tường lửa:**
 

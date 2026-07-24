@@ -30,7 +30,7 @@ For an internet-facing deployment, bind port 1349 to loopback and terminate TLS 
 
 File processing is local, but a default installation is **not an egress-free system**. Anonymous product analytics use PostHog and crash reporting uses Sentry when telemetry is enabled. Set `SNAPOTTER_TELEMETRY=0` (or disable analytics under Settings > System > Privacy) to turn off both. SnapOtter never includes uploaded files, file names, OCR output, document text, or other file contents in those events.
 
-Other outbound traffic is feature-driven: AI bundle/model installation downloads signed release inputs; URL import fetches a user-requested public URL; and explicitly configured OIDC, SAML, OpenTelemetry, webhooks, S3-compatible storage, or similar integrations contact the destinations chosen by the administrator. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` prevents automatic model downloads. An [offline bundle import](/guide/deployment) can provision AI features without runtime model egress.
+Other outbound traffic is feature-driven: AI bundle/model installation downloads signed release inputs; URL import fetches a user-requested public URL; and explicitly configured OIDC, SAML, OpenTelemetry, webhooks, S3-compatible storage, or similar integrations contact the destinations chosen by the administrator. Runtime model downloads are disabled by default. Set `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` only to explicitly opt into automatic fallback downloads. An [offline bundle import](/guide/deployment) can provision AI features without runtime model egress.
 
 **Firewall recommendations:**
 

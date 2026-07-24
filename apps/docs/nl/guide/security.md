@@ -34,7 +34,7 @@ Voor een internetgerichte implementatie bindt u poort 1349 aan loopback en beëi
 
 Bestandsverwerking is lokaal, maar een standaardinstallatie is **geen uitgaand systeem**. Anonieme productanalyses gebruiken PostHog en crashrapportage gebruikt Sentry wanneer telemetrie is ingeschakeld. Stel `SNAPOTTER_TELEMETRY=0` in (of schakel analyses uit onder Instellingen > Systeem > Privacy) om beide uit te schakelen. SnapOtter neemt nooit geüploade bestanden, bestandsnamen, OCR-uitvoer, documenttekst of andere bestandsinhoud op in deze gebeurtenissen.
 
-Ander uitgaand verkeer is functiegestuurd: AI-bundel-/modelinstallatie downloadt ondertekende release-invoer; URL-import haalt een door de gebruiker aangevraagde openbare URL op; en expliciet geconfigureerde OIDC, SAML, OpenTelemetry, webhooks, S3-compatibele opslag of soortgelijke integraties maken contact met de door de beheerder gekozen bestemmingen. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` voorkomt automatische modeldownloads. Met een [offlinebundelimport](/nl/guide/deployment) kunnen AI-functies worden ingericht zonder uitgaand runtimemodel.
+Ander uitgaand verkeer is functiegestuurd: AI-bundel-/modelinstallatie downloadt ondertekende release-invoer; URL-import haalt een door de gebruiker aangevraagde openbare URL op; en expliciet geconfigureerde OIDC, SAML, OpenTelemetry, webhooks, S3-compatibele opslag of soortgelijke integraties maken contact met de door de beheerder gekozen bestemmingen. Modeldownloads tijdens runtime zijn standaard uitgeschakeld. Stel `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` alleen in om automatische fallback-downloads expliciet in te schakelen. Met een [offlinebundelimport](/nl/guide/deployment) kunnen AI-functies worden ingericht zonder uitgaand runtimemodel.
 
 **Firewall-aanbevelingen:**
 

@@ -34,7 +34,7 @@ För en Internet-vänd distribution, bind port 1349 till loopback och avsluta TL
 
 Filbehandlingen är lokal, men en standardinstallation är **inte ett utgångsfritt system**. Anonym produktanalys använder PostHog och kraschrapportering använder Sentry när telemetri är aktiverat. Ställ in `SNAPOTTER_TELEMETRY=0` (eller inaktivera analys under Inställningar > System > Sekretess) för att stänga av båda. SnapOtter inkluderar aldrig uppladdade filer, filnamn, OCR-utdata, dokumenttext eller annat filinnehåll i dessa händelser.
 
-Annan utgående trafik är funktionsdriven: AI-paket/modellinstallation laddar ner signerade release-ingångar; URL-import hämtar en användarbegärd offentlig URL; och explicit konfigurerade OIDC, SAML, OpenTelemetry, webhooks, S3-kompatibel lagring eller liknande integrationer kontaktar de destinationer som administratören valt. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` förhindrar automatiska modellnedladdningar. En [offline-paketimport](/sv/guide/deployment) kan tillhandahålla AI-funktioner utan körtidsmodellutgång.
+Annan utgående trafik är funktionsdriven: AI-paket/modellinstallation laddar ner signerade release-ingångar; URL-import hämtar en användarbegärd offentlig URL; och explicit konfigurerade OIDC, SAML, OpenTelemetry, webhooks, S3-kompatibel lagring eller liknande integrationer kontaktar de destinationer som administratören valt. Modellnedladdningar under körning är inaktiverade som standard. Ange `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` endast för att uttryckligen aktivera automatiska reservnedladdningar. En [offline-paketimport](/sv/guide/deployment) kan tillhandahålla AI-funktioner utan körtidsmodellutgång.
 
 **Brandväggsrekommendationer:**
 

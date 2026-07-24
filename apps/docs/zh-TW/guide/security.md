@@ -34,7 +34,7 @@ SnapOtter 完全在你的基礎架構上處理檔案。它預設會傳送匿名�
 
 文件處理是本地的，但預設安裝**不是無出口系統**。啟用遙測功能時，匿名產品分析使用 PostHog，崩潰報告使用 Sentry。設定 `SNAPOTTER_TELEMETRY=0`（或在「設定」>「系統」>「隱私權」下停用分析）以關閉兩者。 SnapOtter 絕不會在這些事件中包含上傳的檔案、檔案名稱、OCR 輸出、文件文字或其他文件內容。
 
-其他出站流量是功能驅動的：AI 捆綁包/模型安裝下載簽名發布輸入； URL導入獲取用戶請求的公共URL；並明確配置的 OIDC、SAML、OpenTelemetry、webhooks、S3 兼容存儲或類似集成會聯繫管理員選擇的目標。 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` 阻止自動模型下載。 [離線捆綁導入](/zh-TW/guide/deployment) 可以在沒有運行時模型出口的情況下提供 AI 功能。
+其他出站流量是功能驅動的：AI 捆綁包/模型安裝下載簽名發布輸入； URL導入獲取用戶請求的公共URL；並明確配置的 OIDC、SAML、OpenTelemetry、webhooks、S3 兼容存儲或類似集成會聯繫管理員選擇的目標。執行階段模型下載預設為停用。只有在明確選擇啟用自動備援下載時，才設定 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`。[離線捆綁導入](/zh-TW/guide/deployment) 可以在沒有運行時模型出口的情況下提供 AI 功能。
 
 **防火牆建議：**
 

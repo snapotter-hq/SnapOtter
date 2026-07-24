@@ -34,7 +34,7 @@ Untuk penerapan yang terhubung ke internet, ikat port 1349 ke loopback dan akhir
 
 Pemrosesan file bersifat lokal, namun instalasi default **bukan sistem bebas jalan keluar**. Analisis produk anonim menggunakan PostHog dan pelaporan kerusakan menggunakan Sentry saat telemetri diaktifkan. Setel `SNAPOTTER_TELEMETRY=0` (atau nonaktifkan analitik pada Pengaturan > Sistem > Privasi) untuk mematikan keduanya. SnapOtter tidak pernah menyertakan file yang diunggah, nama file, output OCR, teks dokumen, atau konten file lainnya dalam acara tersebut.
 
-Lalu lintas keluar lainnya didorong oleh fitur: unduhan instalasi bundel/model AI, input rilis yang ditandatangani; Impor URL mengambil URL publik yang diminta pengguna; dan OIDC, SAML, OpenTelemetry, webhook, penyimpanan yang kompatibel dengan S3, atau integrasi serupa yang dikonfigurasi secara eksplisit, hubungi tujuan yang dipilih oleh administrator. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` mencegah pengunduhan model otomatis. [Impor paket offline](/id/guide/deployment) dapat menyediakan fitur AI tanpa keluarnya model runtime.
+Lalu lintas keluar lainnya didorong oleh fitur: unduhan instalasi bundel/model AI, input rilis yang ditandatangani; Impor URL mengambil URL publik yang diminta pengguna; dan OIDC, SAML, OpenTelemetry, webhook, penyimpanan yang kompatibel dengan S3, atau integrasi serupa yang dikonfigurasi secara eksplisit, hubungi tujuan yang dipilih oleh administrator. Pengunduhan model saat runtime dinonaktifkan secara default. Tetapkan `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` hanya untuk mengaktifkan pengunduhan fallback otomatis secara eksplisit. [Impor paket offline](/id/guide/deployment) dapat menyediakan fitur AI tanpa keluarnya model runtime.
 
 **Rekomendasi firewall:**
 
