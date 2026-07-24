@@ -1,8 +1,9 @@
 # Isolated QA stack for the exhaustive tool QA sweep.
-# Uses the pre-built snapotter/snapotter:latest image (built from docker/docker-compose.yml).
+# Uses an explicitly supplied immutable digest of the image under test. Set
+# QA_IMAGE to the 64-character hexadecimal digest (without the sha256: prefix).
 # Auth disabled (synthetic admin), high limits, fresh volumes, host port 13499 to avoid
 # clashing with a native dev server on 1349.
-#   docker compose -f tests/qa/docker-compose.qa.yml up -d
+#   QA_IMAGE=<64-hex-digest> docker compose -f tests/qa/docker-compose.qa.yml up -d
 #   open http://localhost:13499
 #
 # Project/container names default to snapotter-qa. Two sessions on the same host
@@ -10,13 +11,13 @@
 # container (last `up` wins, no error) since container_name is fixed rather than
 # derived from the project name. A second concurrent stack also needs its own
 # host port (the default stack holds 13499), so override both:
-#   QA_PROJECT_NAME=snapotter-qa-2 QA_APP_PORT=13498 \
+#   QA_IMAGE=<same-64-hex-digest> QA_PROJECT_NAME=snapotter-qa-2 QA_APP_PORT=13498 \
 #     docker compose -f tests/qa/docker-compose.qa.yml up -d
 name: ${QA_PROJECT_NAME:-snapotter-qa}
 
 services:
   app:
-    image: snapotter/snapotter:latest
+    image: ${QA_IMAGE_REPOSITORY:-snapotter/snapotter}@sha256:${QA_IMAGE:?QA_IMAGE must be the 64-character hexadecimal digest of the image under test}
     container_name: ${QA_PROJECT_NAME:-snapotter-qa}
     ports:
       - "${QA_APP_PORT:-13499}:1349"
@@ -52,7 +53,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     container_name: ${QA_PROJECT_NAME:-snapotter-qa}-postgres
     environment:
       POSTGRES_USER: snapotter
@@ -68,7 +69,7 @@ services:
       start_period: 15s
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
     container_name: ${QA_PROJECT_NAME:-snapotter-qa}-redis
     command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
     volumes:

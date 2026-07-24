@@ -11,10 +11,31 @@ dist
 .env
 .env.*
 !.env.example
+.npmrc
+.pypirc
+.netrc
 .DS_Store
 .mcp.json
 .superpowers
 docs/superpowers
+
+# Local agent context and secret material
+.license-signing-key
+.secrets
+.claude
+.codex
+.local-wiki
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+PRD.md
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*client_secret*.json
+*service_account*.json
 
 # Test artifacts
 test-results

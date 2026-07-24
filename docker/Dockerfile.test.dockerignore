@@ -8,6 +8,11 @@ dist
 *.db-shm
 .env
 .env.local
+.env.*
+!.env.example
+.npmrc
+.pypirc
+.netrc
 .DS_Store
 test-results
 playwright-report
@@ -20,3 +25,21 @@ coverage
 !README.md
 test-*.png
 audit_report.md
+
+# Local agent context and secret material
+.license-signing-key
+.secrets
+.claude
+.codex
+.local-wiki
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+PRD.md
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*client_secret*.json
+*service_account*.json
