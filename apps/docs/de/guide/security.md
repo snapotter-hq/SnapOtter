@@ -1,8 +1,8 @@
 ---
 description: "Leitfaden zur Sicherheitshärtung für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker-Secrets, Kubernetes-Deployment und Compliance-Artefakte."
-i18n_source_hash: ee46e715d6fe
+i18n_source_hash: 5eac3327f4fd
 i18n_provenance: machine
-i18n_output_hash: 39798e7f0fd2
+i18n_output_hash: cb30b9dd00dd
 i18n_hash_version: 2
 ---
 
@@ -215,9 +215,9 @@ REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if e
 
 install -d -m 700 backup
 docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
-  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+  alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce tar czf /backup/snapotter-data.tar.gz -C /source .
 docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
-  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+  alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce tar czf /backup/snapotter-redis.tar.gz -C /source .
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 

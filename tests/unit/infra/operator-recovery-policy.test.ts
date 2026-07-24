@@ -35,6 +35,18 @@ describe("operator recovery policy", () => {
     }
   });
 
+  it("pins the disposable backup helper image by multi-platform digest in every locale", () => {
+    const alpine =
+      "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce";
+
+    for (const locale of localeCodes()) {
+      const prefix = locale === "en" ? "" : `${locale}/`;
+      const guide = source(`apps/docs/${prefix}guide/security.md`);
+      expect(guide, `${locale}/guide/security.md`).toContain(alpine);
+      expect(guide, `${locale}/guide/security.md`).not.toMatch(/alpine:3\.22(?!@sha256:)/);
+    }
+  });
+
   it("uses fail-fast logical database backup and restore commands", () => {
     for (const guidePath of ["apps/docs/guide/security.md", "apps/docs/guide/database.md"]) {
       const guide = source(guidePath);
