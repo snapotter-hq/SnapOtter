@@ -173,11 +173,10 @@ function render(times) {
     </linearGradient>
   </defs>
   <rect x="0.5" y="0.5" width="${WIDTH - 1}" height="${HEIGHT - 1}" rx="14" fill="${COLOR.bg}" stroke="${COLOR.grid}"/>
-  <text x="${M.left - 0}" y="34" fill="${COLOR.text}" font-size="19" font-weight="700">${esc(REPO)}</text>
-  <text x="${M.left - 0}" y="54" fill="${COLOR.muted}" font-size="13">Star history</text>
+  <text x="${M.left}" y="41" fill="${COLOR.text}" font-size="19" font-weight="700">Star history</text>
   <g>
-    <circle cx="${WIDTH - M.right - 96}" cy="30" r="4.5" fill="${COLOR.line}"/>
-    <text x="${WIDTH - M.right - 84}" y="34" fill="${COLOR.muted}" font-size="13">GitHub stars</text>
+    <circle cx="${WIDTH - M.right - 96}" cy="36" r="4.5" fill="${COLOR.line}"/>
+    <text x="${WIDTH - M.right - 84}" y="41" fill="${COLOR.muted}" font-size="13">GitHub stars</text>
   </g>
   <g>
     ${gridLines}
