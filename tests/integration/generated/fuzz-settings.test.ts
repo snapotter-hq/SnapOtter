@@ -58,7 +58,9 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       const fixture = selectFixturesForTool(FIXTURE_INDEX, tool)[0];
       if (!fixture) return context.skip(`${toolId}: no compatible generated fixture`);
       const input = readFixture(join(fixture.dir, fixture.filename));
-      const accounting = new GeneratedCaseAccounting(toolId);
+      const accounting = new GeneratedCaseAccounting(toolId, {
+        expectedAttempts: NUM_RUNS,
+      });
 
       let arbitrary: fc.Arbitrary<unknown>;
       try {
@@ -99,7 +101,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
               accounting.reject();
             }
           }),
-          { numRuns: NUM_RUNS, seed: FUZZ_SEED, interruptAfterTimeLimit: 180_000 },
+          { numRuns: NUM_RUNS, seed: FUZZ_SEED },
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

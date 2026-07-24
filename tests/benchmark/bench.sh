@@ -267,6 +267,7 @@ log "=== TIER 6: Concurrent Load Benchmarks ==="
 for concurrency in 1 3 5 10 20; do
   log "Concurrency: ${concurrency}"
   local_results=$(mktemp)
+  pids=()
 
   for i in $(seq 1 "$concurrency"); do
     (
@@ -283,9 +284,12 @@ for concurrency in 1 3 5 10 20; do
         "$admission_file" "$artifact_file" "$admission_time" || true
       printf '%s\t%s\t%s\n' "$BENCH_PASS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_ADMISSION_STATUS"
       rm -f "$admission_file" "$artifact_file"
+      [ "$BENCH_PASS" = "true" ]
     ) >> "$local_results" &
+    pids+=("$!")
   done
-  wait
+  child_wait_failed=0
+  wait_for_benchmark_children "$concurrency" "$local_results" "${pids[@]}" || child_wait_failed=1
 
   cid=$(get_container_id)
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
@@ -300,6 +304,12 @@ for concurrency in 1 3 5 10 20; do
     fi
   done < "$local_results"
   BENCHMARK_FAILURES=$((BENCHMARK_FAILURES + errors))
+  if [ "$child_wait_failed" -ne 0 ]; then
+    BENCHMARK_FAILURES=$((BENCHMARK_FAILURES + BENCH_CHILD_EXIT_FAILURES))
+    if [ "$BENCH_OBSERVED_ROWS" -ne "$BENCH_EXPECTED_ROWS" ]; then
+      BENCHMARK_FAILURES=$((BENCHMARK_FAILURES + 1))
+    fi
+  fi
 
   sorted=$(printf '%s\n' "${times[@]}" | sort -n)
   count=${#times[@]}

@@ -5,7 +5,7 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
 } from "../../helpers/generated-case-accounting.js";
-import { cancelAcceptedJobAndWait } from "../settle-job.js";
+import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -1157,20 +1157,16 @@ describe("settings variation matrix", () => {
   }, 10_000);
 
   for (const [toolId, variations] of Object.entries(SETTINGS_VARIATIONS)) {
-    describe(toolId, () => {
-      const accounting = new GeneratedCaseAccounting(toolId);
-
-      afterAll(() => {
-        accounting.assertCovered();
+    describe.skipIf(AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES)(toolId, () => {
+      const accounting = new GeneratedCaseAccounting(toolId, {
+        expectedAttempts: variations.length,
       });
 
       for (const { label, settings } of variations) {
-        it(label, async (context) => {
+        it(label, async () => {
           const fixture = TOOL_FIXTURE[toolId];
-          if (!fixture) {
-            accounting.prerequisiteSkip();
-            return context.skip(`${toolId}: no canonical settings fixture`);
-          }
+          expect(fixture, `${toolId}: no canonical settings fixture`).toBeDefined();
+          if (!fixture) throw new Error(`${toolId}: no canonical settings fixture`);
 
           const fields: Array<{
             name: string;
@@ -1225,10 +1221,8 @@ describe("settings variation matrix", () => {
               requireAiFeatures: REQUIRE_AI_FEATURES,
             });
             if (disposition === "skip") {
-              accounting.prerequisiteSkip();
-              return context.skip(
-                `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
-              );
+              accounting.skip("optional-feature", `${String(payload.code)} for ${label}`);
+              return;
             }
           }
 
@@ -1237,9 +1231,6 @@ describe("settings variation matrix", () => {
             ACCEPTED_STATUSES.has(res.statusCode),
             `${toolId} [${label}]: got ${res.statusCode} -- ${res.body.slice(0, 500)}`,
           ).toBe(true);
-          if (res.statusCode === 200 || res.statusCode === 202) accounting.accept();
-          else accounting.reject();
-
           // For 200 responses, validate response shape
           if (res.statusCode === 200) {
             // Some tools (e.g. split) stream a ZIP binary instead of JSON.
@@ -1253,22 +1244,23 @@ describe("settings variation matrix", () => {
               // image-to-base64 returns { results, errors } instead of downloadUrl
               expect(json.downloadUrl || json.jobId || json.results).toBeTruthy();
             }
+            accounting.accept();
           }
 
-          // For 202 (async), just verify the jobId is present
+          // For 202, resolve the accepted job and validate its artifact.
           if (res.statusCode === 202) {
             const json = JSON.parse(res.body);
             expect(json.jobId).toBeTruthy();
-
-            // Settings coverage ends once OCR accepts the validated request.
-            // Cancel it so Fast/default cases cannot outlive the suite and
-            // starve unrelated conversions running in parallel forks.
-            if (toolId === "ocr" || toolId === "ocr-pdf") {
-              await cancelAcceptedJobAndWait(json.jobId as string, "ai");
-            }
+            await waitForGeneratedJobArtifact(testApp.app, token, toolId, json.jobId as string);
+            accounting.accept();
           }
-        }, 60_000); // Generous timeout for media processing tools
+          if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
+        }, 180_000); // Includes terminal async processing and artifact verification.
       }
+
+      it("conserves generated case accounting", () => {
+        accounting.assertCovered();
+      });
     });
   }
 });

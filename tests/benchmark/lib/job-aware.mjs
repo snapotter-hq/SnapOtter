@@ -1,8 +1,48 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import AdmZip from "adm-zip";
 
 const MIN_ARTIFACT_BYTES = 16;
+const SUPPORTED_EXACT_MIMES = new Set([
+  "application/json",
+  "application/pdf",
+  "application/zip",
+  "application/xml",
+  "application/yaml",
+  "application/x-yaml",
+  "application/epub+zip",
+  "application/vnd.apple.mpegurl",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "audio/aac",
+  "audio/flac",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+  "audio/x-wav",
+  "image/avif",
+  "image/bmp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/svg+xml",
+  "image/tiff",
+  "image/vnd.microsoft.icon",
+  "image/webp",
+  "image/x-icon",
+  "video/mp4",
+  "video/ogg",
+  "video/quicktime",
+  "video/webm",
+  "video/x-msvideo",
+]);
 
 function normalizeMime(value) {
   return String(value ?? "")
@@ -20,7 +60,39 @@ function ascii(bytes, start, end) {
   return bytes.subarray(start, end).toString("latin1");
 }
 
-export function validateArtifact(output, contentType) {
+function assertExpectedMime(actualMime, expectedMime) {
+  if (!expectedMime) return;
+  const allowed = String(expectedMime).split(",").map(normalizeMime).filter(Boolean);
+  const matches = allowed.some((candidate) =>
+    candidate.endsWith("/*")
+      ? actualMime.startsWith(candidate.slice(0, -1))
+      : actualMime === candidate,
+  );
+  if (!matches) throw new Error(`expected ${allowed.join(" or ")} but received ${actualMime}`);
+}
+
+function assertSuccessfulJson(payload, label) {
+  if (!payload || typeof payload !== "object") throw new Error(`${label} is not a JSON object`);
+  if (payload.success === false || payload.error !== undefined) {
+    throw new Error(`${label} reported failure: ${errorMessage(payload.error)}`);
+  }
+}
+
+function validatedZipEntries(bytes) {
+  try {
+    const archive = new AdmZip(bytes);
+    const entries = archive.getEntries();
+    if (entries.length === 0) throw new Error("archive has no entries");
+    for (const entry of entries) {
+      if (!entry.isDirectory) entry.getData();
+    }
+    return entries;
+  } catch (error) {
+    throw new Error(`ZIP is invalid: ${errorMessage(error)}`);
+  }
+}
+
+export function validateArtifact(output, contentType, options = {}) {
   const bytes = Buffer.from(output);
   let mime = normalizeMime(contentType);
   if (bytes.length < MIN_ARTIFACT_BYTES) {
@@ -34,6 +106,11 @@ export function validateArtifact(output, contentType) {
     else if (ascii(bytes, 0, 2) === "PK") mime = "application/zip";
     else throw new Error("artifact MIME is missing or generic and magic is unknown");
   }
+
+  if (!SUPPORTED_EXACT_MIMES.has(mime) && !mime.startsWith("text/")) {
+    throw new Error(`unsupported artifact MIME: ${mime}`);
+  }
+  assertExpectedMime(mime, options.expectedMime);
 
   const magicChecks = [
     [mime === "image/png", startsWith(bytes, [0x89, 0x50, 0x4e, 0x47]), "PNG"],
@@ -79,16 +156,42 @@ export function validateArtifact(output, contentType) {
     if (applies && !valid) throw new Error(`${label} magic mismatch for ${mime}`);
   }
 
+  if (mime === "image/jpeg" && !startsWith(bytes, [0xff, 0xd9], bytes.length - 2)) {
+    throw new Error("JPEG is truncated or missing its end marker");
+  }
+  if (mime === "image/png" && ascii(bytes, bytes.length - 8, bytes.length - 4) !== "IEND") {
+    throw new Error("PNG is truncated or missing its IEND chunk");
+  }
+  if (mime === "image/gif" && bytes[bytes.length - 1] !== 0x3b) {
+    throw new Error("GIF is truncated or missing its trailer");
+  }
+  if (mime === "application/pdf" && !/%%EOF\s*$/.test(bytes.toString("latin1"))) {
+    throw new Error("PDF is truncated or missing %%EOF");
+  }
+  if (mime === "application/zip" || mime.endsWith("+zip") || mime.includes("openxmlformats")) {
+    const entries = validatedZipEntries(bytes);
+    if (
+      options.expectedZipEntries !== undefined &&
+      entries.filter((entry) => !entry.isDirectory).length !== options.expectedZipEntries
+    ) {
+      throw new Error(
+        `expected ${options.expectedZipEntries} ZIP entries but received ${entries.filter((entry) => !entry.isDirectory).length}`,
+      );
+    }
+  }
+
   if (mime === "audio/mpeg") {
     const mp3 = ascii(bytes, 0, 3) === "ID3" || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
     if (!mp3) throw new Error("MP3 magic mismatch for audio/mpeg");
   }
   if (mime === "application/json") {
+    let payload;
     try {
-      JSON.parse(bytes.toString("utf8"));
+      payload = JSON.parse(bytes.toString("utf8"));
     } catch {
       throw new Error("JSON artifact is not valid JSON");
     }
+    assertSuccessfulJson(payload, "JSON artifact");
   }
   if (mime === "image/svg+xml" && !/^\s*(?:<\?xml[^>]*>\s*)?<svg\b/i.test(bytes.toString("utf8"))) {
     throw new Error("SVG magic mismatch for image/svg+xml");
@@ -114,6 +217,15 @@ function sameOriginUrl(baseUrl, candidate, label) {
   if (resolved.origin !== base.origin)
     throw new Error(`cross-origin ${label} URL: ${resolved.href}`);
   return resolved;
+}
+
+function assertFinalResponseOrigin(baseUrl, response, label) {
+  if (!response.url) return;
+  const base = new URL(baseUrl);
+  const final = new URL(response.url);
+  if (final.origin !== base.origin) {
+    throw new Error(`cross-origin final ${label} URL: ${final.href}`);
+  }
 }
 
 function errorMessage(value) {
@@ -160,6 +272,11 @@ async function waitForTerminalEvent({ baseUrl, token, jobId, timeoutMs, fetchImp
     if (!response.ok || !response.body) {
       throw new Error(`job ${jobId} progress returned HTTP ${response.status}`);
     }
+    assertFinalResponseOrigin(baseUrl, response, "progress");
+    const progressMime = normalizeMime(response.headers.get("content-type"));
+    if (progressMime !== "text/event-stream") {
+      throw new Error(`job ${jobId} progress returned unsupported content-type ${progressMime}`);
+    }
 
     let buffer = "";
     for await (const chunk of response.body) {
@@ -180,15 +297,27 @@ async function waitForTerminalEvent({ baseUrl, token, jobId, timeoutMs, fetchImp
   }
 }
 
-async function fetchArtifact({ baseUrl, token, downloadUrl, timeoutMs, fetchImpl }) {
+async function fetchArtifact({
+  baseUrl,
+  token,
+  downloadUrl,
+  timeoutMs,
+  fetchImpl,
+  expectedMime,
+  expectedZipEntries,
+}) {
   const url = sameOriginUrl(baseUrl, downloadUrl, "artifact");
   const response = await fetchImpl(url, {
     headers: token ? { authorization: `Bearer ${token}` } : {},
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`artifact download returned HTTP ${response.status}`);
+  assertFinalResponseOrigin(baseUrl, response, "artifact");
   const output = Buffer.from(await response.arrayBuffer());
-  return validateArtifact(output, response.headers.get("content-type"));
+  return validateArtifact(output, response.headers.get("content-type"), {
+    expectedMime,
+    expectedZipEntries,
+  });
 }
 
 async function fallbackDownloadUrl({ baseUrl, token, jobId, timeoutMs, fetchImpl }) {
@@ -202,6 +331,10 @@ async function fallbackDownloadUrl({ baseUrl, token, jobId, timeoutMs, fetchImpl
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`job ${jobId} completed without a downloadable artifact`);
+  assertFinalResponseOrigin(baseUrl, response, "output metadata");
+  if (normalizeMime(response.headers.get("content-type")) !== "application/json") {
+    throw new Error(`job ${jobId} output metadata is not application/json`);
+  }
   const metadata = await response.json();
   if (!metadata || typeof metadata.filename !== "string" || metadata.filename.length === 0) {
     throw new Error(`job ${jobId} output metadata has no filename`);
@@ -218,6 +351,8 @@ export async function resolveBenchmarkResponse({
   admissionLatencyS = 0,
   timeoutMs = 300_000,
   fetchImpl = globalThis.fetch,
+  expectedMime,
+  expectedZipEntries,
 }) {
   const started = performance.now();
   let artifact;
@@ -225,6 +360,7 @@ export async function resolveBenchmarkResponse({
   if (admissionStatus === 200) {
     if (normalizeMime(admissionMime) === "application/json") {
       const payload = parseJson(admissionBody, "200 response");
+      assertSuccessfulJson(payload, "200 response");
       if (typeof payload.downloadUrl === "string") {
         artifact = await fetchArtifact({
           baseUrl,
@@ -232,12 +368,20 @@ export async function resolveBenchmarkResponse({
           downloadUrl: payload.downloadUrl,
           timeoutMs,
           fetchImpl,
+          expectedMime,
+          expectedZipEntries,
         });
       } else {
-        artifact = validateArtifact(admissionBody, admissionMime);
+        artifact = validateArtifact(admissionBody, admissionMime, {
+          expectedMime,
+          expectedZipEntries,
+        });
       }
     } else {
-      artifact = validateArtifact(admissionBody, admissionMime);
+      artifact = validateArtifact(admissionBody, admissionMime, {
+        expectedMime,
+        expectedZipEntries,
+      });
     }
   } else if (admissionStatus === 202) {
     const payload = parseJson(admissionBody, "202 response");
@@ -251,8 +395,27 @@ export async function resolveBenchmarkResponse({
       timeoutMs,
       fetchImpl,
     });
+    const failedFiles = Number(terminal.failedFiles ?? 0);
+    const errors = Array.isArray(terminal.errors) ? terminal.errors : [];
+    if (failedFiles > 0 || errors.length > 0) {
+      throw new Error(
+        `batch ${payload.jobId} completed with ${Math.max(failedFiles, errors.length)} failed file(s)`,
+      );
+    }
+    const totalFiles = Number(terminal.totalFiles);
+    const completedFiles = Number(terminal.completedFiles);
+    if (
+      Number.isFinite(totalFiles) &&
+      totalFiles > 0 &&
+      (!Number.isFinite(completedFiles) || completedFiles !== totalFiles)
+    ) {
+      throw new Error(
+        `batch ${payload.jobId} completed partially (${completedFiles}/${totalFiles} files)`,
+      );
+    }
     const nestedResult =
       terminal.result && typeof terminal.result === "object" ? terminal.result : {};
+    assertSuccessfulJson(nestedResult, `job ${payload.jobId} terminal result`);
     const artifactJobId =
       typeof payload.artifactJobId === "string" && payload.artifactJobId.length > 0
         ? payload.artifactJobId
@@ -269,7 +432,17 @@ export async function resolveBenchmarkResponse({
               timeoutMs,
               fetchImpl,
             });
-    artifact = await fetchArtifact({ baseUrl, token, downloadUrl, timeoutMs, fetchImpl });
+    artifact = await fetchArtifact({
+      baseUrl,
+      token,
+      downloadUrl,
+      timeoutMs,
+      fetchImpl,
+      expectedMime,
+      expectedZipEntries:
+        expectedZipEntries ??
+        (Number.isFinite(totalFiles) && totalFiles > 0 ? totalFiles : undefined),
+    });
   } else {
     throw new Error(`admission returned HTTP ${admissionStatus}`);
   }
@@ -312,6 +485,11 @@ async function main() {
       admissionBody: await readFile(args.body),
       admissionLatencyS,
       timeoutMs: Number(args["timeout-ms"] ?? 300_000),
+      expectedMime: args["expected-mime"],
+      expectedZipEntries:
+        args["expected-zip-entries"] === undefined
+          ? undefined
+          : Number(args["expected-zip-entries"]),
     });
     if (args.output) await writeFile(args.output, result.output);
     process.stdout.write(

@@ -105,7 +105,7 @@ run_batch_bench() {
 
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" 180000 || true
+    "$admission_file" "$artifact_file" "$time_s" 180000 "application/zip" "$count" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"

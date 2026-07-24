@@ -95,7 +95,9 @@ describe("pairwise settings matrix", () => {
         `${toolId}: every pairwise combo was rejected by the schema`,
       ).toBeGreaterThan(0);
 
-      const accounting = new GeneratedCaseAccounting(toolId);
+      const accounting = new GeneratedCaseAccounting(toolId, {
+        expectedAttempts: cases.length,
+      });
       for (const parsed of cases) {
         accounting.attempt();
         try {

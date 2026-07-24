@@ -31,7 +31,9 @@ export function buildGeneratedFixtureIndex(
   const index = new Map<string, GeneratedFixture[]>();
   for (const dir of directories) {
     if (!existsSync(dir)) continue;
-    for (const filename of readdirSync(dir).filter((entry) => !entry.startsWith("."))) {
+    for (const filename of readdirSync(dir)
+      .filter((entry) => !entry.startsWith("."))
+      .sort((left, right) => left.localeCompare(right))) {
       const ext = extname(filename).toLowerCase();
       if (!ext) continue;
       const fixture = { dir, filename, ext };

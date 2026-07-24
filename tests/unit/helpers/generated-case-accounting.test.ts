@@ -9,7 +9,7 @@ describe("GeneratedCaseAccounting", () => {
     const accounting = new GeneratedCaseAccounting("resize");
 
     expect(() => accounting.assertCovered()).toThrow(
-      "resize: generated coverage incomplete (attempted=0, accepted=0, rejected=0)",
+      "resize: generated coverage incomplete (attempted=0, accepted=0, rejected=0, skipped=0)",
     );
   });
 
@@ -19,7 +19,7 @@ describe("GeneratedCaseAccounting", () => {
     accounting.reject();
 
     expect(() => accounting.assertCovered()).toThrow(
-      "resize: generated coverage incomplete (attempted=1, accepted=0, rejected=1)",
+      "resize: generated coverage incomplete (attempted=1, accepted=0, rejected=1, skipped=0)",
     );
   });
 
@@ -30,15 +30,69 @@ describe("GeneratedCaseAccounting", () => {
     accounting.attempt();
     accounting.reject();
 
-    expect(accounting.assertCovered()).toEqual({ attempted: 2, accepted: 1, rejected: 1 });
+    expect(accounting.assertCovered()).toEqual({
+      attempted: 2,
+      accepted: 1,
+      rejected: 1,
+      skipped: 0,
+      skips: [],
+    });
   });
 
-  it("allows an observed prerequisite failure only when explicitly recorded", () => {
+  it("records bounded machine-readable skip categories and reasons", () => {
     const accounting = new GeneratedCaseAccounting("remove-background");
     accounting.attempt();
-    accounting.prerequisiteSkip();
+    accounting.skip("optional-feature", "background-removal bundle is not installed");
+    accounting.attempt();
+    accounting.accept();
 
-    expect(accounting.assertCovered()).toEqual({ attempted: 1, accepted: 0, rejected: 0 });
+    expect(accounting.assertCovered()).toEqual({
+      attempted: 2,
+      accepted: 1,
+      rejected: 0,
+      skipped: 1,
+      skips: [
+        {
+          category: "optional-feature",
+          reason: "background-removal bundle is not installed",
+          count: 1,
+        },
+      ],
+    });
+  });
+
+  it("rejects impossible accounting where accepted exceeds attempted", () => {
+    const accounting = new GeneratedCaseAccounting("resize");
+    accounting.attempt();
+    accounting.accept();
+    accounting.accept();
+
+    expect(() => accounting.assertCovered()).toThrow(
+      "resize: generated accounting is not conserved (attempted=1, accepted=2, rejected=0, skipped=0)",
+    );
+  });
+
+  it("rejects campaigns with no accepted case even when all attempts have outcomes", () => {
+    const accounting = new GeneratedCaseAccounting("resize");
+    for (let index = 0; index < 99; index += 1) {
+      accounting.attempt();
+      accounting.reject();
+    }
+    accounting.attempt();
+    accounting.skip("missing-fixture", "one optional fixture was unavailable");
+
+    expect(() => accounting.assertCovered()).toThrow(
+      "resize: generated coverage incomplete (attempted=100, accepted=0, rejected=99, skipped=1)",
+    );
+  });
+
+  it("rejects an unbounded or unknown skip reason", () => {
+    const accounting = new GeneratedCaseAccounting("resize");
+    accounting.attempt();
+
+    expect(() =>
+      accounting.skip("missing-fixture", `fixture unavailable: ${"x".repeat(300)}`),
+    ).toThrow("resize: generated skip reason must be 1-240 characters");
   });
 });
 

@@ -13,7 +13,7 @@ import {
   defaultSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
-import { cancelAcceptedJobAndWait } from "../settle-job.js";
+import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -116,7 +116,14 @@ describe("tool x format matrix (generated)", () => {
       continue;
     }
     it(`${toolId} handles every input format cleanly`, async (context) => {
-      const accounting = new GeneratedCaseAccounting(toolId);
+      if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
+        return context.skip(
+          `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+        );
+      }
+      const accounting = new GeneratedCaseAccounting(toolId, {
+        expectedAttempts: fixtureFiles.length,
+      });
       for (const fixture of fixtureFiles) {
         const content = readFileSync(join(fixtureDir.formats, fixture));
         const { body, contentType } = createMultipartPayload([
@@ -140,10 +147,8 @@ describe("tool x format matrix (generated)", () => {
             requireAiFeatures: REQUIRE_AI_FEATURES,
           });
           if (disposition === "skip") {
-            accounting.prerequisiteSkip();
-            return context.skip(
-              `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
-            );
+            accounting.skip("optional-feature", `${String(payload.code)} for ${fixture}`);
+            continue;
           }
         }
 
@@ -151,9 +156,6 @@ describe("tool x format matrix (generated)", () => {
           ALLOWED_STATUSES.has(res.statusCode),
           `${toolId} x ${fixture}: status ${res.statusCode}: ${res.body.slice(0, 300)}`,
         ).toBe(true);
-        if (res.statusCode === 200 || res.statusCode === 202) accounting.accept();
-        else accounting.reject();
-
         if (res.statusCode === 200) {
           const resType = (res.headers["content-type"]?.toString() ?? "").split(";")[0];
           if (resType !== "application/json") {
@@ -164,10 +166,23 @@ describe("tool x format matrix (generated)", () => {
                 `${toolId} x ${fixture}: ZIP response is not a ZIP`,
               ).toBe("PK");
             }
+            accounting.accept();
             continue;
           }
-          const payload = JSON.parse(res.body) as { downloadUrl?: string };
-          if (!payload.downloadUrl) continue;
+          const payload = JSON.parse(res.body) as {
+            downloadUrl?: string;
+            error?: unknown;
+            success?: boolean;
+          };
+          if (!payload.downloadUrl) {
+            expect(payload.success, `${toolId} x ${fixture}: JSON reported failure`).not.toBe(
+              false,
+            );
+            expect(payload.error, `${toolId} x ${fixture}: JSON reported an error`).toBeUndefined();
+            expect(Object.keys(payload).length).toBeGreaterThan(0);
+            accounting.accept();
+            continue;
+          }
           const dl = await testApp.app.inject({
             method: "GET",
             url: payload.downloadUrl,
@@ -187,13 +202,21 @@ describe("tool x format matrix (generated)", () => {
             const meta = await sharp(dl.rawPayload).metadata();
             expect(meta.width, `${toolId} x ${fixture}: output not decodable`).toBeGreaterThan(0);
           }
+          accounting.accept();
         }
 
-        if (res.statusCode === 202 && (toolId === "ocr" || toolId === "ocr-pdf")) {
+        if (res.statusCode === 202) {
           const payload = JSON.parse(res.body) as { jobId?: string };
           expect(payload.jobId).toBeDefined();
-          await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
+          await waitForGeneratedJobArtifact(
+            testApp.app,
+            adminToken,
+            toolId,
+            payload.jobId as string,
+          );
+          accounting.accept();
         }
+        if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
       }
       expect(accounting.assertCovered().accepted).toBeGreaterThan(0);
       // The nightly avif converters run many slow encodes per test; a busy runner

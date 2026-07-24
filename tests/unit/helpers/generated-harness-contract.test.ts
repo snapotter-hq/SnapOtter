@@ -32,4 +32,32 @@ describe("generated QA harness contract", () => {
     expect(text).toContain("generatedFixtureDirectories");
     expect(text).toContain("selectFixturesForTool");
   });
+
+  it.each([
+    "format-matrix-generated.test.ts",
+    "format-matrix-multimodal.test.ts",
+    "settings-matrix.test.ts",
+  ])("%s resolves every 202 and validates its completed artifact", (filename) => {
+    const text = source(filename);
+    expect(text).toContain("waitForGeneratedJobArtifact");
+    expect(text).not.toContain("cancelAcceptedJobAndWait");
+    expect(text).not.toMatch(
+      /statusCode === 200 \|\| res\.statusCode === 202\) accounting\.accept/,
+    );
+  });
+
+  it("fuzz executes the exact requested run count instead of interrupting successfully", () => {
+    const text = source("fuzz-settings.test.ts");
+    expect(text).not.toContain("interruptAfterTimeLimit");
+    expect(text).toContain("expectedAttempts: NUM_RUNS");
+  });
+
+  it("the actual nightly extended lane requires installed AI features", () => {
+    const workflow = readFileSync(join(process.cwd(), ".github/workflows/nightly.yml"), "utf8");
+    const extendedLane = workflow.slice(
+      workflow.indexOf("  extended-matrix:"),
+      workflow.indexOf("  api-fuzz:"),
+    );
+    expect(extendedLane).toContain('REQUIRE_AI_FEATURES: "1"');
+  });
 });

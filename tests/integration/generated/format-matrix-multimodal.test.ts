@@ -13,7 +13,7 @@ import {
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
-import { cancelAcceptedJobAndWait } from "../settle-job.js";
+import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -142,11 +142,9 @@ describe("multi-modality tool x format matrix", () => {
       continue;
     }
 
-    describe(toolId, () => {
-      const accounting = new GeneratedCaseAccounting(toolId);
-
-      afterAll(() => {
-        accounting.assertCovered();
+    describe.skipIf(isAiTool && !REQUIRE_AI_FEATURES)(toolId, () => {
+      const accounting = new GeneratedCaseAccounting(toolId, {
+        expectedAttempts: effectiveFixtures.length,
       });
 
       for (const fixture of effectiveFixtures) {
@@ -154,7 +152,7 @@ describe("multi-modality tool x format matrix", () => {
         // under load a contended docs/media job can ride the full sync-wait window and
         // return a valid 202 (which this matrix accepts), so the timeout must sit above
         // that floor or a slow-but-valid job is wrongly flagged as a hang.
-        it(`${fixture.filename} -> clean status`, async (context) => {
+        it(`${fixture.filename} -> clean status`, async () => {
           const content = readFileSync(join(fixture.dir, fixture.filename));
           const settings = defaultSettingsFor(toolId);
 
@@ -212,10 +210,11 @@ describe("multi-modality tool x format matrix", () => {
               requireAiFeatures: REQUIRE_AI_FEATURES,
             });
             if (disposition === "skip") {
-              accounting.prerequisiteSkip();
-              return context.skip(
-                `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+              accounting.skip(
+                "optional-feature",
+                `${String(payload.code)} for ${fixture.filename}`,
               );
+              return;
             }
           }
 
@@ -223,9 +222,6 @@ describe("multi-modality tool x format matrix", () => {
             ALLOWED_STATUSES.has(res.statusCode),
             `${toolId} x ${fixture.filename}: status ${res.statusCode}: ${res.body.slice(0, 300)}`,
           ).toBe(true);
-          if (res.statusCode === 200 || res.statusCode === 202) accounting.accept();
-          else accounting.reject();
-
           // ── Validate response shape by status ──
           if (res.statusCode === 200) {
             const resType = (res.headers["content-type"]?.toString() ?? "").split(";")[0];
@@ -254,6 +250,7 @@ describe("multi-modality tool x format matrix", () => {
               ).toBe("PK");
             }
             // Other content types (audio/*, video/*, application/pdf, text/*) are valid
+            accounting.accept();
           }
 
           if (res.statusCode === 202) {
@@ -265,15 +262,21 @@ describe("multi-modality tool x format matrix", () => {
             ).toBeDefined();
             expect(typeof payload.jobId).toBe("string");
 
-            // The generic matrix verifies acceptance, not OCR execution. If an
-            // optional OCR runtime happens to be installed locally, release its
-            // long-running job immediately rather than leaking it into teardown.
-            if (toolId === "ocr-pdf") {
-              await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
-            }
+            await waitForGeneratedJobArtifact(
+              testApp.app,
+              adminToken,
+              toolId,
+              payload.jobId as string,
+            );
+            accounting.accept();
           }
-        }, 60_000);
+          if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
+        }, 180_000);
       }
+
+      it("conserves generated case accounting", () => {
+        accounting.assertCovered();
+      });
     });
   }
 });
