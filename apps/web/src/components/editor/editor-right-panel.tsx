@@ -98,25 +98,27 @@ export function EditorRightPanel() {
       {sourceImageUrl && <NavigatorPanel />}
 
       {/* Tabs */}
-      <div className="flex items-center border-b border-border" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => setTab(tab.id)}
-            className={cn(
-              "flex-1 py-2 text-xs font-medium text-center transition-colors",
-              activeTab === tab.id
-                ? "text-foreground border-b-2 border-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            data-testid={`tab-${tab.id}`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex items-center border-b border-border">
+        <div className="flex flex-1" role="tablist" aria-label={t.editor.menu.view.panels}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setTab(tab.id)}
+              className={cn(
+                "flex-1 py-2 text-xs font-medium text-center transition-colors",
+                activeTab === tab.id
+                  ? "text-foreground border-b-2 border-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              data-testid={`tab-${tab.id}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={togglePanel}

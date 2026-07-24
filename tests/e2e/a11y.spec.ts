@@ -4,35 +4,10 @@
  * Scoped set: home, one tool per modality, editor, settings, login.
  * Runs in the default locale (en) and one RTL locale (ar).
  *
- * Uses a baseline file (a11y-baseline.json) to avoid failing on known
- * violations while catching any NEW regressions. To update the baseline
- * after fixing violations, run with A11Y_UPDATE_BASELINE=1.
+ * The release gate requires zero axe violations in the scoped pages.
  */
-import fs from "node:fs";
-import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "./helpers";
-
-// ---- Baseline machinery ----
-
-interface BaselineFile {
-  _comment: string;
-  violations: Record<string, { impact: string; description: string; count: number }>;
-}
-
-const BASELINE_PATH = path.join(__dirname, "a11y-baseline.json");
-
-function loadBaseline(): BaselineFile {
-  try {
-    return JSON.parse(fs.readFileSync(BASELINE_PATH, "utf-8"));
-  } catch {
-    return { _comment: "", violations: {} };
-  }
-}
-
-function saveBaseline(baseline: BaselineFile): void {
-  fs.writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);
-}
 
 interface ViolationEntry {
   id: string;
@@ -46,20 +21,12 @@ function buildKey(pageKey: string, ruleId: string): string {
 }
 
 /**
- * Run axe on the current page and assert no NEW critical/serious violations
- * beyond the committed baseline.
+ * Run axe on the current page and collect every violation. The caller gates
+ * on the complete result so moderate debt cannot silently become permanent.
  */
 async function auditPage(
   page: import("@playwright/test").Page,
   pageKey: string,
-  baseline: BaselineFile,
-  newViolations: {
-    key: string;
-    impact: string;
-    description: string;
-    count: number;
-    targets: string[];
-  }[],
   allViolations: {
     key: string;
     impact: string;
@@ -82,11 +49,6 @@ async function auditPage(
       targets: v.nodes.map((n) => (n.target ?? []).join(" ")),
     };
     allViolations.push(entry);
-
-    // If this violation is NOT in the baseline, it is new
-    if (!baseline.violations[key]) {
-      newViolations.push(entry);
-    }
   }
 }
 
@@ -115,12 +77,10 @@ const PAGES_AR = [
 // Each test scans 9+ pages with axe; the default 30s timeout is tight.
 test.describe("Axe a11y audit -- desktop EN", () => {
   test.setTimeout(90_000);
-  test("no new critical/serious violations on scoped pages", async ({
+  test("has no accessibility violations on scoped pages", async ({
     loggedInPage: page,
     browser,
   }) => {
-    const baseline = loadBaseline();
-    const newViolations: { key: string; impact: string; description: string; count: number }[] = [];
     const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
 
     for (const p of PAGES_EN) {
@@ -128,7 +88,7 @@ test.describe("Axe a11y audit -- desktop EN", () => {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
-        await auditPage(page, p.key, baseline, newViolations, allViolations);
+        await auditPage(page, p.key, allViolations);
       } else {
         // Login page: use a fresh context without auth
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -136,7 +96,7 @@ test.describe("Axe a11y audit -- desktop EN", () => {
         await anonPage.goto(p.path);
         await anonPage.waitForLoadState("networkidle");
         await anonPage.waitForTimeout(500);
-        await auditPage(anonPage, p.key, baseline, newViolations, allViolations);
+        await auditPage(anonPage, p.key, allViolations);
         await ctx.close();
       }
     }
@@ -148,39 +108,11 @@ test.describe("Axe a11y audit -- desktop EN", () => {
     }
     console.log("a11y violation counts by severity (desktop EN):", JSON.stringify(bySeverity));
     console.log(`total unique rules violated: ${allViolations.length}`);
-    console.log(`baselined: ${allViolations.length - newViolations.length}`);
-    console.log(`NEW (not in baseline): ${newViolations.length}`);
 
-    if (newViolations.length > 0) {
-      console.log("NEW violations:");
-      for (const v of newViolations) {
-        console.log(`  ${v.key} [${v.impact}] (${v.count} nodes): ${v.description}`);
-      }
-    }
-
-    // Update baseline if requested (skip assertion when generating baseline)
-    if (process.env.A11Y_UPDATE_BASELINE === "1") {
-      for (const v of allViolations) {
-        baseline.violations[v.key] = {
-          impact: v.impact,
-          description: v.description,
-          count: v.count,
-        };
-      }
-      saveBaseline(baseline);
-      console.log("Baseline updated -- skipping assertion.");
-      return;
-    }
-
-    // Gate: fail only on NEW critical or serious violations
-    const newCriticalSerious = newViolations.filter(
-      (v) => v.impact === "critical" || v.impact === "serious",
-    );
     expect(
-      newCriticalSerious,
-      `${newCriticalSerious.length} NEW critical/serious a11y violation(s) found. ` +
-        `Run with A11Y_UPDATE_BASELINE=1 to baseline after review.\n` +
-        newCriticalSerious
+      allViolations,
+      `${allViolations.length} accessibility violation(s) found.\n` +
+        allViolations
           .map(
             (v) =>
               `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,
@@ -192,12 +124,7 @@ test.describe("Axe a11y audit -- desktop EN", () => {
 
 test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
   test.setTimeout(60_000);
-  test("no new critical/serious violations on RTL pages", async ({
-    loggedInPage: page,
-    browser,
-  }) => {
-    const baseline = loadBaseline();
-    const newViolations: { key: string; impact: string; description: string; count: number }[] = [];
+  test("has no accessibility violations on RTL pages", async ({ loggedInPage: page, browser }) => {
     const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
 
     for (const p of PAGES_AR) {
@@ -209,7 +136,7 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
-        await auditPage(page, p.key, baseline, newViolations, allViolations);
+        await auditPage(page, p.key, allViolations);
       } else {
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         const anonPage = await ctx.newPage();
@@ -221,7 +148,7 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
         await anonPage.goto(p.path);
         await anonPage.waitForLoadState("networkidle");
         await anonPage.waitForTimeout(500);
-        await auditPage(anonPage, p.key, baseline, newViolations, allViolations);
+        await auditPage(anonPage, p.key, allViolations);
         await ctx.close();
       }
     }
@@ -238,35 +165,10 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
     }
     console.log("a11y violation counts by severity (desktop AR):", JSON.stringify(bySeverity));
     console.log(`total unique rules violated: ${allViolations.length}`);
-    console.log(`NEW (not in baseline): ${newViolations.length}`);
-
-    if (newViolations.length > 0) {
-      console.log("NEW violations:");
-      for (const v of newViolations) {
-        console.log(`  ${v.key} [${v.impact}] (${v.count} nodes): ${v.description}`);
-      }
-    }
-
-    if (process.env.A11Y_UPDATE_BASELINE === "1") {
-      for (const v of allViolations) {
-        baseline.violations[v.key] = {
-          impact: v.impact,
-          description: v.description,
-          count: v.count,
-        };
-      }
-      saveBaseline(baseline);
-      console.log("Baseline updated -- skipping assertion.");
-      return;
-    }
-
-    const newCriticalSerious = newViolations.filter(
-      (v) => v.impact === "critical" || v.impact === "serious",
-    );
     expect(
-      newCriticalSerious,
-      `${newCriticalSerious.length} NEW critical/serious a11y violation(s) in AR locale.\n` +
-        newCriticalSerious
+      allViolations,
+      `${allViolations.length} accessibility violation(s) in AR locale.\n` +
+        allViolations
           .map(
             (v) =>
               `  ${v.key} [${v.impact}]: ${v.description}\n${v.targets.map((t) => `    - ${t}`).join("\n")}`,

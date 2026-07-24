@@ -13,7 +13,7 @@ test.describe("Editor Layers Panel", () => {
     await expect(layersPanel).toBeVisible();
 
     // Should have at least one layer with "Layer 1" text
-    const layerRows = layersPanel.locator("[role='option']");
+    const layerRows = layersPanel.locator("[data-layer-id]");
     await expect(layerRows).toHaveCount(1);
     await expect(layersPanel.getByText("Layer 1")).toBeVisible();
   });
@@ -27,7 +27,7 @@ test.describe("Editor Layers Panel", () => {
 
     // Now there should be 2 layers
     const layersPanel = page.locator("[data-testid='layers-panel']");
-    const layerRows = layersPanel.locator("[role='option']");
+    const layerRows = layersPanel.locator("[data-layer-id]");
     await expect(layerRows).toHaveCount(2);
   });
 
@@ -50,7 +50,7 @@ test.describe("Editor Layers Panel", () => {
 
   test("eye icon toggles visibility", async ({ editorPage: page }) => {
     const layersPanel = page.locator("[data-testid='layers-panel']");
-    const layerRow = layersPanel.locator("[role='option']").first();
+    const layerRow = layersPanel.locator("[data-layer-id]").first();
 
     // Initially visible (Eye icon, aria-label "Hide layer")
     const hideBtn = layerRow.locator("button[aria-label='Hide layer']");
@@ -73,7 +73,7 @@ test.describe("Editor Layers Panel", () => {
 
   test("lock icon toggles lock state", async ({ editorPage: page }) => {
     const layersPanel = page.locator("[data-testid='layers-panel']");
-    const layerRow = layersPanel.locator("[role='option']").first();
+    const layerRow = layersPanel.locator("[data-layer-id]").first();
 
     // Initially unlocked
     const lockBtn = layerRow.locator("button[aria-label='Lock layer']");
@@ -122,7 +122,7 @@ test.describe("Editor Layers Panel", () => {
 
     // Double-click the layer name button
     const nameBtn = layersPanel
-      .locator("[role='option']")
+      .locator("[data-layer-id]")
       .first()
       .locator("button")
       .filter({ hasText: "Layer 1" });
@@ -136,8 +136,8 @@ test.describe("Editor Layers Panel", () => {
 
   test("layer row highlights active layer", async ({ editorPage: page }) => {
     const layersPanel = page.locator("[data-testid='layers-panel']");
-    const layerRow = layersPanel.locator("[role='option']").first();
+    const layerRow = layersPanel.locator("[data-layer-id]").first();
 
-    await expect(layerRow).toHaveAttribute("aria-selected", "true");
+    await expect(layerRow).toHaveAttribute("aria-current", "true");
   });
 });

@@ -1,7 +1,10 @@
 // apps/web/src/components/editor/editor-status-bar.tsx
+
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function EditorStatusBar() {
+  const { t } = useTranslation();
   const cursorPosition = useEditorStore((s) => s.cursorPosition);
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const zoom = useEditorStore((s) => s.zoom);
@@ -25,6 +28,7 @@ export function EditorStatusBar() {
       </div>
       <div className="flex items-center gap-1" data-testid="status-zoom">
         <input
+          aria-label={t.a11y.zoomControls}
           type="number"
           value={zoomPercent}
           onChange={(e) => {

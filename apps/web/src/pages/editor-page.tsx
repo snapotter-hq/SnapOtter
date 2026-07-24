@@ -148,7 +148,12 @@ export function EditorPage() {
 
   if (isMobile) {
     return (
-      <main className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex flex-col items-center justify-center h-full p-8 text-center"
+      >
+        <h1 className="sr-only">{t.editor.welcome.heading}</h1>
         <Monitor size={48} className="text-muted-foreground mb-4" />
         <h2 className="text-lg font-semibold text-foreground mb-2">{t.editor.mobile.heading}</h2>
         <p className="text-sm text-muted-foreground max-w-sm">{t.editor.mobile.description}</p>
@@ -157,7 +162,11 @@ export function EditorPage() {
   }
 
   return (
-    <main className="flex flex-col h-dvh overflow-hidden bg-background text-foreground">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex flex-col h-dvh overflow-hidden bg-background text-foreground"
+    >
       <h1 className="sr-only">{t.editor.welcome.heading}</h1>
       <EditorMenuBar
         onNewDocument={() => setShowNewDocument(true)}

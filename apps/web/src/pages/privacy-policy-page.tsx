@@ -5,7 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 export function PrivacyPolicyPage() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background text-foreground">
       <div className="max-w-2xl mx-auto px-6 py-12">
         <Link
           to="/"
@@ -96,6 +96,6 @@ export function PrivacyPolicyPage() {
           </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
