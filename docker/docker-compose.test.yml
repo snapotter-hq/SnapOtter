@@ -85,7 +85,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     container_name: SnapOtter-test-postgres
     environment:
       POSTGRES_USER: snapotter
@@ -101,7 +101,7 @@ services:
       - /var/lib/postgresql/data
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
     container_name: SnapOtter-test-redis
     command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "no"]
     healthcheck:

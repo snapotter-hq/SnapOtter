@@ -8,7 +8,7 @@
 # Stage 0: Static FFmpeg/FFprobe binaries
 # ============================================
 # Multi-arch (amd64 + arm64) static builds for video/audio processing.
-FROM mwader/static-ffmpeg:8.1.2 AS ffmpeg
+FROM mwader/static-ffmpeg:8.1.2@sha256:33f770f812cbfc3de96c547157fc9faf8bd95a36481753439ffa761045167585 AS ffmpeg
 
 # ============================================
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
@@ -173,8 +173,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libde265-dev libx265-dev libjpeg-dev libpng-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL --retry 3 --retry-delay 5 "https://github.com/strukturag/libheif/releases/download/v${LIBHEIF_VERSION}/libheif-${LIBHEIF_VERSION}.tar.gz" \
-      | tar xz \
+RUN curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 \
+      --output /tmp/libheif.tar.gz \
+      "https://github.com/strukturag/libheif/releases/download/v${LIBHEIF_VERSION}/libheif-${LIBHEIF_VERSION}.tar.gz" \
+    && printf '%s  %s\n' \
+      "75f530b7154bc93e7ecf846edfc0416bf5f490612de8c45983c36385aa742b42" \
+      /tmp/libheif.tar.gz | sha256sum --check --strict - \
+    && tar -xzf /tmp/libheif.tar.gz \
     && cmake -B build -S "libheif-${LIBHEIF_VERSION}" \
       -DCMAKE_INSTALL_PREFIX=/opt/libheif \
       -DWITH_EXAMPLES=ON \
@@ -291,11 +297,16 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
          apt-get install -y --no-install-recommends libcublas-12-6; \
        fi \
     && case "$TARGETARCH" in \
-         amd64) PANDOC_ARCH=amd64 ;; \
-         arm64) PANDOC_ARCH=arm64 ;; \
+         amd64) PANDOC_ARCH=amd64; PANDOC_SHA256=d502599878eb29af3ae5f0cb5d559134df96534125d452c7a0674a5bad2c5ecf ;; \
+         arm64) PANDOC_ARCH=arm64; PANDOC_SHA256=b651c8bfd5a0a2f6650d6c0830131747ef67a1d9c0475b1399626611419e2205 ;; \
          *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
        esac \
-    && curl -fsSL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-${PANDOC_ARCH}.deb" -o /tmp/pandoc.deb \
+    && curl --fail --location --silent --show-error --retry 3 \
+       --proto '=https' --tlsv1.2 \
+       --output /tmp/pandoc.deb \
+       "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-${PANDOC_ARCH}.deb" \
+    && printf '%s  %s\n' "${PANDOC_SHA256}" /tmp/pandoc.deb \
+       | sha256sum --check --strict - \
     && apt-get install -y --no-install-recommends /tmp/pandoc.deb \
     && rm -f /tmp/pandoc.deb \
     && pandoc --version \
@@ -309,10 +320,22 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
 # multi-GB base. They enter the Trivy CVE surface and ride the existing
 # apt-get upgrade patching.
 RUN install -d /usr/share/postgresql-common/pgdg \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && curl --fail --location --silent --show-error --retry 3 \
+         --proto '=https' --tlsv1.2 \
+         https://www.postgresql.org/media/keys/ACCC4CF8.asc \
          -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-    && curl -fsSL https://packages.redis.io/gpg \
+    && printf '%s  %s\n' \
+         "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76" \
+         /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+         | sha256sum --check --strict - \
+    && curl --fail --location --silent --show-error --retry 3 \
+         --proto '=https' --tlsv1.2 \
+         https://packages.redis.io/gpg \
          -o /usr/share/keyrings/redis-archive-keyring.asc \
+    && printf '%s  %s\n' \
+         "817b5a78358d00ed6b71884d70ad5d2eab9934badca1a34299fdc6a2e4a8ad20" \
+         /usr/share/keyrings/redis-archive-keyring.asc \
+         | sha256sum --check --strict - \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
          > /etc/apt/sources.list.d/pgdg.list \
@@ -325,25 +348,30 @@ RUN install -d /usr/share/postgresql-common/pgdg \
     && rm -rf /var/lib/apt/lists/*
 
 # s6-overlay supervises the embedded service tree (postgres + redis + app).
-# Pinned and checksum-verified against the upstream-published .sha256, consistent
-# with the repo's digest-pinning posture. For stricter supply-chain pinning,
-# replace the .sha256 fetch with a literal hash checked via
-# `echo "<hash>  <file>" | sha256sum -c -`.
+# Pinned and checksum-verified against repository-controlled literal hashes.
+# The values were independently matched against the upstream release assets.
 ARG S6_OVERLAY_VERSION=3.2.0.2
 RUN set -e; \
     case "$TARGETARCH" in \
-      amd64) S6_ARCH=x86_64 ;; \
-      arm64) S6_ARCH=aarch64 ;; \
+      amd64) S6_ARCH=x86_64; S6_ARCH_SHA256=59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478 ;; \
+      arm64) S6_ARCH=aarch64; S6_ARCH_SHA256=8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785 ;; \
       *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
     esac; \
     cd /tmp; \
     base="https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}"; \
-    for f in "s6-overlay-noarch.tar.xz" "s6-overlay-${S6_ARCH}.tar.xz"; do \
-      curl -fsSL -O "${base}/${f}"; \
-      curl -fsSL -O "${base}/${f}.sha256"; \
-      sha256sum -c "${f}.sha256"; \
-      tar -C / -Jxpf "${f}"; \
-    done; \
+    curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 --output s6-overlay-noarch.tar.xz \
+      "${base}/s6-overlay-noarch.tar.xz"; \
+    printf '%s  %s\n' \
+      "6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae" \
+      s6-overlay-noarch.tar.xz | sha256sum --check --strict -; \
+    curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 --output "s6-overlay-${S6_ARCH}.tar.xz" \
+      "${base}/s6-overlay-${S6_ARCH}.tar.xz"; \
+    printf '%s  %s\n' "${S6_ARCH_SHA256}" "s6-overlay-${S6_ARCH}.tar.xz" \
+      | sha256sum --check --strict -; \
+    tar -C / -Jxpf s6-overlay-noarch.tar.xz; \
+    tar -C / -Jxpf "s6-overlay-${S6_ARCH}.tar.xz"; \
     rm -f /tmp/s6-overlay-*
 
 # Allow ImageMagick to use Ghostscript delegate for EPS (read for decode,

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noTemplateCurlyInString: Contract assertions intentionally match Docker and shell interpolation syntax.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dockerfile = readFileSync(resolve(here, "../../../docker/Dockerfile"), "utf8");
+const dockerfileTest = readFileSync(resolve(here, "../../../docker/Dockerfile.test"), "utf8");
 const snapotterRun = readFileSync(
   resolve(here, "../../../docker/s6/s6-rc.d/snapotter/run"),
   "utf8",
@@ -15,6 +17,8 @@ const postgresReady = readFileSync(
 );
 const composeCpu = readFileSync(resolve(here, "../../../docker/docker-compose.yml"), "utf8");
 const composeGpu = readFileSync(resolve(here, "../../../docker/docker-compose-gpu.yml"), "utf8");
+const composeDev = readFileSync(resolve(here, "../../../docker-compose.dev.yml"), "utf8");
+const composeTest = readFileSync(resolve(here, "../../../docker/docker-compose.test.yml"), "utf8");
 
 function stageBody(stageName: string): string {
   const lines = dockerfile.split(/\r?\n/);
@@ -28,6 +32,66 @@ function stageBody(stageName: string): string {
 }
 
 describe("Dockerfile build args", () => {
+  it("pins every external Dockerfile base image to an immutable digest", () => {
+    for (const [name, source] of [
+      ["Dockerfile", dockerfile],
+      ["Dockerfile.test", dockerfileTest],
+    ] as const) {
+      const externalBases = source
+        .split(/\r?\n/)
+        .filter((line) => /^FROM\s+/.test(line))
+        .filter((line) => !/^FROM\s+(?:libheif-base-|base-)\$\{/.test(line));
+
+      expect(externalBases.length, `${name} should contain external bases`).toBeGreaterThan(0);
+      for (const base of externalBases) {
+        expect(base, `${name} base is mutable: ${base}`).toMatch(
+          /@sha256:[a-f0-9]{64}(?:\s+AS\s+\S+)?$/,
+        );
+      }
+    }
+  });
+
+  it("verifies every downloaded Docker build input against repository-controlled hashes", () => {
+    for (const [name, source] of [
+      ["Dockerfile", dockerfile],
+      ["Dockerfile.test", dockerfileTest],
+    ] as const) {
+      expect(source, `${name} must pin libheif bytes`).toContain(
+        "75f530b7154bc93e7ecf846edfc0416bf5f490612de8c45983c36385aa742b42",
+      );
+      expect(source, `${name} must verify downloads`).toContain("sha256sum --check --strict");
+    }
+
+    for (const digest of [
+      "d502599878eb29af3ae5f0cb5d559134df96534125d452c7a0674a5bad2c5ecf",
+      "b651c8bfd5a0a2f6650d6c0830131747ef67a1d9c0475b1399626611419e2205",
+      "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76",
+      "817b5a78358d00ed6b71884d70ad5d2eab9934badca1a34299fdc6a2e4a8ad20",
+      "8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785",
+      "6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae",
+      "59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478",
+    ]) {
+      expect(dockerfile, `Dockerfile is missing literal SHA-256 ${digest}`).toContain(digest);
+    }
+    expect(dockerfile).not.toContain('curl -fsSL -O "${base}/${f}.sha256"');
+  });
+
+  it("pins Compose infrastructure images while keeping their major-version labels", () => {
+    for (const [name, compose] of [
+      ["docker-compose.yml", composeCpu],
+      ["docker-compose-gpu.yml", composeGpu],
+      ["docker-compose.dev.yml", composeDev],
+      ["docker-compose.test.yml", composeTest],
+    ] as const) {
+      expect(compose, `${name} must pin PostgreSQL 17`).toMatch(
+        /image:\s*postgres:17-alpine@sha256:[a-f0-9]{64}/,
+      );
+      expect(compose, `${name} must pin Redis 8`).toMatch(
+        /image:\s*redis:8-alpine@sha256:[a-f0-9]{64}/,
+      );
+    }
+  });
+
   it("keeps the Pandoc version default in the production stage", () => {
     const production = stageBody("production");
     const argMatch = production.match(/^ARG PANDOC_VERSION=(.+)$/m);
