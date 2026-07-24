@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/lib/job-aware.sh"
+
 SYSTEM="${1:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode]}"
 FIXTURE_DIR="${2:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode]}"
 PORT="${3:-1349}"
@@ -38,18 +41,20 @@ gpu_vram_mb() {
 
 record() {
   local tier="$1" tool="$2" variant="$3" time_s="$4" pass="$5" output_size="${6:-0}" mem_mb="${7:-0}" cpu_pct="${8:-0}" vram_mb="${9:-0}"
-  printf '{"system":"%s","tier":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"cpu_pct":%s,"vram_mb":%s,"gpu_mode":"%s"}\n' \
-    "$SYSTEM" "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_mb" "$cpu_pct" "$vram_mb" "$GPU_MODE" >> "$RESULTS_FILE"
+  local admission_status="${10:-0}" completion_status="${11:-failed}" completion_latency_s="${12:-0}" output_mime="${13:-unknown}"
+  printf '{"system":"%s","tier":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"cpu_pct":%s,"vram_mb":%s,"gpu_mode":"%s","admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
+    "$SYSTEM" "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_mb" "$cpu_pct" "$vram_mb" "$GPU_MODE" "$admission_status" "$completion_status" "$completion_latency_s" "$output_mime" >> "$RESULTS_FILE"
 }
 
 bench_ai_tool() {
-  local tool="$1" variant="$2" file="$3" settings="${4:-}" extra_args="${5:-}"
-  local cid time_s http_code mem_after cpu vram output_file pass output_size
+  local tool="$1" variant="$2" file="$3" settings="${4:-}"
+  local cid time_s http_code response_mime mem_after cpu vram admission_file artifact_file pass output_size
 
   cid=$(get_container_id)
-  output_file=$(mktemp)
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
 
-  local curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
+  local curl_args=(-sS -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
 
   if [ -n "$file" ] && [ "$file" != "NONE" ]; then
     curl_args+=(-F "file=@${file}")
@@ -59,34 +64,27 @@ bench_ai_tool() {
     curl_args+=(-F "settings=${settings}")
   fi
 
-  if [ -n "$extra_args" ]; then
-    eval "curl_args+=($extra_args)"
-  fi
-
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
   local result
-  result=$(curl --max-time 300 "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
+  result=$(curl --max-time 300 "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
 
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
   cpu=$(docker_cpu_pct "$cid" 2>/dev/null || echo "0")
   vram=$(gpu_vram_mb)
 
-  output_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
+  record "ai" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu" "$vram" \
+    "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME"
+  log "ai/$tool/$variant: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME} mem:${mem_after}MB vram:${vram}MB pass:${pass}"
 
-  if [ "$http_code" = "200" ]; then
-    pass="true"
-  else
-    pass="false"
-  fi
-
-  record "ai" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu" "$vram"
-  log "ai/$tool/$variant: ${time_s}s HTTP:${http_code} mem:${mem_after}MB vram:${vram}MB pass:${pass}"
-
-  rm -f "$output_file"
+  rm -f "$admission_file" "$artifact_file"
 }
 
 F="${FIXTURE_DIR}"
@@ -147,7 +145,8 @@ log "=== TIER 3: AI Batch Processing ==="
 
 for batch_size in 3 5; do
   log "AI Batch ${batch_size} - remove-background"
-  output_file=$(mktemp)
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
   cid=$(get_container_id)
 
   curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/image/remove-background" -H "Authorization: Bearer ${TOKEN}")
@@ -155,18 +154,22 @@ for batch_size in 3 5; do
     curl_args+=(-F "file=@${P}")
   done
   curl_args+=(-F 'settings={"backgroundType":"transparent"}')
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
-  result=$(curl --max-time 600 "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  result=$(curl --max-time 600 "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" 600000 || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
   vram=$(gpu_vram_mb)
-  pass=$( [ "$http_code" = "200" ] && echo "true" || echo "false" )
 
-  record "ai-batch" "remove-background" "b${batch_size}" "$time_s" "$pass" "0" "$mem_after" "0" "$vram"
-  log "ai-batch/remove-background/b${batch_size}: ${time_s}s HTTP:${http_code}"
-  rm -f "$output_file"
+  record "ai-batch" "remove-background" "b${batch_size}" "$time_s" "$pass" "$output_size" "$mem_after" "0" "$vram" \
+    "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME"
+  log "ai-batch/remove-background/b${batch_size}: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME}"
+  rm -f "$admission_file" "$artifact_file"
 done
 
 log "=== Sustained AI Load (10 cycles) ==="
@@ -186,3 +189,4 @@ printf '{"system":"%s","tier":"ai-sustained-summary","gpu_mode":"%s","mem_start_
 log "=== ALL AI BENCHMARKS COMPLETE for ${SYSTEM} (${GPU_MODE}) ==="
 log "Results in: ${RESULTS_FILE}"
 wc -l "$RESULTS_FILE" | awk '{print $1 " AI benchmark records written"}'
+benchmark_assert_success

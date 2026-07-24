@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/lib/job-aware.sh"
+
 SYSTEM="${1:?Usage: bench.sh <system-name> <fixture-dir> [port]}"
 FIXTURE_DIR="${2:?Usage: bench.sh <system-name> <fixture-dir> [port]}"
 PORT="${3:-1349}"
@@ -32,22 +35,21 @@ docker_cpu_pct() {
 }
 
 record() {
-  local tier="$1" tool="$2" variant="$3" time_s="$4" pass="$5" output_size="${6:-0}" mem_mb="${7:-0}" cpu_pct="${8:-0}" extra="${9:-}"
-  printf '{"system":"%s","tier":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"cpu_pct":%s%s}\n' \
-    "$SYSTEM" "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_mb" "$cpu_pct" "$extra" >> "$RESULTS_FILE"
+  local tier="$1" tool="$2" variant="$3" time_s="$4" pass="$5" output_size="${6:-0}" mem_mb="${7:-0}" cpu_pct="${8:-0}"
+  local admission_status="${9:-0}" completion_status="${10:-failed}" completion_latency_s="${11:-0}" output_mime="${12:-unknown}"
+  printf '{"system":"%s","tier":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"cpu_pct":%s,"admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
+    "$SYSTEM" "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_mb" "$cpu_pct" "$admission_status" "$completion_status" "$completion_latency_s" "$output_mime" >> "$RESULTS_FILE"
 }
 
 bench_tool() {
-  local tier="$1" tool="$2" variant="$3" file="$4" settings="${5:-}" extra_args="${6:-}"
-  local cid time_s http_code mem_before mem_after cpu output_file pass output_size
+  local tier="$1" tool="$2" variant="$3" file="$4" settings="${5:-}"
+  local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
 
   cid=$(get_container_id)
-  mem_before=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
 
-  output_file=$(mktemp)
-  local timing_file=$(mktemp)
-
-  local curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
+  local curl_args=(-sS --max-time 300 -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
 
   if [ -n "$file" ] && [ "$file" != "NONE" ]; then
     curl_args+=(-F "file=@${file}")
@@ -57,34 +59,27 @@ bench_tool() {
     curl_args+=(-F "settings=${settings}")
   fi
 
-  if [ -n "$extra_args" ]; then
-    eval "curl_args+=($extra_args)"
-  fi
-
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
   local result
-  result=$(curl "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
+  result=$(curl "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
 
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
   cpu=$(docker_cpu_pct "$cid" 2>/dev/null || echo "0")
 
-  output_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
+  record "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu" \
+    "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME"
 
-  if [ "$http_code" = "200" ]; then
-    pass="true"
-  else
-    pass="false"
-  fi
+  log "$tier/$tool/$variant: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME} mem:${mem_after}MB pass:${pass}"
 
-  record "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu"
-
-  log "$tier/$tool/$variant: ${time_s}s HTTP:${http_code} mem:${mem_after}MB pass:${pass}"
-
-  rm -f "$output_file" "$timing_file"
+  rm -f "$admission_file" "$artifact_file"
 }
 
 bench_tool_multifile() {
@@ -92,12 +87,13 @@ bench_tool_multifile() {
   shift 4
   local files=("$@")
 
-  local cid time_s http_code mem_after cpu output_file pass output_size
+  local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
 
   cid=$(get_container_id)
-  output_file=$(mktemp)
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
 
-  local curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
+  local curl_args=(-sS --max-time 300 -X POST "${BASE_URL}/api/v1/tools/${tool}" -H "Authorization: Bearer ${TOKEN}")
 
   for f in "${files[@]}"; do
     curl_args+=(-F "file=@${f}")
@@ -107,28 +103,25 @@ bench_tool_multifile() {
     curl_args+=(-F "settings=${settings}")
   fi
 
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
   local result
-  result=$(curl "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
+  result=$(curl "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
 
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
   cpu=$(docker_cpu_pct "$cid" 2>/dev/null || echo "0")
-  output_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
+  record "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu" \
+    "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME"
+  log "$tier/$tool/$variant: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME} pass:${pass}"
 
-  if [ "$http_code" = "200" ]; then
-    pass="true"
-  else
-    pass="false"
-  fi
-
-  record "$tier" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$cpu"
-  log "$tier/$tool/$variant: ${time_s}s HTTP:${http_code} pass:${pass}"
-
-  rm -f "$output_file"
+  rm -f "$admission_file" "$artifact_file"
 }
 
 run_n_times() {
@@ -277,12 +270,19 @@ for concurrency in 1 3 5 10 20; do
 
   for i in $(seq 1 "$concurrency"); do
     (
+      admission_file=$(mktemp)
+      artifact_file=$(mktemp)
       result=$(curl -s -X POST "${BASE_URL}/api/v1/tools/image/resize" \
         -H "Authorization: Bearer ${TOKEN}" \
         -F "file=@${L}" \
         -F 'settings={"width":800}' \
-        -o /dev/null -w "%{http_code} %{time_total}")
-      echo "$result"
+        -o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}') \
+        || result=$'000\t0.000\tapplication/octet-stream'
+      IFS=$'\t' read -r http_code admission_time response_mime <<< "$result"
+      resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
+        "$admission_file" "$artifact_file" "$admission_time" || true
+      printf '%s\t%s\t%s\n' "$BENCH_PASS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_ADMISSION_STATUS"
+      rm -f "$admission_file" "$artifact_file"
     ) >> "$local_results" &
   done
   wait
@@ -293,13 +293,13 @@ for concurrency in 1 3 5 10 20; do
   times=()
   errors=0
   while IFS= read -r line; do
-    code=$(echo "$line" | awk '{print $1}')
-    t=$(echo "$line" | awk '{print $2}')
+    IFS=$'\t' read -r request_pass t code <<< "$line"
     times+=("$t")
-    if [ "$code" != "200" ]; then
+    if [ "$request_pass" != "true" ]; then
       errors=$((errors + 1))
     fi
   done < "$local_results"
+  BENCHMARK_FAILURES=$((BENCHMARK_FAILURES + errors))
 
   sorted=$(printf '%s\n' "${times[@]}" | sort -n)
   count=${#times[@]}
@@ -309,9 +309,11 @@ for concurrency in 1 3 5 10 20; do
   p95=$(echo "$sorted" | sed -n "$((p95_idx + 1))p")
   max=$(echo "$sorted" | tail -1)
   min=$(echo "$sorted" | head -1)
+  completion_status="completed"
+  if [ "$errors" -gt 0 ]; then completion_status="failed"; fi
 
-  printf '{"system":"%s","tier":"concurrent","tool":"resize","variant":"c%d","concurrency":%d,"avg_s":%s,"p95_s":%s,"max_s":%s,"min_s":%s,"errors":%d,"mem_mb":%s}\n' \
-    "$SYSTEM" "$concurrency" "$concurrency" "$avg" "${p95:-0}" "${max:-0}" "${min:-0}" "$errors" "$mem_after" >> "$RESULTS_FILE"
+  printf '{"system":"%s","tier":"concurrent","tool":"resize","variant":"c%d","concurrency":%d,"avg_s":%s,"p95_s":%s,"max_s":%s,"min_s":%s,"errors":%d,"mem_mb":%s,"admission_status":"mixed","completion_status":"%s","completion_latency_s":%s,"output_mime":"mixed"}\n' \
+    "$SYSTEM" "$concurrency" "$concurrency" "$avg" "${p95:-0}" "${max:-0}" "${min:-0}" "$errors" "$mem_after" "$completion_status" "$avg" >> "$RESULTS_FILE"
 
   log "concurrent/c${concurrency}: avg=${avg}s p95=${p95}s max=${max}s errors=${errors} mem=${mem_after}MB"
   rm -f "$local_results"
@@ -364,3 +366,4 @@ log "Cold start measurement requires container restart - skipping in automated r
 log "=== ALL BENCHMARKS COMPLETE for ${SYSTEM} ==="
 log "Results in: ${RESULTS_FILE}"
 wc -l "$RESULTS_FILE" | awk '{print $1 " benchmark records written"}'
+benchmark_assert_success

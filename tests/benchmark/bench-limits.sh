@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/lib/job-aware.sh"
+
 SYSTEM="${1:?Usage: bench-limits.sh <system-name> <fixture-dir> <docker-image>}"
 FIXTURE_DIR="${2:?}"
 DOCKER_IMAGE="${3:-snapotter:latest}"
@@ -45,9 +48,10 @@ start_container() {
 
 run_bench() {
   local cpus="$1" memory="$2" tool="$3" variant="$4" file="$5" settings="${6:-}"
-  local output_file time_s http_code pass output_size mem_after
+  local admission_file artifact_file time_s http_code response_mime pass output_size mem_after
 
-  output_file=$(mktemp)
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
 
   local curl_args=(-s --max-time 120 -X POST "${BASE_URL}/api/v1/tools/${tool}")
 
@@ -59,36 +63,33 @@ run_bench() {
     curl_args+=(-F "settings=${settings}")
   fi
 
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
   local result
-  result=$(curl "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
+  result=$(curl "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" 120000 || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
 
   mem_after=$(docker stats "$CONTAINER_NAME" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}' || echo "0")
 
-  output_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
+  printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
+    "$SYSTEM" "$cpus" "$memory" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME" >> "$RESULTS_FILE"
 
-  if [ "$http_code" = "200" ]; then
-    pass="true"
-  else
-    pass="false"
-  fi
-
-  printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s}\n' \
-    "$SYSTEM" "$cpus" "$memory" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" >> "$RESULTS_FILE"
-
-  log "cpus=${cpus} mem=${memory} ${tool}/${variant}: ${time_s}s HTTP:${http_code} pass:${pass}"
-  rm -f "$output_file"
+  log "cpus=${cpus} mem=${memory} ${tool}/${variant}: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME} pass:${pass}"
+  rm -f "$admission_file" "$artifact_file"
 }
 
 run_batch_bench() {
   local cpus="$1" memory="$2" count="$3"
-  local output_file time_s http_code pass mem_after
+  local admission_file artifact_file time_s http_code response_mime pass output_size mem_after
 
-  output_file=$(mktemp)
+  admission_file=$(mktemp)
+  artifact_file=$(mktemp)
 
   local curl_args=(-s --max-time 180 -X POST "${BASE_URL}/api/v1/tools/image/resize")
 
@@ -97,23 +98,25 @@ run_batch_bench() {
   done
 
   curl_args+=(-F 'settings={"width":100}')
-  curl_args+=(-o "$output_file" -w "%{http_code} %{time_total}")
+  curl_args+=(-o "$admission_file" -w $'%{http_code}\t%{time_total}\t%{content_type}')
 
   local result
-  result=$(curl "${curl_args[@]}" 2>/dev/null) || result="000 0.000"
+  result=$(curl "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
-  http_code=$(echo "$result" | awk '{print $1}')
-  time_s=$(echo "$result" | awk '{print $2}')
+  IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
+  resolve_benchmark_response "$BASE_URL" "" "$http_code" "$response_mime" \
+    "$admission_file" "$artifact_file" "$time_s" 180000 || true
+  pass="$BENCH_PASS"
+  time_s="$BENCH_COMPLETION_LATENCY_S"
+  output_size="$BENCH_OUTPUT_SIZE"
 
   mem_after=$(docker stats "$CONTAINER_NAME" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}' || echo "0")
 
-  if [ "$http_code" = "200" ]; then pass="true"; else pass="false"; fi
+  printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"batch-resize","variant":"b%d","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
+    "$SYSTEM" "$cpus" "$memory" "$count" "$time_s" "$pass" "$output_size" "$mem_after" "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME" >> "$RESULTS_FILE"
 
-  printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"batch-resize","variant":"b%d","time_s":%s,"pass":%s,"output_size":0,"mem_mb":%s}\n' \
-    "$SYSTEM" "$cpus" "$memory" "$count" "$time_s" "$pass" "$mem_after" >> "$RESULTS_FILE"
-
-  log "cpus=${cpus} mem=${memory} batch-resize/b${count}: ${time_s}s HTTP:${http_code} pass:${pass}"
-  rm -f "$output_file"
+  log "cpus=${cpus} mem=${memory} batch-resize/b${count}: ${time_s}s admission:${BENCH_ADMISSION_STATUS} completion:${BENCH_COMPLETION_STATUS} mime:${BENCH_OUTPUT_MIME} pass:${pass}"
+  rm -f "$admission_file" "$artifact_file"
 }
 
 F="${FIXTURE_DIR}"
@@ -189,3 +192,4 @@ done
 log "=== Resource Limit Sweep COMPLETE ==="
 log "Results in: ${RESULTS_FILE}"
 wc -l "$RESULTS_FILE" | awk '{print $1 " records written"}'
+benchmark_assert_success
