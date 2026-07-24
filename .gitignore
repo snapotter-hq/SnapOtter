@@ -77,9 +77,12 @@ remotion/
 pentest-results/
 # Stryker mutation testing
 .stryker-tmp/
+.stryker-tmp-api/
 packages/image-engine/reports/
 packages/media-engine/reports/
 packages/doc-engine/reports/
+# Root Stryker output for the apps/api mutation lane (stryker.api.config.json)
+/reports/
 
 # Local AI run scratch scripts
 run-ai-*.py

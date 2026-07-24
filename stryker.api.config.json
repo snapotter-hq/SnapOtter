@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": { "configFile": "vitest.stryker-api.config.ts" },
+  "mutate": [
+    "apps/api/src/lib/ssrf.ts",
+    "apps/api/src/lib/object-storage.ts",
+    "apps/api/src/lib/encryption.ts",
+    "apps/api/src/lib/sentry-scrub.ts",
+    "apps/api/src/lib/external-auth-resolver.ts",
+    "apps/api/src/lib/audit-integrity.ts",
+    "apps/api/src/lib/audit.ts",
+    "apps/api/src/lib/settings-policy.ts",
+    "apps/api/src/lib/csp.ts",
+    "apps/api/src/lib/analytics-allowlist.ts",
+    "apps/api/src/lib/analytics-gate.ts",
+    "apps/api/src/lib/file-validation.ts",
+    "apps/api/src/lib/ocr-limits.ts",
+    "apps/api/src/lib/storage-writable.ts"
+  ],
+  "incremental": true,
+  "incrementalFile": "reports/stryker-api-incremental.json",
+  "reporters": ["clear-text", "progress"],
+  "thresholds": { "high": 80, "low": 60, "break": null },
+  "tempDirName": ".stryker-tmp-api",
+  "ignoreStatic": true,
+  "concurrency": 6
+}
