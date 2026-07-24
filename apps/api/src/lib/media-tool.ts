@@ -81,6 +81,20 @@ export function audioContentType(ext: string): string {
   return EXT_AUDIO_CONTENT_TYPES[ext.toLowerCase()] || "audio/mpeg";
 }
 
+const FFMPEG_SECONDS_FORMATTER = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumFractionDigits: 6,
+});
+
+/** Format seconds as a plain microsecond-precision decimal accepted by FFmpeg. */
+export function formatFfmpegSeconds(value: number): string {
+  if (!Number.isFinite(value)) {
+    throw new RangeError("FFmpeg seconds must be finite");
+  }
+  const formatted = FFMPEG_SECONDS_FORMATTER.format(value);
+  return formatted === "-0" ? "0" : formatted;
+}
+
 /** atempo only accepts 0.5..100; chain factors of 0.5 until in range. */
 export function buildAtempoChain(factor: number): string {
   const parts: string[] = [];
