@@ -2,6 +2,7 @@ import { TOOLS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   buildGeneratedFixtureIndex,
+  type GeneratedFixture,
   generatedFixtureDirectories,
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
@@ -31,5 +32,37 @@ describe("generated fixture discovery", () => {
     expect(
       fixtures.some((fixture) => [".gif", ".png", ".jpg", ".webp"].includes(fixture.ext)),
     ).toBe(true);
+  });
+
+  it("treats an empty accepted-input list as accepting any generated fixture", () => {
+    const fixtures = selectFixturesForTool(
+      buildGeneratedFixtureIndex(generatedFixtureDirectories()),
+      { acceptedInputs: [] },
+    );
+
+    expect(fixtures.length).toBeGreaterThan(0);
+  });
+
+  it("prioritizes semantic positive-control fixtures for generated tools", () => {
+    const fixture = (filename: string, ext: string): GeneratedFixture => ({
+      dir: "/fixtures",
+      filename,
+      ext,
+    });
+    const index = new Map([
+      [".csv", [fixture("tiny-a.csv", ".csv"), fixture("tiny.csv", ".csv")]],
+      [".mp4", [fixture("tiny.mp4", ".mp4")]],
+      [".mkv", [fixture("tiny-subs.mkv", ".mkv")]],
+    ]);
+
+    expect(
+      selectFixturesForTool(index, { id: "chart-maker", acceptedInputs: [".csv"] })[0].filename,
+    ).toBe("tiny.csv");
+    expect(
+      selectFixturesForTool(index, {
+        id: "extract-subtitles",
+        acceptedInputs: [".mp4", ".mkv"],
+      })[0].filename,
+    ).toBe("tiny-subs.mkv");
   });
 });

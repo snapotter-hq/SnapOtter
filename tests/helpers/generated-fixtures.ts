@@ -8,7 +8,12 @@ export interface GeneratedFixture {
   ext: string;
 }
 
-type ToolInputs = { acceptedInputs: readonly string[] };
+type ToolInputs = { id?: string; acceptedInputs: readonly string[] };
+
+const POSITIVE_CONTROL_FIXTURE: Readonly<Record<string, string>> = {
+  "chart-maker": "tiny.csv",
+  "extract-subtitles": "tiny-subs.mkv",
+};
 
 export function generatedFixtureDirectories(): string[] {
   return [
@@ -49,5 +54,17 @@ export function selectFixturesForTool(
   index: ReadonlyMap<string, GeneratedFixture[]>,
   tool: ToolInputs,
 ): GeneratedFixture[] {
-  return tool.acceptedInputs.flatMap((extension) => index.get(extension.toLowerCase()) ?? []);
+  const fixtures =
+    tool.acceptedInputs.length === 0
+      ? [...index.values()].flat()
+      : tool.acceptedInputs.flatMap((extension) => index.get(extension.toLowerCase()) ?? []);
+  const preferredFilename = tool.id ? POSITIVE_CONTROL_FIXTURE[tool.id] : undefined;
+  if (!preferredFilename) return fixtures;
+  const preferredIndex = fixtures.findIndex((fixture) => fixture.filename === preferredFilename);
+  if (preferredIndex <= 0) return fixtures;
+  return [
+    fixtures[preferredIndex],
+    ...fixtures.slice(0, preferredIndex),
+    ...fixtures.slice(preferredIndex + 1),
+  ];
 }

@@ -17,6 +17,7 @@ export function registerReplaceAudio(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "replace-audio",
     maxInputs: 2,
+    minInputs: 2,
     inputKinds: ["video", "audio"],
     settingsSchema,
     process: async () => {

@@ -5,6 +5,7 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
 } from "../../helpers/generated-case-accounting.js";
+import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
@@ -18,21 +19,18 @@ import {
 // Fixtures -- one canonical file per modality
 // ---------------------------------------------------------------------------
 const IMG = () => readFixture(fixtures.image.base.png200);
+const SVG = () => readFixture(fixtures.image.base.svg100);
 const VID = () => readFixture(fixtures.video.tiny("mp4"));
 const AUD = () => readFixture(fixtures.audio.tiny("mp3"));
 const PDF = () => readFixture(fixtures.document.pdf3);
 const CSV = () => readFixture(fixtures.data.csv);
 const JSON_F = () => readFixture(fixtures.data.json);
-const YAML_F = () => readFixture(fixtures.data.yaml);
 const DOCX = () => readFixture(fixtures.document.tiny("docx"));
 const XLSX = () => readFixture(fixtures.document.tiny("xlsx"));
 const PPTX = () => readFixture(fixtures.document.tiny("pptx"));
-const HTML = () => readFixture(fixtures.document.tiny("html"));
-const MD = () => readFixture(fixtures.document.tiny("md"));
 const EPUB = () => readFixture(fixtures.document.tiny("epub"));
 const GIF = () => readFixture(fixtures.image.animated.gif);
 const SRT = () => readFixture(fixtures.video.subs.srt);
-const WAV = () => readFixture(fixtures.audio.tiny("wav"));
 
 // ---------------------------------------------------------------------------
 // Fixture + filename resolver per tool modality
@@ -73,7 +71,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   split: IMAGE_FIX,
   "image-to-pdf": IMAGE_FIX,
   "image-to-base64": IMAGE_FIX,
-  "svg-to-raster": IMAGE_FIX,
+  "svg-to-raster": { buffer: SVG, filename: "test.svg" },
   "smart-crop": IMAGE_FIX,
   "content-aware-resize": IMAGE_FIX,
   // Video tools
@@ -1132,9 +1130,6 @@ const AI_GATED_TOOLS = new Set([
   "vectorize",
 ]);
 
-// Tools that need a second input (subtitle or second image)
-const MULTI_INPUT_TOOLS = new Set(["burn-subtitles", "embed-subtitles"]);
-
 // Accepted status codes: 200 = success, 202 = async, 400 = bad settings,
 // 422 = processing failure, 415 = wrong type
 const ACCEPTED_STATUSES = new Set([200, 202, 400, 415, 422]);
@@ -1186,35 +1181,15 @@ describe("settings variation matrix", () => {
           expect(fixture, `${toolId}: no canonical settings fixture`).toBeDefined();
           if (!fixture) throw new Error(`${toolId}: no canonical settings fixture`);
 
-          const fields: Array<{
-            name: string;
-            filename?: string;
-            contentType?: string;
-            content: Buffer | string;
-          }> = [];
-
-          // Primary file input
-          fields.push({
-            name: "file",
-            filename: fixture.filename,
-            contentType: "application/octet-stream",
-            content: fixture.buffer(),
-          });
-
-          // Multi-input tools: add a second file
-          if (MULTI_INPUT_TOOLS.has(toolId)) {
-            fields.push({
-              name: "file",
-              filename: "subtitles.srt",
-              contentType: "application/x-subrip",
-              content: SRT(),
-            });
-          }
-
-          // Settings field
-          fields.push({
-            name: "settings",
-            content: JSON.stringify(settings),
+          const fields = buildGeneratedMultipartFields({
+            toolId,
+            primary: { filename: fixture.filename, content: fixture.buffer() },
+            settings,
+            companions: {
+              image: { filename: IMAGE_FIX.filename, content: IMAGE_FIX.buffer() },
+              audio: { filename: AUDIO_FIX.filename, content: AUDIO_FIX.buffer() },
+              subtitle: { filename: "subtitles.srt", content: SRT() },
+            },
           });
 
           const { body, contentType } = createMultipartPayload(fields);

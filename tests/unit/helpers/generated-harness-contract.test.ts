@@ -7,12 +7,18 @@ const source = (filename: string): string => readFileSync(join(GENERATED, filena
 
 describe("generated QA harness contract", () => {
   it.each(["fuzz-settings.test.ts", "settings-pairwise.test.ts"])(
-    "%s accounts for execution and uses explicit runtime skips",
+    "%s accounts for execution through the production v2 contract and uses explicit runtime skips",
     (filename) => {
       const text = source(filename);
       expect(text).toContain("GeneratedCaseAccounting");
+      expect(text).toContain("runGeneratedTool");
       expect(text).toContain("context.skip(");
+      expect(text).toContain("isExpectedGeneratedRejection");
+      expect(text).toContain("findMissingGeneratedPrerequisite");
+      expect(text).toContain("buildGeneratedProcessInputs(fixtures, config, tool.modality)");
       expect(text).not.toMatch(/if \(!config\) return;/);
+      expect(text).not.toContain("config.process(");
+      expect(text).not.toContain("CRASH_PATTERN");
       expect(text).not.toContain("Clean operational failure");
     },
   );
@@ -50,6 +56,12 @@ describe("generated QA harness contract", () => {
     const text = source("fuzz-settings.test.ts");
     expect(text).not.toContain("interruptAfterTimeLimit");
     expect(text).toContain("expectedAttempts: NUM_RUNS");
+  });
+
+  it("pairwise does not truncate the covering array after it is generated", () => {
+    const text = source("settings-pairwise.test.ts");
+    expect(text).not.toContain("MAX_CASES_PER_TOOL");
+    expect(text).not.toMatch(/\.slice\(0,/);
   });
 
   it("the actual nightly extended lane requires installed AI features", () => {

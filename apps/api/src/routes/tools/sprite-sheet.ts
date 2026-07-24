@@ -27,6 +27,7 @@ export function registerSpriteSheet(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "sprite-sheet",
     maxInputs: 64,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("sprite-sheet is v2-only");

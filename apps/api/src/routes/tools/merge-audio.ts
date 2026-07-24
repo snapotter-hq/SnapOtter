@@ -29,6 +29,7 @@ export function registerMergeAudio(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "merge-audio",
     maxInputs: 10,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("merge-audio is v2-only");

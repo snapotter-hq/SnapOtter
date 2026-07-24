@@ -17,6 +17,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "passport-photo": { countryCode: "US" },
   "trim-video": { startS: 0, endS: 5 },
   "trim-audio": { startS: 0, endS: 5 },
+  "split-audio": { mode: "parts", parts: 2 },
   "split-pdf": { mode: "range", range: "1" },
   "extract-pages": { range: "1" },
   "remove-pages": { pages: "2" },

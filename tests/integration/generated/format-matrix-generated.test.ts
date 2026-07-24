@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -9,6 +9,8 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
 } from "../../helpers/generated-case-accounting.js";
+import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
+import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
 import {
   defaultSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
@@ -42,9 +44,10 @@ const CORE_FORMATS = [
   "sample.heic",
 ];
 
-const fixtureFiles = process.env.FULL_MATRIX
-  ? readdirSync(fixtureDir.formats).filter((f) => !f.startsWith("."))
-  : CORE_FORMATS;
+const ALL_FIXTURE_FILES = readdirSync(fixtureDir.formats)
+  .filter((filename) => !filename.startsWith("."))
+  .sort((left, right) => left.localeCompare(right));
+const fixtureFiles = process.env.FULL_MATRIX ? ALL_FIXTURE_FILES : CORE_FORMATS;
 
 const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422]);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
@@ -121,15 +124,38 @@ describe("tool x format matrix (generated)", () => {
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
         );
       }
+      const missingPrerequisite = await findMissingGeneratedPrerequisite(toolId);
+      if (missingPrerequisite) return context.skip(`${toolId}: ${missingPrerequisite}`);
+
+      // Core mode keeps its six cross-format probes but adds one accepted
+      // fixture for narrow-input tools (for example TIFF/EPS-only presets),
+      // so clean rejection coverage cannot masquerade as tool execution.
+      const acceptedInputs = new Set(
+        tool.acceptedInputs.map((extension) => extension.toLowerCase()),
+      );
+      const acceptedFixture = ALL_FIXTURE_FILES.find((filename) =>
+        acceptedInputs.has(extname(filename).toLowerCase()),
+      );
+      const toolFixtureFiles = process.env.FULL_MATRIX
+        ? fixtureFiles
+        : [...new Set([...fixtureFiles, ...(acceptedFixture ? [acceptedFixture] : [])])];
       const accounting = new GeneratedCaseAccounting(toolId, {
-        expectedAttempts: fixtureFiles.length,
+        expectedAttempts: toolFixtureFiles.length,
       });
-      for (const fixture of fixtureFiles) {
+      for (const fixture of toolFixtureFiles) {
         const content = readFileSync(join(fixtureDir.formats, fixture));
-        const { body, contentType } = createMultipartPayload([
-          { name: "file", filename: fixture, contentType: "application/octet-stream", content },
-          { name: "settings", content: JSON.stringify(defaultSettingsFor(toolId)) },
-        ]);
+        const { body, contentType } = createMultipartPayload(
+          buildGeneratedMultipartFields({
+            toolId,
+            primary: { filename: fixture, content },
+            settings: defaultSettingsFor(toolId),
+            companions: {
+              image: { filename: fixture, content },
+              audio: { filename: "unused.wav", content: Buffer.alloc(0) },
+              subtitle: { filename: "unused.srt", content: Buffer.alloc(0) },
+            },
+          }),
+        );
         const res = await testApp.app.inject({
           method: "POST",
           url: apiToolPath(toolId),

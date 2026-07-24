@@ -14,6 +14,7 @@ export function registerBurnSubtitles(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "burn-subtitles",
     maxInputs: 2,
+    minInputs: 2,
     inputKinds: ["video", "subtitle"],
     settingsSchema,
     process: async () => {

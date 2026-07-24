@@ -12,6 +12,7 @@ import {
   generatedFixtureDirectories,
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
+import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { waitForGeneratedJobArtifact } from "../settle-job.js";
@@ -72,6 +73,8 @@ const MULTI_INPUT_TOOLS = new Set([
 
 const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422]);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
+const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"]);
+const MIXED_INPUT_TOOLS = new Set(["burn-subtitles", "embed-subtitles", "replace-audio"]);
 
 // ── Select only non-image tools ──────────────────────────────────
 const NON_IMAGE_TOOLS = TOOLS.filter((t) => {
@@ -123,20 +126,25 @@ describe("multi-modality tool x format matrix", () => {
 
   for (const tool of NON_IMAGE_TOOLS) {
     const toolId = tool.id;
-    const fixtures = selectFixturesForTool(FIXTURES_BY_EXT, tool);
+    const selectedFixtures = selectFixturesForTool(FIXTURES_BY_EXT, tool);
     const isAiTool = PYTHON_SIDECAR_TOOLS.includes(toolId);
     const isMultiInput = MULTI_INPUT_TOOLS.has(toolId);
 
     // Tools with empty acceptedInputs that aren't in the non-image set
     // (create-zip accepts anything) -- handle gracefully
-    if (fixtures.length === 0 && tool.acceptedInputs.length > 0) {
+    if (selectedFixtures.length === 0 && tool.acceptedInputs.length > 0) {
       it.skip(`${toolId} -- no matching fixtures for ${tool.acceptedInputs.join(", ")}`, () => {});
       continue;
     }
 
     // create-zip accepts [] (any file); give it a CSV fixture
-    const effectiveFixtures =
-      fixtures.length === 0 ? (FIXTURES_BY_EXT.get(".csv") ?? []).slice(0, 1) : fixtures;
+    const fallbackFixtures =
+      selectedFixtures.length === 0
+        ? (FIXTURES_BY_EXT.get(".csv") ?? []).slice(0, 1)
+        : selectedFixtures;
+    const effectiveFixtures = MIXED_INPUT_TOOLS.has(toolId)
+      ? fallbackFixtures.filter((fixture) => VIDEO_EXTENSIONS.has(fixture.ext))
+      : fallbackFixtures;
 
     if (effectiveFixtures.length === 0) {
       it.skip(`${toolId} -- no fixtures available`, () => {});
@@ -174,7 +182,32 @@ describe("multi-modality tool x format matrix", () => {
             content: Buffer | string;
           }> = [];
 
-          if (isMultiInput) {
+          if (MIXED_INPUT_TOOLS.has(toolId) || toolId === "sign-pdf") {
+            const companion = (extensions: readonly string[]) => {
+              for (const extension of extensions) {
+                const fixture = FIXTURES_BY_EXT.get(extension)?.[0];
+                if (fixture) {
+                  return {
+                    filename: fixture.filename,
+                    content: readFileSync(join(fixture.dir, fixture.filename)),
+                  };
+                }
+              }
+              throw new Error(`${toolId}: missing generated companion for ${extensions.join(",")}`);
+            };
+            fields.push(
+              ...buildGeneratedMultipartFields({
+                toolId,
+                primary: { filename: fixture.filename, content },
+                settings,
+                companions: {
+                  image: companion([".png", ".jpg"]),
+                  audio: companion([".wav", ".mp3"]),
+                  subtitle: companion([".srt", ".vtt"]),
+                },
+              }),
+            );
+          } else if (isMultiInput) {
             const second = secondFixtureForExt(fixture.ext, fixture);
             const secondContent = readFileSync(join(second.dir, second.filename));
             fields.push(
@@ -200,7 +233,9 @@ describe("multi-modality tool x format matrix", () => {
             });
           }
 
-          fields.push({ name: "settings", content: JSON.stringify(settings) });
+          if (!MIXED_INPUT_TOOLS.has(toolId) && toolId !== "sign-pdf") {
+            fields.push({ name: "settings", content: JSON.stringify(settings) });
+          }
 
           const { body, contentType } = createMultipartPayload(fields);
           const res = await testApp.app.inject({

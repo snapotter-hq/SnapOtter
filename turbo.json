@@ -3,7 +3,12 @@
   "globalEnv": ["ANALYTICS_BAKED_OVERRIDE", "SENTRY_CRON_MONITORS"],
   "globalPassThroughEnv": [
     "API_URL",
+    "CAIRE_PATH",
     "E2E_PG_BASE_URL",
+    "FULL_MATRIX",
+    "FUZZ",
+    "FUZZ_RUNS",
+    "FUZZ_SEED",
     "PLAYWRIGHT_API_PORT",
     "PLAYWRIGHT_API_URL",
     "PLAYWRIGHT_AUTH_FILE",
@@ -19,7 +24,8 @@
     "QA_IMAGE_FIXTURE",
     "QA_PASSWORD",
     "QA_USERNAME",
-    "REDIS_URL"
+    "REDIS_URL",
+    "REQUIRE_AI_FEATURES"
   ],
   "tasks": {
     "dev": {

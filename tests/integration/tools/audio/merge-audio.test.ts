@@ -69,8 +69,8 @@ describe.skipIf(!ffmpegAvailable())("merge-audio (requires ffmpeg)", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/at least two/i);
+    expect(parsed.error).toMatch(/at least 2 files/i);
   }, 60_000);
 });

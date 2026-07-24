@@ -149,8 +149,7 @@ describe("Sprite Sheet", () => {
       body,
     });
 
-    // The factory wraps InputValidationError as 422
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
-    expect(res.statusCode).toBeLessThan(500);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/at least 2 files/i);
   });
 });

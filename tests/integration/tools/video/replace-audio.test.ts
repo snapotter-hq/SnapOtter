@@ -94,10 +94,8 @@ describe.skipIf(!ffmpegAvailable())("replace-audio (requires ffmpeg)", () => {
       body,
     });
 
-    // Fast-hint tool: processV2 checks input count and throws,
-    // caught by the factory's generic catch -> 422.
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/video and an audio/i);
+    expect(parsed.error).toMatch(/at least 2 files/i);
   }, 60_000);
 });

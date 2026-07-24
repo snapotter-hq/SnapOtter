@@ -65,7 +65,7 @@ describe.skipIf(!ffmpegAvailable())("images-to-video (requires ffmpeg)", () => {
     expect(v?.height).toBe(720);
   }, 60_000);
 
-  it("rejects a single image with 422", async () => {
+  it("rejects a single image with 400 before enqueue", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
       { name: "settings", content: JSON.stringify({}) },
@@ -77,9 +77,8 @@ describe.skipIf(!ffmpegAvailable())("images-to-video (requires ffmpeg)", () => {
       body,
     });
 
-    // fast hint: inline 422
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/at least two images/i);
+    expect(parsed.error).toMatch(/at least 2 files/i);
   }, 60_000);
 });

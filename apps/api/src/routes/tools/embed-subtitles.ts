@@ -23,6 +23,7 @@ export function registerEmbedSubtitles(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "embed-subtitles",
     maxInputs: 2,
+    minInputs: 2,
     inputKinds: ["video", "subtitle"],
     settingsSchema,
     process: async () => {

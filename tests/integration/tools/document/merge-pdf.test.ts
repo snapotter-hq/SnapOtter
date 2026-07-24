@@ -62,7 +62,7 @@ describe.skipIf(!qpdfAvailable())("merge-pdf (requires qpdf)", () => {
     }
   }, 60_000);
 
-  it("returns 422 when only one PDF is provided", async () => {
+  it("returns 400 before enqueue when only one PDF is provided", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "only.pdf", contentType: "application/pdf", content: PDF },
       { name: "settings", content: JSON.stringify({}) },
@@ -73,11 +73,8 @@ describe.skipIf(!qpdfAvailable())("merge-pdf (requires qpdf)", () => {
       headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
       body,
     });
-    // The worker throws "Merging needs at least two PDFs" which surfaces as 422
-    // with a generic "Processing failed" error (the factory strips internal details)
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.error).toBe("Processing failed");
-    expect(parsed.details).toMatch(/at least two/i);
+    expect(parsed.error).toMatch(/at least 2 files/i);
   }, 60_000);
 });

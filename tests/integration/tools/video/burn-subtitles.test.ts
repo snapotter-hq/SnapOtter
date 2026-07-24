@@ -57,7 +57,10 @@ async function resolveResult(res: Awaited<ReturnType<typeof testApp.app.inject>>
     await new Promise((r) => setTimeout(r, 500));
   }
   expect(row?.status).toBe("completed");
-  const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+  if (!Array.isArray(row?.outputRefs) || typeof row.outputRefs[0] !== "string") {
+    throw new Error("Completed burn-subtitles job has no output reference");
+  }
+  const outName = row.outputRefs[0].split("/").pop() as string;
   const dl = await testApp.app.inject({
     method: "GET",
     url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
@@ -132,4 +135,20 @@ describe.skipIf(!ffmpegAvailable())("burn-subtitles (requires ffmpeg)", () => {
     const parsed = JSON.parse(res.body);
     expect(parsed.error).toMatch(/subtitle/i);
   }, 60_000);
+
+  it("rejects a missing subtitle before enqueue", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/video/burn-subtitles",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/at least 2 files/i);
+  });
 });

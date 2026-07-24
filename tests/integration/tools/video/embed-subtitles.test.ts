@@ -71,4 +71,20 @@ describe.skipIf(!ffmpegAvailable())("embed-subtitles (requires ffmpeg)", () => {
 
     expect(res.statusCode).toBe(400);
   }, 60_000);
+
+  it("rejects a missing subtitle before enqueue", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/video/embed-subtitles",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/at least 2 files/i);
+  });
 });

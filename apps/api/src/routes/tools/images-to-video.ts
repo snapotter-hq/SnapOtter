@@ -24,6 +24,7 @@ export function registerImagesToVideo(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "images-to-video",
     maxInputs: 60,
+    minInputs: 2,
     inputKinds: ["image"],
     settingsSchema,
     process: async () => {

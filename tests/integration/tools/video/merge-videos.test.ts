@@ -54,7 +54,10 @@ async function resolveResult(res: Awaited<ReturnType<typeof testApp.app.inject>>
     await new Promise((r) => setTimeout(r, 500));
   }
   expect(row?.status).toBe("completed");
-  const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+  if (!Array.isArray(row?.outputRefs) || typeof row.outputRefs[0] !== "string") {
+    throw new Error("Completed merge-videos job has no output reference");
+  }
+  const outName = row.outputRefs[0].split("/").pop() as string;
   const dl = await testApp.app.inject({
     method: "GET",
     url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
@@ -116,28 +119,7 @@ describe.skipIf(!ffmpegAvailable())("merge-videos (requires ffmpeg)", () => {
       body,
     });
 
-    // merge-videos has executionHint "long", so 202 is returned immediately.
-    // The worker then fails with InputValidationError. Poll for the failure.
-    expect(res.statusCode).toBe(202);
-    const { jobId } = JSON.parse(res.body);
-    expect(jobId).toBeDefined();
-
-    const { db, schema } = await import("../../../../apps/api/src/db/index.js");
-    const { eq } = await import("drizzle-orm");
-    let row: { status: string; error: unknown } | undefined;
-    for (let i = 0; i < 60; i++) {
-      [row] = await db
-        .select({ status: schema.jobs.status, error: schema.jobs.error })
-        .from(schema.jobs)
-        .where(eq(schema.jobs.id, jobId));
-      if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    // Observed behavior: 202 (async) -> job status "failed" with error message.
-    // The plan noted "400/422" but long-hint tools skip the sync window.
-    expect(row?.status).toBe("failed");
-    const error = row?.error as { message?: string } | null;
-    expect(error?.message).toMatch(/at least two/i);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/at least 2 files/i);
   }, 60_000);
 });

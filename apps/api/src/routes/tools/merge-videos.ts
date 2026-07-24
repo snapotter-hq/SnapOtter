@@ -12,6 +12,7 @@ export function registerMergeVideos(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "merge-videos",
     maxInputs: 10,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("merge-videos is v2-only");

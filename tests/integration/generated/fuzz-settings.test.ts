@@ -1,11 +1,9 @@
-import { join } from "node:path";
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { ZodFastCheck } from "zod-fast-check";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
-import { readFixture } from "../../fixtures/index.js";
 import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -13,6 +11,13 @@ import {
   selectFixturesForTool,
 } from "../../helpers/generated-fixtures.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
+import {
+  buildGeneratedProcessInputs,
+  findMissingGeneratedPrerequisite,
+  isExpectedGeneratedRejection,
+  runGeneratedTool,
+} from "../../helpers/run-generated-tool.js";
+import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { collectRegexStringSchemas } from "../../helpers/zod-pict.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -29,8 +34,6 @@ const NUM_RUNS = Number(process.env.FUZZ_RUNS ?? 25);
 const FUZZ_SEED = Number(process.env.FUZZ_SEED ?? 20_260_724);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const FIXTURE_INDEX = buildGeneratedFixtureIndex(generatedFixtureDirectories());
-const CRASH_PATTERN =
-  /TypeError|undefined is not|null is not|Cannot read propert|is not a function/i;
 
 describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
   let testApp: TestApp;
@@ -57,13 +60,37 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       if (!config) return context.skip(`${toolId}: no standard tool config`);
       const missingPython = findMissingGeneratedPythonPrerequisite(toolId, undefined);
       if (missingPython) return context.skip(`${toolId}: ${missingPython}`);
+      const missingPrerequisite = await findMissingGeneratedPrerequisite(toolId);
+      if (missingPrerequisite) return context.skip(`${toolId}: ${missingPrerequisite}`);
 
-      const fixture = selectFixturesForTool(FIXTURE_INDEX, tool)[0];
-      if (!fixture) return context.skip(`${toolId}: no compatible generated fixture`);
-      const input = readFixture(join(fixture.dir, fixture.filename));
+      const fixtures = selectFixturesForTool(FIXTURE_INDEX, tool);
+      if (fixtures.length === 0) {
+        return context.skip(`${toolId}: no compatible generated fixture`);
+      }
+      const inputs = await buildGeneratedProcessInputs(fixtures, config, tool.modality);
       const accounting = new GeneratedCaseAccounting(toolId, {
-        expectedAttempts: NUM_RUNS,
+        expectedAttempts: NUM_RUNS + 1,
       });
+
+      // Every fuzz target gets one deterministic, user-realistic smoke case.
+      // This distinguishes a valid schema whose random values are all rejected
+      // by fixture-dependent semantic checks from a tool that cannot succeed.
+      const baseline = config.settingsSchema.safeParse(defaultSettingsFor(toolId));
+      if (!baseline.success) {
+        throw new Error(`${toolId}: default settings do not satisfy the registered schema`);
+      }
+      accounting.attempt();
+      const missingBaselinePython = findMissingGeneratedPythonPrerequisite(toolId, baseline.data);
+      if (missingBaselinePython) {
+        accounting.skip("optional-feature", missingBaselinePython);
+      } else {
+        const baselineOutput = await runGeneratedTool(config, inputs, baseline.data);
+        expect(
+          baselineOutput.length,
+          `${toolId} produced empty output for defaults`,
+        ).toBeGreaterThan(0);
+        accounting.accept();
+      }
 
       let arbitrary: fc.Arbitrary<unknown>;
       try {
@@ -98,14 +125,14 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
               return;
             }
             try {
-              const result = await config.process(input, parsed.data, fixture.filename);
+              const result = await runGeneratedTool(config, inputs, parsed.data);
               expect(
-                result.buffer.length,
+                result.length,
                 `${toolId} produced empty output for ${JSON.stringify(settings)}`,
               ).toBeGreaterThan(0);
               accounting.accept();
             } catch (error) {
-              if (!(error instanceof Error) || CRASH_PATTERN.test(error.message)) throw error;
+              if (!isExpectedGeneratedRejection(error)) throw error;
               accounting.reject();
             }
           }),

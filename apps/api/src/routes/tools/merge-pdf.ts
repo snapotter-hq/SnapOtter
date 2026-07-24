@@ -12,6 +12,7 @@ export function registerMergePdf(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "merge-pdf",
     maxInputs: 20,
+    minInputs: 2,
     settingsSchema,
     process: async () => {
       throw new Error("merge-pdf is v2-only");

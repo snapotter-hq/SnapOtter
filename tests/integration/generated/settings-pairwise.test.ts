@@ -1,8 +1,6 @@
-import { join } from "node:path";
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
-import { readFixture } from "../../fixtures/index.js";
 import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -11,6 +9,12 @@ import {
 } from "../../helpers/generated-fixtures.js";
 import { pairwise } from "../../helpers/pairwise.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
+import {
+  buildGeneratedProcessInputs,
+  findMissingGeneratedPrerequisite,
+  isExpectedGeneratedRejection,
+  runGeneratedTool,
+} from "../../helpers/run-generated-tool.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
@@ -21,9 +25,8 @@ import { buildTestApp, type TestApp } from "../test-server.js";
  * schema's own refinements, with each survivor run through the tool's process
  * function directly.
  *
- * Invariant: a tool either succeeds or fails with a real, descriptive Error.
- * TypeErrors and undefined-access crashes are the AI-written-code failure
- * class this suite exists to catch.
+ * Invariant: a tool either succeeds or rejects through a typed input-error
+ * contract. Untyped operational errors and programming errors fail the lane.
  *
  * PR runs cover the core tools; FULL_MATRIX=1 (nightly) covers every tool.
  */
@@ -38,11 +41,8 @@ const CORE_TOOLS = [
   "border",
 ];
 
-const MAX_CASES_PER_TOOL = 40;
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const FIXTURE_INDEX = buildGeneratedFixtureIndex(generatedFixtureDirectories());
-const CRASH_PATTERN =
-  /TypeError|undefined is not|null is not|Cannot read propert|is not a function/i;
 
 describe("pairwise settings matrix", () => {
   let testApp: TestApp;
@@ -74,12 +74,16 @@ describe("pairwise settings matrix", () => {
       }
       const missingPython = findMissingGeneratedPythonPrerequisite(toolId, undefined);
       if (missingPython) return context.skip(`${toolId}: ${missingPython}`);
+      const missingPrerequisite = await findMissingGeneratedPrerequisite(toolId);
+      if (missingPrerequisite) return context.skip(`${toolId}: ${missingPrerequisite}`);
 
       const tool = TOOLS.find((candidate) => candidate.id === toolId);
       if (!tool) return context.skip(`${toolId}: missing shared tool metadata`);
-      const fixture = selectFixturesForTool(FIXTURE_INDEX, tool)[0];
-      if (!fixture) return context.skip(`${toolId}: no compatible generated fixture`);
-      const input = readFixture(join(fixture.dir, fixture.filename));
+      const fixtures = selectFixturesForTool(FIXTURE_INDEX, tool);
+      if (fixtures.length === 0) {
+        return context.skip(`${toolId}: no compatible generated fixture`);
+      }
+      const inputs = await buildGeneratedProcessInputs(fixtures, config, tool.modality);
 
       const axes = deriveAxes(config.settingsSchema);
 
@@ -90,8 +94,7 @@ describe("pairwise settings matrix", () => {
       const cases = combos
         .map((combo) => ({ ...base, ...compactCase(combo) }))
         .map((combo) => config.settingsSchema.safeParse(combo))
-        .filter((parsed): parsed is { success: true; data: unknown } => parsed.success)
-        .slice(0, MAX_CASES_PER_TOOL);
+        .filter((parsed): parsed is { success: true; data: unknown } => parsed.success);
 
       expect(
         cases.length,
@@ -109,14 +112,14 @@ describe("pairwise settings matrix", () => {
           continue;
         }
         try {
-          const result = await config.process(input, parsed.data, fixture.filename);
+          const result = await runGeneratedTool(config, inputs, parsed.data);
           expect(
-            result.buffer.length,
+            result.length,
             `${toolId} produced empty output for ${JSON.stringify(parsed.data)}`,
           ).toBeGreaterThan(0);
           accounting.accept();
         } catch (error) {
-          if (!(error instanceof Error) || CRASH_PATTERN.test(error.message)) throw error;
+          if (!isExpectedGeneratedRejection(error)) throw error;
           accounting.reject();
         }
       }
