@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const DOCS_PORT = 4173;
+const DOCS_PORT = Number(process.env.PLAYWRIGHT_DOCS_PORT ?? 4173);
 
 export default defineConfig({
   testDir: "./tests/e2e-docs",
@@ -22,10 +22,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      "apps/api/node_modules/.bin/tsx tests/e2e-docs/fixtures/seed-de-locale.mjs && pnpm --filter @snapotter/docs docs:build && pnpm --filter @snapotter/docs docs:preview",
+    command: `cd apps/docs && pnpm docs:build && pnpm exec vitepress preview . --host 127.0.0.1 --port ${DOCS_PORT}`,
     port: DOCS_PORT,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

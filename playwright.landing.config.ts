@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const LANDING_PORT = 4350;
+const LANDING_PORT = Number(process.env.PLAYWRIGHT_LANDING_PORT ?? 4350);
 
 export default defineConfig({
   testDir: "./tests/e2e-landing",
@@ -22,9 +22,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `cd apps/landing && PLAYWRIGHT=1 npx astro dev --port ${LANDING_PORT}`,
+    command: `cd apps/landing && PLAYWRIGHT=1 pnpm build && pnpm exec astro preview --host 127.0.0.1 --port ${LANDING_PORT}`,
     port: LANDING_PORT,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    reuseExistingServer: false,
+    timeout: 120_000,
   },
 });

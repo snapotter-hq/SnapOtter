@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { openDocsSearch } from "./helpers";
 
-test.describe("docs i18n (English + seeded German locale)", () => {
+test.describe("docs i18n (English + committed German locale)", () => {
   test("English home still renders at root", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/SnapOtter/);
@@ -10,15 +10,14 @@ test.describe("docs i18n (English + seeded German locale)", () => {
 
   test("German locale subtree renders under /de/", async ({ page }) => {
     await page.goto("/de/guide/getting-started");
-    // The seed prefixes headings with [DE]; the page must resolve, not 404.
-    await expect(page.getByRole("heading", { name: /\[DE\]/ }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Erste Schritte" }).first()).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 
   test("machine-translation banner shows on a non-English page, not on English", async ({
     page,
   }) => {
-    await page.goto("/de/guide/getting-started");
+    await page.goto("/de/guide/low-resource");
     await expect(page.locator(".mt-banner")).toBeVisible();
     await page.goto("/guide/getting-started");
     await expect(page.locator(".mt-banner")).toHaveCount(0);

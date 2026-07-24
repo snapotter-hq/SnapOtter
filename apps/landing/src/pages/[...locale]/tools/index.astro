@@ -8,7 +8,7 @@ import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
 import Base from "@/layouts/Base.astro";
-import { localizeHref } from "@/lib/i18n-page";
+import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 import { loadToolStrings } from "@/lib/tool-strings";
 
 export function getStaticPaths() {
@@ -236,7 +236,7 @@ const collectionJsonLd = {
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.tools.map((tool) => (
                 <a
-                  href={localizeHref(locale, `/tools/${toolSection(tool)}/${tool.id}/`)}
+                  href={enOnlyHref(`/tools/${toolSection(tool)}/${tool.id}/`)}
                   class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
                   data-name={toolName(tool.id, tool.name).toLowerCase()}
                   data-desc={toolDesc(tool.id, tool.description).toLowerCase()}

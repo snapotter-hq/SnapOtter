@@ -7,7 +7,7 @@ import Footer from "@/components/Footer.astro";
 import Navbar from "@/components/Navbar.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
 import Base from "@/layouts/Base.astro";
-import { localizeHref } from "@/lib/i18n-page";
+import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 import { loadToolStrings } from "@/lib/tool-strings";
 
 export function getStaticPaths() {
@@ -84,7 +84,7 @@ const toolDesc = (id: string, fallback: string) => toolStrings[id]?.description 
               <li>
                 <a
                   class="tool-item group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary hover:shadow-md"
-                  href={localizeHref(locale, `/tools/${section.id}/${tool.id}/`)}
+                  href={enOnlyHref(`/tools/${section.id}/${tool.id}/`)}
                 >
                   <div
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"

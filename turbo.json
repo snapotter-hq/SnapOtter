@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["ANALYTICS_BAKED_OVERRIDE", "SENTRY_CRON_MONITORS"],
+  "globalPassThroughEnv": ["PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_LANDING_PORT"],
   "tasks": {
     "dev": {
       "cache": false,
