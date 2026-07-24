@@ -31,6 +31,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 vi.mock("@snapotter/doc-engine", () => ({
   htmlToPdfPy: vi.fn(),
   pdfFlattenPy: vi.fn(),
+  pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
   qpdfAvailable: vi.fn(() => false),
   qpdfCheck: vi.fn(),
@@ -41,13 +42,14 @@ vi.mock("@snapotter/doc-engine", () => ({
   sofficeAvailable: vi.fn(() => false),
 }));
 
-import { htmlToPdfPy, pdfFlattenPy, pdfTextPy } from "@snapotter/doc-engine";
+import { htmlToPdfPy, pdfFlattenPy, pdfRedactPy, pdfTextPy } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
+import { registerRedactPdf } from "../../../apps/api/src/routes/tools/redact-pdf.js";
 
 function createMockApp(): FastifyInstance {
   return {
@@ -184,5 +186,133 @@ describe("document route processors", () => {
         contentType: "application/pdf",
       });
     });
+  });
+});
+
+describe("redact-pdf route processor (no PyMuPDF)", () => {
+  function createRedactCtx(
+    scratchDir: string,
+    filename: string,
+    settings: Record<string, unknown>,
+  ) {
+    return {
+      inputs: [{ buffer: Buffer.from("secret pdf bytes"), filename, ref: "uploads/job/input" }],
+      settings,
+      scratchDir,
+      signal: new AbortController().signal,
+      report: vi.fn(),
+    };
+  }
+
+  it("redacts terms, forwards case sensitivity, and returns the found count", async () => {
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createRedactCtx(scratchDir, "annual report.pdf", {
+        terms: ["Alice", "SSN"],
+        caseSensitive: true,
+      });
+      const result = await config?.processV2?.(ctx);
+
+      // Input written under a sanitized "in-" name; spaces become underscores.
+      expect(pdfRedactPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-annual_report.pdf"),
+        join(scratchDir, "annual report_redacted.pdf"),
+        ["Alice", "SSN"],
+        true,
+      );
+      // The buffer actually landed on disk at the sanitized path.
+      expect(await readFile(join(scratchDir, "in-annual_report.pdf"))).toEqual(
+        Buffer.from("secret pdf bytes"),
+      );
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Redacting");
+      expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(result).toEqual({
+        scratchPath: join(scratchDir, "annual report_redacted.pdf"),
+        filename: "annual report_redacted.pdf",
+        contentType: "application/pdf",
+        resultPayload: { found: 3 },
+      });
+    });
+  });
+
+  it("defaults caseSensitive to false when the setting is omitted", async () => {
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createRedactCtx(scratchDir, "doc.pdf", { terms: ["confidential"] });
+      await config?.processV2?.(ctx);
+
+      expect(pdfRedactPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        join(scratchDir, "doc_redacted.pdf"),
+        ["confidential"],
+        false,
+      );
+    });
+  });
+
+  it("sanitizes hostile filenames for the input path while keeping the display base", async () => {
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createRedactCtx(scratchDir, "My Secret (v2)/../evil.pdf", {
+        terms: ["x"],
+        caseSensitive: false,
+      });
+      const result = await config?.processV2?.(ctx);
+
+      // Chars outside [A-Za-z0-9._-] collapse to "_" (dots and dashes stay),
+      // so the "/" separators are neutralized into the on-disk input name.
+      expect(pdfRedactPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-My_Secret__v2__.._evil.pdf"),
+        join(scratchDir, "My Secret (v2)/../evil_redacted.pdf"),
+        ["x"],
+        false,
+      );
+      // base is filename with the final extension stripped, unsanitized.
+      expect(result?.filename).toBe("My Secret (v2)/../evil_redacted.pdf");
+    });
+  });
+
+  it("propagates a redaction engine failure instead of swallowing it", async () => {
+    vi.mocked(pdfRedactPy).mockRejectedValueOnce(new Error("doc_redact failed: boom"));
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createRedactCtx(scratchDir, "doc.pdf", { terms: ["a"] });
+      await expect(config?.processV2?.(ctx)).rejects.toThrow(/doc_redact failed/);
+      // The completion report never fires when the engine throws mid-run.
+      expect(ctx.report).toHaveBeenCalledWith(10, "Redacting");
+      expect(ctx.report).not.toHaveBeenCalledWith(90, "Done");
+    });
+  });
+
+  it("re-validates settings inside processV2 and rejects an empty terms array", async () => {
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createRedactCtx(scratchDir, "doc.pdf", { terms: [] });
+      await expect(config?.processV2?.(ctx)).rejects.toThrow();
+      expect(pdfRedactPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("keeps the legacy process fn as a v2-only guard that throws", async () => {
+    registerRedactPdf(createMockApp());
+    const config = getToolConfig("redact-pdf");
+
+    await expect(
+      config?.process?.(Buffer.from("x"), { terms: ["a"] }, "doc.pdf", {
+        signal: new AbortController().signal,
+        scratchDir: "/tmp",
+        report: vi.fn(),
+      }),
+    ).rejects.toThrow("redact-pdf is v2-only");
   });
 });

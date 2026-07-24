@@ -11,11 +11,23 @@
 
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { sign } from "@fastify/cookie";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
+
+// The test app registers @fastify/cookie with this exact secret (see
+// tests/integration/test-server.ts). Sign our own oidc-state cookies with it
+// so callback branches that require a validly-signed-but-otherwise-bad cookie
+// (malformed JSON, mismatched state) are reachable deterministically without
+// first driving a full login handshake.
+const TEST_COOKIE_SECRET = "test-cookie-secret";
+
+function signStateCookie(value: string): string {
+  return sign(value, TEST_COOKIE_SECRET);
+}
 
 // trackEvent is mocked so OIDC failure analytics can be asserted without a
 // baked PostHog client; every other analytics export stays real.
@@ -390,6 +402,72 @@ describe("Config endpoint with OIDC disabled", () => {
 });
 
 // =====================================================================
+// LOGIN DISCOVERY FAILURE (issuer unreachable / not an OIDC provider)
+//
+// This describe MUST run before any describe that successfully discovers a
+// provider: getOrDiscoverConfig() caches the resolved config in a module-level
+// variable for 24h, so once discovery has succeeded once, a later login can no
+// longer be made to fail. It is positioned here, before "OIDC login redirect",
+// so the module cache is still cold when it runs.
+// =====================================================================
+describe("OIDC login discovery failure", () => {
+  let oidcApp: TestApp;
+  let deadServer: Server;
+  let deadPort: number;
+
+  const origOidcEnabled = env.OIDC_ENABLED;
+  const origExternalUrl = env.EXTERNAL_URL;
+  const origIssuerUrl = env.OIDC_ISSUER_URL;
+  const origClientId = env.OIDC_CLIENT_ID;
+  const origClientSecret = env.OIDC_CLIENT_SECRET;
+
+  beforeAll(async () => {
+    // A server that 404s the discovery document, so oidc.discovery() rejects.
+    deadServer = createServer((_req, res) => {
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => {
+      deadServer.listen(0, "127.0.0.1", () => {
+        const addr = deadServer.address();
+        deadPort = typeof addr === "object" && addr ? addr.port : 0;
+        resolve();
+      });
+    });
+
+    (env as any).OIDC_ENABLED = true;
+    (env as any).EXTERNAL_URL = "http://localhost:9999";
+    (env as any).OIDC_ISSUER_URL = `http://localhost:${deadPort}`;
+    (env as any).OIDC_CLIENT_ID = "test-client-id";
+    (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
+
+    oidcApp = await buildTestApp();
+  }, 30_000);
+
+  afterAll(async () => {
+    (env as any).OIDC_ENABLED = origOidcEnabled;
+    (env as any).EXTERNAL_URL = origExternalUrl;
+    (env as any).OIDC_ISSUER_URL = origIssuerUrl;
+    (env as any).OIDC_CLIENT_ID = origClientId;
+    (env as any).OIDC_CLIENT_SECRET = origClientSecret;
+
+    await oidcApp.cleanup();
+    await new Promise<void>((resolve) => deadServer.close(() => resolve()));
+  }, 10_000);
+
+  it("login redirects to oidc_provider_unreachable when discovery fails", async () => {
+    const res = await oidcApp.app.inject({
+      method: "GET",
+      url: "/api/auth/oidc/login",
+    });
+
+    expect(res.statusCode).toBe(302);
+    const location = res.headers.location as string;
+    expect(location).toBe("/login?error=oidc_provider_unreachable");
+  });
+});
+
+// =====================================================================
 // LOGIN REDIRECT (requires OIDC routes + mock OIDC discovery)
 // =====================================================================
 describe("OIDC login redirect", () => {
@@ -637,6 +715,124 @@ describe("OIDC callback edge cases", () => {
     // The failed attempt is recorded as auth_login_failed (parity with the
     // password path) so OIDC failures aren't invisible in analytics.
     expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
+  });
+
+  it("callback with signed-but-malformed state cookie redirects to oidc_session_expired", async () => {
+    // A cookie that carries a valid HMAC signature (so unsignCookie passes) but
+    // whose payload is not valid JSON, exercising the JSON.parse catch branch.
+    const cookieValue = signStateCookie("this-is-not-json{");
+
+    const res = await oidcApp.app.inject({
+      method: "GET",
+      url: "/api/auth/oidc/callback?code=abc&state=whatever",
+      cookies: { "oidc-state": cookieValue },
+    });
+
+    expect(res.statusCode).toBe(302);
+    const location = res.headers.location as string;
+    expect(location).toContain("/login?error=oidc_session_expired");
+  });
+
+  it("callback with state mismatch redirects to oidc_session_expired", async () => {
+    // Valid signature, valid JSON, but the query state differs from the stored
+    // state, exercising the state-mismatch guard.
+    const stored = JSON.stringify({
+      state: "stored-state-value",
+      nonce: "n",
+      codeVerifier: "v",
+    });
+    const cookieValue = signStateCookie(stored);
+
+    const res = await oidcApp.app.inject({
+      method: "GET",
+      url: "/api/auth/oidc/callback?code=abc&state=a-different-state",
+      cookies: { "oidc-state": cookieValue },
+    });
+
+    expect(res.statusCode).toBe(302);
+    const location = res.headers.location as string;
+    expect(location).toContain("/login?error=oidc_session_expired");
+  });
+
+  it("callback with matching state but no code redirects to oidc_auth_failed (token exchange fails)", async () => {
+    // Drive a real login so the state cookie and its PKCE verifier/nonce line
+    // up with the query state. With no usable code, the token exchange against
+    // the mock provider (which 404s /token) throws, hitting the
+    // token_exchange_failed branch.
+    const loginRes = await oidcApp.app.inject({
+      method: "GET",
+      url: "/api/auth/oidc/login",
+    });
+    expect(loginRes.statusCode).toBe(302);
+
+    const rawCookies = loginRes.headers["set-cookie"];
+    const cookieStr = Array.isArray(rawCookies) ? rawCookies[0] : rawCookies || "";
+    const cookieMatch = cookieStr.match(/oidc-state=([^;]+)/);
+    expect(cookieMatch).toBeTruthy();
+    const encoded = cookieMatch ? cookieMatch[1] : "";
+    const cookieValue = decodeURIComponent(encoded);
+
+    const redirectUrl = new URL(loginRes.headers.location as string);
+    const state = redirectUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+
+    trackEventSpy.mockClear();
+    const callbackRes = await oidcApp.app.inject({
+      method: "GET",
+      url: `/api/auth/oidc/callback?code=bogus-authorization-code&state=${state}`,
+      cookies: { "oidc-state": cookieValue },
+    });
+
+    expect(callbackRes.statusCode).toBe(302);
+    const location = callbackRes.headers.location as string;
+    expect(location).toContain("/login?error=oidc_auth_failed");
+    // The token-exchange failure path also records the failed attempt.
+    expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
+  });
+
+  it("logout omits logoutUrl when the cached provider has no end_session_endpoint", async () => {
+    // At this point a prior login in this describe has cached OIDC discovery.
+    // The mock discovery document exposes no end_session_endpoint, so
+    // getOidcEndSessionEndpoint() resolves to null and the logout route returns
+    // no logoutUrl even though the session carries an idToken and OIDC is on.
+    const userId = randomUUID();
+    const username = `oidc_logout_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    await db.insert(schema.users).values({
+      id: userId,
+      username,
+      passwordHash: null,
+      role: "user",
+      team: "default-team-00000000",
+      mustChangePassword: false,
+      authProvider: "oidc",
+      externalId: `sub-${userId}`,
+      email: `${username}@example.com`,
+    });
+    const sessionToken = randomUUID();
+    await db.insert(schema.sessions).values({
+      id: sessionToken,
+      userId,
+      expiresAt: new Date(Date.now() + 3_600_000),
+      idToken: "mock-id-token-jwt",
+    });
+
+    const res = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      cookies: { "snapotter-session": sessionToken },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body).not.toHaveProperty("logoutUrl");
+
+    // Session is deleted regardless of the logoutUrl branch.
+    const [gone] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionToken));
+    expect(gone).toBeUndefined();
   });
 });
 
