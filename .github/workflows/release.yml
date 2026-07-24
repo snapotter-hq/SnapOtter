@@ -56,17 +56,6 @@ jobs:
       - name: Verify production Node dependency licenses and notices
         run: pnpm check:production-node-licenses
 
-      - name: Save release notes
-        id: notes
-        run: |
-          if [ -f .release-notes.md ]; then
-            cp .release-notes.md /tmp/release-notes.md
-            echo "has_notes=true" >> "$GITHUB_OUTPUT"
-            echo "Custom release notes found -- will apply after release."
-          else
-            echo "No .release-notes.md found -- using default release notes."
-          fi
-
       - name: Run semantic-release
         env:
           # RELEASE_TOKEN is a fine-grained PAT (repo Contents/Issues/PRs: write)
@@ -106,62 +95,74 @@ jobs:
             echo "::error::Release tag did not peel to an immutable commit"
             exit 1
           }
+          git checkout --detach "${release_commit}"
+          [[ "$(git rev-parse HEAD)" == "${release_commit}" ]] || {
+            echo "::error::Could not check out the immutable release commit"
+            exit 1
+          }
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "release_commit=${release_commit}" >> "$GITHUB_OUTPUT"
 
-      - name: Update GitHub release notes
-        if: steps.notes.outputs.has_notes == 'true' && steps.check.outputs.version
+      - name: Materialize durable release notes
+        id: notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Updating release v${{ steps.check.outputs.version }} with custom notes..."
-          gh release edit "v${{ steps.check.outputs.version }}" \
-            --notes-file /tmp/release-notes.md
-          echo "Release notes updated successfully."
-
-      - name: Update docs changelog
-        if: steps.notes.outputs.has_notes == 'true' && steps.check.outputs.version
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.check.outputs.version }}
         run: |
-          CHANGELOG="apps/docs/changelog.md"
-          if [ ! -f "$CHANGELOG" ]; then
-            echo "No docs changelog found, skipping."
-            exit 0
+          result="$(
+            node scripts/manage-release-notes.mjs materialize \
+              "${VERSION}" /tmp/release-notes.md
+          )"
+          [[ "${result}" =~ ^custom=(true|false)$ ]] || {
+            echo "::error::Release-note materializer returned an invalid result"
+            exit 1
+          }
+          [[ -s /tmp/release-notes.md ]] || {
+            echo "::error::Committed release notes are empty"
+            exit 1
+          }
+          echo "has_custom_notes=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure exact GitHub draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          release_endpoint="repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}"
+          if ! gh api "${release_endpoint}" > /tmp/release.json 2> /tmp/release.error; then
+            if ! grep -Fq "(HTTP 404)" /tmp/release.error; then
+              cat /tmp/release.error >&2
+              echo "::error::Could not determine whether the GitHub draft exists"
+              exit 1
+            fi
+            gh release create "v${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --verify-tag \
+              --title "v${VERSION}" \
+              --notes-file /tmp/release-notes.md
+            gh api "${release_endpoint}" > /tmp/release.json
           fi
-          NOTES="/tmp/release-notes.md"
-          # Build the new entry: ## vX.Y.Z header + release notes body (skip the first ## Highlights/Upgrade sections wrapper)
-          {
-            echo ""
-            echo "## v${VERSION}"
-            echo ""
-            # Strip the ## Highlights header and ## Upgrade section, keep the rest
-            sed '1{/^## Highlights$/d}' "$NOTES" | sed '/^## Upgrade$/,/^---$/d' | sed '/^---$/d'
-            echo ""
-            echo "[Full diff on GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v$(git tag --sort=-v:refname | grep -E '^v[0-9]' | sed -n '2p' | sed 's/^v//')...v${VERSION})"
-            echo ""
-            echo "---"
-            echo ""
-          } > /tmp/changelog-entry.md
-          # Insert after the "# Changelog" header
-          sed -i '/^# Changelog$/r /tmp/changelog-entry.md' "$CHANGELOG"
-          # Commit and push
-          git config user.name "SnapOtter"
-          git config user.email "snapotter.hq@gmail.com"
-          git add "$CHANGELOG"
-          if git diff --cached --quiet; then
-            echo "Docs changelog already current for v${VERSION}."
-            exit 0
-          fi
-          git commit -m "docs: update changelog for v${VERSION} [skip ci]"
-          # Authenticate this direct push explicitly: the job's checkout uses
-          # persist-credentials: false, so there is no ambient credential. The
-          # PAT's admin identity bypasses branch protection. Authentication or
-          # push failures must stop the release so the public changelog cannot
-          # silently drift from the immutable release.
-          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
-          echo "Docs changelog updated for v${VERSION}."
+          jq -e --arg tag "v${VERSION}" \
+            '.draft == true and .tag_name == $tag' /tmp/release.json >/dev/null || {
+            echo "::error::Expected release is missing, public, or bound to the wrong tag"
+            exit 1
+          }
+
+          # Normalize both first-run and recovered drafts to the committed body.
+          gh release edit "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --notes-file /tmp/release-notes.md
+          gh api "${release_endpoint}" > /tmp/release.json
+          node --input-type=module - /tmp/release.json /tmp/release-notes.md <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const [releasePath, notesPath] = process.argv.slice(2);
+          const release = JSON.parse(readFileSync(releasePath, "utf8"));
+          const expected = readFileSync(notesPath, "utf8");
+          if (release.draft !== true || release.body !== expected) {
+            throw new Error("GitHub draft body differs from committed release notes");
+          }
+          NODE
 
   prebuilt:
     name: Archive (${{ matrix.arch }})

@@ -57,7 +57,18 @@ fi
 # aligned with the tag and immutable artifact names created by this release.
 node "$ROOT/scripts/sync-published-docs-version.mjs" "$VERSION"
 
-# Clean up release notes file (consumed by CI, not needed after release commit)
-rm -f "$ROOT/.release-notes.md"
+# Archive optional custom notes under their immutable release version before the
+# semantic-release git plugin commits and tags them. This makes a tag-only retry
+# able to reconstruct the exact draft body and published docs changelog.
+node "$ROOT/scripts/manage-release-notes.mjs" archive "$VERSION" --root "$ROOT" >/dev/null
+if [ -f "$ROOT/.release-notes/v$VERSION.md" ]; then
+  PREVIOUS_TAG="$(git -C "$ROOT" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+  if [[ ! "$PREVIOUS_TAG" =~ ^v(.+)$ ]]; then
+    echo "Cannot update the published changelog without a previous release tag" >&2
+    exit 1
+  fi
+  node "$ROOT/scripts/manage-release-notes.mjs" sync-docs "$VERSION" "${PREVIOUS_TAG#v}" \
+    --root "$ROOT" >/dev/null
+fi
 
 echo "All versions synced to $VERSION"

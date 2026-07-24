@@ -30,6 +30,7 @@
           "pnpm-lock.yaml",
           "CHANGELOG.md",
           ".release-notes.md",
+          ".release-notes/*.md",
           "apps/web/package.json",
           "apps/api/package.json",
           "apps/demo/package.json",
@@ -37,6 +38,7 @@
           "apps/landing/package.json",
           "apps/docs/**/guide/getting-started.md",
           "apps/docs/**/guide/security.md",
+          "apps/docs/changelog.md",
           "packages/shared/package.json",
           "packages/shared/src/constants.ts",
           "packages/doc-engine/package.json",
@@ -51,7 +53,9 @@
     [
       "@semantic-release/github",
       {
-        "draftRelease": true
+        "draftRelease": true,
+        "successCommentCondition": false,
+        "releasedLabels": false
       }
     ]
   ]

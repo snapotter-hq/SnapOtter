@@ -7,6 +7,7 @@ const root = process.cwd();
 const releaseWorkflowPath = path.resolve(root, ".github/workflows/release.yml");
 const manualAttestationPath = path.resolve(root, ".github/workflows/attest.yml");
 const releaseConfigPath = path.resolve(root, ".releaserc.json");
+const versionSyncPath = path.resolve(root, "scripts/sync-version.sh");
 
 function readRequired(file: string): string {
   expect(existsSync(file), `${path.relative(root, file)} is missing`).toBe(true);
@@ -29,12 +30,51 @@ describe("release supply-chain closure", () => {
       (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "@semantic-release/github",
     );
     expect(githubPlugin?.[1]?.draftRelease).toBe(true);
+    expect(githubPlugin?.[1]?.successCommentCondition).toBe(false);
+    expect(githubPlugin?.[1]?.releasedLabels).toBe(false);
 
     const workflow = readRequired(releaseWorkflowPath);
     const publish = job(workflow, "publish-release");
     expect(publish).toContain("needs: [release, aliases]");
     expect(publish).toContain("Verify approved release is still a draft");
     expect(publish).toContain("--draft=false");
+  });
+
+  it("commits custom release notes and the published changelog before tagging", () => {
+    const releaseConfig = JSON.parse(readRequired(releaseConfigPath));
+    const gitPlugin = releaseConfig.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "@semantic-release/git",
+    );
+    expect(gitPlugin?.[1]?.assets).toContain(".release-notes/*.md");
+    expect(gitPlugin?.[1]?.assets).toContain("apps/docs/changelog.md");
+
+    const sync = readRequired(versionSyncPath);
+    expect(sync).toContain('manage-release-notes.mjs" archive "$VERSION"');
+    expect(sync).toContain('manage-release-notes.mjs" sync-docs "$VERSION"');
+    expect(sync).not.toContain('rm -f "$ROOT/.release-notes.md"');
+  });
+
+  it("recreates and verifies the exact expected draft on a tag-only retry", () => {
+    const workflow = readRequired(releaseWorkflowPath);
+    const release = job(workflow, "release", "prebuilt");
+    const check = release.indexOf("- name: Check for new release");
+    const materialize = release.indexOf("- name: Materialize durable release notes");
+    const ensureDraft = release.indexOf("- name: Ensure exact GitHub draft");
+
+    expect(check).toBeGreaterThanOrEqual(0);
+    expect(materialize).toBeGreaterThan(check);
+    expect(ensureDraft).toBeGreaterThan(materialize);
+    expect(release).toContain('git checkout --detach "${release_commit}"');
+    expect(release).toContain("node scripts/manage-release-notes.mjs materialize");
+    expect(release).toContain('"${VERSION}" /tmp/release-notes.md');
+    expect(release).toContain('grep -Fq "(HTTP 404)" /tmp/release.error');
+    expect(release).toContain('gh release create "v${VERSION}"');
+    expect(release).toContain("--draft");
+    expect(release).toContain("--verify-tag");
+    expect(release).toContain("--notes-file /tmp/release-notes.md");
+    expect(release).toContain("GitHub draft body differs from committed release notes");
+    expect(release).not.toContain("- name: Update docs changelog");
+    expect(release).not.toContain("HEAD:main");
   });
 
   it("eliminates the arbitrary manual attestation workflow", () => {
@@ -162,18 +202,13 @@ describe("release supply-chain closure", () => {
     expect(sbom).toContain("snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.cdx.json");
   });
 
-  it("fails closed on changelog commit or push errors", () => {
+  it("does not create a fallible post-tag changelog commit", () => {
     const workflow = readRequired(releaseWorkflowPath);
     const release = job(workflow, "release", "prebuilt");
-    const changelog = release.slice(release.indexOf("- name: Update docs changelog"));
 
-    expect(changelog).toContain("if git diff --cached --quiet; then");
-    expect(changelog).toContain('echo "Docs changelog already current for v${VERSION}."');
-    expect(changelog).toContain('git commit -m "docs: update changelog for v${VERSION} [skip ci]"');
-    expect(changelog).toContain(
-      'git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main',
-    );
-    expect(changelog).not.toMatch(/git (?:commit|push)[^\n]*\|\| true/);
+    expect(release).not.toContain("- name: Update docs changelog");
+    expect(release).not.toContain("git commit");
+    expect(release).not.toContain("HEAD:main");
   });
 
   it("pins every external action to an immutable commit", () => {
