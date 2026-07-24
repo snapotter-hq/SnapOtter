@@ -20,6 +20,13 @@ function isInputFocused(): boolean {
   return false;
 }
 
+function isNativeInteractiveTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('a[href], button, input, select, textarea, [contenteditable="true"]') !== null
+  );
+}
+
 // Brush size step depends on current size for natural feel
 function getBrushSizeStep(current: number): number {
   if (current < 10) return 1;
@@ -605,11 +612,11 @@ export function useEditorShortcuts(callbacks?: {
   useHotkeys(
     "tab",
     (e) => {
-      if (isInputFocused()) return;
+      if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
       e.preventDefault();
       useEditorStore.getState().toggleRightPanel();
     },
-    { preventDefault: true },
+    { preventDefault: false },
   );
 
   // Arrow keys - Nudge selected 1px
@@ -698,14 +705,14 @@ export function useEditorShortcuts(callbacks?: {
   useHotkeys(
     "enter",
     (e) => {
-      if (isInputFocused()) return;
+      if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.isCropping && state.cropState) {
         state.applyCrop();
       }
     },
-    { preventDefault: true },
+    { preventDefault: false },
   );
 
   // Escape - Cancel current operation
@@ -855,7 +862,7 @@ export function useEditorShortcuts(callbacks?: {
   // ---- Space key: temporary hand tool ----
 
   const handleSpaceDown = useCallback((e: KeyboardEvent) => {
-    if (isInputFocused()) return;
+    if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
     if (e.code !== "Space") return;
     if (e.repeat) return;
     e.preventDefault();
@@ -871,6 +878,7 @@ export function useEditorShortcuts(callbacks?: {
 
   const handleSpaceUp = useCallback((e: KeyboardEvent) => {
     if (e.code !== "Space") return;
+    if (!isSpaceHeldRef.current && isNativeInteractiveTarget(e.target)) return;
     e.preventDefault();
 
     if (isSpaceHeldRef.current) {

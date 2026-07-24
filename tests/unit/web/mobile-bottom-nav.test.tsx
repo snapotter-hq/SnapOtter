@@ -54,7 +54,7 @@ describe("MobileBottomNav", () => {
     const onClick = vi.fn();
     renderNav(onClick);
 
-    const settingsBtn = screen.getByText("Settings");
+    const settingsBtn = screen.getByTestId("open-settings");
     fireEvent.click(settingsBtn);
     expect(onClick).toHaveBeenCalledTimes(1);
   });

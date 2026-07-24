@@ -59,18 +59,11 @@ export function FilesPage() {
           </div>
 
           {activeTab === "recent" ? (
-            <div
-              role="listbox"
-              tabIndex={0}
-              className="flex-1 overflow-hidden"
-              onClick={() => {
-                if (selectedFileId) setShowDetails(true);
-              }}
-              onKeyDown={(e) => {
-                if ((e.key === "Enter" || e.key === " ") && selectedFileId) setShowDetails(true);
-              }}
-            >
-              <FileList filterMimePrefix={filterMimePrefix} />
+            <div className="flex-1 overflow-hidden">
+              <FileList
+                filterMimePrefix={filterMimePrefix}
+                onFileActivate={() => setShowDetails(true)}
+              />
             </div>
           ) : (
             <FileUploadArea />
@@ -97,7 +90,7 @@ export function FilesPage() {
                     <X className="h-5 w-5 text-muted-foreground" />
                   </button>
                 </div>
-                <FileDetails mobile />
+                <FileDetails filterMimePrefix={filterMimePrefix} mobile />
               </div>
             </div>
           )}
@@ -114,7 +107,7 @@ export function FilesPage() {
         {activeTab === "recent" ? (
           <>
             <FileList filterMimePrefix={filterMimePrefix} />
-            <FileDetails />
+            <FileDetails filterMimePrefix={filterMimePrefix} />
           </>
         ) : (
           <FileUploadArea />

@@ -28,6 +28,8 @@ const ocrRuntime = vi.hoisted(() => ({
 const fsFaults = vi.hoisted(() => ({
   denyOwnerOnlyMutationPath: null as string | null,
   denyRecursiveRemovePath: null as string | null,
+  existsSequencePath: null as string | null,
+  existsSequence: [] as boolean[],
   forceNonDocker: false,
   pretendBaseVenvExists: false,
 }));
@@ -75,6 +77,9 @@ vi.mock("node:fs", async (importOriginal) => {
   return {
     ...actual,
     existsSync: (...args: Parameters<typeof actual.existsSync>) => {
+      if (args[0] === fsFaults.existsSequencePath && fsFaults.existsSequence.length > 0) {
+        return fsFaults.existsSequence.shift() ?? false;
+      }
       if (args[0] === "/.dockerenv" && fsFaults.forceNonDocker) return false;
       if (args[0] === "/opt/venv" && fsFaults.pretendBaseVenvExists) return true;
       return actual.existsSync(...args);
@@ -120,6 +125,8 @@ beforeEach(async () => {
   vi.resetModules();
   fsFaults.denyOwnerOnlyMutationPath = null;
   fsFaults.denyRecursiveRemovePath = null;
+  fsFaults.existsSequencePath = null;
+  fsFaults.existsSequence.length = 0;
   fsFaults.forceNonDocker = false;
   fsFaults.pretendBaseVenvExists = false;
   childProcessFaults.nextKernelLockFailure = null;
@@ -1013,6 +1020,73 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
 
     expect(recovered).not.toHaveBeenCalled();
+  });
+
+  it("recovers when the AI data directory appears after startup", async () => {
+    vi.useFakeTimers();
+    try {
+      rmSync(aiDir, { recursive: true, force: true });
+      const recovered = vi.fn();
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+      mkdirSync(modelsDir, { recursive: true });
+      const partial = join(modelsDir, "late-model.downloading");
+      writeFileSync(partial, "partial");
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(existsSync(partial)).toBe(false);
+      expect(recovered).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not mistake a newly appeared AI directory for an already recovered one", async () => {
+    vi.useFakeTimers();
+    try {
+      const partial = join(modelsDir, "racing-model.downloading");
+      writeFileSync(partial, "partial");
+      fsFaults.existsSequencePath = aiDir;
+      fsFaults.existsSequence.push(false);
+      const recovered = vi.fn();
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+
+      expect(existsSync(partial)).toBe(true);
+      expect(recovered).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(25);
+      expect(existsSync(partial)).toBe(false);
+      expect(recovered).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("polls for a missing AI data directory without logging", async () => {
+    vi.useFakeTimers();
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      rmSync(aiDir, { recursive: true, force: true });
+      const recovered = vi.fn();
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+      await vi.advanceTimersByTimeAsync(75);
+
+      expect(recovered).not.toHaveBeenCalled();
+      expect(info).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+
+      mkdirSync(modelsDir, { recursive: true });
+      await vi.advanceTimersByTimeAsync(25);
+      expect(recovered).toHaveBeenCalledTimes(1);
+    } finally {
+      info.mockRestore();
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("retains venv.writing and reports incomplete recovery when Docker reseed fails", () => {

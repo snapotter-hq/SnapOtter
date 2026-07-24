@@ -13,7 +13,7 @@ export function FilesNav() {
 
   return (
     <div className="w-48 border-e border-border p-4 shrink-0 hidden md:block">
-      <h3 className="text-sm font-semibold text-foreground mb-3">{t.files.myFiles}</h3>
+      <h2 className="text-sm font-semibold text-foreground mb-3">{t.files.myFiles}</h2>
       <div className="space-y-1">
         {items.map((item) => (
           <button

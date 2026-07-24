@@ -140,4 +140,42 @@ test.describe("Editor Layers Panel", () => {
 
     await expect(layerRow).toHaveAttribute("aria-current", "true");
   });
+
+  test("Enter selects an inactive layer from its name button", async ({ editorPage: page }) => {
+    await page.getByTestId("add-layer-btn").click();
+    const layerOne = page.getByTestId(/^layer-name-/).filter({ hasText: "Layer 1" });
+    await expect(layerOne).toHaveAttribute("aria-pressed", "false");
+
+    await layerOne.focus();
+    await page.keyboard.press("Enter");
+
+    await expect(layerOne).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("Space selects an inactive layer from its name button", async ({ editorPage: page }) => {
+    await page.getByTestId("add-layer-btn").click();
+    const layerOne = page.getByTestId(/^layer-name-/).filter({ hasText: "Layer 1" });
+    await expect(layerOne).toHaveAttribute("aria-pressed", "false");
+
+    await layerOne.focus();
+    await page.keyboard.press("Space");
+
+    await expect(layerOne).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("keyboard-accessible controls reorder the active layer", async ({ editorPage: page }) => {
+    await page.getByTestId("add-layer-btn").click();
+    const rows = page.locator("[data-layer-id]");
+    await expect(rows).toHaveText(["Layer 2", "Layer 1"]);
+
+    const moveDown = page.getByRole("button", { name: "Move down: Layer 2" });
+    await moveDown.focus();
+    await page.keyboard.press("Enter");
+    await expect(rows).toHaveText(["Layer 1", "Layer 2"]);
+
+    const moveUp = page.getByRole("button", { name: "Move up: Layer 2" });
+    await moveUp.focus();
+    await page.keyboard.press("Space");
+    await expect(rows).toHaveText(["Layer 2", "Layer 1"]);
+  });
 });

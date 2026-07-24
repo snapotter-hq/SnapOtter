@@ -4,9 +4,14 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { getFileDownloadUrl } from "@/lib/api";
 import { format } from "@/lib/format";
 import { useFilesPageStore } from "@/stores/files-page-store";
-import { FileListItem } from "./file-list-item";
+import { FileListItem, type FileNavigationKey } from "./file-list-item";
 
-export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
+interface FileListProps {
+  filterMimePrefix?: string;
+  onFileActivate?: (fileId: string) => void;
+}
+
+export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
   const { t } = useTranslation();
   const {
     files: allFiles,
@@ -23,7 +28,7 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
 
   const [inputValue, setInputValue] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const files = allFiles;
 
@@ -52,38 +57,50 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
     }
   }
 
-  const handleListKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (files.length === 0) return;
-      const currentIndex = selectedFileId ? files.findIndex((f) => f.id === selectedFileId) : -1;
+  const enabledFileIndices = files.flatMap((file, index) =>
+    filterMimePrefix && !file.mimeType.startsWith(filterMimePrefix) ? [] : [index],
+  );
+  const selectedFileIndex = selectedFileId
+    ? files.findIndex((file) => file.id === selectedFileId)
+    : -1;
+  const tabStopIndex = enabledFileIndices.includes(selectedFileIndex)
+    ? selectedFileIndex
+    : (enabledFileIndices[0] ?? -1);
 
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const next = currentIndex < files.length - 1 ? currentIndex + 1 : 0;
-        selectFile(files[next].id);
-        listRef.current
-          ?.querySelector(`[data-file-id="${files[next].id}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const prev = currentIndex > 0 ? currentIndex - 1 : files.length - 1;
-        selectFile(files[prev].id);
-        listRef.current
-          ?.querySelector(`[data-file-id="${files[prev].id}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        selectFile(files[0].id);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        selectFile(files[files.length - 1].id);
+  const handleFileNavigate = useCallback(
+    (currentIndex: number, key: FileNavigationKey) => {
+      const enabledIndices = files.flatMap((file, index) =>
+        filterMimePrefix && !file.mimeType.startsWith(filterMimePrefix) ? [] : [index],
+      );
+      if (enabledIndices.length === 0) return;
+
+      const currentEnabledIndex = enabledIndices.indexOf(currentIndex);
+      let targetIndex: number;
+      if (key === "Home") targetIndex = enabledIndices[0];
+      else if (key === "End") targetIndex = enabledIndices[enabledIndices.length - 1];
+      else if (key === "ArrowDown") {
+        targetIndex = enabledIndices[(currentEnabledIndex + 1) % enabledIndices.length];
+      } else {
+        const previousIndex =
+          currentEnabledIndex <= 0 ? enabledIndices.length - 1 : currentEnabledIndex - 1;
+        targetIndex = enabledIndices[previousIndex];
       }
+
+      selectFile(files[targetIndex].id);
+      const target = listRef.current?.querySelector<HTMLButtonElement>(
+        `[data-file-button-index="${targetIndex}"]`,
+      );
+      target?.focus();
+      target?.scrollIntoView({ block: "nearest" });
     },
-    [files, selectedFileId, selectFile],
+    [files, filterMimePrefix, selectFile],
   );
 
   const allChecked = files.length > 0 && checkedIds.size === files.length;
   const someChecked = checkedIds.size > 0;
+  const hasFileItems = !loading && !error && files.length > 0;
+  const listClassName =
+    "flex-1 overflow-y-auto p-2 space-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
@@ -105,6 +122,7 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
         <input
           type="checkbox"
+          aria-label={`${t.files.selectFile}: ${t.files.myFiles}`}
           checked={allChecked}
           onChange={toggleCheckAll}
           className="h-4 w-4 accent-primary"
@@ -137,38 +155,39 @@ export function FileList({ filterMimePrefix }: { filterMimePrefix?: string }) {
       </div>
 
       {/* File list */}
-      <div
-        ref={listRef}
-        role="listbox"
-        tabIndex={0}
-        onKeyDown={handleListKeyDown}
-        className="flex-1 overflow-y-auto p-2 space-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {loading && (
-          <div className="flex items-center justify-center h-32">
-            <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-        {!loading && error && (
-          <div className="flex items-center justify-center h-32">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
-        {!loading && !error && files.length === 0 && (
-          <div className="flex items-center justify-center h-32">
-            <p className="text-sm text-muted-foreground">{t.files.noFilesFound}</p>
-          </div>
-        )}
-        {!loading &&
-          !error &&
-          files.map((file) => (
+      {hasFileItems ? (
+        <ul ref={listRef} className={`${listClassName} m-0 list-none`}>
+          {files.map((file, index) => (
             <FileListItem
               key={file.id}
               file={file}
+              index={index}
               disabled={!!filterMimePrefix && !file.mimeType.startsWith(filterMimePrefix)}
+              tabStop={index === tabStopIndex}
+              onActivate={onFileActivate}
+              onNavigate={handleFileNavigate}
             />
           ))}
-      </div>
+        </ul>
+      ) : (
+        <div className={listClassName}>
+          {loading && (
+            <div className="flex items-center justify-center h-32">
+              <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {!loading && error && (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+          {!loading && !error && files.length === 0 && (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-sm text-muted-foreground">{t.files.noFilesFound}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

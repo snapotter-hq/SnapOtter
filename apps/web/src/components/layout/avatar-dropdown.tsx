@@ -82,6 +82,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
           {/* Settings */}
           <button
             type="button"
+            data-testid="open-settings"
             onClick={() => {
               setOpen(false);
               onSettingsClick();

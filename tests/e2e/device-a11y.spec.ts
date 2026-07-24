@@ -7,7 +7,8 @@
  * The release gate requires zero axe violations in the scoped pages.
  */
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "./helpers";
+import { MOBILE_A11Y_PAGES } from "./a11y-routes.js";
+import { expect, openSettings, test } from "./helpers";
 
 interface ViolationEntry {
   id: string;
@@ -48,25 +49,6 @@ async function auditPage(
   }
 }
 
-// ---- Scoped page set (mobile, EN + AR) ----
-
-const PAGES_MOBILE_EN = [
-  { key: "mobile-home-en", path: "/", needsAuth: true },
-  { key: "mobile-image-resize-en", path: "/image/resize", needsAuth: true },
-  { key: "mobile-video-convert-en", path: "/video/convert-video", needsAuth: true },
-  { key: "mobile-audio-convert-en", path: "/audio/convert-audio", needsAuth: true },
-  { key: "mobile-pdf-pdf-to-image-en", path: "/pdf/pdf-to-image", needsAuth: true },
-  { key: "mobile-files-csv-excel-en", path: "/files/csv-excel", needsAuth: true },
-  { key: "mobile-editor-en", path: "/editor", needsAuth: true },
-  { key: "mobile-login-en", path: "/login", needsAuth: false },
-];
-
-const PAGES_MOBILE_AR = [
-  { key: "mobile-home-ar", path: "/", needsAuth: true, locale: "ar" },
-  { key: "mobile-image-resize-ar", path: "/image/resize", needsAuth: true, locale: "ar" },
-  { key: "mobile-login-ar", path: "/login", needsAuth: false, locale: "ar" },
-];
-
 // ---- Tests ----
 
 test.describe("@mobile Axe a11y audit -- mobile EN", () => {
@@ -83,12 +65,14 @@ test.describe("@mobile Axe a11y audit -- mobile EN", () => {
       targets: string[];
     }[] = [];
 
-    for (const p of PAGES_MOBILE_EN) {
+    for (const p of MOBILE_A11Y_PAGES.en) {
       if (p.needsAuth) {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
+        if (p.openSettings) await openSettings(page);
         await auditPage(page, p.key, allViolations);
+        if (p.openSettings) await page.keyboard.press("Escape");
       } else {
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         const anonPage = await ctx.newPage();
@@ -133,7 +117,7 @@ test.describe("@mobile Axe a11y audit -- mobile AR (RTL)", () => {
       targets: string[];
     }[] = [];
 
-    for (const p of PAGES_MOBILE_AR) {
+    for (const p of MOBILE_A11Y_PAGES.ar) {
       if (p.needsAuth) {
         await page.evaluate(() => {
           localStorage.setItem("snapotter-locale", "ar");
@@ -141,7 +125,9 @@ test.describe("@mobile Axe a11y audit -- mobile AR (RTL)", () => {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
+        if (p.openSettings) await openSettings(page);
         await auditPage(page, p.key, allViolations);
+        if (p.openSettings) await page.keyboard.press("Escape");
       } else {
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         const anonPage = await ctx.newPage();

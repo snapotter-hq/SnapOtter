@@ -945,17 +945,19 @@ function deleteDownloadingFiles(dir: string): void {
   }
 }
 
-export function recoverInterruptedInstalls(): boolean {
+type InterruptedInstallRecoveryResult = "complete" | "deferred" | "directory-missing";
+
+function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResult {
   if (!existsSync(AI_DIR)) {
     invalidateCache();
-    return true;
+    return "directory-missing";
   }
 
   // A second API replica can start while the first is actively mutating this
   // shared volume. Never erase its lock, downloads, staging, or venv marker.
   if (!acquireInstallLock("__recovery__")) {
     console.info("[feature-status] Another replica owns the install lease; recovery deferred");
-    return false;
+    return "deferred";
   }
 
   let recoveryIncomplete = false;
@@ -1134,10 +1136,14 @@ export function recoverInterruptedInstalls(): boolean {
     }
 
     invalidateCache();
-    return !recoveryIncomplete;
+    return recoveryIncomplete ? "deferred" : "complete";
   } finally {
     releaseInstallLock();
   }
+}
+
+export function recoverInterruptedInstalls(): boolean {
+  return recoverInterruptedInstallsWithResult() !== "deferred";
 }
 
 interface InterruptedInstallRecoveryOptions {
@@ -1183,19 +1189,23 @@ export function startInterruptedInstallRecovery(
   const attempt = () => {
     if (generation !== interruptedInstallRecoveryGeneration) return;
     interruptedInstallRecoveryTimer = null;
-    let recovered = false;
+    let recoveryResult: InterruptedInstallRecoveryResult = "deferred";
     try {
-      recovered = recoverInterruptedInstalls();
+      recoveryResult = recoverInterruptedInstallsWithResult();
     } catch (error) {
       console.warn(
         `[feature-status] Interrupted-install recovery failed; retrying: ${(error as Error).message}`,
       );
     }
-    if (recovered) {
+    if (recoveryResult === "directory-missing") {
       // A fresh native checkout has no AI state to reconcile. Calling the
       // post-recovery hook here would immediately try to open install.flock in
-      // a directory that intentionally does not exist, then retry forever.
-      if (!existsSync(AI_DIR)) return;
+      // a directory that intentionally does not exist. Poll silently until the
+      // directory appears so a late mount or first AI write is still recovered.
+      scheduleRetry();
+      return;
+    }
+    if (recoveryResult === "complete") {
       if (!options.onRecovered) return;
       let postRecovery: boolean | undefined | Promise<boolean | undefined>;
       try {

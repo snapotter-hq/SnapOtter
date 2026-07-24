@@ -3,6 +3,7 @@
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Copy,
   Eye,
   EyeOff,
@@ -95,6 +96,7 @@ export function LayersPanel() {
   const flattenAll = useEditorStore((s) => s.flattenAll);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
+  const activeLayerIndex = layers.findIndex((layer) => layer.id === activeLayerId);
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{
@@ -206,6 +208,28 @@ export function LayersPanel() {
           data-testid="add-layer-btn"
         >
           <Plus size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => reorderLayers(activeLayerIndex, activeLayerIndex + 1)}
+          disabled={!activeLayer || activeLayerIndex >= layers.length - 1}
+          className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          title={t.automate.moveUp}
+          aria-label={`${t.automate.moveUp}: ${activeLayer?.name ?? ""}`}
+          data-testid="move-layer-up-btn"
+        >
+          <ChevronUp size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => reorderLayers(activeLayerIndex, activeLayerIndex - 1)}
+          disabled={!activeLayer || activeLayerIndex <= 0}
+          className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          title={t.automate.moveDown}
+          aria-label={`${t.automate.moveDown}: ${activeLayer?.name ?? ""}`}
+          data-testid="move-layer-down-btn"
+        >
+          <ChevronDown size={16} />
         </button>
         <button
           type="button"

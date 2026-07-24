@@ -269,13 +269,10 @@ export async function openSettings(page: Page): Promise<void> {
   const width = page.viewportSize()?.width ?? 1280;
   if (width < 768) {
     // Mobile: Settings lives in the fixed bottom nav.
-    await page
-      .getByRole("button", { name: /settings/i })
-      .first()
-      .click();
+    await page.getByTestId("open-settings").click();
   } else {
     await page.getByTestId("user-menu").click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByTestId("open-settings").click();
   }
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
 }

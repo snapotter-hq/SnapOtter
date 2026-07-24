@@ -9,6 +9,7 @@ import {
   getFileDownloadUrl,
   getFilePreviewUrl,
   getFileThumbnailUrl,
+  type UserFile,
   type UserFileDetail,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -371,13 +372,34 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function getFilesToOpen({
+  details,
+  files,
+  checkedIds,
+  filterMimePrefix,
+}: {
+  details: UserFileDetail;
+  files: UserFile[];
+  checkedIds: Set<string>;
+  filterMimePrefix?: string;
+}): UserFile[] {
+  const isCompatible = (file: Pick<UserFile, "mimeType">) =>
+    !filterMimePrefix || file.mimeType.startsWith(filterMimePrefix);
+
+  if (!isCompatible(details)) return [];
+  const compatibleChecked = files.filter((file) => checkedIds.has(file.id) && isCompatible(file));
+  if (compatibleChecked.length > 1) return compatibleChecked;
+  return [details];
+}
+
 interface FileDetailsProps {
+  filterMimePrefix?: string;
   mobile?: boolean;
 }
 
-export function FileDetails({ mobile = false }: FileDetailsProps) {
+export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsProps) {
   const { t } = useTranslation();
-  const { selectedFileId } = useFilesPageStore();
+  const { files, selectedFileId } = useFilesPageStore();
   const setFiles = useFileStore((s) => s.setFiles);
   const navigate = useNavigate();
   const location = useLocation();
@@ -385,9 +407,12 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
 
   const [details, setDetails] = useState<UserFileDetail | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const selectedFile = files.find((file) => file.id === selectedFileId);
+  const selectedFileIsCompatible =
+    !filterMimePrefix || selectedFile?.mimeType.startsWith(filterMimePrefix) === true;
 
   useEffect(() => {
-    if (!selectedFileId) {
+    if (!selectedFileId || !selectedFileIsCompatible) {
       setDetails(null);
       return;
     }
@@ -396,7 +421,7 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
       .then(setDetails)
       .catch(() => setDetails(null))
       .finally(() => setLoadingDetails(false));
-  }, [selectedFileId]);
+  }, [selectedFileId, selectedFileIsCompatible]);
 
   async function handleOpenFile() {
     if (!details) return;
@@ -404,10 +429,12 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
     const { checkedIds, files: allFiles } = useFilesPageStore.getState();
 
     // If multiple files are checked, open all of them; otherwise just the selected one
-    const filesToOpen =
-      checkedIds.size > 1
-        ? allFiles.filter((f) => checkedIds.has(f.id))
-        : [{ id: details.id, originalName: details.originalName, mimeType: details.mimeType }];
+    const filesToOpen = getFilesToOpen({
+      details,
+      files: allFiles,
+      checkedIds,
+      filterMimePrefix,
+    });
 
     const downloaded = await Promise.all(
       filesToOpen.map(async (f) => {
@@ -445,7 +472,7 @@ export function FileDetails({ mobile = false }: FileDetailsProps) {
     }, 0);
   }
 
-  if (!selectedFileId) {
+  if (!selectedFileId || !selectedFileIsCompatible) {
     return (
       <div
         className={cn(

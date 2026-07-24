@@ -71,6 +71,60 @@ test.describe("Editor Navigation", () => {
     await expect(historyTab).toHaveText("History");
   });
 
+  test("right panel tabs use roving focus and standard navigation keys", async ({
+    editorPage: page,
+  }) => {
+    const layersTab = page.getByTestId("tab-layers");
+    const adjustmentsTab = page.getByTestId("tab-adjustments");
+    const historyTab = page.getByTestId("tab-history");
+
+    await expect(layersTab).toHaveAttribute("tabindex", "0");
+    await expect(adjustmentsTab).toHaveAttribute("tabindex", "-1");
+    await expect(historyTab).toHaveAttribute("tabindex", "-1");
+    for (const tab of [layersTab, adjustmentsTab, historyTab]) {
+      await expect(tab).toHaveAttribute("aria-controls", "editor-panel");
+    }
+    await expect(page.locator("#editor-panel")).toHaveCount(1);
+
+    await layersTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(adjustmentsTab).toBeFocused();
+    await expect(adjustmentsTab).toHaveAttribute("aria-selected", "true");
+
+    await page.keyboard.press("End");
+    await expect(historyTab).toBeFocused();
+    await expect(historyTab).toHaveAttribute("aria-selected", "true");
+
+    await page.keyboard.press("Home");
+    await expect(layersTab).toBeFocused();
+    await expect(layersTab).toHaveAttribute("aria-selected", "true");
+
+    await page.keyboard.press("ArrowLeft");
+    await expect(historyTab).toBeFocused();
+    await expect(historyTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("Tab leaves the tablist without collapsing the right panel", async ({
+    editorPage: page,
+  }) => {
+    const layersTab = page.getByTestId("tab-layers");
+    await layersTab.focus();
+
+    await page.keyboard.press("Tab");
+
+    await expect(layersTab).toBeVisible();
+    await expect(page.locator('button[aria-label="Collapse panel"]')).toBeFocused();
+  });
+
+  test("editor skip link focuses the main landmark", async ({ editorPage: page }) => {
+    const skipLink = page.locator('a[href="#main-content"]');
+    await skipLink.focus();
+
+    await page.keyboard.press("Enter");
+
+    await expect(page.locator("#main-content")).toBeFocused();
+  });
+
   test("right panel collapses and expands", async ({ editorPage: page }) => {
     // Panel starts visible with tabs
     await expect(page.locator("[data-testid='tab-layers']")).toBeVisible();

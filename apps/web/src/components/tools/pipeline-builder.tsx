@@ -202,7 +202,7 @@ export function PipelineBuilder({
         <div className="p-4 rounded-full bg-muted/50 mb-4">
           <Workflow className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="text-sm font-medium text-foreground mb-1">{t.automate.noStepsHeading}</h3>
+        <h2 className="text-sm font-medium text-foreground mb-1">{t.automate.noStepsHeading}</h2>
         <p className="text-sm text-muted-foreground max-w-[240px]">{t.automate.addToolsPrompt}</p>
       </div>
     );

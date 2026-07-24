@@ -23,6 +23,7 @@ export function MobileBottomNav({ onSettingsClick }: MobileBottomNavProps) {
         <button
           type="button"
           onClick={onSettingsClick}
+          data-testid="open-settings"
           className="flex flex-col items-center gap-0.5 px-3 py-2 text-muted-foreground"
         >
           <SettingsIcon className="h-6 w-6" />

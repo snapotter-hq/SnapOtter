@@ -7,7 +7,8 @@
  * The release gate requires zero axe violations in the scoped pages.
  */
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "./helpers";
+import { DESKTOP_A11Y_PAGES } from "./a11y-routes.js";
+import { expect, openSettings, test } from "./helpers";
 
 interface ViolationEntry {
   id: string;
@@ -52,26 +53,6 @@ async function auditPage(
   }
 }
 
-// ---- Scoped page set ----
-
-const PAGES_EN = [
-  { key: "home-en", path: "/", needsAuth: true },
-  { key: "image-resize-en", path: "/image/resize", needsAuth: true },
-  { key: "video-convert-en", path: "/video/convert-video", needsAuth: true },
-  { key: "audio-convert-en", path: "/audio/convert-audio", needsAuth: true },
-  { key: "pdf-pdf-to-image-en", path: "/pdf/pdf-to-image", needsAuth: true },
-  { key: "files-csv-excel-en", path: "/files/csv-excel", needsAuth: true },
-  { key: "editor-en", path: "/editor", needsAuth: true },
-  { key: "login-en", path: "/login", needsAuth: false },
-];
-
-const PAGES_AR = [
-  { key: "home-ar", path: "/", needsAuth: true, locale: "ar" },
-  { key: "image-resize-ar", path: "/image/resize", needsAuth: true, locale: "ar" },
-  { key: "editor-ar", path: "/editor", needsAuth: true, locale: "ar" },
-  { key: "login-ar", path: "/login", needsAuth: false, locale: "ar" },
-];
-
 // ---- Tests ----
 
 // Each test scans 9+ pages with axe; the default 30s timeout is tight.
@@ -83,12 +64,14 @@ test.describe("Axe a11y audit -- desktop EN", () => {
   }) => {
     const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
 
-    for (const p of PAGES_EN) {
+    for (const p of DESKTOP_A11Y_PAGES.en) {
       if (p.needsAuth) {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
+        if (p.openSettings) await openSettings(page);
         await auditPage(page, p.key, allViolations);
+        if (p.openSettings) await page.keyboard.press("Escape");
       } else {
         // Login page: use a fresh context without auth
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -127,7 +110,7 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
   test("has no accessibility violations on RTL pages", async ({ loggedInPage: page, browser }) => {
     const allViolations: { key: string; impact: string; description: string; count: number }[] = [];
 
-    for (const p of PAGES_AR) {
+    for (const p of DESKTOP_A11Y_PAGES.ar) {
       if (p.needsAuth) {
         // Switch to Arabic locale
         await page.evaluate(() => {
@@ -136,7 +119,9 @@ test.describe("Axe a11y audit -- desktop AR (RTL)", () => {
         await page.goto(p.path);
         await page.waitForLoadState("networkidle");
         await page.waitForTimeout(500);
+        if (p.openSettings) await openSettings(page);
         await auditPage(page, p.key, allViolations);
+        if (p.openSettings) await page.keyboard.press("Escape");
       } else {
         const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         const anonPage = await ctx.newPage();
