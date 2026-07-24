@@ -79,7 +79,12 @@ const blocks = [
         ta.style.left = "-9999px";
         document.body.appendChild(ta);
         ta.select();
-        try { document.execCommand("copy"); } catch {}
+        try {
+          const legacyCopy = Reflect.get(document, "execCommand") as
+            | ((commandId: string) => boolean)
+            | undefined;
+          legacyCopy?.call(document, "copy");
+        } catch {}
         document.body.removeChild(ta);
       }
       flip(true);

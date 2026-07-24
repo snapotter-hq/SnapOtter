@@ -1,5 +1,6 @@
 ---
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes frontmatter imports.
 import { t } from "@/i18n";
 
 interface Props {
@@ -117,7 +118,10 @@ const DOCKER_CMD =
         document.body.appendChild(ta);
         ta.select();
         try {
-          document.execCommand("copy");
+          const legacyCopy = Reflect.get(document, "execCommand") as
+            | ((commandId: string) => boolean)
+            | undefined;
+          legacyCopy?.call(document, "copy");
         } catch {
           // Nothing else to try; the icon still flips so the user can copy manually.
         }
