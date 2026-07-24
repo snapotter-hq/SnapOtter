@@ -35,6 +35,8 @@
           "apps/demo/package.json",
           "apps/docs/package.json",
           "apps/landing/package.json",
+          "apps/docs/**/guide/getting-started.md",
+          "apps/docs/**/guide/security.md",
           "packages/shared/package.json",
           "packages/shared/src/constants.ts",
           "packages/doc-engine/package.json",

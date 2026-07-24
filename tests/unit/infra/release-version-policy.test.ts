@@ -1,4 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -51,6 +61,76 @@ describe("release version domains", () => {
 
     for (const manifest of workspaceManifests()) {
       expect(assets.has(manifest), `${manifest} is missing from release commit assets`).toBe(true);
+    }
+  });
+
+  it("keeps published release commands synchronized and commits their source pages", () => {
+    const releaseConfig = JSON.parse(readFileSync(path.resolve(root, ".releaserc.json"), "utf8"));
+    const gitPlugin = releaseConfig.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "@semantic-release/git",
+    );
+    const assets = new Set<string>(gitPlugin[1].assets);
+    expect(assets).toContain("apps/docs/**/guide/getting-started.md");
+    expect(assets).toContain("apps/docs/**/guide/security.md");
+
+    const syncScript = readFileSync(path.resolve(root, "scripts/sync-version.sh"), "utf8");
+    expect(syncScript).toContain('node "$ROOT/scripts/sync-published-docs-version.mjs" "$VERSION"');
+
+    const releasePages = ["apps/docs/guide/getting-started.md", "apps/docs/guide/security.md"];
+    for (const locale of readdirSync(path.resolve(root, "apps/docs"))) {
+      for (const page of ["getting-started.md", "security.md"]) {
+        const candidate = path.join("apps/docs", locale, "guide", page);
+        if (existsSync(path.resolve(root, candidate))) releasePages.push(candidate);
+      }
+    }
+    for (const page of releasePages) {
+      const source = readFileSync(path.resolve(root, page), "utf8");
+      const versions = [
+        ...source.matchAll(/SnapOtter\/(?:blob\/)?v([^/]+)\/docker\/docker-compose\.yml/g),
+        ...source.matchAll(
+          /snapotter-v([0-9][0-9A-Za-z.+-]*?)-(?:release-subjects|image-linux-amd64-sbom)/g,
+        ),
+        ...source.matchAll(/snapotter\/snapotter:([0-9][0-9A-Za-z.+-]*)/g),
+      ].map((match) => match[1]);
+      expect(versions.length, `${page} must contain release-coupled examples`).toBeGreaterThan(0);
+      expect(new Set(versions), `${page} has a stale release example`).toEqual(
+        new Set([rootPackage.version]),
+      );
+    }
+  });
+
+  it("rewrites every published release-reference shape for the next version", () => {
+    const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-docs-version-"));
+    const guide = path.join(fixtureRoot, "apps/docs/guide");
+    mkdirSync(guide, { recursive: true });
+    const fixture = [
+      "https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v1.9.0/docker/docker-compose.yml",
+      "https://github.com/snapotter-hq/SnapOtter/blob/v1.9.0/docker/docker-compose.yml",
+      "snapotter-v1.9.0-release-subjects.json",
+      "snapotter-v1.9.0-image-linux-amd64-sbom.cdx.json",
+      "snapotter-v1.9.0-image-linux-amd64-sbom.spdx.json",
+      "snapotter/snapotter:1.9.0",
+    ].join("\n");
+    try {
+      writeFileSync(path.join(guide, "getting-started.md"), fixture);
+      writeFileSync(path.join(guide, "security.md"), fixture);
+      execFileSync(
+        process.execPath,
+        [
+          path.resolve(root, "scripts/sync-published-docs-version.mjs"),
+          "3.0.0-rc.1",
+          "--root",
+          fixtureRoot,
+        ],
+        { encoding: "utf8" },
+      );
+      for (const page of ["getting-started.md", "security.md"]) {
+        const source = readFileSync(path.join(guide, page), "utf8");
+        expect(source).not.toContain("1.9.0");
+        expect(source.match(/3\.0\.0-rc\.1/g)).toHaveLength(6);
+      }
+    } finally {
+      rmSync(fixtureRoot, { force: true, recursive: true });
     }
   });
 

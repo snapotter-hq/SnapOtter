@@ -193,7 +193,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
 
 # ============================================
 # Stage 3: Platform-specific base images
-# Pin tags to specific major.minor for reproducible builds.
+# Pin tags to a stable upstream series; release digests provide artifact provenance.
 # ============================================
 FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS base-linux-arm64
 # CUDA base must match the remaining GPU AI bundles' torch/onnxruntime wheels

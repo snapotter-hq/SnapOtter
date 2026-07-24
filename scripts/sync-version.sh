@@ -53,6 +53,10 @@ if [ -f "$CONSTANTS" ]; then
   echo "  Updated APP_VERSION -> $VERSION"
 fi
 
+# Keep the release-specific commands in every published documentation locale
+# aligned with the tag and immutable artifact names created by this release.
+node "$ROOT/scripts/sync-published-docs-version.mjs" "$VERSION"
+
 # Clean up release notes file (consumed by CI, not needed after release commit)
 rm -f "$ROOT/.release-notes.md"
 
