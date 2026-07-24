@@ -723,7 +723,9 @@ describe("OCR v3 bundle release workflow", () => {
     expect(aiBundles).toContain(
       "OCR_RUNTIME_INDEX_SIGNING_KEY_B64: ${{ secrets.OCR_RUNTIME_INDEX_SIGNING_KEY_B64 }}",
     );
-    expect(manifest).toContain("needs: [release, docker, scan, sbom, ai-bundles]");
+    expect(manifest).toContain(
+      "needs: [release, prebuilt, archive-security, docker, scan, sbom, ai-bundles]",
+    );
     expect(docker).toContain("Reuse an existing published platform digest");
     expect(docker).toContain("snapotter-v${VERSION}-${PLATFORM_PAIR}.digest");
     expect(docker).toContain('reuse_description="immutable ${asset_name} checkpoint"');
@@ -773,7 +775,7 @@ describe("OCR v3 bundle release workflow", () => {
 
   it("makes every run-scoped artifact upload safe to replace on a rerun", () => {
     const workflows = [readRequired(bundlesWorkflowPath), readRequired(releaseWorkflowPath)];
-    const expectedUploadCounts = [5, 1];
+    const expectedUploadCounts = [5, 2];
 
     workflows.forEach((workflow, workflowIndex) => {
       const uploadSteps = [
@@ -812,7 +814,7 @@ describe("OCR v3 bundle release workflow", () => {
     expect(releaseJob).toContain("release_commit: ${{ steps.check.outputs.release_commit }}");
     expect(releaseJob).toContain('git rev-parse "refs/tags/v${version}^{commit}"');
     expect(release.match(/ref: \$\{\{ needs\.release\.outputs\.release_commit \}\}/g)).toHaveLength(
-      5,
+      7,
     );
     expect(bundles).toContain("release_commit:");
     expect(bundles).toContain("required: true");
@@ -1289,9 +1291,9 @@ describe("OCR v3 bundle release workflow", () => {
   it("serializes mutation boundaries without locking the approval-gated manifest", () => {
     const release = readRequired(releaseWorkflowPath);
     const releaseJob = job(release, "release", "prebuilt");
-    const prebuiltJob = job(release, "prebuilt", "docker");
+    const prebuiltJob = job(release, "prebuilt", "archive-security");
     const dockerJob = job(release, "docker", "scan");
-    const manifestJob = job(release, "manifest", "aliases");
+    const manifestJob = job(release, "manifest", "image-provenance");
     const aliasesJob = job(release, "aliases");
 
     expect(releaseJob).toContain("group: snapotter-semantic-release");
@@ -1312,12 +1314,14 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("requires application SBOM completion before publishing public image tags", () => {
-    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "aliases");
-    expect(manifest).toContain("needs: [release, docker, scan, sbom, ai-bundles]");
+    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "image-provenance");
+    expect(manifest).toContain(
+      "needs: [release, prebuilt, archive-security, docker, scan, sbom, ai-bundles]",
+    );
   });
 
   it("revalidates the remote release tag after approval and at both immutable publications", () => {
-    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "aliases");
+    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "image-provenance");
 
     expect(manifest).toContain("ref: ${{ needs.release.outputs.release_commit }}");
     expect(manifest).toContain("persist-credentials: false");
@@ -1343,14 +1347,14 @@ describe("OCR v3 bundle release workflow", () => {
 
   it("publishes immutable version tags separately and never regresses moving aliases", () => {
     const release = readRequired(releaseWorkflowPath);
-    const manifest = job(release, "manifest", "aliases");
+    const manifest = job(release, "manifest", "image-provenance");
     const aliases = job(release, "aliases");
 
     expect(manifest).toContain('arguments=("-t" "snapotter/snapotter:${VERSION}")');
     expect(manifest).toContain('arguments=("-t" "ghcr.io/snapotter-hq/snapotter:${VERSION}")');
     expect(manifest).not.toContain("{{major}}");
     expect(manifest).not.toContain("value=latest");
-    expect(aliases).toContain("needs: [release, manifest]");
+    expect(aliases).toContain("needs: [release, manifest, image-provenance]");
     expect(aliases).toContain(
       "Fetch and evaluate stable tags immediately before Docker Hub aliases",
     );
@@ -1418,7 +1422,9 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("builds deterministic immutable prebuilt archive and checksum assets", () => {
-    const prebuilt = job(readRequired(releaseWorkflowPath), "prebuilt", "docker");
+    const release = readRequired(releaseWorkflowPath);
+    const prebuilt = job(release, "prebuilt", "archive-security");
+    const archiveSecurity = job(release, "archive-security", "docker");
 
     expect(prebuilt).toContain(
       'SOURCE_DATE_EPOCH="$(git show -s --format=%ct "${RELEASE_COMMIT}")"',
@@ -1433,10 +1439,12 @@ describe("OCR v3 bundle release workflow", () => {
     expect(prebuilt).toContain("--pax-option=delete=atime,delete=ctime");
     expect(prebuilt).toContain("gzip -n");
     expect(prebuilt).not.toContain("--clobber");
-    expect(prebuilt).toContain("verify_or_upload_asset");
-    expect(prebuilt).toContain("Existing immutable release asset differs");
-    expect(prebuilt).toContain("Expected exactly one immutable release asset after upload");
-    expect(prebuilt).toContain('verify_or_upload_asset "/tmp/${archive_name}"');
-    expect(prebuilt).toContain('verify_or_upload_asset "/tmp/${archive_name}.sha256"');
+    expect(prebuilt).toContain("name: prebuilt-${{ matrix.arch }}");
+    expect(prebuilt).not.toContain("gh release upload");
+    expect(archiveSecurity).toContain("verify_or_upload_asset");
+    expect(archiveSecurity).toContain("Existing immutable release asset differs");
+    expect(archiveSecurity).toContain("Expected exactly one immutable release asset after upload");
+    expect(archiveSecurity).toContain('"/tmp/prebuilt/${archive_name}"');
+    expect(archiveSecurity).toContain('"/tmp/prebuilt/${archive_name}.sha256"');
   });
 });

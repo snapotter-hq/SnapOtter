@@ -147,12 +147,17 @@ jobs:
           git config user.name "SnapOtter"
           git config user.email "snapotter.hq@gmail.com"
           git add "$CHANGELOG"
-          git commit -m "docs: update changelog for v${VERSION} [skip ci]" || true
+          if git diff --cached --quiet; then
+            echo "Docs changelog already current for v${VERSION}."
+            exit 0
+          fi
+          git commit -m "docs: update changelog for v${VERSION} [skip ci]"
           # Authenticate this direct push explicitly: the job's checkout uses
           # persist-credentials: false, so there is no ambient credential. The
-          # PAT's admin identity bypasses branch protection; if the secret is
-          # unset this no-ops (|| true) exactly as before.
-          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main || true
+          # PAT's admin identity bypasses branch protection. Authentication or
+          # push failures must stop the release so the public changelog cannot
+          # silently drift from the immutable release.
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
           echo "Docs changelog updated for v${VERSION}."
 
   prebuilt:
@@ -250,8 +255,171 @@ jobs:
       - name: Generate checksum
         run: cd /tmp && sha256sum "${archive_name}" > "${archive_name}.sha256"
 
-      - name: Upload to GitHub Release
+      - name: Upload unverified archive for security verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prebuilt-${{ matrix.arch }}
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+          path: |
+            /tmp/${{ env.archive_name }}
+            /tmp/${{ env.archive_name }}.sha256
+
+  archive-security:
+    name: Verify Archive (${{ matrix.arch }})
+    needs: [release, prebuilt]
+    if: needs.release.outputs.new_version
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out the immutable release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
         env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Download unverified archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: prebuilt-${{ matrix.arch }}
+          path: /tmp/prebuilt
+
+      - name: Verify checksum and safely extract archive
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          archive_name="snapotter-v${VERSION}-linux-${ARCH}.tar.gz"
+          [[ -f "/tmp/prebuilt/${archive_name}" \
+            && ! -L "/tmp/prebuilt/${archive_name}" \
+            && -f "/tmp/prebuilt/${archive_name}.sha256" \
+            && ! -L "/tmp/prebuilt/${archive_name}.sha256" ]] || {
+              echo "::error::Archive artifact closure is incomplete"
+              exit 1
+            }
+          [[ "$(find /tmp/prebuilt -mindepth 1 -maxdepth 1 -type f | wc -l)" -eq 2 ]] || {
+            echo "::error::Archive artifact contains unexpected files"
+            exit 1
+          }
+          (cd /tmp/prebuilt && sha256sum --check --strict "${archive_name}.sha256")
+          rm -rf /tmp/prebuilt-root
+          mkdir -p /tmp/prebuilt-root
+          python3 - "/tmp/prebuilt/${archive_name}" <<'PY'
+          import pathlib
+          import sys
+          import tarfile
+
+          archive = pathlib.Path(sys.argv[1])
+          root = pathlib.Path("/tmp/prebuilt-root")
+          with tarfile.open(archive, "r:gz") as handle:
+              members = handle.getmembers()
+              if not members:
+                  raise SystemExit("release archive is empty")
+              for member in members:
+                  parts = pathlib.PurePosixPath(member.name).parts
+                  if not parts or parts[0] != "snapotter" or ".." in parts:
+                      raise SystemExit(f"unsafe release archive member: {member.name}")
+              handle.extractall(root, filter="data")
+          PY
+          test -s /tmp/prebuilt-root/snapotter/apps/web/dist/index.html
+          test -s /tmp/prebuilt-root/snapotter/apps/api/src/index.ts
+          test -x /tmp/prebuilt-root/snapotter/node_modules/.bin/tsx
+          /tmp/prebuilt-root/snapotter/node_modules/.bin/tsx --version
+          echo "archive_name=${archive_name}" >> "$GITHUB_ENV"
+
+      - name: Install pinned Syft 1.42.3 from verified release bytes
+        env:
+          SYFT_VERSION: "1.42.3"
+        run: |
+          case "$(uname -m)" in
+            x86_64)
+              syft_arch="amd64"
+              expected_sha256="0d6be741479eddd2c8644a288990c04f3df0d609bbc1599a005532a9dff63509"
+              ;;
+            aarch64 | arm64)
+              syft_arch="arm64"
+              expected_sha256="dc630590c953347789d08f8ebf57c7d8094db89100785fcd94b1cddeac791804"
+              ;;
+            *)
+              echo "::error::Unsupported Syft installer architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+          archive="syft_${SYFT_VERSION}_linux_${syft_arch}.tar.gz"
+          install_root="${RUNNER_TEMP}/syft-${SYFT_VERSION}"
+          rm -rf "${install_root}"
+          mkdir -p "${install_root}"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${install_root}/${archive}" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/${archive}"
+          printf '%s  %s\n' "${expected_sha256}" "${install_root}/${archive}" \
+            | sha256sum --check --strict -
+          tar -xzf "${install_root}/${archive}" -C "${install_root}" syft
+          chmod 0755 "${install_root}/syft"
+          "${install_root}/syft" version -o json \
+            | jq -e --arg version "${SYFT_VERSION}" '.version == $version' >/dev/null
+          echo "${install_root}" >> "$GITHUB_PATH"
+
+      - name: Generate archive SBOMs
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          syft scan dir:/tmp/prebuilt-root/snapotter \
+            -o "cyclonedx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.cdx.json"
+          syft scan dir:/tmp/prebuilt-root/snapotter \
+            -o "spdx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.spdx.json"
+
+      - name: Scan archive filesystem
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: /tmp/prebuilt-root/snapotter
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+
+      - name: Record archive scan
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: /tmp/prebuilt-root/snapotter
+          format: json
+          output: snapotter-v${{ needs.release.outputs.new_version }}-linux-${{ matrix.arch }}-trivy.json
+          ignore-unfixed: true
+
+      - name: Publish verified immutable archive assets
+        env:
+          ARCH: ${{ matrix.arch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
@@ -263,7 +431,6 @@ jobs:
             echo "::error::GitHub release did not resolve to one immutable ID"
             exit 1
           }
-
           asset_list="$(mktemp)"
           trap 'rm -f "${asset_list}" /tmp/existing-release-asset-*' EXIT
 
@@ -304,10 +471,10 @@ jobs:
             asset_name="$(basename "${asset_path}")"
             refresh_assets
             mapfile -t asset_ids < <(matching_asset_ids "${asset_name}")
-            if [[ ${#asset_ids[@]} -gt 1 ]]; then
+            [[ ${#asset_ids[@]} -le 1 ]] || {
               echo "::error::Immutable release asset name collides: ${asset_name}"
               exit 1
-            fi
+            }
             if [[ ${#asset_ids[@]} -eq 1 ]]; then
               compare_asset "${asset_ids[0]}" "${asset_path}"
               echo "Verified existing immutable release asset: ${asset_name}"
@@ -316,10 +483,17 @@ jobs:
             gh release upload "v${VERSION}" "${asset_path}" --repo "${REPOSITORY}"
           }
 
-          verify_or_upload_asset "/tmp/${archive_name}"
-          verify_or_upload_asset "/tmp/${archive_name}.sha256"
-
-          for asset_path in "/tmp/${archive_name}" "/tmp/${archive_name}.sha256"; do
+          assets=(
+            "/tmp/prebuilt/${archive_name}"
+            "/tmp/prebuilt/${archive_name}.sha256"
+            "snapotter-v${VERSION}-linux-${ARCH}-sbom.cdx.json"
+            "snapotter-v${VERSION}-linux-${ARCH}-sbom.spdx.json"
+            "snapotter-v${VERSION}-linux-${ARCH}-trivy.json"
+          )
+          for asset_path in "${assets[@]}"; do
+            verify_or_upload_asset "${asset_path}"
+          done
+          for asset_path in "${assets[@]}"; do
             asset_name="$(basename "${asset_path}")"
             refresh_assets
             mapfile -t asset_ids < <(matching_asset_ids "${asset_name}")
@@ -329,6 +503,11 @@ jobs:
             }
             compare_asset "${asset_ids[0]}" "${asset_path}"
           done
+
+      - name: Attest exact verified archive
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: "/tmp/prebuilt/${{ env.archive_name }}"
 
   docker:
     name: Build (${{ matrix.platform }})
@@ -981,7 +1160,7 @@ jobs:
 
   manifest:
     name: Create Multi-Arch Manifests
-    needs: [release, docker, scan, sbom, ai-bundles]
+    needs: [release, prebuilt, archive-security, docker, scan, sbom, ai-bundles]
     runs-on: ubuntu-latest
     # Manual publish gate: this job creates only the immutable version tags. A
     # downstream, globally serialized job advances moving aliases after checking
@@ -992,6 +1171,7 @@ jobs:
       contents: read
       packages: write
     outputs:
+      manifest_digest: ${{ steps.manifest_digest.outputs.digest }}
       platform_digests: ${{ steps.verified_digests.outputs.platform_digests }}
     steps:
       - name: Check out the approved immutable release commit
@@ -1198,7 +1378,7 @@ jobs:
               }
           )
 
-          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \;)
+          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \; | sort)
           [[ ${#digests[@]} -eq 2 ]] || {
             echo "::error::Docker Hub manifest input closure is incomplete"
             exit 1
@@ -1231,7 +1411,7 @@ jobs:
               }
           )
 
-          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \;)
+          mapfile -t digests < <(find . -maxdepth 1 -type f -exec basename {} \; | sort)
           [[ ${#digests[@]} -eq 2 ]] || {
             echo "::error::GHCR manifest input closure is incomplete"
             exit 1
@@ -1246,9 +1426,109 @@ jobs:
           done
           docker buildx imagetools create "${arguments[@]}"
 
+      - name: Verify immutable manifest parity
+        id: manifest_digest
+        env:
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          docker buildx imagetools inspect \
+            "snapotter/snapotter:${VERSION}" --raw > /tmp/dockerhub-manifest.json
+          docker buildx imagetools inspect \
+            "ghcr.io/snapotter-hq/snapotter:${VERSION}" --raw > /tmp/ghcr-manifest.json
+          dockerhub_digest="sha256:$(sha256sum /tmp/dockerhub-manifest.json | cut -d ' ' -f 1)"
+          ghcr_digest="sha256:$(sha256sum /tmp/ghcr-manifest.json | cut -d ' ' -f 1)"
+          [[ "${dockerhub_digest}" == "${ghcr_digest}" ]] || {
+            echo "::error::Immutable registry manifests do not have identical bytes"
+            exit 1
+          }
+          [[ "${ghcr_digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Published manifest digest is invalid"
+            exit 1
+          }
+          echo "digest=${ghcr_digest}" >> "$GITHUB_OUTPUT"
+
+  image-provenance:
+    name: Attest Immutable Image Manifest
+    needs: [release, manifest]
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: read
+    steps:
+      - name: Check out the immutable release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Verify version tags resolve to the release-produced manifest
+        env:
+          MANIFEST_DIGEST: ${{ needs.manifest.outputs.manifest_digest }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          [[ "${MANIFEST_DIGEST}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Release manifest output is invalid"
+            exit 1
+          }
+          for reference in \
+            "docker.io/snapotter/snapotter:${VERSION}" \
+            "ghcr.io/snapotter-hq/snapotter:${VERSION}"; do
+            raw="/tmp/$(echo "${reference}" | tr '/:' '_').json"
+            docker buildx imagetools inspect "${reference}" --raw > "${raw}"
+            resolved_digest="sha256:$(sha256sum "${raw}" | cut -d ' ' -f 1)"
+            [[ "${resolved_digest}" == "${MANIFEST_DIGEST}" ]] || {
+              echo "::error::${reference} does not resolve to the release manifest"
+              exit 1
+            }
+          done
+
+      - name: Attest exact GHCR manifest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ghcr.io/snapotter-hq/snapotter
+          subject-digest: ${{ needs.manifest.outputs.manifest_digest }}
+          push-to-registry: false
+
+      - name: Attest exact Docker Hub manifest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: docker.io/snapotter/snapotter
+          subject-digest: ${{ needs.manifest.outputs.manifest_digest }}
+          push-to-registry: false
+
   aliases:
     name: Advance Non-Regressing Image Aliases
-    needs: [release, manifest]
+    needs: [release, manifest, image-provenance]
     runs-on: ubuntu-latest
     # GitHub does not guarantee FIFO ordering for a concurrency group. Every
     # holder therefore fetches the complete remote tag set again while holding
