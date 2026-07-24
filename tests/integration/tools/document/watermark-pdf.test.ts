@@ -52,6 +52,11 @@ describe.skipIf(!pdfcpuAvailable())("watermark-pdf (requires pdfcpu)", () => {
 });
 
 describe("watermark-pdf validation (ungated)", () => {
+  it("rejects whitespace-only watermark text with 400", async () => {
+    const res = await runTool({ text: "   \t" });
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
   it("rejects text longer than 200 characters with 400", async () => {
     const longText = "A".repeat(201);
     const res = await runTool({ text: longText });

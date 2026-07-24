@@ -6,7 +6,11 @@ import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  text: z.string().min(1).max(200),
+  text: z
+    .string()
+    .min(1)
+    .max(200)
+    .refine((text) => text.trim().length > 0, { message: "Watermark text cannot be blank" }),
   position: z.enum(["tl", "tc", "tr", "l", "c", "r", "bl", "bc", "br"]).default("c"),
   fontSize: z.number().int().min(6).max(72).default(48),
   opacity: z.number().min(0.05).max(1).default(0.3),

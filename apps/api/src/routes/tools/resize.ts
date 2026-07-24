@@ -13,7 +13,7 @@ const settingsSchema = z
     height: z.number().int().positive().max(MAX_DIMENSION).optional(),
     fit: z.enum(["contain", "cover", "fill", "inside", "outside"]).default("contain"),
     withoutEnlargement: z.boolean().default(false),
-    percentage: z.number().positive().optional(),
+    percentage: z.number().finite().positive().optional(),
   })
   .refine((s) => s.width !== undefined || s.height !== undefined || s.percentage !== undefined, {
     message: "At least one of width, height, or percentage is required",

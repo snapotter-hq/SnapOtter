@@ -31,9 +31,9 @@ const FORMAT_EXTENSIONS: Record<string, string> = {
 
 const settingsSchema = z.object({
   format: z.enum(["webp", "jpeg", "avif", "png", "jxl"]).default("webp"),
-  quality: z.number().min(1).max(100).default(80),
-  maxWidth: z.number().positive().optional(),
-  maxHeight: z.number().positive().optional(),
+  quality: z.number().int().min(1).max(100).default(80),
+  maxWidth: z.number().int().positive().optional(),
+  maxHeight: z.number().int().positive().optional(),
   progressive: z.boolean().default(true),
   stripMetadata: z.boolean().default(true),
 });

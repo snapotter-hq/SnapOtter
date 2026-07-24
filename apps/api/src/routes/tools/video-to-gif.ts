@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -22,7 +23,10 @@ export function registerVideoToGif(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}.gif`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, out, info) => {
+        if (settings.startS >= (info.durationS ?? Infinity)) {
+          throw new InputValidationError("Start is beyond the end of the video");
+        }
         // Place -ss/-t AFTER -i (output-side seeking) so ffmpeg decodes
         // from the start.  Input-side seeking relies on a keyframe index
         // which FLV (and some other legacy containers) often lack, causing

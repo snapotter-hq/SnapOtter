@@ -328,9 +328,6 @@ export function registerBeautify(app: FastifyInstance) {
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const s = settings as BeautifySettings;
-      if (s.backgroundType === "image") {
-        throw new Error("Image backgrounds are not supported in pipeline mode.");
-      }
       const buffer = await processBeautify(inputBuffer, s, filename);
       const outFilename = resolveOutputFilename(filename, s);
       const forcedPng = needsAlphaOutput(s) && !ALPHA_FORMATS.has(s.outputFormat);

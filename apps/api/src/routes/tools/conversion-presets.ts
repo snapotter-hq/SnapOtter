@@ -13,7 +13,7 @@ import { registerSvgToRasterPreset } from "./svg-to-raster.js";
  */
 function presetSchema(base: string) {
   if (base === "convert" || base === "svg-to-raster") {
-    return z.object({ quality: z.number().min(1).max(100).optional() });
+    return z.object({ quality: z.number().int().min(1).max(100).optional() });
   }
   if (base === "convert-video") {
     return z.object({ quality: z.enum(["high", "balanced", "small"]).optional() });

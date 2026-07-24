@@ -7,7 +7,7 @@ import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   mode: z.enum(["quality", "targetSize"]).default("quality"),
-  quality: z.number().min(1).max(100).optional(),
+  quality: z.number().int().min(1).max(100).optional(),
   targetSizeKb: z.number().positive().optional(),
 });
 

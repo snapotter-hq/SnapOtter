@@ -17,12 +17,12 @@ import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
-  columns: z.number().min(1).max(100).default(3),
-  rows: z.number().min(1).max(100).default(3),
-  tileWidth: z.number().min(10).optional(),
-  tileHeight: z.number().min(10).optional(),
+  columns: z.number().int().min(1).max(100).default(3),
+  rows: z.number().int().min(1).max(100).default(3),
+  tileWidth: z.number().int().min(10).optional(),
+  tileHeight: z.number().int().min(10).optional(),
   outputFormat: z.enum(["original", "png", "jpg", "webp", "avif", "jxl"]).default("original"),
-  quality: z.number().min(1).max(100).default(90),
+  quality: z.number().int().min(1).max(100).default(90),
 });
 
 function resolveOutputFormat(

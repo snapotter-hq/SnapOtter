@@ -66,23 +66,23 @@ const settingsSchema = z.object({
   mode: z.enum(["resize", "optimize", "speed", "reverse", "extract", "rotate"]).default("resize"),
 
   // Resize
-  width: z.number().min(1).max(16384).optional(),
-  height: z.number().min(1).max(16384).optional(),
+  width: z.number().int().min(1).max(16384).optional(),
+  height: z.number().int().min(1).max(16384).optional(),
   percentage: z.number().min(1).max(500).optional(),
 
   // Optimize
-  colors: z.number().min(2).max(256).default(256),
+  colors: z.number().int().min(2).max(256).default(256),
   dither: z.number().min(0).max(1).default(1.0),
-  effort: z.number().min(1).max(10).default(7),
+  effort: z.number().int().min(1).max(10).default(7),
 
   // Speed
   speedFactor: z.number().min(0.1).max(10).default(1.0),
 
   // Extract
   extractMode: z.enum(["single", "range", "all"]).default("single"),
-  frameNumber: z.number().min(0).default(0),
-  frameStart: z.number().min(0).default(0),
-  frameEnd: z.number().min(0).optional(),
+  frameNumber: z.number().int().min(0).default(0),
+  frameStart: z.number().int().min(0).default(0),
+  frameEnd: z.number().int().min(0).optional(),
   extractFormat: z.enum(["png", "webp"]).default("png"),
 
   // Rotate
@@ -94,7 +94,7 @@ const settingsSchema = z.object({
   flipV: z.boolean().default(false),
 
   // Global
-  loop: z.number().min(0).max(100).default(0),
+  loop: z.number().int().min(0).max(100).default(0),
 });
 
 export function registerGifTools(app: FastifyInstance) {

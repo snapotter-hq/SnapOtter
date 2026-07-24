@@ -1,6 +1,11 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { InputValidationError } from "../../../../apps/api/src/modality/contract.js";
+import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -36,6 +41,27 @@ async function pollJob(jobId: string) {
 }
 
 describe.skipIf(!ffmpegAvailable())("video-to-gif (requires ffmpeg)", () => {
+  it("rejects a start time beyond the video instead of running an empty encode", async () => {
+    const config = getToolConfig("video-to-gif");
+    if (!config?.processV2) throw new Error("video-to-gif processV2 must be registered");
+    const processV2 = config.processV2;
+    const scratchDir = await mkdtemp(join(tmpdir(), "snapotter-video-to-gif-test-"));
+
+    try {
+      await expect(
+        processV2({
+          inputs: [{ buffer: MP4, filename: "tiny.mp4", ref: "test/tiny.mp4" }],
+          settings: { fps: 1, width: 672, startS: 2, durationS: 1 },
+          scratchDir,
+          signal: new AbortController().signal,
+          report: () => undefined,
+        }),
+      ).rejects.toBeInstanceOf(InputValidationError);
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns 202 (long hint) and produces a GIF with GIF8 magic", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },

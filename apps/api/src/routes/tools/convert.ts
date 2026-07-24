@@ -98,7 +98,7 @@ const settingsSchema = z.object({
     "eps",
     "tga",
   ]),
-  quality: z.number().min(1).max(100).optional(),
+  quality: z.number().int().min(1).max(100).optional(),
 });
 
 export function registerConvert(app: FastifyInstance) {
