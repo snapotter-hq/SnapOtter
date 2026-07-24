@@ -46,10 +46,10 @@ describe("release supply-chain closure", () => {
     expect(archiveSecurity).toContain('filter="data"');
     expect(archiveSecurity).toContain("node_modules/.bin/tsx --version");
     expect(archiveSecurity).toContain(
-      "cyclonedx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.cdx.json",
+      "cyclonedx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.cdx.json",
     );
     expect(archiveSecurity).toContain(
-      "spdx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.spdx.json",
+      "spdx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.spdx.json",
     );
     expect(archiveSecurity).toContain("scan-type: fs");
     expect(archiveSecurity).toContain("scan-ref: /tmp/prebuilt-root/snapotter");
@@ -64,7 +64,7 @@ describe("release supply-chain closure", () => {
   it("attests only the exact manifest digest emitted by the immutable release job", () => {
     const workflow = readRequired(releaseWorkflowPath);
     const manifest = job(workflow, "manifest", "image-provenance");
-    const provenance = job(workflow, "image-provenance", "aliases");
+    const provenance = job(workflow, "image-provenance", "release-subjects");
     const aliases = job(workflow, "aliases");
 
     expect(manifest).toContain("manifest_digest: ${{ steps.manifest_digest.outputs.digest }}");
@@ -83,17 +83,59 @@ describe("release supply-chain closure", () => {
       provenance.match(/subject-digest: \$\{\{ needs\.manifest\.outputs\.manifest_digest \}\}/g),
     ).toHaveLength(2);
 
-    expect(aliases).toContain("needs: [release, manifest, image-provenance]");
+    expect(aliases).toContain("needs: [release, manifest, image-provenance, release-subjects]");
+  });
+
+  it("cryptographically binds the generated release commit to every published subject", () => {
+    const workflow = readRequired(releaseWorkflowPath);
+    const releaseSubjects = job(workflow, "release-subjects", "aliases");
+    const aliases = job(workflow, "aliases");
+
+    expect(releaseSubjects).toContain(
+      "needs: [release, archive-security, manifest, image-provenance]",
+    );
+    expect(releaseSubjects).toContain("ref: ${{ needs.release.outputs.release_commit }}");
+    expect(releaseSubjects).toContain(
+      "RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}",
+    );
+    expect(releaseSubjects).toContain("WORKFLOW_TRIGGER_COMMIT: ${{ github.sha }}");
+    expect(releaseSubjects).toContain('"releaseCommit": release_commit');
+    expect(releaseSubjects).toContain('"releaseTag": release_tag');
+    expect(releaseSubjects).toContain('"workflowTriggerCommit": workflow_trigger_commit');
+    expect(releaseSubjects).toContain('for arch in ("amd64", "arm64")');
+    expect(releaseSubjects).toContain('archive = f"snapotter-v{version}-linux-{arch}.tar.gz"');
+    expect(releaseSubjects).toContain("docker.io/snapotter/snapotter");
+    expect(releaseSubjects).toContain("ghcr.io/snapotter-hq/snapotter");
+    expect(releaseSubjects).toContain("actions/attest-build-provenance@");
+    expect(releaseSubjects).toContain('subject-path: "/tmp/${{ env.release_subjects_name }}"');
+    expect(releaseSubjects).toContain("Existing release-subject manifest differs");
+    expect(releaseSubjects).not.toContain("--clobber");
+    expect(aliases).toContain("needs: [release, manifest, image-provenance, release-subjects]");
   });
 
   it("never overwrites an existing immutable release asset", () => {
     const workflow = readRequired(releaseWorkflowPath);
     const archiveSecurity = job(workflow, "archive-security", "docker");
+    const scan = job(workflow, "scan", "sbom");
+    const sbom = job(workflow, "sbom", "ai-bundles");
 
     expect(archiveSecurity).toContain("verify_or_upload_asset() {");
     expect(archiveSecurity).toContain("Existing immutable release asset differs");
     expect(archiveSecurity).toContain("Expected exactly one immutable release asset after upload");
-    expect(archiveSecurity).not.toContain("--clobber");
+    expect(scan).toContain("Existing immutable Trivy report differs");
+    expect(sbom).toContain("Existing immutable SBOM differs");
+    expect(workflow).not.toContain("--clobber");
+  });
+
+  it("uses disjoint archive and image compliance asset names", () => {
+    const workflow = readRequired(releaseWorkflowPath);
+    const archiveSecurity = job(workflow, "archive-security", "docker");
+    const scan = job(workflow, "scan", "sbom");
+    const sbom = job(workflow, "sbom", "ai-bundles");
+
+    expect(archiveSecurity).toContain("snapotter-v${VERSION}-archive-linux-${ARCH}-trivy.json");
+    expect(scan).toContain("snapotter-v${VERSION}-image-${{ matrix.platform }}-trivy.json");
+    expect(sbom).toContain("snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.cdx.json");
   });
 
   it("fails closed on changelog commit or push errors", () => {

@@ -395,9 +395,9 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           syft scan dir:/tmp/prebuilt-root/snapotter \
-            -o "cyclonedx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.cdx.json"
+            -o "cyclonedx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.cdx.json"
           syft scan dir:/tmp/prebuilt-root/snapotter \
-            -o "spdx-json=snapotter-v${VERSION}-linux-${ARCH}-sbom.spdx.json"
+            -o "spdx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.spdx.json"
 
       - name: Scan archive filesystem
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -417,7 +417,7 @@ jobs:
           scan-type: fs
           scan-ref: /tmp/prebuilt-root/snapotter
           format: json
-          output: snapotter-v${{ needs.release.outputs.new_version }}-linux-${{ matrix.arch }}-trivy.json
+          output: snapotter-v${{ needs.release.outputs.new_version }}-archive-linux-${{ matrix.arch }}-trivy.json
           ignore-unfixed: true
 
       - name: Publish verified immutable archive assets
@@ -489,9 +489,9 @@ jobs:
           assets=(
             "/tmp/prebuilt/${archive_name}"
             "/tmp/prebuilt/${archive_name}.sha256"
-            "snapotter-v${VERSION}-linux-${ARCH}-sbom.cdx.json"
-            "snapotter-v${VERSION}-linux-${ARCH}-sbom.spdx.json"
-            "snapotter-v${VERSION}-linux-${ARCH}-trivy.json"
+            "snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.cdx.json"
+            "snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.spdx.json"
+            "snapotter-v${VERSION}-archive-linux-${ARCH}-trivy.json"
           )
           for asset_path in "${assets[@]}"; do
             verify_or_upload_asset "${asset_path}"
@@ -507,7 +507,10 @@ jobs:
             compare_asset "${asset_ids[0]}" "${asset_path}"
           done
 
-      - name: Attest exact verified archive
+      # This provenance records the workflow identity that performed the
+      # verification. The release-subjects job below separately attests a
+      # canonical manifest that binds the semantic-release-created commit.
+      - name: Attest verified archive workflow provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: "/tmp/prebuilt/${{ env.archive_name }}"
@@ -1029,7 +1032,7 @@ jobs:
         with:
           image-ref: "ghcr.io/snapotter-hq/snapotter@sha256:${{ steps.digest.outputs.sha }}"
           format: "json"
-          output: "snapotter-v${{ needs.release.outputs.new_version }}-${{ matrix.platform }}-trivy.json"
+          output: "snapotter-v${{ needs.release.outputs.new_version }}-image-${{ matrix.platform }}-trivy.json"
           ignore-unfixed: true
 
       - name: Upload Trivy report to GitHub Release
@@ -1038,9 +1041,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          gh release upload "v${VERSION}" \
-            "snapotter-v${VERSION}-${{ matrix.platform }}-trivy.json" \
-            --clobber --repo snapotter-hq/SnapOtter
+          repository="snapotter-hq/SnapOtter"
+          report="snapotter-v${VERSION}-image-${{ matrix.platform }}-trivy.json"
+          release_id="$(gh api "repos/${repository}/releases/tags/v${VERSION}" --jq .id)"
+          [[ "${release_id}" =~ ^[0-9]+$ ]] || exit 1
+          mapfile -t asset_ids < <(
+            gh api "repos/${repository}/releases/${release_id}/assets?per_page=100" \
+              --jq ".[] | select(.name == \"${report}\") | .id"
+          )
+          [[ ${#asset_ids[@]} -le 1 ]] || {
+            echo "::error::Immutable Trivy report name collides: ${report}"
+            exit 1
+          }
+          if [[ ${#asset_ids[@]} -eq 1 ]]; then
+            gh api -H "Accept: application/octet-stream" \
+              "repos/${repository}/releases/assets/${asset_ids[0]}" \
+              > /tmp/existing-trivy-report.json
+            cmp --silent "${report}" /tmp/existing-trivy-report.json || {
+              echo "::error::Existing immutable Trivy report differs: ${report}"
+              exit 1
+            }
+          else
+            gh release upload "v${VERSION}" "${report}" --repo "${repository}"
+          fi
 
   sbom:
     name: Generate SBOM (${{ matrix.platform }})
@@ -1124,18 +1147,40 @@ jobs:
           IMAGE: "ghcr.io/snapotter-hq/snapotter@sha256:${{ steps.digest.outputs.sha }}"
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          syft scan "$IMAGE" -o "cyclonedx-json=snapotter-v${VERSION}-${{ matrix.platform }}-sbom.cdx.json"
-          syft scan "$IMAGE" -o "spdx-json=snapotter-v${VERSION}-${{ matrix.platform }}-sbom.spdx.json"
+          syft scan "$IMAGE" -o "cyclonedx-json=snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.cdx.json"
+          syft scan "$IMAGE" -o "spdx-json=snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.spdx.json"
 
       - name: Upload SBOMs to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
-          gh release upload "v${VERSION}" \
-            "snapotter-v${VERSION}-${{ matrix.platform }}-sbom.cdx.json" \
-            "snapotter-v${VERSION}-${{ matrix.platform }}-sbom.spdx.json" \
-            --clobber --repo snapotter-hq/SnapOtter
+          repository="snapotter-hq/SnapOtter"
+          release_id="$(gh api "repos/${repository}/releases/tags/v${VERSION}" --jq .id)"
+          [[ "${release_id}" =~ ^[0-9]+$ ]] || exit 1
+          for sbom in \
+            "snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.cdx.json" \
+            "snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.spdx.json"; do
+            mapfile -t asset_ids < <(
+              gh api "repos/${repository}/releases/${release_id}/assets?per_page=100" \
+                --jq ".[] | select(.name == \"${sbom}\") | .id"
+            )
+            [[ ${#asset_ids[@]} -le 1 ]] || {
+              echo "::error::Immutable SBOM name collides: ${sbom}"
+              exit 1
+            }
+            if [[ ${#asset_ids[@]} -eq 1 ]]; then
+              gh api -H "Accept: application/octet-stream" \
+                "repos/${repository}/releases/assets/${asset_ids[0]}" \
+                > /tmp/existing-sbom.json
+              cmp --silent "${sbom}" /tmp/existing-sbom.json || {
+                echo "::error::Existing immutable SBOM differs: ${sbom}"
+                exit 1
+              }
+            else
+              gh release upload "v${VERSION}" "${sbom}" --repo "${repository}"
+            fi
+          done
 
   ai-bundles:
     name: AI Bundles
@@ -1515,23 +1560,236 @@ jobs:
             }
           done
 
-      - name: Attest exact GHCR manifest
+      - name: Attest GHCR manifest workflow provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: ghcr.io/snapotter-hq/snapotter
           subject-digest: ${{ needs.manifest.outputs.manifest_digest }}
           push-to-registry: false
 
-      - name: Attest exact Docker Hub manifest
+      - name: Attest Docker Hub manifest workflow provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: docker.io/snapotter/snapotter
           subject-digest: ${{ needs.manifest.outputs.manifest_digest }}
           push-to-registry: false
 
+  release-subjects:
+    name: Bind Release Commit to Published Subjects
+    needs: [release, archive-security, manifest, image-provenance]
+    if: needs.release.outputs.new_version
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out the immutable release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.release.outputs.release_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release tag binding
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Release tag no longer resolves to the selected commit"
+              exit 1
+            }
+
+      - name: Download verified archive inputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: prebuilt-*
+          merge-multiple: true
+          path: /tmp/prebuilt-subjects
+
+      # GITHUB_SHA remains the commit that triggered this workflow even after
+      # checkout. Record it separately instead of misrepresenting it as the
+      # semantic-release-created commit. The attested file explicitly binds
+      # that release commit and tag to every immutable release asset and image.
+      - name: Build canonical release-subject manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANIFEST_DIGEST: ${{ needs.manifest.outputs.manifest_digest }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+          WORKFLOW_TRIGGER_COMMIT: ${{ github.sha }}
+        run: |
+          [[ "${GITHUB_REPOSITORY}" == "snapotter-hq/SnapOtter" ]] || {
+            echo "::error::Release subjects can only be created by the canonical repository"
+            exit 1
+          }
+          [[ "${RELEASE_COMMIT}" =~ ^[a-f0-9]{40}$ \
+            && "${WORKFLOW_TRIGGER_COMMIT}" =~ ^[a-f0-9]{40}$ \
+            && "${MANIFEST_DIGEST}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+              echo "::error::Release subject identity is malformed"
+              exit 1
+            }
+          release_subjects_name="snapotter-v${VERSION}-release-subjects.json"
+          echo "release_subjects_name=${release_subjects_name}" >> "$GITHUB_ENV"
+          release_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" --jq .id
+          )"
+          [[ "${release_id}" =~ ^[0-9]+$ ]] || {
+            echo "::error::GitHub release did not resolve to one immutable ID"
+            exit 1
+          }
+          gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+            > /tmp/release-asset-pages.json
+          RELEASE_ID="${release_id}" python3 <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+          import re
+          import subprocess
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          release_id = os.environ["RELEASE_ID"]
+          release_commit = os.environ["RELEASE_COMMIT"]
+          release_tag = f"v{os.environ['VERSION']}"
+          version = os.environ["VERSION"]
+          workflow_trigger_commit = os.environ["WORKFLOW_TRIGGER_COMMIT"]
+          manifest_digest = os.environ["MANIFEST_DIGEST"]
+          release_subjects_name = f"snapotter-v{version}-release-subjects.json"
+          output = Path("/tmp") / release_subjects_name
+          published_root = Path("/tmp/published-release-subjects")
+          prebuilt_root = Path("/tmp/prebuilt-subjects")
+          published_root.mkdir(mode=0o700, exist_ok=False)
+
+          if not re.fullmatch(r"[0-9]+", release_id):
+              raise SystemExit("invalid release ID")
+          pages = json.loads(Path("/tmp/release-asset-pages.json").read_text())
+          if not isinstance(pages, list) or not all(isinstance(page, list) for page in pages):
+              raise SystemExit("GitHub release asset response is not paginated JSON")
+          assets = [asset for page in pages for asset in page]
+          if not assets:
+              raise SystemExit("GitHub release contains no immutable assets")
+          names = [asset.get("name") for asset in assets]
+          if any(not isinstance(name, str) or PurePosixPath(name).name != name for name in names):
+              raise SystemExit("GitHub release contains an unsafe asset name")
+          if len(names) != len(set(names)):
+              raise SystemExit("GitHub release contains duplicate asset names")
+
+          expected_assets = set()
+          for arch in ("amd64", "arm64"):
+              archive = f"snapotter-v{version}-linux-{arch}.tar.gz"
+              expected_assets.update(
+                  {
+                      archive,
+                      f"{archive}.sha256",
+                      f"snapotter-v{version}-archive-linux-{arch}-sbom.cdx.json",
+                      f"snapotter-v{version}-archive-linux-{arch}-sbom.spdx.json",
+                      f"snapotter-v{version}-archive-linux-{arch}-trivy.json",
+                      f"snapotter-v{version}-linux-{arch}.digest",
+                      f"snapotter-v{version}-image-linux-{arch}-sbom.cdx.json",
+                      f"snapotter-v{version}-image-linux-{arch}-sbom.spdx.json",
+                      f"snapotter-v{version}-image-linux-{arch}-trivy.json",
+                  }
+              )
+          missing = sorted(expected_assets - set(names))
+          if missing:
+              raise SystemExit(f"release subject closure is incomplete: {missing}")
+
+          subjects = []
+          existing_manifest = None
+          for asset in sorted(assets, key=lambda item: item["name"]):
+              name = asset["name"]
+              asset_id = asset.get("id")
+              if not isinstance(asset_id, int) or asset_id <= 0:
+                  raise SystemExit(f"release asset has an invalid ID: {name}")
+              destination = published_root / name
+              with destination.open("xb") as handle:
+                  subprocess.run(
+                      [
+                          "gh",
+                          "api",
+                          "-H",
+                          "Accept: application/octet-stream",
+                          f"repos/{repository}/releases/assets/{asset_id}",
+                      ],
+                      check=True,
+                      stdout=handle,
+                  )
+              if name == release_subjects_name:
+                  existing_manifest = destination
+                  continue
+              if name.endswith(".tar.gz") or name.endswith(".tar.gz.sha256"):
+                  candidate = prebuilt_root / name
+                  if not candidate.is_file() or candidate.read_bytes() != destination.read_bytes():
+                      raise SystemExit(f"published archive input differs: {name}")
+              subjects.append(
+                  {
+                      "digest": {"sha256": hashlib.sha256(destination.read_bytes()).hexdigest()},
+                      "name": f"github-release://{repository}/{release_tag}/{name}",
+                  }
+              )
+
+          image_digest = manifest_digest.removeprefix("sha256:")
+          for image in (
+              "docker.io/snapotter/snapotter",
+              "ghcr.io/snapotter-hq/snapotter",
+          ):
+              subjects.append({"digest": {"sha256": image_digest}, "name": image})
+          subjects.sort(key=lambda subject: subject["name"])
+
+          statement = {
+              "_type": "https://snapotter.dev/attestations/release-subjects/v1",
+              "releaseCommit": release_commit,
+              "releaseTag": release_tag,
+              "repository": repository,
+              "subjects": subjects,
+              "workflowTriggerCommit": workflow_trigger_commit,
+          }
+          payload = json.dumps(statement, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+          output.write_text(f"{payload}\n", encoding="utf-8")
+          if existing_manifest is not None and existing_manifest.read_bytes() != output.read_bytes():
+              raise SystemExit("Existing release-subject manifest differs")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as environment:
+              environment.write(f"release_subjects_exists={str(existing_manifest is not None).lower()}\n")
+          PY
+
+      - name: Attest release-commit subject binding
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: "/tmp/${{ env.release_subjects_name }}"
+
+      - name: Publish immutable release-subject manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          if [[ "${release_subjects_exists}" != "true" ]]; then
+            gh release upload "v${VERSION}" \
+              "/tmp/${release_subjects_name}" \
+              --repo snapotter-hq/SnapOtter
+          fi
+          rm -rf /tmp/release-subject-verification
+          mkdir -p /tmp/release-subject-verification
+          gh release download "v${VERSION}" \
+            --pattern "${release_subjects_name}" \
+            --dir /tmp/release-subject-verification \
+            --repo snapotter-hq/SnapOtter
+          cmp --silent \
+            "/tmp/${release_subjects_name}" \
+            "/tmp/release-subject-verification/${release_subjects_name}" || {
+              echo "::error::Published release-subject manifest differs"
+              exit 1
+            }
+
   aliases:
     name: Advance Non-Regressing Image Aliases
-    needs: [release, manifest, image-provenance]
+    needs: [release, manifest, image-provenance, release-subjects]
     runs-on: ubuntu-latest
     # GitHub does not guarantee FIFO ordering for a concurrency group. Every
     # holder therefore fetches the complete remote tag set again while holding

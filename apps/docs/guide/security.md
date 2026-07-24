@@ -306,9 +306,10 @@ Each SnapOtter release includes the following security artifacts:
 
 | Artifact | Format | Where to find it |
 |---|---|---|
-| SBOM (CycloneDX) | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) asset: `snapotter-v{version}-sbom.cdx.json` |
-| SBOM (SPDX) | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) asset: `snapotter-v{version}-sbom.spdx.json` |
-| Vulnerability scan | Trivy JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) asset: `snapotter-v{version}-trivy.json` |
+| Release subject binding | Canonical JSON + GitHub attestation | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) asset: `snapotter-v{version}-release-subjects.json` |
+| Archive SBOM | CycloneDX and SPDX JSON | Release assets: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Image SBOM | CycloneDX and SPDX JSON | Release assets: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Vulnerability scans | Trivy JSON | Release assets with matching `archive-linux-{arch}` or `image-linux-{arch}` prefixes |
 | Vulnerability scan | SARIF | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) tab |
 | Static analysis | CodeQL (JS/TS + Python) | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) tab, runs weekly + per PR |
 | Dependency review | GitHub native | Per-PR check, fails on high-severity additions |
@@ -318,19 +319,29 @@ Each SnapOtter release includes the following security artifacts:
 
 **Running your own scan:**
 
-Download the SBOM from the release and scan it with your preferred tool:
+Download the release-subject manifest and verify that it was attested by the release workflow:
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+The manifest records `releaseTag`, `releaseCommit`, and `workflowTriggerCommit` separately. Verify that `releaseCommit` is the commit peeled from the immutable tag, then verify the SHA-256 digest of the archive, image, SBOM, or scan you consume against its entry in `subjects`. This distinction is intentional: checking out a newly created release commit does not change the commit identity in the workflow's OIDC credential.
+
+You can also scan a downloaded SBOM or the image directly:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
 ::: info
-The SBOM and vulnerability scan reflect the exact image published for that release. AI model bundles installed after deployment are not included in the SBOM since they are downloaded at runtime.
+Image SBOMs and scans reflect the exact architecture-specific image published for that release. Archive SBOMs and scans describe the prebuilt archive separately. AI model bundles installed after deployment are not included in these SBOMs because they are downloaded at runtime.
 :::

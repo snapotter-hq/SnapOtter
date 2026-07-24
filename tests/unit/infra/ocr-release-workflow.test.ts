@@ -841,7 +841,7 @@ describe("OCR v3 bundle release workflow", () => {
     expect(releaseJob).toContain("release_commit: ${{ steps.check.outputs.release_commit }}");
     expect(releaseJob).toContain('git rev-parse "refs/tags/v${version}^{commit}"');
     expect(release.match(/ref: \$\{\{ needs\.release\.outputs\.release_commit \}\}/g)).toHaveLength(
-      7,
+      8,
     );
     expect(bundles).toContain("release_commit:");
     expect(bundles).toContain("required: true");
@@ -1381,7 +1381,7 @@ describe("OCR v3 bundle release workflow", () => {
     expect(manifest).toContain('arguments=("-t" "ghcr.io/snapotter-hq/snapotter:${VERSION}")');
     expect(manifest).not.toContain("{{major}}");
     expect(manifest).not.toContain("value=latest");
-    expect(aliases).toContain("needs: [release, manifest, image-provenance]");
+    expect(aliases).toContain("needs: [release, manifest, image-provenance, release-subjects]");
     expect(aliases).toContain(
       "Fetch and evaluate stable tags immediately before Docker Hub aliases",
     );
