@@ -9,6 +9,7 @@ const e2eDir = path.join(root, "tests", "e2e");
 const authSetupPath = path.join(e2eDir, "auth.setup.ts");
 const helpersPath = path.join(root, "tests", "e2e", "helpers.ts");
 const packagePath = path.join(root, "package.json");
+const e2eRunnerPath = path.join(root, "scripts", "run-main-e2e.mjs");
 const turboPath = path.join(root, "turbo.json");
 
 const isolationEnvKeys = [
@@ -245,8 +246,18 @@ test("the canonical E2E command exactly covers every release browser and device 
   const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
     scripts: Record<string, string>;
   };
-  const command = packageJson.scripts["test:e2e"];
-  const selectedProjects = [...command.matchAll(/--project=([^\s&]+)/g)].map((match) => match[1]);
+  expect(packageJson.scripts["test:e2e"]).toBe("node scripts/run-main-e2e.mjs");
+  expect(packageJson.scripts["test:all"]).toContain("pnpm test:e2e");
+
+  const darwinPlan = JSON.parse(
+    execFileSync(process.execPath, [e2eRunnerPath, "--plan", "darwin"], { encoding: "utf8" }),
+  ) as string[][];
+  const linuxPlan = JSON.parse(
+    execFileSync(process.execPath, [e2eRunnerPath, "--plan", "linux"], { encoding: "utf8" }),
+  ) as string[][];
+  const selectedProjects = darwinPlan
+    .flat()
+    .flatMap((arg) => (arg.startsWith("--project=") ? [arg.slice("--project=".length)] : []));
   const config = await loadConfig({
     PLAYWRIGHT_API_PORT: "18129",
     PLAYWRIGHT_API_URL: "http://127.0.0.1:18129",
@@ -261,6 +272,9 @@ test("the canonical E2E command exactly covers every release browser and device 
   expect(packageJson.scripts["test:e2e:core"]).toBeTruthy();
   expect(new Set(selectedProjects)).toEqual(new Set(configuredProjects));
   expect(selectedProjects).toHaveLength(configuredProjects?.length ?? 0);
+  expect(linuxPlan.flat()).not.toContain("--project=chromium-visual");
+  expect(linuxPlan[0]).toContain("--grep-invert=@visual");
+  expect(linuxPlan[1]).toEqual(["test", "--project=chromium-serial", "--workers=1"]);
 });
 
 test("Turbo passes every main harness endpoint override through task boundaries", () => {

@@ -154,7 +154,9 @@ export async function runGeneratedTool(
       report: () => {},
     });
     if (result.buffer) return result.buffer;
-    if (result.scratchPath) return readFile(result.scratchPath);
+    // Await inside the try block so cleanup cannot remove the scratch tree
+    // before the asynchronous read has opened and consumed the output.
+    if (result.scratchPath) return await readFile(result.scratchPath);
     throw new Error(`Tool ${config.toolId} returned neither buffer nor scratchPath`);
   } finally {
     await rm(scratchDir, { recursive: true, force: true });
