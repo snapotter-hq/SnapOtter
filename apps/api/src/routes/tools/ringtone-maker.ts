@@ -11,6 +11,12 @@ const settingsSchema = z.object({
   durationS: z.number().min(1).max(30).default(30),
 });
 
+function formatFfmpegSeconds(value: number): string {
+  const rounded = Math.round(value * 1_000_000) / 1_000_000;
+  if (rounded === 0) return "0";
+  return rounded.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 export function registerRingtoneMaker(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "ringtone-maker",
@@ -35,9 +41,9 @@ export function registerRingtoneMaker(app: FastifyInstance) {
         ctx,
         [
           "-ss",
-          String(settings.startS),
+          formatFfmpegSeconds(settings.startS),
           "-t",
-          String(settings.durationS),
+          formatFfmpegSeconds(settings.durationS),
           "-i",
           inPath,
           "-vn",

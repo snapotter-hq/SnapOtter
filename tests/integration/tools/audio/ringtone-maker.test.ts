@@ -77,4 +77,11 @@ describe.skipIf(!ffmpegAvailable())("ringtone-maker (requires ffmpeg)", () => {
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatch(/beyond the end/i);
   }, 60_000);
+
+  it("normalizes sub-microsecond offsets instead of emitting exponential ffmpeg syntax", async () => {
+    const res = await runTool({ startS: Number.MIN_VALUE, durationS: 1 });
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+  }, 60_000);
 });
