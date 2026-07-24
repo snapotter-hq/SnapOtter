@@ -26,8 +26,20 @@ vi.mock("../../../../apps/api/src/lib/feature-status.js", async (importOriginal)
   return { ...mod, isToolInstalled: () => true };
 });
 
+// Spies on the real decodeHeic (still calls through to the actual heif-convert
+// CLI) so the mask-decode regression test below can assert it fires for a
+// HEIC mask, the same way it already fires for a HEIC main image.
+vi.mock("../../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
+  const mod =
+    await importOriginal<typeof import("../../../../apps/api/src/lib/heic-converter.js")>();
+  return { ...mod, decodeHeic: vi.fn(mod.decodeHeic) };
+});
+
+import { decodeHeic } from "../../../../apps/api/src/lib/heic-converter.js";
+
 const JPG = readFixture(fixtures.image.base.jpg100);
 const PNG = readFixture(fixtures.image.base.png200);
+const HEIC = readFixture(fixtures.image.base.heic200);
 // Large first file: widens the window in which the request stream fully
 // buffers (firing "close") while the first part is still streaming to
 // storage, which is what dropped the trailing mask part.
@@ -63,6 +75,28 @@ describe("erase-object multipart contract", () => {
       payload: body,
     });
     expect(res.statusCode, res.body).toBeLessThan(400);
+  });
+
+  it("decodes a HEIC mask before enqueueing, mirroring the main image's decode path", {
+    timeout: 60_000,
+  }, async () => {
+    vi.mocked(decodeHeic).mockClear();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "mask", filename: "mask.heic", contentType: "image/heic", content: HEIC },
+      { name: "clientJobId", content: randomUUID() },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/erase-object",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      payload: body,
+    });
+    expect(res.statusCode, res.body).toBeLessThan(400);
+    // The main image here is a plain JPG, so a single decodeHeic call means
+    // the mask (and only the mask) was decoded.
+    expect(vi.mocked(decodeHeic)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(decodeHeic)).toHaveBeenCalledWith(HEIC);
   });
 
   it("keeps trailing parts across reused keep-alive connections", async () => {

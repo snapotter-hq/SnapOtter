@@ -432,13 +432,11 @@ describe("validateImageBuffer - ftyp brand verification", () => {
 
   const heifBrands = ["heic", "heix", "mif1", "msf1", "hevc", "hevx"];
   for (const brand of heifBrands) {
-    it(`accepts the heif brand "${brand}" (detected, then synthetic decode fails)`, async () => {
-      // Each brand must pass the L349 includes() check; on a synthetic buffer
-      // the format is heif (not CLI-decoded) and sharp fails -> metadata error.
-      expectRejected(
-        await validateImageBuffer(withFtypBrand(brand)),
-        "Failed to read image metadata",
-      );
+    it(`accepts the heif brand "${brand}" and returns early without a sharp decode`, async () => {
+      // Each brand must pass the L349 includes() check; heif is CLI-decoded
+      // (real HEVC decode happens later via decodeHeic()), so this must return
+      // valid immediately, the same as the CR3->raw arm below.
+      expectValid(await validateImageBuffer(withFtypBrand(brand)), "heif", 0, 0);
     });
   }
 
