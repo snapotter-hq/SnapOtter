@@ -396,14 +396,18 @@ export function registerPdfToImageRoute(
       await zipDone;
       const zipBuffer = Buffer.concat(zipChunks);
       await putObject(`outputs/${jobId}/${zipFilename}`, zipBuffer);
+      const zipUrl = `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`;
 
       return reply.send({
         jobId,
+        downloadUrl: zipUrl,
+        originalSize: fileBuffer.length,
+        processedSize: zipBuffer.length,
         pageCount: totalPages,
         selectedPages,
         format: settings.format,
         pages,
-        zipUrl: `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`,
+        zipUrl,
         zipSize: zipBuffer.length,
       });
     } catch (err) {

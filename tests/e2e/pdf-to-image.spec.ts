@@ -72,3 +72,20 @@ test.describe("PDF to Image tool", () => {
     await expect(page.locator("text=3 of 3 pages selected")).toBeVisible();
   });
 });
+
+test.describe("PDF conversion preset pages", () => {
+  for (const toolId of ["pdf-to-png", "pdf-to-jpg"]) {
+    test(`${toolId} shows the ZIP download after synchronous conversion`, async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto(`/pdf/${toolId}`);
+      await uploadPdf(page);
+
+      await page.getByTestId("preset-submit").click();
+
+      const download = page.getByTestId("preset-download");
+      await expect(download).toBeVisible({ timeout: 15_000 });
+      await expect(download).toHaveAttribute("href", /\/api\/v1\/download\/[^/]+\/pdf-pages\.zip$/);
+    });
+  }
+});

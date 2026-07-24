@@ -8,6 +8,7 @@ import {
   type Tool,
   toolSection,
 } from "@snapotter/shared";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -213,4 +214,49 @@ describe("conversion presets (all)", () => {
       90_000,
     );
   }
+});
+
+describe("PDF to image conversion presets", () => {
+  it.each([
+    ["pdf-to-png", "png"],
+    ["pdf-to-jpg", "jpg"],
+    ["pdf-to-tiff", "tiff"],
+  ])("%s returns the standard synchronous result and a downloadable ZIP", async (toolId, ext) => {
+    const input = readFixture(fixtures.document.tiny("pdf"));
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "input.pdf",
+        contentType: "application/pdf",
+        content: input,
+      },
+      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: `/api/v1/tools/pdf/${toolId}`,
+      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBe(result.zipUrl);
+    expect(result.originalSize).toBe(input.length);
+    expect(result.processedSize).toBe(result.zipSize);
+
+    const download = await testApp.app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toContain("application/zip");
+
+    const entries = new AdmZip(download.rawPayload).getEntries();
+    expect(entries).toHaveLength(result.selectedPages.length);
+    for (const entry of entries) {
+      expect(entry.entryName).toMatch(new RegExp(`\\.${ext}$`));
+      expect(entry.header.size).toBeGreaterThan(0);
+    }
+  });
 });
