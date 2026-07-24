@@ -27,7 +27,14 @@ export function registerPitchShift(app: FastifyInstance) {
       const ratio = (2 ** (settings.semitones / 12)).toFixed(6);
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", `rubberband=pitch=${ratio}`, ...out.encodeArgs, outPath];
+        return [
+          "-i",
+          inPath,
+          "-af",
+          `rubberband=pitch=${ratio},aresample`,
+          ...out.encodeArgs,
+          outPath,
+        ];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },

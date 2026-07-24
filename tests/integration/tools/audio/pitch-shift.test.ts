@@ -39,6 +39,13 @@ async function runTool(settings: Record<string, unknown>) {
 }
 
 describe.skipIf(!ffmpegAvailable())("pitch-shift (requires ffmpeg)", () => {
+  it("encodes small positive shifts without MP3 frame padding errors", async () => {
+    const res = await runTool({ semitones: 2 });
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toBeDefined();
+  }, 60_000);
+
   it("shifts +12 semitones with duration roughly unchanged", async () => {
     const res = await runTool({ semitones: 12 });
     expect(res.statusCode).toBe(200);
