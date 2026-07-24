@@ -1,7 +1,15 @@
-const BASE = "http://localhost:1349";
-const USERNAME = "admin";
-const PASSWORD = "qFIJS2KcQ0NuUfZ0";
-const TEST_IMAGE = "C:/Users/siddh/Downloads/passport-photo-sample-correct.webp";
+function requiredEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+const BASE = process.env.QA_BASE_URL?.trim() || "http://localhost:13499";
+const USERNAME = process.env.QA_USERNAME?.trim() || "admin";
+const PASSWORD = requiredEnv("QA_PASSWORD");
+const TEST_IMAGE =
+  process.env.QA_IMAGE_FIXTURE?.trim() ||
+  new URL("../fixtures/image/valid/multi-face.webp", import.meta.url);
 
 const results = [];
 

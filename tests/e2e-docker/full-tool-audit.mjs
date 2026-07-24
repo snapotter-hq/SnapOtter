@@ -4,12 +4,21 @@
  * back, and (3) execution provenance matches the declared contract. OCR is
  * deliberately CPU-only on every host, including NVIDIA systems.
  */
-const BASE = "http://localhost:1349";
-const USERNAME = "admin";
-const PASSWORD = "qFIJS2KcQ0NuUfZ0";
-const IMG = "C:/Users/siddh/Downloads/passport-photo-sample-correct.webp";
-
 import { readFileSync } from "node:fs";
+
+function requiredEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+const BASE = process.env.QA_BASE_URL?.trim() || "http://localhost:13499";
+const USERNAME = process.env.QA_USERNAME?.trim() || "admin";
+const PASSWORD = requiredEnv("QA_PASSWORD");
+const IMG =
+  process.env.QA_IMAGE_FIXTURE?.trim() ||
+  new URL("../fixtures/image/valid/multi-face.webp", import.meta.url);
+const CONTAINER_NAME = requiredEnv("QA_CONTAINER_NAME");
 
 const results = [];
 let token = "";
@@ -368,11 +377,15 @@ async function main() {
 
   // Check GPU usage in docker logs
   console.log("\n--- GPU USAGE CHECK ---\n");
-  const { execSync } = await import("node:child_process");
-  const logs = execSync("docker logs SnapOtter 2>&1", {
+  const { spawnSync } = await import("node:child_process");
+  const logResult = spawnSync("docker", ["logs", CONTAINER_NAME], {
     encoding: "utf-8",
     maxBuffer: 1024 * 1024,
   });
+  if (logResult.error || logResult.status !== 0) {
+    throw logResult.error ?? new Error(`docker logs failed with exit ${logResult.status}`);
+  }
+  const logs = `${logResult.stdout}${logResult.stderr}`;
   const gpuLines = logs
     .split("\n")
     .filter(

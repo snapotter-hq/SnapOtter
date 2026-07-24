@@ -14,6 +14,11 @@
     "PLAYWRIGHT_WEB_PORT",
     "PLAYWRIGHT_WEB_URL",
     "PW_WORKERS",
+    "QA_BASE_URL",
+    "QA_CONTAINER_NAME",
+    "QA_IMAGE_FIXTURE",
+    "QA_PASSWORD",
+    "QA_USERNAME",
     "REDIS_URL"
   ],
   "tasks": {
