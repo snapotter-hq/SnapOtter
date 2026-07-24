@@ -9,6 +9,7 @@
     "lint": "biome check src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:mutation": "stryker run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -16,6 +17,8 @@
     "@snapotter/shared": "workspace:*"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "typescript": "^5.7.0",
     "vitest": "^3.2.6"
   },
