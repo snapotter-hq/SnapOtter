@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const releaseWorkflowPath = path.resolve(root, ".github/workflows/release.yml");
 const manualAttestationPath = path.resolve(root, ".github/workflows/attest.yml");
+const releaseConfigPath = path.resolve(root, ".releaserc.json");
 
 function readRequired(file: string): string {
   expect(existsSync(file), `${path.relative(root, file)} is missing`).toBe(true);
@@ -22,6 +23,20 @@ function job(workflow: string, name: string, nextName?: string): string {
 }
 
 describe("release supply-chain closure", () => {
+  it("keeps the GitHub release private until every publication gate succeeds", () => {
+    const releaseConfig = JSON.parse(readRequired(releaseConfigPath));
+    const githubPlugin = releaseConfig.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "@semantic-release/github",
+    );
+    expect(githubPlugin?.[1]?.draftRelease).toBe(true);
+
+    const workflow = readRequired(releaseWorkflowPath);
+    const publish = job(workflow, "publish-release");
+    expect(publish).toContain("needs: [release, aliases]");
+    expect(publish).toContain("Verify approved release is still a draft");
+    expect(publish).toContain("--draft=false");
+  });
+
   it("eliminates the arbitrary manual attestation workflow", () => {
     expect(existsSync(manualAttestationPath)).toBe(false);
   });

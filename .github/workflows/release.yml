@@ -1965,3 +1965,42 @@ jobs:
             arguments+=("ghcr.io/snapotter-hq/snapotter@sha256:${digest}")
           done
           docker buildx imagetools create "${arguments[@]}"
+
+  publish-release:
+    name: Publish Fully Verified GitHub Release
+    needs: [release, aliases]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Verify approved release is still a draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          draft="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+              --jq .draft
+          )"
+          [[ "${draft}" == "true" ]] || {
+            echo "::error::Approved release is not a draft before final publication"
+            exit 1
+          }
+
+      - name: Publish approved release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          gh release edit "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false
+          [[ "$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+              --jq .draft
+          )" == "false" ]] || {
+            echo "::error::Approved release remained a draft after publication"
+            exit 1
+          }
