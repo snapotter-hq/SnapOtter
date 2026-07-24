@@ -441,6 +441,13 @@ describe("OIDC login discovery failure", () => {
     (env as any).OIDC_CLIENT_ID = "test-client-id";
     (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
 
+    // Force a cold discovery cache so this test does not depend on running
+    // before any describe that warms the module-level 24h cache.
+    const { resetOidcDiscoveryCacheForTests } = await import(
+      "../../../apps/api/src/plugins/oidc.js"
+    );
+    resetOidcDiscoveryCacheForTests();
+
     oidcApp = await buildTestApp();
   }, 30_000);
 

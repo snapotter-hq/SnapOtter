@@ -39,6 +39,7 @@ describe("job queues", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

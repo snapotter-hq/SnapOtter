@@ -27,6 +27,14 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 let cachedConfig: { config: oidc.Configuration; cachedAt: number } | null = null;
 
+/**
+ * Test hook: clear the module-level discovery cache so a test can force a cold
+ * discovery independent of execution order. Production code never calls this.
+ */
+export function resetOidcDiscoveryCacheForTests(): void {
+  cachedConfig = null;
+}
+
 async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
   if (cachedConfig && Date.now() - cachedConfig.cachedAt < CACHE_TTL_MS) {
     return cachedConfig.config;
