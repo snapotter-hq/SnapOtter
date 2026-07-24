@@ -1,8 +1,8 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 239723cdcc17
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: c8ecc4e725ac
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-تشغّل هذه الحاوية الواحدة كل ما تحتاجه: مع عدم تعيين `DATABASE_URL`، تبدأ PostgreSQL و Redis الخاصين بها على واجهة الاسترجاع (الوضع المدمج) وتحتفظ بجميع البيانات في وحدة التخزين `SnapOtter-data`. إنها أسرع طريقة لتجربة SnapOtter أو الاستضافة الذاتية على مختبر منزلي. لبيئة الإنتاج، شغّل حزمة [Docker Compose](#docker-compose) أدناه، التي تبقي PostgreSQL و Redis في حاوياتهما الخاصة. يعمل الوضع المدمج كـ root (الافتراضي) ويتوقف تلقائيًا بمجرد تعيينك لـ `DATABASE_URL`.
+تعمل هذه الحاوية الفردية على تشغيل كل ما تحتاجه: بدون تعيين `DATABASE_URL`، فإنها تبدأ تشغيل PostgreSQL وRedis الخاصين بها على واجهة الاسترجاع (الوضع المضمن) وتحتفظ بجميع البيانات في وحدة تخزين `SnapOtter-data`. إنها أسرع طريقة لتجربة SnapOtter أو الاستضافة الذاتية على معمل منزلي. للإنتاج، استخدم [مكدس Docker Compose الأساسي](#docker-compose)، الذي يحتفظ بـ PostgreSQL وRedis في حاوياتهما الخاصة. يعمل الوضع المضمن كجذر (الافتراضي) ويتم إيقاف تشغيله تلقائيًا بمجرد ضبط `DATABASE_URL`.
 
 هل تثبّت على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير؟ راجع [التشغيل على موارد محدودة](/ar/guide/low-resource) للاطلاع على شرح تطبيقي مضبوط وما يمكن توقعه من العتاد المحدود.
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ينشر كلا السجلين نفس الصورة عند كل إصدار.
 :::
 
-## Docker Compose {#docker-compose}
+## دوكر يؤلف {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+استخدم ملف الإنتاج الذي تمت صيانته واختباره مع كل إصدار بدلاً من نسخ مثال الإنشاء المختصر من هذه الصفحة:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-راجع [التهيئة](/ar/guide/configuration) لجميع متغيرات البيئة.
+يتضمن [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) الأساسي جميع وحدات تخزين وقت التشغيل الأربعة، وفحوصات السلامة، وحدود الموارد، وتكوين Redis الدائم، وصور قاعدة البيانات/ذاكرة التخزين المؤقت المثبتة، وتصلب الحاوية الحالية. قم بتغيير كلمة مرور المسؤول الافتراضية مباشرة بعد تسجيل الدخول الأول. للحصول على نشر قابل للتكرار، قم بتثبيت صورة تطبيق SnapOtter على علامة الإصدار أو الملخص الذي قمت بالتحقق منه بدلاً من اتباع `latest`.
+
+راجع [التكوين](/ar/guide/configuration) للتعرف على كافة متغيرات البيئة و[الأمان والصلابة](/ar/guide/security) للتعرف على الأسرار وسياسة الشبكة وإرشادات النسخ الاحتياطي.
 
 ## البناء من المصدر {#build-from-source}
 

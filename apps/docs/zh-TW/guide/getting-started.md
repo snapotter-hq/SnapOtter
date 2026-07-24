@@ -1,8 +1,8 @@
 ---
 description: "用一道 Docker 指令安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整功能總覽。"
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 37fde1abd65f
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: ddc3a90c024a
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-這個單一容器會執行它所需的一切：在未設定 `DATABASE_URL` 的情況下，它會在 loopback 介面上啟動自己的 PostgreSQL 和 Redis（嵌入模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用實驗室自我託管的最快方式。就正式環境而言，請執行下方的 [Docker Compose](#docker-compose) 堆疊，它會將 PostgreSQL 和 Redis 保留在各自的容器中。嵌入模式以 root（預設值）執行，並在你設定 `DATABASE_URL` 後自動關閉。
+這個單一容器運行它所需的一切：在沒有設定 `DATABASE_URL` 的情況下，它在環回介面（嵌入模式）上啟動自己的 PostgreSQL 和 Redis，並將所有資料保存在 `SnapOtter-data` 卷中。這是在家庭實驗室上嘗試 SnapOtter 或自架網站的最快方法。對於生產，請使用[規範的 Docker Compose 堆疊](#docker-compose)，它將 PostgreSQL 和 Redis 保留在自己的容器中。嵌入模式以 root 身份運行（預設），並在您設定 `DATABASE_URL` 後自動關閉。
 
 要安裝在 Raspberry Pi、舊筆電或小型 VPS 上？請參閱[低資源環境部署](/zh-TW/guide/low-resource)，取得調校過的逐步教學，並了解受限硬體能有什麼表現。
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 兩個登錄檔在每次發行時都會發布相同的映像檔。
 :::
 
-## Docker Compose {#docker-compose}
+## Docker 編寫 {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+使用每個版本維護和測試的生產文件，而不是從此頁面複製縮寫的 Compose 範例：
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 針對非本地部署更改此設置
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-關於所有環境變數，請參閱 [Configuration](/zh-TW/guide/configuration)。
+規範的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) 包括所有四個運行時卷、運行狀況檢查、資源限制、持久性 Redis 配置、固定資料庫/快取映像以及當前容器強化。首次登入後立即變更預設管理員密碼。對於可重現的部署，請將 SnapOtter 應用程式映像固定到您驗證的發布標籤或摘要，而不是遵循 `latest`。
+
+有關所有環境變量，請參閱[配置](/zh-TW/guide/configuration)；有關機密、網路策略和備份指南，請參閱[安全性和強化](/zh-TW/guide/security)。
 
 ## 從原始碼建置 {#build-from-source}
 

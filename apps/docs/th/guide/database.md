@@ -1,8 +1,9 @@
 ---
 description: "สคีมาฐานข้อมูล PostgreSQL ตาราง การย้ายข้อมูล และขั้นตอนการสำรองข้อมูลสำหรับ SnapOtter"
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: b589c2175a16
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: ec41785970af
+i18n_hash_version: 2
 ---
 
 # ฐานข้อมูล {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 ในโปรดักชัน การย้ายข้อมูลที่ค้างอยู่จะถูกนำมาใช้โดยอัตโนมัติเมื่อเริ่มต้น
 
-## การสำรองและกู้คืนข้อมูล {#backup-and-restore}
+## สำรองและกู้คืน {#backup-and-restore}
 
-ฐานข้อมูลเชิงสัมพันธ์อยู่ใน volume `SnapOtter-pgdata` ของคอนเทนเนอร์ Postgres ไม่ใช่ volume `/data` ของแอป
+ฐานข้อมูลเชิงสัมพันธ์อยู่ในโวลุ่ม `SnapOtter-pgdata` ของคอนเทนเนอร์ Postgres ไม่ใช่โวลุ่ม `/data` ของแอป
 
-**ตัวเลือกที่ 1: pg_dump (แนะนำ)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**ตัวเลือกที่ 2: Volume snapshot**
+**การสำรองข้อมูลแบบลอจิคัลพร้อมการตรวจสอบความถูกต้อง (แนะนำ)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+ดัมพ์ฐานข้อมูลนี้ไม่มีอ็อบเจ็กต์ไลบรารีที่บันทึกไว้ใน `/data/files` หรือสถานะ BullMQ แบบทนทานใน Redis สำรองและกู้คืนข้อมูลเหล่านั้นด้วยขั้นตอนการประสานงานใน [Security & Hardening](/th/guide/security#backup-and-recovery)
+
+**สแนปชอตวอลุ่มเย็น**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+อย่าคัดลอกไดเร็กทอรีข้อมูล PostgreSQL แบบสดด้วย `tar` เขียนคำนำหน้าชื่อวอลุ่มตามโปรเจ็กต์ ดังนั้นแก้ไข ID วอลุ่มที่ติดตั้งจาก `docker inspect` หรือแพลตฟอร์มพื้นที่จัดเก็บข้อมูลของคุณ แทนที่จะใช้ป้ายกำกับตัวอักษร `SnapOtter-pgdata`
 
 ### การย้ายข้อมูลจาก 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

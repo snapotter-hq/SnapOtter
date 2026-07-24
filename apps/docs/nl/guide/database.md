@@ -1,8 +1,9 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: e283a792e124
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 0c2305505e16
+i18n_hash_version: 2
 ---
 
 # Database {#database}
@@ -161,24 +162,32 @@ In productie worden openstaande migraties automatisch toegepast bij het opstarte
 
 De relationele database bevindt zich in het `SnapOtter-pgdata`-volume van de Postgres-container, niet in het `/data`-volume van de app.
 
-**Optie 1: pg_dump (aanbevolen)**
+**Logische back-up met validatie (aanbevolen)**
 
 ```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-**Optie 2: Volume-snapshot**
+Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` of de duurzame BullMQ-status in Redis. Maak een back-up en herstel deze met de gecoördineerde procedure in [Beveiliging en verharding](/nl/guide/security#backup-and-recovery).
+
+**Koude volumemomentopname**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
 ```
+
+Kopieer geen live PostgreSQL-gegevensmap met `tar`. Stel volumenamen voor voorvoegsels samen per project, dus los de gekoppelde volume-ID's van `docker inspect` of uw opslagplatform op in plaats van het letterlijke label `SnapOtter-pgdata` aan te nemen.
 
 ### Migreren vanaf 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

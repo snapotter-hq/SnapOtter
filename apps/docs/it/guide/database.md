@@ -1,8 +1,9 @@
 ---
 description: "Schema del database PostgreSQL, tabelle, migrazioni e procedure di backup per SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 6498644e25e3
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: fdef77ac4a47
+i18n_hash_version: 2
 ---
 
 # Database {#database}
@@ -159,26 +160,34 @@ In produzione, le migrazioni in sospeso vengono applicate automaticamente all'av
 
 ## Backup e ripristino {#backup-and-restore}
 
-Il database relazionale risiede nel volume `SnapOtter-pgdata` del container Postgres, non nel volume `/data` dell'app.
+Il database relazionale si trova nel volume `SnapOtter-pgdata` del contenitore Postgres, non nel volume `/data` dell'app.
 
-**Opzione 1: pg_dump (consigliata)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Opzione 2: Snapshot del volume**
+**Backup logico con convalida (consigliato)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Questo dump del database non contiene oggetti di libreria salvati in `/data/files` o lo stato BullMQ durevole in Redis. Effettuare il backup e il ripristino di quelli con la procedura coordinata in [Sicurezza e rafforzamento](/it/guide/security#backup-and-recovery).
+
+**Istantanea del volume freddo**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Non copiare una directory di dati PostgreSQL live con `tar`. Componi i prefissi dei nomi dei volumi in base al progetto, quindi risolvi gli ID dei volumi montati da `docker inspect` o dalla tua piattaforma di archiviazione anziché assumere l'etichetta letterale `SnapOtter-pgdata`.
 
 ### Migrazione dalla 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

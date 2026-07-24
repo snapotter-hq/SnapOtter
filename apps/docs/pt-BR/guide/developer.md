@@ -1,8 +1,9 @@
 ---
 description: "Configuração de ambiente de desenvolvimento local, comandos, convenções de código e como adicionar uma nova ferramenta ao SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 3003ce78a10f
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 0806e99453c7
+i18n_hash_version: 2
 ---
 
 # Guia do desenvolvedor {#developer-guide}
@@ -219,6 +220,17 @@ Use cache mounts do BuildKit para rebuilds mais rápidos:
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Domínios de versões de lançamento {#release-version-domains}
+
+SnapOtter possui intencionalmente três domínios de versão. Não copie um domínio para outro durante um lançamento:
+
+- A versão de lançamento do aplicativo abrange o manifesto raiz, todos os pacotes de espaço de trabalho privado e `APP_VERSION`. Semantic-release fornece esse valor e `pnpm version:sync <version>` atualiza cada espaço de trabalho antes do lançamento do aplicativo.
+- OpenAPI `info.version` é o contrato público estável API-major. Todas as especificações localizadas permanecem em `<major>.0.0` para versões de aplicativos compatíveis e mudam somente quando o contrato API passa para uma nova versão principal.
+- `docker/feature-manifest.json` mantém `imageVersion: 2.0.0` como a época de armazenamento de pacote de recursos legado imutável. Esses caminhos de arquivo v2 não são versões de pacotes de aplicativos. O OCR preciso usa o formato de tempo de execução v3 e registra a origem da versão do aplicativo separadamente.
+
+`tests/unit/infra/release-version-policy.test.ts` impõe esses limites. Um novo domínio de versão ou migração deve atualizar esse contrato e o design de migração de artefato relevante juntos.
+Os valores independentes API e do pacote legado residem em `config/release-version-policy.json`; a sincronização de versão do aplicativo nunca deve reescrever esse arquivo de política implicitamente.
 
 ## Variáveis de ambiente {#environment-variables}
 

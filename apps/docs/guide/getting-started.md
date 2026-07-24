@@ -14,7 +14,7 @@ Explore the full UI at [demo.snapotter.com](https://demo.snapotter.com) - no sig
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-This single container runs everything it needs: with no `DATABASE_URL` set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It is the fastest way to try SnapOtter or self-host on a homelab. For production, run the [Docker Compose](#docker-compose) stack below, which keeps PostgreSQL and Redis in their own containers. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`.
+This single container runs everything it needs: with no `DATABASE_URL` set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It is the fastest way to try SnapOtter or self-host on a homelab. For production, use the [canonical Docker Compose stack](#docker-compose), which keeps PostgreSQL and Redis in their own containers. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`.
 
 Installing on a Raspberry Pi, an old laptop, or a small VPS? See [Low-Resource Setups](/guide/low-resource) for a tuned walkthrough and what to expect from constrained hardware.
 
@@ -50,61 +50,27 @@ Both registries publish the same image on every release.
 
 ## Docker Compose {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Use the production file maintained and tested with each release instead of copying an abbreviated Compose example from this page:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-See [Configuration](/guide/configuration) for all environment variables.
+The canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) includes all four runtime volumes, health checks, resource limits, durable Redis configuration, pinned database/cache images, and the current container hardening. Change the default admin password immediately after first login. For a reproducible deployment, pin the SnapOtter application image to the release tag or digest you verified instead of following `latest`.
+
+See [Configuration](/guide/configuration) for all environment variables and [Security & Hardening](/guide/security) for secrets, network policy, and backup guidance.
 
 ## Build from Source {#build-from-source}
 

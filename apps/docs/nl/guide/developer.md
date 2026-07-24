@@ -1,8 +1,9 @@
 ---
 description: "Lokale ontwikkelomgeving opzetten, commando's, codeconventies en hoe je een nieuwe tool aan SnapOtter toevoegt."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 057d7364f4cc
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: cbb0bac30630
+i18n_hash_version: 2
 ---
 
 # Ontwikkelaarsgids {#developer-guide}
@@ -219,6 +220,17 @@ Gebruik BuildKit-cachemounts voor snellere rebuilds:
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Versiedomeinen vrijgeven {#release-version-domains}
+
+SnapOtter heeft opzettelijk drie versiedomeinen. Kopieer tijdens een release niet het ene domein naar het andere:
+
+- De releaseversie van de applicatie omvat het rootmanifest, alle privéwerkruimtepakketten en `APP_VERSION`. Semantic-release levert deze waarde, en `pnpm version:sync <version>` werkt elke werkruimte bij voordat een applicatie wordt uitgebracht.
+- OpenAPI `info.version` is het stabiele publieke API-groot contract. Alle gelokaliseerde specificaties blijven op `<major>.0.0` voor compatibele applicatiereleases en veranderen alleen wanneer het API-contract overgaat naar een nieuwe hoofdversie.
+- `docker/feature-manifest.json` behoudt `imageVersion: 2.0.0` als het onveranderlijke historische opslagtijdperk met featurebundels. Deze v2-archiefpaden zijn geen applicatiepakketversies. Nauwkeurige OCR maakt gebruik van runtime-indeling v3 en registreert de herkomst van de applicatierelease afzonderlijk.
+
+`tests/unit/infra/release-version-policy.test.ts` handhaaft deze grenzen. Een nieuw versiedomein of een nieuwe migratie moet dat contract en het relevante artefactmigratieontwerp samen bijwerken.
+De onafhankelijke API- en legacy-bundelwaarden bevinden zich in `config/release-version-policy.json`; Synchronisatie van de applicatieversie mag dat beleidsbestand nooit impliciet herschrijven.
 
 ## Omgevingsvariabelen {#environment-variables}
 

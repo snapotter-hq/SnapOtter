@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 보안 강화 가이드. 컨테이너 보안, 네트워크 격리, Docker 시크릿, Kubernetes 배포, 컴플라이언스 산출물."
-i18n_source_hash: 9d021c1ceb40
-i18n_provenance: human
-i18n_output_hash: 231ebb53ba36
+i18n_source_hash: ee46e715d6fe
+i18n_provenance: machine
+i18n_output_hash: 3b083643a85e
 i18n_hash_version: 2
 ---
 
@@ -12,133 +12,42 @@ SnapOtter는 파일을 전적으로 사용자의 인프라에서 처리한다. �
 
 컨테이너는 최소 필수 집합을 제외한 모든 Linux 기능(capability)을 제거한 전용 비root 사용자(`snapotter`)로 실행된다. 전체 취약점 공개 정책과 보안 아키텍처는 GitHub의 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)를 참고하라.
 
-## 컨테이너 강화 {#container-hardening}
+## 컨테이너 경화 {#container-hardening}
 
-[기본 docker-compose.yml](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml)에는 프로덕션 보안 강화가 포함되어 있다. 각 옵션과 그것이 중요한 이유를 정리하면 다음과 같다:
+표준 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) 및 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose 파일이 정보의 소스입니다. 축약된 예제를 프로덕션에 복사하지 마십시오. 확인한 릴리스 태그에서 파일을 배포합니다.
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+두 스택 모두 다음 컨트롤을 적용합니다.
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- 메모리, 스왑, CPU 및 PID 제한에는 런어웨이 기본 처리가 포함됩니다.
+- 모든 서비스는 모든 Linux 기능을 삭제합니다. 애플리케이션은 볼륨 소유권, 단방향 `gosu` ID 삭제 및 정상적인 신호 전달을 위해 `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL`만 다시 추가합니다. PostgreSQL 및 Redis는 공식 진입점에 필요한 하위 집합만 받습니다.
+- `security_opt: [no-new-privileges:true]`는 애플리케이션, PostgreSQL 및 Redis 컨테이너의 프로세스가 추가 권한을 얻지 못하도록 방지합니다. 이는 `gosu`와의 호환성을 유지합니다. 진입점은 루트로 시작하고 볼륨을 준비하며 전용 `snapotter` 사용자에게만 전달됩니다.
+- PostgreSQL 및 Redis 이미지 입력은 다이제스트에 의해 고정됩니다. 마찬가지로 애플리케이션은 `latest`가 아닌 확인된 릴리스 태그 또는 다이제스트에 고정되어야 합니다.
+- 상태 확인, 제한된 JSON 로그 회전, 내구성 있는 Redis AOF 및 다시 시작 정책이 정식 파일에 중앙에서 정의됩니다.
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
+인터넷 연결 배포의 경우 포트 1349를 루프백에 바인딩하고 유지 관리되는 역방향 프록시에서 TLS를 종료합니다. 고유한 PostgreSQL 및 Redis 자격 증명을 생성하고, 보호된 파일이나 비밀 관리자에 비밀을 저장하고, 초기 관리자 비밀번호를 즉시 변경하세요.
 
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
+### `read_only`가 {#why-read-only-is-not-set}로 설정되지 않은 이유
 
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 로컬이 아닌 배포의 경우 이를 변경합니다.
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### `no-new-privileges`를 설정하지 않는 이유 {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]`은 의도적으로 생략된다. 엔트리포인트는 볼륨 소유권을 수정하기 위해 root로 시작한 뒤, setuid가 필요한 [gosu](https://github.com/tianon/gosu)를 통해 `snapotter` 사용자로 강등한다. 권한 강등이 완료되면 프로세스는 위에 나열된 다섯 개를 제외한 모든 기능이 제거된 상태로 `snapotter`로 실행된다.
-
-Kubernetes 또는 Docker의 `--user` 플래그를 사용해 비root로 직접 실행한다면(gosu를 우회), `no-new-privileges`를 활성화해도 안전하다.
-
-### `read_only`를 설정하지 않는 이유 {#why-read-only-is-not-set}
-
-`read_only: true`이 설정되지 않은 것은 PUID/PGID 리매핑이 시작 시 `/etc/passwd`과 `/etc/group`에 쓰기 때문이다. PUID/PGID 대신 Docker의 `--user` 플래그나 Kubernetes `runAsUser`을 사용한다면 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있다.
+PUID/PGID 재매핑은 시작 시 `/etc/passwd` 및 `/etc/group`에 쓰기 때문에 `read_only: true`가 설정되지 않았습니다. PUID/PGID 대신 Docker의 `--user` 플래그 또는 Kubernetes `runAsUser`를 사용하는 경우 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있습니다.
 
 ## 네트워크 격리 {#network-isolation}
 
-정상 작동 중에는 컨테이너가 **아웃바운드 네트워크 연결을 전혀 하지 않는다**. 모든 파일 처리는 번들된 라이브러리를 사용해 로컬에서 이루어진다.
+파일 처리는 로컬이지만 기본 설치는 **송신 방지 시스템이 아닙니다**. 원격 측정이 활성화된 경우 익명 제품 분석은 PostHog를 사용하고 충돌 보고는 Sentry를 사용합니다. `SNAPOTTER_TELEMETRY=0`를 설정하거나 설정 > 시스템 > 개인 정보 보호에서 분석을 비활성화하여 둘 다 끄십시오. SnapOtter에는 해당 이벤트에 업로드된 파일, 파일 이름, OCR 출력, 문서 텍스트 또는 기타 파일 콘텐츠가 포함되지 않습니다.
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
+기타 아웃바운드 트래픽은 기능 중심입니다. AI 번들/모델 설치는 서명된 릴리스 입력을 다운로드합니다. URL 가져오기는 사용자가 요청한 공개 URL을 가져옵니다. 명시적으로 구성된 OIDC, SAML, OpenTelemetry, 웹훅, S3 호환 스토리지 또는 유사한 통합은 관리자가 선택한 대상에 연결됩니다. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`는 자동 모델 다운로드를 방지합니다. [오프라인 번들 가져오기](/ko/guide/deployment)는 런타임 모델 송신 없이 AI 기능을 프로비저닝할 수 있습니다.
 
-유일한 예외는 **AI 모델 다운로드**다. 사용자가 UI를 통해 AI 기능 번들을 설치하면, 컨테이너는 사전 빌드된 번들 아카이브를 Hugging Face에서, 그리고 몇몇 개별 모델 파일을 GitHub Releases, Google Storage, PyPI에서 다운로드한다. 이 다운로드는 번들당 한 번 발생하며 `/data` 볼륨에 저장된다.
+**방화벽 권장사항:**
 
-**방화벽 권장 사항:**
-
-| 시나리오 | 아웃바운드 규칙 |
+|대본|아웃바운드 규칙|
 |---|---|
-| 에어갭 (AI 없음) | 컨테이너의 모든 아웃바운드 트래픽 차단 |
-| AI 번들 필요 | 설치 중 `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org`에 대한 HTTPS를 허용한 뒤 차단 |
-| AI 설치 후 | 모든 아웃바운드 트래픽 차단 - 모델이 로컬에 캐시됨 |
+|에어 갭|`SNAPOTTER_TELEMETRY=0` 및 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` 설정, 오프라인 AI 번들 가져오기 사용, URL 가져오기 및 외부 통합 비활성화, 송신 차단|
+|기본 원격 측정|브라우저/네트워크 로그에 나열된 PostHog 및 Sentry 엔드포인트를 허용하십시오. 정책에서 허용하지 않는 경우 원격 측정을 비활성화합니다.|
+|AI 번들이 필요함|설치 중에 HTTPS를 `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`로 허용하십시오. 그런 다음 해당 호스트를 차단하세요.|
+|외부 통합|관리자가 구성한 정확한 OIDC/SAML/OTLP/webhook/객체 저장소 대상만 허용|
 
-번들 아카이브는 Hugging Face의 Xet 스토리지에서 제공되며, 이는 `*.xethub.hf.co` 엔드포인트를 통해 병렬로 전송되어 수 GB 번들 다운로드를 빠르게 만든다. 방화벽이 `huggingface.co`을 허용하지만 `*.xethub.hf.co`를 차단하면, 설치는 여전히 성공하지만 더 느린 단일 스트림 다운로드로 폴백하므로, 빠른 경로를 유지하려면 Xet 호스트를 허용 목록에 추가하라. 완전 오프라인 설치는 이 모든 것을 건너뛰고 대신 [오프라인 번들 임포트](/ko/guide/deployment)를 사용할 수 있다.
+번들 아카이브는 `*.xethub.hf.co` 엔드포인트를 통해 병렬로 전송되고 다중 GB 번들 다운로드를 빠르게 만드는 Hugging Face의 Xet 스토리지에서 제공됩니다. 방화벽이 `huggingface.co`를 허용하지만 `*.xethub.hf.co`를 차단하는 경우 설치는 성공하지만 느린 단일 스트림 다운로드로 돌아가므로 Xet 호스트가 빠른 경로를 유지하도록 허용 목록에 추가하세요. 완전 오프라인 설치에서는 이 모든 과정을 건너뛰고 대신 [오프라인 번들 가져오기](/ko/guide/deployment)를 사용할 수 있습니다.
 
-리버스 프록시 구성(Nginx, Traefik, Caddy, Cloudflare Tunnels)은 [배포 가이드](/ko/guide/deployment#reverse-proxy)를 참고하라.
+역방향 프록시 구성(Nginx, Traefik, Caddy, Cloudflare Tunnels)은 [배포 가이드](/ko/guide/deployment#reverse-proxy)를 참조하세요.
 
 ## Docker 시크릿 {#docker-secrets}
 
@@ -258,83 +167,101 @@ spec:
 
 ## 백업 및 복구 {#backup-and-recovery}
 
-영속 상태는 두 볼륨에 나뉘어 있다:
+프로덕션 Compose 스택은 4개의 볼륨을 정의합니다. PostgreSQL, Redis 및 파일 상태가 동일한 시점을 설명하도록 조정된 백업을 수행하기 전에 수신을 중지하고 활성 작업이 완료되도록 하세요.
 
-| 볼륨 | 내용 | 필수 여부? |
+|용량|내용물|회복치료|
 |---|---|---|
-| `SnapOtter-pgdata` | PostgreSQL 데이터베이스 (사용자, 설정, 파이프라인, 작업, 감사 로그) | 예 |
-| `/data` (app 볼륨) | 사용자가 업로드한 파일, AI 모델, Python venv | 부분적 (아래 참고) |
+|`SnapOtter-pgdata`|PostgreSQL 사용자, 설정, 파이프라인, 작업, 파일 메타데이터 및 감사 로그|비판적인; 휴대용 복구를 위해 빠른 실패 논리 덤프 사용|
+|`SnapOtter-data`|저장된 라이브러리 개체, 로그 및 AI 상태(`/data/files, /data/logs, /data/ai, /data/ai/venv`)|전체 볼륨을 백업하십시오. 공간을 절약하기 위해 의도적으로 모든 AI 상태를 생략하고 해당 번들을 다시 설치합니다.|
+|`SnapOtter-redisdata`|내구성 있는 BullMQ 대기열 상태를 위한 Redis AOF|앱을 일시 중지하고 `SAVE`를 강제 실행한 후 백업하세요. 대기 중인 작업을 정확하게 재개하는 데 필요|
+|`SnapOtter-workspace`|임시 객체 스토리지 키(`/tmp/workspace/uploads, /tmp/workspace/outputs`)|모든 작업이 소진되거나 취소된 후에는 백업하지 마십시오. 작업이 활성 상태인 동안에는 절대 버리지 마세요.|
 
-`/data` 볼륨 내부:
-
-| 경로 | 내용 | 필수 여부? |
-|---|---|---|
-| `/data/uploads/`, `/data/outputs/` | 사용자 파일 및 처리 결과 | 예 |
-| `/data/ai/` | 다운로드된 AI 모델 파일 | 아니요 (재다운로드 가능) |
-| `/data/venv/` | Python 가상 환경 | 아니요 (시작 시 재빌드됨) |
+Compose는 일반적으로 볼륨 이름 앞에 프로젝트 이름을 붙입니다. `SnapOtter-data`와 같은 표시 이름이 Docker 볼륨 이름이라고 가정하는 대신 탑재된 컨테이너에서 실제 소스 볼륨을 확인합니다.
 
 ### 데이터베이스 백업 {#database-backup}
 
-스택이 실행되는 동안 데이터베이스를 백업하려면 `pg_dump`을 사용하라:
+PostgreSQL의 사용자 정의 아카이브 형식을 사용하고 백업을 완전한 것으로 처리하기 전에 아카이브를 확인하십시오.
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-또는 스택을 중지하고 `SnapOtter-pgdata` 볼륨을 스냅샷하라:
+모든 백업을 격리된 스택으로 복원하고, 데이터베이스 레코드와 파일 체크섬을 확인하고, 애플리케이션을 시작하여 테스트합니다. 저장소의 `tests/qa/backup-restore-drill.sh`는 명시적인 `QA_IMAGE`에 대해 해당 릴리스 게이트를 자동화합니다.
+
+플랫폼이 대신 충돌 일관성이 있는 볼륨 스냅샷을 생성하는 경우 먼저 전체 스택을 중지하고 모든 중요한 볼륨을 하나의 세트로 스냅샷하십시오. 실행 중인 컨테이너의 원시 PostgreSQL 데이터 디렉터리 복사본은 지원되는 논리적 백업이 아닙니다.
+
+### 파일 및 큐 백업 {#file-and-queue-backup}
+
+파일 및 대기열 볼륨을 캡처하기 전에 애플리케이션을 일시 중지하십시오. `docker inspect`를 사용하여 실제 볼륨 이름을 확인하고 Redis가 현재 상태를 유지하도록 강제하며 소유권과 권한이 보존된 상태로 보관합니다.
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### 사용자 파일 백업 {#user-files-backup}
+애플리케이션을 적용하기 전에 Redis를 다시 시작하십시오. `/data/ai`를 의도적으로 제외하는 경우 모델이나 가상 환경 없이 `installed.json` 레코드를 보존하는 대신 전체 AI 하위 트리를 제거하십시오. 백업 파일을 암호화하고 액세스를 제어하며 SnapOtter를 실행하는 호스트와 별도로 보관하세요.
 
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
+## 규정 준수 아티팩트 {#compliance-artifacts}
 
-AI 모델은 모든 번들을 합쳐 최대 약 24 GB에 이른다. 재다운로드가 가능하므로, 공간을 절약하려면 백업에서 `/data/ai/`와 `/data/venv/`을 제외하라. 데이터베이스와 사용자 파일만 필수적이다.
+각 SnapOtter 릴리스에는 다음 보안 아티팩트가 포함되어 있습니다.
 
-## 컴플라이언스 산출물 {#compliance-artifacts}
-
-각 SnapOtter 릴리스에는 다음 보안 산출물이 포함된다:
-
-| 산출물 | 형식 | 찾을 수 있는 곳 |
+| 인공물 | 체재 | 어디서 찾을 수 있나요? |
 |---|---|---|
-| SBOM (CycloneDX) | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) 자산: `snapotter-v{version}-sbom.cdx.json` |
-| SBOM (SPDX) | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) 자산: `snapotter-v{version}-sbom.spdx.json` |
-| 취약점 스캔 | Trivy JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) 자산: `snapotter-v{version}-trivy.json` |
-| 취약점 스캔 | SARIF | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) 탭 |
-| 정적 분석 | CodeQL (JS/TS + Python) | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) 탭, 매주 + PR마다 실행 |
-| 의존성 리뷰 | GitHub 네이티브 | PR별 검사, 고위험 추가 시 실패 |
-| Python 의존성 감사 | pip-audit | 모든 푸시의 CI 실행 로그 |
-| 보안 정책 | Markdown | 저장소의 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
-| 의존성 업데이트 | Dependabot | npm, pip, Docker, Actions에 대한 자동 주간 PR |
+| 릴리스 주제 바인딩 | 정식 JSON + GitHub 증명 | [GitHub 출시](https://github.com/snapotter-hq/SnapOtter/releases) 자산: `snapotter-v{version}-release-subjects.json` |
+| 아카이브 SBOM | CycloneDX 및 SPDX JSON | 릴리스 자산: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 이미지 SBOM | CycloneDX 및 SPDX JSON | 릴리스 자산: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 취약점 스캔 | Trivy JSON | `archive-linux-{arch}` 또는 `image-linux-{arch}` 접두사가 일치하는 자산 릴리스 |
+| 취약점 스캔 | SARIF | [GitHub 보안](https://github.com/snapotter-hq/SnapOtter/security) 탭 |
+| 정적 분석 | CodeQL(JS/TS + Python) | [GitHub 보안](https://github.com/snapotter-hq/SnapOtter/security) 탭, 매주 + PR별로 실행 |
+| 의존성 검토 | GitHub 네이티브 | PR별 검사, 심각도가 높은 추가 시 실패 |
+| Python 종속성 감사 | pip-audit | 푸시할 때마다 CI 실행 로그 |
+| 보안정책 | Markdown | 저장소의 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
+| 종속성 업데이트 | Dependabot | npm, pip, Docker, Actions에 대한 자동 주간 PR |
 
-**직접 스캔 실행하기:**
+**자체 스캔 실행:**
 
-릴리스에서 SBOM을 다운로드하고 원하는 도구로 스캔하라:
+릴리스 주제 매니페스트를 다운로드하고 릴리스 워크플로에서 증명되었는지 확인합니다.
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+매니페스트는 `releaseTag`, `releaseCommit` 및 `workflowTriggerCommit`를 별도로 기록합니다. `releaseCommit`가 불변 태그에서 벗겨낸 커밋인지 확인한 다음 아카이브, 이미지, SBOM의 SHA-256 다이제스트를 확인하거나 `subjects`의 해당 항목에 대해 사용하는 스캔을 확인하세요. 이러한 구분은 의도적인 것입니다. 새로 생성된 릴리스 커밋을 체크아웃해도 워크플로의 OIDC 자격 증명에서 커밋 ID가 변경되지 않습니다.
+
+다운로드한 SBOM 또는 이미지를 직접 스캔할 수도 있습니다.
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
-::: info 
-SBOM과 취약점 스캔은 해당 릴리스로 게시된 정확한 이미지를 반영한다. 배포 후 설치되는 AI 모델 번들은 런타임에 다운로드되므로 SBOM에 포함되지 않는다.
+::: info
+이미지 SBOMs 및 스캔은 해당 릴리스에 게시된 정확한 아키텍처별 이미지를 반영합니다. SBOMs 아카이브와 스캔은 사전 구축된 아카이브를 별도로 설명합니다. 배포 후 설치된 AI 모델 번들은 런타임 시 다운로드되므로 이러한 SBOMs에는 포함되지 않습니다.
 :::

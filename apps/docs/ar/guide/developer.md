@@ -1,8 +1,9 @@
 ---
 description: "إعداد بيئة التطوير المحلية، والأوامر، وأعراف الكود، وكيفية إضافة أداة جديدة إلى SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 297ae392c8cf
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: d05ef83f5cb7
+i18n_hash_version: 2
 ---
 
 # دليل المطوّر {#developer-guide}
@@ -219,6 +220,17 @@ docker build -f docker/Dockerfile -t snapotter:latest .
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## مجالات الإصدار الإصدار {#release-version-domains}
+
+يحتوي SnapOtter على ثلاثة مجالات إصدار عمدًا. لا تقم بنسخ نطاق إلى آخر أثناء الإصدار:
+
+- يغطي إصدار إصدار التطبيق بيان الجذر وجميع حزم مساحة العمل الخاصة و`APP_VERSION`. يوفر Semantic-release هذه القيمة، ويقوم `pnpm version:sync <version>` بتحديث كل مساحة عمل قبل إصدار التطبيق.
+- OpenAPI `info.version` هو العقد العام المستقر API. تظل جميع المواصفات المترجمة على `<major>.0.0` لإصدارات التطبيقات المتوافقة وتتغير فقط عندما ينتقل عقد API إلى إصدار رئيسي جديد.
+- يحافظ `docker/feature-manifest.json` على `imageVersion: 2.0.0` باعتباره عصر تخزين حزمة الميزات القديمة غير القابلة للتغيير. مسارات أرشيف الإصدار 2 هذه ليست إصدارات حزمة التطبيقات. يستخدم Accurate OCR تنسيق وقت التشغيل v3 ويسجل مصدر إصدار التطبيق الخاص به بشكل منفصل.
+
+`tests/unit/infra/release-version-policy.test.ts` يفرض هذه الحدود. يجب أن يقوم مجال الإصدار الجديد أو الترحيل بتحديث هذا العقد وتصميم ترحيل العناصر ذات الصلة معًا.
+تعيش قيم API المستقلة والحزمة القديمة في `config/release-version-policy.json`؛ يجب ألا تقوم مزامنة إصدار التطبيق أبدًا بإعادة كتابة ملف السياسة هذا ضمنيًا.
 
 ## متغيرات البيئة {#environment-variables}
 

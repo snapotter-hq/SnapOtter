@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter の PostgreSQL データベーススキーマ、テーブル、マイグレーション、バックアップ手順。"
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 1113cd0160d9
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: f5d73e5b3f07
+i18n_hash_version: 2
 ---
 
 # データベース {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 本番環境では、保留中のマイグレーションが起動時に自動的に適用されます。
 
-## バックアップとリストア {#backup-and-restore}
+## {#backup-and-restore} のバックアップと復元
 
-リレーショナルデータベースは、アプリの `/data` ボリュームではなく、Postgres コンテナの `SnapOtter-pgdata` ボリュームに存在します。
+リレーショナル データベースは、アプリの `/data` ボリュームではなく、Postgres コンテナーの `SnapOtter-pgdata` ボリュームに存在します。
 
-**オプション 1: pg_dump（推奨）**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**オプション 2: ボリュームスナップショット**
+**検証付きの論理バックアップ (推奨)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+このデータベース ダンプには、`/data/files` で保存されたライブラリ オブジェクトや、Redis の永続的な BullMQ 状態は含まれません。 [セキュリティと強化](/ja/guide/security#backup-and-recovery) の連携手順でバックアップと復元を行ってください。
+
+**コールド ボリューム スナップショット**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+`tar` を使用してライブ PostgreSQL データ ディレクトリをコピーしないでください。ボリューム名はプロジェクトごとにプレフィックスを作成するため、リテラル ラベル `SnapOtter-pgdata` を想定するのではなく、`docker inspect` またはストレージ プラットフォームからマウントされたボリューム ID を解決します。
 
 ### 1.x（SQLite）からの移行 {#migrating-from-1-x-sqlite}
 

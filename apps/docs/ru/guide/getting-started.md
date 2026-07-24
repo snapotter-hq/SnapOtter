@@ -1,8 +1,8 @@
 ---
 description: "Установите SnapOtter с помощью Docker одной командой. Включает настройку Docker Compose, сборку из исходников и полный обзор функций."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: fd51d5b4d939
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: 9c478069767b
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Этот единственный контейнер запускает всё необходимое: без установленной `DATABASE_URL` он запускает собственные PostgreSQL и Redis на loopback-интерфейсе (встроенный режим) и хранит все данные в томе `SnapOtter-data`. Это самый быстрый способ попробовать SnapOtter или развернуть на своём homelab. Для продакшена запустите стек [Docker Compose](#docker-compose) ниже, который держит PostgreSQL и Redis в их собственных контейнерах. Встроенный режим работает от имени root (по умолчанию) и автоматически отключается, как только вы установите `DATABASE_URL`.
+Этот единственный контейнер выполняет все, что ему нужно: без установленного `DATABASE_URL` он запускает свои собственные PostgreSQL и Redis на интерфейсе обратной связи (встроенный режим) и сохраняет все данные в томе `SnapOtter-data`. Это самый быстрый способ опробовать SnapOtter или самостоятельно разместить его в домашней лаборатории. Для производства используйте [канонический стек Docker Compose](#docker-compose), который хранит PostgreSQL и Redis в отдельных контейнерах. Встроенный режим запускается от имени пользователя root (по умолчанию) и автоматически отключается, как только вы устанавливаете `DATABASE_URL`.
 
 Устанавливаете SnapOtter на Raspberry Pi, старый ноутбук или небольшой VPS? В разделе [Установка на маломощном оборудовании](/ru/guide/low-resource) есть пошаговое руководство с подобранными лимитами и описание того, чего ожидать от ограниченного оборудования.
 
@@ -41,7 +41,7 @@ SnapOtter по умолчанию включает анонимную проду
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Требуется [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматически переключается на процессор, когда CUDA недоступна. Ускорение Intel/AMD iGPU через VA-API, Quick Sync или OpenCL сегодня не поддерживается для вывода AI. См. [Docker Tags](/ru/guide/docker-tags) для ознакомления с тестами. Если инструменты ИИ работают на ЦП, несмотря на `--gpus all`, см. [Проверка ускорения графического процессора] (/guide/deployment#verify-gpu-acceleration).
+Требуется [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматически переключается на процессор, когда CUDA недоступна. Ускорение Intel/AMD iGPU через VA-API, Quick Sync или OpenCL сегодня не поддерживается для вывода AI. См. [Docker Tags](/ru/guide/docker-tags) для ознакомления с тестами. Если инструменты ИИ работают на ЦП, несмотря на `--gpus all`, см. [Проверка ускорения графического процессора](/ru/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Также на GHCR
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Оба реестра публикуют один и тот же образ при каждом релизе.
 :::
 
-## Docker Compose {#docker-compose}
+## Docker Создать {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Используйте рабочий файл, поддерживаемый и тестируемый с каждым выпуском, вместо копирования сокращенного примера Compose с этой страницы:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Измените это для нелокальных развертываний.
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-См. [Конфигурация](/ru/guide/configuration) для всех переменных окружения.
+Канонический [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) включает все четыре тома среды выполнения, проверки работоспособности, ограничения ресурсов, устойчивую конфигурацию Redis, закрепленные образы базы данных/кэша и текущее усиление защиты контейнера. Измените пароль администратора по умолчанию сразу после первого входа в систему. Для воспроизводимого развертывания прикрепите образ приложения SnapOtter к проверенному вами тегу выпуска или дайджесту вместо того, чтобы следовать `latest`.
+
+См. [Конфигурация](/ru/guide/configuration) для всех переменных среды и [Безопасность и усиление](/ru/guide/security) для секретов, сетевой политики и инструкций по резервному копированию.
 
 ## Сборка из исходников {#build-from-source}
 

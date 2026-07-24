@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter için PostgreSQL veritabanı şeması, tablolar, migration'lar ve yedekleme prosedürleri."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 1a738c4f269b
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 635a49df1d8b
+i18n_hash_version: 2
 ---
 
 # Veritabanı {#database}
@@ -159,26 +160,34 @@ npx drizzle-kit migrate    # apply pending migrations
 
 ## Yedekleme ve geri yükleme {#backup-and-restore}
 
-İlişkisel veritabanı, uygulamanın `/data` volume'unda değil, Postgres container'ının `SnapOtter-pgdata` volume'unda bulunur.
+İlişkisel veritabanı, uygulamanın `/data` biriminde değil, Postgres kapsayıcısının `SnapOtter-pgdata` biriminde bulunur.
 
-**Seçenek 1: pg_dump (önerilen)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Seçenek 2: Volume anlık görüntüsü**
+**Doğrulama ile mantıksal yedekleme (önerilir)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Bu veritabanı dökümü, `/data/files`'de veya Redis'te dayanıklı BullMQ durumunda kaydedilmiş kitaplık nesnelerini içermiyor. Bunları [Güvenlik ve Güçlendirme](/tr/guide/security#backup-and-recovery) bölümündeki koordineli prosedürle yedekleyin ve geri yükleyin.
+
+**Soğuk hacim anlık görüntüsü**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Canlı bir PostgreSQL veri dizinini `tar` ile kopyalamayın. Ön ek birim adlarını projeye göre oluşturun; bu nedenle, `SnapOtter-pgdata` değişmez etiketini varsaymak yerine, bağlı birim kimliklerini `docker inspect`'den veya depolama platformunuzdan çözümleyin.
 
 ### 1.x'ten (SQLite) geçiş {#migrating-from-1-x-sqlite}
 

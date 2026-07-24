@@ -1,8 +1,8 @@
 ---
 description: "Installeer SnapOtter met Docker in één commando. Inclusief Docker Compose-installatie, bouwen vanaf broncode en een volledig functieoverzicht."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: a7b25ab8e32b
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: 0ea17ff5045b
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Verken de volledige UI op [demo.snapotter.com](https://demo.snapotter.com) - gee
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Deze enkele container draait alles wat hij nodig heeft: zonder ingestelde `DATABASE_URL` start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded-modus) en houdt alle data in het `SnapOtter-data`-volume. Het is de snelste manier om SnapOtter te proberen of zelf te hosten op een homelab. Draai voor productie de [Docker Compose](#docker-compose)-stack hieronder, die PostgreSQL en Redis in hun eigen containers houdt. De embedded-modus draait als root (de standaard) en schakelt zichzelf automatisch uit zodra je `DATABASE_URL` instelt.
+Deze enkele container voert alles uit wat hij nodig heeft: zonder `DATABASE_URL` ingesteld, start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded mode) en bewaart hij alle gegevens in het `SnapOtter-data`-volume. Het is de snelste manier om SnapOtter uit te proberen of zelf te hosten op een thuislab. Gebruik voor productie de [canonieke Docker Compose-stack](#docker-compose), die PostgreSQL en Redis in hun eigen containers bewaart. De ingebouwde modus wordt uitgevoerd als root (standaard) en wordt automatisch uitgeschakeld zodra u `DATABASE_URL` instelt.
 
 Installeer je op een Raspberry Pi, een oude laptop of een kleine VPS? Zie [Setups met beperkte resources](/nl/guide/low-resource) voor een afgestemd stappenplan en wat je van beperkte hardware kunt verwachten.
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Beide registries publiceren bij elke release dezelfde image.
 :::
 
-## Docker Compose {#docker-compose}
+## Docker Componeer {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Gebruik het productiebestand dat bij elke release wordt onderhouden en getest in plaats van een verkort Compose-voorbeeld van deze pagina te kopiëren:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Wijzig dit voor niet-lokale implementaties
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen.
+De canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) omvat alle vier de runtimevolumes, gezondheidscontroles, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerverharding. Wijzig het standaard beheerderswachtwoord onmiddellijk na de eerste keer inloggen. Voor een reproduceerbare implementatie maakt u de SnapOtter-toepassingsimage vast aan de releasetag of -digest die u hebt geverifieerd, in plaats van `latest` te volgen.
+
+Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen en [Beveiliging en beveiliging](/nl/guide/security) voor geheimen, netwerkbeleid en back-uprichtlijnen.
 
 ## Bouwen vanaf broncode {#build-from-source}
 

@@ -1,8 +1,9 @@
 ---
 description: "Lokalna konfiguracja środowiska developerskiego, komendy, konwencje kodu oraz jak dodać nowe narzędzie do SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: ed42eca006b5
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 35e5749a9414
+i18n_hash_version: 2
 ---
 
 # Przewodnik dla programistów {#developer-guide}
@@ -219,6 +220,17 @@ Użyj montowań cache BuildKit dla szybszych przebudów:
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Wydaj domeny wersji {#release-version-domains}
+
+SnapOtter celowo ma trzy domeny wersji. Nie kopiuj jednej domeny do drugiej podczas wydania:
+
+- Wersja aplikacji obejmuje manifest główny, wszystkie pakiety prywatnego obszaru roboczego i `APP_VERSION`. Semantic-release dostarcza tę wartość, a `pnpm version:sync <version>` aktualizuje każdy obszar roboczy przed wydaniem aplikacji.
+- OpenAPI `info.version` to stabilny publiczny kontrakt główny API. Wszystkie zlokalizowane specyfikacje pozostają w `<major>.0.0` dla zgodnych wydań aplikacji i zmieniają się tylko wtedy, gdy umowa API zostanie przeniesiona do nowej głównej wersji.
+- `docker/feature-manifest.json` utrzymuje `imageVersion: 2.0.0` jako niezmienną epokę przechowywania starszych pakietów funkcji. Te ścieżki archiwów v2 nie są wersjami pakietów aplikacji. Accurate OCR korzysta z formatu wykonawczego v3 i oddzielnie rejestruje pochodzenie wydania aplikacji.
+
+`tests/unit/infra/release-version-policy.test.ts` wymusza te granice. Domena nowej wersji lub migracja muszą jednocześnie aktualizować tę umowę i odpowiedni projekt migracji artefaktów.
+Niezależne wartości API i starsze pakiety znajdują się w `config/release-version-policy.json`; synchronizacja wersji aplikacji nie może nigdy pośrednio przepisać tego pliku zasad.
 
 ## Zmienne środowiskowe {#environment-variables}
 

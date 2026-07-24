@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 的 PostgreSQL 資料庫結構、資料表、遷移，以及備份程序。"
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 34debcc24c5a
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 867212c1ca88
+i18n_hash_version: 2
 ---
 
 # 資料庫 {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 在生產環境中，待處理的遷移會在啟動時自動套用。
 
-## 備份與還原 {#backup-and-restore}
+## 備份與還原{#backup-and-restore}
 
-關聯式資料庫位於 Postgres 容器的 `SnapOtter-pgdata` 磁碟區，而非應用程式的 `/data` 磁碟區。
+關聯式資料庫位於 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是應用程式的 `/data` 卷中。
 
-**選項 1：pg_dump（建議）**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**選項 2：磁碟區快照**
+**帶有驗證的邏輯備份（建議）**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+此資料庫轉儲不包含以 `/data/files` 保存的庫物件或 Redis 中持久的 BullMQ 狀態。使用[安全性與強化](/zh-TW/guide/security#backup-and-recovery) 中的協調程序備份和還原這些內容。
+
+**冷捲快照**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+不要使用 `tar` 複製即時 PostgreSQL 資料目錄。按項目編寫磁碟區名稱前綴，因此從 `docker inspect` 或您的儲存平台解析已安裝的磁碟區 ID，而不是假設文字標籤 `SnapOtter-pgdata`。
 
 ### 從 1.x（SQLite）遷移 {#migrating-from-1-x-sqlite}
 

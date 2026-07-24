@@ -1,8 +1,9 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur pencadangan untuk SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 8a963902d4f7
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: e23431b3174a
+i18n_hash_version: 2
 ---
 
 # Database {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Di produksi, migrasi yang tertunda diterapkan secara otomatis saat startup.
 
-## Pencadangan dan pemulihan {#backup-and-restore}
+## Cadangkan dan pulihkan {#backup-and-restore}
 
-Database relasional berada di volume `SnapOtter-pgdata` kontainer Postgres, bukan di volume `/data` aplikasi.
+Basis data relasional berada di volume `SnapOtter-pgdata` container Postgres, bukan volume `/data` aplikasi.
 
-**Opsi 1: pg_dump (direkomendasikan)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Opsi 2: Snapshot volume**
+**Cadangan logis dengan validasi (disarankan)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Dump database ini tidak berisi objek perpustakaan yang disimpan di `/data/files` atau status BullMQ yang tahan lama di Redis. Cadangkan dan pulihkan dengan prosedur terkoordinasi di [Keamanan & Pengerasan](/id/guide/security#backup-and-recovery).
+
+**Snapshot volume dingin**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Jangan menyalin direktori data PostgreSQL langsung dengan `tar`. Tulis nama volume awalan berdasarkan proyek, jadi selesaikan ID volume yang terpasang dari `docker inspect` atau platform penyimpanan Anda daripada menggunakan label literal `SnapOtter-pgdata`.
 
 ### Migrasi dari 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

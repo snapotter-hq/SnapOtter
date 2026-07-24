@@ -1,8 +1,9 @@
 ---
 description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir araç ekleme."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: ca6f585e8551
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 5873717e6499
+i18n_hash_version: 2
 ---
 
 # Geliştirici kılavuzu {#developer-guide}
@@ -219,6 +220,17 @@ Daha hızlı yeniden derlemeler için BuildKit önbellek bağlamalarını kullan
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Sürüm etki alanlarını yayınlayın {#release-version-domains}
+
+SnapOtter kasıtlı olarak üç sürüm alanına sahiptir. Sürüm sırasında bir alanı diğerine kopyalamayın:
+
+- Uygulama yayın sürümü, kök bildirimi, tüm özel çalışma alanı paketlerini ve `APP_VERSION`'yi kapsar. Semantic-release bu değeri sağlar ve `pnpm version:sync <version>`, bir uygulama yayınlanmadan önce her çalışma alanını günceller.
+- OpenAPI `info.version`, istikrarlı halka açık API ana sözleşmesidir. Tüm yerelleştirilmiş özellikler, uyumlu uygulama sürümleri için `<major>.0.0`'de kalır ve yalnızca API sözleşmesi yeni bir ana sürüme taşındığında değişir.
+- `docker/feature-manifest.json`, `imageVersion: 2.0.0`'yi değişmez eski özellik paketi depolama çağı olarak koruyor. Bu v2 arşiv yolları uygulama paketi sürümleri değildir. Accurate OCR, çalışma zamanı formatı v3'ü kullanır ve uygulama yayın kaynağını ayrı olarak kaydeder.
+
+`tests/unit/infra/release-version-policy.test.ts` bu sınırları zorlar. Yeni bir sürüm etki alanı veya geçişi, söz konusu sözleşmeyi ve ilgili yapıt geçiş tasarımını birlikte güncellemelidir.
+Bağımsız API ve eski paket değerleri `config/release-version-policy.json`'de bulunur; uygulama sürümü senkronizasyonu bu politika dosyasını hiçbir zaman örtülü olarak yeniden yazmamalıdır.
 
 ## Ortam değişkenleri {#environment-variables}
 

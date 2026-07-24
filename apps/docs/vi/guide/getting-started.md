@@ -1,8 +1,8 @@
 ---
 description: "Cài đặt SnapOtter với Docker trong một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn, và tổng quan đầy đủ về tính năng."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 77a310799bcf
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: fb3b2d7dd51c
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Khám phá toàn bộ giao diện tại [demo.snapotter.com](https://demo.snapot
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Container duy nhất này chạy mọi thứ nó cần: khi không đặt `DATABASE_URL`, nó khởi động PostgreSQL và Redis của riêng mình trên giao diện loopback (chế độ nhúng) và giữ toàn bộ dữ liệu trong volume `SnapOtter-data`. Đây là cách nhanh nhất để thử SnapOtter hoặc tự lưu trữ trên một homelab. Với production, hãy chạy stack [Docker Compose](#docker-compose) bên dưới, vốn giữ PostgreSQL và Redis trong các container riêng của chúng. Chế độ nhúng chạy dưới danh nghĩa root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`.
+Vùng chứa duy nhất này chạy mọi thứ nó cần: không có bộ `DATABASE_URL`, nó khởi động PostgreSQL và Redis của riêng nó trên giao diện loopback (chế độ nhúng) và giữ tất cả dữ liệu trong ổ `SnapOtter-data`. Đây là cách nhanh nhất để dùng thử SnapOtter hoặc tự lưu trữ trên homelab. Để sản xuất, hãy sử dụng [ngăn xếp Docker Compose chuẩn](#docker-compose), để giữ PostgreSQL và Redis trong các vùng chứa riêng của chúng. Chế độ nhúng chạy bằng root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`.
 
 Cài đặt trên Raspberry Pi, laptop cũ, hay một VPS nhỏ? Xem [Thiết lập trên phần cứng hạn chế](/vi/guide/low-resource) để có hướng dẫn từng bước đã tinh chỉnh và biết nên kỳ vọng gì từ phần cứng hạn chế.
 
@@ -41,7 +41,7 @@ Thêm `--gpus all` để loại bỏ nền, nâng cấp, nâng cấp và phục 
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Yêu cầu [Bộ công cụ bộ chứa NVIDIA] (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động quay trở lại CPU khi CUDA không khả dụng. Hiện nay, khả năng tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL không được hỗ trợ cho suy luận AI. Xem [Thẻ Docker](/vi/guide/docker-tags) để biết điểm chuẩn. Nếu các công cụ AI chạy trên CPU mặc dù có `--gpus all`, hãy xem [Xác minh khả năng tăng tốc GPU](/vi/guide/deployment#verify-gpu-acceleration).
+Yêu cầu [Bộ công cụ bộ chứa NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động quay trở lại CPU khi CUDA không khả dụng. Hiện nay, khả năng tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL không được hỗ trợ cho suy luận AI. Xem [Thẻ Docker](/vi/guide/docker-tags) để biết điểm chuẩn. Nếu các công cụ AI chạy trên CPU mặc dù có `--gpus all`, hãy xem [Xác minh khả năng tăng tốc GPU](/vi/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Cũng có trên GHCR
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Cả hai registry đều phát hành cùng một image trong mỗi bản phát hành.
 :::
 
-## Docker Compose {#docker-compose}
+## Docker Soạn {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Sử dụng tệp sản xuất được duy trì và thử nghiệm với mỗi bản phát hành thay vì sao chép ví dụ Compose viết tắt từ trang này:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến môi trường.
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) chuẩn bao gồm tất cả bốn khối thời gian chạy, kiểm tra tình trạng, giới hạn tài nguyên, cấu hình Redis bền vững, hình ảnh bộ đệm/cơ sở dữ liệu được ghim và tăng cường vùng chứa hiện tại. Thay đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể lặp lại, hãy ghim hình ảnh ứng dụng SnapOtter vào thẻ phát hành hoặc thông báo mà bạn đã xác minh thay vì theo dõi `latest`.
+
+Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến môi trường và [Bảo mật & tăng cường](/vi/guide/security) để biết bí mật, chính sách mạng và hướng dẫn sao lưu.
 
 ## Build từ mã nguồn {#build-from-source}
 

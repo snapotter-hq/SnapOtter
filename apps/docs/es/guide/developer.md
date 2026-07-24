@@ -1,8 +1,9 @@
 ---
 description: "Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 572206416dc1
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 15787f19cf87
+i18n_hash_version: 2
 ---
 
 # Guía del desarrollador {#developer-guide}
@@ -219,6 +220,17 @@ Usa las cache mounts de BuildKit para reconstrucciones más rápidas:
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Dominios de versión de lanzamiento {#release-version-domains}
+
+SnapOtter tiene intencionalmente tres dominios de versión. No copie un dominio en otro durante un lanzamiento:
+
+- La versión de lanzamiento de la aplicación cubre el manifiesto raíz, todos los paquetes de espacios de trabajo privados y `APP_VERSION`. Semantic-release proporciona este valor y `pnpm version:sync <version>` actualiza cada espacio de trabajo antes del lanzamiento de una aplicación.
+- OpenAPI `info.version` es el contrato principal público estable API. Todas las especificaciones localizadas permanecen en `<major>.0.0` para versiones de aplicaciones compatibles y cambian solo cuando el contrato API pasa a una nueva versión principal.
+- `docker/feature-manifest.json` mantiene a `imageVersion: 2.0.0` como la época de almacenamiento de paquetes de funciones heredadas e inmutables. Esas rutas de archivo v2 no son versiones de paquetes de aplicaciones. Accurate OCR utiliza el formato de tiempo de ejecución v3 y registra el origen de la versión de la aplicación por separado.
+
+`tests/unit/infra/release-version-policy.test.ts` impone estos límites. Una nueva versión de dominio o migración debe actualizar ese contrato y el diseño de migración de artefacto relevante juntos.
+Los valores independientes API y del paquete heredado se encuentran en `config/release-version-policy.json`; La sincronización de la versión de la aplicación nunca debe reescribir ese archivo de política implícitamente.
 
 ## Variables de entorno {#environment-variables}
 

@@ -1,8 +1,9 @@
 ---
 description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych w SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 3c05e8b14f7d
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: a5a489e038ba
+i18n_hash_version: 2
 ---
 
 # Baza danych {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 W środowisku produkcyjnym oczekujące migracje są stosowane automatycznie przy uruchomieniu.
 
-## Kopia zapasowa i przywracanie {#backup-and-restore}
+## Utwórz kopię zapasową i przywróć {#backup-and-restore}
 
-Relacyjna baza danych znajduje się w wolumenie `SnapOtter-pgdata` kontenera Postgres, a nie w wolumenie `/data` aplikacji.
+Relacyjna baza danych znajduje się w woluminie `SnapOtter-pgdata` kontenera Postgres, a nie w wolumenie `/data` aplikacji.
 
-**Opcja 1: pg_dump (zalecana)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Opcja 2: Migawka wolumenu**
+**Logiczna kopia zapasowa z walidacją (zalecane)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Ten zrzut bazy danych nie zawiera zapisanych obiektów biblioteki w `/data/files` ani trwałego stanu BullMQ w Redis. Utwórz kopię zapasową i przywróć te dane, stosując skoordynowaną procedurę w [Bezpieczeństwo i wzmacnianie](/pl/guide/security#backup-and-recovery).
+
+**Migawka zimnego woluminu**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Nie kopiuj aktywnego katalogu danych PostgreSQL za pomocą `tar`. Twórz przedrostki nazw woluminów według projektu, więc rozpoznaj identyfikatory zamontowanych woluminów z `docker inspect` lub platformy pamięci masowej, zamiast przyjmować dosłowną etykietę `SnapOtter-pgdata`.
 
 ### Migracja z 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

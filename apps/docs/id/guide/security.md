@@ -1,8 +1,8 @@
 ---
 description: "Panduan pengerasan keamanan untuk SnapOtter. Keamanan kontainer, isolasi jaringan, Docker secrets, deployment Kubernetes, dan artefak kepatuhan."
-i18n_source_hash: 9d021c1ceb40
-i18n_provenance: human
-i18n_output_hash: dd5686e04a3b
+i18n_source_hash: ee46e715d6fe
+i18n_provenance: machine
+i18n_output_hash: e51193b0197e
 i18n_hash_version: 2
 ---
 
@@ -14,131 +14,40 @@ Kontainer berjalan sebagai pengguna non-root khusus (`snapotter`) dengan semua k
 
 ## Pengerasan Kontainer {#container-hardening}
 
-[docker-compose.yml default](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) menyertakan pengerasan keamanan produksi. Berikut rincian setiap opsi dan mengapa itu penting:
+File Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) dan [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) kanonik adalah sumber kebenarannya. Jangan menyalin contoh yang disingkat ke dalam produksi; menyebarkan file dari tag rilis yang Anda verifikasi.
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+Kedua tumpukan menerapkan kontrol berikut:
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- Batas memori, swap, CPU, dan PID berisi pemrosesan asli yang tidak terkendali.
+- Setiap layanan menghilangkan semua kemampuan Linux. Aplikasi hanya menambahkan kembali `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` untuk kepemilikan volume, penurunan identitas `gosu` satu arah, dan penerusan sinyal yang baik. PostgreSQL dan Redis hanya menerima subset yang dibutuhkan oleh titik masuk resmi mereka.
+- `security_opt: [no-new-privileges:true]` mencegah proses dalam aplikasi, PostgreSQL, dan kontainer Redis mendapatkan hak istimewa tambahan. Ini tetap kompatibel dengan `gosu`: titik masuk dimulai sebagai root, menyiapkan volume, dan hanya turun ke pengguna `snapotter` khusus.
+- Input gambar PostgreSQL dan Redis disematkan oleh intisari. Aplikasi juga harus disematkan ke tag rilis atau intisari yang terverifikasi, bukan `latest`.
+- Pemeriksaan kesehatan, rotasi log JSON yang dibatasi, Redis AOF yang tahan lama, dan kebijakan mulai ulang ditentukan secara terpusat dalam file kanonik.
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
+Untuk penerapan yang terhubung ke internet, ikat port 1349 ke loopback dan akhiri TLS pada proksi terbalik yang dikelola. Hasilkan kredensial PostgreSQL dan Redis yang unik, simpan rahasia dalam file yang dilindungi atau manajer rahasia, dan segera ubah kata sandi administrator awal.
 
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
+### Mengapa `read_only` Tidak Disetel {#why-read-only-is-not-set}
 
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### Mengapa `no-new-privileges` Tidak Diatur {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]` sengaja dihilangkan. Entrypoint mulai sebagai root untuk memperbaiki kepemilikan volume, lalu turun ke pengguna `snapotter` melalui [gosu](https://github.com/tianon/gosu), yang membutuhkan setuid. Setelah penurunan hak istimewa selesai, proses berjalan sebagai `snapotter` dengan semua kapabilitas kecuali lima yang tercantum di atas dihapus.
-
-Jika Anda menggunakan Kubernetes atau flag `--user` Docker untuk berjalan sebagai non-root secara langsung (melewati gosu), `no-new-privileges` aman untuk diaktifkan.
-
-### Mengapa `read_only` Tidak Diatur {#why-read-only-is-not-set}
-
-`read_only: true` tidak diatur karena remapping PUID/PGID menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau `runAsUser` Kubernetes alih-alih PUID/PGID, Anda dapat mengaktifkan filesystem root read-only dengan aman.
+`read_only: true` tidak disetel karena pemetaan ulang PUID/PGID menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau Kubernetes `runAsUser` dan bukan PUID/PGID, Anda dapat dengan aman mengaktifkan sistem file root read-only.
 
 ## Isolasi Jaringan {#network-isolation}
 
-Selama operasi normal, kontainer membuat **nol koneksi jaringan keluar**. Semua pemrosesan file terjadi secara lokal menggunakan pustaka yang disertakan.
+Pemrosesan file bersifat lokal, namun instalasi default **bukan sistem bebas jalan keluar**. Analisis produk anonim menggunakan PostHog dan pelaporan kerusakan menggunakan Sentry saat telemetri diaktifkan. Setel `SNAPOTTER_TELEMETRY=0` (atau nonaktifkan analitik pada Pengaturan > Sistem > Privasi) untuk mematikan keduanya. SnapOtter tidak pernah menyertakan file yang diunggah, nama file, output OCR, teks dokumen, atau konten file lainnya dalam acara tersebut.
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
-
-Satu-satunya pengecualian adalah **unduhan model AI**: ketika pengguna memasang bundle fitur AI melalui UI, kontainer mengunduh arsip bundle yang telah dibangun sebelumnya dari Hugging Face, ditambah beberapa file model individual dari GitHub Releases, Google Storage, dan PyPI. Unduhan ini terjadi sekali per bundle dan disimpan di volume `/data`.
+Lalu lintas keluar lainnya didorong oleh fitur: unduhan instalasi bundel/model AI, input rilis yang ditandatangani; Impor URL mengambil URL publik yang diminta pengguna; dan OIDC, SAML, OpenTelemetry, webhook, penyimpanan yang kompatibel dengan S3, atau integrasi serupa yang dikonfigurasi secara eksplisit, hubungi tujuan yang dipilih oleh administrator. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` mencegah pengunduhan model otomatis. [Impor paket offline](/id/guide/deployment) dapat menyediakan fitur AI tanpa keluarnya model runtime.
 
 **Rekomendasi firewall:**
 
-| Skenario | Aturan keluar |
+|Skenario|Aturan keluar|
 |---|---|
-| Air-gapped (tanpa AI) | Blokir semua lalu lintas keluar dari kontainer |
-| Bundle AI diperlukan | Izinkan HTTPS ke `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org` selama instalasi, lalu blokir |
-| Setelah instalasi AI | Blokir semua lalu lintas keluar, model di-cache secara lokal |
+|Celah udara|Setel `SNAPOTTER_TELEMETRY=0` dan `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, gunakan impor bundel AI offline, nonaktifkan impor URL dan integrasi eksternal, lalu blokir jalan keluar|
+|Telemetri bawaan|Izinkan titik akhir PostHog dan Sentry dicantumkan oleh log browser/jaringan Anda; nonaktifkan telemetri jika kebijakan tidak mengizinkannya|
+|Paket AI diperlukan|Selama instalasi, izinkan HTTPS ke `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; lalu blokir host tersebut|
+|Integrasi eksternal|Izinkan hanya tujuan OIDC/SAML/OTLP/webhook/penyimpanan objek yang dikonfigurasikan oleh administrator|
 
-Arsip bundle disajikan dari penyimpanan Xet Hugging Face, yang mentransfer melalui endpoint `*.xethub.hf.co` secara paralel dan itulah yang membuat unduhan bundle multi-GB cepat. Jika firewall Anda mengizinkan `huggingface.co` tetapi memblokir `*.xethub.hf.co`, instalasi tetap berhasil tetapi kembali ke unduhan single-stream yang lebih lambat, jadi masukkan host Xet ke allowlist agar tetap di jalur cepat. Instalasi sepenuhnya offline dapat melewati semua ini dan menggunakan [Impor Bundle Offline](/id/guide/deployment) sebagai gantinya.
+Arsip bundel disajikan dari penyimpanan Xet Hugging Face, yang ditransfer melalui titik akhir `*.xethub.hf.co` secara paralel dan membuat pengunduhan bundel multi-GB menjadi cepat. Jika firewall Anda mengizinkan `huggingface.co` tetapi memblokir `*.xethub.hf.co`, penginstalan masih berhasil tetapi kembali ke pengunduhan aliran tunggal yang lebih lambat, jadi izinkan host Xet untuk tetap berada di jalur cepat. Penginstalan yang sepenuhnya offline dapat melewati semua ini dan menggunakan [Impor Paket Offline](/id/guide/deployment) sebagai gantinya.
 
-Untuk konfigurasi reverse proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels), lihat [panduan Deployment](/id/guide/deployment#reverse-proxy).
+Untuk konfigurasi proxy terbalik (Nginx, Traefik, Caddy, Cloudflare Tunnels), lihat [Panduan penerapan](/id/guide/deployment#reverse-proxy).
 
 ## Docker Secrets {#docker-secrets}
 
@@ -258,51 +167,58 @@ Untuk penentuan ukuran sumber daya, lihat [Persyaratan Perangkat Keras](/id/guid
 
 ## Pencadangan dan Pemulihan {#backup-and-recovery}
 
-State persisten dibagi di dua volume:
+Tumpukan Compose produksi mendefinisikan empat volume. Hentikan ingress dan biarkan pekerjaan aktif selesai sebelum mengambil cadangan terkoordinasi sehingga PostgreSQL, Redis, dan status file menggambarkan titik waktu yang sama.
 
-| Volume | Isi | Kritis? |
+|Volume|Isi|Perawatan pemulihan|
 |---|---|---|
-| `SnapOtter-pgdata` | Basis data PostgreSQL (pengguna, pengaturan, pipeline, job, audit log) | Ya |
-| `/data` (volume app) | File yang diunggah pengguna, model AI, venv Python | Sebagian (lihat di bawah) |
+|`SnapOtter-pgdata`|Pengguna PostgreSQL, pengaturan, saluran pipa, pekerjaan, metadata file, dan log audit|Kritis; gunakan dump logis cepat gagal untuk pemulihan portabel|
+|`SnapOtter-data`|Objek perpustakaan yang disimpan, log, dan status AI (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Cadangkan seluruh volume; untuk menghemat ruang, dengan sengaja hilangkan semua status AI dan instal ulang bundelnya|
+|`SnapOtter-redisdata`|Redis AOF untuk status antrean BullMQ yang tahan lama|Cadangkan setelah menjeda aplikasi dan memaksa `SAVE`; diperlukan untuk melanjutkan pekerjaan yang antri dengan tepat|
+|`SnapOtter-workspace`|Kunci penyimpanan objek sementara (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Jangan membuat cadangan setelah semua pekerjaan dihentikan atau dibatalkan; jangan pernah membuangnya saat pekerjaan sedang aktif|
 
-Di dalam volume `/data`:
+Biasanya menulis awalan nama volume dengan nama proyek. Selesaikan volume sumber sebenarnya dari kontainer yang terpasang alih-alih berasumsi bahwa nama tampilan seperti `SnapOtter-data` adalah nama volume Docker.
 
-| Path | Isi | Kritis? |
-|---|---|---|
-| `/data/uploads/`, `/data/outputs/` | File pengguna dan hasil pemrosesan | Ya |
-| `/data/ai/` | File model AI yang diunduh | Tidak (dapat diunduh ulang) |
-| `/data/venv/` | Lingkungan virtual Python | Tidak (dibangun ulang saat start) |
+### Cadangan basis data {#database-backup}
 
-### Pencadangan basis data {#database-backup}
-
-Gunakan `pg_dump` untuk mencadangkan basis data selama stack berjalan:
+Gunakan format arsip khusus PostgreSQL dan verifikasi arsip sebelum menganggap pencadangan selesai:
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-Atau, hentikan stack dan buat snapshot volume `SnapOtter-pgdata`:
+Uji setiap cadangan dengan mengembalikannya ke tumpukan terisolasi, memeriksa catatan database dan checksum file, dan memulai aplikasi. `tests/qa/backup-restore-drill.sh` repositori mengotomatiskan gerbang rilis tersebut terhadap `QA_IMAGE` eksplisit.
+
+Jika platform Anda mengambil snapshot volume yang konsisten dengan error, hentikan seluruh tumpukan terlebih dahulu dan ambil snapshot semua volume penting sebagai satu set. Salinan direktori data PostgreSQL mentah dari kontainer yang berjalan bukan merupakan cadangan logis yang didukung.
+
+### File dan antrian cadangan {#file-and-queue-backup}
+
+Jeda aplikasi sebelum mengambil file dan volume antrian. Gunakan `docker inspect` untuk menyelesaikan nama volume sebenarnya, memaksa Redis untuk mempertahankan kondisinya saat ini, dan mengarsipkan dengan kepemilikan dan izin yang dipertahankan:
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### Pencadangan file pengguna {#user-files-backup}
-
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
-
-Model AI berjumlah hingga sekitar 24 GB di semua bundle. Karena dapat diunduh ulang, kecualikan `/data/ai/` dan `/data/venv/` dari pencadangan untuk menghemat ruang. Hanya basis data dan file pengguna yang kritis.
+Mulai ulang Redis sebelum aplikasi. Jika Anda sengaja mengecualikan `/data/ai`, hapus seluruh subpohon AI daripada mempertahankan data `installed.json` tanpa model atau lingkungan virtualnya. Jaga agar file cadangan tetap terenkripsi, dikontrol aksesnya, dan terpisah dari host yang menjalankan SnapOtter.
 
 ## Artefak Kepatuhan {#compliance-artifacts}
 
@@ -310,31 +226,42 @@ Setiap rilis SnapOtter menyertakan artefak keamanan berikut:
 
 | Artefak | Format | Di mana menemukannya |
 |---|---|---|
-| SBOM (CycloneDX) | JSON | Aset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-sbom.cdx.json` |
-| SBOM (SPDX) | JSON | Aset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-sbom.spdx.json` |
-| Pemindaian kerentanan | Trivy JSON | Aset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-trivy.json` |
-| Pemindaian kerentanan | SARIF | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
+| Lepaskan pengikatan subjek | Pengesahan kanonik JSON + GitHub | [Rilis GitHub](https://github.com/snapotter-hq/SnapOtter/releases) aset: `snapotter-v{version}-release-subjects.json` |
+| Arsip SBOM | CycloneDX dan SPDX JSON | Rilis aset: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Gambar SBOM | CycloneDX dan SPDX JSON | Rilis aset: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Pemindaian kerentanan | Trivy JSON | Rilis aset dengan awalan `archive-linux-{arch}` atau `image-linux-{arch}` yang cocok |
+| Pemindaian kerentanan | SARIF | Tab [GitHub Keamanan](https://github.com/snapotter-hq/SnapOtter/security). |
 | Analisis statis | CodeQL (JS/TS + Python) | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), berjalan mingguan + per PR |
-| Tinjauan dependensi | GitHub native | Pemeriksaan per-PR, gagal pada penambahan severity tinggi |
-| Audit dependensi Python | pip-audit | Log run CI pada setiap push |
+| Tinjauan ketergantungan | GitHub asli | Pemeriksaan per-PR, gagal pada penambahan dengan tingkat keparahan tinggi |
+| Audit ketergantungan Python | pip-audit | CI menjalankan log pada setiap dorongan |
 | Kebijakan keamanan | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) di repositori |
-| Pembaruan dependensi | Dependabot | PR mingguan otomatis untuk npm, pip, Docker, Actions |
+| Pembaruan ketergantungan | Dependabot | PR mingguan otomatis untuk npm, pip, Docker, Actions |
 
 **Menjalankan pemindaian Anda sendiri:**
 
-Unduh SBOM dari rilis dan pindai dengan perkakas pilihan Anda:
+Unduh manifes subjek rilis dan verifikasi bahwa manifes tersebut dibuktikan oleh alur kerja rilis:
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+Manifes mencatat `releaseTag`, `releaseCommit`, dan `workflowTriggerCommit` secara terpisah. Verifikasi bahwa `releaseCommit` adalah komit yang dikupas dari tag yang tidak dapat diubah, lalu verifikasi intisari SHA-256 dari arsip, gambar, SBOM, atau pindaian yang Anda gunakan terhadap entri di `subjects`. Perbedaan ini disengaja: memeriksa komit rilis yang baru dibuat tidak mengubah identitas komit dalam kredensial OIDC alur kerja.
+
+Anda juga dapat memindai SBOM atau gambar yang diunduh secara langsung:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
-::: info 
-SBOM dan pemindaian kerentanan mencerminkan image persis yang dipublikasikan untuk rilis itu. Bundle model AI yang dipasang setelah deployment tidak disertakan dalam SBOM karena diunduh saat runtime.
+::: info
+Gambar SBOMs dan pindaian mencerminkan gambar spesifik arsitektur yang dipublikasikan untuk rilis tersebut. Arsip SBOMs dan pindaian menjelaskan arsip bawaan secara terpisah. Bundel model AI yang diinstal setelah penerapan tidak disertakan dalam SBOMs ini karena diunduh saat runtime.
 :::

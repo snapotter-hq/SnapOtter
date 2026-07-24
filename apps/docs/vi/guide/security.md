@@ -1,8 +1,8 @@
 ---
 description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secret, triển khai Kubernetes, và các tài liệu tuân thủ."
-i18n_source_hash: 9d021c1ceb40
-i18n_provenance: human
-i18n_output_hash: 85a95eb24982
+i18n_source_hash: ee46e715d6fe
+i18n_provenance: machine
+i18n_output_hash: d7f3379fe78a
 i18n_hash_version: 2
 ---
 
@@ -12,133 +12,42 @@ SnapOtter xử lý tập tin hoàn toàn trên hạ tầng của bạn. Nó gử
 
 Container chạy dưới danh nghĩa một người dùng không phải root chuyên dụng (`snapotter`) với tất cả các capability của Linux được loại bỏ ngoại trừ tập tối thiểu cần thiết. Để xem đầy đủ chính sách công bố lỗ hổng và kiến trúc bảo mật, xem [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trên GitHub.
 
-## Tăng cường Container {#container-hardening}
+## Làm cứng thùng chứa {#container-hardening}
 
-[docker-compose.yml mặc định](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) bao gồm việc tăng cường bảo mật cho production. Dưới đây là phân tích từng tùy chọn và lý do nó quan trọng:
+Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+Cả hai ngăn xếp đều áp dụng các điều khiển sau:
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- Các giới hạn về bộ nhớ, trao đổi, CPU và PID chứa quá trình xử lý gốc chạy trốn.
+- Mọi dịch vụ đều loại bỏ tất cả các khả năng của Linux. Ứng dụng chỉ bổ sung lại `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` để sở hữu khối lượng, giảm danh tính `gosu` một chiều và chuyển tiếp tín hiệu duyên dáng. PostgreSQL và Redis chỉ nhận được tập hợp con mà điểm truy nhập chính thức của họ cần.
+- `security_opt: [no-new-privileges:true]` ngăn các quy trình trong vùng chứa ứng dụng, PostgreSQL và Redis có được các đặc quyền bổ sung. Điều này vẫn tương thích với `gosu`: điểm vào bắt đầu với quyền root, chuẩn bị các ổ đĩa và chỉ giảm xuống người dùng `snapotter` chuyên dụng.
+- Đầu vào hình ảnh PostgreSQL và Redis được ghim bằng thông báo. Ứng dụng cũng phải được ghim vào thẻ phát hành hoặc thông báo đã được xác minh thay vì `latest`.
+- Kiểm tra tình trạng, xoay vòng nhật ký JSON có giới hạn, Redis AOF bền vững và chính sách khởi động lại được xác định tập trung trong các tệp chuẩn.
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
-
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
-
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### Tại sao `no-new-privileges` không được đặt {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]` được cố ý bỏ qua. Entrypoint khởi động dưới danh nghĩa root để sửa quyền sở hữu volume, rồi hạ xuống người dùng `snapotter` thông qua [gosu](https://github.com/tianon/gosu), vốn yêu cầu setuid. Một khi việc hạ đặc quyền hoàn tất, tiến trình chạy dưới danh nghĩa `snapotter` với tất cả các capability được loại bỏ ngoại trừ năm capability được liệt kê ở trên.
-
-Nếu bạn dùng Kubernetes hoặc cờ `--user` của Docker để chạy trực tiếp dưới danh nghĩa không phải root (bỏ qua gosu), thì `no-new-privileges` an toàn để bật.
+Để triển khai qua Internet, hãy liên kết cổng 1349 với loopback và chấm dứt TLS tại proxy ngược được duy trì. Tạo thông tin đăng nhập PostgreSQL và Redis duy nhất, lưu trữ bí mật trong các tệp được bảo vệ hoặc trình quản lý bí mật và thay đổi mật khẩu quản trị viên ban đầu ngay lập tức.
 
 ### Tại sao `read_only` không được đặt {#why-read-only-is-not-set}
 
-`read_only: true` không được đặt vì việc ánh xạ lại PUID/PGID ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể an toàn bật hệ thống tập tin gốc chỉ đọc.
+`read_only: true` không được đặt vì ánh xạ lại PUID/PGID ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu sử dụng cờ `--user` của Docker hoặc Kubernetes `runAsUser` thay vì PUID/PGID, bạn có thể kích hoạt hệ thống tệp gốc chỉ đọc một cách an toàn.
 
-## Cô lập mạng {#network-isolation}
+## Cách ly mạng {#network-isolation}
 
-Trong quá trình vận hành bình thường, container tạo ra **không có kết nối mạng đi ra nào**. Tất cả việc xử lý tập tin diễn ra cục bộ bằng các thư viện đi kèm.
+Quá trình xử lý tệp diễn ra cục bộ nhưng cài đặt mặc định **không phải là hệ thống không có đầu ra**. Phân tích sản phẩm ẩn danh sử dụng PostHog và báo cáo sự cố sử dụng Sentry khi bật tính năng đo từ xa. Đặt `SNAPOTTER_TELEMETRY=0` (hoặc tắt phân tích trong Cài đặt > Hệ thống > Quyền riêng tư) để tắt cả hai. SnapOtter không bao giờ bao gồm các tệp đã tải lên, tên tệp, đầu ra OCR, văn bản tài liệu hoặc nội dung tệp khác trong các sự kiện đó.
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
-
-Ngoại lệ duy nhất là **tải mô hình AI**: khi một người dùng cài đặt một bundle tính năng AI thông qua giao diện, container tải kho lưu trữ bundle được dựng sẵn từ Hugging Face, cùng với một vài tập tin mô hình riêng lẻ từ GitHub Releases, Google Storage, và PyPI. Các bản tải này diễn ra một lần cho mỗi bundle và được lưu trong volume `/data`.
+Lưu lượng truy cập đi khác được điều khiển theo tính năng: Tải xuống bản cài đặt mô hình/gói AI đã ký các đầu vào phát hành; Nhập URL tìm nạp URL công khai do người dùng yêu cầu; và OIDC, SAML, OpenTelemetry, webhooks, bộ lưu trữ tương thích với S3 hoặc các tích hợp tương tự được định cấu hình rõ ràng sẽ liên hệ với các đích đến do quản trị viên chọn. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` ngăn tải xuống mô hình tự động. [Nhập gói ngoại tuyến](/vi/guide/deployment) có thể cung cấp các tính năng AI mà không cần xuất ra mô hình thời gian chạy.
 
 **Khuyến nghị về tường lửa:**
 
-| Kịch bản | Quy tắc đi ra |
+|Kịch bản|Quy tắc đi|
 |---|---|
-| Cách ly mạng (không có AI) | Chặn toàn bộ lưu lượng đi ra từ container |
-| Cần bundle AI | Cho phép HTTPS đến `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org` trong lúc cài đặt, rồi chặn |
-| Sau khi cài AI | Chặn toàn bộ lưu lượng đi ra, các mô hình được lưu cache cục bộ |
+|Khe hở không khí|Đặt `SNAPOTTER_TELEMETRY=0` và `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, sử dụng tính năng nhập gói AI ngoại tuyến, tắt tính năng nhập URL và tích hợp bên ngoài, sau đó chặn lối ra|
+|đo từ xa mặc định|Cho phép các điểm cuối PostHog và Sentry được liệt kê theo nhật ký trình duyệt/mạng của bạn; vô hiệu hóa đo từ xa nếu chính sách không cho phép chúng|
+|Cần có gói AI|Trong quá trình cài đặt, hãy cho phép HTTPS thành `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; sau đó chặn những máy chủ đó|
+|Tích hợp bên ngoài|Chỉ cho phép các đích đến OIDC/SAML/OTLP/webhook/object-storage được định cấu hình chính xác bởi quản trị viên|
 
-Các kho lưu trữ bundle được phục vụ từ kho Xet của Hugging Face, vốn truyền qua các endpoint `*.xethub.hf.co` song song và là điều làm cho các bản tải bundle nhiều GB nhanh. Nếu tường lửa của bạn cho phép `huggingface.co` nhưng chặn `*.xethub.hf.co`, việc cài đặt vẫn thành công nhưng chuyển về một bản tải luồng đơn chậm hơn, nên hãy đưa các host Xet vào danh sách cho phép để duy trì trên đường nhanh. Các bản cài đặt hoàn toàn ngoại tuyến có thể bỏ qua tất cả những điều này và dùng [Nhập Bundle Ngoại tuyến](/vi/guide/deployment) thay thế.
+Các kho lưu trữ gói được cung cấp từ bộ lưu trữ Xet của Hugging Face, lưu trữ này truyền song song qua các điểm cuối `*.xethub.hf.co` và giúp tải xuống gói nhiều GB nhanh chóng. Nếu tường lửa của bạn cho phép `huggingface.co` nhưng chặn `*.xethub.hf.co`, quá trình cài đặt vẫn thành công nhưng quay lại tải xuống một luồng chậm hơn, vì vậy, hãy đưa các máy chủ Xet vào danh sách để tiếp tục hoạt động nhanh chóng. Các bản cài đặt hoàn toàn ngoại tuyến có thể bỏ qua tất cả những điều này và thay vào đó hãy sử dụng [Nhập gói ngoại tuyến](/vi/guide/deployment).
 
-Để cấu hình reverse proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels), xem [hướng dẫn Triển khai](/vi/guide/deployment#reverse-proxy).
+Để biết cấu hình proxy ngược (Nginx, Traefik, Caddy, Cloudflare Tunnels), hãy xem [Hướng dẫn triển khai](/vi/guide/deployment#reverse-proxy).
 
 ## Docker Secret {#docker-secrets}
 
@@ -256,85 +165,103 @@ Vì `runAsUser: 999` được đặt ở cấp pod, entrypoint bỏ qua hoàn to
 
 Để xác định kích cỡ tài nguyên, xem [Yêu cầu phần cứng](/vi/guide/deployment#hardware-requirements).
 
-## Sao lưu và Khôi phục {#backup-and-recovery}
+## Sao lưu và phục hồi {#backup-and-recovery}
 
-Trạng thái bền vững được chia trên hai volume:
+Ngăn xếp Compose sản xuất xác định bốn tập. Dừng xâm nhập và để các công việc đang hoạt động kết thúc trước khi thực hiện một bản sao lưu phối hợp để PostgreSQL, Redis và trạng thái tệp mô tả cùng một thời điểm.
 
-| Volume | Nội dung | Quan trọng? |
+|Âm lượng|Nội dung|Điều trị phục hồi|
 |---|---|---|
-| `SnapOtter-pgdata` | Cơ sở dữ liệu PostgreSQL (người dùng, cài đặt, pipeline, tác vụ, nhật ký kiểm toán) | Có |
-| `/data` (volume app) | Tập tin do người dùng tải lên, mô hình AI, venv Python | Một phần (xem bên dưới) |
+|`SnapOtter-pgdata`|Người dùng PostgreSQL, cài đặt, quy trình, công việc, siêu dữ liệu tệp và nhật ký kiểm tra|Phê bình; sử dụng kết xuất logic không nhanh để khôi phục di động|
+|`SnapOtter-data`|Các đối tượng thư viện, nhật ký và trạng thái AI đã lưu (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Sao lưu toàn bộ âm lượng; để tiết kiệm dung lượng, cố tình bỏ qua tất cả trạng thái AI và cài đặt lại các gói của nó|
+|`SnapOtter-redisdata`|Redis AOF cho trạng thái hàng đợi BullMQ bền bỉ|Sao lưu sau khi tạm dừng ứng dụng và buộc `SAVE`; bắt buộc phải tiếp tục công việc được xếp hàng đợi một cách chính xác|
+|`SnapOtter-workspace`|Khóa lưu trữ đối tượng tạm thời (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Không sao lưu sau khi tất cả công việc đã hoàn thành hoặc bị hủy bỏ; không bao giờ loại bỏ nó trong khi công việc đang hoạt động|
 
-Bên trong volume `/data`:
-
-| Đường dẫn | Nội dung | Quan trọng? |
-|---|---|---|
-| `/data/uploads/`, `/data/outputs/` | Tập tin người dùng và kết quả xử lý | Có |
-| `/data/ai/` | Các tập tin mô hình AI đã tải về | Không (có thể tải lại) |
-| `/data/venv/` | Môi trường ảo Python | Không (được dựng lại khi khởi động) |
+Soạn các tên tập tiền tố thông thường với tên dự án. Giải quyết ổ nguồn thực từ vùng chứa được gắn thay vì giả sử rằng tên hiển thị như `SnapOtter-data` là tên ổ Docker.
 
 ### Sao lưu cơ sở dữ liệu {#database-backup}
 
-Dùng `pg_dump` để sao lưu cơ sở dữ liệu trong khi stack đang chạy:
+Sử dụng định dạng lưu trữ tùy chỉnh của PostgreSQL và xác minh kho lưu trữ trước khi xử lý bản sao lưu hoàn chỉnh:
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-Hoặc, dừng stack và chụp snapshot volume `SnapOtter-pgdata`:
+Kiểm tra mọi bản sao lưu bằng cách khôi phục nó vào một ngăn xếp riêng biệt, kiểm tra các bản ghi cơ sở dữ liệu và tổng kiểm tra tệp, rồi khởi động ứng dụng. `tests/qa/backup-restore-drill.sh` của kho lưu trữ tự động hóa cổng phát hành đó dựa trên `QA_IMAGE` rõ ràng.
+
+Thay vào đó, nếu nền tảng của bạn thực hiện các ảnh chụp nhanh ổ đĩa nhất quán với sự cố, trước tiên hãy dừng toàn bộ ngăn xếp và chụp nhanh tất cả các ổ đĩa quan trọng dưới dạng một bộ. Bản sao thư mục dữ liệu PostgreSQL thô từ vùng chứa đang chạy không phải là bản sao lưu logic được hỗ trợ.
+
+### Sao lưu tệp và hàng đợi {#file-and-queue-backup}
+
+Tạm dừng ứng dụng trước khi chụp khối lượng tệp và hàng đợi. Sử dụng `docker inspect` để phân giải tên tập thực tế, buộc Redis duy trì trạng thái hiện tại và lưu trữ với quyền sở hữu và quyền được bảo toàn:
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### Sao lưu tập tin người dùng {#user-files-backup}
+Khởi động lại Redis trước ứng dụng. Nếu bạn cố tình loại trừ `/data/ai`, hãy xóa toàn bộ cây con AI thay vì lưu giữ bản ghi `installed.json` mà không có mô hình hoặc môi trường ảo của nó. Giữ các tệp sao lưu được mã hóa, kiểm soát quyền truy cập và tách biệt khỏi máy chủ chạy SnapOtter.
 
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
+## Cấu phần tuân thủ {#compliance-artifacts}
 
-Các mô hình AI tổng cộng lên đến khoảng 24 GB trên tất cả các bundle. Vì chúng có thể tải lại, hãy loại trừ `/data/ai/` và `/data/venv/` khỏi các bản sao lưu để tiết kiệm dung lượng. Chỉ cơ sở dữ liệu và tập tin người dùng là quan trọng.
+Mỗi bản phát hành SnapOtter bao gồm các tạo phẩm bảo mật sau:
 
-## Tài liệu tuân thủ {#compliance-artifacts}
-
-Mỗi bản phát hành SnapOtter bao gồm các tài liệu bảo mật sau:
-
-| Tài liệu | Định dạng | Nơi tìm |
+| Cổ vật | Định dạng | Tìm nó ở đâu |
 |---|---|---|
-| SBOM (CycloneDX) | JSON | Asset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-sbom.cdx.json` |
-| SBOM (SPDX) | JSON | Asset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-sbom.spdx.json` |
-| Quét lỗ hổng | Trivy JSON | Asset [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-trivy.json` |
+| Giải phóng ràng buộc chủ đề | Chứng thực Canonical JSON + GitHub | Nội dung [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
+| Lưu trữ SBOM | CycloneDX và SPDX JSON | Nội dung phát hành: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Hình ảnh SBOM | CycloneDX và SPDX JSON | Nội dung phát hành: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Quét lỗ hổng | Trivy JSON | Phát hành nội dung có tiền tố `archive-linux-{arch}` hoặc `image-linux-{arch}` phù hợp |
 | Quét lỗ hổng | SARIF | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
 | Phân tích tĩnh | CodeQL (JS/TS + Python) | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), chạy hàng tuần + mỗi PR |
-| Đánh giá phụ thuộc | GitHub native | Kiểm tra mỗi PR, thất bại khi thêm phụ thuộc có mức độ nghiêm trọng cao |
-| Kiểm toán phụ thuộc Python | pip-audit | Log chạy CI trên mỗi lần push |
-| Chính sách bảo mật | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trong kho |
-| Cập nhật phụ thuộc | Dependabot | PR tự động hàng tuần cho npm, pip, Docker, Actions |
+| Xem xét phụ thuộc | GitHub bản địa | Kiểm tra mỗi PR, không thành công khi bổ sung mức độ nghiêm trọng cao |
+| Kiểm tra phụ thuộc Python | pip-audit | CI chạy nhật ký trên mỗi lần đẩy |
+| Chính sách bảo mật | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trong kho lưu trữ |
+| Cập nhật phụ thuộc | Dependabot | PR hàng tuần tự động cho npm, pip, Docker, Hành động |
 
-**Chạy bản quét của riêng bạn:**
+**Chạy quá trình quét của riêng bạn:**
 
-Tải SBOM từ bản phát hành và quét nó bằng công cụ bạn ưa thích:
+Tải xuống bản kê khai chủ đề phát hành và xác minh rằng nó đã được chứng thực bởi quy trình phát hành:
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+Tệp kê khai ghi lại `releaseTag`, `releaseCommit` và `workflowTriggerCommit` riêng biệt. Xác minh rằng `releaseCommit` là cam kết được tách khỏi thẻ bất biến, sau đó xác minh thông báo SHA-256 của kho lưu trữ, hình ảnh, SBOM hoặc bản quét mà bạn sử dụng đối với mục nhập của nó trong `subjects`. Sự khác biệt này là có chủ ý: việc kiểm tra cam kết phát hành mới được tạo không làm thay đổi danh tính cam kết trong thông tin xác thực OIDC của quy trình làm việc.
+
+Bạn cũng có thể quét trực tiếp SBOM đã tải xuống hoặc hình ảnh:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
-::: info 
-SBOM và bản quét lỗ hổng phản ánh chính xác image được phát hành cho bản phát hành đó. Các bundle mô hình AI được cài đặt sau khi triển khai không được bao gồm trong SBOM vì chúng được tải về khi chạy.
+::: info
+Hình ảnh SBOMs và các bản quét phản ánh chính xác hình ảnh theo kiến ​​trúc cụ thể được xuất bản cho bản phát hành đó. Lưu trữ SBOMs và các bản quét mô tả riêng biệt kho lưu trữ dựng sẵn. Các gói mô hình AI được cài đặt sau khi triển khai không được bao gồm trong các SBOMs này vì chúng được tải xuống khi chạy.
 :::

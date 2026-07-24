@@ -1,8 +1,9 @@
 ---
 description: "Схема базы данных PostgreSQL, таблицы, миграции и процедуры резервного копирования для SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 0222caf7a400
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: b97e8f6d09ef
+i18n_hash_version: 2
 ---
 
 # База данных {#database}
@@ -161,24 +162,32 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Реляционная база данных находится в томе `SnapOtter-pgdata` контейнера Postgres, а не в томе `/data` приложения.
 
-**Вариант 1: pg_dump (рекомендуется)**
+**Логическая резервная копия с проверкой (рекомендуется)**
 
 ```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-**Вариант 2: Снимок тома**
+Этот дамп базы данных не содержит сохраненных объектов библиотеки в `/data/files` или устойчивого состояния BullMQ в Redis. Создайте резервные копии и восстановите их, выполнив согласованную процедуру в разделе [Безопасность и усиление защиты](/ru/guide/security#backup-and-recovery).
+
+**Снимок холодного тома**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
 ```
+
+Не копируйте действующий каталог данных PostgreSQL с помощью `tar`. Составляйте префиксы имен томов по проектам, поэтому разрешайте идентификаторы подключенных томов из `docker inspect` или вашей платформы хранения, а не принимайте буквальную метку `SnapOtter-pgdata`.
 
 ### Миграция с 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

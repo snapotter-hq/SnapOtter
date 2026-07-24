@@ -1,8 +1,9 @@
 ---
 description: "مخطط قاعدة بيانات PostgreSQL، والجداول، وعمليات الترحيل، وإجراءات النسخ الاحتياطي في SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: fd2c87426e2d
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 2ee3b1bee0e9
+i18n_hash_version: 2
 ---
 
 # قاعدة البيانات {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 في بيئة الإنتاج، تُطبَّق عمليات الترحيل المعلَّقة تلقائيًا عند بدء التشغيل.
 
-## النسخ الاحتياطي والاستعادة {#backup-and-restore}
+## النسخ الاحتياطي واستعادة {#backup-and-restore}
 
-تقع قاعدة البيانات العلائقية في وحدة تخزين `SnapOtter-pgdata` الخاصة بحاوية Postgres، وليس في وحدة تخزين `/data` الخاصة بالتطبيق.
+توجد قاعدة البيانات العلائقية في حجم `SnapOtter-pgdata` الخاص بحاوية Postgres، وليس في حجم `/data` الخاص بالتطبيق.
 
-**الخيار 1: pg_dump (موصى به)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**الخيار 2: لقطة وحدة التخزين**
+** النسخ الاحتياطي المنطقي مع التحقق من الصحة (مستحسن) **
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+لا يحتوي تفريغ قاعدة البيانات على كائنات المكتبة المحفوظة في `/data/files` أو حالة BullMQ الدائمة في Redis. قم بعمل نسخة احتياطية من تلك العناصر واستعادتها باستخدام الإجراء المنسق في [الأمان والتقوية](/ar/guide/security#backup-and-recovery).
+
+**لقطة من الحجم البارد**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+لا تقم بنسخ دليل بيانات PostgreSQL المباشر باستخدام `tar`. أنشئ أسماء وحدات التخزين البادئة حسب المشروع، لذا قم بحل معرفات وحدات التخزين المحملة من `docker inspect` أو منصة التخزين الخاصة بك بدلاً من افتراض التسمية الحرفية `SnapOtter-pgdata`.
 
 ### الترحيل من 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

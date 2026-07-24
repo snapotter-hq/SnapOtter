@@ -1,8 +1,9 @@
 ---
 description: "Configuration de l'environnement de développement local, commandes, conventions de code et comment ajouter un nouvel outil à SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: c1deca322def
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 6505ab0978eb
+i18n_hash_version: 2
 ---
 
 # Guide du développeur {#developer-guide}
@@ -219,6 +220,17 @@ Utilisez les cache mounts de BuildKit pour des reconstructions plus rapides :
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Domaines de la version Release {#release-version-domains}
+
+SnapOtter possède intentionnellement trois domaines de version. Ne copiez pas un domaine dans un autre lors d'une version :
+
+- La version de l'application couvre le manifeste racine, tous les packages d'espace de travail privé et `APP_VERSION`. Semantic-release fournit cette valeur et `pnpm version:sync <version>` met à jour chaque espace de travail avant la version d'une application.
+- OpenAPI `info.version` est le contrat public stable majeur API. Toutes les spécifications localisées restent sur `<major>.0.0` pour les versions d'applications compatibles et ne changent que lorsque le contrat API passe à une nouvelle version majeure.
+- `docker/feature-manifest.json` conserve `imageVersion: 2.0.0` comme époque de stockage immuable des ensembles de fonctionnalités héritées. Ces chemins d'archives v2 ne sont pas des versions de packages d'application. Accurate OCR utilise le format d'exécution v3 et enregistre séparément la provenance de la version de l'application.
+
+`tests/unit/infra/release-version-policy.test.ts` applique ces limites. Un nouveau domaine de version ou une nouvelle migration doit mettre à jour ce contrat et la conception de migration d'artefact pertinente ensemble.
+Les valeurs indépendantes API et du bundle hérité résident dans `config/release-version-policy.json` ; la synchronisation des versions d'application ne doit jamais réécrire implicitement ce fichier de stratégie.
 
 ## Variables d'environnement {#environment-variables}
 

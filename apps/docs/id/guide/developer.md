@@ -1,8 +1,9 @@
 ---
 description: "Penyiapan pengembangan lokal, perintah, konvensi kode, dan cara menambahkan tool baru ke SnapOtter."
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 3702cfaac3e7
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: ce5e9533aae1
+i18n_hash_version: 2
 ---
 
 # Panduan developer {#developer-guide}
@@ -219,6 +220,17 @@ Gunakan cache mount BuildKit untuk build ulang yang lebih cepat:
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## Rilis domain versi {#release-version-domains}
+
+SnapOtter sengaja memiliki tiga versi domain. Jangan menyalin satu domain ke domain lain selama rilis:
+
+- Versi rilis aplikasi mencakup manifes root, semua paket ruang kerja pribadi, dan `APP_VERSION`. Semantic-release menyediakan nilai ini, dan `pnpm version:sync <version>` memperbarui setiap ruang kerja sebelum aplikasi dirilis.
+- OpenAPI `info.version` adalah kontrak utama publik API yang stabil. Semua spesifikasi yang dilokalkan tetap pada `<major>.0.0` untuk rilis aplikasi yang kompatibel dan hanya berubah ketika kontrak API berpindah ke versi utama baru.
+- `docker/feature-manifest.json` menjadikan `imageVersion: 2.0.0` sebagai masa penyimpanan paket fitur lama yang tidak dapat diubah. Jalur arsip v2 tersebut bukan versi paket aplikasi. OCR yang akurat menggunakan format runtime v3 dan mencatat asal rilis aplikasinya secara terpisah.
+
+`tests/unit/infra/release-version-policy.test.ts` menerapkan batasan ini. Domain atau migrasi versi baru harus memperbarui kontrak tersebut dan desain migrasi artefak yang relevan secara bersamaan.
+Nilai API independen dan paket warisan ada di `config/release-version-policy.json`; sinkronisasi versi aplikasi tidak boleh menulis ulang file kebijakan tersebut secara implisit.
 
 ## Variabel lingkungan {#environment-variables}
 

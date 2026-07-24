@@ -1,8 +1,9 @@
 ---
 description: "Lược đồ cơ sở dữ liệu PostgreSQL, bảng, di trú và quy trình sao lưu cho SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 6c4e1015e3a3
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 7bdde4aaee73
+i18n_hash_version: 2
 ---
 
 # Cơ sở dữ liệu {#database}
@@ -159,26 +160,34 @@ Trong môi trường sản xuất, các di trú đang chờ được áp dụng 
 
 ## Sao lưu và khôi phục {#backup-and-restore}
 
-Cơ sở dữ liệu quan hệ nằm trong volume `SnapOtter-pgdata` của container Postgres, không phải volume `/data` của ứng dụng.
+Cơ sở dữ liệu quan hệ nằm trong ổ `SnapOtter-pgdata` của vùng chứa Postgres chứ không phải ổ `/data` của ứng dụng.
 
-**Tùy chọn 1: pg_dump (khuyến nghị)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Tùy chọn 2: Ảnh chụp nhanh volume**
+**Sao lưu hợp lý có xác thực (được khuyến nghị)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Kết xuất cơ sở dữ liệu này không chứa các đối tượng thư viện đã lưu ở `/data/files` hoặc trạng thái BullMQ bền vững trong Redis. Sao lưu và khôi phục chúng bằng quy trình phối hợp trong [Bảo mật & tăng cường](/vi/guide/security#backup-and-recovery).
+
+**Ảnh chụp nhanh khối lượng lạnh**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Không sao chép thư mục dữ liệu PostgreSQL trực tiếp bằng `tar`. Soạn tiền tố tên tập đĩa theo dự án, do đó hãy phân giải ID tập đĩa được gắn từ `docker inspect` hoặc nền tảng lưu trữ của bạn thay vì giả định nhãn bằng chữ `SnapOtter-pgdata`.
 
 ### Di trú từ 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter のセキュリティ強化ガイド。コンテナのセキュリティ、ネットワーク分離、Docker シークレット、Kubernetes デプロイ、コンプライアンス成果物を扱います。"
-i18n_source_hash: 9d021c1ceb40
-i18n_provenance: human
-i18n_output_hash: 03795f620b50
+i18n_source_hash: ee46e715d6fe
+i18n_provenance: machine
+i18n_output_hash: fce86a6046a2
 i18n_hash_version: 2
 ---
 
@@ -14,131 +14,40 @@ SnapOtter はファイルを完全にあなたのインフラ上で処理しま�
 
 ## コンテナの強化 {#container-hardening}
 
-[デフォルトの docker-compose.yml](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) には本番向けのセキュリティ強化が含まれています。各オプションの内訳と、なぜそれが重要なのかを以下に示します：
+正規の [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) および [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose ファイルが信頼できる情報源です。短縮された例を運用環境にコピーしないでください。確認したリリース タグからファイルをデプロイします。
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+どちらのスタックも次の制御を適用します。
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- メモリ、スワップ、CPU、および PID の制限には、暴走したネイティブ処理が含まれています。
+- すべてのサービスで、すべての Linux 機能が削除されます。アプリケーションは、ボリューム所有権、一方向 `gosu` ID ドロップ、および正常な信号転送のために `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` のみを追加し直します。 PostgreSQL と Redis は、公式エントリポイントに必要なサブセットのみを受け取ります。
+- `security_opt: [no-new-privileges:true]` は、アプリケーション、PostgreSQL、および Redis コンテナー内のプロセスが追加の権限を取得できないようにします。これは `gosu` との互換性を維持します。エントリポイントは root として開始され、ボリュームを準備し、専用の `snapotter` ユーザーにのみドロップされます。
+- PostgreSQL および Redis のイメージ入力はダイジェストによって固定されます。同様に、アプリケーションは `latest` ではなく、検証済みのリリース タグまたはダイジェストに固定する必要があります。
+- ヘルスチェック、制限された JSON ログローテーション、永続的な Redis AOF、および再起動ポリシーは、正規ファイルで一元的に定義されます。
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
+インターネットに接続する展開の場合は、ポート 1349 をループバックにバインドし、維持されているリバース プロキシで TLS を終了します。一意の PostgreSQL および Redis 認証情報を生成し、保護されたファイルまたはシークレット マネージャーにシークレットを保存し、初期管理者パスワードをすぐに変更します。
 
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
+### `read_only` が {#why-read-only-is-not-set} に設定されない理由
 
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### なぜ `no-new-privileges` を設定しないのか {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]` は意図的に省略されています。エントリーポイントはボリュームの所有権を修正するために root として起動し、その後 [gosu](https://github.com/tianon/gosu) を介して `snapotter` ユーザーに降格します。gosu には setuid が必要です。権限の降格が完了すると、プロセスは上記の 5 つを除くすべての capability が削除された状態で `snapotter` として実行されます。
-
-Kubernetes や Docker の `--user` フラグを使って（gosu を回避して）直接非 root として実行する場合は、`no-new-privileges` を有効にしても安全です。
-
-### なぜ `read_only` を設定しないのか {#why-read-only-is-not-set}
-
-`read_only: true` を設定しないのは、PUID/PGID の再マッピングが起動時に `/etc/passwd` と `/etc/group` に書き込むためです。PUID/PGID の代わりに Docker の `--user` フラグや Kubernetes の `runAsUser` を使う場合は、読み取り専用のルートファイルシステムを安全に有効にできます。
+PUID/PGID の再マッピングにより起動時に `/etc/passwd` および `/etc/group` に書き込まれるため、`read_only: true` は設定されません。 PUID/PGID の代わりに Docker の `--user` フラグまたは Kubernetes `runAsUser` を使用すると、読み取り専用のルート ファイルシステムを安全に有効にすることができます。
 
 ## ネットワーク分離 {#network-isolation}
 
-通常の運用中、コンテナは **アウトバウンドのネットワーク接続をまったく行いません**。すべてのファイル処理は同梱のライブラリを使ってローカルで行われます。
+ファイル処理はローカルですが、デフォルトのインストールは**出力のないシステム**ではありません。テレメトリが有効な場合、匿名の製品分析では PostHog が使用され、クラッシュ レポートでは Sentry が使用されます。 `SNAPOTTER_TELEMETRY=0` を設定 (または [設定] > [システム] > [プライバシー] で分析を無効に) して両方をオフにします。 SnapOtter は、アップロードされたファイル、ファイル名、OCR 出力、ドキュメント テキスト、またはその他のファイル コンテンツをこれらのイベントに含めることはありません。
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
+その他のアウトバウンド トラフィックは機能主導型です。AI バンドル/モデルのインストールは、署名されたリリース入力をダウンロードします。 URL インポートでは、ユーザーが要求したパブリック URL を取得します。明示的に構成された OIDC、SAML、OpenTelemetry、Webhook、S3 互換ストレージ、または同様の統合は、管理者が選択した宛先に接続します。 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` は、モデルの自動ダウンロードを防ぎます。 [オフライン バンドル インポート](/ja/guide/deployment) は、ランタイム モデルの出力なしで AI 機能をプロビジョニングできます。
 
-唯一の例外は **AI モデルのダウンロード** です。ユーザーが UI から AI 機能バンドルをインストールすると、コンテナは Hugging Face から事前ビルド済みのバンドルアーカイブをダウンロードし、加えて GitHub Releases、Google Storage、PyPI からいくつかの個別モデルファイルをダウンロードします。これらのダウンロードはバンドルごとに一度だけ行われ、`/data` ボリュームに保存されます。
+**ファイアウォールの推奨事項:**
 
-**ファイアウォールの推奨事項：**
-
-| シナリオ | アウトバウンドルール |
+|シナリオ|アウトバウンドルール|
 |---|---|
-| エアギャップ（AI なし） | コンテナからのすべてのアウトバウンドトラフィックをブロックする |
-| AI バンドルが必要 | インストール中は `huggingface.co`、`*.xethub.hf.co`、`cdn-lfs.huggingface.co`、`github.com`、`objects.githubusercontent.com`、`storage.googleapis.com`、`pypi.org`、`files.pythonhosted.org` への HTTPS を許可し、その後ブロックする |
-| AI インストール後 | すべてのアウトバウンドトラフィックをブロックする。モデルはローカルにキャッシュされている |
+|エアギャップ|`SNAPOTTER_TELEMETRY=0` と `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` を設定し、オフライン AI バンドル インポートを使用し、URL インポートと外部統合を無効にして、下りをブロックします|
+|デフォルトのテレメトリ|ブラウザ/ネットワーク ログにリストされている PostHog および Sentry エンドポイントを許可します。ポリシーで許可されていない場合はテレメトリを無効にする|
+|AI バンドルが必要|インストール中に、`huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org` への HTTPS を許可します。次にそれらのホストをブロックします|
+|外部統合|管理者が正確に構成した OIDC/SAML/OTLP/webhook/object-storage 宛先のみを許可します|
 
-バンドルアーカイブは Hugging Face の Xet ストレージから配信されます。これは `*.xethub.hf.co` エンドポイント経由で並列に転送され、数 GB のバンドルダウンロードを高速化するものです。ファイアウォールが `huggingface.co` を許可しても `*.xethub.hf.co` をブロックする場合、インストールは成功しますが、より遅い単一ストリームのダウンロードにフォールバックします。そのため、高速な経路を維持するには Xet ホストを許可リストに入れてください。完全にオフラインのインストールでは、これらすべてを省略して代わりに [オフラインバンドルのインポート](/ja/guide/deployment) を使えます。
+バンドル アーカイブは、Hugging Face の Xet ストレージから提供されます。これにより、`*.xethub.hf.co` エンドポイント経由で並行して転送され、複数 GB のバンドルのダウンロードが高速になります。ファイアウォールで `huggingface.co` は許可されるが `*.xethub.hf.co` はブロックされる場合でも、インストールは成功しますが、より遅い単一ストリーム ダウンロードにフォールバックするため、高速パス上に留まるように Xet ホストをホワイトリストに登録します。完全なオフライン インストールでは、これをすべてスキップし、代わりに [オフライン バンドル インポート](/ja/guide/deployment) を使用できます。
 
-リバースプロキシの設定（Nginx、Traefik、Caddy、Cloudflare Tunnels）については、[デプロイガイド](/ja/guide/deployment#reverse-proxy) を参照してください。
+リバース プロキシ構成 (Nginx、Traefik、Caddy、Cloudflare トンネル) については、[導入ガイド](/ja/guide/deployment#reverse-proxy) を参照してください。
 
 ## Docker シークレット {#docker-secrets}
 
@@ -258,83 +167,101 @@ spec:
 
 ## バックアップとリカバリ {#backup-and-recovery}
 
-永続的な状態は 2 つのボリュームに分かれています：
+実稼働 Compose スタックは 4 つのボリュームを定義します。 PostgreSQL、Redis、およびファイルの状態が同じ時点を表すように、調整されたバックアップを取得する前にイングレスを停止し、アクティブなジョブを終了させます。
 
-| ボリューム | 内容 | 重要か？ |
+|音量|コンテンツ|回復治療|
 |---|---|---|
-| `SnapOtter-pgdata` | PostgreSQL データベース（ユーザー、設定、パイプライン、ジョブ、監査ログ） | はい |
-| `/data`（アプリボリューム） | ユーザーがアップロードしたファイル、AI モデル、Python venv | 部分的（下記参照） |
+|`SnapOtter-pgdata`|PostgreSQL ユーザー、設定、パイプライン、ジョブ、ファイル メタデータ、監査ログ|致命的;ポータブルリカバリにフェイルファスト論理ダンプを使用する|
+|`SnapOtter-data`|保存されたライブラリ オブジェクト、ログ、および AI 状態 (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|ボリューム全体をバックアップします。スペースを節約するために、すべての AI 状態を意図的に省略し、そのバンドルを再インストールします|
+|`SnapOtter-redisdata`|耐久性のある BullMQ キュー状態のための Redis AOF|アプリを一時停止して `SAVE` を強制した後、バックアップします。キューに入れられた作業を正確に再開するために必要|
+|`SnapOtter-workspace`|一時オブジェクトストレージキー (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|すべてのジョブがドレインまたはキャンセルされた後はバックアップしないでください。ジョブがアクティブな間は決して破棄しないでください|
 
-`/data` ボリューム内：
-
-| パス | 内容 | 重要か？ |
-|---|---|---|
-| `/data/uploads/`、`/data/outputs/` | ユーザーファイルと処理結果 | はい |
-| `/data/ai/` | ダウンロードされた AI モデルファイル | いいえ（再ダウンロード可能） |
-| `/data/venv/` | Python 仮想環境 | いいえ（起動時に再構築される） |
+Compose は通常、ボリューム名の前にプロジェクト名を付けます。 `SnapOtter-data` などの表示名が Docker ボリューム名であると想定するのではなく、マウントされたコンテナーから実際のソース ボリュームを解決します。
 
 ### データベースのバックアップ {#database-backup}
 
-スタックの稼働中にデータベースをバックアップするには `pg_dump` を使います：
+PostgreSQL のカスタム アーカイブ形式を使用し、バックアップが完了したものとして扱う前にアーカイブを検証します。
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-あるいは、スタックを停止して `SnapOtter-pgdata` ボリュームのスナップショットを取ります：
+すべてのバックアップを分離スタックに復元し、データベース レコードとファイルのチェックサムを確認し、アプリケーションを起動して、すべてのバックアップをテストします。リポジトリの `tests/qa/backup-restore-drill.sh` は、明示的な `QA_IMAGE` に対するゲートの解放を自動化します。
+
+代わりにプラットフォームがクラッシュ整合性ボリューム スナップショットを取得する場合は、最初にスタック全体を停止し、すべての重要なボリュームを 1 つのセットとしてスナップショットします。実行中のコンテナからの生の PostgreSQL データ ディレクトリのコピーは、サポートされている論理バックアップではありません。
+
+### ファイルとキューのバックアップ {#file-and-queue-backup}
+
+ファイルとキューのボリュームをキャプチャする前に、アプリケーションを一時停止します。 `docker inspect` を使用して実際のボリューム名を解決し、Redis に現在の状態を強制的に保持させ、所有権とアクセス許可を保持してアーカイブします。
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### ユーザーファイルのバックアップ {#user-files-backup}
-
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
-
-AI モデルは全バンドルで合計およそ 24 GB になります。再ダウンロード可能なので、容量を節約するにはバックアップから `/data/ai/` と `/data/venv/` を除外してください。重要なのはデータベースとユーザーファイルだけです。
+アプリケーションの前に Redis を再起動します。 `/data/ai` を意図的に除外する場合は、モデルや仮想環境なしで `installed.json` レコードを保存するのではなく、AI サブツリー全体を削除します。バックアップ ファイルは暗号化され、アクセスが制御され、SnapOtter を実行しているホストから分離された状態に保たれます。
 
 ## コンプライアンス成果物 {#compliance-artifacts}
 
-各 SnapOtter リリースには以下のセキュリティ成果物が含まれます：
+各 SnapOtter リリースには、次のセキュリティ アーティファクトが含まれています。
 
-| 成果物 | 形式 | 入手先 |
+| アーチファクト | 形式 | どこで見つけられますか |
 |---|---|---|
-| SBOM（CycloneDX） | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) のアセット: `snapotter-v{version}-sbom.cdx.json` |
-| SBOM（SPDX） | JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) のアセット: `snapotter-v{version}-sbom.spdx.json` |
-| 脆弱性スキャン | Trivy JSON | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) のアセット: `snapotter-v{version}-trivy.json` |
-| 脆弱性スキャン | SARIF | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) タブ |
-| 静的解析 | CodeQL（JS/TS + Python） | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) タブ。週次 + PR ごとに実行 |
-| 依存関係レビュー | GitHub ネイティブ | PR ごとのチェック。高深刻度の追加で失敗する |
-| Python 依存関係監査 | pip-audit | すべてのプッシュで CI 実行ログ |
+| 件名のバインディングを解放する | 正規の JSON + GitHub 証明書 | [GitHub リリース](https://github.com/snapotter-hq/SnapOtter/releases) アセット: `snapotter-v{version}-release-subjects.json` |
+| アーカイブ SBOM | CycloneDX および SPDX JSON | リリースアセット: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 画像SBOM | CycloneDX および SPDX JSON | リリースアセット: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 脆弱性スキャン | Trivy JSON | `archive-linux-{arch}` または `image-linux-{arch}` プレフィックスが一致するアセットをリリースする |
+| 脆弱性スキャン | SARIF | [GitHubセキュリティ](https://github.com/snapotter-hq/SnapOtter/security)タブ |
+| 静的解析 | CodeQL (JS/TS + Python) | [GitHub セキュリティ](https://github.com/snapotter-hq/SnapOtter/security) タブ、毎週 + PR ごとに実行 |
+| 依存関係のレビュー | GitHub ネイティブ | PR ごとのチェック、重大度の高い追加で失敗する |
+| Python 依存関係の監査 | pip-audit | プッシュごとの CI 実行ログ |
 | セキュリティポリシー | Markdown | リポジトリ内の [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
-| 依存関係の更新 | Dependabot | npm、pip、Docker、Actions 向けの自動化された週次 PR |
+| 依存関係の更新 | Dependabot | npm、pip、Docker、アクションの自動化された毎週の PR |
 
-**独自のスキャンを実行する：**
+**独自のスキャンを実行する:**
 
-リリースから SBOM をダウンロードし、お好みのツールでスキャンします：
+リリース対象のマニフェストをダウンロードし、それがリリース ワークフローによって証明されていることを確認します。
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+マニフェストには、`releaseTag`、`releaseCommit`、および `workflowTriggerCommit` が個別に記録されます。 `releaseCommit` が不変タグから剥がされたコミットであることを確認してから、使用したアーカイブ、イメージ、SBOM、またはスキャンの SHA-256 ダイジェストを `subjects` のエントリと照合して確認します。この区別は意図的なものです。新しく作成されたリリース コミットをチェックアウトしても、ワークフローの OIDC 資格情報のコミット ID は変更されません。
+
+ダウンロードした SBOM または画像を直接スキャンすることもできます。
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
-::: info 
-SBOM と脆弱性スキャンは、そのリリース向けに公開された正確なイメージを反映します。デプロイ後にインストールされる AI モデルバンドルは実行時にダウンロードされるため、SBOM には含まれません。
+::: info
+イメージ SBOMs とスキャンは、そのリリース用に公開されたアーキテクチャ固有のイメージを正確に反映しています。アーカイブ SBOMs とスキャンでは、事前構築されたアーカイブを個別に説明します。デプロイメント後にインストールされた AI モデル バンドルは、実行時にダウンロードされるため、これらの SBOMs には含まれません。
 :::

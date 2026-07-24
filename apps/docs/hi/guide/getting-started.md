@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter को एक ही कमांड में Docker के साथ इंस्टॉल करें। इसमें Docker Compose सेटअप, सोर्स से बिल्ड करना, और एक पूर्ण फ़ीचर अवलोकन शामिल है।"
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 2990278c7570
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: 70825df744c9
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-यह एकल कंटेनर वह सब कुछ चलाता है जिसकी उसे ज़रूरत है: बिना कोई `DATABASE_URL` सेट किए, यह लूपबैक इंटरफ़ेस पर अपना खुद का PostgreSQL और Redis शुरू करता है (एंबेडेड मोड) और सारा डेटा `SnapOtter-data` वॉल्यूम में रखता है। यह SnapOtter को आज़माने या किसी homelab पर सेल्फ़-होस्ट करने का सबसे तेज़ तरीका है। प्रोडक्शन के लिए, नीचे दिया गया [Docker Compose](#docker-compose) स्टैक चलाएँ, जो PostgreSQL और Redis को उनके अपने कंटेनरों में रखता है। एंबेडेड मोड root के रूप में चलता है (डिफ़ॉल्ट) और जैसे ही आप `DATABASE_URL` सेट करते हैं, यह स्वचालित रूप से बंद हो जाता है।
+यह एकल कंटेनर वह सब कुछ चलाता है जिसकी उसे आवश्यकता होती है: बिना किसी `DATABASE_URL` सेट के, यह लूपबैक इंटरफ़ेस (एम्बेडेड मोड) पर अपना स्वयं का PostgreSQL और Redis शुरू करता है और सभी डेटा को `SnapOtter-data` वॉल्यूम में रखता है। यह होमलैब पर SnapOtter या सेल्फ-होस्ट आज़माने का सबसे तेज़ तरीका है। उत्पादन के लिए, [कैनोनिकल डॉकर कंपोज़ स्टैक](#docker-compose) का उपयोग करें, जो PostgreSQL और Redis को अपने कंटेनर में रखता है। एंबेडेड मोड रूट (डिफ़ॉल्ट) के रूप में चलता है और जैसे ही आप `DATABASE_URL` सेट करते हैं तो स्वचालित रूप से बंद हो जाता है।
 
 Raspberry Pi, किसी पुराने लैपटॉप, या छोटे VPS पर इंस्टॉल कर रहे हैं? ट्यून की गई वॉकथ्रू और सीमित हार्डवेयर से क्या अपेक्षा करें, इसके लिए [कम संसाधन वाले सेटअप](/hi/guide/low-resource) देखें।
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 दोनों रजिस्ट्री हर रिलीज़ पर वही इमेज प्रकाशित करती हैं।
 :::
 
-## Docker Compose {#docker-compose}
+## डॉकर कंपोज़ {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+इस पृष्ठ से संक्षिप्त कंपोज़ उदाहरण की प्रतिलिपि बनाने के बजाय प्रत्येक रिलीज़ के साथ बनाए और परीक्षण की गई उत्पादन फ़ाइल का उपयोग करें:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-सभी एनवायरनमेंट वेरिएबल के लिए [Configuration](/hi/guide/configuration) देखें।
+कैनोनिकल [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) में सभी चार रनटाइम वॉल्यूम, स्वास्थ्य जांच, संसाधन सीमाएं, टिकाऊ रेडिस कॉन्फ़िगरेशन, पिन किए गए डेटाबेस/कैश छवियां और वर्तमान कंटेनर हार्डनिंग शामिल हैं। प्रथम लॉगिन के तुरंत बाद डिफ़ॉल्ट एडमिन पासवर्ड बदलें। प्रतिलिपि प्रस्तुत करने योग्य परिनियोजन के लिए, `latest` का अनुसरण करने के बजाय SnapOtter एप्लिकेशन छवि को रिलीज़ टैग पर पिन करें या आपके द्वारा सत्यापित डाइजेस्ट करें।
+
+सभी पर्यावरण चर के लिए [कॉन्फ़िगरेशन](/hi/guide/configuration) और रहस्यों, नेटवर्क नीति और बैकअप मार्गदर्शन के लिए [सुरक्षा और हार्डनिंग](/hi/guide/security) देखें।
 
 ## Build from Source {#build-from-source}
 

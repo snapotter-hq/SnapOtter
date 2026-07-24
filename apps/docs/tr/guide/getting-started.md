@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutla kurun. Docker Compose kurulumu, kaynaktan derleme ve tam özellik genel bakışı içerir."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 9628812bfcb3
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: fe066bc20dd2
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Tam arayüzü [demo.snapotter.com](https://demo.snapotter.com) adresinde keşfed
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Bu tek konteyner ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında, geri döngü arayüzünde kendi PostgreSQL ve Redis'ini başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin veya bir ev laboratuvarında kendiniz barındırmanın en hızlı yoludur. Üretim için, PostgreSQL ve Redis'i kendi konteynerlerinde tutan aşağıdaki [Docker Compose](#docker-compose) yığınını çalıştırın. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarladığınız anda otomatik olarak kapanır.
+Bu tek konteyner ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadan, geridöngü arayüzünde (gömülü mod) kendi PostgreSQL ve Redis'ini başlatır ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'yi denemenin veya bir ev laboratuvarında kendi kendine barındırmanın en hızlı yoludur. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [canonical Docker Compose yığınını](#docker-compose) kullanın. Katıştırılmış mod, kök (varsayılan) olarak çalışır ve `DATABASE_URL`'yi ayarladığınız anda otomatik olarak kapanır.
 
 Bir Raspberry Pi'ye, eski bir dizüstüne veya küçük bir VPS'e mi kuruyorsunuz? Ayarlanmış adım adım kurulum ve kısıtlı donanımdan neler bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) bölümüne bakın.
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Her iki kayıt defteri de her sürümde aynı imajı yayınlar.
 :::
 
-## Docker Compose {#docker-compose}
+## Docker Oluşturma {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Bu sayfadaki kısaltılmış bir Oluşturma örneğini kopyalamak yerine, her sürümde bakımı yapılan ve test edilen üretim dosyasını kullanın:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration) bölümüne bakın.
+Kurallı [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tümünü, durum denetimlerini, kaynak sınırlarını, dayanıklı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek görüntülerini ve geçerli kapsayıcı güçlendirmeyi içerir. İlk girişten hemen sonra varsayılan yönetici şifresini değiştirin. Tekrarlanabilir bir dağıtım için `latest`'yi takip etmek yerine SnapOtter uygulama görüntüsünü doğruladığınız sürüm etiketine veya özete sabitleyin.
+
+Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration)'ya ve gizli diziler, ağ politikası ve yedekleme kılavuzu için [Güvenlik ve Güçlendirme](/tr/guide/security)'ye bakın.
 
 ## Kaynaktan Derleme {#build-from-source}
 

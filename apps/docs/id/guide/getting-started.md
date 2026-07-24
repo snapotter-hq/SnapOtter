@@ -1,8 +1,8 @@
 ---
 description: "Pasang SnapOtter dengan Docker dalam satu perintah. Termasuk penyiapan Docker Compose, membangun dari sumber, dan gambaran lengkap fitur."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: f7965f19fa0c
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: 468809094690
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Jelajahi UI lengkap di [demo.snapotter.com](https://demo.snapotter.com), tanpa p
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Kontainer tunggal ini menjalankan semua yang dibutuhkannya: tanpa `DATABASE_URL` yang diatur, ia memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode embedded) dan menyimpan semua data di volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Untuk produksi, jalankan stack [Docker Compose](#docker-compose) di bawah, yang menjaga PostgreSQL dan Redis di kontainer mereka sendiri. Mode embedded berjalan sebagai root (default) dan mati secara otomatis segera setelah Anda mengatur `DATABASE_URL`.
+Kontainer tunggal ini menjalankan semua yang diperlukan: tanpa set `DATABASE_URL`, ia memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode tertanam) dan menyimpan semua data dalam volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Untuk produksi, gunakan [tumpukan Docker Compose kanonik](#docker-compose), yang menyimpan PostgreSQL dan Redis dalam containernya masing-masing. Mode tertanam berjalan sebagai root (default) dan mati secara otomatis segera setelah Anda mengatur `DATABASE_URL`.
 
 Memasang di Raspberry Pi, laptop lama, atau VPS kecil? Lihat [Penyiapan Sumber Daya Rendah](/id/guide/low-resource) untuk panduan yang sudah disetel dan apa yang bisa diharapkan dari perangkat keras terbatas.
 
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Kedua registry mempublikasikan image yang sama pada setiap rilis.
 :::
 
-## Docker Compose {#docker-compose}
+## Penulisan Docker {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Gunakan file produksi yang dikelola dan diuji pada setiap rilis alih-alih menyalin contoh Compose yang disingkat dari halaman ini:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Lihat [Configuration](/id/guide/configuration) untuk semua variabel lingkungan.
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) kanonik mencakup keempat volume runtime, health check, batasan sumber daya, konfigurasi Redis yang tahan lama, gambar database/cache yang disematkan, dan pengerasan kontainer saat ini. Ubah kata sandi admin default segera setelah login pertama. Untuk penerapan yang dapat direproduksi, sematkan gambar aplikasi SnapOtter ke tag rilis atau intisari yang Anda verifikasi, bukan mengikuti `latest`.
+
+Lihat [Konfigurasi](/id/guide/configuration) untuk semua variabel lingkungan dan [Keamanan & Pengerasan](/id/guide/security) untuk rahasia, kebijakan jaringan, dan panduan pencadangan.
 
 ## Membangun dari Sumber {#build-from-source}
 

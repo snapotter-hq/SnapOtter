@@ -1,8 +1,8 @@
 ---
 description: "1 つのコマンドで SnapOtter を Docker でインストールします。Docker Compose のセットアップ、ソースからのビルド、機能の全体像を含みます。"
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 7be2b4a38edd
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: 396d583c43ce
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-この単一コンテナは、必要なものすべてを内部で実行します。`DATABASE_URL` が未設定の場合、ループバックインターフェイス上で独自の PostgreSQL と Redis を起動し（組み込みモード）、すべてのデータを `SnapOtter-data` ボリュームに保持します。SnapOtter を試す、あるいはホームラボでセルフホストする最速の方法です。本番環境では、下記の [Docker Compose](#docker-compose) スタックを実行してください。こちらは PostgreSQL と Redis をそれぞれ専用のコンテナに保ちます。組み込みモードは root（デフォルト）として実行され、`DATABASE_URL` を設定するとすぐに自動的にオフになります。
+この単一のコンテナーは必要なものをすべて実行します。`DATABASE_URL` を設定せずに、ループバック インターフェイス (埋め込みモード) で独自の PostgreSQL と Redis を開始し、すべてのデータを `SnapOtter-data` ボリュームに保持します。これは、ホームラボで SnapOtter またはセルフホストを試す最も速い方法です。運用環境では、PostgreSQL と Redis を独自のコンテナーに保持する [正規の Docker Compose スタック](#docker-compose) を使用します。埋め込みモードは root (デフォルト) として実行され、`DATABASE_URL` を設定するとすぐに自動的にオフになります。
 
 Raspberry Pi、古いラップトップ、小さな VPS にインストールしますか？調整済みの手順と、限られたハードウェアで何が期待できるかについては、[低リソース環境のセットアップ](/ja/guide/low-resource) を参照してください。
 
@@ -54,61 +54,27 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 
 ## Docker Compose {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+このページから短縮された Compose サンプルをコピーする代わりに、各リリースで保守およびテストされた実稼働ファイルを使用してください。
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-すべての環境変数については [設定](/ja/guide/configuration) を参照してください。
+正規の [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) には、4 つのランタイム ボリュームすべて、ヘルス チェック、リソース制限、耐久性のある Redis 構成、固定されたデータベース/キャッシュ イメージ、および現在のコンテナーの強化が含まれています。最初のログイン直後にデフォルトの管理者パスワードを変更します。再現可能な展開を行うには、`latest` をフォローする代わりに、SnapOtter アプリケーション イメージをリリース タグまたは確認したダイジェストに固定します。
+
+すべての環境変数については [構成](/ja/guide/configuration) を、シークレット、ネットワーク ポリシー、およびバックアップ ガイダンスについては [セキュリティと強化](/ja/guide/security) を参照してください。
 
 ## ソースからビルド {#build-from-source}
 

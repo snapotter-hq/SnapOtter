@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter의 PostgreSQL 데이터베이스 스키마, 테이블, 마이그레이션, 백업 절차."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 4616baed29d0
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 469f8d270e1f
+i18n_hash_version: 2
 ---
 
 # 데이터베이스 {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 프로덕션에서는 시작 시 대기 중인 마이그레이션이 자동으로 적용됩니다.
 
-## 백업 및 복원 {#backup-and-restore}
+## {#backup-and-restore} 백업 및 복원
 
-관계형 데이터베이스는 앱의 `/data` 볼륨이 아니라 Postgres 컨테이너의 `SnapOtter-pgdata` 볼륨에 있습니다.
+관계형 데이터베이스는 앱의 `/data` 볼륨이 아닌 Postgres 컨테이너의 `SnapOtter-pgdata` 볼륨에 있습니다.
 
-**옵션 1: pg_dump (권장)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**옵션 2: 볼륨 스냅샷**
+**검증을 통한 논리적 백업(권장)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+이 데이터베이스 덤프에는 Redis의 `/data/files` 또는 내구성 있는 BullMQ 상태에 저장된 라이브러리 개체가 포함되어 있지 않습니다. [보안 및 강화](/ko/guide/security#backup-and-recovery)의 조정된 절차에 따라 백업 및 복원하세요.
+
+**콜드 볼륨 스냅샷**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+`tar`를 사용하여 라이브 PostgreSQL 데이터 디렉터리를 복사하지 마세요. 프로젝트별로 접두사 볼륨 이름을 구성하므로 리터럴 레이블 `SnapOtter-pgdata`를 가정하는 대신 `docker inspect` 또는 스토리지 플랫폼에서 마운트된 볼륨 ID를 확인합니다.
 
 ### 1.x(SQLite)에서 마이그레이션 {#migrating-from-1-x-sqlite}
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter için güvenlik sıkılaştırma kılavuzu. Konteyner güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk yapıtları."
-i18n_source_hash: 9d021c1ceb40
-i18n_provenance: human
-i18n_output_hash: 26dc43e34a87
+i18n_source_hash: ee46e715d6fe
+i18n_provenance: machine
+i18n_output_hash: 80cb54bfd206
 i18n_hash_version: 2
 ---
 
@@ -12,133 +12,42 @@ SnapOtter dosyaları tamamen kendi altyapınızda işler. Projeyi geliştirmeye 
 
 Konteyner, gerekli minimum küme dışında tüm Linux yetenekleri düşürülmüş özel bir root olmayan kullanıcı (`snapotter`) olarak çalışır. Tam güvenlik açığı açıklama politikası ve güvenlik mimarisi için GitHub'daki [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) dosyasına bakın.
 
-## Konteyner Sıkılaştırma {#container-hardening}
+## Konteyner Sertleştirme {#container-hardening}
 
-[Varsayılan docker-compose.yml](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) üretim güvenlik sıkılaştırması içerir. İşte her seçeneğin bir dökümü ve neden önemli olduğu:
+Kurallı [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) ve [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose dosyaları gerçeğin kaynağıdır. Kısaltılmış bir örneği üretime kopyalamayın; dosyayı doğruladığınız sürüm etiketinden dağıtın.
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+Her iki yığın da aşağıdaki kontrolleri uygular:
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- Bellek, takas, CPU ve PID sınırları kaçak yerel işleme içerir.
+- Her hizmet tüm Linux yeteneklerini düşürür. Uygulama, birim sahipliği, tek yönlü `gosu` kimlik düşüşü ve zarif sinyal iletimi için yalnızca `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL`'yi geri ekler. PostgreSQL ve Redis yalnızca resmi giriş noktalarının ihtiyaç duyduğu alt kümeyi alır.
+- `security_opt: [no-new-privileges:true]`, uygulamadaki, PostgreSQL ve Redis kapsayıcılarındaki işlemlerin ek ayrıcalıklar kazanmasını engeller. Bu, `gosu` ile uyumlu olmaya devam eder: giriş noktası kök olarak başlar, birimleri hazırlar ve yalnızca özel `snapotter` kullanıcısına düşer.
+- PostgreSQL ve Redis görüntü girişleri özet ile sabitlenir. Uygulama aynı şekilde `latest` yerine doğrulanmış bir sürüm etiketine veya özete sabitlenmelidir.
+- Durum denetimleri, sınırlı JSON günlük rotasyonu, dayanıklı Redis AOF ve yeniden başlatma politikası, standart dosyalarda merkezi olarak tanımlanır.
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
+İnternet'e yönelik bir dağıtım için, 1349 numaralı bağlantı noktasını geri döngüye bağlayın ve korunan bir ters proxy'de TLS'yi sonlandırın. Benzersiz PostgreSQL ve Redis kimlik bilgileri oluşturun, sırları korumalı dosyalarda veya gizli yöneticide saklayın ve ilk yönetici şifresini hemen değiştirin.
 
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
+### `read_only` Neden Ayarlanmıyor {#why-read-only-is-not-set}
 
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### Neden `no-new-privileges` Ayarlanmıyor {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]` kasıtlı olarak atlanmıştır. Giriş noktası, birim sahipliğini düzeltmek için root olarak başlar, ardından setuid gerektiren [gosu](https://github.com/tianon/gosu) aracılığıyla `snapotter` kullanıcısına düşer. Ayrıcalık düşürme tamamlandığında, işlem yukarıda listelenen beşi dışındaki tüm yeteneklerden arındırılmış olarak `snapotter` olarak çalışır.
-
-Doğrudan root olmayan olarak çalıştırmak için Kubernetes veya Docker'ın `--user` bayrağını kullanırsanız (gosu'yu atlayarak), `no-new-privileges` etkinleştirmek güvenlidir.
-
-### Neden `read_only` Ayarlanmıyor {#why-read-only-is-not-set}
-
-`read_only: true` ayarlanmamıştır çünkü PUID/PGID yeniden eşleme başlangıçta `/etc/passwd` ve `/etc/group` dizinlerine yazar. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser` kullanırsanız, salt-okunur bir root dosya sistemini güvenle etkinleştirebilirsiniz.
+PUID/PGID yeniden eşlemesi başlangıçta `/etc/passwd` ve `/etc/group`'ye yazdığı için `read_only: true` ayarlanmadı. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser`'yi kullanırsanız salt okunur bir kök dosya sistemini güvenli bir şekilde etkinleştirebilirsiniz.
 
 ## Ağ Yalıtımı {#network-isolation}
 
-Normal çalışma sırasında konteyner **sıfır giden ağ bağlantısı** yapar. Tüm dosya işleme, birlikte gelen kitaplıklar kullanılarak yerel olarak gerçekleşir.
+Dosya işleme yereldir ancak varsayılan kurulum **çıkışsız bir sistem değildir**. Anonim ürün analitiği PostHog'u kullanır ve telemetri etkinleştirildiğinde kilitlenme raporlaması Sentry'yi kullanır. Her ikisini de kapatmak için `SNAPOTTER_TELEMETRY=0`'yi ayarlayın (veya Ayarlar > Sistem > Gizlilik altında analitiği devre dışı bırakın). SnapOtter hiçbir zaman yüklenen dosyaları, dosya adlarını, OCR çıktısını, belge metnini veya diğer dosya içeriklerini bu etkinliklere dahil etmez.
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
-
-Tek istisna **AI model indirmeleridir**: bir kullanıcı arayüz aracılığıyla bir AI özellik paketi kurduğunda, konteyner önceden derlenmiş paket arşivini Hugging Face'ten, ayrıca GitHub Releases, Google Storage ve PyPI'dan birkaç bireysel model dosyasını indirir. Bu indirmeler paket başına bir kez gerçekleşir ve `/data` biriminde saklanır.
+Diğer giden trafik ise özellik odaklıdır: AI paketi/model kurulumu, imzalı sürüm girişlerini indirir; URL içe aktarma, kullanıcı tarafından istenen genel bir URL'yi getirir; ve açıkça yapılandırılmış OIDC, SAML, OpenTelemetry, web kancaları, S3 uyumlu depolama veya benzer entegrasyonlar, yönetici tarafından seçilen hedeflerle iletişim kurar. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` otomatik model indirmeleri önler. [Çevrimdışı paket içe aktarma](/tr/guide/deployment), çalışma zamanı modeli çıkışı olmadan AI özelliklerini sağlayabilir.
 
 **Güvenlik duvarı önerileri:**
 
-| Senaryo | Giden kural |
+|Senaryo|Giden kuralı|
 |---|---|
-| Hava boşluklu (AI yok) | Konteynerden tüm giden trafiği engelle |
-| AI paketleri gerekli | Kurulum sırasında `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org` adreslerine HTTPS'ye izin ver, ardından engelle |
-| AI kurulumundan sonra | Tüm giden trafiği engelle - modeller yerel olarak önbelleğe alınır |
+|Hava boşluklu|`SNAPOTTER_TELEMETRY=0` ve `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`'yi ayarlayın, çevrimdışı AI paketi içe aktarmayı kullanın, URL içe aktarmayı ve harici entegrasyonları devre dışı bırakın, ardından çıkışı engelleyin|
+|Varsayılan telemetri|Tarayıcınız/ağ günlükleriniz tarafından listelenen PostHog ve Sentry uç noktalarına izin verin; politika izin vermiyorsa telemetriyi devre dışı bırakın|
+|AI paketleri gerekli|Kurulum sırasında HTTPS'nin `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`'ye izin vermesine izin verin; daha sonra bu ana bilgisayarları engelleyin|
+|Harici entegrasyonlar|Yalnızca yönetici tarafından yapılandırılan OIDC/SAML/OTLP/webhook/nesne depolama hedeflerine tam olarak izin verin|
 
-Paket arşivleri, `*.xethub.hf.co` uç noktaları üzerinden paralel olarak aktarılan ve çoklu GB paket indirmelerini hızlı yapan Hugging Face'in Xet depolamasından sunulur. Güvenlik duvarınız `huggingface.co` adresine izin veriyor ancak `*.xethub.hf.co` adresini engelliyorsa, kurulumlar yine de başarılı olur ancak daha yavaş bir tek akışlı indirmeye geri döner, bu nedenle hızlı yolda kalmak için Xet ana bilgisayarlarını izin listesine ekleyin. Tamamen çevrimdışı kurulumlar tüm bunları atlayabilir ve bunun yerine [Çevrimdışı Paket İçe Aktarma](/tr/guide/deployment) kullanabilir.
+Paket arşivleri, `*.xethub.hf.co` uç noktaları üzerinden paralel olarak aktarım yapan Hugging Face'in Xet depolama alanından sunulur ve çoklu GB paket indirmelerini hızlı kılan da budur. Güvenlik duvarınız `huggingface.co`'ye izin veriyor ancak `*.xethub.hf.co`'yi engelliyorsa, yüklemeler yine de başarılı olur ancak daha yavaş tek akışlı indirmeye geri dönerse, hızlı yolda kalmak için Xet ana bilgisayarlarını izin verilenler listesine ekleyin. Tamamen çevrimdışı yüklemeler tüm bunları atlayabilir ve bunun yerine [Çevrimdışı Paket İçe Aktarma](/tr/guide/deployment) yöntemini kullanabilir.
 
-Ters proxy yapılandırması (Nginx, Traefik, Caddy, Cloudflare Tunnels) için [Dağıtım kılavuzuna](/tr/guide/deployment#reverse-proxy) bakın.
+Ters proxy yapılandırması için (Nginx, Traefik, Caddy, Cloudflare Tünelleri), [Dağıtım kılavuzuna](/tr/guide/deployment#reverse-proxy) bakın.
 
 ## Docker Secrets {#docker-secrets}
 
@@ -258,83 +167,101 @@ Kaynak boyutlandırma için [Donanım Gereksinimleri](/tr/guide/deployment#hardw
 
 ## Yedekleme ve Kurtarma {#backup-and-recovery}
 
-Kalıcı durum iki birim arasında bölünmüştür:
+Üretim Oluşturma yığını dört cilt tanımlar. PostgreSQL, Redis ve dosya durumunun zaman içinde aynı noktayı tanımlaması için, girişi durdurun ve koordineli bir yedekleme almadan önce etkin işlerin bitmesini bekleyin.
 
-| Birim | İçerik | Kritik mi? |
+|Hacim|İçindekiler|İyileşme tedavisi|
 |---|---|---|
-| `SnapOtter-pgdata` | PostgreSQL veritabanı (kullanıcılar, ayarlar, ardışık düzenler, işler, denetim günlüğü) | Evet |
-| `/data` (uygulama birimi) | Kullanıcı tarafından yüklenen dosyalar, AI modelleri, Python venv | Kısmen (aşağıya bakın) |
+|`SnapOtter-pgdata`|PostgreSQL kullanıcıları, ayarlar, işlem hatları, işler, dosya meta verileri ve denetim günlüğü|Kritik; taşınabilir kurtarma için hızlı bir mantıksal döküm kullanın|
+|`SnapOtter-data`|Kaydedilen kitaplık nesneleri, günlükler ve AI durumu (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Tüm birimi yedekleyin; yerden tasarruf etmek için tüm AI durumlarını kasıtlı olarak çıkarın ve paketlerini yeniden yükleyin|
+|`SnapOtter-redisdata`|Dayanıklı BullMQ kuyruk durumu için Redis AOF|Uygulamayı duraklatıp `SAVE`'yi zorladıktan sonra yedekleyin; sıraya alınmış çalışmayı tam olarak sürdürmek için gerekli|
+|`SnapOtter-workspace`|Geçici nesne depolama anahtarları (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Tüm işler boşaltıldıktan veya iptal edildikten sonra yedekleme yapmayın; işler aktifken asla atmayın|
 
-`/data` birimi içinde:
+Normalde birim adlarının ön ekini proje adıyla birlikte oluşturun. `SnapOtter-data` gibi bir görünen adın Docker birim adı olduğunu varsaymak yerine, gerçek kaynak birimini takılı kapsayıcıdan çözümleyin.
 
-| Yol | İçerik | Kritik mi? |
-|---|---|---|
-| `/data/uploads/`, `/data/outputs/` | Kullanıcı dosyaları ve işleme sonuçları | Evet |
-| `/data/ai/` | İndirilen AI model dosyaları | Hayır (yeniden indirilebilir) |
-| `/data/venv/` | Python sanal ortamı | Hayır (başlangıçta yeniden derlenir) |
+### Veritabanı yedeklemesi {#database-backup}
 
-### Veritabanı yedekleme {#database-backup}
-
-Yığın çalışırken veritabanını yedeklemek için `pg_dump` kullanın:
+PostgreSQL'in özel arşiv formatını kullanın ve yedeklemeyi tamamlanmış olarak değerlendirmeden önce arşivi doğrulayın:
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-Alternatif olarak, yığını durdurun ve `SnapOtter-pgdata` biriminin anlık görüntüsünü alın:
+Her yedeklemeyi yalıtılmış bir yığına geri yükleyerek, veritabanı kayıtlarını ve dosya sağlama toplamlarını kontrol ederek ve uygulamayı başlatarak test edin. Deponun `tests/qa/backup-restore-drill.sh`'si, açık bir `QA_IMAGE`'ye karşı bu serbest bırakma kapısını otomatikleştirir.
+
+Platformunuz bunun yerine kilitlenmeyle tutarlı birim anlık görüntüleri alıyorsa, önce tüm yığını durdurun ve tüm kritik birimlerin anlık görüntüsünü tek bir set olarak alın. Çalışan bir kapsayıcıdan alınan ham PostgreSQL veri dizini kopyası, desteklenen bir mantıksal yedekleme değildir.
+
+### Dosya ve kuyruk yedeklemesi {#file-and-queue-backup}
+
+Dosya ve kuyruk birimlerini yakalamadan önce uygulamayı duraklatın. Gerçek birim adını çözümlemek, Redis'i mevcut durumunu sürdürmeye zorlamak ve sahiplik ve izinler korunarak arşivlemek için `docker inspect` kullanın:
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### Kullanıcı dosyaları yedekleme {#user-files-backup}
+Uygulamadan önce Redis'i yeniden başlatın. `/data/ai`'yi kasıtlı olarak hariç tutarsanız, bir `installed.json` kaydını modelleri veya sanal ortamı olmadan korumak yerine tüm AI alt ağacını kaldırın. Yedekleme dosyalarını şifrelenmiş, erişim kontrollü ve SnapOtter çalıştıran ana bilgisayardan ayrı tutun.
 
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
+## Uyumluluk Eserleri {#compliance-artifacts}
 
-AI modelleri tüm paketlerde toplamda yaklaşık 24 GB'a kadar çıkar. Yeniden indirilebilir olduklarından, yerden tasarruf etmek için `/data/ai/` ve `/data/venv/` dizinlerini yedeklemelerden hariç tutun. Yalnızca veritabanı ve kullanıcı dosyaları kritiktir.
+Her SnapOtter sürümü aşağıdaki güvenlik yapılarını içerir:
 
-## Uyumluluk Yapıtları {#compliance-artifacts}
-
-Her SnapOtter sürümü aşağıdaki güvenlik yapıtlarını içerir:
-
-| Yapıt | Format | Nerede bulunur |
+| eser | Biçim | Nerede bulunur? |
 |---|---|---|
-| SBOM (CycloneDX) | JSON | [GitHub Sürümü](https://github.com/snapotter-hq/SnapOtter/releases) varlığı: `snapotter-v{version}-sbom.cdx.json` |
-| SBOM (SPDX) | JSON | [GitHub Sürümü](https://github.com/snapotter-hq/SnapOtter/releases) varlığı: `snapotter-v{version}-sbom.spdx.json` |
-| Güvenlik açığı taraması | Trivy JSON | [GitHub Sürümü](https://github.com/snapotter-hq/SnapOtter/releases) varlığı: `snapotter-v{version}-trivy.json` |
-| Güvenlik açığı taraması | SARIF | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) sekmesi |
-| Statik analiz | CodeQL (JS/TS + Python) | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) sekmesi, haftalık + PR başına çalışır |
-| Bağımlılık incelemesi | GitHub yerel | PR başına kontrol, yüksek önem dereceli eklemelerde başarısız olur |
-| Python bağımlılık denetimi | pip-audit | Her push'ta CI çalıştırma günlüğü |
+| Konu bağlamayı serbest bırak | Kanonik JSON + GitHub onayı | [GitHub Sürümü](https://github.com/snapotter-hq/SnapOtter/releases) varlığı: `snapotter-v{version}-release-subjects.json` |
+| Arşiv SBOM | CycloneDX ve SPDX JSON | Varlıkları serbest bırakma: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Resim SBOM | CycloneDX ve SPDX JSON | Varlıkları serbest bırakma: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Güvenlik açığı taramaları | Trivy JSON | Eşleşen `archive-linux-{arch}` veya `image-linux-{arch}` önekleriyle varlıkları serbest bırakın |
+| Güvenlik açığı taraması | SARIF | [GitHub Güvenlik](https://github.com/snapotter-hq/SnapOtter/security) sekmesi |
+| Statik analiz | CodeQL (JS/TS + Python) | [GitHub Güvenlik](https://github.com/snapotter-hq/SnapOtter/security) sekmesi, haftalık + PR başına çalışır |
+| Bağımlılık incelemesi | GitHub yerel | PR başına kontrol, yüksek önem derecesine sahip eklemelerde başarısız olur |
+| Python bağımlılık denetimi | pip-audit | Her basışta CI çalıştırma günlüğü |
 | Güvenlik politikası | Markdown | Depodaki [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
-| Bağımlılık güncellemeleri | Dependabot | npm, pip, Docker, Actions için otomatik haftalık PR'ler |
+| Bağımlılık güncellemeleri | Dependabot | Npm, pip, Docker, Eylemler için otomatik haftalık PR'ler |
 
 **Kendi taramanızı çalıştırma:**
 
-SBOM'u sürümden indirin ve tercih ettiğiniz araçla tarayın:
+Yayın konusu bildirimini indirin ve yayın iş akışı tarafından onaylandığını doğrulayın:
+
+```bash
+gh attestation verify snapotter-v2.1.0-release-subjects.json \
+  --repo snapotter-hq/SnapOtter \
+  --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
+```
+
+Bildirim, `releaseTag`, `releaseCommit` ve `workflowTriggerCommit`'yi ayrı ayrı kaydeder. `releaseCommit`'nin değişmez etiketten çıkarılan kayıt olduğunu doğrulayın, ardından arşivin, görüntünün, SBOM'nin veya tükettiğiniz taramanın SHA-256 özetini `subjects`'deki girişine göre doğrulayın. Bu ayrım kasıtlıdır: yeni oluşturulan bir sürüm taahhüdünün kontrol edilmesi, iş akışının OIDC kimlik bilgisindeki taahhüt kimliğini değiştirmez.
+
+İndirilen bir SBOM'yi veya görüntüyü doğrudan da tarayabilirsiniz:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v1.17.2-sbom.cdx.json
+grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v1.17.2-sbom.spdx.json
+trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:1.17.2
+trivy image snapotter/snapotter:2.1.0
 ```
 
-::: info 
-SBOM ve güvenlik açığı taraması, o sürüm için yayınlanan tam imajı yansıtır. Dağıtımdan sonra kurulan AI model paketleri, çalışma zamanında indirildiğinden SBOM'a dahil edilmez.
+::: info
+Görüntü SBOMs ve taramalar, söz konusu sürüm için yayınlanan mimariye özgü görüntüyü tam olarak yansıtır. Arşiv SBOMs ve taramalar, önceden oluşturulmuş arşivi ayrı ayrı açıklar. Dağıtımdan sonra yüklenen AI model paketleri, çalışma zamanında indirildikleri için bu SBOMs'ye dahil edilmez.
 :::

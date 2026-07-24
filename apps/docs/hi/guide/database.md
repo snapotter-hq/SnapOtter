@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter के लिए PostgreSQL डेटाबेस स्कीमा, टेबल, माइग्रेशन और बैकअप प्रक्रियाएँ।"
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 5592d4435806
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: de28f97f3fab
+i18n_hash_version: 2
 ---
 
 # डेटाबेस {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 प्रोडक्शन में, लंबित माइग्रेशन स्टार्टअप पर स्वचालित रूप से लागू किए जाते हैं।
 
-## बैकअप और रिस्टोर {#backup-and-restore}
+## बैकअप लें और {#backup-and-restore} को पुनर्स्थापित करें
 
-रिलेशनल डेटाबेस Postgres कंटेनर के `SnapOtter-pgdata` वॉल्यूम में रहता है, ऐप के `/data` वॉल्यूम में नहीं।
+रिलेशनल डेटाबेस पोस्टग्रेज कंटेनर के `SnapOtter-pgdata` वॉल्यूम में रहता है, ऐप के `/data` वॉल्यूम में नहीं।
 
-**विकल्प 1: pg_dump (अनुशंसित)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**विकल्प 2: वॉल्यूम स्नैपशॉट**
+**सत्यापन के साथ तार्किक बैकअप (अनुशंसित)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+इस डेटाबेस डंप में `/data/files` या Redis में टिकाऊ BullMQ स्थिति में सहेजे गए लाइब्रेरी ऑब्जेक्ट शामिल नहीं हैं। [सुरक्षा और हार्डनिंग](/hi/guide/security#backup-and-recovery) में समन्वित प्रक्रिया के साथ उनका बैकअप लें और पुनर्स्थापित करें।
+
+**कोल्ड वॉल्यूम स्नैपशॉट**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+`tar` के साथ लाइव PostgreSQL डेटा निर्देशिका की प्रतिलिपि न बनाएं। प्रोजेक्ट के अनुसार उपसर्ग वॉल्यूम नाम लिखें, इसलिए शाब्दिक लेबल `SnapOtter-pgdata` मानने के बजाय `docker inspect` या अपने स्टोरेज प्लेटफ़ॉर्म से माउंटेड वॉल्यूम आईडी को हल करें।
 
 ### 1.x (SQLite) से माइग्रेट करना {#migrating-from-1-x-sqlite}
 

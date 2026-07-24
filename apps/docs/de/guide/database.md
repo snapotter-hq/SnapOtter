@@ -1,8 +1,9 @@
 ---
 description: "PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter."
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: dd3579a83805
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 37efb265dd4b
+i18n_hash_version: 2
 ---
 
 # Datenbank {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 In der Produktion werden ausstehende Migrationen beim Start automatisch angewendet.
 
-## Backup und Wiederherstellung {#backup-and-restore}
+## Sichern und Wiederherstellen von {#backup-and-restore}
 
-Die relationale Datenbank liegt im Volume `SnapOtter-pgdata` des Postgres-Containers, nicht im Volume `/data` der App.
+Die relationale Datenbank befindet sich im `SnapOtter-pgdata`-Volume des Postgres-Containers, nicht im `/data`-Volume der App.
 
-**Option 1: pg_dump (empfohlen)**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**Option 2: Volume-Snapshot**
+**Logische Sicherung mit Validierung (empfohlen)**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+Dieser Datenbank-Dump enthält keine gespeicherten Bibliotheksobjekte im `/data/files`- oder dauerhaften BullMQ-Status in Redis. Sichern und wiederherstellen Sie diese mit dem koordinierten Verfahren in [Sicherheit und Härtung](/de/guide/security#backup-and-recovery).
+
+**Schnappschuss des kalten Volumens**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+Kopieren Sie kein Live-PostgreSQL-Datenverzeichnis mit `tar`. Verfassen Sie Volume-Namen mit Präfixen nach Projekt. Lösen Sie daher die gemounteten Volume-IDs von `docker inspect` oder Ihrer Speicherplattform auf, anstatt die wörtliche Bezeichnung `SnapOtter-pgdata` anzunehmen.
 
 ### Migration von 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

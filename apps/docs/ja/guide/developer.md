@@ -1,8 +1,9 @@
 ---
 description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: 8034bc92f69d
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 34378e7f7c08
+i18n_hash_version: 2
 ---
 
 # 開発者ガイド {#developer-guide}
@@ -219,6 +220,17 @@ docker build -f docker/Dockerfile -t snapotter:latest .
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## リリースバージョンのドメイン {#release-version-domains}
+
+SnapOtter には意図的に 3 つのバージョン ドメインがあります。リリース中に、あるドメインを別のドメインにコピーしないでください。
+
+- アプリケーションのリリース バージョンには、ルート マニフェスト、すべてのプライベート ワークスペース パッケージ、および `APP_VERSION` が含まれます。 Semantic-release はこの値を提供し、`pnpm version:sync <version>` はアプリケーションのリリース前にすべてのワークスペースを更新します。
+- OpenAPI `info.version` は、安定したパブリック API メジャー コントラクトです。すべてのローカライズされた仕様は、互換性のあるアプリケーション リリースでは `<major>.0.0` に残り、API 契約が新しいメジャー バージョンに移行する場合にのみ変更されます。
+- `docker/feature-manifest.json` は、`imageVersion: 2.0.0` を不変のレガシー機能バンドル ストレージ エポックとして保持します。これらの v2 アーカイブ パスは、アプリケーション パッケージのバージョンではありません。正確な OCR はランタイム形式 v3 を使用し、アプリケーションのリリースの出所を個別に記録します。
+
+`tests/unit/infra/release-version-policy.test.ts` はこれらの境界を強制します。新しいバージョンのドメインまたは移行では、その契約と関連するアーティファクトの移行設計を一緒に更新する必要があります。
+独立した API およびレガシーバンドルの値は `config/release-version-policy.json` に存在します。アプリケーションのバージョン同期では、そのポリシー ファイルを暗黙的に書き換えてはなりません。
 
 ## 環境変数 {#environment-variables}
 

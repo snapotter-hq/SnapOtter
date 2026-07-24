@@ -158,24 +158,32 @@ In production, pending migrations are applied automatically on startup.
 
 The relational database lives in the Postgres container's `SnapOtter-pgdata` volume, not the app's `/data` volume.
 
-**Option 1: pg_dump (recommended)**
+**Logical backup with validation (recommended)**
 
 ```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-**Option 2: Volume snapshot**
+This database dump does not contain saved library objects in `/data/files` or durable BullMQ state in Redis. Back up and restore those with the coordinated procedure in [Security & Hardening](/guide/security#backup-and-recovery).
+
+**Cold volume snapshot**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
 ```
+
+Do not copy a live PostgreSQL data directory with `tar`. Compose prefixes volume names by project, so resolve the mounted volume IDs from `docker inspect` or your storage platform rather than assuming the literal label `SnapOtter-pgdata`.
 
 ### Migrating from 1.x (SQLite) {#migrating-from-1-x-sqlite}
 

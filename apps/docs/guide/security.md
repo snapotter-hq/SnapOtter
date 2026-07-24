@@ -10,105 +10,17 @@ The container runs as a dedicated non-root user (`snapotter`) with all Linux cap
 
 ## Container Hardening {#container-hardening}
 
-The [default docker-compose.yml](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) includes production security hardening. Here is a breakdown of each option and why it matters:
+The canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) and [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose files are the source of truth. Do not copy an abbreviated example into production; deploy the file from the release tag you verified.
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest
-    ports:
-      # Bind to localhost only for internet-facing deployments:
-      - "127.0.0.1:1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-      - SnapOtter-workspace:/tmp/workspace
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_PASSWORD=change-me-immediately
-      - RATE_LIMIT_PER_MIN=1000
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+Both stacks apply the following controls:
 
-    # --- Resource limits ---
-    mem_limit: 6g            # Prevents runaway memory from crashing the host
-    memswap_limit: 6g        # No swap - fail fast instead of degrading the host
-    cpus: 4                  # Cap CPU usage to 4 cores
-    pids_limit: 512          # Prevents fork bombs
+- Memory, swap, CPU, and PID limits contain runaway native processing.
+- Every service drops all Linux capabilities. The application adds back only `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` for volume ownership, the one-way `gosu` identity drop, and graceful signal forwarding. PostgreSQL and Redis receive only the subset their official entrypoints need.
+- `security_opt: [no-new-privileges:true]` prevents processes in the application, PostgreSQL, and Redis containers from gaining additional privileges. This remains compatible with `gosu`: the entrypoint begins as root, prepares the volumes, and only drops to the dedicated `snapotter` user.
+- PostgreSQL and Redis image inputs are pinned by digest. The application should likewise be pinned to a verified release tag or digest rather than `latest`.
+- Health checks, bounded JSON log rotation, durable Redis AOF, and restart policy are defined centrally in the canonical files.
 
-    # --- Capability restrictions ---
-    cap_drop:
-      - ALL                  # Drop ALL Linux capabilities first
-    cap_add:
-      - CHOWN                # Needed for volume permission setup
-      - SETUID               # Needed for gosu privilege drop (root -> snapotter)
-      - SETGID               # Needed for gosu privilege drop
-      - DAC_OVERRIDE         # Needed for volume permission setup
-      - FOWNER               # Needed for volume permission setup
-
-    # --- Logging ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"      # Rotate logs at 50 MB
-        max-file: "5"        # Keep 5 rotated log files
-
-    # --- Health check ---
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
-      retries: 3
-
-    shm_size: "2gb"          # Required for Python ML shared memory
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-volumes:
-  SnapOtter-data:
-  SnapOtter-workspace:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
-```
-
-### Why `no-new-privileges` Is Not Set {#why-no-new-privileges-is-not-set}
-
-`security_opt: [no-new-privileges:true]` is intentionally omitted. The entrypoint starts as root to fix volume ownership, then drops to the `snapotter` user via [gosu](https://github.com/tianon/gosu), which requires setuid. Once the privilege drop completes, the process runs as `snapotter` with all capabilities except the five listed above removed.
-
-If you use Kubernetes or Docker's `--user` flag to run as non-root directly (bypassing gosu), `no-new-privileges` is safe to enable.
+For an internet-facing deployment, bind port 1349 to loopback and terminate TLS at a maintained reverse proxy. Generate unique PostgreSQL and Redis credentials, store secrets in protected files or a secret manager, and change the initial administrator password immediately.
 
 ### Why `read_only` Is Not Set {#why-read-only-is-not-set}
 
@@ -116,21 +28,18 @@ If you use Kubernetes or Docker's `--user` flag to run as non-root directly (byp
 
 ## Network Isolation {#network-isolation}
 
-During normal operation, the container makes **zero outbound network connections**. All file processing happens locally using bundled libraries.
+File processing is local, but a default installation is **not an egress-free system**. Anonymous product analytics use PostHog and crash reporting uses Sentry when telemetry is enabled. Set `SNAPOTTER_TELEMETRY=0` (or disable analytics under Settings > System > Privacy) to turn off both. SnapOtter never includes uploaded files, file names, OCR output, document text, or other file contents in those events.
 
-```
-Browser  -->  Reverse Proxy (TLS)  -->  SnapOtter container  -->  (nothing)
-```
-
-The only exception is **AI model downloads**: when a user installs an AI feature bundle through the UI, the container downloads the pre-built bundle archive from Hugging Face, plus a few individual model files from GitHub Releases, Google Storage, and PyPI. These downloads happen once per bundle and are stored in the `/data` volume.
+Other outbound traffic is feature-driven: AI bundle/model installation downloads signed release inputs; URL import fetches a user-requested public URL; and explicitly configured OIDC, SAML, OpenTelemetry, webhooks, S3-compatible storage, or similar integrations contact the destinations chosen by the administrator. `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` prevents automatic model downloads. An [offline bundle import](/guide/deployment) can provision AI features without runtime model egress.
 
 **Firewall recommendations:**
 
 | Scenario | Outbound rule |
 |---|---|
-| Air-gapped (no AI) | Block all outbound traffic from the container |
-| AI bundles needed | Allow HTTPS to `huggingface.co`, `*.xethub.hf.co`, `cdn-lfs.huggingface.co`, `github.com`, `objects.githubusercontent.com`, `storage.googleapis.com`, `pypi.org`, `files.pythonhosted.org` during install, then block |
-| After AI install | Block all outbound traffic - models are cached locally |
+| Air-gapped | Set `SNAPOTTER_TELEMETRY=0` and `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, use offline AI bundle import, disable URL import and external integrations, then block egress |
+| Default telemetry | Allow the PostHog and Sentry endpoints listed by your browser/network logs; disable telemetry if policy does not permit them |
+| AI bundles needed | During installation, allow HTTPS to `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; then block those hosts |
+| External integrations | Allow only the exact administrator-configured OIDC/SAML/OTLP/webhook/object-storage destinations |
 
 Bundle archives are served from Hugging Face's Xet storage, which transfers over the `*.xethub.hf.co` endpoints in parallel and is what makes multi-GB bundle downloads fast. If your firewall allows `huggingface.co` but blocks `*.xethub.hf.co`, installs still succeed but fall back to a slower single-stream download, so allowlist the Xet hosts to stay on the fast path. Fully offline installs can skip all of this and use [Offline Bundle Import](/guide/deployment) instead.
 
@@ -254,51 +163,58 @@ For resource sizing, see [Hardware Requirements](/guide/deployment#hardware-requ
 
 ## Backup and Recovery {#backup-and-recovery}
 
-Persistent state is split across two volumes:
+The production Compose stack defines four volumes. Stop ingress and let active jobs finish before taking a coordinated backup so PostgreSQL, Redis, and file state describe the same point in time.
 
-| Volume | Contents | Critical? |
+| Volume | Contents | Recovery treatment |
 |---|---|---|
-| `SnapOtter-pgdata` | PostgreSQL database (users, settings, pipelines, jobs, audit log) | Yes |
-| `/data` (app volume) | User-uploaded files, AI models, Python venv | Partially (see below) |
+| `SnapOtter-pgdata` | PostgreSQL users, settings, pipelines, jobs, file metadata, and audit log | Critical; use a fail-fast logical dump for portable recovery |
+| `SnapOtter-data` | Saved library objects, logs, and AI state (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Back up the whole volume; to save space, deliberately omit all AI state and reinstall its bundles |
+| `SnapOtter-redisdata` | Redis AOF for durable BullMQ queue state | Back up after pausing the app and forcing `SAVE`; required to resume queued work exactly |
+| `SnapOtter-workspace` | Temporary object-storage keys (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Do not back up after all jobs are drained or cancelled; never discard it while jobs are active |
 
-Within the `/data` volume:
-
-| Path | Contents | Critical? |
-|---|---|---|
-| `/data/uploads/`, `/data/outputs/` | User files and processing results | Yes |
-| `/data/ai/` | Downloaded AI model files | No (re-downloadable) |
-| `/data/venv/` | Python virtual environment | No (rebuilt on start) |
+Compose normally prefixes volume names with the project name. Resolve the real source volume from the mounted container instead of assuming that a display name such as `SnapOtter-data` is the Docker volume name.
 
 ### Database backup {#database-backup}
 
-Use `pg_dump` to back up the database while the stack is running:
+Use PostgreSQL's custom archive format and verify the archive before treating the backup as complete:
 
 ```bash
-# Dump the database
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
 
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
+# Restore only into a fresh/disposable target first; any SQL error fails the command.
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
 
-Alternatively, stop the stack and snapshot the `SnapOtter-pgdata` volume:
+Test every backup by restoring it into an isolated stack, checking database records and file checksums, and starting the application. The repository's `tests/qa/backup-restore-drill.sh` automates that release gate against an explicit `QA_IMAGE`.
+
+If your platform takes crash-consistent volume snapshots instead, stop the entire stack first and snapshot all critical volumes as one set. A raw PostgreSQL data-directory copy from a running container is not a supported logical backup.
+
+### File and queue backup {#file-and-queue-backup}
+
+Pause the application before capturing file and queue volumes. Use `docker inspect` to resolve the actual volume name, force Redis to persist its current state, and archive with ownership and permissions preserved:
 
 ```bash
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+docker stop SnapOtter
+docker exec SnapOtter-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE
+docker stop SnapOtter-redis
+
+DATA_VOLUME="$(docker inspect SnapOtter --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+REDIS_VOLUME="$(docker inspect SnapOtter-redis --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')"
+
+install -d -m 700 backup
+docker run --rm -v "$DATA_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-data.tar.gz -C /source .
+docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
+  alpine:3.22 tar czf /backup/snapotter-redis.tar.gz -C /source .
+sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-### User files backup {#user-files-backup}
-
-```bash
-# Snapshot the app data volume (excluding re-downloadable AI models)
-docker run --rm -v SnapOtter-data:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-files.tar.gz \
-    --exclude='ai' --exclude='venv' -C /data .
-```
-
-AI models total up to about 24 GB across all bundles. Since they are re-downloadable, exclude `/data/ai/` and `/data/venv/` from backups to save space. Only the database and user files are critical.
+Restart Redis before the application. If you intentionally exclude `/data/ai`, remove the whole AI subtree rather than preserving an `installed.json` record without its models or virtual environment. Keep backup files encrypted, access-controlled, and separate from the host running SnapOtter.
 
 ## Compliance Artifacts {#compliance-artifacts}
 

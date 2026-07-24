@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。"
-i18n_source_hash: 50d5d4f220cf
-i18n_provenance: human
-i18n_output_hash: 3289d2d06514
+i18n_source_hash: a68264552836
+i18n_provenance: machine
+i18n_output_hash: 127adc94ef4c
+i18n_hash_version: 2
 ---
 
 # 数据库 {#database}
@@ -157,28 +158,36 @@ npx drizzle-kit migrate    # apply pending migrations
 
 在生产环境中，待处理的迁移会在启动时自动应用。
 
-## 备份与恢复 {#backup-and-restore}
+## 备份和恢复{#backup-and-restore}
 
-关系数据库位于 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是应用的 `/data` 卷中。
+关系数据库位于 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是应用程序的 `/data` 卷中。
 
-**方案 1：pg_dump（推荐）**
-
-```bash
-# Dump the database while the stack is running
-docker exec SnapOtter-postgres pg_dump -U snapotter snapotter > backup.sql
-
-# Restore into a fresh database
-cat backup.sql | docker exec -i SnapOtter-postgres psql -U snapotter snapotter
-```
-
-**方案 2：卷快照**
+**带验证的逻辑备份（推荐）**
 
 ```bash
-# Stop the stack, then snapshot the pgdata volume
-docker compose down
-docker run --rm -v SnapOtter-pgdata:/data -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/snapotter-pgdata.tar.gz -C /data .
+# Dump into PostgreSQL's portable custom archive format
+docker exec SnapOtter-postgres \
+  pg_dump --format=custom --no-owner -U snapotter snapotter > snapotter.dump
+test -s snapotter.dump
+docker exec -i SnapOtter-postgres pg_restore --list < snapotter.dump >/dev/null
+
+# Restore into a fresh/disposable target first and fail on the first SQL error
+docker exec -i SnapOtter-postgres \
+  pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U snapotter -d snapotter < snapotter.dump
 ```
+
+此数据库转储不包含以 `/data/files` 保存的库对象或 Redis 中的持久 BullMQ 状态。使用[安全与强化](/zh-CN/guide/security#backup-and-recovery) 中的协调程序备份和恢复这些内容。
+
+**冷卷快照**
+
+```bash
+# Stop every service first, then use your storage platform to snapshot the
+# PostgreSQL, app-data, and Redis volumes as one crash-consistent set.
+docker compose -f docker/docker-compose.yml stop
+```
+
+不要使用 `tar` 复制实时 PostgreSQL 数据目录。按项目编写卷名称前缀，因此从 `docker inspect` 或您的存储平台解析已安装的卷 ID，而不是假设文字标签 `SnapOtter-pgdata`。
 
 ### 从 1.x（SQLite）迁移 {#migrating-from-1-x-sqlite}
 

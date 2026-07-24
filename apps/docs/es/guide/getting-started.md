@@ -1,8 +1,8 @@
 ---
 description: "Instala SnapOtter con Docker en un solo comando. Incluye la configuración de Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 470a40f3f0af
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: e4d6f9228de8
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Explora la interfaz completa en [demo.snapotter.com](https://demo.snapotter.com)
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` definido, inicia su propio PostgreSQL y Redis en la interfaz de loopback (modo embebido) y mantiene todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o de autoalojarlo en un homelab. Para producción, ejecuta la pila de [Docker Compose](#docker-compose) que aparece abajo, que mantiene PostgreSQL y Redis en sus propios contenedores. El modo embebido se ejecuta como root (el valor por defecto) y se desactiva automáticamente en cuanto defines `DATABASE_URL`.
+Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` configurado, inicia su propio PostgreSQL y Redis en la interfaz loopback (modo integrado) y mantiene todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o autohospedarse en un laboratorio doméstico. Para producción, utilice la [pila canónica de Docker Compose](#docker-compose), que mantiene PostgreSQL y Redis en sus propios contenedores. El modo integrado se ejecuta como root (el valor predeterminado) y se apaga automáticamente tan pronto como configura `DATABASE_URL`.
 
 ¿Vas a instalar en una Raspberry Pi, un portátil viejo o un VPS pequeño? Consulta [Configuraciones con recursos limitados](/es/guide/low-resource) para una guía paso a paso ajustada y para saber qué esperar de un hardware limitado.
 
@@ -41,7 +41,7 @@ Agregue `--gpus all` para NVIDIA eliminación de fondo, ampliación, mejora faci
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Vuelve a la CPU automáticamente cuando CUDA no está disponible. La aceleración Intel/AMD iGPU a través de VA-API, Quick Sync u OpenCL no es compatible con la inferencia de IA en la actualidad. Consulte [Etiquetas Docker](/es/guide/docker-tags) para conocer los puntos de referencia. Si las herramientas de IA se ejecutan en la CPU a pesar de `--gpus all`, consulte [Verificar la aceleración de la GPU] (/guide/deployment#verify-gpu-acceleration).
+Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Vuelve a la CPU automáticamente cuando CUDA no está disponible. La aceleración Intel/AMD iGPU a través de VA-API, Quick Sync u OpenCL no es compatible con la inferencia de IA en la actualidad. Consulte [Etiquetas Docker](/es/guide/docker-tags) para conocer los puntos de referencia. Si las herramientas de IA se ejecutan en la CPU a pesar de `--gpus all`, consulte [Verificar la aceleración de la GPU](/es/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details También en GHCR
@@ -52,63 +52,29 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Ambos registros publican la misma imagen en cada versión.
 :::
 
-## Docker Compose {#docker-compose}
+## Docker componer {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Utilice el archivo de producción mantenido y probado con cada versión en lugar de copiar un ejemplo de Compose abreviado de esta página:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Cambie esto para implementaciones no locales
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Consulta [Configuración](/es/guide/configuration) para todas las variables de entorno.
+El canónico [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) incluye los cuatro volúmenes de tiempo de ejecución, comprobaciones de estado, límites de recursos, configuración duradera de Redis, imágenes de caché/base de datos fijadas y el refuerzo del contenedor actual. Cambie la contraseña de administrador predeterminada inmediatamente después del primer inicio de sesión. Para una implementación reproducible, fije la imagen de la aplicación SnapOtter a la etiqueta de versión o resumen que verificó en lugar de seguir `latest`.
+
+Consulte [Configuración](/es/guide/configuration) para conocer todas las variables de entorno y [Seguridad y refuerzo](/es/guide/security) para conocer secretos, políticas de red y orientación sobre copias de seguridad.
 
 ## Compilar desde el código fuente {#build-from-source}
 

@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter में स्थानीय विकास सेटअप, कमांड, कोड परंपराएँ, और एक नया टूल कैसे जोड़ें।"
-i18n_source_hash: cb03724d2829
-i18n_provenance: human
-i18n_output_hash: c6b1b3537584
+i18n_source_hash: e47c0885d404
+i18n_provenance: machine
+i18n_output_hash: 3f442a734b57
+i18n_hash_version: 2
 ---
 
 # डेवलपर गाइड {#developer-guide}
@@ -219,6 +220,17 @@ docker build -f docker/Dockerfile -t snapotter:latest .
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
+
+## रिलीज़ संस्करण डोमेन {#release-version-domains}
+
+SnapOtter में जानबूझकर तीन संस्करण डोमेन हैं। रिलीज़ के दौरान एक डोमेन को दूसरे में कॉपी न करें:
+
+- एप्लिकेशन रिलीज़ संस्करण रूट मेनिफेस्ट, सभी निजी कार्यक्षेत्र पैकेज और `APP_VERSION` को कवर करता है। Semantic-release यह मान प्रदान करता है, और `pnpm version:sync <version>` एप्लिकेशन रिलीज़ से पहले प्रत्येक कार्यक्षेत्र को अपडेट करता है।
+- OpenAPI `info.version` स्थिर सार्वजनिक API-प्रमुख अनुबंध है। संगत एप्लिकेशन रिलीज़ के लिए सभी स्थानीयकृत विनिर्देश `<major>.0.0` पर बने रहते हैं और केवल तभी बदलते हैं जब API अनुबंध एक नए प्रमुख संस्करण में चला जाता है।
+- `docker/feature-manifest.json`, `imageVersion: 2.0.0` को अपरिवर्तनीय विरासत सुविधा-बंडल भंडारण युग के रूप में रखता है। वे v2 संग्रह पथ एप्लिकेशन पैकेज संस्करण नहीं हैं। सटीक OCR रनटाइम प्रारूप v3 का उपयोग करता है और इसके एप्लिकेशन रिलीज़ उद्गम को अलग से रिकॉर्ड करता है।
+
+`tests/unit/infra/release-version-policy.test.ts` इन सीमाओं को लागू करता है। एक नए संस्करण डोमेन या माइग्रेशन को उस अनुबंध और प्रासंगिक आर्टिफैक्ट माइग्रेशन डिज़ाइन को एक साथ अपडेट करना होगा।
+स्वतंत्र API और लीगेसी-बंडल मान `config/release-version-policy.json` में रहते हैं; एप्लिकेशन संस्करण सिंक्रोनाइज़ेशन को कभी भी उस नीति फ़ाइल को परोक्ष रूप से दोबारा नहीं लिखना चाहिए।
 
 ## एनवायरनमेंट वेरिएबल {#environment-variables}
 

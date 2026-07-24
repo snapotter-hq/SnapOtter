@@ -1,8 +1,8 @@
 ---
 description: "Встановіть SnapOtter за допомогою Docker однією командою. Включає налаштування Docker Compose, збирання з вихідного коду й повний огляд функцій."
-i18n_source_hash: c278dd70d2a2
-i18n_provenance: human
-i18n_output_hash: 8a07131b1f87
+i18n_source_hash: df95d95de14a
+i18n_provenance: machine
+i18n_output_hash: f309184b8076
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Цей єдиний контейнер запускає все, що йому потрібно: без встановленого `DATABASE_URL` він запускає власні PostgreSQL і Redis на інтерфейсі loopback (вбудований режим) і зберігає всі дані в томі `SnapOtter-data`. Це найшвидший спосіб спробувати SnapOtter або самостійно розмістити його в homelab. Для продакшену запустіть стек [Docker Compose](#docker-compose) нижче, який тримає PostgreSQL і Redis у власних контейнерах. Вбудований режим працює від root (за замовчуванням) і автоматично вимикається, щойно ви встановлюєте `DATABASE_URL`.
+Цей єдиний контейнер запускає все, що йому потрібно: без встановлення `DATABASE_URL` він запускає власний PostgreSQL і Redis на інтерфейсі петлі (вбудований режим) і зберігає всі дані в тому `SnapOtter-data`. Це найшвидший спосіб спробувати SnapOtter або самостійне розміщення в домашній лабораторії. Для виробництва використовуйте [канонічний стек Docker Compose](#docker-compose), який зберігає PostgreSQL і Redis у власних контейнерах. Вбудований режим працює як root (за замовчуванням) і вимикається автоматично, щойно ви встановите `DATABASE_URL`.
 
 Встановлюєте на Raspberry Pi, старому ноутбуці чи невеликому VPS? Див. [Робота на слабкому обладнанні](/uk/guide/low-resource): там є покроковий посібник із підібраними налаштуваннями й пояснення, чого очікувати від обмеженого обладнання.
 
@@ -41,7 +41,7 @@ SnapOtter містить анонімну продуктову аналітик�
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Потрібен [NVIDIA Container Toolkit] (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматично повертається до ЦП, коли CUDA недоступна. Прискорення Intel/AMD iGPU через VA-API, Quick Sync або OpenCL на сьогодні не підтримується для висновків ШІ. Див. [Теги Docker](/uk/guide/docker-tags) для тестів. Якщо інструменти штучного інтелекту працюють на ЦП, незважаючи на `--gpus all`, див. [Перевірте прискорення GPU] (/guide/deployment#verify-gpu-acceleration).
+Потрібен [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматично повертається до ЦП, коли CUDA недоступна. Прискорення Intel/AMD iGPU через VA-API, Quick Sync або OpenCL на сьогодні не підтримується для висновків ШІ. Див. [Теги Docker](/uk/guide/docker-tags) для тестів. Якщо інструменти штучного інтелекту працюють на ЦП, незважаючи на `--gpus all`, див. [Перевірте прискорення GPU](/uk/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Також на GHCR
@@ -54,61 +54,27 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 
 ## Docker Compose {#docker-compose}
 
-```yaml
-services:
-  SnapOtter:
-    image: snapotter/snapotter:latest  # or ghcr.io/snapotter-hq/snapotter:latest
-    ports:
-      - "1349:1349"
-    volumes:
-      - SnapOtter-data:/data
-    environment:
-      - AUTH_ENABLED=true
-      - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+Використовуйте робочий файл, який підтримується та перевіряється з кожним випуском, замість копіювання скороченого прикладу Compose із цієї сторінки:
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Змініть це для нелокальних розгортань
-      POSTGRES_DB: snapotter
-    volumes:
-      - SnapOtter-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+```bash
+install -d -m 700 snapotter && cd snapotter
+curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
 
-  redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
-    volumes:
-      - SnapOtter-redisdata:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+# Keep generated service credentials out of shell history and world-readable files.
+umask 077
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+REDIS_PASSWORD="$(openssl rand -hex 32)"
+printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
+  "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" > .env
 
-volumes:
-  SnapOtter-data:
-  SnapOtter-pgdata:
-  SnapOtter-redisdata:
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Див. [Конфігурація](/uk/guide/configuration) щодо всіх змінних середовища.
+Канонічний [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) включає всі чотири томи часу виконання, перевірки працездатності, обмеження ресурсів, надійну конфігурацію Redis, закріплені зображення бази даних/кешу та поточний захист контейнера. Змініть стандартний пароль адміністратора одразу після першого входу. Для відтворюваного розгортання прикріпіть зображення програми SnapOtter до тегу випуску або перевіреного дайджесту замість `latest`.
+
+Перегляньте [Конфігурація](/uk/guide/configuration) для всіх змінних середовища та [Безпека та зміцнення](/uk/guide/security) для секретів, мережевої політики та вказівок щодо резервного копіювання.
 
 ## Збирання з вихідного коду {#build-from-source}
 
