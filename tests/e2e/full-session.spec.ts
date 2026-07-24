@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Full user session: simulates a real user uploading images, applying
@@ -42,7 +42,7 @@ test.describe("Full user session", () => {
     expect(download.suggestedFilename()).toBeTruthy();
 
     // Save to disk and verify it is a non-empty file
-    const downloadPath = path.join(process.cwd(), "test-results", "download-resize-result");
+    const downloadPath = path.join(getE2eRunRoot(), "download-resize-result");
     await download.saveAs(downloadPath);
     const stat = fs.statSync(downloadPath);
     expect(stat.size).toBeGreaterThan(0);
@@ -160,7 +160,7 @@ test.describe("Full user session", () => {
     expect(download.suggestedFilename()).toBeTruthy();
 
     // Save and verify the downloaded file is a valid non-empty image
-    const downloadPath = path.join(process.cwd(), "test-results", "download-compress-result");
+    const downloadPath = path.join(getE2eRunRoot(), "download-compress-result");
     await download.saveAs(downloadPath);
     const stat = fs.statSync(downloadPath);
     expect(stat.size).toBeGreaterThan(0);
@@ -228,7 +228,7 @@ test.describe("Full user session", () => {
     expect(filename.length).toBeGreaterThan(0);
 
     // Save and confirm it wrote bytes
-    const savePath = path.join(process.cwd(), "test-results", "download-strip-metadata-result");
+    const savePath = path.join(getE2eRunRoot(), "download-strip-metadata-result");
     await download.saveAs(savePath);
     const stat = fs.statSync(savePath);
     expect(stat.size).toBeGreaterThan(0);

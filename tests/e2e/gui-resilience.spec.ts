@@ -1,4 +1,11 @@
-import { expect, openSettings, test, uploadTestImage, waitForProcessing } from "./helpers";
+import {
+  expect,
+  getE2eRunRoot,
+  openSettings,
+  test,
+  uploadTestImage,
+  waitForProcessing,
+} from "./helpers";
 
 // ---------------------------------------------------------------------------
 // GUI Resilience: Error handling, form validation, state reset, stability,
@@ -233,7 +240,7 @@ test.describe("File Upload Validation", () => {
     // the file, or the app may ignore it. Either way, no crash should occur.
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const tmpDir = path.join(process.cwd(), "test-results");
+    const tmpDir = getE2eRunRoot();
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const txtPath = path.join(tmpDir, "not-an-image.txt");
     fs.writeFileSync(txtPath, "This is not an image file.");
@@ -835,7 +842,7 @@ test.describe("Server Error Handling", () => {
     // Create a 0-byte file
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const tmpDir = path.join(process.cwd(), "test-results");
+    const tmpDir = getE2eRunRoot();
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const emptyPath = path.join(tmpDir, "empty.png");
     fs.writeFileSync(emptyPath, "");

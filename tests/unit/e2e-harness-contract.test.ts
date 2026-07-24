@@ -5,6 +5,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 const root = process.cwd();
 const createDbPath = path.join(root, "tests", "e2e-pg-create-db.cjs");
+const e2eDir = path.join(root, "tests", "e2e");
+const authSetupPath = path.join(e2eDir, "auth.setup.ts");
 const helpersPath = path.join(root, "tests", "e2e", "helpers.ts");
 const packagePath = path.join(root, "package.json");
 const turboPath = path.join(root, "turbo.json");
@@ -13,6 +15,9 @@ const isolationEnvKeys = [
   "API_URL",
   "PLAYWRIGHT_API_PORT",
   "PLAYWRIGHT_API_URL",
+  "PLAYWRIGHT_AUTH_FILE",
+  "PLAYWRIGHT_RUN_ID",
+  "PLAYWRIGHT_RUN_ROOT",
   "PLAYWRIGHT_WEB_PORT",
   "PLAYWRIGHT_WEB_URL",
 ] as const;
@@ -32,6 +37,22 @@ async function loadConfig(overrides: Record<string, string>) {
   for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
   vi.resetModules();
   return (await import("../../playwright.config.js")).default;
+}
+
+function mutablePaths(config: Awaited<ReturnType<typeof loadConfig>>) {
+  const [apiServer] = config.webServer as Array<{ env: Record<string, string> }>;
+  const chromium = config.projects?.find((project) => project.name === "chromium");
+  const reporter = config.reporter as Array<[string, { outputFolder?: string }]>;
+
+  return {
+    authFile: chromium?.use?.storageState,
+    dataDir: apiServer.env.DATA_DIR,
+    filesStoragePath: apiServer.env.FILES_STORAGE_PATH,
+    outputDir: config.outputDir,
+    reportDir: reporter[0]?.[1]?.outputFolder,
+    runRoot: process.env.PLAYWRIGHT_RUN_ROOT,
+    workspacePath: apiServer.env.WORKSPACE_PATH,
+  };
 }
 
 describe("main Playwright harness isolation", () => {
@@ -80,6 +101,67 @@ describe("main Playwright harness isolation", () => {
     expect(firstApiUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(firstWebUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect([process.env.API_URL, second.use?.baseURL]).not.toEqual([firstApiUrl, firstWebUrl]);
+  });
+
+  test("isolates every mutable path by a stable run identity", async () => {
+    const firstConfig = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18125",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18125",
+      PLAYWRIGHT_RUN_ID: "run_a",
+      PLAYWRIGHT_WEB_PORT: "28125",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28125",
+    });
+    const first = mutablePaths(firstConfig);
+
+    const secondConfig = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18126",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18126",
+      PLAYWRIGHT_RUN_ID: "run_b",
+      PLAYWRIGHT_WEB_PORT: "28126",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28126",
+    });
+    const second = mutablePaths(secondConfig);
+
+    for (const key of Object.keys(first) as Array<keyof typeof first>) {
+      expect(first[key], key).toContain("run_a");
+      expect(second[key], key).toContain("run_b");
+      expect(second[key], key).not.toBe(first[key]);
+    }
+
+    const reloaded = mutablePaths(
+      await loadConfig({
+        PLAYWRIGHT_API_PORT: "18126",
+        PLAYWRIGHT_API_URL: "http://127.0.0.1:18126",
+        PLAYWRIGHT_RUN_ID: "run_b",
+        PLAYWRIGHT_WEB_PORT: "28126",
+        PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28126",
+      }),
+    );
+    expect(reloaded).toEqual(second);
+  });
+
+  test("rejects unsafe run identities", async () => {
+    await expect(
+      loadConfig({
+        PLAYWRIGHT_API_PORT: "18127",
+        PLAYWRIGHT_API_URL: "http://127.0.0.1:18127",
+        PLAYWRIGHT_RUN_ID: "../shared",
+        PLAYWRIGHT_WEB_PORT: "28127",
+        PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28127",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_RUN_ID/);
+  });
+
+  test("rejects unsupported IPv6 loopback URLs", async () => {
+    await expect(
+      loadConfig({
+        PLAYWRIGHT_API_PORT: "18128",
+        PLAYWRIGHT_API_URL: "http://127.0.0.1:18128",
+        PLAYWRIGHT_RUN_ID: "ipv6_test",
+        PLAYWRIGHT_WEB_PORT: "28128",
+        PLAYWRIGHT_WEB_URL: "http://[::1]:28128",
+      }),
+    ).rejects.toThrow(/loopback host/);
   });
 
   test("matches only the canonical auth setup file", async () => {
@@ -135,26 +217,50 @@ test("loggedInPage does not mutate global settings for every test", () => {
   expect(fixture).not.toContain("settings heal");
 });
 
-test("the canonical E2E command covers every release browser and device project", () => {
+test("main E2E consumers use the resolved run endpoint and artifact root", () => {
+  const endpointOffenders: string[] = [];
+  const artifactOffenders: string[] = [];
+
+  for (const entry of fs.readdirSync(e2eDir)) {
+    if (!entry.endsWith(".ts")) continue;
+    const source = fs.readFileSync(path.join(e2eDir, entry), "utf8");
+    if (/=\s*["']http:\/\/(?:localhost|127\.0\.0\.1):13490["']/.test(source)) {
+      endpointOffenders.push(entry);
+    }
+    if (/path\.join\(\s*process\.cwd\(\),\s*["']test-results["']/.test(source)) {
+      artifactOffenders.push(entry);
+    }
+  }
+
+  expect.soft(endpointOffenders).toEqual([]);
+  expect.soft(artifactOffenders).toEqual([]);
+
+  const authSetup = fs.readFileSync(authSetupPath, "utf8");
+  expect.soft(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
+  expect.soft(authSetup).not.toContain(":13490");
+  expect.soft(authSetup).not.toContain(":2349");
+});
+
+test("the canonical E2E command exactly covers every release browser and device project", async () => {
   const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
     scripts: Record<string, string>;
   };
   const command = packageJson.scripts["test:e2e"];
+  const selectedProjects = [...command.matchAll(/--project=([^\s&]+)/g)].map((match) => match[1]);
+  const config = await loadConfig({
+    PLAYWRIGHT_API_PORT: "18129",
+    PLAYWRIGHT_API_URL: "http://127.0.0.1:18129",
+    PLAYWRIGHT_RUN_ID: "project_contract",
+    PLAYWRIGHT_WEB_PORT: "28129",
+    PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28129",
+  });
+  const configuredProjects = config.projects
+    ?.map((project) => project.name)
+    .filter((name) => name !== "setup");
 
   expect(packageJson.scripts["test:e2e:core"]).toBeTruthy();
-  for (const project of [
-    "chromium",
-    "chromium-serial",
-    "chromium-visual",
-    "firefox",
-    "webkit",
-    "mobile-chromium",
-    "mobile-webkit",
-    "tablet-chromium",
-    "tablet-webkit",
-  ]) {
-    expect(command).toContain(`--project=${project}`);
-  }
+  expect(new Set(selectedProjects)).toEqual(new Set(configuredProjects));
+  expect(selectedProjects).toHaveLength(configuredProjects?.length ?? 0);
 });
 
 test("Turbo passes every main harness endpoint override through task boundaries", () => {
@@ -168,6 +274,9 @@ test("Turbo passes every main harness endpoint override through task boundaries"
       "E2E_PG_BASE_URL",
       "PLAYWRIGHT_API_PORT",
       "PLAYWRIGHT_API_URL",
+      "PLAYWRIGHT_AUTH_FILE",
+      "PLAYWRIGHT_RUN_ID",
+      "PLAYWRIGHT_RUN_ROOT",
       "PLAYWRIGHT_WEB_PORT",
       "PLAYWRIGHT_WEB_URL",
       "PW_WORKERS",

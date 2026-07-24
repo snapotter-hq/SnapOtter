@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { expect, getTestImagePath, test, uploadTestImage, waitForProcessing } from "./helpers";
+import {
+  expect,
+  getE2eRunRoot,
+  getTestImagePath,
+  test,
+  uploadTestImage,
+  waitForProcessing,
+} from "./helpers";
 
 // ---------------------------------------------------------------------------
 // GUI E2E: Watermark & Overlay Tools
@@ -462,7 +469,8 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await page.goto("/image/compose");
       await uploadBaseImage(page);
 
-      const tmpDir = path.join(process.cwd(), "test-results");
+      const tmpDir = getE2eRunRoot();
+      fs.mkdirSync(tmpDir, { recursive: true });
       const corruptPath = path.join(tmpDir, "corrupt-overlay.png");
       fs.writeFileSync(corruptPath, Buffer.from("not-an-image"));
       await uploadOverlayImage(page, corruptPath);

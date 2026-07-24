@@ -20,10 +20,16 @@ export async function login(page: Page, username = "admin", password = "admin") 
 // ---------------------------------------------------------------------------
 let _testImagePath: string | null = null;
 
+export function getE2eRunRoot(): string {
+  const runRoot = process.env.PLAYWRIGHT_RUN_ROOT;
+  if (!runRoot) throw new Error("PLAYWRIGHT_RUN_ROOT was not initialized by playwright.config.ts");
+  return runRoot;
+}
+
 export function getTestImagePath(): string {
   if (_testImagePath && fs.existsSync(_testImagePath)) return _testImagePath;
 
-  const dir = path.join(process.cwd(), "test-results");
+  const dir = getE2eRunRoot();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   _testImagePath = path.join(dir, "test-image.png");

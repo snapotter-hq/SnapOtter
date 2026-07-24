@@ -8,7 +8,8 @@ import { expect, test } from "./helpers";
 // it afterward. Running serial avoids tripping concurrent logins during the
 // low-limit window.
 
-const API = "http://localhost:13490";
+const API = process.env.API_URL;
+if (!API) throw new Error("API_URL was not initialized by playwright.config.ts");
 
 test.describe("Login rate limiting", () => {
   test("after too many failed attempts, rate limiting kicks in", async ({ page }) => {

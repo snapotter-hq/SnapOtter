@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 test.describe("Color Blindness Simulation tool", () => {
   test("upload -> simulate -> download cycle", async ({ loggedInPage: page }) => {
@@ -28,11 +28,7 @@ test.describe("Color Blindness Simulation tool", () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBeTruthy();
 
-    const downloadPath = path.join(
-      process.cwd(),
-      "test-results",
-      "download-color-blindness-result",
-    );
+    const downloadPath = path.join(getE2eRunRoot(), "download-color-blindness-result");
     await download.saveAs(downloadPath);
     const stat = fs.statSync(downloadPath);
     expect(stat.size).toBeGreaterThan(0);

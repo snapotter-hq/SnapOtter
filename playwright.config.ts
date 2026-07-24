@@ -2,7 +2,22 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const authFile = path.join(__dirname, ".playwright", ".auth", "user.json");
+function resolveRunId(): string {
+  const runId = process.env.PLAYWRIGHT_RUN_ID ?? `${process.pid}_${randomBytes(4).toString("hex")}`;
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(runId)) {
+    throw new Error(
+      `PLAYWRIGHT_RUN_ID must be 1-64 letters, digits, underscores, or hyphens and start with a letter or digit, received ${JSON.stringify(runId)}`,
+    );
+  }
+  process.env.PLAYWRIGHT_RUN_ID = runId;
+  return runId;
+}
+
+const runId = resolveRunId();
+const runRoot = path.join(__dirname, "test-results", "e2e-runs", runId);
+const authFile = path.join(runRoot, "auth", "user.json");
+process.env.PLAYWRIGHT_RUN_ROOT = runRoot;
+process.env.PLAYWRIGHT_AUTH_FILE = authFile;
 
 type E2eEndpoint = {
   host: string;
@@ -40,7 +55,7 @@ function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndp
   if (parsedUrl.protocol !== "http:") {
     throw new Error(`${urlEnvName} must use http, received "${parsedUrl.protocol}"`);
   }
-  if (!["127.0.0.1", "localhost", "[::1]"].includes(parsedUrl.hostname)) {
+  if (!["127.0.0.1", "localhost"].includes(parsedUrl.hostname)) {
     throw new Error(`${urlEnvName} must use a loopback host, received "${parsedUrl.hostname}"`);
   }
   if (
@@ -117,7 +132,8 @@ export default defineConfig({
   // dev-mode webServers saturate beyond that and 30s-timeout tests start
   // flaking. Raise via PW_WORKERS on stronger setups.
   workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 2,
-  reporter: "html",
+  outputDir: path.join(runRoot, "playwright-output"),
+  reporter: [["html", { open: "never", outputFolder: path.join(runRoot, "playwright-report") }]],
   use: {
     baseURL: TEST_WEB_URL,
     screenshot: "only-on-failure",
@@ -249,7 +265,9 @@ export default defineConfig({
         BULLMQ_PREFIX: e2eDbName,
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
-        DATA_DIR: path.join(__dirname, "test-results", ".e2e-data"),
+        DATA_DIR: path.join(runRoot, "data"),
+        FILES_STORAGE_PATH: path.join(runRoot, "files"),
+        WORKSPACE_PATH: path.join(runRoot, "workspace"),
         // Point feature-manifest detection at a path that does not exist so the
         // API runs in native mode: it reports every AI bundle as available
         // (apps/api/src/routes/features.ts) instead of gating each AI tool
@@ -258,7 +276,7 @@ export default defineConfig({
         // AI-tool GUI test is blocked before reaching a control. Real inference
         // still no-ops, but the AI GUI specs assert on settings only and the
         // processing specs skip when the sidecar is absent.
-        FEATURE_MANIFEST_PATH: path.join(__dirname, "test-results", ".no-feature-manifest.json"),
+        FEATURE_MANIFEST_PATH: path.join(runRoot, ".no-feature-manifest.json"),
       },
       timeout: 30_000,
     },
