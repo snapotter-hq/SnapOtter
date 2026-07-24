@@ -411,6 +411,14 @@ jobs:
           --ignore-vuln PYSEC-2024-277
           --ignore-vuln PYSEC-2026-89
 
+      - name: Audit exact OCR runtime dependency locks
+        run: |
+          for requirements in \
+            docker/ocr-runtime-requirements-amd64.txt \
+            docker/ocr-runtime-requirements-arm64.txt; do
+            pip-audit -r "${requirements}" --no-deps --disable-pip --aliases
+          done
+
   build:
     name: Build
     runs-on: ubuntu-latest

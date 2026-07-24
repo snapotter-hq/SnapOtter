@@ -8,10 +8,15 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const bundlesWorkflowPath = path.resolve(root, ".github/workflows/ai-bundles.yml");
+const ciWorkflowPath = path.resolve(root, ".github/workflows/ci.yml");
 const releaseWorkflowPath = path.resolve(root, ".github/workflows/release.yml");
 const verifierPath = path.resolve(root, "docker/verify-ocr-runtime.sh");
 const hfReleaseRequirementsPath = path.resolve(root, "docker/hf-release-requirements.txt");
 const ocrReleaseRunbookPath = path.resolve(root, ".github/OCR_RUNTIME_RELEASE_RUNBOOK.md");
+const ocrRequirementsPaths = [
+  path.resolve(root, "docker/ocr-runtime-requirements-amd64.txt"),
+  path.resolve(root, "docker/ocr-runtime-requirements-arm64.txt"),
+];
 
 function readRequired(file: string): string {
   expect(existsSync(file), `${path.relative(root, file)} is missing`).toBe(true);
@@ -44,6 +49,28 @@ function measuredEstimateContract(workflow: string): string {
 }
 
 describe("OCR v3 bundle release workflow", () => {
+  it("uses audited non-vulnerable HTTP dependency locks on both architectures", () => {
+    for (const requirementsPath of ocrRequirementsPaths) {
+      const requirements = readRequired(requirementsPath);
+      expect(requirements).toMatch(/^requests==2\.33\.0 --hash=sha256:[a-f0-9]{64}$/m);
+      expect(requirements).toMatch(/^idna==3\.15 --hash=sha256:[a-f0-9]{64}$/m);
+      expect(requirements).not.toMatch(/^requests==2\.32\.3\b/m);
+      expect(requirements).not.toMatch(/^idna==3\.10\b/m);
+    }
+
+    const ci = readRequired(ciWorkflowPath);
+    const bundles = readRequired(bundlesWorkflowPath);
+    for (const workflow of [ci, bundles]) {
+      expect(workflow).toContain('pip install "pip-audit==2.10.0"');
+      expect(workflow).toContain("docker/ocr-runtime-requirements-amd64.txt");
+      expect(workflow).toContain("docker/ocr-runtime-requirements-arm64.txt");
+      expect(workflow).toContain("--no-deps --disable-pip --aliases");
+    }
+    expect(job(bundles, "build-ocr", "verify-ocr")).toContain(
+      "Audit exact OCR runtime dependency lock",
+    );
+  });
+
   it("scans and inventories both architecture-specific release images", () => {
     const workflow = readRequired(releaseWorkflowPath);
     const scanJob = job(workflow, "scan", "sbom");
