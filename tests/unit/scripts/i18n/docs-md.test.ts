@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDocsAdapter } from "../../../../scripts/i18n/adapters/docs-md.mjs";
+import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 
 let root: string;
 
@@ -120,6 +121,48 @@ describe("docs-md adapter", () => {
     expect(e?.sourceHash).toBe("abc123def456");
     expect(e?.provenance).toBe("human");
     expect(e?.text).toContain("# Iks {#x}");
+  });
+
+  it("hashes the canonical post-render document and detects later edits", async () => {
+    await seed(
+      "guide/x.md",
+      "---\ndescription: Install: quickly\n---\n# X {#x}\n\nSee [Config](/guide/configuration).",
+    );
+    const adapter = createDocsAdapter({ root });
+    const units = await adapter.extract();
+    const entry = {
+      text: units[0].sourceText.replace("Install: quickly", "Installieren: schnell"),
+      sourceHash: "abc123def456",
+      provenance: "machine" as const,
+      outputHash: "0".repeat(12),
+      stale: false,
+    };
+
+    await adapter.write("de", new Map([[units[0].id, entry]]));
+
+    const written = await readFile(join(root, "de/guide/x.md"), "utf8");
+    expect(written).toContain("i18n_hash_version: 2");
+    expect(written).toContain("[Config](/de/guide/configuration)");
+    const stored = await adapter.load("de");
+    const loaded = stored.get("guide/x.md");
+    expect(loaded?.text).not.toContain("i18n_output_hash");
+    expect(loaded?.outputHash).toBe(hash(loaded?.text ?? ""));
+
+    await writeFile(join(root, "de/guide/x.md"), written.replace("schnell", "bearbeitet"));
+    const edited = (await adapter.load("de")).get("guide/x.md");
+    expect(edited?.outputHash).not.toBe(hash(edited?.text ?? ""));
+  });
+
+  it("migrates legacy machine hashes without misclassifying rendered output as human", async () => {
+    await seed("guide/x.md", "# X {#x}\n");
+    await seed(
+      "de/guide/x.md",
+      "---\ni18n_source_hash: oldsource001\ni18n_provenance: machine\ni18n_output_hash: 000000000000\n---\n# Iks {#x}\n",
+    );
+    const adapter = createDocsAdapter({ root });
+    const loaded = (await adapter.load("de")).get("guide/x.md");
+    expect(loaded?.provenance).toBe("machine");
+    expect(loaded?.outputHash).toBe(hash(loaded?.text ?? ""));
   });
 
   it("writeFallback emits an English copy flagged for a missing translation", async () => {

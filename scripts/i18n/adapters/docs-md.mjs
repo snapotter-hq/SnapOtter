@@ -2,6 +2,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hash } from "../lib/hash.mjs";
 import { localeCodes } from "../lib/shared-i18n.mjs";
 import { slugify } from "../lib/slugify.mjs";
 
@@ -214,6 +215,22 @@ function upsertFrontmatter(text, fields) {
 }
 
 /**
+ * Remove pipeline-owned metadata before hashing or rendering a stored document.
+ * The returned text is the canonical localized document a person can edit: it
+ * includes rendered links/anchors/frontmatter quoting, but excludes the
+ * self-referential i18n bookkeeping fields.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function stripI18nFrontmatter(text) {
+  const { fm, body } = splitFrontmatter(text);
+  if (fm == null) return text;
+  const kept = fm.split("\n").filter((line) => !/^i18n_[A-Za-z0-9_]+:/.test(line));
+  return kept.length > 0 ? `---\n${kept.join("\n")}\n---\n${body}` : body;
+}
+
+/**
  * Double-quote bare `description`/`title` frontmatter values so a translated
  * value containing a colon, `#`, or other YAML-significant character does not
  * break frontmatter parsing (VitePress loads it as YAML).
@@ -294,11 +311,20 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
       for (const rel of files) {
         const text = await readFile(join(dir, rel), "utf8");
         const { fm } = splitFrontmatter(text);
+        const provenance = fmGet(fm, "i18n_provenance") === "human" ? "human" : "machine";
+        const canonicalText = stripI18nFrontmatter(text);
+        const storedOutputHash = fmGet(fm, "i18n_output_hash") ?? "";
+        const hashVersion = fmGet(fm, "i18n_hash_version");
         map.set(rel, {
-          text,
+          text: canonicalText,
           sourceHash: fmGet(fm, "i18n_source_hash") ?? "",
-          provenance: fmGet(fm, "i18n_provenance") === "human" ? "human" : "machine",
-          outputHash: fmGet(fm, "i18n_output_hash") ?? "",
+          provenance,
+          // Version 1 hashed the pre-render translator output, while load()
+          // returned the post-render on-disk document. Every machine entry was
+          // therefore misclassified as a human edit. For legacy machine files,
+          // trust the current canonical document once; the next write stamps v2.
+          outputHash:
+            hashVersion === "2" || provenance === "human" ? storedOutputHash : hash(canonicalText),
           stale: fmGet(fm, "i18n_stale") === "true",
         });
       }
@@ -310,12 +336,13 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
         const abs = join(root, locale, id);
         await mkdir(dirname(abs), { recursive: true });
         const table = tokenTables.get(id) ?? [];
-        const undone = restoreDocs(entry.text, table);
+        const undone = restoreDocs(stripI18nFrontmatter(entry.text), table);
         const linked = quoteFrontmatterScalars(rewriteLinks(undone, locale));
         const withMeta = upsertFrontmatter(linked, {
           i18n_source_hash: entry.sourceHash,
           i18n_provenance: entry.provenance,
-          i18n_output_hash: entry.outputHash,
+          i18n_output_hash: hash(linked),
+          i18n_hash_version: "2",
           ...(entry.stale ? { i18n_stale: "true" } : {}),
         });
         await writeFile(abs, withMeta, "utf8");
