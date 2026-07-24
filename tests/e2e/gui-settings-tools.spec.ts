@@ -74,7 +74,7 @@ test.describe("GUI Settings - Tools Tab (additional)", () => {
     await expect(dialog.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
 
     // The Resize tool is listed with its name (toggle aria-label) and description
-    await expect(dialog.getByRole("switch", { name: "Resize", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("switch", { name: "Resize Image", exact: true })).toBeVisible();
     await expect(
       dialog.getByText("Resize by pixels, percentage, or social media presets"),
     ).toBeVisible();
@@ -95,7 +95,7 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     // is true when the tool is enabled. Make sure Resize starts enabled, then
     // disable it, asserting each flip so the post-toggle state is flushed before
     // saving (saveToolSettings persists the current disabledTools state).
-    const resizeSwitch = dialog.getByRole("switch", { name: "Resize", exact: true });
+    const resizeSwitch = dialog.getByRole("switch", { name: "Resize Image", exact: true });
     await expect(resizeSwitch).toBeVisible();
     if ((await resizeSwitch.getAttribute("aria-checked")) === "false") {
       await resizeSwitch.click();
@@ -136,7 +136,7 @@ test.describe("GUI Settings - Tools Tab (toggle visibility)", () => {
     const dialog2 = page.getByRole("dialog");
     await dialog2.getByRole("button", { name: /tools/i }).click();
     await expect(dialog2.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
-    const resizeSwitch2 = dialog2.getByRole("switch", { name: "Resize", exact: true });
+    const resizeSwitch2 = dialog2.getByRole("switch", { name: "Resize Image", exact: true });
     if ((await resizeSwitch2.getAttribute("aria-checked")) === "false") {
       await resizeSwitch2.click();
     }

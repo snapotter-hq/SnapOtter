@@ -286,8 +286,11 @@ test.describe("GUI Settings - People Tab", () => {
       page.on("dialog", (d) => d.accept());
       await page.getByText("Delete User").click();
 
-      // User should be removed from the list
-      await expect(page.getByText(username)).not.toBeVisible({ timeout: 5_000 });
+      // User should be removed from the list. A success toast briefly repeats the
+      // username, so a bare not.toBeVisible() can match both the toast and the
+      // removing row (strict-mode violation). Wait for the count to reach zero,
+      // which holds once the row is gone and the toast auto-dismisses.
+      await expect(page.getByText(username)).toHaveCount(0, { timeout: 10_000 });
     } finally {
       await cleanupUsersByPrefix(adminToken, "guidelete-");
     }

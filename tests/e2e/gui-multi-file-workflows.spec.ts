@@ -631,10 +631,11 @@ test.describe("Pipeline Builder - execution progress", () => {
     const slider = page.locator("[aria-label='Before/after comparison slider']");
     await expect(slider).toBeVisible({ timeout: 60_000 });
 
-    // Should show Original and Processed labels (exact: the resize step's
-    // "Limit to original size" setting also contains "original").
-    await expect(page.getByText("Original", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Processed", { exact: true }).first()).toBeVisible();
+    // Should show Original and Processed labels. Scope to the slider: the resize
+    // step's settings panel also renders an "Original" aspect-ratio chip, so an
+    // unscoped getByText("Original") collides with it.
+    await expect(slider.getByText("Original", { exact: true }).first()).toBeVisible();
+    await expect(slider.getByText("Processed", { exact: true }).first()).toBeVisible();
   });
 
   test("pipeline execution shows download button in result", async ({ loggedInPage: page }) => {

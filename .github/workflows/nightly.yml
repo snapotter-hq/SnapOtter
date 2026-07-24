@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 env:
-  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf
+  # Keep in sync with ci.yml's install step. tesseract-ocr + language packs are
+  # required by the built-in Fast OCR tier: without them the OCR integration
+  # tests throw "spawn tesseract ENOENT" and fail the coverage/matrix jobs.
+  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn
   # See ci.yml: ryuk's Docker Hub pull is a recurring flake source; disable the reaper
   # (tests/global-setup.ts stops its containers explicitly; runners are ephemeral).
   TESTCONTAINERS_RYUK_DISABLED: "true"
@@ -238,12 +241,28 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Run container test suite
-        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-e2e
+        # Attribute the job to test-unit: it runs the full integration suite
+        # against the container's real binaries (ffmpeg/qpdf/tesseract/...), which
+        # is the in-container validation this job exists for. --exit-code-from
+        # test-e2e never worked: --abort-on-container-exit (which it implies) kills
+        # test-e2e the moment test-unit exits, so test-e2e's SIGKILL (137) became
+        # the result. Browser e2e is covered by the E2E Full/Serial/Cross-Browser
+        # jobs; running test-e2e in-container too is a separate follow-up (it also
+        # would not fit this job's 60-minute budget alongside test-unit).
+        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit
 
   extended-matrix:
-    name: Extended Matrix + Fuzz
+    name: Extended Matrix + Fuzz (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # The full format x tool matrix plus property fuzz overran a single 90-min
+    # job. Shard it four ways (mirroring E2E Full) so each runner takes a quarter
+    # of the integration files; the generous per-shard ceiling absorbs the fact
+    # that the heavy format-matrix-* files cluster onto one shard.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
@@ -268,7 +287,7 @@ jobs:
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
       - name: Run integration suite with full matrix and fuzz enabled
-        run: pnpm vitest run tests/integration/ --reporter=verbose
+        run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/4
         env:
           FULL_MATRIX: "1"
           FUZZ: "1"
@@ -320,7 +339,7 @@ jobs:
       - name: Start API server
         run: |
           mkdir -p /tmp/st-data
-          AUTH_ENABLED=false ANALYTICS_ENABLED=false \
+          AUTH_ENABLED=false ANALYTICS_ENABLED=false SYNC_WAIT_MS=0 \
             DATABASE_URL=postgres://snapotter:snapotter@localhost:5432/snapotter \
             REDIS_URL=redis://localhost:6379 \
             WORKSPACE_PATH=/tmp/st-data/workspace DATA_DIR=/tmp/st-data \
@@ -334,11 +353,27 @@ jobs:
           echo "API failed to start"; exit 1
       - name: Fuzz tool endpoints from the OpenAPI spec
         run: |
+          # This fuzz targets the async tool-factory endpoints: they validate the
+          # request, enqueue a job, and return 202 immediately (the server is
+          # started above with SYNC_WAIT_MS=0). Excluded are the feature-gated
+          # AI/media tools and the handful of tools with bespoke handlers that
+          # process synchronously in-request (meme-generator, collage, stitch,
+          # compose, beautify, vectorize, ...). On adversarial input that
+          # in-request work is unbounded and trips the request timeout, so those
+          # tools are fuzzed by the integration and e2e suites instead.
+          #
+          # --suppress-health-check all: the tool endpoints need a real uploaded
+          # file, so the fuzzer's random bytes get rejected (404) and Hypothesis's
+          # filter_too_much check would fail the run. Those checks grade data
+          # generation quality, not API correctness; not_a_server_error still runs
+          # on every generated case (5000+ per run).
           schemathesis run http://localhost:13490/api/v1/openapi.yaml \
             --url http://localhost:13490 \
             --checks not_a_server_error \
+            --suppress-health-check all \
+            --request-timeout 120 \
             --include-path-regex "^/api/v1/(tools|health|info)" \
-            --exclude-path-regex "/(remove-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background)(/[a-z-]+)?$" \
+            --exclude-path-regex "/tools/(audio|video)/|/(remove-background|remove-gif-background|upscale|html-to-image|blur-faces|erase-object|ocr|ocr-pdf|colorize|enhance-faces|noise-removal|smart-crop|red-eye-removal|restore-photo|passport-photo|transparency-fixer|ai-canvas-expand|transcribe-audio|auto-subtitles|background-replace|blur-background|meme-generator|compare|stitch|collage|bulk-rename|watermark-image|vectorize|find-duplicates|split|sign-pdf|beautify|favicon|color-palette|compose)(/[a-z-]+)?$" \
             --max-examples 25 \
             --report junit \
             --report-dir st-report

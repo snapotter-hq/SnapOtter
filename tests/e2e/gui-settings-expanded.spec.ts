@@ -1513,27 +1513,14 @@ base.describe("RBAC GUI - User tab content access", () => {
     await expect(page.getByText("Password changed successfully")).toBeVisible({ timeout: 5_000 });
   });
 
-  base.test("user can toggle tool visibility in Tools tab", async ({ page }) => {
+  base.test("user cannot access the Tools tab (requires settings:write)", async ({ page }) => {
     await login(page, USER_GUI, USER_GUI_PASS);
     await openSettings(page);
-    await page.getByRole("button", { name: /tools/i }).click();
+    await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
 
-    await expect(page.getByText(/\d+ tools? disabled/)).toBeVisible({ timeout: 5_000 });
-
-    const counterText = page.getByText(/\d+ tools? disabled/);
-    const initialText = await counterText.textContent();
-    const initialCount = parseInt(initialText?.match(/(\d+)/)?.[1] || "0", 10);
-
-    // Toggle the first tool
-    const firstToggle = page.locator("button.w-11.h-6").first();
-    await firstToggle.click();
-
-    const updatedText = await counterText.textContent();
-    const updatedCount = parseInt(updatedText?.match(/(\d+)/)?.[1] || "0", 10);
-    expect(Math.abs(updatedCount - initialCount)).toBe(1);
-
-    // Revert
-    await firstToggle.click();
+    // The Tools tab writes the admin-only /v1/settings endpoint, so it is gated
+    // behind settings:write and hidden from the user role.
+    await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
   });
 
   base.test("user can generate API key from GUI", async ({ page }) => {

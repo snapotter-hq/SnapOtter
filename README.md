@@ -156,8 +156,8 @@ If SnapOtter has replaced a paid subscription or two in your workflow, a small s
 <!-- sponsors -->
 
 <p align="center">
-  <a href="https://star-history.com/#snapotter-hq/SnapOtter&Date">
-    <img src="https://api.star-history.com/svg?repos=snapotter-hq/SnapOtter&type=Date&theme=dark" alt="Star History Chart">
+  <a href="https://github.com/snapotter-hq/SnapOtter/stargazers">
+    <img src="https://raw.githubusercontent.com/snapotter-hq/SnapOtter/star-history/star-history.svg" width="760" alt="SnapOtter star history chart">
   </a>
 </p>
 

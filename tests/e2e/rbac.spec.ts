@@ -136,11 +136,10 @@ base.describe("RBAC - User sees restricted tabs", () => {
 
     await openSettings(page);
 
-    // Should see these 5 tabs (no permission gate, or authRequired only)
+    // Should see these 4 tabs (no permission gate, or authRequired only)
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
 
     // Should NOT see admin-only tabs
@@ -153,9 +152,11 @@ base.describe("RBAC - User sees restricted tabs", () => {
     await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
     // AI Features requires settings:write.
     await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
+    // Tools requires settings:write, so it is admin-only.
+    await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
 
-    // Exactly 5 nav buttons for the user role.
-    expect(await page.locator(".w-48 button").count()).toBe(5);
+    // Exactly 4 nav buttons for the user role.
+    expect(await page.locator(".w-48 button").count()).toBe(4);
   });
 
   base.test("user role gets 403 on admin API endpoints", async ({ page }) => {
@@ -237,17 +238,16 @@ base.describe("RBAC - Editor sees collaborative tabs", () => {
   });
 
   base.test(
-    "editor sees general, security, api-keys, tools, about but not admin tabs",
+    "editor sees general, security, api-keys, about but not admin tabs",
     async ({ page }) => {
       await login(page, "editortest", "EditorTest1");
       await openSettings(page);
 
-      // Should see these 5 tabs (editor lacks settings:write, users:manage,
+      // Should see these 4 tabs (editor lacks settings:write, users:manage,
       // teams:manage, and audit:read).
       await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /tools/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
 
       // Should NOT see admin tabs
@@ -256,12 +256,13 @@ base.describe("RBAC - Editor sees collaborative tabs", () => {
       await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /^roles$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
-      // Usage requires audit:read, AI Features requires settings:write.
+      // Usage requires audit:read, AI Features and Tools require settings:write.
       await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
       await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
 
-      // Exactly 5 nav buttons for the editor role.
-      expect(await page.locator(".w-48 button").count()).toBe(5);
+      // Exactly 4 nav buttons for the editor role.
+      expect(await page.locator(".w-48 button").count()).toBe(4);
     },
   );
 

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadTranslations, SUPPORTED_LOCALES } from "@snapotter/shared";
 import yaml from "js-yaml";
@@ -124,6 +124,9 @@ describe("Korean OCR product contract", () => {
   });
 
   it("publishes the measured 25 MiB Fast OCR footprint without stale 24/29 MiB copy", () => {
+    // Reads root DOCKERHUB.md, which .dockerignore strips from the shipped image;
+    // this repo-content contract runs in PR CI, not inside the container.
+    if (existsSync("/.dockerenv")) return;
     const documents = [
       "api/ai.md",
       "guide/deployment.md",

@@ -162,6 +162,8 @@ describe("tool x format matrix (generated)", () => {
           await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
         }
       }
-    }, 240_000);
+      // The nightly avif converters run many slow encodes per test; a busy runner
+      // intermittently overran the old 240s cap, so allow the job's full budget.
+    }, 600_000);
   }
 });

@@ -37,6 +37,33 @@ const ANON_ADMIN_PERMISSIONS = [
   "audit:read",
 ];
 
+interface AuthConfig {
+  authEnabled: boolean;
+  oidcEnabled?: boolean;
+  oidcProviderName?: string | null;
+  samlEnabled?: boolean;
+  samlProviderName?: string | null;
+  ssoEnforced?: boolean;
+}
+
+// /api/v1/config/auth returns static instance config (auth mode, OIDC/SAML
+// setup) that cannot change without a server restart. useAuth() runs in many
+// components, so without sharing this the tool page fetches it once per consumer
+// (6+ times on initial load). Share a single fetch; reset on failure so a
+// transient error can be retried.
+let authConfigPromise: Promise<AuthConfig> | null = null;
+function fetchAuthConfig(): Promise<AuthConfig> {
+  if (!authConfigPromise) {
+    authConfigPromise = fetch("/api/v1/config/auth")
+      .then((res) => res.json() as Promise<AuthConfig>)
+      .catch((err) => {
+        authConfigPromise = null;
+        throw err;
+      });
+  }
+  return authConfigPromise;
+}
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
     loading: true,
@@ -61,8 +88,7 @@ export function useAuth() {
 
     async function checkAuth() {
       try {
-        const configRes = await fetch("/api/v1/config/auth");
-        const config = await configRes.json();
+        const config = await fetchAuthConfig();
 
         if (!config.authEnabled) {
           if (!cancelled)

@@ -42,6 +42,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjxl-tools \
     ghostscript \
     qpdf \
+    tesseract-ocr \
+    tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra \
+    tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
          apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \

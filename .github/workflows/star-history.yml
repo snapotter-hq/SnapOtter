@@ -1,0 +1,55 @@
+name: Star History
+
+# Regenerates the README star-history chart from the repo's own stargazer timeline
+# and publishes it to the unprotected `star-history` branch, which the README embeds
+# by raw URL. GitHub restricted the public stargazers API to a repo's own
+# admins/collaborators (June 2026), which broke the hosted api.star-history.com badge.
+# Running here with the default GITHUB_TOKEN reads our own stars, so there's no
+# third-party service and no rate-limited shared token pool. See scripts/generate-star-history.mjs.
+
+on:
+  schedule:
+    - cron: "23 7 * * 1" # Mondays 07:23 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: star-history
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Refresh chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Generate chart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STAR_HISTORY_REPO: ${{ github.repository }}
+          STAR_HISTORY_OUT: ${{ runner.temp }}/star-history.svg
+        run: node scripts/generate-star-history.mjs
+
+      - name: Publish to star-history branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp "${{ runner.temp }}/star-history.svg" "$work/star-history.svg"
+          cd "$work"
+          git init -q
+          git checkout -q -b star-history
+          git add star-history.svg
+          git -c user.name="SnapOtter" -c user.email="snapotter.hq@gmail.com" \
+            commit -q -m "chore: refresh star history chart [skip ci]"
+          git push -q --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:star-history

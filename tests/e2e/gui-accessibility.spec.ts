@@ -31,6 +31,10 @@ test.describe("Semantic HTML - Landmarks", () => {
 
 test.describe("Semantic HTML - Buttons", () => {
   test("all visible buttons on home page have accessible names", async ({ loggedInPage: page }) => {
+    // The home grid renders 240+ tool cards as buttons; walking them all with
+    // per-button attribute reads is many serial round-trips, which overruns the
+    // 30s default. Give it headroom (the check itself is correct, just O(n)).
+    test.setTimeout(120_000);
     // Wait for the page to fully load
     await page.waitForLoadState("networkidle");
 
