@@ -78,6 +78,7 @@ pentest-results/
 # Stryker mutation testing
 .stryker-tmp/
 .stryker-tmp-api/
+.stryker-tmp-shared/
 packages/image-engine/reports/
 packages/media-engine/reports/
 packages/doc-engine/reports/

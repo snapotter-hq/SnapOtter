@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": { "configFile": "vitest.stryker-shared.config.ts" },
+  "mutate": [
+    "packages/shared/src/modality.ts",
+    "packages/shared/src/section.ts",
+    "packages/shared/src/features.ts",
+    "packages/shared/src/conversion-presets.ts",
+    "packages/shared/src/tool-errors.ts",
+    "packages/shared/src/subprocess-limit.ts",
+    "packages/shared/src/permissions.ts",
+    "packages/shared/src/pipeline-templates.ts",
+    "packages/shared/src/library-save.ts",
+    "packages/shared/src/audit-events.ts",
+    "packages/enterprise/src/license.ts"
+  ],
+  "incremental": true,
+  "incrementalFile": "reports/stryker-shared-incremental.json",
+  "reporters": ["clear-text", "progress"],
+  "thresholds": { "high": 80, "low": 60, "break": null },
+  "tempDirName": ".stryker-tmp-shared",
+  "ignoreStatic": true,
+  "concurrency": 8
+}
