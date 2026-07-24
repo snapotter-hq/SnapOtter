@@ -832,8 +832,8 @@ jobs:
             SNAPOTTER_SENTRY_DSN=${{ secrets.SNAPOTTER_SENTRY_DSN }}
             SNAPOTTER_SENTRY_DSN_WEB=${{ secrets.SNAPOTTER_SENTRY_DSN_WEB }}
             SENTRY_RELEASE=${{ needs.release.outputs.new_version }}
-            OCR_RUNTIME_INDEX_KEY_ID=${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
-            OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
+            OCR_RUNTIME_TRUST_ID=${{ vars.OCR_RUNTIME_INDEX_KEY_ID }}
+            OCR_RUNTIME_TRUST_PEM_B64=${{ vars.OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64 }}
             SNAPOTTER_OFFICIAL_CONTAINER=1
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}

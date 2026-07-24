@@ -109,11 +109,9 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Environment for tests
+# Non-sensitive test defaults. Authentication credentials belong to the test
+# runner or Compose environment rather than the reusable image metadata.
 ENV NODE_ENV=test \
-    AUTH_ENABLED=true \
-    DEFAULT_USERNAME=admin \
-    DEFAULT_PASSWORD=admin \
     WORKSPACE_PATH=/tmp/test-workspace \
     MAX_MEGAPIXELS=100 \
     MAX_UPLOAD_SIZE_MB=100 \

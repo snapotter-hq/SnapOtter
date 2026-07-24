@@ -216,17 +216,15 @@ FROM base-${TARGETOS}-${TARGETARCH} AS production
 
 ARG TARGETARCH
 ARG PANDOC_VERSION=3.10
-ARG OCR_RUNTIME_INDEX_KEY_ID=
-ARG OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=
+ARG OCR_RUNTIME_TRUST_ID=
+ARG OCR_RUNTIME_TRUST_PEM_B64=
 ARG SNAPOTTER_OFFICIAL_CONTAINER=0
 
-# Public release-verification key pinned independently from the bundle host.
-# Official release builds inject these repository variables and opt into the
-# exact ABI target. Source builds fail closed unless their operator explicitly
-# opts in and provides the same trust identity or mounts a trust file.
-ENV OCR_RUNTIME_INDEX_KEY_ID=${OCR_RUNTIME_INDEX_KEY_ID} \
-    OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64=${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64} \
-    SNAPOTTER_OFFICIAL_CONTAINER=${SNAPOTTER_OFFICIAL_CONTAINER}
+# Official builds opt into the exact ABI target. Public release-verification
+# metadata is validated and written to the image trust store below rather than
+# exposed as image environment metadata. Runtime environment overrides remain
+# supported for self-hosters who intentionally supply a different trust key.
+ENV SNAPOTTER_OFFICIAL_CONTAINER=${SNAPOTTER_OFFICIAL_CONTAINER}
 
 # Pin corepack's cache during image build. It is removed after dependency and
 # browser installation so pnpm is not part of the production runtime surface.
@@ -439,6 +437,17 @@ RUN /opt/venv/bin/pip freeze | sha256sum | cut -d' ' -f1 > /opt/venv/.venv-versi
 # On-demand AI feature installer and manifest
 COPY docker/feature-manifest.json /app/docker/feature-manifest.json
 COPY packages/ai/python/install_feature.py /app/packages/ai/python/install_feature.py
+
+# Pin public OCR release trust independently from the bundle host. Source
+# builds without trust metadata stay unconfigured; official builds fail closed
+# unless both values are present, canonical, and identify an Ed25519 key.
+COPY docker/write-ocr-runtime-trust.mjs /tmp/write-ocr-runtime-trust.mjs
+RUN node /tmp/write-ocr-runtime-trust.mjs \
+      /app/docker/ocr-runtime-trust.json \
+      "${OCR_RUNTIME_TRUST_ID}" \
+      "${OCR_RUNTIME_TRUST_PEM_B64}" \
+      "${SNAPOTTER_OFFICIAL_CONTAINER}" \
+    && rm -f /tmp/write-ocr-runtime-trust.mjs
 
 WORKDIR /app
 
