@@ -1,7 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["ANALYTICS_BAKED_OVERRIDE", "SENTRY_CRON_MONITORS"],
-  "globalPassThroughEnv": ["PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_LANDING_PORT"],
+  "globalPassThroughEnv": [
+    "API_URL",
+    "E2E_PG_BASE_URL",
+    "PLAYWRIGHT_API_PORT",
+    "PLAYWRIGHT_API_URL",
+    "PLAYWRIGHT_DOCS_PORT",
+    "PLAYWRIGHT_LANDING_PORT",
+    "PLAYWRIGHT_WEB_PORT",
+    "PLAYWRIGHT_WEB_URL",
+    "PW_WORKERS",
+    "REDIS_URL"
+  ],
   "tasks": {
     "dev": {
       "cache": false,

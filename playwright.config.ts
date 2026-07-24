@@ -4,11 +4,73 @@ import { defineConfig, devices } from "@playwright/test";
 
 const authFile = path.join(__dirname, ".playwright", ".auth", "user.json");
 
-const TEST_WEB_PORT = 2349;
+type E2eEndpoint = {
+  host: string;
+  port: number;
+  url: string;
+};
 
-// Fresh Postgres database per e2e run.  The create-db script (chained before
-// the API in the webServer command) CREATEs it and cleans up stale databases
-// from previous runs.  The API auto-migrates the empty database at boot.
+function parsePort(value: string, envName: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${envName} must be an integer port, received "${value}"`);
+  }
+  const port = Number(value);
+  if (!Number.isSafeInteger(port) || port < 1024 || port > 65_535) {
+    throw new Error(`${envName} must be between 1024 and 65535, received "${value}"`);
+  }
+  return port;
+}
+
+function randomPort(min: number): number {
+  return min + (randomBytes(2).readUInt16BE(0) % 10_000);
+}
+
+function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndpoint {
+  const portEnvName = `PLAYWRIGHT_${kind}_PORT`;
+  const urlEnvName = `PLAYWRIGHT_${kind}_URL`;
+  const urlOverride = process.env[urlEnvName] ?? (kind === "API" ? process.env.API_URL : undefined);
+  const parsedOverride = urlOverride ? new URL(urlOverride) : undefined;
+  const port = process.env[portEnvName]
+    ? parsePort(process.env[portEnvName], portEnvName)
+    : parsedOverride?.port
+      ? parsePort(parsedOverride.port, urlEnvName)
+      : randomPort(defaultPortFloor);
+  const parsedUrl = parsedOverride ?? new URL(`http://127.0.0.1:${port}`);
+
+  if (parsedUrl.protocol !== "http:") {
+    throw new Error(`${urlEnvName} must use http, received "${parsedUrl.protocol}"`);
+  }
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(parsedUrl.hostname)) {
+    throw new Error(`${urlEnvName} must use a loopback host, received "${parsedUrl.hostname}"`);
+  }
+  if (
+    parsedUrl.username ||
+    parsedUrl.password ||
+    parsedUrl.pathname !== "/" ||
+    parsedUrl.search ||
+    parsedUrl.hash
+  ) {
+    throw new Error(`${urlEnvName} must be an origin without credentials, path, query, or hash`);
+  }
+  if (parsePort(parsedUrl.port || "80", urlEnvName) !== port) {
+    throw new Error(`${portEnvName} must match the port in ${urlEnvName}`);
+  }
+
+  const url = parsedUrl.origin;
+  process.env[portEnvName] = String(port);
+  process.env[urlEnvName] = url;
+  return { host: parsedUrl.hostname, port, url };
+}
+
+const apiEndpoint = resolveEndpoint("API", 20_000);
+const webEndpoint = resolveEndpoint("WEB", 30_000);
+const TEST_API_URL = apiEndpoint.url;
+const TEST_WEB_URL = webEndpoint.url;
+process.env.API_URL = TEST_API_URL;
+
+// Fresh Postgres database per e2e run. The create-db script (chained before
+// the API in the webServer command) recreates only this run's validated target.
+// The API auto-migrates the empty database at boot.
 const E2E_PG_BASE_URL =
   process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
 const e2eDbName = `snapotter_e2e_${process.pid}_${randomBytes(4).toString("hex")}`;
@@ -57,14 +119,14 @@ export default defineConfig({
   workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 2,
   reporter: "html",
   use: {
-    baseURL: `http://localhost:${TEST_WEB_PORT}`,
+    baseURL: TEST_WEB_URL,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
   projects: [
     {
       name: "setup",
-      testMatch: /auth\.setup\.ts/,
+      testMatch: /(?:^|[/\\])auth\.setup\.ts$/,
     },
     {
       name: "chromium",
@@ -162,10 +224,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api dev`,
-      port: 13490,
-      reuseExistingServer: !process.env.CI,
+      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api exec tsx watch --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts`,
+      url: `${TEST_API_URL}/api/v1/health`,
+      reuseExistingServer: false,
       env: {
+        PORT: String(apiEndpoint.port),
         AUTH_ENABLED: "true",
         DEFAULT_USERNAME: "admin",
         DEFAULT_PASSWORD: "admin",
@@ -203,12 +266,12 @@ export default defineConfig({
       // Production build + static preview: the dev server's on-demand
       // transform saturates under parallel workers and flakes 30s-timeout
       // tests. The build adds ~40s once per run and removes that whole class.
-      command: "pnpm --filter @snapotter/web build && pnpm --filter @snapotter/web preview",
-      port: TEST_WEB_PORT,
-      reuseExistingServer: !process.env.CI,
+      command: `pnpm --filter @snapotter/web build && pnpm --filter @snapotter/web exec vite preview --host ${webEndpoint.host} --port ${webEndpoint.port} --strictPort`,
+      url: TEST_WEB_URL,
+      reuseExistingServer: false,
       env: {
-        PORT: String(TEST_WEB_PORT),
-        VITE_API_URL: "http://localhost:13490",
+        PORT: String(webEndpoint.port),
+        VITE_API_URL: TEST_API_URL,
       },
       timeout: 240_000,
     },

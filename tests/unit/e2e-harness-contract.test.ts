@@ -1,0 +1,177 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
+const root = process.cwd();
+const createDbPath = path.join(root, "tests", "e2e-pg-create-db.cjs");
+const helpersPath = path.join(root, "tests", "e2e", "helpers.ts");
+const packagePath = path.join(root, "package.json");
+const turboPath = path.join(root, "turbo.json");
+
+const isolationEnvKeys = [
+  "API_URL",
+  "PLAYWRIGHT_API_PORT",
+  "PLAYWRIGHT_API_URL",
+  "PLAYWRIGHT_WEB_PORT",
+  "PLAYWRIGHT_WEB_URL",
+] as const;
+
+const originalEnv = new Map(isolationEnvKeys.map((key) => [key, process.env[key]]));
+
+afterEach(() => {
+  vi.resetModules();
+  for (const key of isolationEnvKeys) {
+    const value = originalEnv.get(key);
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+async function loadConfig(overrides: Record<string, string>) {
+  for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
+  vi.resetModules();
+  return (await import("../../playwright.config.js")).default;
+}
+
+describe("main Playwright harness isolation", () => {
+  test("propagates the exact isolated API and web endpoints through every process", async () => {
+    const apiUrl = "http://127.0.0.1:18123";
+    const webUrl = "http://127.0.0.1:28123";
+    const config = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18123",
+      PLAYWRIGHT_API_URL: apiUrl,
+      PLAYWRIGHT_WEB_PORT: "28123",
+      PLAYWRIGHT_WEB_URL: webUrl,
+    });
+
+    expect(config.use?.baseURL).toBe(webUrl);
+    expect(process.env.API_URL).toBe(apiUrl);
+
+    const [apiServer, webServer] = config.webServer as Array<{
+      command: string;
+      env: Record<string, string>;
+      reuseExistingServer: boolean;
+      url?: string;
+    }>;
+
+    expect(apiServer.url).toBe(`${apiUrl}/api/v1/health`);
+    expect(apiServer.reuseExistingServer).toBe(false);
+    expect(apiServer.env.PORT).toBe("18123");
+    expect(apiServer.command).not.toContain("@snapotter/api dev");
+
+    expect(webServer.url).toBe(webUrl);
+    expect(webServer.reuseExistingServer).toBe(false);
+    expect(webServer.env.PORT).toBe("28123");
+    expect(webServer.env.VITE_API_URL).toBe(apiUrl);
+    expect(webServer.command).toContain("--port 28123");
+    expect(webServer.command).toContain("--strictPort");
+  });
+
+  test("generates distinct endpoint pairs when no endpoint override is supplied", async () => {
+    for (const key of isolationEnvKeys) delete process.env[key];
+    const first = await loadConfig({});
+    const firstApiUrl = process.env.API_URL;
+    const firstWebUrl = first.use?.baseURL;
+
+    for (const key of isolationEnvKeys) delete process.env[key];
+    const second = await loadConfig({});
+
+    expect(firstApiUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(firstWebUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect([process.env.API_URL, second.use?.baseURL]).not.toEqual([firstApiUrl, firstWebUrl]);
+  });
+
+  test("matches only the canonical auth setup file", async () => {
+    const config = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18124",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18124",
+      PLAYWRIGHT_WEB_PORT: "28124",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28124",
+    });
+    const setup = config.projects?.find((project) => project.name === "setup");
+    const match = setup?.testMatch as RegExp;
+
+    expect(match.test(path.join(root, "tests/e2e/auth.setup.ts"))).toBe(true);
+    expect(match.test(path.join(root, "tests/e2e/qa-auth.setup.ts"))).toBe(false);
+    expect(match.test(path.join(root, "tests/e2e/not-auth.setup.ts"))).toBe(false);
+  });
+});
+
+describe("E2E database bootstrap safety", () => {
+  test("rejects an unsafe target before attempting a database connection", () => {
+    expect(() =>
+      execFileSync(process.execPath, [createDbPath, "production"], {
+        cwd: root,
+        env: {
+          ...process.env,
+          E2E_PG_BASE_URL: "postgres://snapotter:snapotter@127.0.0.1:1/postgres",
+        },
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 10_000,
+      }),
+    ).toThrow(/unsafe database name/i);
+  });
+
+  test("never enumerates or drops sibling E2E databases", () => {
+    const source = fs.readFileSync(createDbPath, "utf8");
+
+    expect(source).not.toContain("FROM pg_database");
+    expect(source).not.toContain("LIKE 'snapotter_e2e_%'");
+    expect(source).not.toContain("row.datname");
+  });
+});
+
+test("loggedInPage does not mutate global settings for every test", () => {
+  const source = fs.readFileSync(helpersPath, "utf8");
+  const fixture = source.slice(
+    source.indexOf("export const test = base.extend"),
+    source.indexOf("// isAiSidecarRunning"),
+  );
+
+  expect(fixture).toContain('await page.goto("/")');
+  expect(fixture).not.toContain("putSettings(");
+  expect(fixture).not.toContain("settings heal");
+});
+
+test("the canonical E2E command covers every release browser and device project", () => {
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
+    scripts: Record<string, string>;
+  };
+  const command = packageJson.scripts["test:e2e"];
+
+  expect(packageJson.scripts["test:e2e:core"]).toBeTruthy();
+  for (const project of [
+    "chromium",
+    "chromium-serial",
+    "chromium-visual",
+    "firefox",
+    "webkit",
+    "mobile-chromium",
+    "mobile-webkit",
+    "tablet-chromium",
+    "tablet-webkit",
+  ]) {
+    expect(command).toContain(`--project=${project}`);
+  }
+});
+
+test("Turbo passes every main harness endpoint override through task boundaries", () => {
+  const turbo = JSON.parse(fs.readFileSync(turboPath, "utf8")) as {
+    globalPassThroughEnv: string[];
+  };
+
+  expect(turbo.globalPassThroughEnv).toEqual(
+    expect.arrayContaining([
+      "API_URL",
+      "E2E_PG_BASE_URL",
+      "PLAYWRIGHT_API_PORT",
+      "PLAYWRIGHT_API_URL",
+      "PLAYWRIGHT_WEB_PORT",
+      "PLAYWRIGHT_WEB_URL",
+      "PW_WORKERS",
+      "REDIS_URL",
+    ]),
+  );
+});

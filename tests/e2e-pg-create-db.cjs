@@ -18,9 +18,16 @@ const pg = apiRequire("pg");
 const baseUrl =
   process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
 const dbName = process.argv[2];
+const safeDbName = /^snapotter_e2e_[a-z0-9_]+$/;
 
 if (!dbName) {
   console.error("Usage: node tests/e2e-pg-create-db.cjs <db-name>");
+  process.exit(1);
+}
+if (!safeDbName.test(dbName) || Buffer.byteLength(dbName, "utf8") > 63) {
+  console.error(
+    `[e2e-pg] unsafe database name: ${JSON.stringify(dbName)}; expected snapotter_e2e_ followed by lowercase letters, digits, or underscores`,
+  );
   process.exit(1);
 }
 
@@ -28,25 +35,13 @@ async function main() {
   const client = new pg.Client({ connectionString: baseUrl });
   await client.connect();
   try {
-    // Clean up stale e2e databases from previous runs (best-effort).
-    const { rows } = await client.query(
-      "SELECT datname FROM pg_database WHERE datname LIKE 'snapotter_e2e_%'",
+    // Terminate only sessions connected to this run's validated target. Other
+    // Playwright runs own their databases and must remain untouched.
+    await client.query(
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+       WHERE datname = $1 AND pid <> pg_backend_pid()`,
+      [dbName],
     );
-    for (const row of rows) {
-      if (row.datname !== dbName) {
-        try {
-          await client.query(
-            `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-             WHERE datname = $1 AND pid <> pg_backend_pid()`,
-            [row.datname],
-          );
-          await client.query(`DROP DATABASE IF EXISTS "${row.datname}"`);
-        } catch {
-          // ignore: another process may still be using it
-        }
-      }
-    }
-
     await client.query(`DROP DATABASE IF EXISTS "${dbName}"`);
     await client.query(`CREATE DATABASE "${dbName}"`);
     console.log(`[e2e-pg] created database: ${dbName}`);

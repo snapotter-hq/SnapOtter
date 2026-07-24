@@ -226,25 +226,10 @@ export async function changePasswordViaApi(
 
 export const test = base.extend<{ loggedInPage: Page }>({
   loggedInPage: async ({ page }, use) => {
-    // storageState is already loaded by the project config, just navigate
+    // storageState is already loaded by the project config. Each Playwright
+    // invocation owns a fresh database, so this fixture must not mutate shared
+    // system settings before every test.
     await page.goto("/");
-    // Self-heal global server settings a crashed predecessor may have left
-    // mutated. defaultToolView=fullscreen would redirect "/"; a stale locale
-    // would translate the whole UI. loginAttemptLimit is the important one:
-    // saving System Settings persists it at the UI default ("5"), which
-    // overrides the env LOGIN_ATTEMPT_LIMIT=100000 and 429s every later admin
-    // login, cascading into "create user 401" failures across the serial run.
-    const healed = await putSettings(page, {
-      defaultToolView: "sidebar",
-      defaultLocale: "en",
-      loginAttemptLimit: "100000",
-    });
-    if (!healed.ok) {
-      console.warn(`loggedInPage settings heal failed with status ${healed.status}`);
-    }
-    if (page.url().includes("/fullscreen")) {
-      await page.goto("/");
-    }
     await use(page);
   },
 });
