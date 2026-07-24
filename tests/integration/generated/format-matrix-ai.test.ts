@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { featureUnavailableDisposition } from "../../helpers/generated-case-accounting.js";
 import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
@@ -337,7 +338,8 @@ const AI_TOOLS: AiToolDef[] = [
  * - 422: processing error (format decode failure, etc.)
  * - 501: AI feature not installed (FEATURE_NOT_INSTALLED)
  */
-const ACCEPTABLE_AI_CODES = [200, 202, 400, 422, 501];
+const ACCEPTABLE_AI_CODES = [200, 202, 400, 422];
+const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -352,6 +354,22 @@ function getToolUrl(toolId: string): string {
     return `${apiToolPath("passport-photo")}/analyze`;
   }
   return apiToolPath(toolId);
+}
+
+function featurePrerequisiteSkipReason(
+  toolId: string,
+  statusCode: number,
+  body: Record<string, unknown>,
+): string | undefined {
+  const disposition = featureUnavailableDisposition({
+    toolId,
+    statusCode,
+    code: body.code,
+    requireAiFeatures: REQUIRE_AI_FEATURES,
+  });
+  return disposition === "skip"
+    ? `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`
+    : undefined;
 }
 
 /**
@@ -435,8 +453,10 @@ describe("AI tool cross-format matrix", () => {
 
         it(
           `${tool.label}`,
-          async () => {
-            if (!existsSync(fixturePath)) return;
+          async (context) => {
+            if (!existsSync(fixturePath)) {
+              return context.skip(`${tool.id}: missing fixture ${fmt.file}`);
+            }
 
             const buffer = readFileSync(fixturePath);
             const { body: payload, contentType } = buildAiPayload(
@@ -461,20 +481,17 @@ describe("AI tool cross-format matrix", () => {
               500,
             );
 
+            const responseBody = JSON.parse(res.body) as Record<string, unknown>;
+            const skipReason = featurePrerequisiteSkipReason(tool.id, res.statusCode, responseBody);
+            if (skipReason) return context.skip(skipReason);
+
             // Must be one of the acceptable codes
             expect(ACCEPTABLE_AI_CODES).toContain(res.statusCode);
 
             // Response must always be valid JSON
-            const body = JSON.parse(res.body);
+            const body = responseBody;
 
-            if (res.statusCode === 501) {
-              // The optional runtime may be absent or present for another
-              // platform (for example, Linux bundles on a macOS developer
-              // machine). Both are truthful ingress outcomes for this matrix.
-              expect(["FEATURE_NOT_INSTALLED", "FEATURE_INCOMPATIBLE"]).toContain(body.code);
-              expect(body.error).toBeDefined();
-              expect(typeof body.error).toBe("string");
-            } else if (res.statusCode === 202) {
+            if (res.statusCode === 202) {
               // Async processing accepted
               expect(body.jobId).toBeDefined();
               expect(typeof body.jobId).toBe("string");
@@ -508,7 +525,7 @@ describe("AI tool cross-format matrix", () => {
 // ---------------------------------------------------------------------------
 describe("Missing file returns 400", () => {
   for (const tool of AI_TOOLS) {
-    it(`${tool.label}: no file -> 400`, async () => {
+    it(`${tool.label}: no file -> 400`, async (context) => {
       // Send empty multipart with only settings
       const fields: Array<{
         name: string;
@@ -544,14 +561,10 @@ describe("Missing file returns 400", () => {
         body: payload,
       });
 
-      // Tools with 501 guard may return 501 before checking for file
-      if (tool.has501Guard) {
-        expect([400, 501]).toContain(res.statusCode);
-      } else {
-        expect(res.statusCode).toBe(400);
-      }
-
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as Record<string, unknown>;
+      const skipReason = featurePrerequisiteSkipReason(tool.id, res.statusCode, body);
+      if (skipReason) return context.skip(skipReason);
+      expect(res.statusCode).toBe(400);
       expect(body.error).toBeDefined();
       expect(typeof body.error).toBe("string");
     });
@@ -563,9 +576,9 @@ describe("Missing file returns 400", () => {
 // ---------------------------------------------------------------------------
 describe("Unauthenticated requests return 401", () => {
   for (const tool of AI_TOOLS) {
-    it(`${tool.label}: no auth -> 401`, async () => {
+    it(`${tool.label}: no auth -> 401`, async (context) => {
       const fixturePath = fixtures.image.formats("png");
-      if (!existsSync(fixturePath)) return;
+      if (!existsSync(fixturePath)) return context.skip(`${tool.id}: missing fixture sample.png`);
 
       const buffer = readFileSync(fixturePath);
       const fmt = FORMAT_SAMPLES.find((f) => f.file === "sample.png")!;
@@ -602,9 +615,9 @@ describe("Invalid settings return 400", () => {
   );
 
   for (const tool of TOOLS_WITH_INVALID_SETTINGS) {
-    it(`${tool.label}: invalid settings -> 400`, async () => {
+    it(`${tool.label}: invalid settings -> 400`, async (context) => {
       const fixturePath = fixtures.image.formats("png");
-      if (!existsSync(fixturePath)) return;
+      if (!existsSync(fixturePath)) return context.skip(`${tool.id}: missing fixture sample.png`);
 
       const buffer = readFileSync(fixturePath);
 
@@ -648,14 +661,10 @@ describe("Invalid settings return 400", () => {
         body: payload,
       });
 
-      // Tools with 501 guard may return 501 before validating settings
-      if (tool.has501Guard) {
-        expect([400, 501]).toContain(res.statusCode);
-      } else {
-        expect(res.statusCode).toBe(400);
-      }
-
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as Record<string, unknown>;
+      const skipReason = featurePrerequisiteSkipReason(tool.id, res.statusCode, body);
+      if (skipReason) return context.skip(skipReason);
+      expect(res.statusCode).toBe(400);
       expect(body.error).toBeDefined();
       expect(typeof body.error).toBe("string");
     });
@@ -666,9 +675,9 @@ describe("Invalid settings return 400", () => {
 // Erase-object specific: missing mask -> 400
 // ---------------------------------------------------------------------------
 describe("Erase-object missing mask returns 400", () => {
-  it("erase-object without mask file -> 400 or 501", async () => {
+  it("erase-object without mask file -> 400", async (context) => {
     const fixturePath = fixtures.image.formats("png");
-    if (!existsSync(fixturePath)) return;
+    if (!existsSync(fixturePath)) return context.skip("erase-object: missing fixture sample.png");
 
     const buffer = readFileSync(fixturePath);
     const { body: payload, contentType } = createMultipartPayload([
@@ -690,10 +699,10 @@ describe("Erase-object missing mask returns 400", () => {
       body: payload,
     });
 
-    // 501 if AI not installed, 400 if validation catches missing mask
-    expect([400, 501]).toContain(res.statusCode);
-
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as Record<string, unknown>;
+    const skipReason = featurePrerequisiteSkipReason("erase-object", res.statusCode, body);
+    if (skipReason) return context.skip(skipReason);
+    expect(res.statusCode).toBe(400);
     expect(body.error).toBeDefined();
     expect(typeof body.error).toBe("string");
   });
@@ -703,9 +712,11 @@ describe("Erase-object missing mask returns 400", () => {
 // Content-aware-resize specific: missing dimensions -> 400
 // ---------------------------------------------------------------------------
 describe("Content-aware-resize without dimensions returns 400", () => {
-  it("content-aware-resize without width/height/square -> 400", async () => {
+  it("content-aware-resize without width/height/square -> 400", async (context) => {
     const fixturePath = fixtures.image.formats("png");
-    if (!existsSync(fixturePath)) return;
+    if (!existsSync(fixturePath)) {
+      return context.skip("content-aware-resize: missing fixture sample.png");
+    }
 
     const buffer = readFileSync(fixturePath);
     const { body: payload, contentType } = createMultipartPayload([
@@ -749,9 +760,9 @@ describe("Malformed JSON settings return 400", () => {
   ).slice(0, 5);
 
   for (const tool of REPRESENTATIVE_TOOLS) {
-    it(`${tool.label}: malformed JSON settings -> 400 or 501`, async () => {
+    it(`${tool.label}: malformed JSON settings -> 400`, async (context) => {
       const fixturePath = fixtures.image.formats("png");
-      if (!existsSync(fixturePath)) return;
+      if (!existsSync(fixturePath)) return context.skip(`${tool.id}: missing fixture sample.png`);
 
       const buffer = readFileSync(fixturePath);
       const { body: payload, contentType } = createMultipartPayload([
@@ -777,14 +788,10 @@ describe("Malformed JSON settings return 400", () => {
         body: payload,
       });
 
-      // 501 if AI not installed, 400 for malformed JSON
-      if (tool.has501Guard) {
-        expect([400, 501]).toContain(res.statusCode);
-      } else {
-        expect(res.statusCode).toBe(400);
-      }
-
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as Record<string, unknown>;
+      const skipReason = featurePrerequisiteSkipReason(tool.id, res.statusCode, body);
+      if (skipReason) return context.skip(skipReason);
+      expect(res.statusCode).toBe(400);
       expect(body.error).toBeDefined();
       expect(typeof body.error).toBe("string");
     });

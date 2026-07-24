@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import {
+  featureUnavailableDisposition,
+  GeneratedCaseAccounting,
+} from "../../helpers/generated-case-accounting.js";
 import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
@@ -20,7 +22,6 @@ const AUD = () => readFixture(fixtures.audio.tiny("mp3"));
 const PDF = () => readFixture(fixtures.document.pdf3);
 const CSV = () => readFixture(fixtures.data.csv);
 const JSON_F = () => readFixture(fixtures.data.json);
-const XML_F = () => readFixture(fixtures.data.xml);
 const YAML_F = () => readFixture(fixtures.data.yaml);
 const DOCX = () => readFixture(fixtures.document.tiny("docx"));
 const XLSX = () => readFixture(fixtures.document.tiny("xlsx"));
@@ -1102,8 +1103,8 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
 
 // ---------------------------------------------------------------------------
 // Tools that are AI-gated (need an installed bundle). These tools will
-// return 501 FEATURE_NOT_INSTALLED which we accept as a valid non-crash
-// response. We still exercise the settings validation path.
+// return 501 FEATURE_NOT_INSTALLED when their prerequisite is absent.
+// Default campaigns report that as a skip; installed-feature campaigns fail.
 // ---------------------------------------------------------------------------
 const AI_GATED_TOOLS = new Set([
   "noise-removal",
@@ -1134,8 +1135,9 @@ const AI_GATED_TOOLS = new Set([
 const MULTI_INPUT_TOOLS = new Set(["burn-subtitles", "embed-subtitles"]);
 
 // Accepted status codes: 200 = success, 202 = async, 400 = bad settings,
-// 422 = processing failure, 501 = feature not installed, 415 = wrong type
-const ACCEPTED_STATUSES = new Set([200, 202, 400, 415, 422, 501]);
+// 422 = processing failure, 415 = wrong type
+const ACCEPTED_STATUSES = new Set([200, 202, 400, 415, 422]);
+const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test suite
@@ -1156,12 +1158,18 @@ describe("settings variation matrix", () => {
 
   for (const [toolId, variations] of Object.entries(SETTINGS_VARIATIONS)) {
     describe(toolId, () => {
+      const accounting = new GeneratedCaseAccounting(toolId);
+
+      afterAll(() => {
+        accounting.assertCovered();
+      });
+
       for (const { label, settings } of variations) {
-        it(label, async () => {
+        it(label, async (context) => {
           const fixture = TOOL_FIXTURE[toolId];
           if (!fixture) {
-            // No fixture mapped for this tool; skip gracefully
-            return;
+            accounting.prerequisiteSkip();
+            return context.skip(`${toolId}: no canonical settings fixture`);
           }
 
           const fields: Array<{
@@ -1206,12 +1214,31 @@ describe("settings variation matrix", () => {
             },
             payload: body,
           });
+          accounting.attempt();
+
+          if (res.statusCode === 501 && AI_GATED_TOOLS.has(toolId)) {
+            const payload = JSON.parse(res.body) as { code?: unknown };
+            const disposition = featureUnavailableDisposition({
+              toolId,
+              statusCode: res.statusCode,
+              code: payload.code,
+              requireAiFeatures: REQUIRE_AI_FEATURES,
+            });
+            if (disposition === "skip") {
+              accounting.prerequisiteSkip();
+              return context.skip(
+                `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+              );
+            }
+          }
 
           // Core assertion: no 500 (internal server error / crash)
           expect(
             ACCEPTED_STATUSES.has(res.statusCode),
             `${toolId} [${label}]: got ${res.statusCode} -- ${res.body.slice(0, 500)}`,
           ).toBe(true);
+          if (res.statusCode === 200 || res.statusCode === 202) accounting.accept();
+          else accounting.reject();
 
           // For 200 responses, validate response shape
           if (res.statusCode === 200) {

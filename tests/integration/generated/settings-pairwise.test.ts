@@ -1,7 +1,14 @@
-import { TOOLS } from "@snapotter/shared";
+import { join } from "node:path";
+import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
-import { fixtures, readFixture } from "../../fixtures/index.js";
+import { readFixture } from "../../fixtures/index.js";
+import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
+import {
+  buildGeneratedFixtureIndex,
+  generatedFixtureDirectories,
+  selectFixturesForTool,
+} from "../../helpers/generated-fixtures.js";
 import { pairwise } from "../../helpers/pairwise.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
@@ -31,16 +38,16 @@ const CORE_TOOLS = [
 ];
 
 const MAX_CASES_PER_TOOL = 40;
+const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
+const FIXTURE_INDEX = buildGeneratedFixtureIndex(generatedFixtureDirectories());
 const CRASH_PATTERN =
   /TypeError|undefined is not|null is not|Cannot read propert|is not a function/i;
 
 describe("pairwise settings matrix", () => {
   let testApp: TestApp;
-  let inputPng: Buffer;
 
   beforeAll(async () => {
     testApp = await buildTestApp();
-    inputPng = readFixture(fixtures.image.base.png200);
   }, 30_000);
 
   afterAll(async () => {
@@ -53,23 +60,30 @@ describe("pairwise settings matrix", () => {
   const toolIds = process.env.FULL_MATRIX ? TOOLS.map((t) => t.id) : CORE_TOOLS;
 
   for (const toolId of toolIds) {
-    it(`${toolId} survives its pairwise settings matrix`, async () => {
+    it(`${toolId} survives its pairwise settings matrix`, async (context) => {
+      if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
+        return context.skip(
+          `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+        );
+      }
       const config = getToolConfig(toolId);
       if (!config) {
         expect(process.env.FULL_MATRIX, `core tool "${toolId}" is not registered`).toBeTruthy();
-        return;
+        return context.skip(`${toolId}: no standard tool config`);
       }
 
+      const tool = TOOLS.find((candidate) => candidate.id === toolId);
+      if (!tool) return context.skip(`${toolId}: missing shared tool metadata`);
+      const fixture = selectFixturesForTool(FIXTURE_INDEX, tool)[0];
+      if (!fixture) return context.skip(`${toolId}: no compatible generated fixture`);
+      const input = readFixture(join(fixture.dir, fixture.filename));
+
       const axes = deriveAxes(config.settingsSchema);
-      if (axes.length < 2) {
-        // Not enough enumerable axes for pair coverage; fuzz covers this tool.
-        return;
-      }
 
       // Merge combos over the tool's minimal valid settings so required
       // fields that are not enumerable axes (e.g. watermark text) are present.
       const base = defaultSettingsFor(toolId) as Record<string, unknown>;
-      const combos = pairwise(axes);
+      const combos = axes.length < 2 ? [base] : pairwise(axes);
       const cases = combos
         .map((combo) => ({ ...base, ...compactCase(combo) }))
         .map((combo) => config.settingsSchema.safeParse(combo))
@@ -81,27 +95,22 @@ describe("pairwise settings matrix", () => {
         `${toolId}: every pairwise combo was rejected by the schema`,
       ).toBeGreaterThan(0);
 
+      const accounting = new GeneratedCaseAccounting(toolId);
       for (const parsed of cases) {
+        accounting.attempt();
         try {
-          const result = await config.process(inputPng, parsed.data, "test-200x150.png");
+          const result = await config.process(input, parsed.data, fixture.filename);
           expect(
             result.buffer.length,
             `${toolId} produced empty output for ${JSON.stringify(parsed.data)}`,
           ).toBeGreaterThan(0);
-        } catch (err) {
-          // Clean operational failures (e.g. crop area outside image) are
-          // acceptable; crash-class errors are not.
-          expect(
-            err,
-            `${toolId} threw a non-Error for ${JSON.stringify(parsed.data)}`,
-          ).toBeInstanceOf(Error);
-          const message = (err as Error).message;
-          expect(
-            CRASH_PATTERN.test(message),
-            `${toolId} crashed on ${JSON.stringify(parsed.data)}: ${message}`,
-          ).toBe(false);
+          accounting.accept();
+        } catch (error) {
+          if (!(error instanceof Error) || CRASH_PATTERN.test(error.message)) throw error;
+          accounting.reject();
         }
       }
+      expect(accounting.assertCovered().accepted).toBeGreaterThan(0);
     }, 240_000);
   }
 });

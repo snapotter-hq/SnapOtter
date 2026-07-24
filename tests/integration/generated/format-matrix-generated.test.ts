@@ -1,10 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { apiToolPath, TOOLS } from "@snapotter/shared";
+import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getRegisteredToolIds, getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtureDir } from "../../fixtures/index.js";
+import {
+  featureUnavailableDisposition,
+  GeneratedCaseAccounting,
+} from "../../helpers/generated-case-accounting.js";
 import {
   defaultSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
@@ -42,7 +46,15 @@ const fixtureFiles = process.env.FULL_MATRIX
   ? readdirSync(fixtureDir.formats).filter((f) => !f.startsWith("."))
   : CORE_FORMATS;
 
-const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422, 501]);
+const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422]);
+const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
+const CUSTOM_ROUTE_TOOLS = new Set([
+  "barcode-generate",
+  "chart-maker",
+  "html-to-image",
+  "passport-photo",
+  "qr-generate",
+]);
 
 /**
  * Raster content types this libvips/Sharp build is guaranteed to decode. Used
@@ -97,9 +109,14 @@ describe("tool x format matrix (generated)", () => {
     ).toEqual([]);
   });
 
-  for (const tool of TOOLS) {
+  for (const tool of TOOLS.filter((candidate) => candidate.modality === "image")) {
     const toolId = tool.id;
-    it(`${toolId} handles every input format cleanly`, async () => {
+    if (CUSTOM_ROUTE_TOOLS.has(toolId)) {
+      it.skip(`${toolId} -- custom route covered outside the generated factory matrix`, () => {});
+      continue;
+    }
+    it(`${toolId} handles every input format cleanly`, async (context) => {
+      const accounting = new GeneratedCaseAccounting(toolId);
       for (const fixture of fixtureFiles) {
         const content = readFileSync(join(fixtureDir.formats, fixture));
         const { body, contentType } = createMultipartPayload([
@@ -112,14 +129,30 @@ describe("tool x format matrix (generated)", () => {
           headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
           body,
         });
+        accounting.attempt();
 
-        // Custom-route tools can 404 on the standard path; covered elsewhere.
-        if (res.statusCode === 404) return;
+        if (res.statusCode === 501 && PYTHON_SIDECAR_TOOLS.includes(toolId)) {
+          const payload = JSON.parse(res.body) as { code?: unknown };
+          const disposition = featureUnavailableDisposition({
+            toolId,
+            statusCode: res.statusCode,
+            code: payload.code,
+            requireAiFeatures: REQUIRE_AI_FEATURES,
+          });
+          if (disposition === "skip") {
+            accounting.prerequisiteSkip();
+            return context.skip(
+              `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+            );
+          }
+        }
 
         expect(
           ALLOWED_STATUSES.has(res.statusCode),
           `${toolId} x ${fixture}: status ${res.statusCode}: ${res.body.slice(0, 300)}`,
         ).toBe(true);
+        if (res.statusCode === 200 || res.statusCode === 202) accounting.accept();
+        else accounting.reject();
 
         if (res.statusCode === 200) {
           const resType = (res.headers["content-type"]?.toString() ?? "").split(";")[0];
@@ -162,6 +195,7 @@ describe("tool x format matrix (generated)", () => {
           await cancelAcceptedJobAndWait(payload.jobId as string, "ai");
         }
       }
+      expect(accounting.assertCovered().accepted).toBeGreaterThan(0);
       // The nightly avif converters run many slow encodes per test; a busy runner
       // intermittently overran the old 240s cap, so allow the job's full budget.
     }, 600_000);

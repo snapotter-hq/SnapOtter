@@ -35,12 +35,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { featureUnavailableDisposition } from "../../helpers/generated-case-accounting.js";
 import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
   type TestApp,
 } from "../test-server.js";
+
+const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 
 // ---------------------------------------------------------------------------
 // Format sample definitions (subset relevant to the expanded tools)
@@ -1455,10 +1458,12 @@ describe("Transparency-fixer cross-format", () => {
     const perTestTimeout = fmt.needsHeifDecoder || fmt.needsCliDecoder ? 180_000 : undefined;
 
     it(
-      `${fmt.name}: returns 501 or accepts input`,
-      async () => {
+      `${fmt.name}: accepts input when its AI prerequisite is installed`,
+      async (context) => {
         const fixturePath = join(fixtureDir.formats, fmt.file);
-        if (!existsSync(fixturePath)) return;
+        if (!existsSync(fixturePath)) {
+          return context.skip(`transparency-fixer: missing fixture ${fmt.file}`);
+        }
 
         const buffer = readFileSync(fixturePath);
         const { body: payload, contentType } = createMultipartPayload([
@@ -1487,15 +1492,22 @@ describe("Transparency-fixer cross-format", () => {
         // Must never crash
         expect(res.statusCode).not.toBe(500);
 
-        // Acceptable: 200 (sync success), 202 (async accepted), 400 (bad input),
-        // 422 (processing error), 501 (AI not installed)
-        expect([200, 202, 400, 422, 501]).toContain(res.statusCode);
+        const body = JSON.parse(res.body) as Record<string, unknown>;
+        const disposition = featureUnavailableDisposition({
+          toolId: "transparency-fixer",
+          statusCode: res.statusCode,
+          code: body.code,
+          requireAiFeatures: REQUIRE_AI_FEATURES,
+        });
+        if (disposition === "skip") {
+          return context.skip(
+            "transparency-fixer: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install",
+          );
+        }
 
-        const body = JSON.parse(res.body);
-        if (res.statusCode === 501) {
-          expect(body.code).toBe("FEATURE_NOT_INSTALLED");
-          expect(body.error).toBeDefined();
-        } else if (res.statusCode === 202) {
+        expect([200, 202, 400, 422]).toContain(res.statusCode);
+
+        if (res.statusCode === 202) {
           expect(body.jobId).toBeDefined();
           expect(body.async).toBe(true);
         } else if (res.statusCode >= 400) {
