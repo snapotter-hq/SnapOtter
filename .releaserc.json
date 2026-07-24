@@ -32,11 +32,15 @@
           ".release-notes.md",
           "apps/web/package.json",
           "apps/api/package.json",
+          "apps/demo/package.json",
           "apps/docs/package.json",
           "apps/landing/package.json",
           "packages/shared/package.json",
           "packages/shared/src/constants.ts",
+          "packages/doc-engine/package.json",
+          "packages/enterprise/package.json",
           "packages/image-engine/package.json",
+          "packages/media-engine/package.json",
           "packages/ai/package.json"
         ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"

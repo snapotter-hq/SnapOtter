@@ -41,6 +41,19 @@ describe("release version domains", () => {
     }
   });
 
+  it("commits every manifest changed by the release sync script", () => {
+    const releaseConfig = JSON.parse(readFileSync(path.resolve(root, ".releaserc.json"), "utf8"));
+    const gitPlugin = releaseConfig.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "@semantic-release/git",
+    );
+    expect(gitPlugin, "@semantic-release/git configuration is missing").toBeDefined();
+    const assets = new Set<string>(gitPlugin[1].assets);
+
+    for (const manifest of workspaceManifests()) {
+      expect(assets.has(manifest), `${manifest} is missing from release commit assets`).toBe(true);
+    }
+  });
+
   it("rejects non-semver input before mutating release metadata", () => {
     const syncScript = readFileSync(path.resolve(root, "scripts/sync-version.sh"), "utf8");
     const validation = syncScript.indexOf('if [[ ! "$VERSION" =~');
