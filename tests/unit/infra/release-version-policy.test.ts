@@ -4,6 +4,15 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const rootPackage = JSON.parse(readFileSync(path.resolve(root, "package.json"), "utf8"));
+const releaseVersionPolicyPath = path.resolve(root, "config/release-version-policy.json");
+
+function releaseVersionPolicy(): {
+  legacyBundleImageVersion: string;
+  openapiVersion: string;
+} {
+  expect(existsSync(releaseVersionPolicyPath), "release version policy is missing").toBe(true);
+  return JSON.parse(readFileSync(releaseVersionPolicyPath, "utf8"));
+}
 
 function workspaceManifests(): string[] {
   return ["apps", "packages"].flatMap((group) =>
@@ -33,7 +42,8 @@ describe("release version domains", () => {
   });
 
   it("keeps the OpenAPI version on the stable API-major domain", () => {
-    const apiVersion = `${rootPackage.version.split(".")[0]}.0.0`;
+    const { openapiVersion } = releaseVersionPolicy();
+    expect(openapiVersion).toMatch(/^[1-9]\d*\.0\.0$/);
     const specs = readdirSync(path.resolve(root, "apps/api/src"))
       .filter((name) => /^openapi(?:\.[A-Za-z-]+)?\.yaml$/.test(name))
       .sort();
@@ -41,13 +51,14 @@ describe("release version domains", () => {
     expect(specs).toHaveLength(21);
     for (const spec of specs) {
       const source = readFileSync(path.resolve(root, "apps/api/src", spec), "utf8");
-      expect(source, `${spec} must publish API major ${apiVersion}`).toMatch(
-        new RegExp(`^  version: ${apiVersion.replaceAll(".", "\\.")}$`, "m"),
+      expect(source, `${spec} must publish API major ${openapiVersion}`).toMatch(
+        new RegExp(`^  version: ${openapiVersion.replaceAll(".", "\\.")}$`, "m"),
       );
     }
   });
 
   it("documents the independent app, API-major, and legacy-bundle epochs", () => {
+    const policy = releaseVersionPolicy();
     const developerGuide = readFileSync(path.resolve(root, "apps/docs/guide/developer.md"), "utf8");
     const manifest = JSON.parse(
       readFileSync(path.resolve(root, "docker/feature-manifest.json"), "utf8"),
@@ -57,7 +68,8 @@ describe("release version domains", () => {
     expect(developerGuide).toContain("workspace packages and `APP_VERSION`");
     expect(developerGuide).toContain("OpenAPI `info.version`");
     expect(developerGuide).toContain("legacy feature-bundle storage epoch");
-    expect(manifest.imageVersion).toBe("2.0.0");
+    expect(developerGuide).toContain("config/release-version-policy.json");
+    expect(manifest.imageVersion).toBe(policy.legacyBundleImageVersion);
     expect(manifest.bundles.ocr.runtimeFormatVersion).toBe(3);
   });
 });

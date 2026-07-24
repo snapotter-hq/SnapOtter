@@ -110,6 +110,15 @@ describe("release supply-chain closure", () => {
     expect(releaseSubjects).toContain('subject-path: "/tmp/${{ env.release_subjects_name }}"');
     expect(releaseSubjects).toContain("Existing release-subject manifest differs");
     expect(releaseSubjects).not.toContain("--clobber");
+    const build = releaseSubjects.indexOf("Build canonical release-subject manifest");
+    const revalidate = releaseSubjects.indexOf(
+      "Revalidate release tag immediately before attesting subjects",
+    );
+    const attest = releaseSubjects.indexOf("Attest release-commit subject binding");
+    expect(build).toBeGreaterThanOrEqual(0);
+    expect(revalidate).toBeGreaterThan(build);
+    expect(attest).toBeGreaterThan(revalidate);
+    expect(releaseSubjects.match(/git fetch --force --no-tags origin/g)).toHaveLength(2);
     expect(aliases).toContain("needs: [release, manifest, image-provenance, release-subjects]");
   });
 

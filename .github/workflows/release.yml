@@ -1759,6 +1759,20 @@ jobs:
               environment.write(f"release_subjects_exists={str(existing_manifest is not None).lower()}\n")
           PY
 
+      - name: Revalidate release tag immediately before attesting subjects
+        env:
+          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "+refs/tags/v${VERSION}:refs/tags/v${VERSION}"
+          tag_commit="$(git rev-parse "refs/tags/v${VERSION}^{commit}")"
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}" \
+            && "${tag_commit}" == "${RELEASE_COMMIT}" ]] || {
+              echo "::error::Remote release tag moved before subject attestation"
+              exit 1
+            }
+
       - name: Attest release-commit subject binding
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:

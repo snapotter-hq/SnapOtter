@@ -226,6 +226,7 @@ SnapOtter intentionally has three version domains. Do not copy one domain into a
 - `docker/feature-manifest.json` keeps `imageVersion: 2.0.0` as the immutable legacy feature-bundle storage epoch. Those v2 archive paths are not application package versions. Accurate OCR uses runtime format v3 and records its application release provenance separately.
 
 `tests/unit/infra/release-version-policy.test.ts` enforces these boundaries. A new version domain or migration must update that contract and the relevant artifact migration design together.
+The independent API and legacy-bundle values live in `config/release-version-policy.json`; application version synchronization must never rewrite that policy file implicitly.
 
 ## Environment variables {#environment-variables}
 
