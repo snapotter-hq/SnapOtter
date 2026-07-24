@@ -9,26 +9,54 @@ permissions:
   contents: read
 
 jobs:
-  mutation-image-engine:
-    name: Stryker (image-engine)
+  mutation:
+    name: Stryker (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      # One broken lane must not hide the others. This is exactly how the
+      # image-engine lane silently rotted: a bad babel override made Stryker
+      # error, but with a single job nobody was watching the other packages.
+      fail-fast: false
+      matrix:
+        include:
+          - lane: image-engine
+            run: pnpm --filter @snapotter/image-engine exec stryker run
+            incremental: packages/image-engine/reports/stryker-incremental.json
+            report: packages/image-engine/reports/mutation/
+          - lane: media-engine
+            run: pnpm --filter @snapotter/media-engine exec stryker run
+            incremental: packages/media-engine/reports/stryker-incremental.json
+            report: packages/media-engine/reports/mutation/
+          - lane: doc-engine
+            run: pnpm --filter @snapotter/doc-engine exec stryker run
+            incremental: packages/doc-engine/reports/stryker-incremental.json
+            report: packages/doc-engine/reports/mutation/
+          - lane: api
+            run: packages/image-engine/node_modules/.bin/stryker run stryker.api.config.json
+            incremental: reports/stryker-api-incremental.json
+            report: reports/mutation/
+          - lane: shared
+            run: packages/image-engine/node_modules/.bin/stryker run stryker.shared.config.json
+            incremental: reports/stryker-shared-incremental.json
+            report: reports/mutation/
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
       - name: Restore incremental mutation state
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: packages/image-engine/reports/stryker-incremental.json
-          key: stryker-incremental-${{ github.sha }}
+          path: ${{ matrix.incremental }}
+          key: stryker-incremental-${{ matrix.lane }}-${{ github.sha }}
           restore-keys: |
-            stryker-incremental-
+            stryker-incremental-${{ matrix.lane }}-
       - name: Run mutation tests
-        run: pnpm --filter @snapotter/image-engine exec stryker run
+        run: ${{ matrix.run }}
       - name: Upload mutation report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: mutation-report-image-engine
-          path: packages/image-engine/reports/mutation/
+          name: mutation-report-${{ matrix.lane }}
+          path: ${{ matrix.report }}
           retention-days: 30
+          if-no-files-found: ignore
