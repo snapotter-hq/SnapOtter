@@ -201,6 +201,11 @@ export async function putObjectStream(
       opts.signal?.reason instanceof Error
         ? opts.signal.reason
         : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    // An abort can arrive while local capacity/directory checks are still
+    // running, before pipeline() has attached its own error listener. Keep that
+    // early destroy from becoming an uncaught process-level stream error while
+    // preserving the caller's exact reason for consumers that do observe it.
+    if (source.listenerCount("error") === 0) source.once("error", () => {});
     source.destroy(reason);
   };
   let written = 0;
@@ -235,28 +240,33 @@ export async function putObjectStream(
   const stagingDir = join(dirname(p), ".snapotter-staging");
   const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
   let stagingOwned = false;
+  opts.signal?.addEventListener("abort", abortSource, { once: true });
   try {
-    await assertLocalCapacity();
-    opts.signal?.throwIfAborted();
-    await mkdir(dirname(p), { recursive: true });
-    opts.signal?.throwIfAborted();
-    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
-    opts.signal?.throwIfAborted();
-    await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
-    stagingOwned = true;
-    opts.signal?.throwIfAborted();
-    await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
-      signal: opts.signal,
-    });
-    opts.signal?.throwIfAborted();
-    await rename(stagingPath, p);
-    await rmdir(stagingDir).catch(() => {});
-  } catch (err) {
-    if (stagingOwned) await unlink(stagingPath).catch(() => {});
-    await rmdir(stagingDir).catch(() => {});
-    throw normalizeOperationalWriteError(err);
+    try {
+      await assertLocalCapacity();
+      opts.signal?.throwIfAborted();
+      await mkdir(dirname(p), { recursive: true });
+      opts.signal?.throwIfAborted();
+      await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+      opts.signal?.throwIfAborted();
+      await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
+      stagingOwned = true;
+      opts.signal?.throwIfAborted();
+      await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
+        signal: opts.signal,
+      });
+      opts.signal?.throwIfAborted();
+      await rename(stagingPath, p);
+      await rmdir(stagingDir).catch(() => {});
+    } catch (err) {
+      if (stagingOwned) await unlink(stagingPath).catch(() => {});
+      await rmdir(stagingDir).catch(() => {});
+      throw normalizeOperationalWriteError(err);
+    }
+    return written;
+  } finally {
+    opts.signal?.removeEventListener("abort", abortSource);
   }
-  return written;
 }
 
 export async function getObjectStream(
