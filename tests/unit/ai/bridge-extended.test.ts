@@ -1,5 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -455,26 +458,32 @@ describe("bridge - PYTHON_VENV_PATH env handling", () => {
     delete process.env.PYTHON_VENV_PATH;
   });
 
-  it("uses custom PYTHON_VENV_PATH when set", async () => {
-    process.env.PYTHON_VENV_PATH = "/custom/venv";
+  it("uses custom PYTHON_VENV_PATH when its interpreter exists", async () => {
+    const venvPath = mkdtempSync(join(tmpdir(), "snapotter-bridge-venv-"));
+    const pythonPath =
+      process.platform === "win32"
+        ? join(venvPath, "Scripts", "python.exe")
+        : join(venvPath, "bin", "python3");
+    mkdirSync(join(pythonPath, ".."), { recursive: true });
+    writeFileSync(pythonPath, "");
+    process.env.PYTHON_VENV_PATH = venvPath;
 
-    const mod = await import("../../../packages/ai/src/bridge.js");
-    runPythonWithProgress = mod.runPythonWithProgress;
+    try {
+      const mod = await import("../../../packages/ai/src/bridge.js");
+      runPythonWithProgress = mod.runPythonWithProgress;
 
-    const mock = createMockProcess();
-    vi.mocked(spawn).mockReturnValue(mock.process);
+      const mock = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mock.process);
 
-    const promise = runPythonWithProgress("test.py", []);
-    mock.stdout.emit("data", Buffer.from('{"ok": true}\n'));
-    mock.emitEvent("close", 0, null);
-    await promise;
+      const promise = runPythonWithProgress("test.py", []);
+      mock.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+      mock.emitEvent("close", 0, null);
+      await promise;
 
-    // At least one spawn call should use the custom venv path
-    const allCalls = vi.mocked(spawn).mock.calls;
-    const usesCustomVenv = allCalls.some(
-      (call) => typeof call[0] === "string" && call[0].includes("/custom/venv"),
-    );
-    expect(usesCustomVenv).toBe(true);
+      expect(vi.mocked(spawn).mock.calls.some((call) => call[0] === pythonPath)).toBe(true);
+    } finally {
+      rmSync(venvPath, { force: true, recursive: true });
+    }
   });
 
   it("passes PYTHON_VENV_PATH through to env when set", async () => {

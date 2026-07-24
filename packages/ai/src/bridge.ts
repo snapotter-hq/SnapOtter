@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
@@ -70,7 +71,12 @@ export function buildMinimalEnv(): Record<string, string> {
 /** Try venv first, then system python. */
 function getPythonPath(): string {
   const venvPath = process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");
-  return `${venvPath}/bin/python3`;
+  const path = process.platform === "win32" ? win32 : posix;
+  const venvPython = path.join(
+    venvPath,
+    process.platform === "win32" ? "Scripts/python.exe" : "bin/python3",
+  );
+  return existsSync(venvPython) ? venvPython : process.platform === "win32" ? "python" : "python3";
 }
 
 /**
