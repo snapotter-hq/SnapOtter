@@ -217,6 +217,16 @@ Use BuildKit cache mounts for faster rebuilds:
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
+## Release version domains {#release-version-domains}
+
+SnapOtter intentionally has three version domains. Do not copy one domain into another during a release:
+
+- The application release version covers the root manifest, all private workspace packages and `APP_VERSION`. Semantic-release supplies this value, and `pnpm version:sync <version>` updates every workspace before an application release.
+- OpenAPI `info.version` is the stable public API-major contract. All localized specifications stay on `<major>.0.0` for compatible application releases and change only when the API contract moves to a new major version.
+- `docker/feature-manifest.json` keeps `imageVersion: 2.0.0` as the immutable legacy feature-bundle storage epoch. Those v2 archive paths are not application package versions. Accurate OCR uses runtime format v3 and records its application release provenance separately.
+
+`tests/unit/infra/release-version-policy.test.ts` enforces these boundaries. A new version domain or migration must update that contract and the relevant artifact migration design together.
+
 ## Environment variables {#environment-variables}
 
 See the [Configuration guide](/guide/configuration) for the full list. Key ones for development:

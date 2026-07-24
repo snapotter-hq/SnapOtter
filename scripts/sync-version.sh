@@ -14,10 +14,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGES=(
   "apps/web/package.json"
   "apps/api/package.json"
+  "apps/demo/package.json"
   "apps/docs/package.json"
   "apps/landing/package.json"
   "packages/shared/package.json"
+  "packages/doc-engine/package.json"
+  "packages/enterprise/package.json"
   "packages/image-engine/package.json"
+  "packages/media-engine/package.json"
   "packages/ai/package.json"
 )
 
