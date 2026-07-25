@@ -23,6 +23,18 @@ function mockStatus(page: import("@playwright/test").Page, status: string) {
   );
 }
 
+/**
+ * `waitForResponse` resolves when Playwright sees the response over CDP, which
+ * is ahead of the page's own `.then` chain. Two frames give the badge its
+ * chance to change, so a "stays grey" assertion proves it did not rather than
+ * just winning a race.
+ */
+function flushFrames(page: import("@playwright/test").Page) {
+  return page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+}
+
 test.describe("Footer status indicator", () => {
   test("ships the grey state in the served HTML, before any script runs", async ({ page }) => {
     // Fetched as raw markup rather than a rendered page, so this covers the
@@ -44,6 +56,7 @@ test.describe("Footer status indicator", () => {
     const settled = page.waitForResponse("**/api/status");
     await page.goto("/");
     await settled;
+    await flushFrames(page);
     await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
     await expect(page.locator(INDICATOR)).toContainText("Checking status");
     // The state most visitors see first, so it needs pinning too. The dot was
@@ -57,6 +70,7 @@ test.describe("Footer status indicator", () => {
     const settled = page.waitForResponse("**/api/status");
     await page.goto("/");
     await settled;
+    await flushFrames(page);
     await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
   });
 
@@ -74,19 +88,28 @@ test.describe("Footer status indicator", () => {
       // 1.4.11's 3:1 non-text floor against the footer's --color-background-alt.
       await expect(page.locator(DOT)).toHaveCSS("background-color", dotColor);
       // And the label never carries it, in any state. --color-success is
-      // 4.498:1 there, just under AA, so a colored label would fail
-      // tests/unit/palette-contrast.test.ts. "down" is the tempting one to redden.
+      // 4.498:1 on the footer's --color-background-alt, just under AA.
+      // palette-contrast.test.ts does not cover that pair (it checks success
+      // against --color-background, where it passes), so this assertion is the
+      // only guard. "down" is the tempting one to redden.
       await expect(page.locator(LABEL)).toHaveCSS("color", MUTED);
     });
   }
 
-  test("ignores an unrecognized status value", async ({ page }) => {
-    await mockStatus(page, "banana");
-    const settled = page.waitForResponse("**/api/status");
-    await page.goto("/");
-    await settled;
-    await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
-  });
+  // "banana" is absent for the easy reason. "toString" is the one that matters:
+  // it resolves on Object.prototype, so an unguarded lookup renders
+  // "function toString() { [native code] }" in the footer.
+  for (const status of ["banana", "toString"] as const) {
+    test(`ignores the unrecognized status "${status}"`, async ({ page }) => {
+      await mockStatus(page, status);
+      const settled = page.waitForResponse("**/api/status");
+      await page.goto("/");
+      await settled;
+      await flushFrames(page);
+      await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
+      await expect(page.locator(INDICATOR)).toContainText("Checking status");
+    });
+  }
 
   test("names the three services it speaks for", async ({ page }) => {
     // The badge reports on snapotter.com's own properties, never on a visitor's
