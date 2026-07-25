@@ -49,7 +49,7 @@ const labels = {
   }
 </style>
 
-<script define:vars={{ labels }}>
+<script is:inline define:vars={{ labels }}>
   (() => {
     const root = document.querySelector("[data-status-indicator]");
     if (!root) return;
