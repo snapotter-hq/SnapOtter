@@ -140,6 +140,7 @@ export async function runGeneratedTool(
   config: AnyToolRouteConfig,
   inputs: ToolProcessInputV2[],
   settings: unknown,
+  signal: AbortSignal = new AbortController().signal,
 ): Promise<Buffer> {
   if (!config.processV2) throw new Error(`No processV2 for ${config.toolId}`);
   if (inputs.length === 0) throw new Error(`No generated inputs for ${config.toolId}`);
@@ -150,7 +151,7 @@ export async function runGeneratedTool(
       inputs,
       settings,
       scratchDir,
-      signal: new AbortController().signal,
+      signal,
       report: () => {},
     });
     if (result.buffer) return result.buffer;

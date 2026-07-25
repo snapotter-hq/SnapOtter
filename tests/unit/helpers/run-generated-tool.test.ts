@@ -57,6 +57,24 @@ describe("generated tool process harness", () => {
     );
   });
 
+  it("forwards a caller-provided watchdog signal to the resolved process", async () => {
+    const processV2 = vi.fn(async () => ({
+      buffer: Buffer.from("result"),
+      filename: "result.bin",
+      contentType: "application/octet-stream",
+    }));
+    const controller = new AbortController();
+
+    await runGeneratedTool(
+      config(processV2),
+      [{ buffer: Buffer.from("input"), filename: "input.bin", ref: "generated/input.bin" }],
+      { quality: 80 },
+      controller.signal,
+    );
+
+    expect(processV2).toHaveBeenCalledWith(expect.objectContaining({ signal: controller.signal }));
+  });
+
   it("reads scratch-path output before deleting the isolated scratch directory", async () => {
     let scratchPath = "";
     const output = await runGeneratedTool(

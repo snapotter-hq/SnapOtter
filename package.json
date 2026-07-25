@@ -43,6 +43,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run --config vitest.config.ts tests/unit",
     "test:integration": "vitest run --config vitest.config.ts tests/integration",
+    "test:fuzz": "node scripts/run-fuzz-gate.mjs",
     "test:coverage": "vitest run --coverage",
     "test:ci": "vitest run --coverage --reporter=verbose",
     "test:all": "vitest run --coverage && pnpm test:e2e",

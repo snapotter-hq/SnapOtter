@@ -4,6 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { ZodFastCheck } from "zod-fast-check";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import {
+  fuzzBudgetFor,
+  parseFuzzConfig,
+  runFuzzCaseWithWatchdog,
+} from "../../helpers/fuzz-policy.js";
 import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -30,8 +35,7 @@ import { buildTestApp, type TestApp } from "../test-server.js";
  * Nightly-only (FUZZ=1); FUZZ_RUNS controls depth (default 25).
  */
 const FUZZ = !!process.env.FUZZ;
-const NUM_RUNS = Number(process.env.FUZZ_RUNS ?? 25);
-const FUZZ_SEED = Number(process.env.FUZZ_SEED ?? 20_260_724);
+const FUZZ_CONFIG = parseFuzzConfig(FUZZ ? process.env : {});
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const FIXTURE_INDEX = buildGeneratedFixtureIndex(generatedFixtureDirectories());
 
@@ -39,6 +43,13 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
   let testApp: TestApp;
 
   beforeAll(async () => {
+    console.info(
+      `[fuzz-config] runs=${FUZZ_CONFIG.runs} seed=${FUZZ_CONFIG.seed} ` +
+        `seedSource=${FUZZ_CONFIG.seedSource}`,
+    );
+    if (FUZZ_CONFIG.seedSource === "FC_SEED") {
+      console.warn("[fuzz-config] FC_SEED is deprecated; use FUZZ_SEED instead");
+    }
     testApp = await buildTestApp();
   }, 30_000);
 
@@ -50,7 +61,10 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
   // are looked up inside the test body; registry-exempt tools no-op here.
   for (const tool of TOOLS) {
     const toolId = tool.id;
-    it(`${toolId} never crashes on schema-valid settings`, async (context) => {
+    const budget = fuzzBudgetFor(tool, FUZZ_CONFIG.runs);
+    it(`${toolId} never crashes on schema-valid settings`, {
+      timeout: budget.targetTimeoutMs,
+    }, async (context) => {
       if (PYTHON_SIDECAR_TOOLS.includes(toolId) && !REQUIRE_AI_FEATURES) {
         return context.skip(
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
@@ -69,7 +83,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       }
       const inputs = await buildGeneratedProcessInputs(fixtures, config, tool.modality);
       const accounting = new GeneratedCaseAccounting(toolId, {
-        expectedAttempts: NUM_RUNS + 1,
+        expectedAttempts: FUZZ_CONFIG.runs + 1,
       });
 
       // Every fuzz target gets one deterministic, user-realistic smoke case.
@@ -84,7 +98,16 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       if (missingBaselinePython) {
         accounting.skip("optional-feature", missingBaselinePython);
       } else {
-        const baselineOutput = await runGeneratedTool(config, inputs, baseline.data);
+        const baselineOutput = await runFuzzCaseWithWatchdog(
+          {
+            toolId,
+            seed: FUZZ_CONFIG.seed,
+            run: 0,
+            settings: baseline.data,
+            timeoutMs: budget.caseTimeoutMs,
+          },
+          (signal) => runGeneratedTool(config, inputs, baseline.data, signal),
+        );
         expect(
           baselineOutput.length,
           `${toolId} produced empty output for defaults`,
@@ -114,10 +137,12 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       }
 
       try {
+        let run = 0;
         await fc.assert(
           fc.asyncProperty(arbitrary, async (settings) => {
             const parsed = config.settingsSchema.safeParse(settings);
             fc.pre(parsed.success);
+            run += 1;
             accounting.attempt();
             const missingCasePython = findMissingGeneratedPythonPrerequisite(toolId, parsed.data);
             if (missingCasePython) {
@@ -125,7 +150,16 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
               return;
             }
             try {
-              const result = await runGeneratedTool(config, inputs, parsed.data);
+              const result = await runFuzzCaseWithWatchdog(
+                {
+                  toolId,
+                  seed: FUZZ_CONFIG.seed,
+                  run,
+                  settings: parsed.data,
+                  timeoutMs: budget.caseTimeoutMs,
+                },
+                (signal) => runGeneratedTool(config, inputs, parsed.data, signal),
+              );
               expect(
                 result.length,
                 `${toolId} produced empty output for ${JSON.stringify(settings)}`,
@@ -136,7 +170,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
               accounting.reject();
             }
           }),
-          { numRuns: NUM_RUNS, seed: FUZZ_SEED },
+          { numRuns: FUZZ_CONFIG.runs, seed: FUZZ_CONFIG.seed },
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -151,6 +185,6 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
         throw err;
       }
       expect(accounting.assertCovered().accepted).toBeGreaterThan(0);
-    }, 240_000);
+    });
   }
 });
