@@ -7,9 +7,9 @@ import { expect, test } from "@playwright/test";
 // workflows, exotic format inputs, and pipeline edge cases not
 // covered by pipeline-chains.spec.ts.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 

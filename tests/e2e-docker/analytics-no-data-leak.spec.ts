@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // Verifies that when analytics is disabled at build time, zero data
 // is sent to PostHog or Sentry, and tool functionality is unaffected.
 
-const FIXTURES_DIR = path.join(process.cwd(), "tests", "fixtures");
+const FIXTURES_DIR = path.join(process.cwd(), "tests", "fixtures", "image", "valid");
 // biome-ignore lint/suspicious/noUndeclaredEnvVars: e2e test env var
 const BASE_URL = process.env.API_URL ?? "http://localhost:1349";
 

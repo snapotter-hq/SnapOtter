@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 // real-world workflows, duplicate steps, format changes mid-chain,
 // and deep pipelines (5+ steps).
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 
 let token: string;
 

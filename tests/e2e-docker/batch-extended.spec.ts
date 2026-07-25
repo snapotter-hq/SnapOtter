@@ -8,9 +8,9 @@ import { expect, test } from "@playwright/test";
 // favicon, beautify, vectorize, replace-color (5+ images), and
 // cross-format batch operations.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 

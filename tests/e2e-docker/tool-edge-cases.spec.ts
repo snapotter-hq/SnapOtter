@@ -7,9 +7,10 @@ import { expect, test } from "@playwright/test";
 // for tools already tested. Exercises uncommon setting combinations,
 // extreme values, and format-specific quirks.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const EDGE_FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "edge");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 
@@ -31,6 +32,10 @@ function formatFixture(name: string): Buffer {
 
 function contentFixture(name: string): Buffer {
   return readFileSync(join(CONTENT, name));
+}
+
+function edgeFixture(name: string): Buffer {
+  return readFileSync(join(EDGE_FIXTURES, name));
 }
 
 function buildMultipart(
@@ -66,7 +71,7 @@ const PNG_200x150 = fixture("test-200x150.png");
 const JPG_100x100 = fixture("test-100x100.jpg");
 const WEBP_50x50 = fixture("test-50x50.webp");
 const HEIC_200x150 = fixture("test-200x150.heic");
-const PNG_1x1 = fixture("test-1x1.png");
+const PNG_1x1 = edgeFixture("test-1x1.png");
 const JPG_SAMPLE = formatFixture("sample.jpg");
 
 // ─── Resize Edge Cases ───────────────────────────────────────────

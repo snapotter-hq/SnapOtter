@@ -8,6 +8,7 @@ const createDbPath = path.join(root, "tests", "e2e-pg-create-db.cjs");
 const e2eDir = path.join(root, "tests", "e2e");
 const authSetupPath = path.join(e2eDir, "auth.setup.ts");
 const helpersPath = path.join(root, "tests", "e2e", "helpers.ts");
+const dockerPlaywrightConfigPath = path.join(root, "playwright.analytics.config.ts");
 const packagePath = path.join(root, "package.json");
 const e2eRunnerPath = path.join(root, "scripts", "run-main-e2e.mjs");
 const turboPath = path.join(root, "turbo.json");
@@ -240,6 +241,27 @@ test("main E2E consumers use the resolved run endpoint and artifact root", () =>
   expect.soft(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
   expect.soft(authSetup).not.toContain(":13490");
   expect.soft(authSetup).not.toContain(":2349");
+});
+
+test("Docker E2E specs collect with tracked fixture references", () => {
+  const output = execFileSync(
+    "pnpm",
+    ["exec", "playwright", "test", "--config", dockerPlaywrightConfigPath, "--list"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        BASE_URL: "http://127.0.0.1:1349",
+        CI: "1",
+        PLAYWRIGHT_RUN_ID: "docker_fixture_contract",
+      },
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: "pipe",
+    },
+  );
+
+  expect(output).toMatch(/Total: \d+ tests in \d+ files/);
 });
 
 test("the canonical E2E command exactly covers every release browser and device project", async () => {

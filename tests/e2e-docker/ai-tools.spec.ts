@@ -15,8 +15,9 @@ import { apiToolPath } from "@snapotter/shared";
 //   - 501 FEATURE_NOT_INSTALLED = skip gracefully (expected when bundle missing)
 //   - Other errors = genuine failures
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const EDGE_FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "edge");
+const CONTENT = FIXTURES;
 
 let token: string;
 
@@ -36,12 +37,16 @@ function contentFixture(name: string): Buffer {
   return readFileSync(join(CONTENT, name));
 }
 
+function edgeFixture(name: string): Buffer {
+  return readFileSync(join(EDGE_FIXTURES, name));
+}
+
 const JPG_100x100 = fixture("test-100x100.jpg");
-const BLANK_PNG = fixture("test-blank.png");
+const BLANK_PNG = edgeFixture("test-blank.png");
 const HEIC_PORTRAIT = fixture("test-portrait.heic");
 
 /** Minimal valid 1x1 PNG for quick feature-detection probes. */
-const TINY_PNG = fixture("test-1x1.png");
+const TINY_PNG = edgeFixture("test-1x1.png");
 
 /**
  * Determine whether a given AI tool's feature bundle is installed by

@@ -7,9 +7,10 @@ import { expect, test } from "@playwright/test";
 // image-to-pdf, image-to-base64, favicon, convert (format matrix)
 // These tools handle format conversion and encoding.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
+const DOCUMENTS = join(process.cwd(), "tests", "fixtures", "document", "valid");
 
 function buildMultipart(
   files: Array<{
@@ -67,11 +68,15 @@ function contentFixture(name: string): Buffer {
   return readFileSync(join(CONTENT, name));
 }
 
+function documentFixture(name: string): Buffer {
+  return readFileSync(join(DOCUMENTS, name));
+}
+
 const PNG_200x150 = fixture("test-200x150.png");
 const JPG_100x100 = fixture("test-100x100.jpg");
 const SVG_100x100 = fixture("test-100x100.svg");
 const ANIMATED_GIF = fixture("animated.gif");
-const PDF_3PAGE = fixture("test-3page.pdf");
+const PDF_3PAGE = documentFixture("test-3page.pdf");
 const HEIC_200x150 = fixture("test-200x150.heic");
 
 // ─── SVG to Raster ──────────────────────────────────────────────────

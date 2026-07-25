@@ -7,7 +7,7 @@ import { expect, type Page, test } from "@playwright/test";
 // watermark-image, text-overlay, content-aware-resize
 // These tools handle multi-image operations, overlays, and layout.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
 
 let token: string;
 

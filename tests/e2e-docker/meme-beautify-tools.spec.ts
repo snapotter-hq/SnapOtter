@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 // These tools handle meme creation with text overlays and screenshot
 // beautification with frames, shadows, backgrounds, and social presets.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 
 let token: string;
 

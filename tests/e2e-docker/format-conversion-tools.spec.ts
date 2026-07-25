@@ -8,9 +8,10 @@ import { expect, test } from "@playwright/test";
 // various operations, PDF-to-image with all DPI and format options.
 // Complements conversion-tools.spec.ts with deeper fixture coverage.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
+const DOCUMENTS = join(process.cwd(), "tests", "fixtures", "document", "valid");
 
 let token: string;
 
@@ -34,12 +35,16 @@ function contentFixture(name: string): Buffer {
   return readFileSync(join(CONTENT, name));
 }
 
+function documentFixture(name: string): Buffer {
+  return readFileSync(join(DOCUMENTS, name));
+}
+
 const PNG_200x150 = fixture("test-200x150.png");
 const SVG_100x100 = fixture("test-100x100.svg");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const WEBP_50x50 = fixture("test-50x50.webp");
 const ANIMATED_GIF = fixture("animated.gif");
-const PDF_3PAGE = fixture("test-3page.pdf");
+const PDF_3PAGE = documentFixture("test-3page.pdf");
 
 // ─── SVG to Raster — Extended Formats ──────────────────────────────
 

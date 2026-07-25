@@ -3,7 +3,11 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 function fixturePath(name: string): string {
-  return path.join(process.cwd(), "tests", "fixtures", name);
+  return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
+}
+
+function edgeFixturePath(name: string): string {
+  return path.join(process.cwd(), "tests", "fixtures", "image", "edge", name);
 }
 
 async function uploadFile(page: import("@playwright/test").Page, filePath: string) {
@@ -32,7 +36,7 @@ test.describe("Blur Faces - HEIC fix and no-face warning", () => {
 
   test("no-face image shows warning message", async ({ page }) => {
     await page.goto("/blur-faces");
-    await uploadFile(page, fixturePath("test-blank.png"));
+    await uploadFile(page, edgeFixturePath("test-blank.png"));
 
     await page.getByTestId("blur-faces-submit").click();
 

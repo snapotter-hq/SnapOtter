@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 // in realistic workflows. Complements pipeline-tools.spec.ts with
 // more complex chains and cross-category combinations.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 let token: string;
 
 test.beforeAll(async ({ request }) => {

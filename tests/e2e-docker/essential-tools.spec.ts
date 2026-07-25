@@ -7,9 +7,10 @@ import { expect, test } from "@playwright/test";
 // edit-metadata, info, sharpening, color-adjustments, color-blindness
 // These are the core Sharp-based image manipulation tools.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const EDGE_FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "edge");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 
@@ -33,6 +34,10 @@ function contentFixture(name: string): Buffer {
   return readFileSync(join(CONTENT, name));
 }
 
+function edgeFixture(name: string): Buffer {
+  return readFileSync(join(EDGE_FIXTURES, name));
+}
+
 /** 200x150 PNG for dimension-sensitive tests. */
 const PNG_200x150 = fixture("test-200x150.png");
 
@@ -46,7 +51,7 @@ const HEIC_200x150 = fixture("test-200x150.heic");
 const SVG_100x100 = fixture("test-100x100.svg");
 
 /** Tiny 1x1 PNG for edge case testing. */
-const PNG_1x1 = fixture("test-1x1.png");
+const PNG_1x1 = edgeFixture("test-1x1.png");
 
 /** Large sample JPEG for stress testing. */
 const JPG_SAMPLE_LARGE = contentFixture("stress-large.jpg");

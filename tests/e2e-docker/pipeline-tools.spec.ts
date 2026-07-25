@@ -12,8 +12,8 @@ import { expect, test } from "@playwright/test";
 // Pipelines chain tool steps: the output of step N feeds into step N+1.
 // AI tools in a pipeline respect the same FEATURE_NOT_INSTALLED guard.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 
 let token: string;
 

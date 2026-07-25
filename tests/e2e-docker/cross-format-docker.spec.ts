@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 // Docker container with real Sharp processing. Verifies actual
 // output dimensions, format, and file size.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 
 let token: string;
 

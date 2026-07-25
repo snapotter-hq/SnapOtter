@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 // edit-metadata, optimize-for-web, image-enhancement
 // These tools modify image properties without changing dimensions.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 
 let token: string;
 

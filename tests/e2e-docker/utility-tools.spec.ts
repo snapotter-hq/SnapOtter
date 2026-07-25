@@ -7,9 +7,9 @@ import { expect, test } from "@playwright/test";
 // qr-generate, barcode-read, bulk-rename
 // These tools extract metadata, compare images, and generate assets.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 

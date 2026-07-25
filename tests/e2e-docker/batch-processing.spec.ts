@@ -6,8 +6,8 @@ import { expect, test } from "@playwright/test";
 // Tests for multi-file batch uploads across every tool category.
 // Verifies ZIP output, batch limits, and correct processing of all files.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
 let token: string;
 
 test.beforeAll(async ({ request }) => {

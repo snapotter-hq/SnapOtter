@@ -7,9 +7,9 @@ import { expect, test } from "@playwright/test";
 // GIF, BMP, SVG) through core processing tools. Verifies the
 // format decode path works end-to-end in the Docker container.
 
-const FIXTURES = join(process.cwd(), "tests", "fixtures");
-const FORMATS = join(FIXTURES, "formats");
-const CONTENT = join(FIXTURES, "content");
+const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
+const FORMATS = join(process.cwd(), "tests", "fixtures", "image", "formats");
+const CONTENT = FIXTURES;
 
 let token: string;
 

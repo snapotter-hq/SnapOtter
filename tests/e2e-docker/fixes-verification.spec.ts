@@ -1,7 +1,7 @@
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
-const FIXTURES_DIR = path.join(process.cwd(), "tests", "fixtures");
+const FIXTURES_DIR = path.join(process.cwd(), "tests", "fixtures", "image", "valid");
 
 function getFixture(name: string): string {
   return path.join(FIXTURES_DIR, name);
@@ -239,10 +239,7 @@ test.describe("Batch processing fixes", () => {
   test("blur-faces processes multiple files", async ({ page }) => {
     await page.goto("/blur-faces");
 
-    await uploadFiles(page, [
-      getFixture("content/multi-face.webp"),
-      getFixture("content/portrait-color.jpg"),
-    ]);
+    await uploadFiles(page, [getFixture("multi-face.webp"), getFixture("portrait-color.jpg")]);
 
     const processBtn = page.getByRole("button", { name: /blur|process/i });
     await expect(processBtn).toBeEnabled({ timeout: 5000 });
@@ -300,7 +297,7 @@ test.describe("Passport photo", () => {
 
   test("passport photo works with real portrait", async ({ page }) => {
     await page.goto("/passport-photo");
-    await uploadFiles(page, [getFixture("content/portrait-color.jpg")]);
+    await uploadFiles(page, [getFixture("portrait-color.jpg")]);
 
     // Wait for face analysis (uses MediaPipe + rembg, can be slow on CPU)
     await page.waitForTimeout(5000);
