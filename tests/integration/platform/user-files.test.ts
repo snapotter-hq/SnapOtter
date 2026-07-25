@@ -19,6 +19,10 @@ const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
 const _WEBP = readFixture(fixtures.image.base.webp50);
 const TINY_PNG = readFixture(fixtures.image.edge.px1);
+// BMP is a CLI_DECODED_FORMATS member (see file-validation.ts): validateImageBuffer()
+// intentionally returns {valid: true, width: 0, height: 0} for it without decoding,
+// since real decoding happens lazily elsewhere. Used to cover the 0x0-vs-null bug.
+const BMP = readFixture(fixtures.image.formats("bmp"));
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -98,6 +102,31 @@ describe("File upload", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/no valid files/i);
+  });
+
+  // Regression test for #635: validateImageBuffer() reports {width: 0, height: 0}
+  // by design for CLI_DECODED_FORMATS members (never decoded on upload), and the
+  // route must treat that sentinel as "unknown" (null), not write the literal 0x0.
+  it("stores null dimensions (not 0x0) for a CLI-decoded format upload", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.bmp", contentType: "image/bmp", content: BMP },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(201);
+    const result = JSON.parse(res.body);
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0].width).toBeNull();
+    expect(result.files[0].height).toBeNull();
   });
 });
 
@@ -475,6 +504,48 @@ describe("Save result", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  // Regression test for #635: same 0x0-vs-null bug as the upload endpoint, but on
+  // the separate save-result write path (a tool result saved as a new version).
+  it("stores null dimensions (not 0x0) for a CLI-decoded format result", async () => {
+    // Upload the parent file
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-bmp-result.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    // Save a BMP "processed" result as a new version
+    const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+      { name: "file", filename: "result.bmp", contentType: "image/bmp", content: BMP },
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "convert" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+      body: saveBody,
+    });
+
+    expect(res.statusCode).toBe(201);
+    const result = JSON.parse(res.body);
+    expect(result.file.width).toBeNull();
+    expect(result.file.height).toBeNull();
   });
 
   it("builds version chain correctly across multiple saves", async () => {

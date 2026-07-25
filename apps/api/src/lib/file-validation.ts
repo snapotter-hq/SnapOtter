@@ -175,6 +175,7 @@ const CLI_DECODED_FORMATS = new Set([
   "ppm",
   "pgm",
   "pbm",
+  "heif",
 ]);
 
 /**

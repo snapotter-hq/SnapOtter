@@ -27,7 +27,7 @@ import {
   saveThumbnail,
   streamStoredFile,
 } from "../lib/file-storage.js";
-import { validateImageBuffer } from "../lib/file-validation.js";
+import { type ValidationResult, validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
@@ -79,6 +79,27 @@ function extToMime(ext: string): string {
     zip: "application/zip",
   };
   return map[clean] ?? "application/octet-stream";
+}
+
+/**
+ * The width/height to store for a validated image, or null if they weren't
+ * actually measured.
+ *
+ * validateImageBuffer() reports {width: 0, height: 0} by design for
+ * CLI_DECODED_FORMATS members (HEIC, RAW, PSD, TGA, ...): it intentionally
+ * skips decoding on upload, so 0 there means "unknown", not a real size.
+ * 0x0 is never a genuine image dimension, so treat it the same as an
+ * invalid/failed validation and store null instead of the literal 0.
+ */
+function measuredDimensions(validation: ValidationResult | null): {
+  width: number | null;
+  height: number | null;
+} {
+  if (!validation) return { width: null, height: null };
+  return {
+    width: validation.width > 0 ? validation.width : null,
+    height: validation.height > 0 ? validation.height : null,
+  };
 }
 
 function serializeFile(row: typeof schema.userFiles.$inferSelect) {
@@ -294,6 +315,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         const mimeType = isValidImage
           ? formatToMime(validation.format)
           : part.mimetype || "application/octet-stream";
+        const dimensions = measuredDimensions(isValidImage ? validation : null);
 
         // Persist to disk
         const storedName = await saveFile(safeBuffer, safeName);
@@ -309,8 +331,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             storedName,
             mimeType,
             size: fileSize,
-            width: isValidImage ? validation.width : null,
-            height: isValidImage ? validation.height : null,
+            width: dimensions.width,
+            height: dimensions.height,
             version: 1,
             parentId: null,
             toolChain: sourceToolId ? [sourceToolId] : null,
@@ -774,6 +796,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const resultName = `${baseName}${ext}`;
 
     const mimeType = isValidImage ? formatToMime(validation.format) : extToMime(ext);
+    const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
     const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
@@ -800,8 +823,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         storedName,
         mimeType,
         size: fileSize,
-        width: isValidImage ? validation.width : null,
-        height: isValidImage ? validation.height : null,
+        width: dimensions.width,
+        height: dimensions.height,
         version: nextVersion,
         parentId,
         toolChain: newChain,
