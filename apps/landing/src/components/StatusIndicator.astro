@@ -30,13 +30,17 @@ const labels = {
 <style>
   /* The dot carries every state color and the label never does:
      --color-success is 4.498:1 on --color-background-alt, just under AA's 4.5,
-     so coloring the label would fail tests/unit/palette-contrast.test.ts. */
+     so coloring the label would fail tests/unit/palette-contrast.test.ts.
+
+     Every state clears WCAG 1.4.11's 3:1 floor for non-text against the
+     footer's --color-background-alt: muted 4.97, success 4.50, primary-ink
+     4.57, danger 4.73. */
   .status-dot {
     width: 6px;
     height: 6px;
     flex: none;
     border-radius: 9999px;
-    background: #a8a29a;
+    background: var(--color-muted);
   }
   [data-status="operational"] .status-dot {
     background: var(--color-success);
