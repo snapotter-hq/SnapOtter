@@ -2,10 +2,14 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import { t } from "@/i18n";
 
+// Required rather than optional-with-an-"en"-default: an omitted prop would
+// typecheck, lint, render, and quietly serve English on all 20 localized page
+// trees. LanguageSwitcher, three lines away in the same footer cluster,
+// declares locale the same way.
 interface Props {
-  locale?: string;
+  locale: string;
 }
-const { locale = "en" } = Astro.props;
+const { locale } = Astro.props;
 
 // Every label is resolved server-side and handed to the script, so the client
 // never needs a second request or a translation table of its own.

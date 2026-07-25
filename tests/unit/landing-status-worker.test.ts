@@ -47,7 +47,9 @@ describe("landing worker /api/status", () => {
     expect(body.status).toBe("operational");
   });
 
-  it("counts a 3xx as up, since redirects are not followed", async () => {
+  // Named for what it pins. The stub ignores `redirect: "manual"`, so this
+  // cannot observe whether redirects are followed, only that a 301 reads as up.
+  it("counts a 301 as up", async () => {
     stubProbes(async () => new Response(null, { status: 301 }));
     const { body } = await getStatus();
     expect(body.status).toBe("operational");
@@ -116,6 +118,20 @@ describe("landing worker /api/status", () => {
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
   });
 
+  // A false green is cheap to sit on; a false red would pin in the browser
+  // across every navigation for the full minute. Bad verdicts recheck sooner.
+  it.each([
+    { verdict: "partial", demo: 503, docs: 200 },
+    { verdict: "down", demo: 503, docs: 503 },
+  ])("caches a $verdict verdict for 15 seconds, not 60", async ({ verdict, demo, docs }) => {
+    stubProbes(async (url) =>
+      url === DEMO ? new Response(null, { status: demo }) : new Response(null, { status: docs }),
+    );
+    const { res, body } = await getStatus();
+    expect(body.status).toBe(verdict);
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=15");
+  });
+
   // Without a bound signal a hung leg would stall the whole route, and the
   // footer request behind it, for as long as the edge allows. Asserting merely
   // that some signal arrived is not enough: a much longer timeout, or an
@@ -132,6 +148,19 @@ describe("landing worker /api/status", () => {
     }
     expect(timeoutSpy).toHaveBeenCalledWith(2000);
     expect(timeoutSpy).toHaveBeenCalledTimes(2);
+  });
+
+  // The test above cannot catch a signal hoisted above the retry loop, because
+  // both legs succeed on attempt 1 and the counts match either way. Force all
+  // four attempts: a hoisted signal would build 2 signals for 4 fetches and
+  // hand attempt 2 an already-fired one, deleting the retry.
+  it("gives each attempt its own deadline, not the first attempt's leftovers", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    const calls = stubProbes(async () => new Response(null, { status: 500 }));
+    await getStatus();
+    expect(calls).toHaveLength(4);
+    expect(timeoutSpy).toHaveBeenCalledTimes(4);
+    expect(new Set(calls.map((c) => c.init?.signal)).size).toBe(4);
   });
 
   it("probes only the two sibling properties, never snapotter.com itself", async () => {

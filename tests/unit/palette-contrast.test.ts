@@ -159,4 +159,13 @@ describe("landing", () => {
     expectPair(landing, "muted", "background");
     expectPair(landing, "dark-fg", "dark-bg");
   });
+
+  // The footer status dot is a graphic, so WCAG 1.4.11's 3:1 applies rather
+  // than AA's 4.5. Note "success" clears 3:1 here but not 4.5, which is why the
+  // badge's label stays muted while only the dot takes a state color.
+  it("footer status dot clears 3:1 non-text on the footer surface", () => {
+    for (const dot of ["muted", "success", "primary-ink", "danger"]) {
+      expectPair(landing, dot, "background-alt", 3);
+    }
+  });
 });

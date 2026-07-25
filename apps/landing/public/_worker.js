@@ -10,13 +10,15 @@ const STATUS_PROBES = ["https://demo.snapotter.com/", "https://docs.snapotter.co
 // follow, so a 3xx arrives as-is and still counts as up.
 async function probe(url) {
   for (let attempt = 0; attempt < 2; attempt++) {
+    // Built outside the try, so a throw here surfaces as the runtime bug it is
+    // rather than being read as a down leg. Built inside the loop, so each
+    // attempt carries its own deadline: hoisting it above the loop would leave
+    // attempt 2 holding an already-fired signal, silently deleting the retry
+    // for the exact transient-blip case the retry exists to absorb.
+    const signal = AbortSignal.timeout(2000);
     let res;
     try {
-      res = await fetch(url, {
-        method: "HEAD",
-        redirect: "manual",
-        signal: AbortSignal.timeout(2000),
-      });
+      res = await fetch(url, { method: "HEAD", redirect: "manual", signal });
     } catch {
       // A throw is a timeout or a network error, which is a legitimate "down"
       // signal rather than a swallowed bug. Retry once, then report the leg
@@ -33,12 +35,17 @@ async function statusResponse() {
   const downCount = legs.filter((up) => !up).length;
   const status = downCount === 0 ? "operational" : downCount === legs.length ? "down" : "partial";
 
+  // A false green is cheap to sit on for a minute; a false red is not, and it
+  // would otherwise pin in the browser across every navigation until it aged
+  // out. Recheck a bad verdict sooner.
+  const maxAge = status === "operational" ? 60 : 15;
+
   // `_headers` only decorates env.ASSETS responses in advanced mode, so a
   // synthesized response has to carry its own.
   return new Response(JSON.stringify({ status }), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": `public, max-age=${maxAge}`,
       "X-Robots-Tag": "noindex",
     },
   });

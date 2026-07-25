@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import de from "../../apps/landing/src/i18n/de.json";
 
 /**
  * `astro dev` does not run _worker.js, so /api/status really is absent here.
@@ -65,13 +66,52 @@ test.describe("Footer status indicator", () => {
     await expect(page.locator(DOT)).toHaveCSS("background-color", MUTED);
   });
 
-  test("stays grey when the status route errors", async ({ page }) => {
-    await page.route("**/api/status", (route) => route.fulfill({ status: 500, body: "" }));
+  // The body is parseable and claims green on purpose. With an empty body the
+  // badge stays grey because res.json() rejects, so `res.ok` is never exercised
+  // and deleting it passes. A 5xx carrying a verdict is the realistic case: a
+  // Cloudflare error envelope, or a stale cached body served on a 502.
+  test("stays grey when the status route errors, even with a parseable body", async ({ page }) => {
+    await page.route("**/api/status", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "operational" }),
+      }),
+    );
     const settled = page.waitForResponse("**/api/status");
     await page.goto("/");
     await settled;
     await flushFrames(page);
     await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
+    await expect(page.locator(INDICATOR)).toContainText("Checking status");
+  });
+
+  // Reaches the .catch through a rejected fetch rather than a bad response.
+  test("stays grey when the request itself fails", async ({ page }) => {
+    await page.route("**/api/status", (route) => route.abort("failed"));
+    await page.goto("/");
+    await flushFrames(page);
+    await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
+    await expect(page.locator(INDICATOR)).toContainText("Checking status");
+  });
+
+  // Reaches the .catch through res.json() instead. This is the broken-deploy
+  // signature: _worker.js fails to load, or a _redirects rule shadows the
+  // route, and the client gets a 200 carrying HTML.
+  test("stays grey when a 200 carries HTML instead of JSON", async ({ page }) => {
+    await page.route("**/api/status", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<!doctype html><title>404</title>",
+      }),
+    );
+    const settled = page.waitForResponse("**/api/status");
+    await page.goto("/");
+    await settled;
+    await flushFrames(page);
+    await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", "checking");
+    await expect(page.locator(INDICATOR)).toContainText("Checking status");
   });
 
   for (const [status, label, dotColor] of [
@@ -82,17 +122,22 @@ test.describe("Footer status indicator", () => {
     test(`renders the ${status} state`, async ({ page }) => {
       await mockStatus(page, status);
       await page.goto("/");
-      await expect(page.locator(INDICATOR)).toHaveAttribute("data-status", status);
-      await expect(page.locator(INDICATOR)).toContainText(label);
+      // Scoped to the footer, which is where the badge belongs. This subsumes
+      // the standalone placement test that used to sit at the bottom of the
+      // file and never observed its own mock.
+      const badge = page.locator(`footer ${INDICATOR}`);
+      await expect(badge).toHaveAttribute("data-status", status);
+      await expect(badge).toContainText(label);
       // The dot is the only thing that carries state. Each color clears WCAG
-      // 1.4.11's 3:1 non-text floor against the footer's --color-background-alt.
-      await expect(page.locator(DOT)).toHaveCSS("background-color", dotColor);
+      // 1.4.11's 3:1 non-text floor against the footer's --color-background-alt,
+      // pinned as a ratio in tests/unit/palette-contrast.test.ts.
+      await expect(badge.locator(DOT)).toHaveCSS("background-color", dotColor);
       // And the label never carries it, in any state. --color-success is
       // 4.498:1 on the footer's --color-background-alt, just under AA.
-      // palette-contrast.test.ts does not cover that pair (it checks success
-      // against --color-background, where it passes), so this assertion is the
-      // only guard. "down" is the tempting one to redden.
-      await expect(page.locator(LABEL)).toHaveCSS("color", MUTED);
+      // palette-contrast.test.ts pins the dot ratios but cannot answer a
+      // cascade question like "does the label take a state color", so this
+      // assertion is the only guard. "down" is the tempting one to redden.
+      await expect(badge.locator(LABEL)).toHaveCSS("color", MUTED);
     });
   }
 
@@ -128,9 +173,18 @@ test.describe("Footer status indicator", () => {
     await expect(page.locator(DOT)).toHaveAttribute("aria-hidden", "true");
   });
 
-  test("sits in the footer, not the page body", async ({ page }) => {
-    await mockStatus(page, "operational");
-    await page.goto("/");
-    await expect(page.locator(`footer ${INDICATOR}`)).toBeVisible();
+  test("localizes the badge on a locale-prefixed page", async ({ page }) => {
+    // Raw markup, no browser: this is about what the server renders for a
+    // localized tree. Without it, dropping the locale prop from <StatusIndicator />
+    // in Footer.astro serves English on all 20 and every other test still passes.
+    const html = await (await page.request.get("/de/")).text();
+    const checking = de["footer.status.checking"];
+    // Makes the assertion below mean something: it fails loudly if de.json ever
+    // falls back to the English string rather than silently comparing "" to "".
+    expect(checking).not.toBe("Checking status");
+    expect(html).toContain(`>${checking}</span>`);
+    // The inline script's label table has to be German too, not just the
+    // server-rendered default the reader sees first.
+    expect(html).toContain(JSON.stringify(de["footer.status.operational"]));
   });
 });
