@@ -9,6 +9,13 @@ async function freshStats() {
   return import("@landing/lib/stats");
 }
 
+// Match the exact host, not a substring. `url.includes("hub.docker.com")` would
+// also match hub.docker.com.evil.test, which is the incomplete-URL-sanitization
+// pattern CodeQL flags, and it is worth not teaching that shape in test code.
+function isDockerHub(url: string): boolean {
+  return new URL(url).hostname === "hub.docker.com";
+}
+
 describe("formatCompact", () => {
   it("formats thousands with one decimal", () => {
     expect(formatCompact(1720)).toBe("1.7k");
@@ -115,7 +122,7 @@ describe("stat fetchers when upstream is unavailable", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) =>
-        String(url).includes("hub.docker.com")
+        isDockerHub(url)
           ? { ok: true, status: 200, json: async () => ({ pull_count: 500_000 }) }
           : { ok: true, status: 200, json: async () => ({ stargazers_count: 4242 }) },
       ),
@@ -134,7 +141,7 @@ describe("stat fetchers when upstream is unavailable", () => {
   // later ones baked in the fallback: one site, two different star numbers.
   it("fetches once per build no matter how many pages ask", async () => {
     const fetchSpy = vi.fn(async (url: string) =>
-      String(url).includes("hub.docker.com")
+      isDockerHub(url)
         ? { ok: true, status: 200, json: async () => ({ pull_count: 500_000 }) }
         : { ok: true, status: 200, json: async () => ({ stargazers_count: 4242 }) },
     );
