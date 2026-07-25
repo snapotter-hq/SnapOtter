@@ -1,8 +1,8 @@
 ---
 description: "Lokal utvecklingskonfiguration, kommandon, kodkonventioner och hur du lägger till ett nytt verktyg i SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: ad1b56c4d9d1
+i18n_output_hash: e95aa750ab7c
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Så ställer du in en lokal utvecklingsmiljö och bidrar med kod till SnapOtter.
 
 ## Förutsättningar {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (krävs för lokal Postgres + Redis, containerbyggen och AI-funktioner)
 - Git

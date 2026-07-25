@@ -8,7 +8,7 @@ How to set up a local development environment and contribute code to SnapOtter.
 
 ## Prerequisites {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (required for local Postgres + Redis, container builds, and AI features)
 - Git

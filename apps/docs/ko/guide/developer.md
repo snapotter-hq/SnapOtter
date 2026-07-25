@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 로컬 개발 환경 설정, 명령어, 코드 규칙, 새 도구를 추가하는 방법."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: da14b17045df
+i18n_output_hash: 6df1aea31133
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## 사전 요구사항 {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (로컬 Postgres + Redis, 컨테이너 빌드, AI 기능에 필요)
 - Git

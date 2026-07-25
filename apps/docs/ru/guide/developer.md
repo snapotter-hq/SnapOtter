@@ -1,8 +1,8 @@
 ---
 description: "Настройка локальной среды разработки, команды, соглашения по коду и как добавить новый инструмент в SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 68c37b80d961
+i18n_output_hash: 41a3694a72a5
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## Предварительные требования {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (требуется для локальных Postgres + Redis, сборок контейнеров и AI-функций)
 - Git

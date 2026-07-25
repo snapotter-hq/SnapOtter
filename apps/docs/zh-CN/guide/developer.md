@@ -1,8 +1,8 @@
 ---
 description: "本地开发环境搭建、命令、代码约定，以及如何为 SnapOtter 添加新工具。"
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: c3b8027f50ca
+i18n_output_hash: 064e6879f3bb
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## 前置条件 {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+（`corepack enable && corepack prepare pnpm@latest --activate`）
 - [Docker](https://www.docker.com/)（本地 Postgres + Redis、容器构建和 AI 功能所必需）
 - Git

@@ -1,8 +1,8 @@
 ---
 description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir araç ekleme."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 5873717e6499
+i18n_output_hash: d3dfe2907fbb
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Yerel bir geliştirme ortamı kurma ve SnapOtter'a kod katkısında bulunma.
 
 ## Ön koşullar {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (yerel Postgres + Redis, container derlemeleri ve AI özellikleri için gerekli)
 - Git

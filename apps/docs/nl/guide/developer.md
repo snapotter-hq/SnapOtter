@@ -1,8 +1,8 @@
 ---
 description: "Lokale ontwikkelomgeving opzetten, commando's, codeconventies en hoe je een nieuwe tool aan SnapOtter toevoegt."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: cbb0bac30630
+i18n_output_hash: f8e939b4ce8e
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Hoe je een lokale ontwikkelomgeving opzet en code bijdraagt aan SnapOtter.
 
 ## Vereisten {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (vereist voor lokale Postgres + Redis, containerbuilds en AI-functies)
 - Git

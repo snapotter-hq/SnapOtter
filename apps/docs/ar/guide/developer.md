@@ -1,8 +1,8 @@
 ---
 description: "إعداد بيئة التطوير المحلية، والأوامر، وأعراف الكود، وكيفية إضافة أداة جديدة إلى SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: d05ef83f5cb7
+i18n_output_hash: ce1345aa5ed2
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## المتطلبات المسبقة {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (مطلوب لـ Postgres + Redis المحليين، وبناء الحاويات، وميزات الذكاء الاصطناعي)
 - Git

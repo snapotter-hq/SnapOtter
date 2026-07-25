@@ -1,8 +1,8 @@
 ---
 description: "Configurazione dell'ambiente di sviluppo locale, comandi, convenzioni di codice e come aggiungere un nuovo strumento a SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: ae34f11b905f
+i18n_output_hash: a505794ce109
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Come configurare un ambiente di sviluppo locale e contribuire con codice a SnapO
 
 ## Prerequisiti {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (richiesto per Postgres + Redis locali, build dei container e funzionalità AI)
 - Git

@@ -1,8 +1,8 @@
 ---
 description: "การตั้งค่าสภาพแวดล้อมการพัฒนาในเครื่อง คำสั่ง แนวทางการเขียนโค้ด และวิธีเพิ่มเครื่องมือใหม่ใน SnapOtter"
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 96bc8b6d4257
+i18n_output_hash: a42eaf432db1
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## สิ่งที่ต้องมีก่อน {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (จำเป็นสำหรับ Postgres + Redis ในเครื่อง, การ build คอนเทนเนอร์ และฟีเจอร์ AI)
 - Git

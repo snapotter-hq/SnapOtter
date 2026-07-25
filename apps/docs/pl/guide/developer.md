@@ -1,8 +1,8 @@
 ---
 description: "Lokalna konfiguracja środowiska developerskiego, komendy, konwencje kodu oraz jak dodać nowe narzędzie do SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 35e5749a9414
+i18n_output_hash: 648dca93f9db
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Jak skonfigurować lokalne środowisko developerskie i wnieść wkład w kod Sna
 
 ## Wymagania wstępne {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (wymagany dla lokalnego Postgresa + Redisa, budowania kontenerów i funkcji AI)
 - Git

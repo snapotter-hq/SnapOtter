@@ -1,8 +1,8 @@
 ---
 description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 34378e7f7c08
+i18n_output_hash: 097bdc7a0a9e
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## 前提条件 {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22 以上
+- [Node.js](https://nodejs.org/) 22.22 以上
 - [pnpm](https://pnpm.io/) 9 以上（`corepack enable && corepack prepare pnpm@latest --activate`）
 - [Docker](https://www.docker.com/)（ローカルの Postgres + Redis、コンテナビルド、AI 機能に必要）
 - Git

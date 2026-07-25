@@ -1,8 +1,8 @@
 ---
 description: "Thiết lập môi trường phát triển cục bộ, lệnh, quy ước mã, và cách thêm một công cụ mới vào SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: a4f10139f435
+i18n_output_hash: 7ce3a1183f27
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Cách thiết lập một môi trường phát triển cục bộ và đóng gó
 
 ## Điều kiện tiên quyết {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (bắt buộc cho Postgres + Redis cục bộ, dựng container, và các tính năng AI)
 - Git

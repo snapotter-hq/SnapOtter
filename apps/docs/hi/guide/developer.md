@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter में स्थानीय विकास सेटअप, कमांड, कोड परंपराएँ, और एक नया टूल कैसे जोड़ें।"
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 3f442a734b57
+i18n_output_hash: feb4df3446de
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## पूर्वापेक्षाएँ {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (स्थानीय Postgres + Redis, कंटेनर बिल्ड, और AI फ़ीचर के लिए आवश्यक)
 - Git

@@ -1,8 +1,8 @@
 ---
 description: "Configuration de l'environnement de développement local, commandes, conventions de code et comment ajouter un nouvel outil à SnapOtter."
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 6505ab0978eb
+i18n_output_hash: 64e0523fcee3
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Comment configurer un environnement de développement local et contribuer au cod
 
 ## Prérequis {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - [Docker](https://www.docker.com/) (requis pour Postgres + Redis en local, les builds de conteneur et les fonctionnalités d'IA)
 - Git

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的本機開發環境設定、指令、程式碼慣例，以及如何新增工具。"
-i18n_source_hash: e47c0885d404
+i18n_source_hash: 56acc1bf9a9b
 i18n_provenance: machine
-i18n_output_hash: 369018e8dfaa
+i18n_output_hash: d94d76633902
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ i18n_hash_version: 2
 
 ## 先決條件 {#prerequisites}
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22.22+
 - [pnpm](https://pnpm.io/) 9+（`corepack enable && corepack prepare pnpm@latest --activate`）
 - [Docker](https://www.docker.com/)（本機 Postgres + Redis、容器建置與 AI 功能所必需）
 - Git
