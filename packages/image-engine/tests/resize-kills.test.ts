@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resize } from "../src/operations/resize.js";
 import type { Sharp } from "../src/types.js";
 
@@ -80,15 +80,222 @@ describe("resize positive-dimension guards (L18 width, L21 height)", () => {
       "Resize height must be greater than 0",
     );
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 1.5])(
+    "rejects a non-finite or fractional width (%s) before Sharp",
+    async (width) => {
+      await expect(resize(source(100, 50), { width })).rejects.toThrow(
+        "Resize width must be a positive integer",
+      );
+    },
+  );
+
+  it.each([Number.NaN, Number.NEGATIVE_INFINITY, 1.5])(
+    "rejects a non-finite or fractional height (%s) before Sharp",
+    async (height) => {
+      await expect(resize(source(100, 50), { height })).rejects.toThrow(
+        "Resize height must be a positive integer",
+      );
+    },
+  );
 });
 
-// The clamp block at L28-L35 mutates width/height BEFORE handing them to
-// Sharp, and Sharp also receives withoutEnlargement. Under fit "cover"/"fill"
-// Sharp's own withoutEnlargement clamps identically, which masks the manual
-// block (mutants there survive). Under fit "contain", Sharp's withoutEnlargement
-// does NOT shrink to fit (it pads to the full box), so ONLY the manual clamp
-// changes the dimensions. Using "contain" makes the block observable, so the
-// L28/L33/L34 mutants die on an exact-dimension mismatch.
+describe("resize percentage safety boundaries", () => {
+  it("rejects zero and negative percentages at the public guard", async () => {
+    await expect(resize(source(100, 50), { percentage: 0 })).rejects.toThrow(
+      "Resize percentage must be greater than 0",
+    );
+    await expect(resize(source(100, 50), { percentage: -1 })).rejects.toThrow(
+      "Resize percentage must be greater than 0",
+    );
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects a non-finite percentage (%s)",
+    async (percentage) => {
+      await expect(resize(source(100, 50), { percentage })).rejects.toThrow(
+        "Resize percentage must be finite",
+      );
+    },
+  );
+
+  it("accepts the exact maximum percentage and rejects one step above it", async () => {
+    const dims = await outputDims(await resize(source(10, 5), { percentage: 1000 }));
+    expect(dims).toEqual({ width: 100, height: 50 });
+    await expect(resize(source(10, 5), { percentage: 1001 })).rejects.toThrow(
+      "Resize percentage must not exceed 1000",
+    );
+  });
+});
+
+describe("resize output allocation safety boundaries", () => {
+  function metadataOnlyImage(
+    width = 100,
+    height = 100,
+  ): {
+    image: Sharp;
+    resizeSpy: ReturnType<typeof vi.fn>;
+  } {
+    const resizeSpy = vi.fn();
+    const fake = {
+      metadata: vi.fn().mockResolvedValue({ width, height }),
+      resize: resizeSpy,
+    };
+    resizeSpy.mockReturnValue(fake);
+    return { image: fake as unknown as Sharp, resizeSpy };
+  }
+
+  it("accepts 16383 pixels on an axis and rejects 16384", async () => {
+    const allowed = metadataOnlyImage();
+    await expect(resize(allowed.image, { width: 16383, height: 1, fit: "fill" })).resolves.toBe(
+      allowed.image,
+    );
+    expect(allowed.resizeSpy).toHaveBeenCalledOnce();
+
+    const rejected = metadataOnlyImage();
+    await expect(resize(rejected.image, { width: 16384, height: 1, fit: "fill" })).rejects.toThrow(
+      "Resize output must not exceed 16383 pixels on either side",
+    );
+    expect(rejected.resizeSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly 67,108,864 pixels and rejects one row more", async () => {
+    const allowed = metadataOnlyImage();
+    await expect(resize(allowed.image, { width: 8192, height: 8192, fit: "fill" })).resolves.toBe(
+      allowed.image,
+    );
+    expect(allowed.resizeSpy).toHaveBeenCalledOnce();
+
+    const rejected = metadataOnlyImage();
+    await expect(
+      resize(rejected.image, { width: 8192, height: 8193, fit: "fill" }),
+    ).rejects.toThrow("Resize output must not exceed 67108864 total pixels");
+    expect(rejected.resizeSpy).not.toHaveBeenCalled();
+  });
+
+  it("checks each axis independently", async () => {
+    const allowedHeight = metadataOnlyImage();
+    await expect(
+      resize(allowedHeight.image, { width: 1, height: 16383, fit: "fill" }),
+    ).resolves.toBe(allowedHeight.image);
+    expect(allowedHeight.resizeSpy).toHaveBeenCalledOnce();
+
+    await expect(
+      resize(metadataOnlyImage().image, { width: 1, height: 16384, fit: "fill" }),
+    ).rejects.toThrow("Resize output must not exceed 16383 pixels on either side");
+  });
+
+  it("applies aspect-ratio math to inside and outside before enforcing limits", async () => {
+    const inside = metadataOnlyImage(2, 1);
+    await expect(resize(inside.image, { width: 8192, height: 8192, fit: "inside" })).resolves.toBe(
+      inside.image,
+    );
+    expect(inside.resizeSpy).toHaveBeenCalledOnce();
+
+    const outside = metadataOnlyImage(2, 1);
+    await expect(
+      resize(outside.image, { width: 8192, height: 8192, fit: "outside" }),
+    ).rejects.toThrow("Resize output must not exceed 16383 pixels on either side");
+    expect(outside.resizeSpy).not.toHaveBeenCalled();
+
+    const tallInside = metadataOnlyImage(1, 4);
+    await expect(
+      resize(tallInside.image, { width: 4096, height: 16383, fit: "inside" }),
+    ).resolves.toBe(tallInside.image);
+    expect(tallInside.resizeSpy).toHaveBeenCalledOnce();
+
+    const heightLimitedInside = metadataOnlyImage(1, 2);
+    await expect(
+      resize(heightLimitedInside.image, { width: 8192, height: 16384, fit: "inside" }),
+    ).rejects.toThrow("Resize output must not exceed 16383 pixels on either side");
+    expect(heightLimitedInside.resizeSpy).not.toHaveBeenCalled();
+
+    const narrowInside = metadataOnlyImage(100, 1);
+    await expect(
+      resize(narrowInside.image, { width: 16383, height: 16384, fit: "inside" }),
+    ).resolves.toBe(narrowInside.image);
+    expect(narrowInside.resizeSpy).toHaveBeenCalledOnce();
+  });
+
+  it("enforces proportional limits for width-only and height-only requests", async () => {
+    const widthOnly = metadataOnlyImage(1, 2);
+    await expect(resize(widthOnly.image, { width: 8192 })).rejects.toThrow(
+      "Resize output must not exceed 16383 pixels on either side",
+    );
+    expect(widthOnly.resizeSpy).not.toHaveBeenCalled();
+
+    const widthAxisOnly = metadataOnlyImage(2, 1);
+    await expect(resize(widthAxisOnly.image, { width: 16384 })).rejects.toThrow(
+      "Resize output must not exceed 16383 pixels on either side",
+    );
+    expect(widthAxisOnly.resizeSpy).not.toHaveBeenCalled();
+
+    const heightOnly = metadataOnlyImage(2, 1);
+    await expect(resize(heightOnly.image, { height: 8192 })).rejects.toThrow(
+      "Resize output must not exceed 16383 pixels on either side",
+    );
+    expect(heightOnly.resizeSpy).not.toHaveBeenCalled();
+
+    const heightAxisOnly = metadataOnlyImage(1, 2);
+    await expect(resize(heightAxisOnly.image, { height: 16384 })).rejects.toThrow(
+      "Resize output must not exceed 16383 pixels on either side",
+    );
+    expect(heightAxisOnly.resizeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("resize required-input and metadata guards", () => {
+  it("rejects a request with no dimensions or percentage", async () => {
+    await expect(resize(source(100, 50), {})).rejects.toThrow(
+      "Resize requires width, height, or percentage",
+    );
+  });
+
+  it("rejects metadata missing either source dimension", async () => {
+    const missingWidth = {
+      metadata: vi.fn().mockResolvedValue({ height: 100 }),
+      resize: vi.fn(),
+    } as unknown as Sharp;
+    await expect(resize(missingWidth, { width: 10 })).rejects.toThrow(
+      "Cannot determine image dimensions for resize",
+    );
+
+    const missingHeight = {
+      metadata: vi.fn().mockResolvedValue({ width: 100 }),
+      resize: vi.fn(),
+    } as unknown as Sharp;
+    await expect(resize(missingHeight, { height: 10 })).rejects.toThrow(
+      "Cannot determine image dimensions for resize",
+    );
+  });
+});
+
+describe("resize output geometry safety", () => {
+  it("computes contain and outside boxes from the source aspect ratio", async () => {
+    expect(
+      await outputDims(await resize(source(100, 50), { width: 80, height: 80, fit: "inside" })),
+    ).toEqual({ width: 80, height: 40 });
+    expect(
+      await outputDims(await resize(source(100, 50), { width: 80, height: 80, fit: "outside" })),
+    ).toEqual({ width: 160, height: 80 });
+  });
+
+  it("preserves aspect ratio for width-only and height-only resize", async () => {
+    expect(await outputDims(await resize(source(100, 50), { width: 40 }))).toEqual({
+      width: 40,
+      height: 20,
+    });
+    expect(await outputDims(await resize(source(100, 50), { height: 20 }))).toEqual({
+      width: 40,
+      height: 20,
+    });
+  });
+});
+
+// The clamp block mutates width/height before handing them to Sharp. This is
+// especially important for fit "contain": Sharp otherwise pads to the full
+// requested box even when its own withoutEnlargement option is true. Using
+// "contain" makes the manual clamp observable through exact output dimensions.
 describe("resize withoutEnlargement block execution (L28)", () => {
   it("keeps output at source size when target is larger and withoutEnlargement is true", async () => {
     // Manual clamp -> 100x50; a false-mutant on L28 skips it and (under contain)

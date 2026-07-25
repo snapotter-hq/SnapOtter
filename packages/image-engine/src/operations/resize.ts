@@ -11,7 +11,6 @@ function outputDimensions(
   width: number | undefined,
   height: number | undefined,
   fit: ResizeOptions["fit"],
-  withoutEnlargement: boolean,
 ): { width: number; height: number } {
   if (width !== undefined && height !== undefined) {
     if (fit === "inside" || fit === "outside") {
@@ -19,17 +18,16 @@ function outputDimensions(
         fit === "inside"
           ? Math.min(width / sourceWidth, height / sourceHeight)
           : Math.max(width / sourceWidth, height / sourceHeight);
-      const effectiveScale = withoutEnlargement ? Math.min(scale, 1) : scale;
       return {
-        width: Math.max(1, Math.round(sourceWidth * effectiveScale)),
-        height: Math.max(1, Math.round(sourceHeight * effectiveScale)),
+        width: Math.max(1, Math.round(sourceWidth * scale)),
+        height: Math.max(1, Math.round(sourceHeight * scale)),
       };
     }
     return { width, height };
   }
 
   if (width !== undefined) {
-    const scale = withoutEnlargement ? Math.min(width / sourceWidth, 1) : width / sourceWidth;
+    const scale = width / sourceWidth;
     return {
       width: Math.max(1, Math.round(sourceWidth * scale)),
       height: Math.max(1, Math.round(sourceHeight * scale)),
@@ -37,9 +35,7 @@ function outputDimensions(
   }
 
   const targetHeight = height as number;
-  const scale = withoutEnlargement
-    ? Math.min(targetHeight / sourceHeight, 1)
-    : targetHeight / sourceHeight;
+  const scale = targetHeight / sourceHeight;
   return {
     width: Math.max(1, Math.round(sourceWidth * scale)),
     height: Math.max(1, Math.round(sourceHeight * scale)),
@@ -50,19 +46,32 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
   let { width, height, fit, withoutEnlargement, percentage } = options;
 
   if (percentage !== undefined) {
+    if (!Number.isFinite(percentage)) {
+      throw new ToolInputError("Resize percentage must be finite");
+    }
     if (percentage <= 0) {
       throw new ToolInputError("Resize percentage must be greater than 0");
     }
-    if (!Number.isFinite(percentage) || percentage > MAX_RESIZE_PERCENTAGE) {
+    if (percentage > MAX_RESIZE_PERCENTAGE) {
       throw new ToolInputError(`Resize percentage must not exceed ${MAX_RESIZE_PERCENTAGE}`);
     }
   }
 
-  if (width !== undefined && width <= 0) {
-    throw new ToolInputError("Resize width must be greater than 0");
+  if (width !== undefined) {
+    if (!Number.isSafeInteger(width)) {
+      throw new ToolInputError("Resize width must be a positive integer");
+    }
+    if (width <= 0) {
+      throw new ToolInputError("Resize width must be greater than 0");
+    }
   }
-  if (height !== undefined && height <= 0) {
-    throw new ToolInputError("Resize height must be greater than 0");
+  if (height !== undefined) {
+    if (!Number.isSafeInteger(height)) {
+      throw new ToolInputError("Resize height must be a positive integer");
+    }
+    if (height <= 0) {
+      throw new ToolInputError("Resize height must be greater than 0");
+    }
   }
   if (width === undefined && height === undefined && percentage === undefined) {
     throw new ToolInputError("Resize requires width, height, or percentage");
@@ -84,14 +93,7 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
   }
 
   const resolvedFit = fit ?? "cover";
-  const target = outputDimensions(
-    metadata.width,
-    metadata.height,
-    width,
-    height,
-    resolvedFit,
-    withoutEnlargement ?? false,
-  );
+  const target = outputDimensions(metadata.width, metadata.height, width, height, resolvedFit);
   if (target.width > MAX_RESIZE_OUTPUT_DIMENSION || target.height > MAX_RESIZE_OUTPUT_DIMENSION) {
     throw new ToolInputError(
       `Resize output must not exceed ${MAX_RESIZE_OUTPUT_DIMENSION} pixels on either side`,

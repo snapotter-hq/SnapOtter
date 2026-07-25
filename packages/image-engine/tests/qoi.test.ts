@@ -37,6 +37,19 @@ function tailMarker(encoded: Uint8Array): number[] {
   return Array.from(encoded.slice(encoded.length - END_MARKER.length));
 }
 
+function qoiFile(width: number, height: number, data: number[], colorspace = 0): Uint8Array {
+  const out = new Uint8Array(HEADER_SIZE + data.length + END_MARKER.length);
+  out.set([0x71, 0x6f, 0x69, 0x66]);
+  const view = new DataView(out.buffer);
+  view.setUint32(4, width);
+  view.setUint32(8, height);
+  out[12] = 4;
+  out[13] = colorspace;
+  out.set(data, HEADER_SIZE);
+  out.set(END_MARKER, HEADER_SIZE + data.length);
+  return out;
+}
+
 describe("qoiEncode header", () => {
   it("writes the qoif magic as the first four bytes", () => {
     const out = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
@@ -155,6 +168,11 @@ describe("qoiEncode run-length encoding", () => {
     expect(dataBytes(out)).toEqual([QOI_OP_RGB, 255, 0, 0, QOI_OP_RUN | 61, QOI_OP_RUN | 36]);
   });
 
+  it("flushes a pending run before encoding the next distinct pixel", () => {
+    const out = qoiEncode(rgba([255, 0, 0, 255], [255, 0, 0, 255], [0, 255, 0, 255]), 3, 1, 4);
+    expect(dataBytes(out)).toEqual([QOI_OP_RGB, 255, 0, 0, QOI_OP_RUN, QOI_OP_RGB, 0, 255, 0]);
+  });
+
   it("encodes an all-black-opaque image as a single run (matches the initial pixel)", () => {
     // (0,0,0,255) equals the encoder's starting prev, so all 5 px are one run.
     const out = qoiEncode(
@@ -169,6 +187,10 @@ describe("qoiEncode run-length encoding", () => {
 });
 
 describe("qoiDecode header parsing", () => {
+  it("rejects a truncated header before reading through the buffer", () => {
+    expect(() => qoiDecode(new Uint8Array(13))).toThrow("QOI file is too short");
+  });
+
   it("reads width, height, channels and colorspace back from the header", () => {
     const out = qoiEncode(new Uint8Array(6 * 4), 3, 2, 4);
     const { header } = qoiDecode(out);
@@ -196,6 +218,308 @@ describe("qoiDecode header parsing", () => {
     bad[12] = 2;
     expect(() => qoiDecode(bad)).toThrow("Invalid QOI channels");
   });
+
+  it("throws on an invalid colorspace", () => {
+    const bad = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
+    bad[13] = 2;
+    expect(() => qoiDecode(bad)).toThrow("Invalid QOI colorspace");
+  });
+
+  it("accepts linear colorspace 1", () => {
+    const linear = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
+    linear[13] = 1;
+    expect(qoiDecode(linear).header.colorspace).toBe(1);
+  });
+
+  it("rejects dimensions whose decoded allocation exceeds the safety limit", () => {
+    const bad = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
+    const view = new DataView(bad.buffer, bad.byteOffset, bad.byteLength);
+    view.setUint32(4, 8192);
+    view.setUint32(8, 8193);
+    expect(() => qoiDecode(bad)).toThrow("QOI image exceeds the pixel safety limit");
+  });
+
+  it("accepts the exact pixel safety limit before rejecting its missing payload", () => {
+    const headerOnly = qoiFile(8192, 8192, []);
+    expect(() => qoiDecode(headerOnly)).toThrow(
+      "QOI pixel data is too short for declared dimensions",
+    );
+  });
+
+  it("preflights short payloads near the maximum run-density boundary", () => {
+    const headerOnly = qoiFile(62, 28, []);
+    expect(() => qoiDecode(headerOnly)).toThrow(
+      "QOI pixel data is too short for declared dimensions",
+    );
+  });
+});
+
+describe("qoiDecode corruption handling", () => {
+  it("rejects a truncated RGB chunk instead of decoding missing bytes as zero", () => {
+    const encoded = qoiEncode(rgba([255, 0, 0, 255]), 1, 1, 4);
+    const truncated = new Uint8Array([
+      ...encoded.slice(0, HEADER_SIZE + 2),
+      ...encoded.slice(encoded.length - END_MARKER.length),
+    ]);
+    expect(() => qoiDecode(truncated)).toThrow("Truncated QOI pixel data");
+  });
+
+  it("rejects a truncated LUMA chunk", () => {
+    const encoded = qoiEncode(rgba([16, 20, 24, 255]), 1, 1, 4);
+    const truncated = new Uint8Array([
+      ...encoded.slice(0, HEADER_SIZE + 1),
+      ...encoded.slice(encoded.length - END_MARKER.length),
+    ]);
+    expect(() => qoiDecode(truncated)).toThrow("Truncated QOI pixel data");
+  });
+
+  it("rejects a corrupt end marker", () => {
+    const bad = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
+    bad[bad.length - 1] = 0;
+    expect(() => qoiDecode(bad)).toThrow("Invalid QOI end marker");
+  });
+
+  it("rejects a run that exceeds the declared pixel count", () => {
+    const bad = qoiEncode(rgba([0, 0, 0, 255]), 1, 1, 4);
+    bad[HEADER_SIZE] = QOI_OP_RUN | 1;
+    expect(() => qoiDecode(bad)).toThrow("QOI run exceeds the declared pixel count");
+  });
+
+  it("rejects an oversized run after one or more pixels were already decoded", () => {
+    const bad = qoiFile(2, 1, [QOI_OP_RGB, 255, 0, 0, QOI_OP_RUN | 1]);
+    expect(() => qoiDecode(bad)).toThrow("QOI run exceeds the declared pixel count");
+  });
+
+  it("updates the color index after a run so a later INDEX chunk is lossless", () => {
+    const blackHash = refHash(0, 0, 0, 255);
+    const encoded = qoiFile(3, 1, [QOI_OP_RUN, QOI_OP_RGB, 255, 0, 0, QOI_OP_INDEX | blackHash]);
+    expect(Array.from(qoiDecode(encoded).pixels)).toEqual([
+      0, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255,
+    ]);
+  });
+
+  it("rejects unused pixel data before the end marker", () => {
+    const encoded = qoiEncode(rgba([1, 2, 3, 255]), 1, 1, 4);
+    const withTrailingChunk = new Uint8Array(encoded.length + 1);
+    withTrailingChunk.set(encoded.slice(0, -END_MARKER.length));
+    withTrailingChunk[encoded.length - END_MARKER.length] = QOI_OP_RUN;
+    withTrailingChunk.set(END_MARKER, encoded.length - END_MARKER.length + 1);
+    expect(() => qoiDecode(withTrailingChunk)).toThrow("Unexpected QOI pixel data");
+  });
+});
+
+describe("qoiEncode input validation", () => {
+  it.each([
+    [0, 1],
+    [1, 0],
+    [-1, 1],
+    [1.5, 1],
+    [Number.NaN, 1],
+    [Number.POSITIVE_INFINITY, 1],
+  ])("rejects invalid dimensions %s x %s", (width, height) => {
+    expect(() => qoiEncode(new Uint8Array(), width, height, 4)).toThrow("Invalid QOI dimensions");
+  });
+
+  it("rejects dimensions whose encoded allocation exceeds the safety limit", () => {
+    expect(() => qoiEncode(new Uint8Array(), 8192, 8193, 4)).toThrow(
+      "QOI image exceeds the pixel safety limit",
+    );
+  });
+
+  it("accepts the exact pixel safety limit before checking buffer length", () => {
+    expect(() => qoiEncode(new Uint8Array(), 8192, 8192, 4)).toThrow(
+      "QOI pixel buffer length does not match dimensions and channels",
+    );
+  });
+
+  it("rejects a runtime-invalid channel count", () => {
+    expect(() => qoiEncode(new Uint8Array(4), 1, 1, 2 as 3 | 4)).toThrow("Invalid QOI channels");
+  });
+
+  it("requires the exact pixel-buffer length", () => {
+    expect(() => qoiEncode(new Uint8Array(3), 1, 1, 4)).toThrow(
+      "QOI pixel buffer length does not match dimensions and channels",
+    );
+    expect(() => qoiEncode(new Uint8Array(5), 1, 1, 4)).toThrow(
+      "QOI pixel buffer length does not match dimensions and channels",
+    );
+  });
+});
+
+describe("qoiEncode chunk boundaries", () => {
+  function secondChunkTag(
+    first: [number, number, number, number],
+    second: [number, number, number, number],
+  ): number {
+    const data = dataBytes(qoiEncode(rgba(first, second), 2, 1, 4));
+    // The first color is deliberately outside DIFF/LUMA and therefore occupies
+    // a four-byte RGB chunk. The next byte starts the boundary under test.
+    expect(data[0]).toBe(QOI_OP_RGB);
+    return data[4];
+  }
+
+  it.each([
+    [
+      [100, 100, 100, 255],
+      [98, 100, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [101, 100, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 98, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 101, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 100, 98, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 100, 101, 255],
+    ],
+  ] as Array<[[number, number, number, number], [number, number, number, number]]>)(
+    "uses DIFF at every inclusive boundary for %j -> %j",
+    (first, second) => {
+      expect(secondChunkTag(first, second) & 0xc0).toBe(QOI_OP_DIFF);
+      const input = rgba(first, second);
+      expect(Array.from(qoiDecode(qoiEncode(input, 2, 1, 4)).pixels)).toEqual(Array.from(input));
+    },
+  );
+
+  it.each([
+    [
+      [100, 100, 100, 255],
+      [97, 100, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [102, 100, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 97, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 102, 100, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 100, 97, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [100, 100, 102, 255],
+    ],
+  ] as Array<[[number, number, number, number], [number, number, number, number]]>)(
+    "does not use DIFF immediately outside its range for %j -> %j",
+    (first, second) => {
+      expect(secondChunkTag(first, second) & 0xc0).toBe(QOI_OP_LUMA);
+      const input = rgba(first, second);
+      expect(Array.from(qoiDecode(qoiEncode(input, 2, 1, 4)).pixels)).toEqual(Array.from(input));
+    },
+  );
+
+  it.each([
+    [
+      [100, 100, 100, 255],
+      [68, 68, 68, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [131, 131, 131, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [102, 110, 110, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [117, 110, 110, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [110, 110, 102, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [110, 110, 117, 255],
+    ],
+  ] as Array<[[number, number, number, number], [number, number, number, number]]>)(
+    "uses LUMA at every inclusive boundary for %j -> %j",
+    (first, second) => {
+      expect(secondChunkTag(first, second) & 0xc0).toBe(QOI_OP_LUMA);
+      const input = rgba(first, second);
+      expect(Array.from(qoiDecode(qoiEncode(input, 2, 1, 4)).pixels)).toEqual(Array.from(input));
+    },
+  );
+
+  it.each([
+    [
+      [100, 100, 100, 255],
+      [67, 67, 67, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [132, 132, 132, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [101, 110, 110, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [118, 110, 110, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [110, 110, 101, 255],
+    ],
+    [
+      [100, 100, 100, 255],
+      [110, 110, 118, 255],
+    ],
+  ] as Array<[[number, number, number, number], [number, number, number, number]]>)(
+    "does not use LUMA immediately outside its range for %j -> %j",
+    (first, second) => {
+      expect(secondChunkTag(first, second)).toBe(QOI_OP_RGB);
+    },
+  );
+});
+
+describe("qoiEncode index collision safety", () => {
+  it.each([
+    [
+      [10, 20, 30, 100],
+      [10, 20, 30, 164],
+    ],
+    [
+      [10, 20, 30, 100],
+      [10, 20, 94, 100],
+    ],
+    [
+      [10, 20, 30, 100],
+      [10, 84, 30, 100],
+    ],
+    [
+      [10, 20, 30, 100],
+      [74, 20, 30, 100],
+    ],
+  ] as Array<[[number, number, number, number], [number, number, number, number]]>)(
+    "does not emit an index hit when only part of a hash-colliding pixel matches",
+    (first, colliding) => {
+      expect(refHash(...first)).toBe(refHash(...colliding));
+      const separator: [number, number, number, number] = [200, 201, 202, 203];
+      const input = rgba(first, separator, colliding);
+      expect(Array.from(qoiDecode(qoiEncode(input, 3, 1, 4)).pixels)).toEqual(Array.from(input));
+    },
+  );
 });
 
 describe("qoi round-trip (encode then decode restores the exact RGBA pixels)", () => {
