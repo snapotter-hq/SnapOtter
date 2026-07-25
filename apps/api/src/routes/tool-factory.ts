@@ -5,6 +5,7 @@ import { extname, join } from "node:path";
 import {
   apiToolPath,
   FEATURE_BUNDLES,
+  isToolInputError,
   type Section,
   TOOL_BUNDLE_MAP,
   TOOLS,
@@ -93,7 +94,10 @@ export interface ToolRouteConfig<T> {
    * and validated settings; throw InputValidationError to reject with its
    * statusCode (default 400) before any job is enqueued (vs a worker 422).
    */
-  preValidate?: (ctx: { inputs: { filename: string; buffer: Buffer }[] }) => Promise<void> | void;
+  preValidate?: (ctx: {
+    inputs: { filename: string; buffer: Buffer }[];
+    settings: T;
+  }) => Promise<void> | void;
   /**
    * Per-position input kind overrides for mixed-input tools (e.g. video +
    * subtitle). Input i validates with kind inputKinds[Math.min(i, len-1)].
@@ -140,7 +144,10 @@ export interface AnyToolRouteConfig {
   toolId: string;
   maxInputs?: number;
   minInputs?: number;
-  preValidate?: (ctx: { inputs: { filename: string; buffer: Buffer }[] }) => Promise<void> | void;
+  preValidate?: (ctx: {
+    inputs: { filename: string; buffer: Buffer }[];
+    settings: unknown;
+  }) => Promise<void> | void;
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
@@ -483,12 +490,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // any job is enqueued, instead of a generic 422 from the worker.
         if (config.preValidate) {
           try {
-            await config.preValidate({ inputs: preparedInputs });
+            await config.preValidate({ inputs: preparedInputs, settings });
           } catch (err) {
             if (err instanceof InputValidationError) {
               const body: Record<string, string> = { error: err.message };
               if (err.details) body.details = err.details;
               return reply.status(err.statusCode).send(body);
+            }
+            if (isToolInputError(err)) {
+              return reply.status(400).send({ error: err.message });
             }
             throw err;
           }

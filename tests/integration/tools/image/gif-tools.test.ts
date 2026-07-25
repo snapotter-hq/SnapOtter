@@ -5,8 +5,10 @@
  * plus the metadata endpoint. Uses a real Fastify server with in-memory SQLite.
  */
 
+import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -105,6 +107,47 @@ describe("POST /api/v1/tools/image/gif-tools/info", () => {
 
 // ── Resize mode ───────────────────────────────────────────────────
 describe("Resize mode", () => {
+  it("rejects an animated resize whose aggregate output exceeds the pixel budget", async () => {
+    const { body: payload, contentType } = makePayload({
+      mode: "resize",
+      width: 5_000,
+      height: 5_000,
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/gif-tools",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/total pixel/i);
+  });
+
+  it("rejects the same oversized workload through the worker contract", async () => {
+    const config = getToolConfig("gif-tools");
+    expect(config).toBeDefined();
+    const settings = config?.settingsSchema.parse({
+      mode: "resize",
+      width: 5_000,
+      height: 5_000,
+    });
+
+    let caught: unknown;
+    try {
+      await config?.process(animatedGif, settings, "test.gif");
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isToolInputError(caught)).toBe(true);
+    expect(caught).toHaveProperty("message", expect.stringMatching(/total pixel/i));
+  });
+
   it("resizes animated GIF by pixel dimensions", async () => {
     const { body: payload, contentType } = makePayload({
       mode: "resize",
