@@ -8,10 +8,16 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, getObjectStream, putObject } from "../../lib/object-storage.js";
+import {
+  deletePrefix,
+  getObjectBuffer,
+  getObjectStream,
+  putObject,
+} from "../../lib/object-storage.js";
+import { requireToolAccess } from "../../permissions.js";
 import { updateJobProgress } from "../progress.js";
 
 // ── Settings schema ──────────────────────────────────────────────
@@ -222,6 +228,13 @@ async function renderPdfPages(
       throw new PdfInputError(err instanceof Error ? err.message : "Invalid page range");
     }
 
+    // mupdf repairs and opens a document whose page tree is empty, which would
+    // otherwise render nothing and hand back a valid but empty ZIP labelled a
+    // success.
+    if (selectedPages.length === 0) {
+      throw new PdfInputError("This PDF has no pages to convert");
+    }
+
     const ext = FORMAT_EXT[settings.format] ?? ".png";
     const pages: RenderedPages["pages"] = [];
     const filenames: string[] = [];
@@ -250,7 +263,11 @@ async function renderPdfPages(
   }
 }
 
-/** Zip one job's already-stored page images, reading a single entry at a time. */
+/**
+ * Zip one job's already-stored page images, reading a single entry at a time.
+ * The finished archive is materialized in memory, so peak cost is one whole
+ * document's worth of encoded pages.
+ */
 async function buildPagesZip(jobId: string, filenames: string[]): Promise<Buffer> {
   const archive = archiver("zip", { zlib: { level: 5 } });
   const chunks: Buffer[] = [];
@@ -267,29 +284,6 @@ async function buildPagesZip(jobId: string, filenames: string[]): Promise<Buffer
   return Buffer.concat(chunks);
 }
 
-/**
- * Give each output a name unique within one response. Two uploads may share a
- * filename, and the client keys results by name, so collisions would drop a
- * result instead of showing it.
- */
-function uniqueNamer(): (name: string) => string {
-  const used = new Set<string>();
-  return (name) => {
-    if (!used.has(name)) {
-      used.add(name);
-      return name;
-    }
-    const dotIdx = name.lastIndexOf(".");
-    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-    let counter = 1;
-    while (used.has(`${base}_${counter}${ext}`)) counter++;
-    const candidate = `${base}_${counter}${ext}`;
-    used.add(candidate);
-    return candidate;
-  };
-}
-
 // ── Route registration ───────────────────────────────────────────
 export function registerPdfToImageRoute(
   app: FastifyInstance,
@@ -299,6 +293,8 @@ export function registerPdfToImageRoute(
 
   // ── Info endpoint ────────────────────────────────────────────
   app.post(`${basePath}/info`, async (request, reply) => {
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -341,6 +337,8 @@ export function registerPdfToImageRoute(
 
   // ── Preview endpoint (thumbnails) ─────────────────────────────
   app.post(`${basePath}/preview`, async (request, reply) => {
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+
     let fileBuffer: Buffer | null = null;
     try {
       const result = await readPdfFromParts(request);
@@ -415,170 +413,220 @@ export function registerPdfToImageRoute(
   // One PDF fans out to many page images, so the per-file result is a ZIP,
   // matching what the single-file route already returns. The response is
   // therefore a ZIP of per-document ZIPs, one per input, in upload order.
-  app.post(`${basePath}/batch`, async (request, reply) => {
-    const files: Array<{ buffer: Buffer; filename: string }> = [];
-    let settingsRaw: string | null = null;
-    let clientJobId: string | null = null;
+  app.post(
+    `${basePath}/batch`,
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      if (!(await requireToolAccess(request, reply, opts.toolId))) return;
 
-    try {
-      for await (const part of request.parts()) {
-        if (part.type === "file") {
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          const buffer = Buffer.concat(chunks);
-          if (buffer.length > 0) {
-            files.push({ buffer, filename: sanitizeFilename(part.filename ?? "document.pdf") });
-          }
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
-        } else if (part.fieldname === "clientJobId") {
-          const raw = part.value as string;
-          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-            clientJobId = raw;
-          }
-        }
-      }
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
-    }
+      // Rasterizing several documents can outrun the default socket timeout.
+      request.raw.socket?.setTimeout?.(0);
 
-    if (files.length === 0) {
-      return reply.status(400).send({ error: "No PDF files provided" });
-    }
+      const files: Array<{ buffer: Buffer; filename: string }> = [];
+      let settingsRaw: string | null = null;
+      let clientJobId: string | null = null;
 
-    if (env.MAX_BATCH_SIZE > 0 && files.length > env.MAX_BATCH_SIZE) {
-      return reply.status(400).send({
-        error: `Too many files. Maximum batch size is ${env.MAX_BATCH_SIZE}`,
-      });
-    }
-
-    let settings: z.infer<typeof settingsSchema>;
-    try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
-        return reply
-          .status(400)
-          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
-      }
-      settings = result.data;
-    } catch {
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
-
-    if (opts.lockedFormat) {
-      settings.format = opts.lockedFormat as typeof settings.format;
-    }
-
-    const jobId = clientJobId || randomUUID();
-    const results: Array<{ key: string; filename: string } | null> = new Array(files.length).fill(
-      null,
-    );
-    const errors: Array<{ filename: string; error: string }> = [];
-
-    const publishProgress = (completedFiles: number, currentFile?: string) =>
-      updateJobProgress({
-        jobId,
-        status: "processing",
-        totalFiles: files.length,
-        completedFiles,
-        failedFiles: errors.length,
-        errors,
-        ...(currentFile ? { currentFile } : {}),
-      });
-
-    publishProgress(0);
-
-    // Sequential on purpose: mupdf rendering is CPU-bound and synchronous, so
-    // interleaving documents multiplies peak memory without shortening the
-    // wall clock.
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      publishProgress(i, file.filename);
       try {
-        if (!isPdfBuffer(file.buffer)) {
-          throw new PdfInputError("Invalid or corrupt PDF file");
+        for await (const part of request.parts()) {
+          if (part.type === "file") {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk);
+            }
+            // Empty parts keep their slot: the client maps results back onto
+            // its own file list by index, so dropping one here would label a
+            // converted document with a different file's name.
+            files.push({
+              buffer: Buffer.concat(chunks),
+              filename: sanitizeFilename(part.filename ?? "document.pdf"),
+            });
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            // Doubles as an object-key segment and a response header value, so
+            // anything outside the key charset is ignored rather than allowed
+            // to fail every file or to break writeHead after hijack.
+            const raw = part.value as string;
+            if (typeof raw === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(raw)) {
+              clientJobId = raw;
+            }
+          }
         }
-        const childJobId = `${jobId}-f${i}`;
-        const { filenames } = await renderPdfPages(file.buffer, settings, childJobId);
-        const zipName = `${file.filename.replace(/\.pdf$/i, "")}-pages.zip`;
-        const key = `outputs/${childJobId}/${zipName}`;
-        await putObject(key, await buildPagesZip(childJobId, filenames));
-        results[i] = { key, filename: zipName };
       } catch (err) {
-        errors.push({
-          filename: file.filename,
-          error: err instanceof Error ? err.message : "PDF conversion failed",
+        return reply.status(400).send({
+          error: "Failed to parse multipart request",
+          details: err instanceof Error ? err.message : String(err),
         });
       }
-    }
 
-    updateJobProgress({
-      jobId,
-      status: errors.length === files.length ? "failed" : "completed",
-      totalFiles: files.length,
-      completedFiles: files.length,
-      failedFiles: errors.length,
-      errors,
-    });
-
-    if (errors.length === files.length) {
-      return reply.status(422).send({ error: "All files failed processing", errors });
-    }
-
-    const uniqueName = uniqueNamer();
-    const fileResultsMap: Record<string, string> = {};
-    for (let i = 0; i < results.length; i++) {
-      const entry = results[i];
-      if (!entry) continue;
-      entry.filename = uniqueName(entry.filename);
-      fileResultsMap[String(i)] = entry.filename;
-    }
-
-    // Hijack and stream the ZIP response
-    reply.hijack();
-    reply.raw.writeHead(200, {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="batch-${opts.toolId}-${jobId.slice(0, 8)}.zip"`,
-      "Transfer-Encoding": "chunked",
-      "X-Job-Id": jobId,
-      "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
-      ...getSecurityHeaders(),
-    });
-
-    const archive = archiver("zip", { zlib: { level: 5 } });
-
-    archive.on("error", (err) => {
-      request.log.error({ err }, "Archiver error during PDF batch processing");
-      if (!reply.raw.writableEnded) {
-        reply.raw.end();
+      if (files.length === 0) {
+        return reply.status(400).send({ error: "No PDF files provided" });
       }
-    });
 
-    archive.pipe(reply.raw);
+      // Backstop only: the multipart iterator reads MAX_BATCH_SIZE per call and
+      // busboy stops at the limit first, so this rarely fires.
+      if (env.MAX_BATCH_SIZE > 0 && files.length > env.MAX_BATCH_SIZE) {
+        return reply.status(400).send({
+          error: `Too many files. Maximum batch size is ${env.MAX_BATCH_SIZE}`,
+        });
+      }
 
-    try {
-      for (const entry of results) {
+      let settings: z.infer<typeof settingsSchema>;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          return reply
+            .status(400)
+            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        }
+        settings = result.data;
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      if (opts.lockedFormat) {
+        settings.format = opts.lockedFormat as typeof settings.format;
+      }
+
+      const jobId = clientJobId || randomUUID();
+      const results: Array<{ key: string; prefix: string; filename: string } | null> = new Array(
+        files.length,
+      ).fill(null);
+      const errors: Array<{ filename: string; error: string }> = [];
+
+      const publishProgress = (completedFiles: number, currentFile?: string) =>
+        updateJobProgress({
+          jobId,
+          status: "processing",
+          totalFiles: files.length,
+          completedFiles,
+          failedFiles: errors.length,
+          errors,
+          ...(currentFile ? { currentFile } : {}),
+        });
+
+      publishProgress(0);
+
+      // Sequential on purpose: mupdf rasterization is synchronous and CPU-bound,
+      // so interleaving documents mostly multiplies peak memory.
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          publishProgress(i, file.filename);
+          if (file.buffer.length === 0) {
+            throw new PdfInputError("File is empty");
+          }
+          if (!isPdfBuffer(file.buffer)) {
+            throw new PdfInputError("Invalid or corrupt PDF file");
+          }
+          const childJobId = `${jobId}-f${i}`;
+          const prefix = `outputs/${childJobId}`;
+          const { filenames } = await renderPdfPages(file.buffer, settings, childJobId);
+          const zipName = `${file.filename.replace(/\.pdf$/i, "")}-pages.zip`;
+          const key = `${prefix}/${zipName}`;
+          await putObject(key, await buildPagesZip(childJobId, filenames));
+          results[i] = { key, prefix, filename: zipName };
+        } catch (err) {
+          // A storage or infrastructure fault is not a bad document. Let it
+          // reach the error handler (which logs it, reports it, and honors its
+          // status) instead of telling the user their PDF is broken.
+          if (typeof (err as { statusCode?: number })?.statusCode === "number") throw err;
+          if (err instanceof PdfInputError) {
+            errors.push({ filename: file.filename, error: err.message });
+          } else {
+            request.log.error(
+              { err, filename: file.filename, toolId: opts.toolId },
+              "PDF batch file conversion failed",
+            );
+            // Generic on purpose: only messages this route authors are safe to
+            // echo, and internal errors can carry absolute paths.
+            errors.push({ filename: file.filename, error: "PDF conversion failed" });
+          }
+        }
+      }
+
+      updateJobProgress({
+        jobId,
+        status: errors.length === files.length ? "failed" : "completed",
+        totalFiles: files.length,
+        completedFiles: files.length,
+        failedFiles: errors.length,
+        errors,
+      });
+
+      if (errors.length === files.length) {
+        // parseApiError on the client reads `error` and `details`, so the
+        // per-file reasons have to ride in `details` to be seen at all.
+        return reply.status(422).send({
+          error: "All files failed processing",
+          details: errors.map((e) => `${e.filename}: ${e.error}`),
+          errors,
+        });
+      }
+
+      const uniqueName = createUniqueNamer();
+      const fileResultsMap: Record<string, string> = {};
+      for (let i = 0; i < results.length; i++) {
+        const entry = results[i];
         if (!entry) continue;
-        archive.append(await getObjectStream(entry.key), { name: entry.filename });
+        entry.filename = uniqueName(entry.filename);
+        fileResultsMap[String(i)] = entry.filename;
       }
-      await archive.finalize();
-    } catch (err) {
-      request.log.error({ err }, "Failed to stream ZIP entries during PDF batch processing");
-      archive.abort();
-      if (!reply.raw.writableEnded) {
-        reply.raw.end();
+
+      // Hijack and stream the ZIP response
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="batch-${opts.toolId}-${jobId.slice(0, 8)}.zip"`,
+        "Transfer-Encoding": "chunked",
+        "X-Job-Id": jobId,
+        "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
+        ...getSecurityHeaders(),
+      });
+
+      const archive = archiver("zip", { zlib: { level: 5 } });
+
+      // Headers are already out, so a failure here cannot change the status.
+      // Destroy the socket rather than end() it: a clean end on a chunked
+      // response is indistinguishable from success, and the client would keep
+      // a truncated ZIP believing it complete.
+      const failStream = (err: Error, msg: string) => {
+        request.log.error({ err, jobId }, msg);
+        archive.abort();
+        reply.raw.destroy(err);
+      };
+
+      archive.on("error", (err) => failStream(err, "Archiver error during PDF batch processing"));
+      archive.pipe(reply.raw);
+
+      try {
+        for (const entry of results) {
+          if (!entry) continue;
+          archive.append(await getObjectStream(entry.key), { name: entry.filename });
+        }
+        await archive.finalize();
+      } catch (err) {
+        failStream(
+          err instanceof Error ? err : new Error(String(err)),
+          "Failed to stream ZIP entries during PDF batch processing",
+        );
       }
-    }
-  });
+
+      // The per-page images and per-document ZIPs exist only to build the
+      // response, which is now sent. Leaving them would strand every rendered
+      // page on the volume until the storage sweep, and they carry no jobs row
+      // for retention or GDPR deletion to find.
+      await Promise.all(
+        results.map((entry) => (entry ? deletePrefix(entry.prefix).catch(() => {}) : null)),
+      );
+    },
+  );
 
   // ── Main processing endpoint ─────────────────────────────────
   app.post(basePath, async (request, reply) => {
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+
     let fileBuffer: Buffer | null = null;
     let settingsRaw: string | null = null;
 

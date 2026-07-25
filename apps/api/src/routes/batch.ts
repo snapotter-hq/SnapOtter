@@ -26,7 +26,7 @@ import { getSecurityHeaders } from "../lib/csp.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { sanitizeFilename } from "../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
@@ -551,24 +551,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
 
           // Deduplicate output filenames and build X-File-Results header
-          const usedNames = new Set<string>();
-          function getUniqueName(name: string): string {
-            if (!usedNames.has(name)) {
-              usedNames.add(name);
-              return name;
-            }
-            const dotIdx = name.lastIndexOf(".");
-            const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-            const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-            let counter = 1;
-            let candidate = `${base}_${counter}${ext}`;
-            while (usedNames.has(candidate)) {
-              counter++;
-              candidate = `${base}_${counter}${ext}`;
-            }
-            usedNames.add(candidate);
-            return candidate;
-          }
+          const getUniqueName = createUniqueNamer();
 
           const fileResultsMap: Record<string, string> = {};
           for (const entry of successEntries) {

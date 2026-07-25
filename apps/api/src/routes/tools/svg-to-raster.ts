@@ -9,7 +9,7 @@ import { env } from "../../config.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -312,24 +312,7 @@ export function registerSvgToRasterRoute(
     }
 
     // Deduplicate filenames and build X-File-Results header
-    const usedNames = new Set<string>();
-    function getUniqueName(name: string): string {
-      if (!usedNames.has(name)) {
-        usedNames.add(name);
-        return name;
-      }
-      const dotIdx = name.lastIndexOf(".");
-      const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-      const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-      let counter = 1;
-      let candidate = `${base}_${counter}${ext}`;
-      while (usedNames.has(candidate)) {
-        counter++;
-        candidate = `${base}_${counter}${ext}`;
-      }
-      usedNames.add(candidate);
-      return candidate;
-    }
+    const getUniqueName = createUniqueNamer();
 
     const fileResultsMap: Record<string, string> = {};
     for (let i = 0; i < results.length; i++) {
