@@ -36,6 +36,8 @@ async function getStatus() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // `unstubAllGlobals` does not undo a `spyOn`, so restore separately.
+  vi.restoreAllMocks();
 });
 
 describe("landing worker /api/status", () => {
@@ -71,8 +73,11 @@ describe("landing worker /api/status", () => {
 
   it("reports down when both probed legs are down", async () => {
     stubProbes(async () => new Response(null, { status: 503 }));
-    const { body } = await getStatus();
+    const { res, body } = await getStatus();
     expect(body.status).toBe("down");
+    // The badge reads the verdict from the body, so the transport stays 200
+    // even when everything probed is down. Answering 503 here would break it.
+    expect(res.status).toBe(200);
   });
 
   it("treats a thrown request (timeout, DNS) as down", async () => {
@@ -105,20 +110,28 @@ describe("landing worker /api/status", () => {
   it("sets the caching and noindex headers on its own response", async () => {
     stubProbes(async () => new Response(null, { status: 200 }));
     const { res } = await getStatus();
+    expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("application/json");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
   });
 
   // Without a bound signal a hung leg would stall the whole route, and the
-  // footer request behind it, for as long as the edge allows.
-  it("bounds every probe with an abort signal", async () => {
+  // footer request behind it, for as long as the edge allows. Asserting merely
+  // that some signal arrived is not enough: a much longer timeout, or an
+  // AbortController signal that never fires, would both slip through. The stub
+  // makes the real deadline unobservable, so pin the budget at the constructor.
+  it("bounds every probe with a 2 second abort signal", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     const calls = stubProbes(async () => new Response(null, { status: 200 }));
     await getStatus();
     expect(calls).toHaveLength(2);
-    for (const call of calls) {
-      expect(call.init?.signal).toBeInstanceOf(AbortSignal);
+    for (const { init } of calls) {
+      expect(init).toBeDefined();
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
     }
+    expect(timeoutSpy).toHaveBeenCalledWith(2000);
+    expect(timeoutSpy).toHaveBeenCalledTimes(2);
   });
 
   it("probes only the two sibling properties, never snapotter.com itself", async () => {
