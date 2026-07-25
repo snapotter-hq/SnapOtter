@@ -1,10 +1,11 @@
 // biome-ignore-all lint/suspicious/noTemplateCurlyInString: Contract assertions intentionally match Docker and shell interpolation syntax.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const root = resolve(here, "../../..");
 const dockerfile = readFileSync(resolve(here, "../../../docker/Dockerfile"), "utf8");
 const dockerfileTest = readFileSync(resolve(here, "../../../docker/Dockerfile.test"), "utf8");
 const snapotterRun = readFileSync(
@@ -48,6 +49,47 @@ describe("Dockerfile build args", () => {
           /@sha256:[a-f0-9]{64}(?:\s+AS\s+\S+)?$/,
         );
       }
+    }
+  });
+
+  it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
+    const goBuilder =
+      "golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58";
+    expect(dockerfile.split(goBuilder)).toHaveLength(3);
+
+    for (const contract of [
+      {
+        stage: "caire-builder",
+        directory: "caire",
+        application: "github.com/esimov/caire v1.5.0",
+      },
+      {
+        stage: "pdfcpu-builder",
+        directory: "pdfcpu",
+        application: "github.com/pdfcpu/pdfcpu v0.13.0",
+      },
+    ]) {
+      const modulePath = resolve(root, `docker/go-tools/${contract.directory}/go.mod`);
+      const checksumPath = resolve(root, `docker/go-tools/${contract.directory}/go.sum`);
+
+      expect(existsSync(modulePath), `${contract.directory} go.mod must be committed`).toBe(true);
+      expect(existsSync(checksumPath), `${contract.directory} go.sum must be committed`).toBe(true);
+      if (!existsSync(modulePath) || !existsSync(checksumPath)) continue;
+
+      const module = readFileSync(modulePath, "utf8");
+      const checksums = readFileSync(checksumPath, "utf8");
+      const stage = stageBody(contract.stage);
+
+      expect(module).toContain(contract.application);
+      expect(module).toContain("golang.org/x/image v0.43.0");
+      expect(checksums).toContain(`${contract.application} h1:`);
+      expect(checksums).toContain("golang.org/x/image v0.43.0 h1:");
+      expect(stage).toContain(
+        `COPY docker/go-tools/${contract.directory}/go.mod docker/go-tools/${contract.directory}/go.sum ./`,
+      );
+      expect(stage).toContain("go mod download");
+      expect(stage).toContain("go mod verify");
+      expect(stage).toContain("-mod=readonly");
     }
   });
 
@@ -172,6 +214,21 @@ describe("Dockerfile build args", () => {
     expect(production).toContain('CMD ["./node_modules/.bin/tsx"');
     expect(snapotterRun).not.toContain("pnpm");
     expect(snapotterRun).toContain("exec s6-setuidgid snapotter ./node_modules/.bin/tsx");
+  });
+
+  it("removes build-time Node package managers from the production runtime", () => {
+    const production = stageBody("production");
+    const installIndex = production.indexOf("playwright install chromium --with-deps");
+    const cleanupIndex = production.indexOf("apt-get purge -y --auto-remove");
+    const cleanup = production.slice(cleanupIndex);
+
+    expect(installIndex).toBeGreaterThanOrEqual(0);
+    expect(cleanupIndex).toBeGreaterThan(installIndex);
+    expect(cleanup).toContain("/usr/local/lib/node_modules/npm");
+    expect(cleanup).toContain("/usr/local/lib/node_modules/corepack");
+    for (const command of ["corepack", "npm", "npx", "pnpm", "pnpx"]) {
+      expect(cleanup).toContain(`/usr/local/bin/${command}`);
+    }
   });
 
   it("checks embedded Postgres readiness with the app database role", () => {

@@ -14,12 +14,14 @@ FROM mwader/static-ffmpeg:8.1.2@sha256:33f770f812cbfc3de96c547157fc9faf8bd95a364
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
 # ============================================
 # CGO_ENABLED=0 produces a fully static binary; no cross-compiler needed.
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:a1ae6b6c564f3e0072d70081036827a2705dbcf6b38aaa6d97f5de97fe9abdb4 AS pdfcpu-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS pdfcpu-builder
 ARG TARGETOS=linux
 ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go install github.com/pdfcpu/pdfcpu/cmd/pdfcpu@v0.13.0 \
-    && cp "$(find /go/bin -type f -name pdfcpu | head -1)" /tmp/pdfcpu
+WORKDIR /build
+COPY docker/go-tools/pdfcpu/go.mod docker/go-tools/pdfcpu/go.sum ./
+RUN go mod download all && go mod verify && \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -mod=readonly -o /tmp/pdfcpu github.com/pdfcpu/pdfcpu/cmd/pdfcpu
 
 # ============================================
 # Stage 1: Build the frontend (Vite + React)
@@ -94,7 +96,7 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # on Apple Silicon when cross-compiling for linux/amd64.
 # caire imports gioui.org/app which requires CGO on Linux, so we use a
 # proper C cross-compiler instead of CGO_ENABLED=0.
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:a1ae6b6c564f3e0072d70081036827a2705dbcf6b38aaa6d97f5de97fe9abdb4 AS caire-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS caire-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -132,25 +134,26 @@ RUN set -e; \
         && rm -rf /var/lib/apt/lists/*; \
     fi
 
-# Build caire and stage to /tmp/caire (stable path for the COPY below).
-# Cross-compiled CGO binaries land in $GOPATH/bin/${GOOS}_${GOARCH}/ not $GOPATH/bin/.
+# Build caire from a repository-checksummed module graph. The explicit x/image
+# requirement lets us patch vulnerable transitive versions without unpinning caire.
+WORKDIR /build
+COPY docker/go-tools/caire/go.mod docker/go-tools/caire/go.sum ./
+RUN go mod download all && go mod verify
+
 RUN set -e; \
     NATIVE=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'); \
     if [ "$TARGETARCH" = "$NATIVE" ]; then \
-        go install github.com/esimov/caire/cmd/caire@v1.5.0 && \
-        cp /go/bin/caire /tmp/caire; \
+        go build -trimpath -mod=readonly -o /tmp/caire github.com/esimov/caire/cmd/caire; \
     elif [ "$TARGETARCH" = "amd64" ]; then \
         CC=x86_64-linux-gnu-gcc \
         PKG_CONFIG_LIBDIR=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
         CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-            go install github.com/esimov/caire/cmd/caire@v1.5.0 && \
-        cp /go/bin/${TARGETOS}_${TARGETARCH}/caire /tmp/caire; \
+            go build -trimpath -mod=readonly -o /tmp/caire github.com/esimov/caire/cmd/caire; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         CC=aarch64-linux-gnu-gcc \
         PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
         CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-            go install github.com/esimov/caire/cmd/caire@v1.5.0 && \
-        cp /go/bin/${TARGETOS}_${TARGETARCH}/caire /tmp/caire; \
+            go build -trimpath -mod=readonly -o /tmp/caire github.com/esimov/caire/cmd/caire; \
     fi
 
 # ============================================
@@ -525,8 +528,10 @@ RUN apt-get purge -y --auto-remove \
         libtirpc-dev \
         rpcsvc-proto \
     && (corepack disable pnpm || true) \
-    && rm -rf /usr/local/share/corepack /root/.cache/node/corepack /root/.cache/pip \
-    && rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/share/corepack /root/.cache/node/corepack /root/.cache/pip \
+    && rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx \
+        /usr/local/bin/pnpm /usr/local/bin/pnpx \
     && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
