@@ -105,6 +105,10 @@ function renderIcon(iconName: string): string {
 </div>
 
 <script>
+  import {
+    isSearchBoxTypeable,
+    isTypeToSearchKey,
+  } from "@snapotter/shared/search/type-to-search.js";
   import { matchTool } from "../lib/tool-search";
 
   const input = document.getElementById("hero-tool-search") as HTMLInputElement | null;
@@ -166,6 +170,26 @@ function renderIcon(iconName: string): string {
     });
     document.addEventListener("click", (e) => {
       if (!box.contains(e.target as Node) && e.target !== input) close();
+    });
+
+    // Start typing anywhere on the page and the hero search picks it up, as long
+    // as it is actually on screen and nothing else holds focus. Once the input
+    // has focus this bails out and the browser types normally, which is what
+    // keeps the caret behaving.
+    document.addEventListener("keydown", (e) => {
+      if (!isTypeToSearchKey(e)) return;
+      if (!isSearchBoxTypeable(input, document)) return;
+      // Focus before committing to the keystroke. The browser silently refuses
+      // focus inside an inert or visibility:hidden subtree, and swallowing the
+      // character there would drop a whole query into an unreachable box.
+      input.focus();
+      if (document.activeElement !== input) return;
+      e.preventDefault();
+      input.value += e.key;
+      input.setSelectionRange(input.value.length, input.value.length);
+      // Drives the existing run(), so filtering, the result cap, firstHref and
+      // aria-expanded all stay in one place.
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
 </script>

@@ -1,5 +1,7 @@
 import { expect, test } from "./helpers";
 
+const MOD = process.platform === "darwin" ? "Meta" : "Control";
+
 test.describe("Home Page", () => {
   test("shows branding and search bar", async ({ loggedInPage: page }) => {
     // The wordmark renders as a logo image, not text; the document title is
@@ -36,6 +38,129 @@ test.describe("Home Page", () => {
 
     // Should show Compress tool
     await expect(page.getByText("Compress").first()).toBeVisible();
+  });
+
+  test("typing with nothing focused fills the tool search", async ({ loggedInPage: page }) => {
+    const searchInput = page.locator("[data-search-input]");
+    // The home page is lazy-loaded, so wait for it to mount before typing.
+    // Without this the keystrokes land on an unmounted page and vanish.
+    await expect(searchInput).toBeVisible();
+
+    await page.keyboard.type("compress");
+
+    await expect(searchInput).toHaveValue("compress");
+    await expect(searchInput).toBeFocused();
+    await expect(page.getByText("Compress").first()).toBeVisible();
+  });
+
+  test("typing does nothing once the search bar is scrolled out of view", async ({
+    loggedInPage: page,
+  }) => {
+    const searchInput = page.locator("[data-search-input]");
+    // Waiting for mount is load-bearing, not politeness: the home page is
+    // lazy-loaded, and without this the element does not exist yet, so the
+    // precondition below passes vacuously and the whole test asserts nothing.
+    await expect(searchInput).toBeVisible();
+
+    // The app shell is h-dvh overflow-hidden and #main-content is the scroller,
+    // so the document does not scroll and mouse.wheel moves nothing at all.
+    await page.locator("#main-content").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(searchInput).not.toBeInViewport();
+
+    await page.keyboard.type("compress");
+
+    await expect(searchInput).toHaveValue("");
+  });
+
+  test("typing works after a client-side navigation to home", async ({ loggedInPage: page }) => {
+    // RouteAnnouncer moves focus 300ms after a client-side route change, which
+    // would break type-to-search if that focus stuck. Every other test here
+    // arrives by hard load, where the announcer short-circuits.
+    await page.goto("/automate");
+    await page.keyboard.press(`${MOD}+/`);
+    await expect(page).toHaveURL("/");
+    const searchInput = page.locator("[data-search-input]");
+    await expect(searchInput).toBeVisible();
+    await page.waitForTimeout(500);
+
+    await page.keyboard.type("compress");
+
+    await expect(searchInput).toHaveValue("compress");
+  });
+
+  test("the ?focus=search param focuses the search bar and cleans the URL", async ({
+    loggedInPage: page,
+  }) => {
+    // Reachable via Mod+K from a page with no search box. Untested before this,
+    // and type-to-search would now mask its failure by filling the box anyway.
+    await page.goto("/?focus=search");
+
+    await expect(page.locator("[data-search-input]")).toBeFocused();
+    await expect(page).toHaveURL("/");
+  });
+
+  test("type-to-search does not leak onto pages with their own search", async ({
+    loggedInPage: page,
+  }) => {
+    // The hook's scope claim: it is mounted next to the home search bar, so no
+    // other page gets it. Automate has its own tool-palette search that must
+    // stay untouched.
+    await page.goto("/automate");
+    await expect(page).toHaveURL("/automate");
+    await page.waitForTimeout(500);
+
+    await page.keyboard.type("abc");
+
+    const anyInputTook = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("input")).some((i) => i.value.includes("abc")),
+    );
+    expect(anyInputTook).toBe(false);
+  });
+
+  test("typing does not hijack when a control already holds focus", async ({
+    loggedInPage: page,
+  }) => {
+    const searchInput = page.locator("[data-search-input]");
+    await page
+      .getByRole("button", { name: /^Image/ })
+      .first()
+      .focus();
+
+    await page.keyboard.type("compress");
+
+    await expect(searchInput).toHaveValue("");
+  });
+
+  test("typing after blurring appends and leaves the caret at the end", async ({
+    loggedInPage: page,
+  }) => {
+    const searchInput = page.locator("[data-search-input]");
+    await searchInput.fill("pdf");
+    await searchInput.blur();
+
+    await page.keyboard.type("x");
+
+    await expect(searchInput).toHaveValue("pdfx");
+    // A caret stranded at position 0 would put the next character in front.
+    await expect
+      .poll(() => searchInput.evaluate((el: HTMLInputElement) => el.selectionStart))
+      .toBe(4);
+  });
+
+  test("editing inside the tool search keeps the native caret position", async ({
+    loggedInPage: page,
+  }) => {
+    const searchInput = page.locator("[data-search-input]");
+    await searchInput.click();
+    await page.keyboard.type("ab");
+
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.type("x");
+
+    // Appending instead of honouring the caret would produce "abx".
+    await expect(searchInput).toHaveValue("axb");
   });
 
   test("clicking a tool card navigates to tool page", async ({ loggedInPage: page }) => {

@@ -18,6 +18,21 @@ test.describe("Keyboard Shortcuts", () => {
     await page.keyboard.press(`${MOD}+k`);
 
     await expect(searchInput).toBeFocused();
+    // Without this, loosening the type-to-search predicate to accept Ctrl would
+    // both focus the box and insert "k" on Linux CI, and this test would still pass.
+    await expect(searchInput).toHaveValue("");
+  });
+
+  test("typing while the Settings dialog is open does not reach the search bar", async ({
+    loggedInPage: page,
+  }) => {
+    const searchInput = page.locator("[data-search-input]");
+    await openSettings(page);
+    await expect(page.locator('[role="dialog"]').first()).toBeVisible();
+
+    await page.keyboard.type("compress");
+
+    await expect(searchInput).toHaveValue("");
   });
 
   test("Cmd/Ctrl+/ navigates to tools (home) page", async ({ loggedInPage: page }) => {

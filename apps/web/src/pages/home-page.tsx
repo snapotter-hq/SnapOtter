@@ -10,6 +10,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
 import { useRecentTools } from "@/hooks/use-recent-tools.js";
+import { useTypeToSearch } from "@/hooks/use-type-to-search.js";
 import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
@@ -236,6 +237,8 @@ function HomeSearchBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useTypeToSearch(inputRef, onChange);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
