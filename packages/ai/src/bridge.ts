@@ -10,10 +10,23 @@ import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
+const DEFAULT_PYTHON_TIMEOUT_MS = 600_000;
 
 function appendEnvPath(base: string, suffix: string): string {
   const normalizedBase = base.replace(/\/+$/, "");
   return `${normalizedBase || "/"}${normalizedBase === "" ? "" : "/"}${suffix}`;
+}
+
+function resolvePythonTimeout(explicitTimeout?: number): number | undefined {
+  const configured = process.env.PROCESSING_TIMEOUT_S?.trim();
+  if (configured !== undefined && configured !== "") {
+    const seconds = Number(configured);
+    if (Number.isFinite(seconds)) {
+      if (seconds === 0) return undefined;
+      if (seconds > 0) return seconds * 1000;
+    }
+  }
+  return explicitTimeout ?? DEFAULT_PYTHON_TIMEOUT_MS;
 }
 
 /**
@@ -475,35 +488,38 @@ export class PythonDispatcher {
     options: { onProgress?: ProgressCallback; timeout?: number } = {},
   ): Promise<{ stdout: string; stderr: string }> | null {
     const proc = this.getChild();
-    if (!proc || !proc.stdin || !this.childReady) return null;
+    const stdin = proc?.stdin;
+    if (!proc || !stdin || !this.childReady) return null;
 
     const id = randomUUID();
-    const timeout =
-      options.timeout ??
-      (process.env.PROCESSING_TIMEOUT_S && parseInt(process.env.PROCESSING_TIMEOUT_S, 10) > 0
-        ? parseInt(process.env.PROCESSING_TIMEOUT_S, 10) * 1000
-        : 600000);
+    const timeout = resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        // Kill the stuck dispatcher so it restarts on the next request instead of
-        // blocking all subsequent operations behind the timed-out script.
-        if (this.child && !this.child.killed) {
-          this.child.kill("SIGTERM");
-        }
-        rejectPromise(
-          new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
-        );
-      }, timeout);
+      const timer =
+        timeout === undefined
+          ? undefined
+          : setTimeout(() => {
+              this.pending.delete(id);
+              // Kill the stuck dispatcher so it restarts on the next request instead of
+              // blocking all subsequent operations behind the timed-out script.
+              if (this.child && !this.child.killed) {
+                this.child.kill("SIGTERM");
+              }
+              rejectPromise(
+                new SafeError("Python script timed out", {
+                  kind: "operational",
+                  code: "timeout",
+                }),
+              );
+            }, timeout);
 
       const wrappedResolve = (result: { stdout: string; stderr: string }) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         resolvePromise(result);
       };
 
       const wrappedReject = (err: Error) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         rejectPromise(err);
       };
 
@@ -528,10 +544,10 @@ export class PythonDispatcher {
       }
       const request = JSON.stringify(msg);
       try {
-        proc.stdin!.write(request + "\n");
+        stdin.write(`${request}\n`);
       } catch {
         this.pending.delete(id);
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         rejectPromise(
           new SafeError("Python dispatcher stdin closed unexpectedly", {
             kind: "operational",
@@ -566,11 +582,7 @@ export class PythonDispatcher {
       );
     }
     const scriptPath = resolve(PYTHON_DIR, scriptName);
-    const timeout =
-      options.timeout ??
-      (process.env.PROCESSING_TIMEOUT_S && parseInt(process.env.PROCESSING_TIMEOUT_S, 10) > 0
-        ? parseInt(process.env.PROCESSING_TIMEOUT_S, 10) * 1000
-        : 600000);
+    const timeout = resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
       let activeAttempt = 0;
@@ -586,11 +598,14 @@ export class PythonDispatcher {
         let stderrBuffer = "";
         let timedOut = false;
 
-        const timer = setTimeout(() => {
-          if (attempt !== activeAttempt) return;
-          timedOut = true;
-          proc.kill("SIGTERM");
-        }, timeout);
+        const timer =
+          timeout === undefined
+            ? undefined
+            : setTimeout(() => {
+                if (attempt !== activeAttempt) return;
+                timedOut = true;
+                proc.kill("SIGTERM");
+              }, timeout);
 
         proc.stdout.on("data", (chunk: Buffer) => {
           stdout += chunk.toString();
@@ -619,7 +634,7 @@ export class PythonDispatcher {
         });
 
         proc.on("error", (err: NodeJS.ErrnoException) => {
-          clearTimeout(timer);
+          if (timer) clearTimeout(timer);
           if (attempt !== activeAttempt) return;
           if (err.code === "ENOENT" && !isFallback) {
             trySpawn("python3", true);
@@ -634,7 +649,7 @@ export class PythonDispatcher {
         });
 
         proc.on("close", (code, signal) => {
-          clearTimeout(timer);
+          if (timer) clearTimeout(timer);
           if (attempt !== activeAttempt) return;
 
           if (stderrBuffer.trim()) {

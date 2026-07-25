@@ -10,6 +10,10 @@
     "FUZZ",
     "FUZZ_RUNS",
     "FUZZ_SEED",
+    "LANG",
+    "DATA_DIR",
+    "DISPATCHER_MAX_REQUESTS",
+    "MODELS_PATH",
     "PLAYWRIGHT_API_PORT",
     "PLAYWRIGHT_API_URL",
     "PLAYWRIGHT_AUTH_FILE",
@@ -28,6 +32,8 @@
     "PLAYWRIGHT_WEB_PORT",
     "PLAYWRIGHT_WEB_URL",
     "PW_WORKERS",
+    "PROCESSING_TIMEOUT_S",
+    "PYTHON_VENV_PATH",
     "QA_BASE_URL",
     "QA_CONTAINER_NAME",
     "QA_IMAGE_FIXTURE",
@@ -36,7 +42,8 @@
     "QA_USERNAME",
     "QA_WORKERS",
     "REDIS_URL",
-    "REQUIRE_AI_FEATURES"
+    "REQUIRE_AI_FEATURES",
+    "U2NET_HOME"
   ],
   "tasks": {
     "dev": {

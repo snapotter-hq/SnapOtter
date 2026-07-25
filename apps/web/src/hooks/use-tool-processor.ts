@@ -90,7 +90,9 @@ export function useToolProcessor(toolId: string) {
   const abortRef = useRef<AbortController | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
+  const activeEntryIndexRef = useRef<number | null>(null);
   const asyncModeRef = useRef(false);
+  const reconnectSSERef = useRef<(force?: boolean) => void>(() => {});
   // Save mode captured at run start (#495). Only "overwrite" re-anchors
   // serverFileId to the saved result, so "new" keeps deriving from the
   // original library file on re-runs.
@@ -101,6 +103,7 @@ export function useToolProcessor(toolId: string) {
 
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
+    activeEntryIndexRef.current = null;
     setActiveJob(null, null);
   }, [setActiveJob]);
 
@@ -113,133 +116,134 @@ export function useToolProcessor(toolId: string) {
         headers: formatHeaders(),
       });
     } catch {
-      // Cancel request failed; SSE handler or stall timeout will clean up
+      // Cancel request failed; SSE handler will clean up
     }
   }, []);
 
-  const reconnectSSE = useCallback(() => {
-    const jobId = activeJobIdRef.current;
-    if (!jobId) return;
-    if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-      return;
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
     }
+  }, []);
 
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
+  const resetStallTimer = useCallback(() => {
+    clearStallTimer();
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      if (!activeJobIdRef.current || !asyncModeRef.current) return;
+      reconnectSSERef.current(true);
+    }, SSE_STALL_TIMEOUT_MS);
+  }, [clearStallTimer]);
 
-    try {
-      const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
-      eventSourceRef.current = es;
+  const reconnectSSE = useCallback(
+    (force = false) => {
+      const jobId = activeJobIdRef.current;
+      if (!jobId) return;
+      if (
+        !force &&
+        eventSourceRef.current &&
+        eventSourceRef.current.readyState === EventSource.OPEN
+      ) {
+        return;
+      }
 
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "heartbeat") {
-            if (asyncModeRef.current && stallTimerRef.current) {
-              clearTimeout(stallTimerRef.current);
-              stallTimerRef.current = setTimeout(() => {
-                if (eventSourceRef.current) {
-                  eventSourceRef.current.close();
-                  eventSourceRef.current = null;
-                }
-                if (elapsedRef.current) clearInterval(elapsedRef.current);
-                clearActiveJob();
-                setError(
-                  "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
-                );
-                setProcessing(false);
-                setProgress(IDLE_PROGRESS);
-              }, SSE_STALL_TIMEOUT_MS);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
+      try {
+        const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
+        eventSourceRef.current = es;
+        if (asyncModeRef.current) resetStallTimer();
+
+        es.onmessage = (event) => {
+          if (eventSourceRef.current !== es) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "heartbeat") {
+              if (asyncModeRef.current) resetStallTimer();
+              return;
             }
-            return;
-          }
-          if (data.type !== "single") return;
+            if (data.type !== "single") return;
 
-          if (asyncModeRef.current && stallTimerRef.current) {
-            clearTimeout(stallTimerRef.current);
-            stallTimerRef.current = setTimeout(() => {
-              if (eventSourceRef.current) {
-                eventSourceRef.current.close();
-                eventSourceRef.current = null;
-              }
+            if (asyncModeRef.current) resetStallTimer();
+
+            if (data.phase === "complete" && data.result) {
+              clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              eventSourceRef.current = null;
+              const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
+
+              const result = data.result as ProcessResult;
+              setWarning(result.warning ?? null);
+              setResultPayload(result as unknown as Record<string, unknown>);
+              if (result.savedFileId) {
+                useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+              }
+              useFileStore.getState().updateEntry(idx, {
+                processedUrl: result.downloadUrl,
+                processedPreviewUrl: result.previewUrl ?? null,
+                processedFilename: null,
+                status: "completed",
+                originalSize: result.originalSize,
+                processedSize: result.processedSize,
+                ...(result.savedFileId && saveModeRef.current === "overwrite"
+                  ? { serverFileId: result.savedFileId }
+                  : {}),
+              });
               clearActiveJob();
-              setError(
-                "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
-              );
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
-            }, SSE_STALL_TIMEOUT_MS);
-          }
-
-          if (data.phase === "complete" && data.result) {
-            if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
-            if (elapsedRef.current) clearInterval(elapsedRef.current);
-            es.close();
-            eventSourceRef.current = null;
-            clearActiveJob();
-
-            const result = data.result as ProcessResult;
-            setWarning(result.warning ?? null);
-            setResultPayload(result as unknown as Record<string, unknown>);
-            if (result.savedFileId) {
-              useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+              return;
             }
-            const idx = useFileStore.getState().selectedIndex;
-            useFileStore.getState().updateEntry(idx, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-              ...(result.savedFileId && saveModeRef.current === "overwrite"
-                ? { serverFileId: result.savedFileId }
-                : {}),
-            });
-            setProcessing(false);
-            setProgress(IDLE_PROGRESS);
-            return;
-          }
 
-          if (data.phase === "failed") {
-            if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
-            if (elapsedRef.current) clearInterval(elapsedRef.current);
+            if (data.phase === "failed") {
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              eventSourceRef.current = null;
+              clearActiveJob();
+              setError(data.error || "Processing failed");
+              setProcessing(false);
+              setProgress(IDLE_PROGRESS);
+              return;
+            }
+
+            if (typeof data.percent === "number") {
+              const scaled = UPLOAD_WEIGHT + (data.percent / 100) * (100 - UPLOAD_WEIGHT);
+              setProgress((prev) => ({
+                ...prev,
+                phase: "processing",
+                percent: Math.max(prev.percent, scaled),
+                stage: data.stage,
+              }));
+            }
+          } catch {
+            // Ignore malformed SSE
+          }
+        };
+
+        es.onerror = () => {
+          if (!asyncModeRef.current) {
             es.close();
-            eventSourceRef.current = null;
-            clearActiveJob();
-            setError(data.error || "Processing failed");
-            setProcessing(false);
-            setProgress(IDLE_PROGRESS);
-            return;
+            if (eventSourceRef.current === es) {
+              eventSourceRef.current = null;
+            }
           }
+        };
+      } catch {
+        // EventSource creation failed
+      }
+    },
+    [clearActiveJob, clearStallTimer, resetStallTimer, setError, setProcessing],
+  );
 
-          if (typeof data.percent === "number") {
-            const scaled = UPLOAD_WEIGHT + (data.percent / 100) * (100 - UPLOAD_WEIGHT);
-            setProgress((prev) => ({
-              ...prev,
-              phase: "processing",
-              percent: Math.max(prev.percent, scaled),
-              stage: data.stage,
-            }));
-          }
-        } catch {
-          // Ignore malformed SSE
-        }
-      };
-
-      es.onerror = () => {
-        if (!asyncModeRef.current) {
-          es.close();
-          eventSourceRef.current = null;
-        }
-      };
-    } catch {
-      // EventSource creation failed
-    }
-  }, [clearActiveJob, setError, setProcessing]);
+  useEffect(() => {
+    reconnectSSERef.current = reconnectSSE;
+  }, [reconnectSSE]);
 
   // Reconnect SSE when tab becomes visible again (mobile tab recovery)
   useEffect(() => {
@@ -305,118 +309,11 @@ export function useToolProcessor(toolId: string) {
 
       const clientJobId = generateId();
       activeJobIdRef.current = clientJobId;
+      activeEntryIndexRef.current = capturedIndex;
       asyncModeRef.current = false;
-      let asyncMode = false;
-
-      const clearStallTimer = () => {
-        if (stallTimerRef.current) {
-          clearTimeout(stallTimerRef.current);
-          stallTimerRef.current = null;
-        }
-      };
-
-      const resetStallTimer = () => {
-        clearStallTimer();
-        stallTimerRef.current = setTimeout(() => {
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-          if (elapsedRef.current) clearInterval(elapsedRef.current);
-          clearActiveJob();
-          useFileStore.getState().updateEntry(capturedIndex, {
-            status: "failed",
-            error: "Processing timed out",
-          });
-          setError(
-            "Processing timed out after 5 minutes without an update from the server. Heavy tools run much slower on CPU than a GPU; try a smaller file, or retry if the connection dropped.",
-          );
-          setProcessing(false);
-          setProgress(IDLE_PROGRESS);
-        }, SSE_STALL_TIMEOUT_MS);
-      };
 
       // Open SSE for real-time progress from the server (all tools)
-      try {
-        const es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
-        eventSourceRef.current = es;
-
-        es.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "heartbeat") {
-              if (asyncMode) resetStallTimer();
-              return;
-            }
-            if (data.type !== "single") return;
-
-            if (asyncMode) resetStallTimer();
-
-            // AI tools deliver results via SSE (they return 202 from the XHR)
-            if (data.phase === "complete" && data.result) {
-              clearStallTimer();
-              if (elapsedRef.current) clearInterval(elapsedRef.current);
-              es.close();
-              eventSourceRef.current = null;
-              clearActiveJob();
-
-              const result = data.result as ProcessResult;
-              setWarning(result.warning ?? null);
-              setResultPayload(result as unknown as Record<string, unknown>);
-              if (result.savedFileId) {
-                useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
-              }
-              useFileStore.getState().updateEntry(capturedIndex, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
-                processedFilename: null,
-                status: "completed",
-                originalSize: result.originalSize,
-                processedSize: result.processedSize,
-                ...(result.savedFileId && saveModeRef.current === "overwrite"
-                  ? { serverFileId: result.savedFileId }
-                  : {}),
-              });
-              setProcessing(false);
-              setProgress(IDLE_PROGRESS);
-              return;
-            }
-
-            if (data.phase === "failed" && asyncMode) {
-              clearStallTimer();
-              if (elapsedRef.current) clearInterval(elapsedRef.current);
-              es.close();
-              eventSourceRef.current = null;
-              clearActiveJob();
-              setError(data.error || "Processing failed");
-              setProcessing(false);
-              setProgress(IDLE_PROGRESS);
-              return;
-            }
-
-            if (typeof data.percent === "number") {
-              const scaled = UPLOAD_WEIGHT + (data.percent / 100) * (100 - UPLOAD_WEIGHT);
-              setProgress((prev) => ({
-                ...prev,
-                phase: "processing",
-                percent: Math.max(prev.percent, scaled),
-                stage: data.stage,
-              }));
-            }
-          } catch {
-            // Ignore malformed SSE
-          }
-        };
-
-        es.onerror = () => {
-          if (!asyncMode) {
-            es.close();
-            eventSourceRef.current = null;
-          }
-        };
-      } catch {
-        // EventSource creation failed -- proceed without SSE
-      }
+      reconnectSSE(true);
 
       // Build form data
       const cleanSettings = { ...settings };
@@ -471,7 +368,6 @@ export function useToolProcessor(toolId: string) {
 
       xhr.onload = () => {
         if (xhr.status === 202) {
-          asyncMode = true;
           asyncModeRef.current = true;
           setActiveJob(clientJobId, cancelCurrentJob);
           resetStallTimer();
@@ -567,6 +463,9 @@ export function useToolProcessor(toolId: string) {
       setActiveJob,
       clearActiveJob,
       cancelCurrentJob,
+      clearStallTimer,
+      reconnectSSE,
+      resetStallTimer,
       toolName,
     ],
   );
