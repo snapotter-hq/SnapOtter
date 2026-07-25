@@ -2,6 +2,7 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
 import LanguageSwitcher from "@/components/LanguageSwitcher.astro";
+import StatusIndicator from "@/components/StatusIndicator.astro";
 import { t } from "@/i18n";
 import { enOnlyHref, localizeHref } from "@/lib/i18n-page";
 
@@ -156,6 +157,8 @@ const columns = [
       {t(locale, "footer.copyright", { year })}
     </p>
     <div class="flex items-center gap-4">
+      <StatusIndicator locale={locale} />
+      <span class="hidden h-3 w-px bg-border sm:block" aria-hidden="true"></span>
       <p class="text-xs text-muted">
         contact@snapotter.com
       </p>

@@ -1,0 +1,70 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+// Every label is resolved server-side and handed to the script, so the client
+// never needs a second request or a translation table of its own.
+const labels = {
+  checking: t(locale, "footer.status.checking"),
+  operational: t(locale, "footer.status.operational"),
+  partial: t(locale, "footer.status.partial"),
+  down: t(locale, "footer.status.down"),
+};
+---
+
+<span
+  class="flex items-center gap-2 text-xs text-muted"
+  data-status-indicator
+  data-status="checking"
+  title="snapotter.com, demo.snapotter.com, docs.snapotter.com"
+>
+  <span class="status-dot" data-status-dot aria-hidden="true"></span>
+  <span data-status-label>{labels.checking}</span>
+</span>
+
+<style>
+  /* The dot carries every state color and the label never does:
+     --color-success is 4.498:1 on --color-background-alt, just under AA's 4.5,
+     so coloring the label would fail tests/unit/palette-contrast.test.ts. */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 9999px;
+    background: #a8a29a;
+  }
+  [data-status="operational"] .status-dot {
+    background: var(--color-success);
+  }
+  [data-status="partial"] .status-dot {
+    background: var(--color-primary-ink);
+  }
+  [data-status="down"] .status-dot {
+    background: var(--color-danger);
+  }
+</style>
+
+<script define:vars={{ labels }}>
+  (() => {
+    const root = document.querySelector("[data-status-indicator]");
+    if (!root) return;
+    fetch("/api/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const label = data && labels[data.status];
+        // An unknown or absent verdict leaves the grey default alone. The badge
+        // never claims a state nothing told it.
+        if (!label) return;
+        root.dataset.status = data.status;
+        root.querySelector("[data-status-label]").textContent = label;
+      })
+      .catch(() => {
+        // Route unreachable or body unparseable: stay grey rather than guess.
+      });
+  })();
+</script>
