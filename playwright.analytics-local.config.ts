@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightBackingState } from "./tests/playwright-backing-state.mjs";
 
 function resolveRunId(): string {
   const runId = process.env.PLAYWRIGHT_RUN_ID ?? `${process.pid}_${randomBytes(4).toString("hex")}`;
@@ -80,16 +81,14 @@ const apiEndpoint = resolveEndpoint("API", 20_000);
 const webEndpoint = resolveEndpoint("WEB", 30_000);
 process.env.API_URL = apiEndpoint.url;
 
-// Fresh Postgres database per analytics-local e2e run (same mechanism as the
-// main playwright.config.ts).
 const E2E_PG_BASE_URL =
   process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
-const e2eDbName = `snapotter_e2e_${process.pid}_${randomBytes(4).toString("hex")}`;
-const e2eDatabaseUrl = (() => {
-  const url = new URL(E2E_PG_BASE_URL);
-  url.pathname = `/${e2eDbName}`;
-  return url.toString();
-})();
+const backingState = resolvePlaywrightBackingState({
+  postgresBaseUrl: E2E_PG_BASE_URL,
+  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
+  runId,
+  scope: "analytics-local",
+});
 
 export default defineConfig({
   testDir: "./tests/e2e-analytics",
@@ -125,9 +124,10 @@ export default defineConfig({
       // `PORT=13490`, which would override the isolated API endpoint below and
       // collide with a developer's running dev server. `start` reads PORT from
       // the env, so the PORT set in this webServer.env block is honored.
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api start`,
+      command: `node tests/playwright-api-lifecycle.mjs ${runId} analytics-local -- pnpm --filter @snapotter/api start`,
       url: `${apiEndpoint.url}/api/v1/health`,
       reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 30_000 },
       env: {
         AUTH_ENABLED: "true",
         DEFAULT_USERNAME: "admin",
@@ -140,9 +140,10 @@ export default defineConfig({
         // exercised end to end. bakedEnabled() honors this when
         // NODE_ENV !== "production".
         ANALYTICS_BAKED_OVERRIDE: "on",
-        DATABASE_URL: e2eDatabaseUrl,
-        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
-        BULLMQ_PREFIX: e2eDbName,
+        DATABASE_URL: backingState.databaseUrl,
+        E2E_PG_BASE_URL: backingState.postgresBaseUrl,
+        REDIS_URL: backingState.redisUrl,
+        BULLMQ_PREFIX: backingState.bullmqPrefix,
         PORT: String(apiEndpoint.port),
       },
       timeout: 30_000,

@@ -1,9 +1,9 @@
-import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightBackingState } from "./tests/playwright-backing-state.mjs";
 import { resolvePlaywrightEndpoint, resolvePlaywrightRun } from "./tests/playwright-run.js";
 
-const { runRoot } = resolvePlaywrightRun(__dirname, "editor");
+const { runId, runRoot } = resolvePlaywrightRun(__dirname, "editor");
 if (!process.env.PLAYWRIGHT_EDITOR_WEB_PORT && process.env.EDITOR_TEST_PORT) {
   process.env.PLAYWRIGHT_EDITOR_WEB_PORT = process.env.EDITOR_TEST_PORT;
 }
@@ -22,12 +22,12 @@ process.env.API_URL = apiEndpoint.url;
 
 const postgresBaseUrl =
   process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
-const databaseName = `snapotter_e2e_editor_${process.pid}_${randomBytes(4).toString("hex")}`;
-const databaseUrl = (() => {
-  const url = new URL(postgresBaseUrl);
-  url.pathname = `/${databaseName}`;
-  return url.toString();
-})();
+const backingState = resolvePlaywrightBackingState({
+  postgresBaseUrl,
+  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
+  runId,
+  scope: "editor",
+});
 
 export default defineConfig({
   testDir: "./tests/e2e-editor",
@@ -52,9 +52,10 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node tests/e2e-pg-create-db.cjs ${databaseName} && exec pnpm --filter @snapotter/api start`,
+      command: `node tests/playwright-api-lifecycle.mjs ${runId} editor -- pnpm --filter @snapotter/api start`,
       url: `${apiEndpoint.url}/api/v1/health`,
       reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 30_000 },
       env: {
         PORT: String(apiEndpoint.port),
         AUTH_ENABLED: "true",
@@ -64,9 +65,10 @@ export default defineConfig({
         LOGIN_ATTEMPT_LIMIT: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
-        DATABASE_URL: databaseUrl,
-        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
-        BULLMQ_PREFIX: databaseName,
+        DATABASE_URL: backingState.databaseUrl,
+        E2E_PG_BASE_URL: backingState.postgresBaseUrl,
+        REDIS_URL: backingState.redisUrl,
+        BULLMQ_PREFIX: backingState.bullmqPrefix,
         DATA_DIR: path.join(runRoot, "data"),
         FILES_STORAGE_PATH: path.join(runRoot, "files"),
         WORKSPACE_PATH: path.join(runRoot, "workspace"),

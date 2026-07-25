@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightBackingState } from "./tests/playwright-backing-state.mjs";
 
 function resolveRunId(): string {
   const runId = process.env.PLAYWRIGHT_RUN_ID ?? `${process.pid}_${randomBytes(4).toString("hex")}`;
@@ -83,17 +84,14 @@ const TEST_API_URL = apiEndpoint.url;
 const TEST_WEB_URL = webEndpoint.url;
 process.env.API_URL = TEST_API_URL;
 
-// Fresh Postgres database per e2e run. The create-db script (chained before
-// the API in the webServer command) recreates only this run's validated target.
-// The API auto-migrates the empty database at boot.
 const E2E_PG_BASE_URL =
   process.env.E2E_PG_BASE_URL || "postgres://snapotter:snapotter@localhost:5432/snapotter";
-const e2eDbName = `snapotter_e2e_${process.pid}_${randomBytes(4).toString("hex")}`;
-const e2eDatabaseUrl = (() => {
-  const url = new URL(E2E_PG_BASE_URL);
-  url.pathname = `/${e2eDbName}`;
-  return url.toString();
-})();
+const backingState = resolvePlaywrightBackingState({
+  postgresBaseUrl: E2E_PG_BASE_URL,
+  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
+  runId,
+  scope: "main",
+});
 
 // Specs that mutate global server state (settings, users, roles, API keys)
 // or assert on global lists/timing. These run in the chromium-serial project
@@ -240,9 +238,10 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node tests/e2e-pg-create-db.cjs ${e2eDbName} && pnpm --filter @snapotter/api exec tsx watch --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts`,
+      command: `node tests/playwright-api-lifecycle.mjs ${runId} main -- pnpm --filter @snapotter/api exec tsx watch --import ./src/tracing.ts --import ./src/instrument.ts src/index.ts`,
       url: `${TEST_API_URL}/api/v1/health`,
       reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 30_000 },
       env: {
         PORT: String(apiEndpoint.port),
         AUTH_ENABLED: "true",
@@ -260,9 +259,10 @@ export default defineConfig({
         // serial api-keys specs hit the list endpoint far more than that on a
         // shared IP, so raise the cap well above any single run.
         API_KEYS_RATE_LIMIT_PER_MIN: "100000",
-        DATABASE_URL: e2eDatabaseUrl,
-        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
-        BULLMQ_PREFIX: e2eDbName,
+        DATABASE_URL: backingState.databaseUrl,
+        E2E_PG_BASE_URL: backingState.postgresBaseUrl,
+        REDIS_URL: backingState.redisUrl,
+        BULLMQ_PREFIX: backingState.bullmqPrefix,
         // The in-repo docker/feature-manifest.json makes the API think it is
         // inside Docker and try to mkdir /data; point it somewhere writable.
         DATA_DIR: path.join(runRoot, "data"),

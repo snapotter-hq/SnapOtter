@@ -78,6 +78,30 @@ function mutablePaths(config: Awaited<ReturnType<typeof loadConfig>>) {
 }
 
 describe("main Playwright harness isolation", () => {
+  test("binds exact backing state to the validated run and tears it down after API shutdown", async () => {
+    const config = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18121",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18121",
+      PLAYWRIGHT_RUN_ID: "main_backing_contract",
+      PLAYWRIGHT_WEB_PORT: "28121",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28121",
+    });
+    const [apiServer] = config.webServer as Array<{
+      command: string;
+      env: Record<string, string>;
+      gracefulShutdown?: { signal: string; timeout: number };
+    }>;
+    const databaseName = new URL(apiServer.env.DATABASE_URL).pathname.slice(1);
+
+    expect(databaseName).toMatch(/^snapotter_e2e_main_[a-f0-9]{24}$/);
+    expect(apiServer.env.BULLMQ_PREFIX).toBe(databaseName);
+    expect(apiServer.command).toContain(
+      "node tests/playwright-api-lifecycle.mjs main_backing_contract main -- pnpm",
+    );
+    expect(apiServer.command).not.toContain("e2e-pg-create-db.cjs");
+    expect(apiServer.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
+  });
+
   test("propagates the exact isolated API and web endpoints through every process", async () => {
     const apiUrl = "http://127.0.0.1:18123";
     const webUrl = "http://127.0.0.1:28123";
@@ -372,6 +396,30 @@ describe("Docker analytics Playwright isolation", () => {
 });
 
 describe("local analytics Playwright isolation", () => {
+  test("binds exact backing state to the validated run and tears it down after API shutdown", async () => {
+    const config = await loadAnalyticsLocalConfig({
+      PLAYWRIGHT_API_PORT: "18490",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18490",
+      PLAYWRIGHT_RUN_ID: "analytics_backing_contract",
+      PLAYWRIGHT_WEB_PORT: "28490",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28490",
+    });
+    const [apiServer] = config.webServer as Array<{
+      command: string;
+      env: Record<string, string>;
+      gracefulShutdown?: { signal: string; timeout: number };
+    }>;
+    const databaseName = new URL(apiServer.env.DATABASE_URL).pathname.slice(1);
+
+    expect(databaseName).toMatch(/^snapotter_e2e_analytics_local_[a-f0-9]{24}$/);
+    expect(apiServer.env.BULLMQ_PREFIX).toBe(databaseName);
+    expect(apiServer.command).toContain(
+      "node tests/playwright-api-lifecycle.mjs analytics_backing_contract analytics-local -- pnpm",
+    );
+    expect(apiServer.command).not.toContain("e2e-pg-create-db.cjs");
+    expect(apiServer.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
+  });
+
   test("uses exact run-scoped endpoints and artifacts without reusing servers", async () => {
     const config = await loadAnalyticsLocalConfig({
       PLAYWRIGHT_API_PORT: "18494",

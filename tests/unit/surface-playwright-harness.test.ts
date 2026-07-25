@@ -107,13 +107,20 @@ describe("surface Playwright harness isolation", () => {
     const [api, web] = config.webServer as Array<{
       command: string;
       env: Record<string, string>;
+      gracefulShutdown?: { signal: string; timeout: number };
       reuseExistingServer: boolean;
       url: string;
     }>;
     expect(api.url).toBe("http://127.0.0.1:44191/api/v1/health");
     expect(api.reuseExistingServer).toBe(false);
-    expect(api.command).toContain("e2e-pg-create-db.cjs");
-    expect(api.command).toContain("&& exec pnpm");
+    const databaseName = new URL(api.env.DATABASE_URL).pathname.slice(1);
+    expect(databaseName).toMatch(/^snapotter_e2e_editor_[a-f0-9]{24}$/);
+    expect(api.env.BULLMQ_PREFIX).toBe(databaseName);
+    expect(api.command).toContain(
+      "node tests/playwright-api-lifecycle.mjs editor_contract editor -- pnpm",
+    );
+    expect(api.command).not.toContain("e2e-pg-create-db.cjs");
+    expect(api.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
     for (const key of ["DATA_DIR", "FILES_STORAGE_PATH", "WORKSPACE_PATH"]) {
       expect(api.env[key]).toContain(path.join("editor_contract", "editor"));
     }
