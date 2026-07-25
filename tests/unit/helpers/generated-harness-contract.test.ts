@@ -55,7 +55,7 @@ describe("generated QA harness contract", () => {
   it("fuzz executes the exact requested run count instead of interrupting successfully", () => {
     const text = source("fuzz-settings.test.ts");
     expect(text).not.toContain("interruptAfterTimeLimit");
-    expect(text).toContain("expectedAttempts: NUM_RUNS");
+    expect(text).toContain("expectedAttempts: FUZZ_CONFIG.runs + 1");
   });
 
   it("pairwise does not truncate the covering array after it is generated", () => {
