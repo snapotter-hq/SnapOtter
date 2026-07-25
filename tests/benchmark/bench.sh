@@ -4,13 +4,21 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/job-aware.sh"
 
-SYSTEM="${1:?Usage: bench.sh <system-name> <fixture-dir> [port]}"
-FIXTURE_DIR="${2:?Usage: bench.sh <system-name> <fixture-dir> [port]}"
+SYSTEM="${1:?Usage: bench.sh <system-name> <fixture-dir> [port] [container]}"
+FIXTURE_DIR="${2:?Usage: bench.sh <system-name> <fixture-dir> [port] [container]}"
 PORT="${3:-1349}"
+CONTAINER_REF="${4:-${SNAPOTTER_BENCH_CONTAINER:-}}"
+RUN_ID="${SNAPOTTER_BENCH_RUN_ID:-$$_${RANDOM}_${RANDOM}}"
+if [[ ! "$SYSTEM" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "system-name must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
+if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "SNAPOTTER_BENCH_RUN_ID must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
 BASE_URL="http://localhost:${PORT}"
-RESULTS_FILE="bench-results-${SYSTEM}.jsonl"
-
-CONTAINER_NAME="SnapOtter"
+RESULTS_FILE="bench-results-${SYSTEM}-${RUN_ID}.jsonl"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 
@@ -21,16 +29,26 @@ get_token() {
 }
 
 get_container_id() {
-  docker ps -q -f name="${CONTAINER_NAME}" | head -1
+  if [ -z "$CONTAINER_REF" ]; then
+    return 0
+  fi
+
+  local cid running
+  cid=$(docker inspect --type container --format '{{.Id}}' "$CONTAINER_REF" 2>/dev/null) || return 1
+  running=$(docker inspect --type container --format '{{.State.Running}}' "$cid" 2>/dev/null) || return 1
+  [ "$running" = "true" ] || return 1
+  printf '%s\n' "$cid"
 }
 
 docker_mem_mb() {
   local cid="$1"
+  if [ -z "$cid" ]; then echo "0"; return; fi
   docker stats "$cid" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}'
 }
 
 docker_cpu_pct() {
   local cid="$1"
+  if [ -z "$cid" ]; then echo "0"; return; fi
   docker stats "$cid" --no-stream --format "{{.CPUPerc}}" 2>/dev/null | tr -d '%'
 }
 
@@ -45,7 +63,7 @@ bench_tool() {
   local tier="$1" tool="$2" variant="$3" file="$4" settings="${5:-}"
   local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
 
-  cid=$(get_container_id)
+  cid="$BENCH_CONTAINER_ID"
   admission_file=$(mktemp)
   artifact_file=$(mktemp)
 
@@ -89,7 +107,7 @@ bench_tool_multifile() {
 
   local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
 
-  cid=$(get_container_id)
+  cid="$BENCH_CONTAINER_ID"
   admission_file=$(mktemp)
   artifact_file=$(mktemp)
 
@@ -134,29 +152,40 @@ run_n_times() {
 }
 
 F="${FIXTURE_DIR}"
-S="${F}/test-200x150.png"
-J="${F}/test-100x100.jpg"
-L="${F}/content/stress-large.jpg"
-P="${F}/content/portrait-color.jpg"
-BW="${F}/content/portrait-bw.jpeg"
-SVG="${F}/content/svg-logo.svg"
-GIF="${F}/content/animated-simpsons.gif"
-PDF="${F}/test-3page.pdf"
-EXIF="${F}/test-with-exif.jpg"
-FACE="${F}/content/multi-face.webp"
-OCR="${F}/content/ocr-chat.jpeg"
-OCRJP="${F}/content/ocr-japanese.png"
-ISO="${F}/content/portrait-isolated.png"
-HEAD="${F}/content/portrait-headshot.heic"
-REDEYE="${F}/content/red-eye.jpg"
-BARCODE="${F}/content/barcode.avif"
+S="${F}/image/valid/test-200x150.png"
+J="${F}/image/valid/test-100x100.jpg"
+L="${F}/image/valid/stress-large.jpg"
+P="${F}/image/valid/portrait-color.jpg"
+BW="${F}/image/valid/portrait-bw.jpeg"
+SVG="${F}/image/valid/svg-logo.svg"
+GIF="${F}/image/valid/animated-simpsons.gif"
+PDF="${F}/document/valid/test-3page.pdf"
+EXIF="${F}/image/valid/test-with-exif.jpg"
+FACE="${F}/image/valid/multi-face.webp"
+OCR="${F}/image/valid/ocr-chat.jpeg"
+OCRJP="${F}/image/valid/ocr-japanese.png"
+ISO="${F}/image/valid/portrait-isolated.png"
+HEAD="${F}/image/valid/portrait-headshot.heic"
+REDEYE="${F}/image/valid/red-eye.jpg"
+BARCODE="${F}/image/valid/barcode.avif"
 
 echo "[]" > /dev/null
-> "$RESULTS_FILE"
+if [ -e "$RESULTS_FILE" ]; then
+  log "Refusing to overwrite benchmark results: ${RESULTS_FILE}"
+  exit 2
+fi
+: > "$RESULTS_FILE"
 
 log "=== Starting benchmarks on ${SYSTEM} ==="
 TOKEN=$(get_token)
 log "Auth token obtained"
+BENCH_CONTAINER_ID=$(get_container_id) || {
+  log "Container '$CONTAINER_REF' does not resolve to one running Docker container"
+  exit 1
+}
+if [ -z "$BENCH_CONTAINER_ID" ]; then
+  log "Docker metrics disabled; pass a container argument or SNAPOTTER_BENCH_CONTAINER"
+fi
 
 log "=== TIER 1: Core Tool Benchmarks ==="
 
@@ -199,10 +228,10 @@ for run in 1 2 3; do
   bench_tool_multifile "core" "image/compose" "small-r${run}" '{"blendMode":"overlay"}' "$S" "$J"
   bench_tool_multifile "core" "image/compose" "large-r${run}" '{"blendMode":"overlay"}' "$L" "$P"
 
-  bench_tool_multifile "core" "image/collage" "4img-small-r${run}" '{"templateId":"4-grid"}' "$S" "$J" "${F}/test-50x50.webp" "${F}/test-100x100.svg"
-  bench_tool_multifile "core" "image/collage" "4img-large-r${run}" '{"templateId":"4-grid"}' "$L" "$P" "$BW" "${F}/content/watermark.jpg"
+  bench_tool_multifile "core" "image/collage" "4img-small-r${run}" '{"templateId":"4-grid"}' "$S" "$J" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-100x100.svg"
+  bench_tool_multifile "core" "image/collage" "4img-large-r${run}" '{"templateId":"4-grid"}' "$L" "$P" "$BW" "${F}/image/valid/watermark.jpg"
 
-  bench_tool_multifile "core" "image/stitch" "3img-small-r${run}" '{"direction":"horizontal"}' "$S" "$J" "${F}/test-50x50.webp"
+  bench_tool_multifile "core" "image/stitch" "3img-small-r${run}" '{"direction":"horizontal"}' "$S" "$J" "${F}/image/valid/test-50x50.webp"
   bench_tool_multifile "core" "image/stitch" "3img-large-r${run}" '{"direction":"horizontal"}' "$L" "$P" "$BW"
 
   bench_tool "core" "image/split" "small-r${run}" "$S" '{"columns":2,"rows":2}'
@@ -211,7 +240,7 @@ for run in 1 2 3; do
   bench_tool "core" "image/border" "small-r${run}" "$S" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
   bench_tool "core" "image/border" "large-r${run}" "$L" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
 
-  bench_tool "core" "image/svg-to-raster" "small-r${run}" "${F}/test-100x100.svg" '{"width":2000,"dpi":300}'
+  bench_tool "core" "image/svg-to-raster" "small-r${run}" "${F}/image/valid/test-100x100.svg" '{"width":2000,"dpi":300}'
 
   bench_tool "core" "image/vectorize" "small-r${run}" "$S" '{"colorMode":"color"}'
   bench_tool "core" "image/vectorize" "large-r${run}" "$P" '{"colorMode":"color"}'
@@ -225,7 +254,7 @@ for run in 1 2 3; do
   bench_tool "core" "image/favicon" "small-r${run}" "$S" ''
   bench_tool "core" "image/favicon" "large-r${run}" "$P" ''
 
-  bench_tool_multifile "core" "image/image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' "$S" "$J" "${F}/test-50x50.webp"
+  bench_tool_multifile "core" "image/image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' "$S" "$J" "${F}/image/valid/test-50x50.webp"
 
   bench_tool "core" "image/replace-color" "small-r${run}" "$S" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
   bench_tool "core" "image/replace-color" "large-r${run}" "$L" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
@@ -236,7 +265,7 @@ for run in 1 2 3; do
   bench_tool_multifile "core" "image/compare" "small-r${run}" '' "$S" "$S"
   bench_tool_multifile "core" "image/compare" "large-r${run}" '' "$L" "$L"
 
-  bench_tool_multifile "core" "image/find-duplicates" "5img-r${run}" '{"threshold":5}' "$S" "$J" "${F}/test-50x50.webp" "$S" "$J"
+  bench_tool_multifile "core" "image/find-duplicates" "5img-r${run}" '{"threshold":5}' "$S" "$J" "${F}/image/valid/test-50x50.webp" "$S" "$J"
 
   bench_tool "core" "image/color-palette" "small-r${run}" "$P" ''
   bench_tool "core" "image/color-palette" "large-r${run}" "$L" ''
@@ -255,7 +284,7 @@ done
 
 log "=== TIER 5: Format Decode Benchmarks ==="
 
-for fmt_file in "${F}/formats/"*; do
+for fmt_file in "${F}/image/formats/"*; do
   fname=$(basename "$fmt_file")
   for run in 1 2 3; do
     bench_tool "format" "image/resize" "fmt-${fname}-r${run}" "$fmt_file" '{"width":200}'
@@ -291,7 +320,7 @@ for concurrency in 1 3 5 10 20; do
   child_wait_failed=0
   wait_for_benchmark_children "$concurrency" "$local_results" "${pids[@]}" || child_wait_failed=1
 
-  cid=$(get_container_id)
+  cid="$BENCH_CONTAINER_ID"
   mem_after=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 
   times=()
@@ -331,7 +360,7 @@ done
 
 log "=== TIER 7: Sustained Load (50 sequential resizes) ==="
 
-cid=$(get_container_id)
+cid="$BENCH_CONTAINER_ID"
 mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 
 for i in $(seq 1 50); do
@@ -363,7 +392,7 @@ for batch_size in 3 5; do
 done
 
 bench_tool_multifile "batch" "image/convert" "mixed-5" '{"format":"webp","quality":80}' \
-  "$J" "$S" "${F}/test-50x50.webp" "${F}/test-200x150.heic" "${F}/formats/sample.avif"
+  "$J" "$S" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-200x150.heic" "${F}/image/formats/sample.avif"
 
 log "=== TIER 4: Pipeline Benchmarks ==="
 

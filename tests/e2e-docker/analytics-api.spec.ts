@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // Tests for the analytics config endpoint.
 // These run against the Docker container at localhost:1349.
 
-const BASE_URL = "http://localhost:1349";
+const BASE_URL = process.env.API_URL ?? "http://localhost:1349";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 test.describe("GET /api/v1/config/analytics (public)", () => {

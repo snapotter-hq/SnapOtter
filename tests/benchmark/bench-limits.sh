@@ -7,17 +7,84 @@ source "${SCRIPT_DIR}/lib/job-aware.sh"
 SYSTEM="${1:?Usage: bench-limits.sh <system-name> <fixture-dir> <docker-image>}"
 FIXTURE_DIR="${2:?}"
 DOCKER_IMAGE="${3:-snapotter:latest}"
-PORT=13491
-BASE_URL="http://localhost:${PORT}"
-RESULTS_FILE="bench-limits-results-${SYSTEM}.jsonl"
-CONTAINER_NAME="SnapOtter-bench-limits"
+RUN_ID="${SNAPOTTER_BENCH_RUN_ID:-$$_${RANDOM}_${RANDOM}}"
+if [[ ! "$SYSTEM" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "system-name must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
+if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "SNAPOTTER_BENCH_RUN_ID must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
+OWNER_LABEL_KEY="com.snapotter.benchmark.run"
+OWNER_LABEL="${OWNER_LABEL_KEY}=${RUN_ID}"
+BASE_URL=""
+RESULTS_FILE="bench-limits-results-${SYSTEM}-${RUN_ID}.jsonl"
+CONTAINER_NAME="snapotter-bench-limits-${RUN_ID}"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 
-> "$RESULTS_FILE"
+if [ -e "$RESULTS_FILE" ]; then
+  log "Refusing to overwrite benchmark results: ${RESULTS_FILE}"
+  exit 2
+fi
+: > "$RESULTS_FILE"
+
+container_is_owned() {
+  local owner
+  owner=$(docker inspect --type container \
+    --format "{{ index .Config.Labels \"${OWNER_LABEL_KEY}\" }}" \
+    "$CONTAINER_NAME" 2>/dev/null) || return 1
+  [ "$owner" = "$RUN_ID" ]
+}
 
 cleanup() {
-  docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+  if ! docker inspect --type container "$CONTAINER_NAME" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! container_is_owned; then
+    log "Refusing to remove container without exact ${OWNER_LABEL} ownership"
+    return 1
+  fi
+  docker rm -f "$CONTAINER_NAME" >/dev/null
+}
+
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap cleanup EXIT
+
+resolve_base_url() {
+  local binding port
+  binding=$(docker port "$CONTAINER_NAME" 1349/tcp 2>/dev/null) || return 1
+  port="${binding##*:}"
+  if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+    log "Docker returned an invalid host port binding: ${binding}"
+    return 1
+  fi
+  BASE_URL="http://127.0.0.1:${port}"
+}
+
+create_container() {
+  local cpus="$1" memory="$2"
+
+  if docker inspect --type container "$CONTAINER_NAME" >/dev/null 2>&1; then
+    log "Unique container name collision: ${CONTAINER_NAME}"
+    return 1
+  fi
+
+  docker run --rm -d \
+    --cpus="$cpus" --memory="$memory" \
+    -p "127.0.0.1::1349" \
+    --label "$OWNER_LABEL" \
+    -e AUTH_ENABLED=false \
+    -e SKIP_MUST_CHANGE_PASSWORD=true \
+    --name "$CONTAINER_NAME" \
+    "$DOCKER_IMAGE" >/dev/null || return 1
+
+  if ! container_is_owned || ! resolve_base_url; then
+    log "Created container failed ownership or port validation"
+    return 1
+  fi
 }
 
 start_container() {
@@ -25,17 +92,11 @@ start_container() {
   cleanup
   log "Starting container: --cpus=${cpus} --memory=${memory}"
 
-  docker run --rm -d \
-    --cpus="$cpus" --memory="$memory" \
-    -p "${PORT}:1349" \
-    -e AUTH_ENABLED=false \
-    -e SKIP_MUST_CHANGE_PASSWORD=true \
-    --name "$CONTAINER_NAME" \
-    "$DOCKER_IMAGE" >/dev/null
+  create_container "$cpus" "$memory" || return 1
 
   log "Waiting for health..."
   local attempts=0
-  while ! curl -sf "http://localhost:${PORT}/api/v1/health" >/dev/null 2>&1; do
+  while ! curl -sf "${BASE_URL}/api/v1/health" >/dev/null 2>&1; do
     sleep 2
     attempts=$((attempts + 1))
     if [ "$attempts" -gt 60 ]; then
@@ -94,7 +155,7 @@ run_batch_bench() {
   local curl_args=(-s --max-time 180 -X POST "${BASE_URL}/api/v1/tools/image/resize")
 
   for i in $(seq 1 "$count"); do
-    curl_args+=(-F "file=@${F}/test-200x150.png")
+    curl_args+=(-F "file=@${F}/image/valid/test-200x150.png")
   done
 
   curl_args+=(-F 'settings={"width":100}')
@@ -120,7 +181,7 @@ run_batch_bench() {
 }
 
 F="${FIXTURE_DIR}"
-L="${F}/content/stress-large.jpg"
+L="${F}/image/valid/stress-large.jpg"
 
 log "=== Resource Limit Sweep on ${SYSTEM} ==="
 
@@ -168,12 +229,10 @@ for config in "1:512m" "2:2g" "4:4g"; do
   cleanup
 
   start_time=$(date +%s%N)
-  docker run --rm -d --cpus="$cpus" --memory="$memory" -p "${PORT}:1349" \
-    -e AUTH_ENABLED=false -e SKIP_MUST_CHANGE_PASSWORD=true \
-    --name "$CONTAINER_NAME" "$DOCKER_IMAGE" >/dev/null
+  create_container "$cpus" "$memory"
 
   attempts=0
-  while ! curl -sf "http://localhost:${PORT}/api/v1/health" >/dev/null 2>&1; do
+  while ! curl -sf "${BASE_URL}/api/v1/health" >/dev/null 2>&1; do
     sleep 0.5
     attempts=$((attempts + 1))
     if [ "$attempts" -gt 120 ]; then break; fi

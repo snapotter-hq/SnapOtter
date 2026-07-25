@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const SCRIPTS = ["bench.sh", "bench-ai.sh", "bench-limits.sh"];
 
@@ -50,4 +51,62 @@ test("the shell adapter forwards output MIME and ZIP-entry expectations", () => 
   assert.match(adapter, /--expected-mime/);
   assert.match(adapter, /--expected-zip-entries/);
   assert.match(limits, /"application\/zip"\s+"\$count"/);
+});
+
+test("benchmark fixture references resolve against the tracked modality layout", () => {
+  const fixtureRoot = fileURLToPath(new URL("../fixtures/", import.meta.url));
+
+  for (const script of SCRIPTS) {
+    const source = readFileSync(new URL(script, import.meta.url), "utf8");
+    const references = new Set(
+      [...source.matchAll(/\$\{F\}\/([A-Za-z0-9_./-]+)/g)].map((match) => match[1]),
+    );
+
+    assert.ok(references.size > 0, `${script} should reference benchmark fixtures`);
+    for (const reference of references) {
+      assert.ok(
+        existsSync(new URL(`../fixtures/${reference}`, import.meta.url)),
+        `${script} references missing fixture path ${reference} under ${fixtureRoot}`,
+      );
+    }
+  }
+});
+
+test("endpoint benchmarks collect Docker metrics only from an explicit exact container", () => {
+  for (const script of ["bench.sh", "bench-ai.sh"]) {
+    const source = readFileSync(new URL(script, import.meta.url), "utf8");
+
+    assert.match(source, /SNAPOTTER_BENCH_CONTAINER/);
+    assert.match(source, /docker inspect/);
+    assert.doesNotMatch(source, /CONTAINER_NAME=["']SnapOtter["']/);
+    assert.doesNotMatch(source, /docker ps[^\n]+(?:--filter|-f)\s+name=/);
+  }
+});
+
+test("resource-limit benchmarks own labeled containers on dynamic loopback ports", () => {
+  const source = readFileSync(new URL("bench-limits.sh", import.meta.url), "utf8");
+
+  assert.match(source, /SNAPOTTER_BENCH_RUN_ID/);
+  assert.match(source, /com\.snapotter\.benchmark\.run/);
+  assert.match(source, /--label/);
+  assert.match(source, /127\.0\.0\.1::1349/);
+  assert.match(source, /docker port/);
+  assert.match(source, /container_is_owned/);
+  assert.doesNotMatch(source, /^PORT=13491$/m);
+  assert.doesNotMatch(source, /CONTAINER_NAME=["']SnapOtter-bench-limits["']/);
+
+  const cleanup = source.slice(source.indexOf("cleanup()"), source.indexOf("start_container()"));
+  assert.match(cleanup, /container_is_owned/);
+  assert.match(cleanup, /docker rm -f/);
+});
+
+test("benchmark results are run-scoped and never overwrite an existing JSONL file", () => {
+  for (const script of SCRIPTS) {
+    const source = readFileSync(new URL(script, import.meta.url), "utf8");
+
+    assert.match(source, /SNAPOTTER_BENCH_RUN_ID/);
+    assert.match(source, /RESULTS_FILE=[^\n]+\$\{RUN_ID\}/);
+    assert.match(source, /\[ -e "\$RESULTS_FILE" \]/);
+    assert.match(source, /Refusing to overwrite benchmark results/);
+  }
 });

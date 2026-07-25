@@ -7,11 +7,27 @@
 // lifecycle: bare-run boot, restart persistence, clean shutdown, the non-root and
 // partial-config fail-fast guards, and the 1.x SQLite auto-detect upgrade.
 import { execFileSync, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const IMAGE = process.env.SNAPOTTER_IMAGE || "snapotter:embed-wip";
-const NAME = "so-embed-test";
-const VOL = "so-embed-test-data";
-const PORT = process.env.SNAPOTTER_TEST_PORT || "13492";
+const RUN_ID =
+  process.env.SNAPOTTER_TEST_RUN_ID || `${process.pid}_${randomBytes(6).toString("hex")}`;
+if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(RUN_ID)) {
+  throw new Error("SNAPOTTER_TEST_RUN_ID must be 1-64 letters, digits, underscores, or hyphens");
+}
+const OWNER_LABEL_KEY = "com.snapotter.e2e.run";
+const OWNER_LABEL = `${OWNER_LABEL_KEY}=${RUN_ID}`;
+const NAME = `so-embed-test-${RUN_ID}`;
+const VOL = `so-embed-test-data-${RUN_ID}`;
+const requestedPort = process.env.SNAPOTTER_TEST_PORT;
+if (requestedPort && !/^\d+$/.test(requestedPort)) {
+  throw new Error("SNAPOTTER_TEST_PORT must be an integer port");
+}
+if (requestedPort && (Number(requestedPort) < 1024 || Number(requestedPort) > 65_535)) {
+  throw new Error("SNAPOTTER_TEST_PORT must be between 1024 and 65535");
+}
+const PORT_SPEC = requestedPort ? `127.0.0.1:${requestedPort}:1349` : "127.0.0.1::1349";
+let PORT = requestedPort || "";
 
 let failures = 0;
 const ok = (m) => console.log(`  PASS ${m}`);
@@ -46,9 +62,75 @@ const dockerLogs = (name) => {
   const res = spawnSync("docker", ["logs", name], { encoding: "utf-8" });
   return `${res.stdout || ""}${res.stderr || ""}`;
 };
+const containerIsOwned = () =>
+  quiet(["inspect", "--format", `{{ index .Config.Labels "${OWNER_LABEL_KEY}" }}`, NAME]).trim() ===
+  RUN_ID;
+const volumeIsOwned = () =>
+  quiet([
+    "volume",
+    "inspect",
+    "--format",
+    `{{ index .Labels "${OWNER_LABEL_KEY}" }}`,
+    VOL,
+  ]).trim() === RUN_ID;
 const cleanup = () => {
-  quiet(["rm", "-f", NAME]);
-  quiet(["volume", "rm", VOL]);
+  if (quiet(["inspect", NAME])) {
+    if (containerIsOwned()) quiet(["rm", "-f", NAME]);
+    else console.error(`Refusing to remove unowned container ${NAME}`);
+  }
+  if (quiet(["volume", "inspect", VOL])) {
+    if (volumeIsOwned()) quiet(["volume", "rm", VOL]);
+    else console.error(`Refusing to remove unowned volume ${VOL}`);
+  }
+};
+const exitOnSignal = (exitCode) => {
+  process.exitCode = exitCode;
+  cleanup();
+  process.exit();
+};
+process.once("SIGINT", () => exitOnSignal(130));
+process.once("SIGTERM", () => exitOnSignal(143));
+process.once("exit", cleanup);
+const createVolume = () => {
+  if (quiet(["volume", "inspect", VOL])) {
+    throw new Error(`Unique volume name collision: ${VOL}`);
+  }
+  docker(["volume", "create", "--label", OWNER_LABEL, VOL]);
+  if (!volumeIsOwned()) throw new Error(`Created volume failed ownership validation: ${VOL}`);
+};
+const resolveContainerPort = () => {
+  const binding = docker(["port", NAME, "1349/tcp"]).trim();
+  const match = /^127\.0\.0\.1:(\d+)$/.exec(binding);
+  if (!match) throw new Error(`Invalid Docker port binding: ${binding}`);
+  PORT = match[1];
+};
+const runEmbeddedContainer = () => {
+  if (quiet(["inspect", NAME])) {
+    throw new Error(`Unique container name collision: ${NAME}`);
+  }
+  docker([
+    "run",
+    "-d",
+    "--name",
+    NAME,
+    "--label",
+    OWNER_LABEL,
+    "-p",
+    PORT_SPEC,
+    "-v",
+    `${VOL}:/data`,
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    IMAGE,
+  ]);
+  if (!containerIsOwned()) {
+    throw new Error(`Created container failed ownership validation: ${NAME}`);
+  }
+  resolveContainerPort();
+};
+const restartEmbeddedContainer = () => {
+  docker(["restart", NAME]);
+  resolveContainerPort();
 };
 
 async function waitHealthy(timeoutMs) {
@@ -72,25 +154,13 @@ const countMatches = (haystack, re) => (haystack.match(re) || []).length;
 
 async function main() {
   console.log(`Embedded-mode tests against ${IMAGE}`);
-  cleanup();
+  createVolume();
 
   // 1. Bare `docker run` with no DB env boots and becomes healthy.
   // Prod images bake real telemetry keys, so every container start in this
   // harness sets SNAPOTTER_TELEMETRY=0 to keep test-fleet boots silent.
   console.log("\n[1] bare docker run boots healthy");
-  docker([
-    "run",
-    "-d",
-    "--name",
-    NAME,
-    "-p",
-    `${PORT}:1349`,
-    "-v",
-    `${VOL}:/data`,
-    "-e",
-    "SNAPOTTER_TELEMETRY=0",
-    IMAGE,
-  ]);
+  runEmbeddedContainer();
   const healthy = await waitHealthy(300000);
   healthy
     ? ok("embedded container reached healthy")
@@ -104,7 +174,7 @@ async function main() {
 
   // 2. Restart reuses PGDATA (no second initdb), stays healthy.
   console.log("\n[2] restart persists data, no re-init");
-  docker(["restart", NAME]);
+  restartEmbeddedContainer();
   (await waitHealthy(180000)) ? ok("healthy after restart") : bad("unhealthy after restart");
   countMatches(dockerLogs(NAME), /first-boot initdb/g) === 1
     ? ok("no second initdb on restart")
@@ -151,6 +221,7 @@ async function main() {
   //    this proves the auto-detect wiring (row migration is covered elsewhere).
   console.log("\n[6] 1.x SQLite auto-detect upgrade");
   cleanup();
+  createVolume();
   const tables = [
     "users",
     "teams",
@@ -174,19 +245,7 @@ async function main() {
     "-c",
     `apk add --no-cache sqlite >/dev/null 2>&1 && sqlite3 /data/snapotter.db "${seedSql}"`,
   ]);
-  docker([
-    "run",
-    "-d",
-    "--name",
-    NAME,
-    "-p",
-    `${PORT}:1349`,
-    "-v",
-    `${VOL}:/data`,
-    "-e",
-    "SNAPOTTER_TELEMETRY=0",
-    IMAGE,
-  ]);
+  runEmbeddedContainer();
   (await waitHealthy(300000))
     ? ok("healthy after upgrade boot")
     : bad("unhealthy after upgrade boot");
@@ -195,7 +254,7 @@ async function main() {
     : bad("did not auto-import the 1.x SQLite DB");
 
   // Second boot must NOT re-import (target Postgres now non-empty).
-  docker(["restart", NAME]);
+  restartEmbeddedContainer();
   (await waitHealthy(180000))
     ? ok("healthy after second boot")
     : bad("unhealthy after second boot");
@@ -205,11 +264,15 @@ async function main() {
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);
-  process.exit(failures === 0 ? 0 : 1);
+  return failures === 0 ? 0 : 1;
 }
 
-main().catch((e) => {
-  console.error(e);
-  cleanup();
-  process.exit(1);
-});
+main()
+  .then((exitCode) => {
+    process.exitCode = exitCode;
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(cleanup);

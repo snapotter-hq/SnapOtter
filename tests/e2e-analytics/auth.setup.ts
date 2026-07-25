@@ -2,7 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test as setup } from "@playwright/test";
 
-const authFile = path.join(process.cwd(), "test-results", ".auth", "analytics-local-user.json");
+const authFile = process.env.PLAYWRIGHT_AUTH_FILE;
+if (!authFile) {
+  throw new Error(
+    "PLAYWRIGHT_AUTH_FILE was not initialized by playwright.analytics-local.config.ts",
+  );
+}
 
 setup("authenticate for analytics tests", async ({ page }) => {
   const dir = path.dirname(authFile);

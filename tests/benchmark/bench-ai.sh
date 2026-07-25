@@ -4,14 +4,26 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/job-aware.sh"
 
-SYSTEM="${1:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode]}"
-FIXTURE_DIR="${2:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode]}"
+SYSTEM="${1:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode] [container]}"
+FIXTURE_DIR="${2:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode] [container]}"
 PORT="${3:-1349}"
 GPU_MODE="${4:-gpu}"
+CONTAINER_REF="${5:-${SNAPOTTER_BENCH_CONTAINER:-}}"
+RUN_ID="${SNAPOTTER_BENCH_RUN_ID:-$$_${RANDOM}_${RANDOM}}"
+if [[ ! "$SYSTEM" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "system-name must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
+if [[ ! "$GPU_MODE" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "gpu-mode must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
+if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo "SNAPOTTER_BENCH_RUN_ID must be 1-64 letters, digits, underscores, or hyphens" >&2
+  exit 2
+fi
 BASE_URL="http://localhost:${PORT}"
-RESULTS_FILE="bench-ai-results-${SYSTEM}-${GPU_MODE}.jsonl"
-
-CONTAINER_NAME="SnapOtter"
+RESULTS_FILE="bench-ai-results-${SYSTEM}-${GPU_MODE}-${RUN_ID}.jsonl"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 
@@ -22,16 +34,26 @@ get_token() {
 }
 
 get_container_id() {
-  docker ps -q -f name="${CONTAINER_NAME}" | head -1
+  if [ -z "$CONTAINER_REF" ]; then
+    return 0
+  fi
+
+  local cid running
+  cid=$(docker inspect --type container --format '{{.Id}}' "$CONTAINER_REF" 2>/dev/null) || return 1
+  running=$(docker inspect --type container --format '{{.State.Running}}' "$cid" 2>/dev/null) || return 1
+  [ "$running" = "true" ] || return 1
+  printf '%s\n' "$cid"
 }
 
 docker_mem_mb() {
   local cid="$1"
+  if [ -z "$cid" ]; then echo "0"; return; fi
   docker stats "$cid" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}'
 }
 
 docker_cpu_pct() {
   local cid="$1"
+  if [ -z "$cid" ]; then echo "0"; return; fi
   docker stats "$cid" --no-stream --format "{{.CPUPerc}}" 2>/dev/null | tr -d '%'
 }
 
@@ -50,7 +72,7 @@ bench_ai_tool() {
   local tool="$1" variant="$2" file="$3" settings="${4:-}"
   local cid time_s http_code response_mime mem_after cpu vram admission_file artifact_file pass output_size
 
-  cid=$(get_container_id)
+  cid="$BENCH_CONTAINER_ID"
   admission_file=$(mktemp)
   artifact_file=$(mktemp)
 
@@ -88,23 +110,34 @@ bench_ai_tool() {
 }
 
 F="${FIXTURE_DIR}"
-P="${F}/content/portrait-color.jpg"
-ISO="${F}/content/portrait-isolated.png"
-J="${F}/test-100x100.jpg"
-BW="${F}/content/portrait-bw.jpeg"
-OCR="${F}/content/ocr-chat.jpeg"
-OCRJP="${F}/content/ocr-japanese.png"
-FACE="${F}/content/multi-face.webp"
-HEAD="${F}/content/portrait-headshot.heic"
-REDEYE="${F}/content/red-eye.jpg"
-S="${F}/test-200x150.png"
-L="${F}/content/stress-large.jpg"
+P="${F}/image/valid/portrait-color.jpg"
+ISO="${F}/image/valid/portrait-isolated.png"
+J="${F}/image/valid/test-100x100.jpg"
+BW="${F}/image/valid/portrait-bw.jpeg"
+OCR="${F}/image/valid/ocr-chat.jpeg"
+OCRJP="${F}/image/valid/ocr-japanese.png"
+FACE="${F}/image/valid/multi-face.webp"
+HEAD="${F}/image/valid/portrait-headshot.heic"
+REDEYE="${F}/image/valid/red-eye.jpg"
+S="${F}/image/valid/test-200x150.png"
+L="${F}/image/valid/stress-large.jpg"
 
-> "$RESULTS_FILE"
+if [ -e "$RESULTS_FILE" ]; then
+  log "Refusing to overwrite benchmark results: ${RESULTS_FILE}"
+  exit 2
+fi
+: > "$RESULTS_FILE"
 
 log "=== Starting AI benchmarks on ${SYSTEM} (${GPU_MODE}) ==="
 TOKEN=$(get_token)
 log "Auth token obtained"
+BENCH_CONTAINER_ID=$(get_container_id) || {
+  log "Container '$CONTAINER_REF' does not resolve to one running Docker container"
+  exit 1
+}
+if [ -z "$BENCH_CONTAINER_ID" ]; then
+  log "Docker metrics disabled; pass a container argument or SNAPOTTER_BENCH_CONTAINER"
+fi
 
 for run in 1 2 3; do
   log "--- AI Run $run of 3 ---"
@@ -147,7 +180,7 @@ for batch_size in 3 5; do
   log "AI Batch ${batch_size} - remove-background"
   admission_file=$(mktemp)
   artifact_file=$(mktemp)
-  cid=$(get_container_id)
+  cid="$BENCH_CONTAINER_ID"
 
   curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/image/remove-background" -H "Authorization: Bearer ${TOKEN}")
   for i in $(seq 1 "$batch_size"); do
@@ -173,7 +206,7 @@ for batch_size in 3 5; do
 done
 
 log "=== Sustained AI Load (10 cycles) ==="
-cid=$(get_container_id)
+cid="$BENCH_CONTAINER_ID"
 mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 vram_start=$(gpu_vram_mb)
 

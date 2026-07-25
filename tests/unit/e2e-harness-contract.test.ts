@@ -9,12 +9,18 @@ const e2eDir = path.join(root, "tests", "e2e");
 const authSetupPath = path.join(e2eDir, "auth.setup.ts");
 const helpersPath = path.join(root, "tests", "e2e", "helpers.ts");
 const dockerPlaywrightConfigPath = path.join(root, "playwright.analytics.config.ts");
+const analyticsLocalConfigPath = path.join(root, "playwright.analytics-local.config.ts");
+const dockerAuthSetupPath = path.join(root, "tests", "e2e-docker", "auth.setup.ts");
+const dockerAnalyticsApiPath = path.join(root, "tests", "e2e-docker", "analytics-api.spec.ts");
+const analyticsLocalAuthSetupPath = path.join(root, "tests", "e2e-analytics", "auth.setup.ts");
+const embeddedModePath = path.join(root, "tests", "e2e-docker", "embedded-mode.mjs");
 const packagePath = path.join(root, "package.json");
 const e2eRunnerPath = path.join(root, "scripts", "run-main-e2e.mjs");
 const turboPath = path.join(root, "turbo.json");
 
 const isolationEnvKeys = [
   "API_URL",
+  "BASE_URL",
   "PLAYWRIGHT_API_PORT",
   "PLAYWRIGHT_API_URL",
   "PLAYWRIGHT_AUTH_FILE",
@@ -39,6 +45,20 @@ async function loadConfig(overrides: Record<string, string>) {
   for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
   vi.resetModules();
   return (await import("../../playwright.config.js")).default;
+}
+
+async function loadDockerConfig(overrides: Record<string, string>) {
+  for (const key of isolationEnvKeys) delete process.env[key];
+  for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
+  vi.resetModules();
+  return (await import("../../playwright.analytics.config.js")).default;
+}
+
+async function loadAnalyticsLocalConfig(overrides: Record<string, string>) {
+  for (const key of isolationEnvKeys) delete process.env[key];
+  for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
+  vi.resetModules();
+  return (await import("../../playwright.analytics-local.config.js")).default;
 }
 
 function mutablePaths(config: Awaited<ReturnType<typeof loadConfig>>) {
@@ -262,6 +282,153 @@ test("Docker E2E specs collect with tracked fixture references", () => {
   );
 
   expect(output).toMatch(/Total: \d+ tests in \d+ files/);
+});
+
+test("embedded lifecycle tests use exact labeled resources and dynamic loopback ports", () => {
+  const source = fs.readFileSync(embeddedModePath, "utf8");
+
+  expect(source).toContain("SNAPOTTER_TEST_RUN_ID");
+  expect(source).toContain("com.snapotter.e2e.run");
+  expect(source).toContain('"--label"');
+  expect(source).toContain('"127.0.0.1::1349"');
+  expect(source).toContain('["port", NAME, "1349/tcp"]');
+  expect(source).toContain("containerIsOwned");
+  expect(source).toContain("volumeIsOwned");
+  expect(source).not.toContain('const NAME = "so-embed-test"');
+  expect(source).not.toContain('const VOL = "so-embed-test-data"');
+  expect(source).not.toContain('|| "13492"');
+
+  const cleanup = source.slice(source.indexOf("const cleanup"), source.indexOf("async function"));
+  expect(cleanup).toContain("containerIsOwned");
+  expect(cleanup).toContain("volumeIsOwned");
+  expect(cleanup).toContain('["rm", "-f", NAME]');
+  expect(cleanup).toContain('["volume", "rm", VOL]');
+  expect(source).toContain('process.once("SIGINT"');
+  expect(source).toContain('process.once("SIGTERM"');
+  expect(source).toContain('process.once("exit", cleanup)');
+  expect(source).toContain(".finally(cleanup)");
+  expect(source).toContain("process.exitCode = exitCode");
+  expect(source).toContain("const restartEmbeddedContainer = () =>");
+  expect(source.match(/restartEmbeddedContainer\(\);/g)).toHaveLength(2);
+});
+
+describe("Docker analytics Playwright isolation", () => {
+  test("isolates auth state, output, and reports under the validated run identity", async () => {
+    const firstConfig = await loadDockerConfig({
+      BASE_URL: "http://127.0.0.1:18491",
+      PLAYWRIGHT_RUN_ID: "docker_run_a",
+    });
+    const firstChromium = firstConfig.projects?.find((project) => project.name === "chromium");
+    const firstReporter = firstConfig.reporter as Array<[string, { outputFolder?: string }]>;
+    const first = {
+      authFile: firstChromium?.use?.storageState,
+      envAuthFile: process.env.PLAYWRIGHT_AUTH_FILE,
+      outputDir: firstConfig.outputDir,
+      reportDir: firstReporter[0]?.[1]?.outputFolder,
+      runRoot: process.env.PLAYWRIGHT_RUN_ROOT,
+    };
+
+    const secondConfig = await loadDockerConfig({
+      BASE_URL: "http://127.0.0.1:18492",
+      PLAYWRIGHT_RUN_ID: "docker_run_b",
+    });
+    const secondChromium = secondConfig.projects?.find((project) => project.name === "chromium");
+    const secondReporter = secondConfig.reporter as Array<[string, { outputFolder?: string }]>;
+    const second = {
+      authFile: secondChromium?.use?.storageState,
+      envAuthFile: process.env.PLAYWRIGHT_AUTH_FILE,
+      outputDir: secondConfig.outputDir,
+      reportDir: secondReporter[0]?.[1]?.outputFolder,
+      runRoot: process.env.PLAYWRIGHT_RUN_ROOT,
+    };
+
+    for (const key of Object.keys(first) as Array<keyof typeof first>) {
+      expect(first[key], key).toContain("docker_run_a");
+      expect(second[key], key).toContain("docker_run_b");
+      expect(second[key], key).not.toBe(first[key]);
+    }
+    expect(first.authFile).toBe(first.envAuthFile);
+    expect(second.authFile).toBe(second.envAuthFile);
+    expect(firstConfig.use?.baseURL).toBe("http://127.0.0.1:18491");
+    expect(secondConfig.use?.baseURL).toBe("http://127.0.0.1:18492");
+    expect(process.env.API_URL).toBe("http://127.0.0.1:18492");
+  });
+
+  test("rejects unsafe run identities and keeps consumers on resolved paths", async () => {
+    await expect(
+      loadDockerConfig({
+        BASE_URL: "http://127.0.0.1:18493",
+        PLAYWRIGHT_RUN_ID: "../shared",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_RUN_ID/);
+
+    const authSetup = fs.readFileSync(dockerAuthSetupPath, "utf8");
+    const analyticsApi = fs.readFileSync(dockerAnalyticsApiPath, "utf8");
+    expect(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
+    expect(authSetup).not.toContain(".playwright");
+    expect(analyticsApi).toContain("process.env.API_URL");
+    expect(analyticsApi).not.toContain('const BASE_URL = "http://localhost:1349"');
+  });
+});
+
+describe("local analytics Playwright isolation", () => {
+  test("uses exact run-scoped endpoints and artifacts without reusing servers", async () => {
+    const config = await loadAnalyticsLocalConfig({
+      PLAYWRIGHT_API_PORT: "18494",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18494",
+      PLAYWRIGHT_RUN_ID: "analytics_local_a",
+      PLAYWRIGHT_WEB_PORT: "28494",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28494",
+    });
+    const [apiServer, webServer] = config.webServer as Array<{
+      env: Record<string, string>;
+      reuseExistingServer: boolean;
+      url?: string;
+    }>;
+    const chromium = config.projects?.find((project) => project.name === "chromium");
+    const reporter = config.reporter as Array<[string, { outputFolder?: string }]>;
+
+    for (const value of [
+      chromium?.use?.storageState,
+      process.env.PLAYWRIGHT_AUTH_FILE,
+      process.env.PLAYWRIGHT_RUN_ROOT,
+      config.outputDir,
+      reporter[0]?.[1]?.outputFolder,
+    ]) {
+      expect(value).toContain("analytics_local_a");
+    }
+    expect(chromium?.use?.storageState).toBe(process.env.PLAYWRIGHT_AUTH_FILE);
+    expect(config.use?.baseURL).toBe("http://127.0.0.1:28494");
+    expect(process.env.API_URL).toBe("http://127.0.0.1:18494");
+    expect(apiServer.url).toBe("http://127.0.0.1:18494/api/v1/health");
+    expect(apiServer.env.PORT).toBe("18494");
+    expect(apiServer.reuseExistingServer).toBe(false);
+    expect(webServer.url).toBe("http://127.0.0.1:28494");
+    expect(webServer.env.PORT).toBe("28494");
+    expect(webServer.env.VITE_API_URL).toBe("http://127.0.0.1:18494");
+    expect(webServer.reuseExistingServer).toBe(false);
+  });
+
+  test("generates unique endpoints, rejects unsafe IDs, and keeps auth setup run-scoped", async () => {
+    const first = await loadAnalyticsLocalConfig({ PLAYWRIGHT_RUN_ID: "analytics_auto_a" });
+    const firstEndpoints = [process.env.API_URL, first.use?.baseURL];
+    const second = await loadAnalyticsLocalConfig({ PLAYWRIGHT_RUN_ID: "analytics_auto_b" });
+    const secondEndpoints = [process.env.API_URL, second.use?.baseURL];
+
+    expect(firstEndpoints[0]).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(firstEndpoints[1]).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(secondEndpoints).not.toEqual(firstEndpoints);
+    await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_RUN_ID: "../shared" })).rejects.toThrow(
+      /PLAYWRIGHT_RUN_ID/,
+    );
+
+    const configSource = fs.readFileSync(analyticsLocalConfigPath, "utf8");
+    const authSetup = fs.readFileSync(analyticsLocalAuthSetupPath, "utf8");
+    expect(configSource).not.toMatch(/(?:TEST_API_PORT\s*=\s*13491|TEST_WEB_PORT\s*=\s*2350)/);
+    expect(configSource).not.toContain("reuseExistingServer: !process.env.CI");
+    expect(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
+    expect(authSetup).not.toContain('"test-results", ".auth"');
+  });
 });
 
 test("the canonical E2E command exactly covers every release browser and device project", async () => {

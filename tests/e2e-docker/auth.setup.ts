@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { test as setup } from "@playwright/test";
 
-const authFile = path.join(__dirname, "..", "..", ".playwright", ".auth", "analytics-user.json");
+const authFile = process.env.PLAYWRIGHT_AUTH_FILE;
+if (!authFile) {
+  throw new Error("PLAYWRIGHT_AUTH_FILE was not initialized by playwright.analytics.config.ts");
+}
 
 setup("authenticate", async ({ page }) => {
   await page.goto("/login");
