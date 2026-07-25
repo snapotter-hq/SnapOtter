@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -265,10 +265,19 @@ describe("UsageSurveyOverlay", () => {
 
       renderOverlay();
       await screen.findByText("How are you using SnapOtter?");
+      await act(async () => {});
 
-      fireEvent.keyDown(document, { key: "Escape" });
-
+      // Escape is the one control here whose handler is a document listener
+      // registered by a passive effect; every other control is an onClick prop
+      // attached at commit. That makes it the only one that can miss an event
+      // dispatched too early, and it flaked exactly once on main: dialog fully
+      // rendered, handler never ran. Locally the listener is always attached by
+      // the time findByText resolves, so the window only opens under CI
+      // contention and cannot be reproduced here. Rather than bet on one
+      // mechanism, retry the dispatch until it lands. handleDismiss guards on
+      // `busy` and the settings write is idempotent, so repeats are harmless.
       await waitFor(() => {
+        fireEvent.keyDown(document, { key: "Escape" });
         expect(apiPut).toHaveBeenCalledWith("/v1/settings", {
           "onboarding.usageSurvey.dismissedAt": expect.any(String),
         });
