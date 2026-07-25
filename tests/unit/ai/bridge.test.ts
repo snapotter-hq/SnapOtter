@@ -619,25 +619,57 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     }
   });
 
-  it("ignores invalid PROCESSING_TIMEOUT_S values", async () => {
+  it("treats zero PROCESSING_TIMEOUT_S as unlimited despite an explicit timeout", async () => {
     const origTimeout = process.env.PROCESSING_TIMEOUT_S;
     process.env.PROCESSING_TIMEOUT_S = "0";
 
-    const mock = createMockProcess();
-    vi.mocked(spawn).mockReturnValue(mock.process);
+    vi.useFakeTimers();
+    try {
+      const mock = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mock.process);
 
-    const promise = runPythonWithProgress("test_script.py", []);
+      const promise = runPythonWithProgress("test_script.py", [], { timeout: 50 });
 
-    mock.stdout.emit("data", Buffer.from('{"success": true}\n'));
-    mock.emitEvent("close", 0, null);
+      vi.advanceTimersByTime(600_001);
+      expect(mock.process.kill).not.toHaveBeenCalled();
 
-    // Should not throw -- falls back to 600000ms default
-    await expect(promise).resolves.toBeDefined();
+      mock.stdout.emit("data", Buffer.from('{"success": true}\n'));
+      mock.emitEvent("close", 0, null);
 
-    if (origTimeout !== undefined) {
-      process.env.PROCESSING_TIMEOUT_S = origTimeout;
-    } else {
-      delete process.env.PROCESSING_TIMEOUT_S;
+      await expect(promise).resolves.toBeDefined();
+    } finally {
+      vi.useRealTimers();
+      if (origTimeout !== undefined) {
+        process.env.PROCESSING_TIMEOUT_S = origTimeout;
+      } else {
+        delete process.env.PROCESSING_TIMEOUT_S;
+      }
+    }
+  });
+
+  it("lets positive PROCESSING_TIMEOUT_S override an explicit timeout", async () => {
+    const origTimeout = process.env.PROCESSING_TIMEOUT_S;
+    process.env.PROCESSING_TIMEOUT_S = "2";
+
+    vi.useFakeTimers();
+    try {
+      const mock = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mock.process);
+
+      const promise = runPythonWithProgress("test_script.py", [], { timeout: 60_000 });
+      const rejection = expect(promise).rejects.toThrow("Python script timed out");
+
+      vi.advanceTimersByTime(2_500);
+      mock.emitEvent("close", null, "SIGTERM");
+
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+      if (origTimeout !== undefined) {
+        process.env.PROCESSING_TIMEOUT_S = origTimeout;
+      } else {
+        delete process.env.PROCESSING_TIMEOUT_S;
+      }
     }
   });
 });

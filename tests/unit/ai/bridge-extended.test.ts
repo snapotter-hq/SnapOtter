@@ -712,7 +712,7 @@ describe("bridge - PROCESSING_TIMEOUT_S env for dispatcher path", () => {
     vi.useRealTimers();
   });
 
-  it("ignores zero PROCESSING_TIMEOUT_S and uses default 600s", async () => {
+  it("treats zero PROCESSING_TIMEOUT_S as unlimited despite an explicit timeout", async () => {
     process.env.PROCESSING_TIMEOUT_S = "0";
 
     vi.useFakeTimers();
@@ -724,13 +724,16 @@ describe("bridge - PROCESSING_TIMEOUT_S env for dispatcher path", () => {
     vi.advanceTimersByTime(100);
     await initPromise;
 
-    const promise = runPythonWithProgress("test.py", []);
+    const promise = runPythonWithProgress("test.py", [], { timeout: 50 });
+    const settled = promise.then(
+      (result) => ({ status: "resolved" as const, result }),
+      (error: Error) => ({ status: "rejected" as const, error }),
+    );
     await vi.advanceTimersByTimeAsync(10);
 
-    // Advance 10s -- should NOT have timed out with default 600s
-    vi.advanceTimersByTime(10_000);
+    vi.advanceTimersByTime(600_001);
+    expect(mock.process.kill).not.toHaveBeenCalled();
 
-    // Respond before default timeout
     const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
     const id = JSON.parse(line).id;
     mock.stdout.emit(
@@ -738,8 +741,33 @@ describe("bridge - PROCESSING_TIMEOUT_S env for dispatcher path", () => {
       Buffer.from(`${JSON.stringify({ id, exitCode: 0, stdout: '{"ok":true}' })}\n`),
     );
 
-    const result = await promise;
-    expect(result.stdout).toBe('{"ok":true}');
+    const outcome = await settled;
+    expect(outcome).toMatchObject({
+      status: "resolved",
+      result: { stdout: '{"ok":true}' },
+    });
+    vi.useRealTimers();
+  });
+
+  it("lets positive PROCESSING_TIMEOUT_S override an explicit timeout", async () => {
+    process.env.PROCESSING_TIMEOUT_S = "2";
+
+    vi.useFakeTimers();
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const initPromise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    vi.advanceTimersByTime(100);
+    await initPromise;
+
+    const promise = runPythonWithProgress("test.py", [], { timeout: 60_000 });
+    const rejection = expect(promise).rejects.toThrow("Python script timed out");
+    await vi.advanceTimersByTimeAsync(10);
+
+    vi.advanceTimersByTime(2_500);
+
+    await rejection;
     vi.useRealTimers();
   });
 
