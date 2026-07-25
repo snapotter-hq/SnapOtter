@@ -20,65 +20,59 @@ test.describe("Connection Banner & Disconnection", () => {
     // Block all health-check requests so the monitor thinks the server is down
     await page.route("**/api/v1/health", (route) => route.abort());
 
-    // Trigger a health check by navigating (the connection monitor polls /api/v1/health)
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("offline"));
-    });
+    try {
+      // Remount the connection monitor while health requests are blocked. This
+      // avoids racing an in-flight successful health request from initial load.
+      await page.reload();
 
-    // The connection banner is a non-sr-only role="status" region. The
-    // RouteAnnouncer also renders role="status" aria-live="polite", so filter by
-    // the banner's visible message text to avoid a strict-mode multi-match.
-    const banner = page.getByRole("status").filter({ hasText: /offline|connect/i });
-    await expect(banner).toBeVisible({ timeout: 10_000 });
-    await expect(banner).toContainText(/offline|reconnecting/i);
-
-    // Unblock for later tests
-    await page.unroute("**/api/v1/health");
+      // The RouteAnnouncer also renders role="status", so match the connection
+      // banner by its exact failure-state message.
+      await expect(
+        page.getByRole("status").filter({ hasText: /reconnecting to server/i }),
+      ).toBeVisible({ timeout: 10_000 });
+    } finally {
+      await page.unroute("**/api/v1/health");
+    }
   });
 
   test("UI remains interactive while disconnected (banner and main visible)", async ({
     loggedInPage: page,
   }) => {
-    // Block health endpoint
-    await page.route("**/api/v1/health", (route) => route.abort());
-    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await expect(page.getByPlaceholder(/search/i).first()).toBeVisible();
+    await page.context().setOffline(true);
+    try {
+      await expect(page.getByRole("status").filter({ hasText: /you're offline/i })).toBeVisible({
+        timeout: 10_000,
+      });
 
-    // Wait for banner
-    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).toBeVisible({
-      timeout: 10_000,
-    });
+      // Top-nav banner and main content should still be visible and interactive
+      await expect(page.getByRole("banner")).toBeVisible();
+      await expect(page.locator("main")).toBeVisible();
 
-    // Top-nav banner and main content should still be visible and interactive
-    await expect(page.getByRole("banner")).toBeVisible();
-    await expect(page.locator("main")).toBeVisible();
-
-    // Should be able to click sidebar navigation (SPA navigation still works)
-    const searchInput = page.getByPlaceholder(/search/i).first();
-    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await searchInput.fill("resize");
-      await expect(page.getByText("Resize").first()).toBeVisible({ timeout: 5_000 });
+      // Client-side filtering remains interactive without a network connection.
+      const searchInput = page.getByPlaceholder(/search/i).first();
+      if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await searchInput.fill("resize");
+        await expect(page.getByText("Resize").first()).toBeVisible({ timeout: 5_000 });
+      }
+    } finally {
+      await page.context().setOffline(false);
     }
-
-    await page.unroute("**/api/v1/health");
   });
 
   test("connection banner disappears when API reconnects", async ({ loggedInPage: page }) => {
-    // Block health to trigger disconnected state
-    await page.route("**/api/v1/health", (route) => route.abort());
-    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
-
-    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).toBeVisible({
+    await expect(page.getByPlaceholder(/search/i).first()).toBeVisible();
+    await page.context().setOffline(true);
+    await expect(page.getByRole("status").filter({ hasText: /you're offline/i })).toBeVisible({
       timeout: 10_000,
     });
 
-    // Unblock health and bring back online
-    await page.unroute("**/api/v1/health");
-    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await page.context().setOffline(false);
 
     // Banner should eventually disappear (after "reconnected" state clears)
-    await expect(page.getByRole("status").filter({ hasText: /offline|connect/i })).not.toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      page.getByRole("status").filter({ hasText: /offline|reconnecting|connected/i }),
+    ).not.toBeVisible({ timeout: 15_000 });
   });
 
   test("toast appears when processing fails due to disconnection", async ({

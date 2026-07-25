@@ -219,13 +219,13 @@ function FileSelectionInfo({
 
 export function ToolPage() {
   const { t } = useTranslation();
-  const { toolId } = useParams<{ toolId: string }>();
+  const { section, toolId } = useParams<{ section: string; toolId: string }>();
   const location = useLocation();
-  const tool = useMemo(() => TOOLS.find((t) => t.id === toolId), [toolId]);
-  const registryEntry = useMemo(
-    () => (toolId ? getToolRegistryEntry(toolId) : undefined),
-    [toolId],
+  const tool = useMemo(
+    () => TOOLS.find((t) => t.id === toolId && t.route === `/${section}/${toolId}`),
+    [section, toolId],
   );
+  const registryEntry = useMemo(() => (tool ? getToolRegistryEntry(tool.id) : undefined), [tool]);
   const isAiTool = toolId ? (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) : false;
   const featuresLoaded = useFeaturesStore((s) => s.loaded);
   const featureBundles = useFeaturesStore((s) => s.bundles);
@@ -555,7 +555,7 @@ export function ToolPage() {
     URL.revokeObjectURL(url);
   }, [batchZipBlob, batchZipFilename]);
 
-  if (toolId && TOOLS.some((tt) => tt.id === toolId) && disabledTools.includes(toolId)) {
+  if (tool && disabledTools.includes(tool.id)) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">

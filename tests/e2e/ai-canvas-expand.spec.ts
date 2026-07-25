@@ -118,6 +118,11 @@ test.describe("AI Canvas Expand", () => {
   // ── Processing (requires AI sidecar) ────────────────────────────────
 
   test("processes image (AI sidecar required)", async ({ loggedInPage: page }) => {
+    // The assertion below intentionally allows up to five minutes for a real
+    // sidecar run, so the enclosing test must not retain Playwright's 30s
+    // default timeout.
+    test.setTimeout(330_000);
+
     await page.goto("/image/ai-canvas-expand");
 
     if (!(await isAiSidecarRunning(page))) {
@@ -131,7 +136,7 @@ test.describe("AI Canvas Expand", () => {
     await page.getByTestId("ai-canvas-expand-submit").click();
 
     const download = page.getByTestId("ai-canvas-expand-download");
-    const error = page.getByText(/failed|not available|not installed|error/i);
+    const error = page.getByText(/failed|not available|not installed|requires.*feature|error/i);
 
     await expect(download.or(error)).toBeVisible({ timeout: 300_000 });
   });

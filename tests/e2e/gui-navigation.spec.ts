@@ -531,8 +531,8 @@ test.describe("Files Page", () => {
     await page.goto("/files");
 
     // "My Files" renders twice: a visually-hidden page <h1> and the visible
-    // FilesNav <h3>. Target the level-3 nav heading so we assert the visible one.
-    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
+    // FilesNav <h2>. Target the level-2 nav heading so we assert the visible one.
+    await expect(page.getByRole("heading", { name: "My Files", level: 2 })).toBeVisible();
     // Navigation items
     await expect(page.getByRole("button", { name: /recent/i }).first()).toBeVisible();
   });
@@ -706,9 +706,9 @@ test.describe("Files Page Layout", () => {
   test("desktop shows nav column with list and details", async ({ loggedInPage: page }) => {
     await page.goto("/files");
 
-    // FilesNav renders the visible level-3 "My Files" heading (a separate sr-only
+    // FilesNav renders the visible level-2 "My Files" heading (a separate sr-only
     // <h1> with the same text also exists, so scope to the nav heading).
-    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Files", level: 2 })).toBeVisible();
     // Nav items: Recent and Upload Files (files-nav.tsx)
     await expect(page.getByRole("button", { name: /recent/i }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /upload files/i }).first()).toBeVisible();
@@ -879,7 +879,7 @@ test.describe("Browser Back/Forward Navigation", () => {
     await page.reload();
     await expect(page).toHaveURL("/files");
     // Scope to the visible FilesNav heading (an sr-only <h1> shares the text).
-    await expect(page.getByRole("heading", { name: "My Files", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Files", level: 2 })).toBeVisible();
   });
 });
 

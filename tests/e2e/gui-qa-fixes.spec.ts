@@ -1,8 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers";
 
 test.describe("QA Fixes Verification", () => {
-  test.use({ storageState: ".playwright/.auth/qa-user.json" });
-
   test("home page loads after login", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
@@ -20,13 +18,9 @@ test.describe("QA Fixes Verification", () => {
     await expect(page.locator("text=Resize").first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test("/tools/:toolId redirects to /:toolId", async ({ page }) => {
+  test("noncanonical section for a known tool shows not-found state", async ({ page }) => {
     await page.goto("/tools/resize");
-    await page.waitForTimeout(2_000);
-    const url = page.url();
-    // After the fix, /tools/resize should redirect to /resize
-    // On pre-fix builds, it stays at /tools/resize (treated as unknown tool)
-    expect(url).toContain("/resize");
+    await expect(page.getByText(/tool not found/i)).toBeVisible();
   });
 
   test("invalid tool slug shows not-found state", async ({ page }) => {
