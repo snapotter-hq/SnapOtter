@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter에 기여하는 방법. 버그 리포트, 기능 요청, 풀 리퀘스트, CLA 요구사항."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: f7601dee43cc
+i18n_output_hash: 435d2600f5c1
+i18n_hash_version: 2
 ---
 
 # 기여하기 {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: f7601dee43cc
 
 ### 사전 요구사항 {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (AI 도구에만 필요)
 - Docker (선택 사항, 전체 통합 테스트용)

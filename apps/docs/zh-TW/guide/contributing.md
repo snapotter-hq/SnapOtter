@@ -1,8 +1,9 @@
 ---
 description: "如何為 SnapOtter 做出貢獻。錯誤回報、功能請求、拉取請求以及 CLA 要求。"
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: 28b8b8d90d65
+i18n_output_hash: 99d1ae43ef11
+i18n_hash_version: 2
 ---
 
 # 貢獻 {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: 28b8b8d90d65
 
 ### 先決條件 {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+（僅供 AI 工具使用）
 - Docker（選用，供完整整合測試使用）

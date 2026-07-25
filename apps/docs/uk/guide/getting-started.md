@@ -1,8 +1,8 @@
 ---
 description: "Встановіть SnapOtter за допомогою Docker однією командою. Включає налаштування Docker Compose, збирання з вихідного коду й повний огляд функцій."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: f309184b8076
+i18n_output_hash: 5859f9d6859f
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## Збирання з вихідного коду {#build-from-source}
 
-**Передумови:** Node.js 22+, pnpm 9+, Docker (для Postgres + Redis), Python 3.10+ (для функцій AI), Git.
+**Передумови:** Node.js 22.22+, pnpm 9+, Docker (для Postgres + Redis), Python 3.10+ (для функцій AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

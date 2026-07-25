@@ -1,8 +1,8 @@
 ---
 description: "Cài đặt SnapOtter với Docker trong một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn, và tổng quan đầy đủ về tính năng."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: fb3b2d7dd51c
+i18n_output_hash: 35795f26270f
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến m
 
 ## Build từ mã nguồn {#build-from-source}
 
-**Điều kiện tiên quyết:** Node.js 22+, pnpm 9+, Docker (cho Postgres + Redis), Python 3.10+ (cho các tính năng AI), Git.
+**Điều kiện tiên quyết:** Node.js 22.22+, pnpm 9+, Docker (cho Postgres + Redis), Python 3.10+ (cho các tính năng AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

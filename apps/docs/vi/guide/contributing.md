@@ -1,8 +1,9 @@
 ---
 description: "Cách đóng góp cho SnapOtter. Báo cáo lỗi, yêu cầu tính năng, pull request và các yêu cầu về CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: 84c90166896b
+i18n_output_hash: 45552b575bff
+i18n_hash_version: 2
 ---
 
 # Đóng góp {#contributing}
@@ -53,7 +54,7 @@ Nếu bạn đóng góp thay mặt cho nhà tuyển dụng của mình và nhà 
 
 ### Điều kiện tiên quyết {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (chỉ dành cho các công cụ AI)
 - Docker (tùy chọn, để kiểm thử tích hợp đầy đủ)

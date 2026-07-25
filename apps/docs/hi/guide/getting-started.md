@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter को एक ही कमांड में Docker के साथ इंस्टॉल करें। इसमें Docker Compose सेटअप, सोर्स से बिल्ड करना, और एक पूर्ण फ़ीचर अवलोकन शामिल है।"
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: 70825df744c9
+i18n_output_hash: 16dd84c66bc6
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## Build from Source {#build-from-source}
 
-**पूर्वापेक्षाएँ:** Node.js 22+, pnpm 9+, Docker (Postgres + Redis के लिए), Python 3.10+ (AI फ़ीचर के लिए), Git।
+**पूर्वापेक्षाएँ:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis के लिए), Python 3.10+ (AI फ़ीचर के लिए), Git।
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

@@ -1,8 +1,9 @@
 ---
 description: "วิธีมีส่วนร่วมกับ SnapOtter รายงานบั๊ก คำขอฟีเจอร์ pull request และข้อกำหนดเรื่อง CLA"
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: 33d63a5f1932
+i18n_output_hash: 88395fe58149
+i18n_hash_version: 2
 ---
 
 # การมีส่วนร่วม {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: 33d63a5f1932
 
 ### สิ่งที่ต้องมีก่อน {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (สำหรับเครื่องมือ AI เท่านั้น)
 - Docker (ไม่บังคับ สำหรับการทดสอบ integration เต็มรูปแบบ)

@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter'a nasıl katkıda bulunulur. Hata bildirimleri, özellik istekleri, pull request'ler ve CLA gereksinimleri."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: bf657da309f3
+i18n_output_hash: 817fbe39bf31
+i18n_hash_version: 2
 ---
 
 # Katkıda Bulunma {#contributing}
@@ -53,7 +54,7 @@ Katkıda bulunmakla ilgilendiğiniz için teşekkürler. Bu kılavuz nasıl kat�
 
 ### Ön koşullar {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (yalnızca AI araçları için)
 - Docker (isteğe bağlı, tam entegrasyon testi için)

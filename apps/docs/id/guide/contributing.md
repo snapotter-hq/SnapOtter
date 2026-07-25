@@ -1,8 +1,9 @@
 ---
 description: "Cara berkontribusi ke SnapOtter. Laporan bug, permintaan fitur, pull request, dan persyaratan CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: bf536bb687ec
+i18n_output_hash: 33567fdbf8ef
+i18n_hash_version: 2
 ---
 
 # Berkontribusi {#contributing}
@@ -53,7 +54,7 @@ Jika Anda berkontribusi atas nama pemberi kerja Anda dan pemberi kerja Anda meme
 
 ### Prasyarat {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (hanya untuk tool AI)
 - Docker (opsional, untuk pengujian integrasi penuh)

@@ -1,8 +1,8 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: c8ecc4e725ac
+i18n_output_hash: e8421f9b57be
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## البناء من المصدر {#build-from-source}
 
-**المتطلبات المسبقة:** Node.js 22+، و pnpm 9+، و Docker (لـ Postgres + Redis)، و Python 3.10+ (لميزات الذكاء الاصطناعي)، و Git.
+**المتطلبات المسبقة:** Node.js 22.22+، و pnpm 9+، و Docker (لـ Postgres + Redis)، و Python 3.10+ (لميزات الذكاء الاصطناعي)، و Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

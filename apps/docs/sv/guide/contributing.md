@@ -1,8 +1,9 @@
 ---
 description: "Så bidrar du till SnapOtter. Buggrapporter, funktionsförslag, pull requests och CLA-krav."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: f8b510a1881a
+i18n_output_hash: b0a61ebb3e0d
+i18n_hash_version: 2
 ---
 
 # Bidra {#contributing}
@@ -53,7 +54,7 @@ Om du bidrar för din arbetsgivares räkning och din arbetsgivare behåller de i
 
 ### Förutsättningar {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (endast för AI-verktyg)
 - Docker (valfritt, för fullständig integrationstestning)

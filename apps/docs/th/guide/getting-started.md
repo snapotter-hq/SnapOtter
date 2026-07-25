@@ -1,8 +1,8 @@
 ---
 description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว รวมถึงการตั้งค่า Docker Compose การ build จากซอร์ส และภาพรวมฟีเจอร์ทั้งหมด"
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: 502f08b9a2b6
+i18n_output_hash: 8e92205fb44d
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ Canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtte
 
 ## Build from Source {#build-from-source}
 
-**ข้อกำหนดเบื้องต้น:** Node.js 22+, pnpm 9+, Docker (สำหรับ Postgres + Redis), Python 3.10+ (สำหรับฟีเจอร์ AI), Git
+**ข้อกำหนดเบื้องต้น:** Node.js 22.22+, pnpm 9+, Docker (สำหรับ Postgres + Redis), Python 3.10+ (สำหรับฟีเจอร์ AI), Git
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

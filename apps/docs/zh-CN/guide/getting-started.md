@@ -1,8 +1,8 @@
 ---
 description: "用一条 Docker 命令安装 SnapOtter。包含 Docker Compose 配置、从源码构建，以及完整的功能概览。"
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: f3c1787b5cc9
+i18n_output_hash: 00a743d88802
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## 从源码构建 {#build-from-source}
 
-**前置条件：** Node.js 22+、pnpm 9+、Docker（用于 Postgres + Redis）、Python 3.10+（用于 AI 功能）、Git。
+**前置条件：** Node.js 22.22+、pnpm 9+、Docker（用于 Postgres + Redis）、Python 3.10+（用于 AI 功能）、Git。
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

@@ -1,8 +1,9 @@
 ---
 description: "Cómo contribuir a SnapOtter. Informes de errores, solicitudes de funciones, pull requests y requisitos del CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: 27b5c04c8d90
+i18n_output_hash: 406a2e39b199
+i18n_hash_version: 2
 ---
 
 # Contribuir {#contributing}
@@ -53,7 +54,7 @@ Si contribuyes en nombre de tu empleador y este conserva los derechos de propied
 
 ### Requisitos previos {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (solo para herramientas de IA)
 - Docker (opcional, para pruebas de integración completas)

@@ -6,9 +6,15 @@ const root = process.cwd();
 
 function packageJson(path: string): {
   dependencies?: Record<string, string>;
+  engines?: { node?: string };
   pnpm?: { overrides?: Record<string, string> };
 } {
   return JSON.parse(readFileSync(resolve(root, path), "utf8"));
+}
+
+function minimumNodeVersion(range: string | undefined): [number, number, number] | null {
+  const match = range?.match(/^>=(\d+)\.(\d+)\.(\d+)$/);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
 describe("production dependency advisory policy", () => {
@@ -24,6 +30,20 @@ describe("production dependency advisory policy", () => {
 
     expect(web.dependencies?.["react-router"]).toBe("^8.3.0");
     expect(web.dependencies).not.toHaveProperty("react-router-dom");
+  });
+
+  it("advertises a Node floor supported by the production router", () => {
+    const rootPackage = packageJson("package.json");
+    const routerPackage = packageJson("apps/web/node_modules/react-router/package.json");
+    const advertisedFloor = minimumNodeVersion(rootPackage.engines?.node);
+    const routerFloor = minimumNodeVersion(routerPackage.engines?.node);
+
+    expect(
+      advertisedFloor,
+      "root package must declare an exact minimum Node version",
+    ).not.toBeNull();
+    expect(routerFloor, "React Router must declare an exact minimum Node version").not.toBeNull();
+    expect(advertisedFloor).toEqual(routerFloor);
   });
 
   it("pins the vulnerable brace-expansion release to its patched successor", () => {

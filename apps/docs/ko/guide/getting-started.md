@@ -1,8 +1,8 @@
 ---
 description: "명령 하나로 Docker에 SnapOtter를 설치. Docker Compose 설정, 소스에서 빌드하기, 전체 기능 개요 포함."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: 1a0b78b04f8b
+i18n_output_hash: 099b08f91118
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## 소스에서 빌드 {#build-from-source}
 
-**전제 조건:** Node.js 22+, pnpm 9+, Docker (Postgres + Redis용), Python 3.10+ (AI 기능용), Git.
+**전제 조건:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis용), Python 3.10+ (AI 기능용), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

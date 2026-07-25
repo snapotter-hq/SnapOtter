@@ -50,7 +50,7 @@ If you are contributing on behalf of your employer and your employer retains IP 
 
 ### Prerequisites {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (only for AI tools)
 - Docker (optional, for full integration testing)

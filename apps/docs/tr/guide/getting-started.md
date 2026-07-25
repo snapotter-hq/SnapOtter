@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutla kurun. Docker Compose kurulumu, kaynaktan derleme ve tam özellik genel bakışı içerir."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: fe066bc20dd2
+i18n_output_hash: aea71ee46492
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration)'ya ve 
 
 ## Kaynaktan Derleme {#build-from-source}
 
-**Ön koşullar:** Node.js 22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.10+ (AI özellikleri için), Git.
+**Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.10+ (AI özellikleri için), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

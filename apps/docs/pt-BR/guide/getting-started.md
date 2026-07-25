@@ -1,8 +1,8 @@
 ---
 description: "Instale o SnapOtter com Docker em um único comando. Inclui configuração de Docker Compose, build a partir do código-fonte e uma visão geral completa das features."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: b8108e9b297a
+i18n_output_hash: c4412ce7358f
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ Consulte [Configuração](/pt-BR/guide/configuration) para todas as variáveis �
 
 ## Build a partir do Código-Fonte {#build-from-source}
 
-**Pré-requisitos:** Node.js 22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.10+ (para features de IA), Git.
+**Pré-requisitos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.10+ (para features de IA), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

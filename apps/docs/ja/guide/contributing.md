@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter への貢献方法。バグ報告、機能リクエスト、プルリクエスト、CLA の要件について。"
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: f22f41277ff7
+i18n_output_hash: 0ccc9f538229
+i18n_hash_version: 2
 ---
 
 # 貢献する {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: f22f41277ff7
 
 ### 前提条件 {#prerequisites}
 
-- Node.js 22 以上
+- Node.js 22.22 以上
 - pnpm 9 以上
 - Python 3.11 以上（AI ツールのみ）
 - Docker（オプション、完全な統合テスト用）

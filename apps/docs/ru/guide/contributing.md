@@ -1,8 +1,9 @@
 ---
 description: "Как участвовать в развитии SnapOtter. Отчёты об ошибках, запросы функций, pull request'ы и требования CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: fc5a31dca269
+i18n_output_hash: ad5af3c27b23
+i18n_hash_version: 2
 ---
 
 # Участие {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: fc5a31dca269
 
 ### Предварительные требования {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (только для AI-инструментов)
 - Docker (опционально, для полного интеграционного тестирования)

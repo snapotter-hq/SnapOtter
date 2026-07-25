@@ -1,8 +1,8 @@
 ---
 description: "Pasang SnapOtter dengan Docker dalam satu perintah. Termasuk penyiapan Docker Compose, membangun dari sumber, dan gambaran lengkap fitur."
-i18n_source_hash: df95d95de14a
+i18n_source_hash: 8040133a6982
 i18n_provenance: machine
-i18n_output_hash: 468809094690
+i18n_output_hash: fbe4a9bf48c8
 i18n_hash_version: 2
 ---
 
@@ -78,7 +78,7 @@ Lihat [Konfigurasi](/id/guide/configuration) untuk semua variabel lingkungan dan
 
 ## Membangun dari Sumber {#build-from-source}
 
-**Prasyarat:** Node.js 22+, pnpm 9+, Docker (untuk Postgres + Redis), Python 3.10+ (untuk fitur AI), Git.
+**Prasyarat:** Node.js 22.22+, pnpm 9+, Docker (untuk Postgres + Redis), Python 3.10+ (untuk fitur AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

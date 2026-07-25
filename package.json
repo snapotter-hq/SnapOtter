@@ -25,6 +25,9 @@
     "open-source"
   ],
   "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "scripts": {
     "dev": "turbo dev & (cd .local-wiki && npm run docs:dev) &",
     "wiki:dev": "cd .local-wiki && npm run docs:dev",

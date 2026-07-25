@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter में योगदान कैसे करें। बग रिपोर्ट, फ़ीचर अनुरोध, पुल रिक्वेस्ट और CLA आवश्यकताएँ।"
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: cf867a422a1c
+i18n_output_hash: 2e30393617bf
+i18n_hash_version: 2
 ---
 
 # योगदान {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: cf867a422a1c
 
 ### पूर्वापेक्षाएँ {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (केवल AI टूल के लिए)
 - Docker (वैकल्पिक, पूर्ण इंटीग्रेशन टेस्टिंग के लिए)

@@ -1,8 +1,9 @@
 ---
 description: "Як зробити внесок у SnapOtter. Звіти про помилки, запити на функції, pull request-и та вимоги CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: 12a7eac534af
+i18n_output_hash: 624e5a689563
+i18n_hash_version: 2
 ---
 
 # Внесок {#contributing}
@@ -53,7 +54,7 @@ i18n_output_hash: 12a7eac534af
 
 ### Передумови {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (лише для інструментів ШІ)
 - Docker (необов'язково, для повного інтеграційного тестування)

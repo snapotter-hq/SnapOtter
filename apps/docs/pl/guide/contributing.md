@@ -1,8 +1,9 @@
 ---
 description: "Jak wnieść wkład w SnapOtter. Zgłoszenia błędów, propozycje funkcji, pull requesty i wymagania CLA."
-i18n_source_hash: 528802503035
+i18n_source_hash: 6c920a5f83e0
 i18n_provenance: human
-i18n_output_hash: a9956b0f7920
+i18n_output_hash: b6b9b3b7dca6
+i18n_hash_version: 2
 ---
 
 # Wnoszenie wkładu {#contributing}
@@ -53,7 +54,7 @@ Jeśli wnosisz wkład w imieniu swojego pracodawcy, a pracodawca zachowuje prawa
 
 ### Wymagania wstępne {#prerequisites}
 
-- Node.js 22+
+- Node.js 22.22+
 - pnpm 9+
 - Python 3.11+ (tylko dla narzędzi AI)
 - Docker (opcjonalnie, do pełnego testowania integracyjnego)

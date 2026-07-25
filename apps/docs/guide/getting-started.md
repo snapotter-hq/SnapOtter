@@ -74,7 +74,7 @@ See [Configuration](/guide/configuration) for all environment variables and [Sec
 
 ## Build from Source {#build-from-source}
 
-**Prerequisites:** Node.js 22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
+**Prerequisites:** Node.js 22.22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
