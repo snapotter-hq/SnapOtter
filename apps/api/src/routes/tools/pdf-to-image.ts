@@ -6,10 +6,13 @@ import * as mupdf from "mupdf";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { getObjectBuffer, getObjectStream, putObject } from "../../lib/object-storage.js";
+import { updateJobProgress } from "../progress.js";
 
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -179,6 +182,114 @@ function isPdfBuffer(buf: Buffer): boolean {
   return buf.subarray(0, 1024).includes("%PDF-");
 }
 
+/**
+ * A caller-fixable problem with one document: it is locked, or the requested
+ * page range does not fit it. Separated from render failures so the
+ * single-file route answers 400 rather than 422, and so the batch route can
+ * report the reason against the file that caused it.
+ */
+class PdfInputError extends Error {}
+
+interface RenderedPages {
+  pages: Array<{ page: number; downloadUrl: string; size: number }>;
+  filenames: string[];
+  totalPages: number;
+  selectedPages: number[];
+}
+
+/**
+ * Render the settings-selected pages of one PDF into `outputs/<jobId>/`.
+ * Each page is written to storage as soon as it is encoded, so peak memory
+ * stays at a single page no matter how long the document is.
+ */
+async function renderPdfPages(
+  fileBuffer: Buffer,
+  settings: z.infer<typeof settingsSchema>,
+  jobId: string,
+): Promise<RenderedPages> {
+  let doc: mupdf.Document | null = null;
+  try {
+    doc = mupdf.Document.openDocument(fileBuffer, "application/pdf");
+    if (doc.needsPassword()) {
+      throw new PdfInputError("Password-protected PDFs are not supported");
+    }
+
+    const totalPages = doc.countPages();
+    let selectedPages: number[];
+    try {
+      selectedPages = parsePageRange(settings.pages, totalPages);
+    } catch (err) {
+      throw new PdfInputError(err instanceof Error ? err.message : "Invalid page range");
+    }
+
+    const ext = FORMAT_EXT[settings.format] ?? ".png";
+    const pages: RenderedPages["pages"] = [];
+    const filenames: string[] = [];
+
+    for (const pageNum of selectedPages) {
+      const pngBytes = renderPage(doc, pageNum - 1, settings.dpi);
+      const imageBuffer = await convertWithSharp(
+        pngBytes,
+        settings.format,
+        settings.quality,
+        settings.colorMode,
+      );
+      const filename = `page-${pageNum}${ext}`;
+      await putObject(`outputs/${jobId}/${filename}`, imageBuffer);
+      filenames.push(filename);
+      pages.push({
+        page: pageNum,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+        size: imageBuffer.length,
+      });
+    }
+
+    return { pages, filenames, totalPages, selectedPages };
+  } finally {
+    doc?.destroy();
+  }
+}
+
+/** Zip one job's already-stored page images, reading a single entry at a time. */
+async function buildPagesZip(jobId: string, filenames: string[]): Promise<Buffer> {
+  const archive = archiver("zip", { zlib: { level: 5 } });
+  const chunks: Buffer[] = [];
+  archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<void>((resolve, reject) => {
+    archive.on("end", resolve);
+    archive.on("error", reject);
+  });
+  for (const filename of filenames) {
+    archive.append(await getObjectBuffer(`outputs/${jobId}/${filename}`), { name: filename });
+  }
+  await archive.finalize();
+  await done;
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Give each output a name unique within one response. Two uploads may share a
+ * filename, and the client keys results by name, so collisions would drop a
+ * result instead of showing it.
+ */
+function uniqueNamer(): (name: string) => string {
+  const used = new Set<string>();
+  return (name) => {
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+    const dotIdx = name.lastIndexOf(".");
+    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+    let counter = 1;
+    while (used.has(`${base}_${counter}${ext}`)) counter++;
+    const candidate = `${base}_${counter}${ext}`;
+    used.add(candidate);
+    return candidate;
+  };
+}
+
 // ── Route registration ───────────────────────────────────────────
 export function registerPdfToImageRoute(
   app: FastifyInstance,
@@ -293,6 +404,179 @@ export function registerPdfToImageRoute(
     }
   });
 
+  // ── Batch endpoint ───────────────────────────────────────────
+  //
+  // This literal path takes priority over the generic
+  // `/api/v1/tools/:section/:toolId/batch` route, which only knows tools in
+  // the createToolRoute/registerToolProcessFn registry. pdf-to-image and its
+  // presets never register there, so without this they 404 the moment the web
+  // client sends a second file (issue #632).
+  //
+  // One PDF fans out to many page images, so the per-file result is a ZIP,
+  // matching what the single-file route already returns. The response is
+  // therefore a ZIP of per-document ZIPs, one per input, in upload order.
+  app.post(`${basePath}/batch`, async (request, reply) => {
+    const files: Array<{ buffer: Buffer; filename: string }> = [];
+    let settingsRaw: string | null = null;
+    let clientJobId: string | null = null;
+
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) {
+            chunks.push(chunk);
+          }
+          const buffer = Buffer.concat(chunks);
+          if (buffer.length > 0) {
+            files.push({ buffer, filename: sanitizeFilename(part.filename ?? "document.pdf") });
+          }
+        } else if (part.fieldname === "settings") {
+          settingsRaw = part.value as string;
+        } else if (part.fieldname === "clientJobId") {
+          const raw = part.value as string;
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
+            clientJobId = raw;
+          }
+        }
+      }
+    } catch (err) {
+      return reply.status(400).send({
+        error: "Failed to parse multipart request",
+        details: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (files.length === 0) {
+      return reply.status(400).send({ error: "No PDF files provided" });
+    }
+
+    if (env.MAX_BATCH_SIZE > 0 && files.length > env.MAX_BATCH_SIZE) {
+      return reply.status(400).send({
+        error: `Too many files. Maximum batch size is ${env.MAX_BATCH_SIZE}`,
+      });
+    }
+
+    let settings: z.infer<typeof settingsSchema>;
+    try {
+      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const result = settingsSchema.safeParse(parsed);
+      if (!result.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+      }
+      settings = result.data;
+    } catch {
+      return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    if (opts.lockedFormat) {
+      settings.format = opts.lockedFormat as typeof settings.format;
+    }
+
+    const jobId = clientJobId || randomUUID();
+    const results: Array<{ key: string; filename: string } | null> = new Array(files.length).fill(
+      null,
+    );
+    const errors: Array<{ filename: string; error: string }> = [];
+
+    const publishProgress = (completedFiles: number, currentFile?: string) =>
+      updateJobProgress({
+        jobId,
+        status: "processing",
+        totalFiles: files.length,
+        completedFiles,
+        failedFiles: errors.length,
+        errors,
+        ...(currentFile ? { currentFile } : {}),
+      });
+
+    publishProgress(0);
+
+    // Sequential on purpose: mupdf rendering is CPU-bound and synchronous, so
+    // interleaving documents multiplies peak memory without shortening the
+    // wall clock.
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      publishProgress(i, file.filename);
+      try {
+        if (!isPdfBuffer(file.buffer)) {
+          throw new PdfInputError("Invalid or corrupt PDF file");
+        }
+        const childJobId = `${jobId}-f${i}`;
+        const { filenames } = await renderPdfPages(file.buffer, settings, childJobId);
+        const zipName = `${file.filename.replace(/\.pdf$/i, "")}-pages.zip`;
+        const key = `outputs/${childJobId}/${zipName}`;
+        await putObject(key, await buildPagesZip(childJobId, filenames));
+        results[i] = { key, filename: zipName };
+      } catch (err) {
+        errors.push({
+          filename: file.filename,
+          error: err instanceof Error ? err.message : "PDF conversion failed",
+        });
+      }
+    }
+
+    updateJobProgress({
+      jobId,
+      status: errors.length === files.length ? "failed" : "completed",
+      totalFiles: files.length,
+      completedFiles: files.length,
+      failedFiles: errors.length,
+      errors,
+    });
+
+    if (errors.length === files.length) {
+      return reply.status(422).send({ error: "All files failed processing", errors });
+    }
+
+    const uniqueName = uniqueNamer();
+    const fileResultsMap: Record<string, string> = {};
+    for (let i = 0; i < results.length; i++) {
+      const entry = results[i];
+      if (!entry) continue;
+      entry.filename = uniqueName(entry.filename);
+      fileResultsMap[String(i)] = entry.filename;
+    }
+
+    // Hijack and stream the ZIP response
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="batch-${opts.toolId}-${jobId.slice(0, 8)}.zip"`,
+      "Transfer-Encoding": "chunked",
+      "X-Job-Id": jobId,
+      "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
+      ...getSecurityHeaders(),
+    });
+
+    const archive = archiver("zip", { zlib: { level: 5 } });
+
+    archive.on("error", (err) => {
+      request.log.error({ err }, "Archiver error during PDF batch processing");
+      if (!reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    });
+
+    archive.pipe(reply.raw);
+
+    try {
+      for (const entry of results) {
+        if (!entry) continue;
+        archive.append(await getObjectStream(entry.key), { name: entry.filename });
+      }
+      await archive.finalize();
+    } catch (err) {
+      request.log.error({ err }, "Failed to stream ZIP entries during PDF batch processing");
+      archive.abort();
+      if (!reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    }
+  });
+
   // ── Main processing endpoint ─────────────────────────────────
   app.post(basePath, async (request, reply) => {
     let fileBuffer: Buffer | null = null;
@@ -335,66 +619,16 @@ export function registerPdfToImageRoute(
       settings.format = opts.lockedFormat as typeof settings.format;
     }
 
-    let doc: mupdf.Document | null = null;
+    const jobId = randomUUID();
     try {
-      doc = mupdf.Document.openDocument(fileBuffer, "application/pdf");
-      if (doc.needsPassword()) {
-        return reply.status(400).send({ error: "Password-protected PDFs are not supported" });
-      }
+      const { pages, filenames, totalPages, selectedPages } = await renderPdfPages(
+        fileBuffer,
+        settings,
+        jobId,
+      );
 
-      const totalPages = doc.countPages();
-
-      let selectedPages: number[];
-      try {
-        selectedPages = parsePageRange(settings.pages, totalPages);
-      } catch (err) {
-        return reply
-          .status(400)
-          .send({ error: err instanceof Error ? err.message : "Invalid page range" });
-      }
-
-      const ext = FORMAT_EXT[settings.format] ?? ".png";
-      const jobId = randomUUID();
-      const pages: Array<{ page: number; downloadUrl: string; size: number }> = [];
-      const pageFilenames: string[] = [];
-
-      for (const pageNum of selectedPages) {
-        const pngBytes = renderPage(doc, pageNum - 1, settings.dpi);
-        const imageBuffer = await convertWithSharp(
-          pngBytes,
-          settings.format,
-          settings.quality,
-          settings.colorMode,
-        );
-        const filename = `page-${pageNum}${ext}`;
-        await putObject(`outputs/${jobId}/${filename}`, imageBuffer);
-        pageFilenames.push(filename);
-        pages.push({
-          page: pageNum,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
-          size: imageBuffer.length,
-        });
-      }
-
-      doc.destroy();
-      doc = null;
-
-      // Build ZIP by streaming each entry from object storage (O(1-entry) peak)
       const zipFilename = "pdf-pages.zip";
-      const archive = archiver("zip", { zlib: { level: 5 } });
-      const zipChunks: Buffer[] = [];
-      archive.on("data", (chunk: Buffer) => zipChunks.push(chunk));
-      const zipDone = new Promise<void>((resolve, reject) => {
-        archive.on("end", resolve);
-        archive.on("error", reject);
-      });
-      for (const fname of pageFilenames) {
-        const buf = await getObjectBuffer(`outputs/${jobId}/${fname}`);
-        archive.append(buf, { name: fname });
-      }
-      await archive.finalize();
-      await zipDone;
-      const zipBuffer = Buffer.concat(zipChunks);
+      const zipBuffer = await buildPagesZip(jobId, filenames);
       await putObject(`outputs/${jobId}/${zipFilename}`, zipBuffer);
       const zipUrl = `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`;
 
@@ -411,7 +645,9 @@ export function registerPdfToImageRoute(
         zipSize: zipBuffer.length,
       });
     } catch (err) {
-      doc?.destroy();
+      if (err instanceof PdfInputError) {
+        return reply.status(400).send({ error: err.message });
+      }
       return reply.status(422).send({
         error: "PDF conversion failed",
         details: err instanceof Error ? err.message : "Unknown error",
