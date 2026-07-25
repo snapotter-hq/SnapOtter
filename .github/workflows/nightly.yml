@@ -52,7 +52,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -106,7 +109,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -210,7 +216,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -266,7 +275,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
         run: |
           POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
@@ -330,7 +342,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - uses: ./.github/actions/setup
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -393,7 +408,10 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends $SYSTEM_DEPS
+        run: |
+          read -r -a system_deps <<< "$SYSTEM_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
         run: |
           POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
