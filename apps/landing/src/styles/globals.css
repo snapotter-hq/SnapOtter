@@ -246,6 +246,61 @@ code, pre, kbd {
   margin-left: 2px;
 }
 
+/* ─── TESTIMONIAL MARQUEE ─── */
+/* Two rows drift in opposite directions. Each row's markup is duplicated, so
+   translating the track by exactly -50% lands on the start of the copy and the
+   loop reads as continuous. */
+@keyframes marquee-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-viewport {
+  overflow: hidden;
+  /* Fade both edges so cards enter and leave instead of being clipped. */
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-drift var(--marquee-duration, 60s) linear infinite;
+}
+
+.marquee-track-reverse {
+  animation-direction: reverse;
+}
+
+/* The spacing lives on the item, not as a track `gap`. A gap would also sit
+   between the last original and the first clone, so half the track would be
+   (N items + N-0.5 gaps) and the -50% translate would jump by half a gap on
+   every loop. Per-item margin keeps both halves exactly equal. */
+.marquee-item {
+  display: flex;
+  width: 20rem;
+  flex-shrink: 0;
+  margin-inline-end: 1.25rem;
+}
+
+/* Hold still while someone is reading a card or tabbing through the links. */
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Reduced motion: no drift at all. The row becomes a plain swipeable strip so
+   the quotes stay reachable rather than being cut off at the fold. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+  .marquee-viewport {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+}
+
 /* ─── TEXTURE OVERLAYS ─── */
 .bg-noise::after {
   content: "";

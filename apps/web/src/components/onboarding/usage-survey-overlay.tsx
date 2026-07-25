@@ -3,16 +3,16 @@ import {
   FEEDBACK_PRIOR_TOOL_VALUES,
   FEEDBACK_SELFHOST_MOTIVATION_VALUES,
 } from "@snapotter/shared";
-import { Building2, GraduationCap, Search, User, Users } from "lucide-react";
+import { Building2, GraduationCap, Search, User, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { apiGet, apiPut } from "@/lib/api";
 import { AUTH_GUARD_UNGATED_PATHS } from "@/lib/auth-routes";
 import {
   type FeedbackDiscoverySource,
+  type FeedbackDismissKind,
   type FeedbackPriorTool,
   type FeedbackSelfHostMotivation,
   type FeedbackUsageType,
@@ -92,7 +92,17 @@ export function UsageSurveyOverlay() {
       analyticsEnabled: Boolean(analyticsConfig?.enabled),
     });
 
-  useFocusTrap(containerRef, visible);
+  // A non-modal prompt must not trap focus (that is what made the old overlay
+  // inescapable), but it should still honour Escape, which the modal version
+  // never did.
+  useEffect(() => {
+    if (!visible) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") void handleDismiss("close");
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
 
   // Record the impression once the overlay first becomes visible, so the survey's
   // completion and skip rates have a denominator (submissions alone can't measure
@@ -143,10 +153,10 @@ export function UsageSurveyOverlay() {
     }
   }
 
-  async function handleDismiss() {
+  async function handleDismiss(kind: FeedbackDismissKind = "dont_ask_again") {
     if (busy) return;
     setDismissing(true);
-    trackFeedbackPromptDismissed("onboarding", "dont_ask_again");
+    trackFeedbackPromptDismissed("onboarding", kind);
     try {
       await recordSettingsKey("onboarding.usageSurvey.dismissedAt");
     } catch {
@@ -161,24 +171,44 @@ export function UsageSurveyOverlay() {
   if (!visible) return null;
 
   return (
+    // Deliberately NOT a modal. This used to be an opaque full-screen takeover
+    // with a focus trap and no Escape, which meant the only ways out were to
+    // answer or to find a tiny grey link. It is now a corner card: the app stays
+    // visible and usable behind it, Escape closes it, and the only required
+    // question is the first one.
     <div
       ref={containerRef}
       role="dialog"
-      aria-modal="true"
       aria-labelledby="usage-survey-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background p-4"
+      className="fixed bottom-4 end-4 z-50 w-[calc(100vw-2rem)] max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-lg space-y-4"
     >
-      <div className="w-full max-w-md space-y-6 max-h-[calc(100dvh-2rem)] overflow-y-auto">
-        <div className="flex flex-col items-center text-center gap-3">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
           <div
             aria-hidden="true"
-            className="h-11 w-11 rounded-full bg-primary flex items-center justify-center text-xl"
+            className="h-8 w-8 shrink-0 rounded-full bg-primary flex items-center justify-center text-base"
           >
             🦦
           </div>
-          <h1 id="usage-survey-title" className="text-lg font-semibold text-foreground">
+          {/*
+            An h2, not an h1. RouteAnnouncer focuses and announces
+            document.querySelector("h1") on every route change, so while this
+            prompt claimed the page's h1 it stole focus on appear and made every
+            subsequent navigation announce "How are you using SnapOtter?"
+            instead of the page the user actually opened.
+          */}
+          <h2 id="usage-survey-title" className="grow text-sm font-semibold text-foreground">
             {t.onboarding.usageSurveyTitle}
-          </h1>
+          </h2>
+          <button
+            type="button"
+            onClick={() => handleDismiss("close")}
+            disabled={busy}
+            aria-label={t.feedback.closeLabel}
+            className="-me-1 -mt-1 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
         </div>
 
         <div
@@ -208,94 +238,107 @@ export function UsageSurveyOverlay() {
           ))}
         </div>
 
-        <div className="space-y-2">
-          <p id="usage-survey-prior-label" className="text-sm font-medium text-foreground">
-            {t.onboarding.priorToolLabel}
-          </p>
-          <div
-            role="radiogroup"
-            aria-labelledby="usage-survey-prior-label"
-            className="grid grid-cols-1 gap-2"
-          >
-            {FEEDBACK_PRIOR_TOOL_VALUES.map((value) => (
-              // biome-ignore lint/a11y/useSemanticElements: styled button acting as an ARIA radio, not a native input
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={priorTool === value}
-                onClick={() => setPriorTool((current) => (current === value ? null : value))}
-                className={cn(
-                  "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
-                  priorTool === value
-                    ? "border-primary bg-primary/10 text-primary-ink"
-                    : "border-border text-foreground hover:bg-muted",
-                )}
+        {/*
+          Progressive disclosure. The optional questions stay out of the way
+          until the one required answer is given, so the opening ask is a single
+          click rather than a wall of 20 choices. Send is enabled the moment the
+          first question is answered, so nobody is obliged to reach these.
+        */}
+        {usageType !== null && (
+          <>
+            <div className="space-y-2">
+              <p id="usage-survey-prior-label" className="text-sm font-medium text-foreground">
+                {t.onboarding.priorToolLabel}{" "}
+                <span className="text-muted-foreground font-normal">
+                  {t.onboarding.optionalHint}
+                </span>
+              </p>
+              <div
+                role="radiogroup"
+                aria-labelledby="usage-survey-prior-label"
+                className="grid grid-cols-1 gap-2"
               >
-                {t.feedback.priorTools[value]}
-              </button>
-            ))}
-          </div>
-        </div>
+                {FEEDBACK_PRIOR_TOOL_VALUES.map((value) => (
+                  // biome-ignore lint/a11y/useSemanticElements: styled button acting as an ARIA radio, not a native input
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={priorTool === value}
+                    onClick={() => setPriorTool((current) => (current === value ? null : value))}
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
+                      priorTool === value
+                        ? "border-primary bg-primary/10 text-primary-ink"
+                        : "border-border text-foreground hover:bg-muted",
+                    )}
+                  >
+                    {t.feedback.priorTools[value]}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="space-y-2">
-          <p id="usage-survey-motivation-label" className="text-sm font-medium text-foreground">
-            {t.onboarding.selfHostMotivationLabel}
-          </p>
-          <div
-            role="radiogroup"
-            aria-labelledby="usage-survey-motivation-label"
-            className="grid grid-cols-1 gap-2"
-          >
-            {FEEDBACK_SELFHOST_MOTIVATION_VALUES.map((value) => (
-              // biome-ignore lint/a11y/useSemanticElements: styled button acting as an ARIA radio, not a native input
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={selfHostMotivation === value}
-                onClick={() =>
-                  setSelfHostMotivation((current) => (current === value ? null : value))
+            <div className="space-y-2">
+              <p id="usage-survey-motivation-label" className="text-sm font-medium text-foreground">
+                {t.onboarding.selfHostMotivationLabel}
+              </p>
+              <div
+                role="radiogroup"
+                aria-labelledby="usage-survey-motivation-label"
+                className="grid grid-cols-1 gap-2"
+              >
+                {FEEDBACK_SELFHOST_MOTIVATION_VALUES.map((value) => (
+                  // biome-ignore lint/a11y/useSemanticElements: styled button acting as an ARIA radio, not a native input
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selfHostMotivation === value}
+                    onClick={() =>
+                      setSelfHostMotivation((current) => (current === value ? null : value))
+                    }
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
+                      selfHostMotivation === value
+                        ? "border-primary bg-primary/10 text-primary-ink"
+                        : "border-border text-foreground hover:bg-muted",
+                    )}
+                  >
+                    {t.feedback.selfHostMotivations[value]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="usage-survey-discovery-source"
+                className="block text-sm font-medium text-foreground"
+              >
+                {t.onboarding.discoverySourceLabel}{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t.onboarding.optionalHint}
+                </span>
+              </label>
+              <select
+                id="usage-survey-discovery-source"
+                value={discoverySource ?? ""}
+                onChange={(event) =>
+                  setDiscoverySource((event.target.value || null) as FeedbackDiscoverySource | null)
                 }
-                className={cn(
-                  "rounded-lg border px-3 py-2.5 text-sm font-medium text-start transition-colors",
-                  selfHostMotivation === value
-                    ? "border-primary bg-primary/10 text-primary-ink"
-                    : "border-border text-foreground hover:bg-muted",
-                )}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground"
               >
-                {t.feedback.selfHostMotivations[value]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label
-            htmlFor="usage-survey-discovery-source"
-            className="block text-sm font-medium text-foreground"
-          >
-            {t.onboarding.discoverySourceLabel}{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              {t.onboarding.optionalHint}
-            </span>
-          </label>
-          <select
-            id="usage-survey-discovery-source"
-            value={discoverySource ?? ""}
-            onChange={(event) =>
-              setDiscoverySource((event.target.value || null) as FeedbackDiscoverySource | null)
-            }
-            className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground"
-          >
-            <option value="" />
-            {FEEDBACK_DISCOVERY_SOURCE_VALUES.map((value) => (
-              <option key={value} value={value}>
-                {t.feedback.discoverySources[value]}
-              </option>
-            ))}
-          </select>
-        </div>
+                <option value="" />
+                {FEEDBACK_DISCOVERY_SOURCE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {t.feedback.discoverySources[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
 
         <div className="space-y-3">
           <button
@@ -308,9 +351,11 @@ export function UsageSurveyOverlay() {
           </button>
           <button
             type="button"
-            onClick={handleDismiss}
+            // Wrapped, not passed by reference: a bare handler would hand the
+            // click event in as the dismiss kind.
+            onClick={() => handleDismiss("dont_ask_again")}
             disabled={busy}
-            className="w-full text-center text-xs text-muted-foreground hover:text-foreground hover:underline"
+            className="w-full text-center text-xs text-muted-foreground hover:text-foreground hover:underline disabled:opacity-50"
           >
             {t.feedback.dontAskAgain}
           </button>

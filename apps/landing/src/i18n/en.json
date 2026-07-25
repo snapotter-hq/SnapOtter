@@ -356,6 +356,8 @@
   "home.stats.languages.value": "20+",
   "home.stats.languages.label": "Languages",
   "home.stats.languages.sublabel": "Speaks your language",
+  "home.testimonials.title": "Straight from the people running it",
+  "home.testimonials.subtitle": "Unedited quotes from reviews, Reddit, GitHub, and the in-app feedback box. Typos and all.",
   "home.toolGrid.title": "One platform. Every file workflow.",
   "home.toolGrid.subtitle": "Search 200+ self-hosted tools by task, format, modality, or workflow.",
   "home.toolGrid.filter.all": "All",
