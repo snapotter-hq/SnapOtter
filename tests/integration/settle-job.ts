@@ -11,6 +11,13 @@ import { resolveToolPool } from "../../apps/api/src/lib/pool.js";
 const LIVE_DATABASE_STATUSES = new Set(["queued", "processing"]);
 const TERMINAL_QUEUE_STATES = new Set(["completed", "failed"]);
 
+export interface DownloadedJobArtifact {
+  buffer: Buffer;
+  contentType: string;
+  filename: string;
+  result: ToolJobResult;
+}
+
 export class AcceptedJobTimeoutError extends Error {
   constructor(jobId: string, timeoutMs: number) {
     super(`Job ${jobId} did not finish within ${timeoutMs}ms and was canceled`);
@@ -85,6 +92,73 @@ export async function waitForAcceptedJobOrCancel(
   throw new AcceptedJobTimeoutError(jobId, timeoutMs);
 }
 
+async function downloadCompletedJobArtifact(
+  app: FastifyInstance,
+  token: string,
+  toolId: string,
+  jobId: string,
+  result: ToolJobResult,
+): Promise<DownloadedJobArtifact> {
+  if (result.outputRefs.length === 0) {
+    throw new Error(`${toolId}: completed job ${jobId} produced no downloadable artifact`);
+  }
+  if (!result.filename) throw new Error(`${toolId}: completed job ${jobId} has no filename`);
+
+  const download = await app.inject({
+    method: "GET",
+    url: `/api/v1/download/${encodeURIComponent(jobId)}/${encodeURIComponent(result.filename)}`,
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (download.statusCode !== 200) {
+    throw new Error(
+      `${toolId}: completed job ${jobId} artifact download returned ${download.statusCode}`,
+    );
+  }
+  if (download.rawPayload.length === 0) {
+    throw new Error(`${toolId}: completed job ${jobId} produced an empty artifact`);
+  }
+  if (result.processedSize <= 0 || download.rawPayload.length !== result.processedSize) {
+    throw new Error(
+      `${toolId}: completed job ${jobId} artifact size mismatch ` +
+        `(worker=${result.processedSize}, downloaded=${download.rawPayload.length})`,
+    );
+  }
+
+  const downloadedType = String(download.headers["content-type"] ?? "")
+    .split(";", 1)[0]
+    .toLowerCase();
+  const workerType = result.contentType.split(";", 1)[0].toLowerCase();
+  if (!downloadedType || downloadedType !== workerType) {
+    throw new Error(
+      `${toolId}: completed job ${jobId} artifact MIME mismatch ` +
+        `(worker=${workerType}, downloaded=${downloadedType || "missing"})`,
+    );
+  }
+
+  return {
+    buffer: Buffer.from(download.rawPayload),
+    contentType: downloadedType,
+    filename: result.filename,
+    result,
+  };
+}
+
+/**
+ * Wait for terminal success and return verified downloadable bytes. Installed
+ * capability tests use this when output semantics, not queue admission, are the
+ * release contract.
+ */
+export async function waitForDownloadedJobArtifact(
+  app: FastifyInstance,
+  token: string,
+  toolId: string,
+  jobId: string,
+  timeoutMs = 120_000,
+): Promise<DownloadedJobArtifact> {
+  const result = await waitForAcceptedJobOrCancel(jobId, resolveToolPool(toolId), timeoutMs);
+  return downloadCompletedJobArtifact(app, token, toolId, jobId, result);
+}
+
 /**
  * Resolve a generated-matrix 202 through terminal success and prove that its
  * worker result is observable as either a downloadable artifact or a
@@ -99,36 +173,7 @@ export async function waitForGeneratedJobArtifact(
 ): Promise<ToolJobResult> {
   const result = await waitForAcceptedJobOrCancel(jobId, resolveToolPool(toolId), timeoutMs);
   if (result.outputRefs.length > 0) {
-    if (!result.filename) throw new Error(`${toolId}: completed job ${jobId} has no filename`);
-    const download = await app.inject({
-      method: "GET",
-      url: `/api/v1/download/${encodeURIComponent(jobId)}/${encodeURIComponent(result.filename)}`,
-      headers: { authorization: `Bearer ${token}` },
-    });
-    if (download.statusCode !== 200) {
-      throw new Error(
-        `${toolId}: completed job ${jobId} artifact download returned ${download.statusCode}`,
-      );
-    }
-    if (download.rawPayload.length === 0) {
-      throw new Error(`${toolId}: completed job ${jobId} produced an empty artifact`);
-    }
-    if (result.processedSize <= 0 || download.rawPayload.length !== result.processedSize) {
-      throw new Error(
-        `${toolId}: completed job ${jobId} artifact size mismatch ` +
-          `(worker=${result.processedSize}, downloaded=${download.rawPayload.length})`,
-      );
-    }
-    const downloadedType = String(download.headers["content-type"] ?? "")
-      .split(";", 1)[0]
-      .toLowerCase();
-    const workerType = result.contentType.split(";", 1)[0].toLowerCase();
-    if (!downloadedType || downloadedType !== workerType) {
-      throw new Error(
-        `${toolId}: completed job ${jobId} artifact MIME mismatch ` +
-          `(worker=${workerType}, downloaded=${downloadedType || "missing"})`,
-      );
-    }
+    await downloadCompletedJobArtifact(app, token, toolId, jobId, result);
     return result;
   }
 

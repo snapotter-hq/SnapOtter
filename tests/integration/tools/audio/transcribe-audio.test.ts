@@ -12,6 +12,11 @@ import { isToolInstalled } from "../../../../apps/api/src/lib/feature-status.js"
 import { fixtures } from "../../../fixtures/index.js";
 import { installedAiCapabilityGate } from "../../../helpers/installed-ai-capability-gate.js";
 import {
+  expectKnownTranscript,
+  expectSrtArtifact,
+} from "../../../helpers/installed-ai-output-oracles.js";
+import { waitForDownloadedJobArtifact } from "../../settle-job.js";
+import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
@@ -19,6 +24,7 @@ import {
 } from "../../test-server.js";
 
 const MP3 = readFileSync(fixtures.audio.tiny("mp3"));
+const SPEECH_WAV = readFileSync(fixtures.audio.speech.wav);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const AI_CAPABILITY = installedAiCapabilityGate(
   "transcribe-audio",
@@ -140,9 +146,9 @@ describe("transcribe-audio", () => {
         const { body, contentType } = createMultipartPayload([
           {
             name: "file",
-            filename: "tiny.mp3",
-            contentType: "audio/mpeg",
-            content: MP3,
+            filename: "speech-10s.wav",
+            contentType: "audio/wav",
+            content: SPEECH_WAV,
           },
           {
             name: "settings",
@@ -164,15 +170,27 @@ describe("transcribe-audio", () => {
         const json = JSON.parse(res.body);
         expect(json.jobId).toBeDefined();
         expect(json.async).toBe(true);
-      }, 120_000);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "transcribe-audio",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("speech-10s.txt");
+        expect(artifact.contentType).toBe("text/plain");
+        expect(artifact.result.resultPayload?.segments).toEqual(expect.any(Number));
+        expect(artifact.result.resultPayload?.segments as number).toBeGreaterThan(0);
+        expectKnownTranscript(artifact.buffer.toString("utf8"));
+      }, 300_000);
 
       it("transcribes audio to srt with correct structure", async () => {
         const { body, contentType } = createMultipartPayload([
           {
             name: "file",
-            filename: "tiny.mp3",
-            contentType: "audio/mpeg",
-            content: MP3,
+            filename: "speech-10s.wav",
+            contentType: "audio/wav",
+            content: SPEECH_WAV,
           },
           {
             name: "settings",
@@ -193,10 +211,19 @@ describe("transcribe-audio", () => {
         expect(res.statusCode).toBe(202);
         const json = JSON.parse(res.body);
         expect(json.jobId).toBeDefined();
-        // Full SRT structure validation happens after polling completes.
-        // The sine tone fixture may produce empty or noise text;
-        // we assert mechanics (counter line "1", arrow timestamp), not words.
-      }, 120_000);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "transcribe-audio",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("speech-10s.srt");
+        expect(artifact.contentType).toBe("application/x-subrip");
+        const subtitles = artifact.buffer.toString("utf8");
+        expectSrtArtifact(subtitles);
+        expectKnownTranscript(subtitles);
+      }, 300_000);
     },
   );
 });

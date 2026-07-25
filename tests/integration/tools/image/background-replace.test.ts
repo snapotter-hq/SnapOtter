@@ -14,6 +14,12 @@ import { isToolInstalled } from "../../../../apps/api/src/lib/feature-status.js"
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { installedAiCapabilityGate } from "../../../helpers/installed-ai-capability-gate.js";
 import {
+  expectConfiguredBackground,
+  expectForegroundPreserved,
+  expectObservablePixelChange,
+} from "../../../helpers/installed-ai-output-oracles.js";
+import { waitForDownloadedJobArtifact } from "../../settle-job.js";
+import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
@@ -21,6 +27,7 @@ import {
 } from "../../test-server.js";
 
 const PNG = readFixture(fixtures.image.base.png200);
+const PORTRAIT = readFixture(fixtures.image.portrait.jpg);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const AI_CAPABILITY = installedAiCapabilityGate(
   "background-replace",
@@ -188,7 +195,12 @@ describe("background-replace", () => {
     () => {
       it("replaces background with color (202 + async)", async () => {
         const { body, contentType } = createMultipartPayload([
-          { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+          {
+            name: "file",
+            filename: "portrait-color.jpg",
+            contentType: "image/jpeg",
+            content: PORTRAIT,
+          },
           { name: "settings", content: JSON.stringify({ color: "#ff0000" }) },
         ]);
 
@@ -206,11 +218,28 @@ describe("background-replace", () => {
         const json = JSON.parse(res.body);
         expect(json.jobId).toBeDefined();
         expect(json.async).toBe(true);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "background-replace",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("portrait-color_bg.png");
+        expect(artifact.contentType).toBe("image/png");
+        await expectObservablePixelChange(PORTRAIT, artifact.buffer);
+        await expectConfiguredBackground(artifact.buffer, "solid-red");
+        await expectForegroundPreserved(PORTRAIT, artifact.buffer);
       }, 300_000);
 
       it("replaces background with gradient (202 + async)", async () => {
         const { body, contentType } = createMultipartPayload([
-          { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+          {
+            name: "file",
+            filename: "portrait-color.jpg",
+            contentType: "image/jpeg",
+            content: PORTRAIT,
+          },
           {
             name: "settings",
             content: JSON.stringify({
@@ -238,6 +267,18 @@ describe("background-replace", () => {
         const json = JSON.parse(res.body);
         expect(json.jobId).toBeDefined();
         expect(json.async).toBe(true);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "background-replace",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("portrait-color_bg.webp");
+        expect(artifact.contentType).toBe("image/webp");
+        await expectObservablePixelChange(PORTRAIT, artifact.buffer);
+        await expectConfiguredBackground(artifact.buffer, "red-blue-gradient");
+        await expectForegroundPreserved(PORTRAIT, artifact.buffer);
       }, 300_000);
     },
   );

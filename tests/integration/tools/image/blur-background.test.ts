@@ -14,6 +14,11 @@ import { isToolInstalled } from "../../../../apps/api/src/lib/feature-status.js"
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { installedAiCapabilityGate } from "../../../helpers/installed-ai-capability-gate.js";
 import {
+  expectForegroundPreserved,
+  expectObservablePixelChange,
+} from "../../../helpers/installed-ai-output-oracles.js";
+import { waitForDownloadedJobArtifact } from "../../settle-job.js";
+import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
@@ -21,6 +26,7 @@ import {
 } from "../../test-server.js";
 
 const PNG = readFixture(fixtures.image.base.png200);
+const PORTRAIT = readFixture(fixtures.image.portrait.jpg);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const AI_CAPABILITY = installedAiCapabilityGate(
   "blur-background",
@@ -179,7 +185,12 @@ describe("blur-background", () => {
     () => {
       it("blurs background with full settings (202 + async)", async () => {
         const { body, contentType } = createMultipartPayload([
-          { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+          {
+            name: "file",
+            filename: "portrait-color.jpg",
+            contentType: "image/jpeg",
+            content: PORTRAIT,
+          },
           {
             name: "settings",
             content: JSON.stringify({ intensity: 75, feather: 3, format: "webp" }),
@@ -200,6 +211,17 @@ describe("blur-background", () => {
         const json = JSON.parse(res.body);
         expect(json.jobId).toBeDefined();
         expect(json.async).toBe(true);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "blur-background",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("portrait-color_blurbg.webp");
+        expect(artifact.contentType).toBe("image/webp");
+        await expectObservablePixelChange(PORTRAIT, artifact.buffer);
+        await expectForegroundPreserved(PORTRAIT, artifact.buffer);
       }, 300_000);
     },
   );
