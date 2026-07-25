@@ -16,8 +16,6 @@
  * 10. Pipeline with format conversion mid-chain affecting subsequent tools
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -177,7 +175,7 @@ function buildToolRequest(
 // ###########################################################################
 describe("Extreme aspect ratio images", () => {
   describe("Very narrow image (1x1000)", () => {
-    it("resizes a 1x1000 image by width", async () => {
+    it("rejects a 1x1000 resize whose inferred height exceeds the output limit", async () => {
       const res = await postTool("resize", [
         {
           name: "file",
@@ -188,9 +186,8 @@ describe("Extreme aspect ratio images", () => {
         { name: "settings", content: JSON.stringify({ width: 50 }) },
       ]);
 
-      expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
-      expect(json.jobId).toBeDefined();
+      expect(res.statusCode).toBe(422);
+      expect(JSON.parse(res.body).error).toBe("Processing failed");
     });
 
     it("resizes a 1x1000 image by height", async () => {
@@ -283,7 +280,7 @@ describe("Extreme aspect ratio images", () => {
       expect(res.statusCode).toBe(200);
     });
 
-    it("resizes a 1000x1 image by height", async () => {
+    it("rejects a 1000x1 resize whose inferred width exceeds the output limit", async () => {
       const res = await postTool("resize", [
         {
           name: "file",
@@ -294,7 +291,8 @@ describe("Extreme aspect ratio images", () => {
         { name: "settings", content: JSON.stringify({ height: 50 }) },
       ]);
 
-      expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(422);
+      expect(JSON.parse(res.body).error).toBe("Processing failed");
     });
 
     it("crops a 1000x1 image to a 10x1 region", async () => {
