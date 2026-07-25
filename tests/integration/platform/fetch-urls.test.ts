@@ -13,10 +13,19 @@ import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const JPG = readFixture(fixtures.image.base.jpg100);
 const TIFF = readFixture(fixtures.image.formats("tiff"));
-// PSD passes validateImageBuffer (CLI-decoded format, no Sharp dimension
-// check) but Sharp cannot re-encode it to webp, so the route's preview
-// generation catch block fires while the result still succeeds.
+// PSD is a CLI-decoded format (file-validation.ts skips the Sharp dimension
+// check for it). The route decodes it via decodeToSharpCompat() before
+// generating a preview, so this fixture exercises that decode path.
 const PSD = readFixture(fixtures.image.formats("psd"));
+// Real iPhone-style HEIC (HEVC-encoded). Sharp's bundled libheif cannot
+// decode HEVC pixels, so this exercises the decodeHeic() pre-processing
+// step the route now runs before preview generation and dimension lookup.
+const HEIC = readFixture(fixtures.image.base.heic200);
+// A real PSD header with its image data sliced off: magic bytes ("8BPS")
+// still detect as "psd" in validateImageBuffer, but the CLI decoder has no
+// pixel data to work with and fails. Exercises the route's non-fatal
+// decode-failure fallback (same posture as the pre-existing preview catch).
+const PSD_TRUNCATED = PSD.subarray(0, 200);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -78,10 +87,23 @@ function createMockFetch() {
       // encoding, so decodeURIComponent throws and filenameFromUrl falls back.
       case "/bad%name.jpg":
         return mockResponse(JPG, { headers: { "Content-Type": "image/jpeg" } });
-      // PSD validates as an image but is not browser-previewable and Sharp
-      // cannot encode it -> preview generation catch block, success stays true.
+      // PSD validates as an image but is not browser-previewable; the route
+      // must decode it via decodeToSharpCompat() before Sharp can re-encode
+      // it to a webp preview.
       case "/layers.psd":
         return mockResponse(PSD, { headers: { "Content-Type": "image/vnd.adobe.photoshop" } });
+      // Real HEVC-encoded HEIC, the format iPhones actually produce. Sharp's
+      // bundled libheif cannot decode HEVC pixels directly; the route must
+      // run decodeHeic() first.
+      case "/photo.heic":
+        return mockResponse(HEIC, { headers: { "Content-Type": "image/heic" } });
+      // Validates as PSD (magic bytes intact) but the CLI decoder fails on
+      // the missing image data -> the route's decode step throws and must
+      // fall back to the raw buffer without failing the whole request.
+      case "/broken.psd":
+        return mockResponse(PSD_TRUNCATED, {
+          headers: { "Content-Type": "image/vnd.adobe.photoshop" },
+        });
       // Non-image body with NO content-type header at all: contentType falls
       // back to application/octet-stream.
       case "/blob.bin":
@@ -450,7 +472,7 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(result.filename).toMatch(/^file-[0-9a-f]{8}$/);
   });
 
-  it("succeeds without a preview when preview generation fails (PSD)", async () => {
+  it("decodes a CLI-decoded format (PSD) to produce a real preview and real dimensions", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/fetch-urls",
@@ -467,13 +489,24 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(result.filename).toBe("layers.psd");
     // MIME comes from the detected format, not the response header.
     expect(result.contentType).toBe("image/vnd.adobe.photoshop");
-    // CLI-decoded format: dimensions are reported as 0, not undefined.
-    expect(result.width).toBe(0);
-    expect(result.height).toBe(0);
-    // Sharp cannot encode PSD to webp, so the preview catch swallowed the
-    // error and left previewUrl null. The file itself is still saved.
-    expect(result.previewUrl).toBeNull();
+    // The route decodes the PSD via decodeToSharpCompat() before computing
+    // dimensions, so these reflect the real decoded image, not 0x0.
+    expect(result.width).toBeGreaterThan(0);
+    expect(result.height).toBeGreaterThan(0);
+    // A real webp preview is generated from the decoded buffer.
+    expect(result.previewUrl).toBeTruthy();
+    expect(result.previewUrl).toContain("preview-");
+    expect(result.previewUrl).toContain(".webp");
 
+    const previewRes = await app.inject({
+      method: "GET",
+      url: result.previewUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(previewRes.statusCode).toBe(200);
+    expect(previewRes.headers["content-type"]).toBe("image/webp");
+
+    // The original, undecoded PSD is still what gets saved for download.
     const dl = await app.inject({
       method: "GET",
       url: result.downloadUrl,
@@ -481,6 +514,88 @@ describe("POST /api/v1/fetch-urls", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.length).toBe(PSD.length);
+  });
+
+  it("decodes a real HEIC (HEVC) image to produce a real preview and real dimensions", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/photo.heic`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    expect(result.success).toBe(true);
+    expect(result.filename).toBe("photo.heic");
+    expect(result.contentType).toBe("image/heic");
+    // The route decodes the HEIC via decodeHeic() before computing
+    // dimensions, so these reflect the real decoded image (200x150), not 0x0.
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(150);
+    // Sharp's bundled libheif cannot re-encode HEVC pixels directly; the
+    // route must decode first, so a real webp preview comes back non-null.
+    expect(result.previewUrl).toBeTruthy();
+    expect(result.previewUrl).toContain("preview-");
+    expect(result.previewUrl).toContain(".webp");
+
+    const previewRes = await app.inject({
+      method: "GET",
+      url: result.previewUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(previewRes.statusCode).toBe(200);
+    expect(previewRes.headers["content-type"]).toBe("image/webp");
+
+    // The original, undecoded HEIC is still what gets saved for download.
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBe(HEIC.length);
+  });
+
+  it("succeeds without a preview when decoding a CLI-decoded format fails", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/broken.psd`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(1);
+
+    const result = body.results[0];
+    // A per-URL decode failure is a soft failure, not a request failure:
+    // the fetch itself succeeded, so the result still reports success with
+    // the pre-decode fallback data, matching the resilience posture of the
+    // pre-existing preview try/catch.
+    expect(result.success).toBe(true);
+    expect(result.filename).toBe("broken.psd");
+    expect(result.contentType).toBe("image/vnd.adobe.photoshop");
+    // Decode failed, so dimensions fall back to validateImageBuffer's 0x0
+    // rather than throwing or failing the whole request.
+    expect(result.width).toBe(0);
+    expect(result.height).toBe(0);
+    // No preview could be generated from the undecoded, broken buffer.
+    expect(result.previewUrl).toBeNull();
+
+    // The raw fetched bytes are still saved for download despite the
+    // decode failure.
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.length).toBe(PSD_TRUNCATED.length);
   });
 
   it("defaults contentType to application/octet-stream when no header is present", async () => {

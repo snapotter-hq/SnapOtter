@@ -16,6 +16,8 @@ import sharp from "sharp";
 import { z } from "zod";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
+import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import { decodeHeic } from "../lib/heic-converter.js";
 import { putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
@@ -254,12 +256,57 @@ async function fetchSingleUrl(
       : responseContentType || "application/octet-stream";
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
 
+    // Formats in CLI_DECODED_FORMATS (HEIC, RAW, PSD, TGA, ...) validate
+    // successfully without Sharp ever decoding pixels -- validateImageBuffer
+    // reports width/height as 0 for them by design. Decode once here (to a
+    // Sharp-compatible PNG buffer) so both the preview and the real
+    // dimensions below can be computed from actual pixel data, the same
+    // pre-processing every other Sharp-touching consumer of
+    // validateImageBuffer() already does (image-input.ts, erase-object.ts,
+    // user-files.ts thumbnails). Decode failure is non-fatal: fall back to
+    // the raw buffer, which preserves today's behavior (skip preview, 0x0
+    // dimensions) for whatever edge case failed to decode.
+    let decodedBuffer: Buffer<ArrayBuffer> = buffer;
+    let didDecode = false;
+    if (validation?.valid) {
+      try {
+        if (validation.format === "heif") {
+          decodedBuffer = Buffer.from(await decodeHeic(buffer));
+          didDecode = true;
+        } else if (needsCliDecode(validation.format)) {
+          decodedBuffer = Buffer.from(await decodeToSharpCompat(buffer, validation.format));
+          didDecode = true;
+        }
+      } catch {
+        // Decode failed -- non-fatal, fall back to the raw buffer below.
+        decodedBuffer = buffer;
+        didDecode = false;
+      }
+    }
+
+    // Real dimensions for formats that just got decoded above; every other
+    // valid format already has real width/height from validateImageBuffer.
+    let width = validation?.valid ? validation.width : undefined;
+    let height = validation?.valid ? validation.height : undefined;
+    if (didDecode) {
+      try {
+        const metadata = await sharp(decodedBuffer).metadata();
+        width = metadata.width ?? width;
+        height = metadata.height ?? height;
+      } catch {
+        // Metadata read failed -- non-fatal, keep the 0x0 fallback.
+      }
+    }
+
     // Generate a webp preview only for non-browser-native image formats.
     // Non-image media has no image preview; the UI shows a modality icon.
+    // Runs against decodedBuffer so CLI-decoded formats (HEIC, RAW, PSD,
+    // ...) produce a real preview instead of failing on the raw, undecoded
+    // buffer.
     let previewUrl: string | null = null;
     if (validation?.valid && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
-        const previewBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
+        const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
         await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
         previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
@@ -274,8 +321,8 @@ async function fetchSingleUrl(
       filename,
       contentType,
       size: buffer.length,
-      width: validation?.valid ? validation.width : undefined,
-      height: validation?.valid ? validation.height : undefined,
+      width,
+      height,
       downloadUrl,
       previewUrl,
     };

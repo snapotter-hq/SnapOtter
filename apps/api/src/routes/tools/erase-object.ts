@@ -172,6 +172,17 @@ export function registerEraseObject(app: FastifyInstance) {
           imageBuffer = await decodeToSharpCompat(imageBuffer, imageValidation.format);
         }
         imageBuffer = await autoOrient(imageBuffer);
+
+        // The mask goes through the same CLI-decoded formats the main image
+        // does. Without this, a HEIC/RAW/etc. mask reaches the unguarded
+        // sharp() calls inside inpaint() and fails with a generic, misclassified
+        // error instead of the clear message the image gets right above.
+        if (maskValidation.format === "heif") {
+          maskBuffer = await decodeHeic(maskBuffer);
+        }
+        if (needsCliDecode(maskValidation.format)) {
+          maskBuffer = await decodeToSharpCompat(maskBuffer, maskValidation.format);
+        }
       } catch (err) {
         request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
         return reply.status(422).send({
@@ -188,6 +199,7 @@ export function registerEraseObject(app: FastifyInstance) {
       } else {
         await putObject(imageKey, imageBuffer);
       }
+      await putObject(maskKey, maskBuffer);
 
       // Enqueue with both image and mask as inputRefs; the worker handler
       // reads them via getObjectBuffer.
