@@ -12,12 +12,18 @@ const ENV = { ASSETS: { fetch: async () => new Response("asset", { status: 200 }
 const DEMO = "https://demo.snapotter.com/";
 const DOCS = "https://docs.snapotter.com/";
 
-/** Stub global fetch with a per-URL responder, returning the call log. */
-function stubProbes(responder: (url: string) => Promise<Response>): string[] {
-  const calls: string[] = [];
-  vi.stubGlobal("fetch", async (input: string | Request) => {
+type ProbeCall = { url: string; init: RequestInit | undefined };
+
+/**
+ * Stub global fetch with a per-URL responder, returning the call log. The log
+ * records the init argument alongside the URL so tests can assert on how a
+ * probe was issued, not only where it was sent.
+ */
+function stubProbes(responder: (url: string) => Promise<Response>): ProbeCall[] {
+  const calls: ProbeCall[] = [];
+  vi.stubGlobal("fetch", async (input: string | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.url;
-    calls.push(url);
+    calls.push({ url, init });
     return responder(url);
   });
   return calls;
@@ -43,6 +49,16 @@ describe("landing worker /api/status", () => {
     stubProbes(async () => new Response(null, { status: 301 }));
     const { body } = await getStatus();
     expect(body.status).toBe("operational");
+  });
+
+  // Pins the up/down boundary at 400, not 500. A 404 on a sibling property is a
+  // realistic bad-deploy signature, so it has to read as down rather than up.
+  it("counts a 404 as down, not just 5xx", async () => {
+    stubProbes(async (url) =>
+      url === DEMO ? new Response(null, { status: 404 }) : new Response(null, { status: 200 }),
+    );
+    const { body } = await getStatus();
+    expect(body.status).toBe("partial");
   });
 
   it("reports partial when exactly one leg is down", async () => {
@@ -77,13 +93,13 @@ describe("landing worker /api/status", () => {
     });
     const { body } = await getStatus();
     expect(body.status).toBe("operational");
-    expect(calls.filter((u) => u === DEMO)).toHaveLength(2);
+    expect(calls.filter((c) => c.url === DEMO)).toHaveLength(2);
   });
 
   it("gives up after the single retry", async () => {
     const calls = stubProbes(async () => new Response(null, { status: 500 }));
     await getStatus();
-    expect(calls.filter((u) => u === DOCS)).toHaveLength(2);
+    expect(calls.filter((c) => c.url === DOCS)).toHaveLength(2);
   });
 
   it("sets the caching and noindex headers on its own response", async () => {
@@ -94,10 +110,21 @@ describe("landing worker /api/status", () => {
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
   });
 
+  // Without a bound signal a hung leg would stall the whole route, and the
+  // footer request behind it, for as long as the edge allows.
+  it("bounds every probe with an abort signal", async () => {
+    const calls = stubProbes(async () => new Response(null, { status: 200 }));
+    await getStatus();
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.init?.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
   it("probes only the two sibling properties, never snapotter.com itself", async () => {
     const calls = stubProbes(async () => new Response(null, { status: 200 }));
     await getStatus();
-    expect(new Set(calls)).toEqual(new Set([DEMO, DOCS]));
+    expect(new Set(calls.map((c) => c.url))).toEqual(new Set([DEMO, DOCS]));
   });
 });
 
