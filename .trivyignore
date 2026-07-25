@@ -37,12 +37,6 @@ CVE-2026-23890
 CVE-2026-24056
 CVE-2026-24131
 
-# golang.org/x/image bundled in the caire binary (content-aware seam-carving
-# resize, one tool). esimov/caire v1.5.0 is the latest release and still pins
-# golang.org/x/image v0.18.0; there is no upstream caire build with the fixed
-# x/image >=0.38.0. Re-evaluate when caire publishes a new release.
-CVE-2026-33809
-
 # brace-expansion: build-toolchain transitive of minimatch/glob. The patched
 # instance (5.0.6) is already present; the only flagged copy is the 2.x line
 # pulled by glob, whose fix is a major-version bump (5.0.5) the glob ecosystem

@@ -20,6 +20,7 @@ const composeCpu = readFileSync(resolve(here, "../../../docker/docker-compose.ym
 const composeGpu = readFileSync(resolve(here, "../../../docker/docker-compose-gpu.yml"), "utf8");
 const composeDev = readFileSync(resolve(here, "../../../docker-compose.dev.yml"), "utf8");
 const composeTest = readFileSync(resolve(here, "../../../docker/docker-compose.test.yml"), "utf8");
+const trivyIgnore = readFileSync(resolve(here, "../../../.trivyignore"), "utf8");
 
 function stageBody(stageName: string): string {
   const lines = dockerfile.split(/\r?\n/);
@@ -91,6 +92,8 @@ describe("Dockerfile build args", () => {
       expect(stage).toContain("go mod verify");
       expect(stage).toContain("-mod=readonly");
     }
+
+    expect(trivyIgnore).not.toContain("CVE-2026-33809");
   });
 
   it("verifies every downloaded Docker build input against repository-controlled hashes", () => {
