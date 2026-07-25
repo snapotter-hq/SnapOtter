@@ -104,6 +104,15 @@ describe("compress: format selection", () => {
     const out = await (await compress(sharp(svg), { quality: 80 })).toBuffer();
     expect(await outputFormat(out)).toBe("png");
   });
+
+  it.each(["bmp", "heic", "qoi", "../../outside"])(
+    "rejects a runtime-unsupported explicit format (%s)",
+    async (format) => {
+      await expect(
+        compress(sharp(photoPng), { quality: 80, format: format as "jpg" }),
+      ).rejects.toThrow(`Unsupported compression format: ${format}`);
+    },
+  );
 });
 
 describe("compress: quality controls output size", () => {
@@ -148,21 +157,38 @@ describe("compress: quality clamp boundaries", () => {
       /between 1 and 100/,
     );
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 1.5])(
+    "rejects a non-finite or fractional quality (%s)",
+    async (quality) => {
+      await expect(compress(sharp(photoPng), { quality, format: "jpg" })).rejects.toThrow(
+        "Quality must be an integer between 1 and 100",
+      );
+    },
+  );
 });
 
 describe("compress: target size", () => {
-  it("rejects a non-positive target and accepts the smallest positive target", async () => {
+  it("rejects non-positive and unreachable targets", async () => {
     await expect(compress(sharp(photoPng), { targetSizeBytes: 0, format: "jpg" })).rejects.toThrow(
       /greater than 0/,
     );
     await expect(compress(sharp(photoPng), { targetSizeBytes: -5, format: "jpg" })).rejects.toThrow(
       /greater than 0/,
     );
-    // target=1 is > 0, so it must NOT throw (kills a `<= 0` -> `< 0` mutant).
-    await expect(
-      compress(sharp(photoPng), { targetSizeBytes: 1, format: "jpg" }),
-    ).resolves.toBeDefined();
+    await expect(compress(sharp(photoPng), { targetSizeBytes: 1, format: "jpg" })).rejects.toThrow(
+      "Unable to compress image to 1 bytes within safe resize limits",
+    );
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 1.5])(
+    "rejects a non-finite or fractional target (%s)",
+    async (targetSizeBytes) => {
+      await expect(compress(sharp(photoPng), { targetSizeBytes, format: "jpg" })).rejects.toThrow(
+        "Target size must be a positive integer",
+      );
+    },
+  );
 
   it("hits a reachable target without downscaling", async () => {
     // Target comfortably above the q=1 full-size floor: the quality search
@@ -190,6 +216,7 @@ describe("compress: target size", () => {
     expect(meta.height).toBeLessThan(400);
     // The fallback should still shrink the file well below the original.
     expect(out.length).toBeLessThan(photoPng.length);
+    expect(out.length).toBeLessThanOrEqual(target);
   });
 
   it("a smaller target produces a smaller (or equal) file than a larger target", async () => {

@@ -211,7 +211,7 @@ describe("editMetadata", () => {
     expect(buf.length).toBeGreaterThan(0);
   });
 
-  it("survives corrupt EXIF during removal (catch branch)", async () => {
+  it("fails safely on corrupt EXIF during removal", async () => {
     // Corrupt the byte order marker in the EXIF so exif-reader throws,
     // but sharp still sees the EXIF segment as present.
     const rawBuf = Buffer.from(jpgWithExif);
@@ -236,11 +236,11 @@ describe("editMetadata", () => {
 
     const img = sharp(corruptBuf);
     // fieldsToRemove triggers the removal path which tries to parse EXIF
-    const result = await editMetadata(img, {
-      fieldsToRemove: ["Software"],
-      artist: "Survivor",
-    });
-    const buf = await result.toBuffer();
-    expect(buf.length).toBeGreaterThan(0);
+    await expect(
+      editMetadata(img, {
+        fieldsToRemove: ["Software"],
+        artist: "Survivor",
+      }),
+    ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
   });
 });

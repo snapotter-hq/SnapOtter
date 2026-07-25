@@ -1,6 +1,6 @@
 import exifReader from "exif-reader";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { editMetadata } from "../src/operations/edit-metadata.js";
 import { stripMetadata } from "../src/operations/strip-metadata.js";
 import type { Sharp } from "../src/types.js";
@@ -14,8 +14,10 @@ const richImage = (): Sharp => sharp(richBuffer);
 interface ExifSections {
   hasExif: boolean;
   hasIcc: boolean;
+  hasXmp: boolean;
   image: NonNullable<ReturnType<typeof exifReader>["Image"]>;
   photo: NonNullable<ReturnType<typeof exifReader>["Photo"]>;
+  gps: NonNullable<ReturnType<typeof exifReader>["GPSInfo"]>;
 }
 
 // Encode the pipeline to a JPEG buffer and decode its EXIF/ICC so we can assert
@@ -23,12 +25,14 @@ interface ExifSections {
 async function readBack(image: Sharp): Promise<ExifSections> {
   const buf = await image.jpeg().toBuffer();
   const meta = await sharp(buf).metadata();
-  const parsed = meta.exif ? exifReader(meta.exif) : { Image: {}, Photo: {} };
+  const parsed = meta.exif ? exifReader(meta.exif) : {};
   return {
     hasExif: !!meta.exif,
     hasIcc: !!meta.icc,
+    hasXmp: !!meta.xmp,
     image: parsed.Image ?? {},
     photo: parsed.Photo ?? {},
+    gps: parsed.GPSInfo ?? {},
   };
 }
 
@@ -51,8 +55,17 @@ beforeAll(async () => {
       IFD2: {
         DateTimeOriginal: "2001:01:01 01:01:01",
       },
+      IFD3: {
+        GPSLatitudeRef: "N",
+        GPSLatitude: "40 30 0",
+        GPSLongitudeRef: "W",
+        GPSLongitude: "74 0 0",
+      },
     })
     .withIccProfile("srgb")
+    .withXmp(
+      '<?xpacket begin="﻿"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:title="SnapOtter XMP"/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+    )
     .jpeg()
     .toBuffer();
 });
@@ -143,7 +156,7 @@ describe("editMetadata", () => {
   });
 
   it("removes a requested field via fieldsToRemove while keeping the rest", async () => {
-    const { image } = await readBack(
+    const { gps, hasIcc, hasXmp, image } = await readBack(
       await editMetadata(richImage(), { fieldsToRemove: ["Software"] }),
     );
     // Removed field is gone...
@@ -152,6 +165,12 @@ describe("editMetadata", () => {
     expect(image.Artist).toBe("OrigArtist");
     expect(image.Copyright).toBe("OrigCopyright");
     expect(image.ImageDescription).toBe("OrigDesc");
+    expect(gps.GPSLatitudeRef).toBe("N");
+    expect(gps.GPSLatitude).toEqual([40, 30, 0]);
+    expect(gps.GPSLongitudeRef).toBe("W");
+    expect(gps.GPSLongitude).toEqual([74, 0, 0]);
+    expect(hasIcc).toBe(true);
+    expect(hasXmp).toBe(true);
   });
 
   it("removes a field AND applies an edit in the same call (withExif rebuild path)", async () => {
@@ -194,11 +213,36 @@ describe("editMetadata", () => {
   it("treats clearGps:true as a removal trigger, rebuilding EXIF while keeping fields", async () => {
     // clearGps flips hasRemovals true even with an empty fieldsToRemove, so the
     // function rebuilds EXIF from the source rather than taking keepMetadata().
-    const { hasExif, image } = await readBack(await editMetadata(richImage(), { clearGps: true }));
+    const { gps, hasExif, image } = await readBack(
+      await editMetadata(richImage(), { clearGps: true }),
+    );
     expect(hasExif).toBe(true);
     // Non-GPS IFD0 fields survive the rebuild verbatim.
     expect(image.Artist).toBe("OrigArtist");
     expect(image.Copyright).toBe("OrigCopyright");
+    expect(gps).toEqual({});
+  });
+
+  it("removes a specifically requested GPS field while preserving sibling GPS fields", async () => {
+    const { gps } = await readBack(
+      await editMetadata(richImage(), { fieldsToRemove: ["GPSLatitude"] }),
+    );
+    expect(gps.GPSLatitude).toBeUndefined();
+    expect(gps.GPSLongitudeRef).toBe("W");
+    expect(gps.GPSLongitude).toEqual([74, 0, 0]);
+  });
+
+  it("fails safely when existing EXIF cannot be parsed during a removal", async () => {
+    const withExif = vi.fn();
+    const fake = {
+      metadata: vi.fn().mockResolvedValue({ exif: Buffer.from("not-valid-exif") }),
+      withExif,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fake, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+      "Cannot safely edit metadata because existing EXIF data is invalid",
+    );
+    expect(withExif).not.toHaveBeenCalled();
   });
 
   it("does not change image dimensions or format", async () => {
@@ -211,10 +255,11 @@ describe("editMetadata", () => {
 });
 
 describe("stripMetadata", () => {
-  it("sanity check: the rich fixture carries both EXIF and ICC", async () => {
+  it("sanity check: the rich fixture carries EXIF, ICC, and XMP", async () => {
     const meta = await sharp(richBuffer).metadata();
     expect(meta.exif).toBeTruthy();
     expect(meta.icc).toBeTruthy();
+    expect(meta.xmp?.toString()).toContain("SnapOtter XMP");
   });
 
   it("strips both EXIF and ICC when stripAll is true", async () => {
@@ -270,23 +315,32 @@ describe("stripMetadata", () => {
     expect(hasIcc).toBe(true);
   });
 
-  it("keeps EXIF but strips ICC when only stripIcc is true", async () => {
-    const { hasExif, hasIcc } = await readBack(
+  it("keeps EXIF and XMP but strips ICC when only stripIcc is true", async () => {
+    const { hasExif, hasIcc, hasXmp } = await readBack(
       await stripMetadata(richImage(), { stripIcc: true }),
     );
     expect(hasExif).toBe(true);
     expect(hasIcc).toBe(false);
+    expect(hasXmp).toBe(true);
   });
 
   it("keeps both EXIF and ICC when only stripXmp is true (selective mode)", async () => {
-    // XMP has no keepXmp(); it is always stripped in selective mode. EXIF and ICC
-    // are both preserved because neither of their guards trips.
-    const { hasExif, hasIcc, image } = await readBack(
+    const { hasExif, hasIcc, hasXmp, image } = await readBack(
       await stripMetadata(richImage(), { stripXmp: true }),
     );
     expect(hasExif).toBe(true);
     expect(hasIcc).toBe(true);
+    expect(hasXmp).toBe(false);
     expect(image.Artist).toBe("OrigArtist");
+  });
+
+  it("preserves XMP when selectively stripping EXIF", async () => {
+    const { hasExif, hasIcc, hasXmp } = await readBack(
+      await stripMetadata(richImage(), { stripExif: true, stripXmp: false }),
+    );
+    expect(hasExif).toBe(false);
+    expect(hasIcc).toBe(true);
+    expect(hasXmp).toBe(true);
   });
 
   it("strips both EXIF and ICC when stripExif and stripIcc are both true", async () => {

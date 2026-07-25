@@ -1,3 +1,4 @@
+import { ToolInputError } from "@snapotter/shared";
 import exifReader from "exif-reader";
 import type { EditMetadataOptions, Sharp } from "../types.js";
 import { sanitizeValue } from "../utils/metadata.js";
@@ -36,6 +37,20 @@ const COMMON_FIELD_MAP: Array<{
   { option: "dateTimeOriginal", ifd: "IFD2", tag: "DateTimeOriginal" },
 ];
 
+function exifString(value: unknown): string | undefined {
+  const sanitized = sanitizeValue(value);
+  if (typeof sanitized === "string" || typeof sanitized === "number") {
+    return String(sanitized);
+  }
+  if (
+    Array.isArray(sanitized) &&
+    sanitized.every((item) => typeof item === "number" && Number.isFinite(item))
+  ) {
+    return sanitized.join(" ");
+  }
+  return undefined;
+}
+
 export async function editMetadata(
   image: Sharp,
   options: EditMetadataOptions = {},
@@ -69,30 +84,36 @@ export async function editMetadata(
 
     const existingIFD0: Record<string, string> = {};
     const existingIFD2: Record<string, string> = {};
+    const existingIFD3: Record<string, string> = {};
 
     if (metadata.exif) {
       try {
         const parsed = exifReader(metadata.exif);
         if (parsed.Image) {
           for (const [k, v] of Object.entries(parsed.Image)) {
-            if (fieldsToRemove.includes(k)) continue;
-            const sv = sanitizeValue(v);
-            if (typeof sv === "string" || typeof sv === "number") {
-              existingIFD0[k] = String(sv);
-            }
+            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+            const value = exifString(v);
+            if (value !== undefined) existingIFD0[k] = value;
           }
         }
         if (parsed.Photo) {
           for (const [k, v] of Object.entries(parsed.Photo)) {
-            if (fieldsToRemove.includes(k)) continue;
-            const sv = sanitizeValue(v);
-            if (typeof sv === "string" || typeof sv === "number") {
-              existingIFD2[k] = String(sv);
-            }
+            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+            const value = exifString(v);
+            if (value !== undefined) existingIFD2[k] = value;
+          }
+        }
+        if (parsed.GPSInfo && options.clearGps !== true) {
+          for (const [k, v] of Object.entries(parsed.GPSInfo)) {
+            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+            const value = exifString(v);
+            if (value !== undefined) existingIFD3[k] = value;
           }
         }
       } catch {
-        // If parsing fails, proceed with just the edits
+        throw new ToolInputError(
+          "Cannot safely edit metadata because existing EXIF data is invalid",
+        );
       }
     }
 
@@ -102,8 +123,9 @@ export async function editMetadata(
     const exif: Record<string, Record<string, string>> = {};
     if (Object.keys(finalIFD0).length > 0) exif.IFD0 = finalIFD0;
     if (Object.keys(finalIFD2).length > 0) exif.IFD2 = finalIFD2;
+    if (Object.keys(existingIFD3).length > 0) exif.IFD3 = existingIFD3;
 
-    return image.withExif(exif);
+    return image.withExif(exif).keepIccProfile().keepXmp();
   }
 
   const exif: Record<string, Record<string, string>> = {};

@@ -766,20 +766,18 @@ describe("compress", () => {
     expect(meta.format).toBe("heif");
   });
 
-  it("target size falls back to dimension reduction when quality alone fails", async () => {
+  it("fails clearly when dimension reduction cannot reach the target", async () => {
     const bigBuf = await sharp({
       create: { width: 200, height: 200, channels: 3, background: "#ff8800" },
     })
       .jpeg({ quality: 100 })
       .toBuffer();
-    const result = await compress(sharp(bigBuf), {
-      targetSizeBytes: 1,
-      format: "jpg",
-    });
-    const buf = await result.toBuffer();
-    expect(buf.length).toBeGreaterThan(0);
-    const meta = await sharp(buf).metadata();
-    expect(meta.width).toBeLessThan(200);
+    await expect(
+      compress(sharp(bigBuf), {
+        targetSizeBytes: 1,
+        format: "jpg",
+      }),
+    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
   });
 });
 

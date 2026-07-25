@@ -207,15 +207,11 @@ describe("compress downscale pass (L110, L117)", () => {
   // 6x13; the whole-condition `-> false` mutant never breaks and shrinks to 2x4;
   // the `newWidth < 10 -> false` operand mutant loses the width guard so 8x17 no
   // longer breaks. All three change the exact output dimensions.
-  it("stops the downscale loop when the width axis hits the floor (kills L110 width operand)", async () => {
+  it("fails clearly when the width axis reaches the floor before the target is met", async () => {
     const asymmetric = await seededPhoto(20, 40, 55555, 3, 2, 120);
-    const result = await compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" });
-    const info = await outputInfo(result);
-    expect(info.width).toBe(11);
-    expect(info.height).toBe(23);
-    // The 10px floor is respected on both axes: dimensions never drop below 10.
-    expect(info.width).toBeGreaterThanOrEqual(10);
-    expect(info.height).toBeGreaterThanOrEqual(10);
+    await expect(
+      compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" }),
+    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
   });
 
   // Transposed source (40x20): the passes are 30x15, 23x11, then 17x8 which trips
@@ -224,25 +220,21 @@ describe("compress downscale pass (L110, L117)", () => {
   // mutant loses the height guard, so 17x8 no longer breaks and the output shrinks
   // further. The width-axis case above cannot catch this operand; only a
   // height-limited source can.
-  it("stops the downscale loop when the height axis hits the floor (kills L110 height operand)", async () => {
+  it("fails clearly when the height axis reaches the floor before the target is met", async () => {
     const asymmetric = await seededPhoto(40, 20, 55555, 3, 2, 120);
-    const result = await compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" });
-    const info = await outputInfo(result);
-    expect(info.width).toBe(23);
-    expect(info.height).toBe(11);
-    expect(info.width).toBeGreaterThanOrEqual(10);
-    expect(info.height).toBeGreaterThanOrEqual(10);
+    await expect(
+      compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" }),
+    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
   });
 
   // A 13x13 source scales to exactly 10x10 on the first pass. With `< 10`
   // (correct) that is NOT below the floor, so the loop continues and the final
   // fallback returns 10x10. The L110 Equality `< -> <=` mutant treats 10 as below
   // the floor, breaks on pass 1, and returns the un-scaled 13x13 instead.
-  it("keeps a dimension that lands exactly on 10 (kills L110 equality)", async () => {
+  it("does not claim success when the 10px floor still exceeds the target", async () => {
     const tiny = await seededPhoto(13, 13, 987654321, 3, 2, 120);
-    const result = await compress(sharp(tiny), { targetSizeBytes: 1, format: "jpg" });
-    const info = await outputInfo(result);
-    expect(info.width).toBe(10);
-    expect(info.height).toBe(10);
+    await expect(compress(sharp(tiny), { targetSizeBytes: 1, format: "jpg" })).rejects.toThrow(
+      "Unable to compress image to 1 bytes within safe resize limits",
+    );
   });
 });

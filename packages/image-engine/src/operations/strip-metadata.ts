@@ -24,7 +24,7 @@ export async function stripMetadata(
   }
 
   // Selective stripping: Sharp strips all metadata by default (no calls needed).
-  // We chain keepExif() / keepIccProfile() to preserve categories the user
+  // We chain keepExif() / keepIccProfile() / keepXmp() to preserve categories the user
   // does NOT want stripped.
   let pipeline = image;
 
@@ -36,7 +36,9 @@ export async function stripMetadata(
     pipeline = pipeline.keepIccProfile();
   }
 
-  // XMP: Sharp has no keepXmp() method. XMP is always stripped in selective mode.
+  if (!stripXmp) {
+    pipeline = pipeline.keepXmp();
+  }
 
   return pipeline;
 }

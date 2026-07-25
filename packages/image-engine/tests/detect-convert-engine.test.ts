@@ -183,11 +183,9 @@ describe("detectFormat via magic bytes", () => {
       expect(await detectFormat(buf)).toBe("unknown");
     });
 
-    it("returns webp for a RIFF header shorter than 12 (signature check skipped)", async () => {
-      // Documents the exact code path: the `buffer.length >= 12` guard is false,
-      // so the WEBP-signature verification is skipped and RIFF alone yields webp.
-      expect(await detectFormat(bytes([0x52, 0x49, 0x46, 0x46], 11))).toBe("webp");
-      expect(await detectFormat(bytes([0x52, 0x49, 0x46, 0x46], 4))).toBe("webp");
+    it("returns unknown for a RIFF header too short to carry the WEBP signature", async () => {
+      expect(await detectFormat(bytes([0x52, 0x49, 0x46, 0x46], 11))).toBe("unknown");
+      expect(await detectFormat(bytes([0x52, 0x49, 0x46, 0x46], 4))).toBe("unknown");
     });
   });
 

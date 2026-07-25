@@ -1,3 +1,4 @@
+import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import type { CompressOptions, Sharp, SharpFormat } from "../types.js";
 
@@ -13,9 +14,6 @@ const FORMAT_MAP: Record<string, SharpFormat> = {
   jxl: "jxl",
 };
 
-/** Formats that Sharp cannot encode — fall back to PNG for output. */
-const NO_ENCODER = new Set(["svg", "raw", "tga", "psd", "exr", "hdr"]);
-
 function formatOpts(format: SharpFormat, quality: number): Record<string, unknown> {
   const opts: Record<string, unknown> = { quality };
   if (format === "avif") opts.effort = 4;
@@ -25,28 +23,44 @@ function formatOpts(format: SharpFormat, quality: number): Record<string, unknow
 export async function compress(image: Sharp, options: CompressOptions): Promise<Sharp> {
   const { quality, targetSizeBytes, format } = options;
 
-  const metadata = await image.metadata();
-  const detected = metadata.format ?? "jpeg";
-  // Fall back to PNG for formats Sharp cannot encode (SVG, BMP, etc.)
-  const safeDetected = NO_ENCODER.has(detected) ? "png" : detected;
-  const outputFormat = (FORMAT_MAP[format ?? ""] ??
-    FORMAT_MAP[safeDetected] ??
-    safeDetected) as SharpFormat;
+  const explicitFormat = FORMAT_MAP[format ?? ""];
+  if (format !== undefined && explicitFormat === undefined) {
+    throw new ToolInputError(`Unsupported compression format: ${format}`);
+  }
+
+  if (quality !== undefined) {
+    if (!Number.isFinite(quality) || !Number.isInteger(quality)) {
+      throw new ToolInputError("Quality must be an integer between 1 and 100");
+    }
+    if (quality < 1 || quality > 100) {
+      throw new ToolInputError("Quality must be between 1 and 100");
+    }
+  }
 
   if (targetSizeBytes !== undefined) {
-    if (targetSizeBytes <= 0) {
-      throw new Error("Target size must be greater than 0");
+    if (!Number.isSafeInteger(targetSizeBytes)) {
+      throw new ToolInputError("Target size must be a positive integer");
     }
+    if (targetSizeBytes <= 0) {
+      throw new ToolInputError("Target size must be greater than 0");
+    }
+  }
+
+  const metadata = await image.metadata();
+  const detectedFormat = FORMAT_MAP[metadata.format ?? ""] ?? "png";
+  const outputFormat = explicitFormat ?? detectedFormat;
+
+  if (targetSizeBytes !== undefined) {
     const inputBuffer = await image.toBuffer();
     return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes);
   }
 
   const q = quality ?? 80;
-  if (q < 1 || q > 100) {
-    throw new Error("Quality must be between 1 and 100");
-  }
-
   return image.toFormat(outputFormat, formatOpts(outputFormat, q));
+}
+
+interface CompressionCandidate {
+  quality: number;
 }
 
 async function findBestQuality(
@@ -54,14 +68,13 @@ async function findBestQuality(
   resize: { width: number; height: number } | null,
   format: SharpFormat,
   targetBytes: number,
-): Promise<number | null> {
+): Promise<CompressionCandidate | null> {
   let low = 1;
   let high = 100;
-  let bestQuality: number | null = null;
-  const maxIterations = 12;
+  let best: CompressionCandidate | null = null;
   const tolerance = 0.01;
 
-  for (let i = 0; i < maxIterations && low <= high; i++) {
+  while (low <= high) {
     const mid = Math.min(100, Math.max(1, Math.round((low + high) / 2)));
     let pipeline = sharp(inputBuffer);
     if (resize) pipeline = pipeline.resize(resize.width, resize.height);
@@ -69,7 +82,7 @@ async function findBestQuality(
     const resultSize = resultBuffer.length;
 
     if (resultSize <= targetBytes) {
-      bestQuality = mid;
+      best = { quality: mid };
       if ((targetBytes - resultSize) / targetBytes <= tolerance) break;
       low = mid + 1;
     } else {
@@ -77,7 +90,7 @@ async function findBestQuality(
     }
   }
 
-  return bestQuality;
+  return best;
 }
 
 async function compressToTargetSize(
@@ -85,9 +98,9 @@ async function compressToTargetSize(
   format: SharpFormat,
   targetBytes: number,
 ): Promise<Sharp> {
-  const quality = await findBestQuality(inputBuffer, null, format, targetBytes);
-  if (quality !== null) {
-    return sharp(inputBuffer).toFormat(format, formatOpts(format, quality));
+  const fullSizeCandidate = await findBestQuality(inputBuffer, null, format, targetBytes);
+  if (fullSizeCandidate !== null) {
+    return sharp(inputBuffer).toFormat(format, formatOpts(format, fullSizeCandidate.quality));
   }
 
   const metadata = await sharp(inputBuffer).metadata();
@@ -95,13 +108,11 @@ async function compressToTargetSize(
   const originalHeight = metadata.height ?? 0;
 
   if (originalWidth === 0 || originalHeight === 0) {
-    return sharp(inputBuffer).toFormat(format, formatOpts(format, 1));
+    throw new ToolInputError("Cannot determine image dimensions for target-size compression");
   }
 
   const scaleFactor = 0.75;
   const maxScalePasses = 8;
-  let lastWidth = originalWidth;
-  let lastHeight = originalHeight;
 
   for (let pass = 1; pass <= maxScalePasses; pass++) {
     const factor = scaleFactor ** pass;
@@ -109,15 +120,16 @@ async function compressToTargetSize(
     const newHeight = Math.round(originalHeight * factor);
     if (newWidth < 10 || newHeight < 10) break;
 
-    lastWidth = newWidth;
-    lastHeight = newHeight;
-
     const dims = { width: newWidth, height: newHeight };
-    const q = await findBestQuality(inputBuffer, dims, format, targetBytes);
-    if (q !== null) {
-      return sharp(inputBuffer).resize(newWidth, newHeight).toFormat(format, formatOpts(format, q));
+    const candidate = await findBestQuality(inputBuffer, dims, format, targetBytes);
+    if (candidate !== null) {
+      return sharp(inputBuffer)
+        .resize(newWidth, newHeight)
+        .toFormat(format, formatOpts(format, candidate.quality));
     }
   }
 
-  return sharp(inputBuffer).resize(lastWidth, lastHeight).toFormat(format, formatOpts(format, 1));
+  throw new ToolInputError(
+    `Unable to compress image to ${targetBytes} bytes within safe resize limits`,
+  );
 }

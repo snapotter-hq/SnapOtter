@@ -102,7 +102,7 @@ function detectByMagicBytes(buffer: Buffer): string {
 
     if (match) {
       // For RIFF, verify it's actually WEBP
-      if (entry.format === "webp" && buffer.length >= 12) {
+      if (entry.format === "webp") {
         const webpSignature = buffer.slice(8, 12).toString("ascii");
         if (webpSignature !== "WEBP") {
           continue;
