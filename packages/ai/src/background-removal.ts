@@ -15,6 +15,7 @@ export interface RemoveBackgroundOptions {
   backgroundColor?: string;
   edgeRefine?: number;
   decontaminate?: boolean;
+  signal?: AbortSignal;
 }
 
 const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
@@ -43,6 +44,7 @@ export async function removeBackground(
   options: RemoveBackgroundOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<Buffer> {
+  const { signal, ...sidecarOptions } = options;
   const id = randomUUID();
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
@@ -67,10 +69,17 @@ export async function removeBackground(
 
   try {
     const megapixels = (origW * origH) / 1_000_000;
-    const baseTimeout = options.model?.startsWith("birefnet") ? 600000 : 300000;
+    const baseTimeout = sidecarOptions.model?.startsWith("birefnet") ? 600000 : 300000;
     const timeout = Math.max(baseTimeout, megapixels * 30 * 1000);
 
-    const rawMask = await runAndParse(inputPath, outputPath, options, onProgress, timeout);
+    const rawMask = await runAndParse(
+      inputPath,
+      outputPath,
+      sidecarOptions,
+      onProgress,
+      timeout,
+      signal,
+    );
 
     if (needsDownscale) {
       return sharp(rawMask).resize({ width: origW, height: origH, fit: "fill" }).png().toBuffer();
@@ -89,12 +98,13 @@ async function runAndParse(
   options: RemoveBackgroundOptions,
   onProgress: ProgressCallback | undefined,
   timeout: number,
+  signal: AbortSignal | undefined,
 ): Promise<Buffer> {
   try {
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(options)],
-      { onProgress, timeout },
+      { onProgress, timeout, signal },
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {
@@ -112,7 +122,7 @@ async function runAndParse(
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-      { onProgress, timeout: 300000 },
+      { onProgress, timeout: 300000, signal },
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {

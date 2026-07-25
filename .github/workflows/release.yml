@@ -1192,10 +1192,11 @@ jobs:
     if: needs.release.outputs.new_version
     # The top-level `permissions: {}` default means this reusable-workflow call
     # grants no token scopes by default. ai-bundles.yml's jobs declare
-    # `contents: read` / `packages: read`, and GitHub rejects a called workflow
+    # `actions: read` / `contents: read` / `packages: read`, and GitHub rejects a called workflow
     # requesting scopes the caller never granted -- failing at startup before any
     # job runs. Grant them here so the call passes startup validation.
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/ai-bundles.yml
@@ -1806,14 +1807,13 @@ jobs:
     name: Advance Non-Regressing Image Aliases
     needs: [release, manifest, image-provenance, release-subjects]
     runs-on: ubuntu-latest
-    # GitHub does not guarantee FIFO ordering for a concurrency group. Every
-    # holder therefore fetches the complete remote tag set again while holding
-    # this lock and only publishes aliases for which its version is still the
-    # highest stable candidate.
+    # GitHub does not guarantee FIFO ordering and retains at most one pending
+    # run for a concurrency group. Every holder therefore fetches the complete
+    # remote tag set again while holding this lock and only publishes aliases
+    # for which its version is still the highest stable candidate.
     concurrency:
       group: snapotter-image-moving-aliases
       cancel-in-progress: false
-      queue: max
     permissions:
       contents: read
       packages: write

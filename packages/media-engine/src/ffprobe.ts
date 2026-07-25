@@ -21,11 +21,19 @@ export interface MediaInfo {
 }
 
 export interface ProbeOptions {
+  signal?: AbortSignal;
   timeoutMs?: number; // default 15s
+}
+
+function abortError(): Error {
+  const error = new Error("ffprobe canceled");
+  error.name = "AbortError";
+  return error;
 }
 
 /** Capped, time-limited ffprobe of a file path (spec 4.7). */
 export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Promise<MediaInfo> {
+  if (opts.signal?.aborted) throw abortError();
   const bin = resolveFfprobe();
   if (!bin) throw new Error("ffprobe binary not found (set FFPROBE_PATH or install ffmpeg)");
   const args = [
@@ -48,12 +56,23 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     let out = "";
     let err = "";
     let settled = false;
-    const timer = setTimeout(() => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
+    };
+    const fail = (error: Error) => {
       if (settled) return;
       settled = true;
+      cleanup();
       child.kill("SIGKILL");
-      reject(new Error(`ffprobe timed out after ${Math.round(timeoutMs / 1000)}s`));
+      reject(error);
+    };
+    const onAbort = () => fail(abortError());
+    const timer = setTimeout(() => {
+      fail(new Error(`ffprobe timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    if (opts.signal?.aborted) onAbort();
     child.stdout.on("data", (c: Buffer) => {
       out += c.toString("utf8");
     });
@@ -63,13 +82,13 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     child.on("error", (e) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       reject(e);
     });
     child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       if (code === 0) resolvePromise(out);
       else {
         const probeErr = new Error(`ffprobe exited ${code ?? signal}: ${err.slice(-1000)}`);

@@ -41,7 +41,7 @@ registerAiJobHandler("auto-subtitles", async (input, data, ctx) => {
   await writeFile(videoPath, input);
 
   // Probe for audio streams
-  const info = await probeMedia(videoPath);
+  const info = await probeMedia(videoPath, { signal: ctx.signal });
   const hasAudio = info.streams.some((s) => s.type === "audio");
   if (!hasAudio) {
     throw new Error("This video has no audio track to transcribe");
@@ -53,14 +53,14 @@ registerAiJobHandler("auto-subtitles", async (input, data, ctx) => {
   const wavPath = join(videoDir, "audio-16k.wav");
   await runFfmpeg(
     ["-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wavPath],
-    { timeoutMs: 10 * 60_000 },
+    { timeoutMs: 10 * 60_000, signal: ctx.signal },
   );
 
   ctx.report(20, "Transcribing audio");
 
   const result = await transcribeAudio(
     wavPath,
-    { language: settings.language },
+    { language: settings.language, signal: ctx.signal },
     (percent, stage) => {
       // Scale transcription progress into 20..95 range
       const scaled = 20 + Math.round(percent * 0.75);

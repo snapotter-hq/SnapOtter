@@ -44,7 +44,7 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
 
   const result = await transcribeAudio(
     audioPath,
-    { language: settings.language },
+    { language: settings.language, signal: ctx.signal },
     (percent, stage) => ctx.report(percent, stage),
   );
 

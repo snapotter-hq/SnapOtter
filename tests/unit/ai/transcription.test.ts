@@ -261,5 +261,17 @@ describe("transcribeAudio", () => {
       const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       expect(options.onProgress).toBeUndefined();
     });
+
+    it("forwards the caller AbortSignal to the Python bridge", async () => {
+      const controller = new AbortController();
+
+      await transcribeAudio(FAKE_AUDIO, { language: "auto", signal: controller.signal });
+
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "transcribe.py",
+        expect.any(Array),
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
   });
 });

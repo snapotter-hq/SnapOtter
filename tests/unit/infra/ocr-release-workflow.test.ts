@@ -1336,7 +1336,7 @@ describe("OCR v3 bundle release workflow", () => {
     expect(manifestJob).not.toContain("concurrency:");
     expect(aliasesJob).toContain("group: snapotter-image-moving-aliases");
     expect(aliasesJob).toContain("cancel-in-progress: false");
-    expect(aliasesJob).toContain("queue: max");
+    expect(aliasesJob).not.toContain("queue:");
     expect(aliasesJob).not.toContain("environment:");
   });
 

@@ -61,11 +61,16 @@ registerAiJobHandler("background-replace", async (input, data, ctx) => {
 
   ctx.report(5, "Removing background");
 
-  const subjectPng = await removeBackground(input, ctx.scratchDir, {}, (percent, stage) => {
-    // Scale rembg progress into 5..80 range
-    const scaled = 5 + Math.round(percent * 0.75);
-    ctx.report(Math.min(scaled, 80), stage);
-  });
+  const subjectPng = await removeBackground(
+    input,
+    ctx.scratchDir,
+    { signal: ctx.signal },
+    (percent, stage) => {
+      // Scale rembg progress into 5..80 range
+      const scaled = 5 + Math.round(percent * 0.75);
+      ctx.report(Math.min(scaled, 80), stage);
+    },
+  );
 
   // Feather alpha edges before compositing
   let subject = subjectPng;

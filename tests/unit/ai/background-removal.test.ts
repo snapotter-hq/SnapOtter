@@ -127,6 +127,19 @@ describe("removeBackground", () => {
       });
     });
 
+    it("forwards AbortSignal to Python without serializing it into sidecar options", async () => {
+      const controller = new AbortController();
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+        model: "u2net",
+        signal: controller.signal,
+      });
+
+      const [, args, bridgeOptions] = vi.mocked(runPythonWithProgress).mock.calls[0];
+      expect(JSON.parse(args[2])).toEqual({ model: "u2net" });
+      expect(bridgeOptions).toEqual(expect.objectContaining({ signal: controller.signal }));
+    });
+
     it("converts input to PNG via sharp before writing to disk", async () => {
       await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 

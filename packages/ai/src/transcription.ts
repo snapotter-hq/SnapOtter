@@ -24,6 +24,7 @@ export interface TranscriptionResult {
 
 export interface TranscribeOptions {
   language: string;
+  signal?: AbortSignal;
 }
 
 export async function transcribeAudio(
@@ -39,6 +40,7 @@ export async function transcribeAudio(
   const { stdout } = await runPythonWithProgress("transcribe.py", [inputPath, optionsJson], {
     timeout: 30 * 60_000,
     onProgress,
+    signal: opts.signal,
   });
 
   const result = parseStdoutJson(stdout);

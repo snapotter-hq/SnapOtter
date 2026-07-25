@@ -16,6 +16,14 @@ on:
         required: true
       OCR_RUNTIME_INDEX_SIGNING_KEY_B64:
         required: true
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Optional successful Release workflow run containing the scanned amd64 digest
+        required: false
+        type: string
+  schedule:
+    - cron: "17 3 * * 1"
 
 concurrency:
   group: ai-bundles-${{ inputs.version }}
@@ -26,6 +34,7 @@ permissions: {}
 jobs:
   validate-inputs:
     name: Validate release inputs
+    if: inputs.release_commit != ''
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -1270,7 +1279,6 @@ jobs:
     concurrency:
       group: snapotter-hf-feature-bundles-publish
       cancel-in-progress: false
-      queue: max
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1992,3 +2000,433 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: echo "Verified immutable existing bundle release v${VERSION}; upload skipped"
+
+  installed-ai-production:
+    name: Verify installed AI in production image
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    steps:
+      - name: Resolve a successful scanned release run
+        id: source
+        if: inputs.release_commit == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SOURCE_RUN_ID}" ]]; then
+            [[ "${SOURCE_RUN_ID}" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::source_run_id must be a positive workflow run ID"
+              exit 1
+            }
+            candidate_run_ids=("${SOURCE_RUN_ID}")
+          else
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs?status=completed&per_page=50" \
+              > "${RUNNER_TEMP}/release-runs.json"
+            mapfile -t candidate_run_ids < <(
+              jq -r '.workflow_runs[] | select(.conclusion == "success") | .id' \
+                "${RUNNER_TEMP}/release-runs.json"
+            )
+          fi
+
+          selected_run=""
+          for candidate_run_id in "${candidate_run_ids[@]}"; do
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}" \
+              > "${RUNNER_TEMP}/candidate-run.json"
+            if ! jq -e \
+              '.path == ".github/workflows/release.yml"
+                and .status == "completed"
+                and .conclusion == "success"' \
+              "${RUNNER_TEMP}/candidate-run.json" >/dev/null; then
+              if [[ -n "${SOURCE_RUN_ID}" ]]; then
+                echo "::error::Selected run is not a completed successful Release workflow"
+                exit 1
+              fi
+              continue
+            fi
+
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/artifacts?per_page=100" \
+              > "${RUNNER_TEMP}/candidate-artifacts.json"
+            artifact_count="$(
+              jq '[.artifacts[] | select(.name == "digests-linux-amd64" and .expired == false)] | length' \
+                "${RUNNER_TEMP}/candidate-artifacts.json"
+            )"
+            if [[ "${artifact_count}" != "1" ]]; then
+              if [[ -n "${SOURCE_RUN_ID}" ]]; then
+                echo "::error::Selected release run does not have one live amd64 digest artifact"
+                exit 1
+              fi
+              continue
+            fi
+
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/jobs?per_page=100" \
+              > "${RUNNER_TEMP}/candidate-jobs.json"
+            if ! jq -e \
+              '([.jobs[] | select(.name == "Trivy Container Scan (linux-amd64)")] | length) == 1
+                and ([.jobs[] | select(.name == "Trivy Container Scan (linux-amd64)")][0].conclusion == "success")' \
+              "${RUNNER_TEMP}/candidate-jobs.json" >/dev/null; then
+              if [[ -n "${SOURCE_RUN_ID}" ]]; then
+                echo "::error::Selected release run has no successful amd64 container scan"
+                exit 1
+              fi
+              continue
+            fi
+
+            selected_run="${candidate_run_id}"
+            break
+          done
+          [[ -n "${selected_run}" ]] || {
+            echo "::error::No successful Release run has a live, scanned amd64 digest artifact"
+            exit 1
+          }
+          echo "run_id=${selected_run}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download current release amd64 digest
+        if: inputs.release_commit != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-linux-amd64
+          path: ${{ runner.temp }}/installed-ai-digest
+
+      - name: Download historical release amd64 digest
+        if: inputs.release_commit == ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-linux-amd64
+          path: ${{ runner.temp }}/installed-ai-digest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+
+      - name: Resolve the exact image digest
+        run: |
+          set -euo pipefail
+          mapfile -t digest_files < <(
+            find "${RUNNER_TEMP}/installed-ai-digest" -mindepth 1 -maxdepth 1 -type f -print
+          )
+          [[ ${#digest_files[@]} -eq 1 ]] || {
+            echo "::error::Expected exactly one amd64 image digest"
+            exit 1
+          }
+          IMAGE_DIGEST="$(basename "${digest_files[0]}")"
+          [[ "${IMAGE_DIGEST}" =~ ^[a-f0-9]{64}$ ]] || {
+            echo "::error::amd64 image artifact contains an invalid digest"
+            exit 1
+          }
+          [[ ! -s "${digest_files[0]}" ]] || {
+            echo "::error::amd64 digest marker unexpectedly contains mutable payload data"
+            exit 1
+          }
+          echo "IMAGE_DIGEST=${IMAGE_DIGEST}" >> "${GITHUB_ENV}"
+
+      - name: Reclaim unused hosted-runner SDK space
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+
+      - name: Require enough free disk for the image and installed bundles
+        run: |
+          set -euo pipefail
+          docker_root_dir="$(docker info --format '{{.DockerRootDir}}')"
+          [[ "${docker_root_dir}" == /* ]] || {
+            echo "::error::Docker reported an invalid storage root"
+            exit 1
+          }
+          available_kib="$(sudo df -Pk "${docker_root_dir}" | awk 'NR == 2 { print $4 }')"
+          [[ "${available_kib}" =~ ^[0-9]+$ ]] || {
+            echo "::error::Could not measure runner disk availability"
+            exit 1
+          }
+          # background-removal's 4.8 GB archive reserves roughly 18.4 GiB in
+          # /data by itself; keep room for the image, venv, and transcription.
+          minimum_kib=$((30 * 1024 * 1024))
+          (( available_kib >= minimum_kib )) || {
+            echo "::error::Installed-AI verification requires 30 GiB free; runner has $((available_kib / 1024 / 1024)) GiB"
+            exit 1
+          }
+          sudo df -h "${docker_root_dir}"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Pull and validate the exact amd64 release image
+        id: image
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/snapotter-hq/snapotter@sha256:${IMAGE_DIGEST}"
+          docker pull "${image}"
+          architecture="$(docker image inspect --format '{{.Architecture}}' "${image}")"
+          source_repository="$(
+            docker image inspect \
+              --format '{{ index .Config.Labels "org.opencontainers.image.source" }}' \
+              "${image}"
+          )"
+          source_commit="$(
+            docker image inspect \
+              --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+              "${image}"
+          )"
+          [[ "${architecture}" == "amd64" ]] || {
+            echo "::error::Digest resolved to ${architecture}, not amd64"
+            exit 1
+          }
+          [[ "${source_repository}" == "https://github.com/${GITHUB_REPOSITORY}" ]] || {
+            echo "::error::Release image source label does not match this repository"
+            exit 1
+          }
+          [[ "${source_commit}" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "::error::Release image has no immutable source revision"
+            exit 1
+          }
+          if [[ -n "${RELEASE_COMMIT}" && "${source_commit}" != "${RELEASE_COMMIT}" ]]; then
+            echo "::error::Release image revision differs from the requested release commit"
+            exit 1
+          fi
+          echo "source_commit=${source_commit}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout the immutable QA harness revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable QA harness checkout
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          [[ "${WORKFLOW_SHA}" =~ ^[a-f0-9]{40}$ \
+            && "$(git rev-parse HEAD)" == "${WORKFLOW_SHA}" ]] || {
+              echo "::error::QA harness checkout differs from the workflow revision"
+              exit 1
+            }
+
+      - uses: ./.github/actions/setup
+
+      - name: Create exact labeled production resources
+        run: |
+          set -euo pipefail
+          RUN_SCOPE="snapotter-ai-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "${RUN_SCOPE}" =~ ^snapotter-ai-[0-9]+-[0-9]+$ ]] || {
+            echo "::error::Unsafe installed-AI run scope"
+            exit 1
+          }
+          QA_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::${QA_PASSWORD}"
+          echo "RUN_SCOPE=${RUN_SCOPE}" >> "${GITHUB_ENV}"
+          echo "QA_PASSWORD=${QA_PASSWORD}" >> "${GITHUB_ENV}"
+
+          docker network create \
+            --label "io.snapotter.qa.scope=${RUN_SCOPE}" \
+            "${RUN_SCOPE}-network"
+          for suffix in data workspace pgdata redisdata; do
+            docker volume create \
+              --label "io.snapotter.qa.scope=${RUN_SCOPE}" \
+              "${RUN_SCOPE}-${suffix}"
+          done
+
+          docker run --detach \
+            --name "${RUN_SCOPE}-postgres" \
+            --label "io.snapotter.qa.scope=${RUN_SCOPE}" \
+            --network "${RUN_SCOPE}-network" \
+            --network-alias postgres \
+            --env POSTGRES_USER=snapotter \
+            --env "POSTGRES_PASSWORD=${QA_PASSWORD}" \
+            --env POSTGRES_DB=snapotter \
+            --volume "${RUN_SCOPE}-pgdata:/var/lib/postgresql/data" \
+            postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+
+          docker run --detach \
+            --name "${RUN_SCOPE}-redis" \
+            --label "io.snapotter.qa.scope=${RUN_SCOPE}" \
+            --network "${RUN_SCOPE}-network" \
+            --network-alias redis \
+            --volume "${RUN_SCOPE}-redisdata:/data" \
+            redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005 \
+            redis-server --maxmemory-policy noeviction --maxmemory 512mb \
+              --appendonly yes --requirepass "${QA_PASSWORD}"
+
+          dependencies_ready=false
+          for _attempt in $(seq 1 90); do
+            if docker exec "${RUN_SCOPE}-postgres" \
+              pg_isready -U snapotter -d snapotter >/dev/null 2>&1 \
+              && docker exec "${RUN_SCOPE}-redis" \
+                redis-cli -a "${QA_PASSWORD}" --no-auth-warning ping 2>/dev/null \
+                | grep -qx PONG; then
+              dependencies_ready=true
+              break
+            fi
+            sleep 2
+          done
+          [[ "${dependencies_ready}" == "true" ]] || {
+            echo "::error::Production dependencies did not become ready"
+            exit 1
+          }
+
+          docker run --detach \
+            --name "${RUN_SCOPE}-app" \
+            --label "io.snapotter.qa.scope=${RUN_SCOPE}" \
+            --network "${RUN_SCOPE}-network" \
+            --publish 127.0.0.1::1349 \
+            --env AUTH_ENABLED=true \
+            --env DEFAULT_USERNAME=admin \
+            --env "DEFAULT_PASSWORD=${QA_PASSWORD}" \
+            --env SKIP_MUST_CHANGE_PASSWORD=true \
+            --env SNAPOTTER_GPU=0 \
+            --env "DATABASE_URL=postgres://snapotter:${QA_PASSWORD}@postgres:5432/snapotter" \
+            --env "REDIS_URL=redis://:${QA_PASSWORD}@redis:6379" \
+            --env PROCESSING_TIMEOUT_S=0 \
+            --env RATE_LIMIT_PER_MIN=1000 \
+            --volume "${RUN_SCOPE}-data:/data" \
+            --volume "${RUN_SCOPE}-workspace:/tmp/workspace" \
+            "ghcr.io/snapotter-hq/snapotter@sha256:${IMAGE_DIGEST}"
+
+          mapfile -t port_bindings < <(docker port "${RUN_SCOPE}-app" 1349/tcp)
+          [[ ${#port_bindings[@]} -eq 1 \
+            && "${port_bindings[0]}" =~ ^127\.0\.0\.1:([1-9][0-9]{0,4})$ ]] || {
+              echo "::error::Production app did not publish one loopback-only dynamic port"
+              exit 1
+            }
+          QA_PORT="${BASH_REMATCH[1]}"
+          (( QA_PORT <= 65535 )) || {
+            echo "::error::Docker returned an invalid published port"
+            exit 1
+          }
+          echo "QA_BASE_URL=http://127.0.0.1:${QA_PORT}" >> "${GITHUB_ENV}"
+
+      - name: Wait for the production API
+        run: |
+          set -euo pipefail
+          api_ready=false
+          for _attempt in $(seq 1 120); do
+            if curl --fail --silent --show-error --max-time 5 \
+              "${QA_BASE_URL}/api/v1/health" \
+              | jq -e '.status == "healthy"' >/dev/null; then
+              api_ready=true
+              break
+            fi
+            if ! docker inspect --format '{{.State.Running}}' "${RUN_SCOPE}-app" \
+              | grep -qx true; then
+              echo "::error::Production app container exited before becoming healthy"
+              docker logs "${RUN_SCOPE}-app" || true
+              exit 1
+            fi
+            sleep 3
+          done
+          [[ "${api_ready}" == "true" ]] || {
+            echo "::error::Production API did not become healthy"
+            docker logs "${RUN_SCOPE}-app" || true
+            exit 1
+          }
+
+      - name: Install bundles and verify four public tool artifacts
+        env:
+          QA_USERNAME: admin
+        run: ./apps/api/node_modules/.bin/tsx tests/qa/verify-installed-ai-production.mts
+
+      - name: Show exact production-container diagnostics
+        if: ${{ failure() }}
+        run: |
+          docker logs "${RUN_SCOPE}-app" || true
+          docker logs "${RUN_SCOPE}-postgres" || true
+          docker logs "${RUN_SCOPE}-redis" || true
+
+      - name: Remove only exact labeled run resources
+        if: ${{ always() }}
+        run: |
+          set -u
+          cleanup_failed=0
+          if [[ "${RUN_SCOPE:-}" =~ ^snapotter-ai-[0-9]+-[0-9]+$ ]]; then
+            if docker container inspect "${RUN_SCOPE}-app" >/dev/null 2>&1; then
+              app_scope="$(
+                docker container inspect \
+                  --format '{{ index .Config.Labels "io.snapotter.qa.scope" }}' \
+                  "${RUN_SCOPE}-app"
+              )"
+              if [[ "${app_scope}" == "${RUN_SCOPE}" ]]; then
+                docker rm --force "${RUN_SCOPE}-app" || cleanup_failed=1
+              else
+                echo "::error::Refusing to remove app container without the exact run label"
+                cleanup_failed=1
+              fi
+            fi
+            for suffix in postgres redis; do
+              name="${RUN_SCOPE}-${suffix}"
+              if docker container inspect "${name}" >/dev/null 2>&1; then
+                scope="$(
+                  docker container inspect \
+                    --format '{{ index .Config.Labels "io.snapotter.qa.scope" }}' \
+                    "${name}"
+                )"
+                if [[ "${scope}" == "${RUN_SCOPE}" ]]; then
+                  docker rm --force "${name}" || cleanup_failed=1
+                else
+                  echo "::error::Refusing to remove ${name} without the exact run label"
+                  cleanup_failed=1
+                fi
+              fi
+            done
+
+            if docker volume inspect "${RUN_SCOPE}-data" >/dev/null 2>&1; then
+              data_scope="$(
+                docker volume inspect \
+                  --format '{{ index .Labels "io.snapotter.qa.scope" }}' \
+                  "${RUN_SCOPE}-data"
+              )"
+              if [[ "${data_scope}" == "${RUN_SCOPE}" ]]; then
+                docker volume rm "${RUN_SCOPE}-data" || cleanup_failed=1
+              else
+                echo "::error::Refusing to remove data volume without the exact run label"
+                cleanup_failed=1
+              fi
+            fi
+            for suffix in workspace pgdata redisdata; do
+              name="${RUN_SCOPE}-${suffix}"
+              if docker volume inspect "${name}" >/dev/null 2>&1; then
+                scope="$(
+                  docker volume inspect \
+                    --format '{{ index .Labels "io.snapotter.qa.scope" }}' \
+                    "${name}"
+                )"
+                if [[ "${scope}" == "${RUN_SCOPE}" ]]; then
+                  docker volume rm "${name}" || cleanup_failed=1
+                else
+                  echo "::error::Refusing to remove ${name} without the exact run label"
+                  cleanup_failed=1
+                fi
+              fi
+            done
+
+            if docker network inspect "${RUN_SCOPE}-network" >/dev/null 2>&1; then
+              network_scope="$(
+                docker network inspect \
+                  --format '{{ index .Labels "io.snapotter.qa.scope" }}' \
+                  "${RUN_SCOPE}-network"
+              )"
+              if [[ "${network_scope}" == "${RUN_SCOPE}" ]]; then
+                docker network rm "${RUN_SCOPE}-network" || cleanup_failed=1
+              else
+                echo "::error::Refusing to remove network without the exact run label"
+                cleanup_failed=1
+              fi
+            fi
+          elif [[ -n "${RUN_SCOPE:-}" ]]; then
+            echo "::error::Refusing cleanup for an unsafe run scope"
+            cleanup_failed=1
+          fi
+          exit "${cleanup_failed}"

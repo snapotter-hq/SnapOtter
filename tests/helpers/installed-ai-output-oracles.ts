@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { expect } from "vitest";
 
 const KNOWN_TRANSCRIPT_TERMS = [
   "quick",
@@ -19,26 +18,34 @@ function normalizedWords(text: string): Set<string> {
   return new Set(text.toLowerCase().match(/[a-z]+/g) ?? []);
 }
 
+function assertOracle(condition: boolean, message: string): asserts condition {
+  if (!condition) throw new Error(`Installed AI output oracle failed: ${message}`);
+}
+
 /** Require recognizable content from the committed CC0 speech fixture. */
 export function expectKnownTranscript(text: string): void {
-  expect(text.trim().length).toBeGreaterThan(20);
+  assertOracle(text.trim().length > 20, "transcript is too short");
   const words = normalizedWords(text);
   const recognized = KNOWN_TRANSCRIPT_TERMS.filter((term) => words.has(term));
-  expect(
-    recognized.length,
-    `recognized transcript terms: ${recognized.join(", ")}`,
-  ).toBeGreaterThanOrEqual(3);
+  assertOracle(
+    recognized.length >= 3,
+    `recognized only ${recognized.length} fixture terms: ${recognized.join(", ")}`,
+  );
 }
 
 export function expectSrtArtifact(text: string): void {
-  expect(text).toMatch(
-    /(?:^|\r?\n)1\r?\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\r?\n\S/u,
+  assertOracle(
+    /(?:^|\r?\n)1\r?\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\r?\n\S/u.test(text),
+    "artifact does not contain a valid first SRT cue",
   );
 }
 
 export function expectVttArtifact(text: string): void {
-  expect(text).toMatch(/^WEBVTT\r?\n/u);
-  expect(text).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}/u);
+  assertOracle(/^WEBVTT\r?\n/u.test(text), "artifact is missing its WEBVTT header");
+  assertOracle(
+    /\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}/u.test(text),
+    "artifact does not contain a valid VTT cue",
+  );
 }
 
 interface RawRgbImage {
@@ -53,9 +60,9 @@ async function rawRgb(buffer: Buffer): Promise<RawRgbImage> {
     .toColorspace("srgb")
     .raw()
     .toBuffer({ resolveWithObject: true });
-  expect(info.channels).toBe(3);
-  expect(info.width).toBeGreaterThan(0);
-  expect(info.height).toBeGreaterThan(0);
+  assertOracle(info.channels === 3, `decoded image has ${info.channels} channels instead of RGB`);
+  assertOracle(info.width > 0, "decoded image has no width");
+  assertOracle(info.height > 0, "decoded image has no height");
   return { data, height: info.height, width: info.width };
 }
 
@@ -69,10 +76,36 @@ function pixelDifference(before: RawRgbImage, after: RawRgbImage, pixel: number)
 }
 
 function expectSameDimensions(before: RawRgbImage, after: RawRgbImage): void {
-  expect({ width: after.width, height: after.height }).toEqual({
-    width: before.width,
-    height: before.height,
-  });
+  assertOracle(
+    after.width === before.width && after.height === before.height,
+    `output dimensions ${after.width}x${after.height} differ from input ${before.width}x${before.height}`,
+  );
+}
+
+function luminance(image: RawRgbImage, x: number, y: number): number {
+  const offset = (y * image.width + x) * 3;
+  return (
+    image.data[offset] * 0.2126 + image.data[offset + 1] * 0.7152 + image.data[offset + 2] * 0.0722
+  );
+}
+
+function backgroundGradientEnergy(image: RawRgbImage): number {
+  // The committed portrait fixture has only wall/window/plant background in
+  // this upper-left ROI. Keeping this oracle fixture-specific prevents the
+  // subject edge from masquerading as unblurred background detail.
+  const right = Math.max(3, Math.floor(image.width * 0.35));
+  const bottom = Math.max(3, Math.floor(image.height * 0.5));
+  let energy = 0;
+  let comparisons = 0;
+  for (let y = 0; y < bottom - 1; y += 1) {
+    for (let x = 0; x < right - 1; x += 1) {
+      const current = luminance(image, x, y);
+      energy += Math.abs(current - luminance(image, x + 1, y));
+      energy += Math.abs(current - luminance(image, x, y + 1));
+      comparisons += 2;
+    }
+  }
+  return energy / comparisons;
 }
 
 /** Prove the decoded background region changed, rather than only the subject. */
@@ -98,8 +131,31 @@ export async function expectObservablePixelChange(input: Buffer, output: Buffer)
     if (difference >= 12) changedPixels += 1;
   }
 
-  expect(changedPixels / inspectedPixels).toBeGreaterThan(0.08);
-  expect(absoluteDifference / inspectedPixels).toBeGreaterThan(2);
+  assertOracle(changedPixels / inspectedPixels > 0.08, "too few background pixels changed");
+  assertOracle(
+    absoluteDifference / inspectedPixels > 2,
+    "background mean pixel difference is too small",
+  );
+}
+
+/** Prove background detail was materially blurred, not just recolored. */
+export async function expectBackgroundBlurEnergyReduced(
+  input: Buffer,
+  output: Buffer,
+): Promise<void> {
+  const [before, after] = await Promise.all([rawRgb(input), rawRgb(output)]);
+  expectSameDimensions(before, after);
+  const beforeEnergy = backgroundGradientEnergy(before);
+  const afterEnergy = backgroundGradientEnergy(after);
+
+  // The committed portrait's deliberately subject-free ROI measures about 1.65
+  // with this decoder and formula. Keep the floor below that evidence while
+  // still rejecting flat or nearly-flat fixtures that cannot prove a blur.
+  assertOracle(beforeEnergy > 0.75, "portrait background does not contain measurable detail");
+  assertOracle(
+    afterEnergy / beforeEnergy < 0.7,
+    `background high-frequency energy ratio ${afterEnergy / beforeEnergy} is not below 0.7`,
+  );
 }
 
 /**
@@ -127,9 +183,12 @@ export async function expectForegroundPreserved(input: Buffer, output: Buffer): 
     }
   }
 
-  expect(inspectedPixels).toBeGreaterThan(0);
-  expect(preservedPixels / inspectedPixels).toBeGreaterThan(0.8);
-  expect(absoluteDifference / inspectedPixels).toBeLessThan(18);
+  assertOracle(inspectedPixels > 0, "foreground region contains no pixels");
+  assertOracle(preservedPixels / inspectedPixels > 0.8, "too few foreground pixels survived");
+  assertOracle(
+    absoluteDifference / inspectedPixels < 18,
+    "foreground mean pixel difference is too large",
+  );
 }
 
 /** Prove the requested red or red-to-blue replacement is visible in the output. */
@@ -159,8 +218,14 @@ export async function expectConfiguredBackground(
     if (blue >= 180 && blue >= red * 2 && blue >= green * 2) bluePixels += 1;
   }
 
-  expect(redPixels / inspectedPixels).toBeGreaterThan(kind === "solid-red" ? 0.2 : 0.02);
+  assertOracle(
+    redPixels / inspectedPixels > (kind === "solid-red" ? 0.2 : 0.02),
+    "requested red background is not visible at the image border",
+  );
   if (kind === "red-blue-gradient") {
-    expect(bluePixels / inspectedPixels).toBeGreaterThan(0.02);
+    assertOracle(
+      bluePixels / inspectedPixels > 0.02,
+      "requested blue gradient endpoint is not visible at the image border",
+    );
   }
 }

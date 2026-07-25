@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { createGradientBackground } from "../../../apps/api/src/lib/bg-effects.js";
 import {
+  expectBackgroundBlurEnergyReduced,
   expectConfiguredBackground,
   expectForegroundPreserved,
   expectKnownTranscript,
@@ -68,6 +70,37 @@ describe("installed AI output oracles", () => {
     await expect(expectObservablePixelChange(input, changed)).resolves.toBeUndefined();
     await expect(expectObservablePixelChange(input, centerOnly)).rejects.toThrow();
     await expect(expectObservablePixelChange(input, input)).rejects.toThrow();
+  });
+
+  it("requires real high-frequency energy loss in the background region", async () => {
+    const checker = Buffer.alloc(200 * 200 * 3);
+    for (let y = 0; y < 200; y += 1) {
+      for (let x = 0; x < 200; x += 1) {
+        const value = (x + y) % 2 === 0 ? 0 : 255;
+        const offset = (y * 200 + x) * 3;
+        checker[offset] = value;
+        checker[offset + 1] = value;
+        checker[offset + 2] = value;
+      }
+    }
+    const input = await sharp(checker, { raw: { width: 200, height: 200, channels: 3 } })
+      .png()
+      .toBuffer();
+    const blurred = await sharp(input).blur(12).webp({ lossless: true }).toBuffer();
+
+    await expect(expectBackgroundBlurEnergyReduced(input, blurred)).resolves.toBeUndefined();
+    await expect(expectBackgroundBlurEnergyReduced(input, input)).rejects.toThrow();
+  });
+
+  it("is calibrated against the committed portrait fixture used in production QA", async () => {
+    const portrait = readFileSync("tests/fixtures/image/valid/portrait-color.jpg");
+    const blurred = await sharp(portrait).blur(37.75).webp({ lossless: true }).toBuffer();
+    const reencoded = await sharp(portrait).webp({ lossless: true }).toBuffer();
+
+    await expect(expectBackgroundBlurEnergyReduced(portrait, blurred)).resolves.toBeUndefined();
+    await expect(expectBackgroundBlurEnergyReduced(portrait, reencoded)).rejects.toThrow(
+      "background high-frequency energy ratio",
+    );
   });
 
   it("requires the known central foreground region to remain recognizable", async () => {
