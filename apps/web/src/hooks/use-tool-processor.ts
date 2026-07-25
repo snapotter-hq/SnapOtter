@@ -156,6 +156,7 @@ export function useToolProcessor(toolId: string) {
       try {
         const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
         eventSourceRef.current = es;
+        if (asyncModeRef.current) resetStallTimer();
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;

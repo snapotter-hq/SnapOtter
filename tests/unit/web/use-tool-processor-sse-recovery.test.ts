@@ -122,7 +122,15 @@ describe("useToolProcessor SSE recovery", () => {
     expect(useFileStore.getState().entries[0].status).toBe("processing");
 
     act(() => {
-      MockEventSource.instances[1].onmessage?.({
+      vi.advanceTimersByTime(300_001);
+    });
+
+    expect(MockEventSource.instances[1].close).toHaveBeenCalledOnce();
+    expect(MockEventSource.instances).toHaveLength(3);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      MockEventSource.instances[2].onmessage?.({
         data: JSON.stringify({
           type: "single",
           phase: "complete",
