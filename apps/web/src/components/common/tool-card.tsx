@@ -7,7 +7,7 @@ import {
 } from "@snapotter/shared";
 import { Clock, Download, FileImage, Loader2, Pin } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { ICON_MAP } from "@/lib/icon-map";
 import { getToolDescription, getToolName } from "@/lib/tool-i18n";

@@ -2,7 +2,7 @@
 import type { FeatureBundleState } from "@snapotter/shared";
 import { TOOLS } from "@snapotter/shared";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToolCard } from "@/components/common/tool-card";
 import { useFeaturesStore } from "@/stores/features-store";

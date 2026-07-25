@@ -1,7 +1,7 @@
 import { TOOLS } from "@snapotter/shared";
 import { FileImage, FileText, ImageIcon, Music, Play, Video } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import {
   apiGetFileDetails,

@@ -1,5 +1,5 @@
 import { FolderOpen, LayoutGrid, Settings as SettingsIcon, Workflow } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { ImageEditIcon } from "../common/image-edit-icon";
 

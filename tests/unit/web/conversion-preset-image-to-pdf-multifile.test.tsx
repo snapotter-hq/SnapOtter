@@ -18,8 +18,8 @@ vi.mock("@/lib/api", () => ({
 }));
 
 let mockToolId = "jpg-to-pdf";
-vi.mock("react-router-dom", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router-dom")>();
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
   return { ...actual, useParams: () => ({ toolId: mockToolId }) };
 });
 

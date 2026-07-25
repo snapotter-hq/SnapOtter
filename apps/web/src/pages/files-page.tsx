@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { FileDetails } from "@/components/files/file-details";
 import { FileList } from "@/components/files/file-list";
 import { FileUploadArea } from "@/components/files/file-upload-area";

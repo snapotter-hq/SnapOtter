@@ -1,7 +1,7 @@
 import type { Tool } from "@snapotter/shared";
 import { FileImage, FolderOpen } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";

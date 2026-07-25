@@ -169,7 +169,7 @@ export default defineConfig({
       ),
       react: path.join(webNodeModules, "react"),
       "react-dom": path.join(webNodeModules, "react-dom"),
-      "react-router-dom": path.join(webNodeModules, "react-router-dom"),
+      "react-router": path.join(webNodeModules, "react-router"),
       zustand: path.join(webNodeModules, "zustand"),
       "fuse.js": path.join(webNodeModules, "fuse.js"),
       "posthog-js": path.join(webNodeModules, "posthog-js"),

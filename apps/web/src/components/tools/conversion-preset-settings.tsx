@@ -1,7 +1,7 @@
 import { BASE_CONFIG, CONVERSION_PRESET_BY_ID } from "@snapotter/shared";
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
