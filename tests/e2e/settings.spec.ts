@@ -1,4 +1,3 @@
-import { authFile } from "../../playwright.config";
 import { expect, openSettings, test } from "./helpers";
 
 test.describe("Settings Dialog", () => {
@@ -47,30 +46,13 @@ test.describe("Settings Dialog", () => {
     await expect(page.getByText("admin").first()).toBeVisible();
   });
 
-  // TODO: This test is flaky due to dialog state isolation — the API keys
-  // endpoint is verified via the API test suite (api.spec.ts)
-  test.skip("API Keys section has generate button", async ({ browser }) => {
-    // Use a fresh context to avoid dialog state from previous tests
-    const context = await browser.newContext({
-      storageState: authFile,
-    });
-    const page = await context.newPage();
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
+  test("API Keys section has generate button", async ({ loggedInPage: page }) => {
     await openSettings(page);
-    await page.waitForTimeout(500);
-
-    const apiKeysBtn = page.getByRole("button", { name: /api keys/i });
-    await expect(apiKeysBtn).toBeVisible({ timeout: 5_000 });
-    await apiKeysBtn.click();
-    await page.waitForTimeout(500);
+    await page.getByRole("button", { name: /api keys/i }).click();
 
     await expect(page.getByRole("button", { name: /generate api key/i })).toBeVisible({
       timeout: 5_000,
     });
-
-    await context.close();
   });
 
   test("About section shows app info", async ({ loggedInPage: page }) => {

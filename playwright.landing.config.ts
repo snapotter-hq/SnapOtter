@@ -1,6 +1,13 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightEndpoint, resolvePlaywrightRun } from "./tests/playwright-run.js";
 
-const LANDING_PORT = Number(process.env.PLAYWRIGHT_LANDING_PORT ?? 4350);
+const { runRoot } = resolvePlaywrightRun(__dirname, "landing");
+const endpoint = resolvePlaywrightEndpoint(
+  "PLAYWRIGHT_LANDING_PORT",
+  "PLAYWRIGHT_LANDING_URL",
+  40_000,
+);
 
 export default defineConfig({
   testDir: "./tests/e2e-landing",
@@ -9,9 +16,10 @@ export default defineConfig({
   fullyParallel: true,
   retries: 0,
   workers: 1,
-  reporter: "html",
+  outputDir: path.join(runRoot, "playwright-output"),
+  reporter: [["html", { open: "never", outputFolder: path.join(runRoot, "playwright-report") }]],
   use: {
-    baseURL: `http://localhost:${LANDING_PORT}`,
+    baseURL: endpoint.url,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -22,8 +30,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `cd apps/landing && PLAYWRIGHT=1 pnpm build && pnpm exec astro preview --host 127.0.0.1 --port ${LANDING_PORT}`,
-    port: LANDING_PORT,
+    command: `cd apps/landing && PLAYWRIGHT=1 pnpm build && exec pnpm exec astro preview --host ${endpoint.host} --port ${endpoint.port}`,
+    url: endpoint.url,
     reuseExistingServer: false,
     timeout: 120_000,
   },

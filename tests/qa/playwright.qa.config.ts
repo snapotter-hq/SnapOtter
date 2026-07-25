@@ -1,5 +1,6 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightRun } from "../playwright-run.js";
 
 // QA sweep config: drives the isolated QA Docker container (auth off) with REAL
 // Google Chrome (channel "chrome") so proprietary codecs (H.264/AAC/MP3) decode
@@ -10,6 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const QA_BASE_URL = process.env.QA_BASE_URL || "http://localhost:13499";
 const repoRoot = path.join(__dirname, "..", "..");
+const { runRoot } = resolvePlaywrightRun(repoRoot, "production-qa");
 
 export default defineConfig({
   testDir: ".",
@@ -24,10 +26,10 @@ export default defineConfig({
   workers: process.env.QA_WORKERS ? Number(process.env.QA_WORKERS) : 4,
   reporter: [
     ["list"],
-    ["json", { outputFile: path.join(repoRoot, "docs", "qa", "results.json") }],
-    ["html", { open: "never", outputFolder: path.join(repoRoot, "test-results", "qa-report") }],
+    ["json", { outputFile: path.join(runRoot, "results.json") }],
+    ["html", { open: "never", outputFolder: path.join(runRoot, "playwright-report") }],
   ],
-  outputDir: path.join(repoRoot, "test-results", "qa-artifacts"),
+  outputDir: path.join(runRoot, "playwright-output"),
   use: {
     baseURL: QA_BASE_URL,
     screenshot: "only-on-failure",

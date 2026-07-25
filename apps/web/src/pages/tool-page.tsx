@@ -1373,7 +1373,13 @@ export function ToolPage() {
             {liveMessage}
           </div>
           <div
-            key={hasProcessed ? `processed-${selectedIndex}` : `pending-${selectedIndex}`}
+            key={
+              hasProcessed
+                ? `processed-${selectedIndex}`
+                : displayMode === "interactive-eraser"
+                  ? "pending-eraser"
+                  : `pending-${selectedIndex}`
+            }
             className={`flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0 ${hasProcessed ? "animate-fade-in" : ""}${isProcessing ? " animate-pulse" : ""}`}
           >
             {renderNavArrows()}

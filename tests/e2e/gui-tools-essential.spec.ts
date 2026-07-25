@@ -848,20 +848,44 @@ test.describe("GUI Essential Tools", () => {
   // ROTATE: LIVE PREVIEW VERIFICATION
   // ========================================================================
   test.describe("Rotate Live Preview", () => {
-    // Live preview applies CSS transforms via inline styles on the ImageViewer
-    // <img> element. The exact DOM path and computed style depend on the
-    // ImageViewer rendering branch (bgPreview, imageWrapperStyle, default).
-    // Asserting getComputedStyle().transform on a generic "img" selector is
-    // too fragile since the viewer element may differ across builds.
-    test.skip("rotating 90 degrees applies CSS transform to preview image", async ({
-      loggedInPage: _page,
-    }) => {});
+    test("rotating 90 degrees applies CSS transform to preview image", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/image/rotate");
+      await uploadTestImage(page);
 
-    test.skip("flip horizontal applies CSS transform to preview image", async ({
-      loggedInPage: _page,
-    }) => {});
+      const preview = page.getByRole("img", { name: "test-image.png" });
+      await expect(preview).toBeVisible();
+      await page.getByTestId("rotate-right").click();
 
-    test.skip("reset all changes reverts preview transform", async ({ loggedInPage: _page }) => {});
+      await expect(preview).toHaveAttribute("style", /transform: rotate\(90deg\)/);
+    });
+
+    test("flip horizontal applies CSS transform to preview image", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/image/rotate");
+      await uploadTestImage(page);
+
+      const preview = page.getByRole("img", { name: "test-image.png" });
+      await expect(preview).toBeVisible();
+      await page.getByTestId("rotate-flip-h").click();
+
+      await expect(preview).toHaveAttribute("style", /transform: scaleX\(-1\)/);
+    });
+
+    test("reset all changes reverts preview transform", async ({ loggedInPage: page }) => {
+      await page.goto("/image/rotate");
+      await uploadTestImage(page);
+
+      const preview = page.getByRole("img", { name: "test-image.png" });
+      await expect(preview).toBeVisible();
+      await page.getByTestId("rotate-right").click();
+      await expect(preview).toHaveAttribute("style", /transform: rotate\(90deg\)/);
+
+      await page.getByRole("button", { name: "Reset all changes" }).click();
+      await expect(preview).toHaveCSS("transform", "none");
+    });
   });
 
   // ========================================================================

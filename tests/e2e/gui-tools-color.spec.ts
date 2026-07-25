@@ -625,17 +625,28 @@ test.describe("GUI Color & Adjustment Tools", () => {
   // ADJUST COLORS: LIVE PREVIEW VERIFICATION
   // ========================================================================
   test.describe("Adjust Colors Live Preview", () => {
-    // Live preview applies CSS filter via inline styles on the ImageViewer
-    // <img> element. The exact DOM path and computed style depend on the
-    // ImageViewer rendering branch (bgPreview, imageWrapperStyle, default).
-    // Asserting getComputedStyle().filter on a generic "img" selector is
-    // too fragile since the viewer element may differ across builds.
-    test.skip("changing brightness applies CSS filter to preview image", async ({
-      loggedInPage: _page,
-    }) => {});
+    test("changing brightness applies CSS filter to preview image", async ({
+      loggedInPage: page,
+    }) => {
+      await page.goto("/image/adjust-colors");
+      await uploadTestImage(page);
 
-    test.skip("selecting grayscale effect applies CSS filter", async ({
-      loggedInPage: _page,
-    }) => {});
+      const preview = page.getByRole("img", { name: "test-image.png" });
+      await expect(preview).toBeVisible();
+      await page.locator("#color-slider-brightness").fill("30");
+
+      await expect(preview).toHaveCSS("filter", "brightness(1.3)");
+    });
+
+    test("selecting grayscale effect applies CSS filter", async ({ loggedInPage: page }) => {
+      await page.goto("/image/adjust-colors");
+      await uploadTestImage(page);
+
+      const preview = page.getByRole("img", { name: "test-image.png" });
+      await expect(preview).toBeVisible();
+      await page.getByRole("button", { name: "grayscale" }).click();
+
+      await expect(preview).toHaveCSS("filter", "grayscale(1)");
+    });
   });
 });

@@ -34,18 +34,12 @@ test.describe("QA Fixes Verification", () => {
   test("multi-segment invalid URL shows 404 page", async ({ page }) => {
     await page.goto("/some/deep/nested/invalid/path");
     await page.waitForLoadState("networkidle");
-    // After the fix, should show 404 page. On pre-fix, shows blank.
-    // At minimum, verify the page has some visible content (not completely blank)
-    const has404 = await page
+    const notFound = page
       .locator("text=404")
       .or(page.locator("text=not found"))
       .or(page.locator("text=Page not found"))
-      .first()
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    if (!has404) {
-      test.skip(true, "404 catch-all route not present in this build (pre-fix)");
-    }
+      .first();
+    await expect(notFound).toBeVisible({ timeout: 10_000 });
   });
 
   test("privacy page renders", async ({ page }) => {

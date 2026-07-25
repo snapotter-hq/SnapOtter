@@ -97,14 +97,7 @@ test.describe("Erase Object tool", () => {
     await expect(qualitySlider).not.toBeVisible();
   });
 
-  // FIXME(pre-existing): cross-file stroke persistence is broken. tool-page renders
-  // the image area under `key={`pending-${selectedIndex}`}`, so switching files
-  // REMOUNTS EraserCanvas and wipes its in-component `allStrokesRef` (the per-image
-  // stroke cache the multi-file design relies on): draw on A, switch to B and back,
-  // and A's strokes are gone. The key predates the lasso work; the fix belongs in
-  // tool-page's key logic. Un-fixme once EraserCanvas survives file switches. This
-  // suite previously skipped entirely (feature gate), so it never caught this.
-  test.fixme("strokes persist when switching between files", async ({ loggedInPage: page }) => {
+  test("strokes persist when switching between files", async ({ loggedInPage: page }) => {
     await gotoEraser(page);
 
     // Upload first file
@@ -183,12 +176,7 @@ test.describe("Erase Object tool", () => {
     await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
   });
 
-  // FIXME(pre-existing): needs per-file masks to persist across file switches,
-  // which is broken by the EraserCanvas remount on switch (see the strokes-persist
-  // fixme above). Un-fixme once that's fixed.
-  test.fixme("shows Erase All button when multiple files have masks", async ({
-    loggedInPage: page,
-  }) => {
+  test("shows Erase All button when multiple files have masks", async ({ loggedInPage: page }) => {
     await gotoEraser(page);
 
     // Upload first file

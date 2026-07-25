@@ -1,13 +1,12 @@
-import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
-const SCREENSHOT_DIR = path.join(__dirname, "screenshots");
 let screenshotIndex = 0;
+let screenshotOutputPath: (filename: string) => string;
 
 async function snap(page: Page, name: string) {
   screenshotIndex++;
   const filename = `${String(screenshotIndex).padStart(2, "0")}-${name}.png`;
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, filename) });
+  await page.screenshot({ path: screenshotOutputPath(filename) });
 }
 
 async function login(page: Page) {
@@ -38,8 +37,9 @@ async function getCanvasBox(page: Page) {
 }
 
 test.describe("Image Editor - Full GUI Test Suite", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     screenshotIndex = 0;
+    screenshotOutputPath = (filename) => testInfo.outputPath(filename);
     await login(page);
   });
 

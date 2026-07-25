@@ -1,5 +1,6 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlaywrightRun } from "../playwright-run.js";
 
 // Editor QA config: drives the isolated QA Docker container (auth off).
 // The editor is mostly client-side Konva, so it is light on the container.
@@ -9,6 +10,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const QA_BASE_URL = process.env.QA_BASE_URL || "http://localhost:13499";
 const repoRoot = path.join(__dirname, "..", "..");
+const { runRoot } = resolvePlaywrightRun(repoRoot, "production-editor-qa");
 
 export default defineConfig({
   testDir: ".",
@@ -23,11 +25,12 @@ export default defineConfig({
     [
       "json",
       {
-        outputFile: path.join(repoRoot, "docs", "qa", "editor-results.json"),
+        outputFile: path.join(runRoot, "results.json"),
       },
     ],
+    ["html", { open: "never", outputFolder: path.join(runRoot, "playwright-report") }],
   ],
-  outputDir: path.join(repoRoot, "test-results", "qa-editor-artifacts"),
+  outputDir: path.join(runRoot, "playwright-output"),
   use: {
     baseURL: QA_BASE_URL,
     trace: "retain-on-failure",
