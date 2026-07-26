@@ -71,7 +71,13 @@
   ],
   "incremental": true,
   "incrementalFile": "reports/stryker-api-incremental.json",
-  "reporters": ["clear-text", "progress"],
+  "reporters": ["html", "clear-text", "progress", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation-api/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation-api/mutation.json"
+  },
   "thresholds": {
     "high": 80,
     "low": 60,

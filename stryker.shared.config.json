@@ -57,7 +57,13 @@
   ],
   "incremental": true,
   "incrementalFile": "reports/stryker-shared-incremental.json",
-  "reporters": ["clear-text", "progress"],
+  "reporters": ["html", "clear-text", "progress", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation-shared/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation-shared/mutation.json"
+  },
   "thresholds": {
     "high": 80,
     "low": 60,

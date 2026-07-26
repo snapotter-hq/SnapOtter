@@ -35,11 +35,11 @@ jobs:
           - lane: api
             run: packages/image-engine/node_modules/.bin/stryker run stryker.api.config.json
             incremental: reports/stryker-api-incremental.json
-            report: reports/mutation/
+            report: reports/mutation-api/
           - lane: shared
             run: packages/image-engine/node_modules/.bin/stryker run stryker.shared.config.json
             incremental: reports/stryker-shared-incremental.json
-            report: reports/mutation/
+            report: reports/mutation-shared/
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
