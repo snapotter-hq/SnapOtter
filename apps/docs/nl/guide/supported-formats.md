@@ -11,7 +11,7 @@ SnapOtter verwerkt bestanden over vijf modaliteiten: afbeelding, video, audio, P
 
 ## Afbeeldingsformaten {#image-formats}
 
-SnapOtter ondersteunt 55+ afbeeldingsformaten voor invoer en 13 formaten voor uitvoer.
+SnapOtter ondersteunt 55+ afbeeldingsformaten voor invoer en 17 formaten voor uitvoer.
 
 ## Invoerformaten {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter ondersteunt 55+ afbeeldingsformaten voor invoer en 13 formaten voor ui
 | PAM | .pam | Sharp (native) | Willekeurige map |
 | PFM | .pfm | Sharp (native) | Float-map |
 
-## Uitvoerformaten (13) {#output-formats-13}
+## Uitvoerformaten (17) {#output-formats-13}
 
 | Formaat | Encoder | Kwaliteitsregeling | Beschikbaar in |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter ondersteunt 55+ afbeeldingsformaten voor invoer en 13 formaten voor ui
 | ICO | ImageMagick CLI | Lossless | Convert-tool |
 | JP2 | opj_compress CLI | Compressieverhouding | Convert-tool |
 | QOI | Inline codec | Lossless | Convert-tool |
+| PSD | ImageMagick CLI | Lossless | Convert-tool |
+| PPM | ImageMagick CLI | Lossless | Convert-tool |
+| EPS | ImageMagick CLI | Lossless | Convert-tool |
+| TGA | ImageMagick CLI | Lossless | Convert-tool |
 
 ## Videoformaten {#video-formats}
 

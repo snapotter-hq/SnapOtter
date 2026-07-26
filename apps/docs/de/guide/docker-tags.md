@@ -141,9 +141,9 @@ Für NVIDIA-CUDA-Beschleunigung über Docker Compose fügen Sie den deploy-Absch
 | Tag | Beschreibung |
 |-----|------------|
 | `latest` | Neueste Version |
-| `1.11.0` | Exakte Version |
-| `1.11` | Neuester Patch in 1.11.x |
-| `1` | Neueste Minor-Version in 1.x |
+| `2.1.0` | Exakte Version |
+| `2.1` | Neuester Patch in 2.1.x |
+| `2` | Neueste Minor-Version in 2.x |
 
 ## Plattformen {#platforms}
 

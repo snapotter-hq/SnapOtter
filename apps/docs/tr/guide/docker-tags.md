@@ -141,9 +141,9 @@ Docker Compose aracılığıyla NVIDIA CUDA hızlandırması için, SnapOtter hi
 | Etiket | Açıklama |
 |-----|------------|
 | `latest` | En son sürüm |
-| `1.11.0` | Tam sürüm |
-| `1.11` | 1.11.x içindeki en son yama |
-| `1` | 1.x içindeki en son ara sürüm |
+| `2.1.0` | Tam sürüm |
+| `2.1` | 2.1.x içindeki en son yama |
+| `2` | 2.x içindeki en son ara sürüm |
 
 ## Platformlar {#platforms}
 

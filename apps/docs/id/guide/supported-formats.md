@@ -11,7 +11,7 @@ SnapOtter memproses file di lima modalitas: image, video, audio, PDF, dan files.
 
 ## Format Gambar {#image-formats}
 
-SnapOtter mendukung 55+ format gambar untuk masukan dan 13 format untuk keluaran.
+SnapOtter mendukung 55+ format gambar untuk masukan dan 17 format untuk keluaran.
 
 ## Format Masukan {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter mendukung 55+ format gambar untuk masukan dan 13 format untuk keluaran
 | PAM | .pam | Sharp (native) | Peta arbitrer |
 | PFM | .pfm | Sharp (native) | Peta float |
 
-## Format Keluaran (13) {#output-formats-13}
+## Format Keluaran (17) {#output-formats-13}
 
 | Format | Encoder | Kontrol Kualitas | Tersedia Di |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter mendukung 55+ format gambar untuk masukan dan 13 format untuk keluaran
 | ICO | ImageMagick CLI | Lossless | Alat convert |
 | JP2 | opj_compress CLI | Rasio kompresi | Alat convert |
 | QOI | Codec inline | Lossless | Alat convert |
+| PSD | ImageMagick CLI | Lossless | Alat convert |
+| PPM | ImageMagick CLI | Lossless | Alat convert |
+| EPS | ImageMagick CLI | Lossless | Alat convert |
+| TGA | ImageMagick CLI | Lossless | Alat convert |
 
 ## Format Video {#video-formats}
 

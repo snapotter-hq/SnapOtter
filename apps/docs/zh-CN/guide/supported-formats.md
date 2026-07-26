@@ -11,7 +11,7 @@ SnapOtter 跨五种模态处理文件：图像、视频、音频、PDF 和文件
 
 ## 图像格式 {#image-formats}
 
-SnapOtter 支持 55+ 种图像输入格式和 13 种输出格式。
+SnapOtter 支持 55+ 种图像输入格式和 17 种输出格式。
 
 ## 输入格式 {#input-formats}
 
@@ -121,6 +121,10 @@ SnapOtter 支持 55+ 种图像输入格式和 13 种输出格式。
 | ICO | ImageMagick CLI | 无损 | 转换工具 |
 | JP2 | opj_compress CLI | 压缩比 | 转换工具 |
 | QOI | 内联编解码器 | 无损 | 转换工具 |
+| PSD | ImageMagick CLI | 无损 | 转换工具 |
+| PPM | ImageMagick CLI | 无损 | 转换工具 |
+| EPS | ImageMagick CLI | 无损 | 转换工具 |
+| TGA | ImageMagick CLI | 无损 | 转换工具 |
 
 ## 视频格式 {#video-formats}
 

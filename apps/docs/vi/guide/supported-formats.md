@@ -11,7 +11,7 @@ SnapOtter xử lý tệp trên năm modality: hình ảnh, video, audio, PDF, v�
 
 ## Định dạng hình ảnh {#image-formats}
 
-SnapOtter hỗ trợ hơn 55 định dạng hình ảnh đầu vào và 13 định dạng đầu ra.
+SnapOtter hỗ trợ hơn 55 định dạng hình ảnh đầu vào và 17 định dạng đầu ra.
 
 ## Định dạng đầu vào {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter hỗ trợ hơn 55 định dạng hình ảnh đầu vào và 13 đị
 | PAM | .pam | Sharp (native) | Bản đồ tùy ý |
 | PFM | .pfm | Sharp (native) | Bản đồ số thực |
 
-## Định dạng đầu ra (13) {#output-formats-13}
+## Định dạng đầu ra (17) {#output-formats-13}
 
 | Định dạng | Bộ mã hóa | Kiểm soát chất lượng | Có sẵn trong |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter hỗ trợ hơn 55 định dạng hình ảnh đầu vào và 13 đị
 | ICO | ImageMagick CLI | Không mất dữ liệu | Công cụ chuyển đổi |
 | JP2 | opj_compress CLI | Tỷ lệ nén | Công cụ chuyển đổi |
 | QOI | Codec nội tuyến | Không mất dữ liệu | Công cụ chuyển đổi |
+| PSD | ImageMagick CLI | Không mất dữ liệu | Công cụ chuyển đổi |
+| PPM | ImageMagick CLI | Không mất dữ liệu | Công cụ chuyển đổi |
+| EPS | ImageMagick CLI | Không mất dữ liệu | Công cụ chuyển đổi |
+| TGA | ImageMagick CLI | Không mất dữ liệu | Công cụ chuyển đổi |
 
 ## Định dạng video {#video-formats}
 

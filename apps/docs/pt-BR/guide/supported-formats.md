@@ -11,7 +11,7 @@ O SnapOtter processa arquivos em cinco modalidades: imagem, vídeo, áudio, PDF 
 
 ## Formatos de Imagem {#image-formats}
 
-O SnapOtter suporta mais de 55 formatos de imagem para entrada e 13 formatos para saída.
+O SnapOtter suporta mais de 55 formatos de imagem para entrada e 17 formatos para saída.
 
 ## Formatos de Entrada {#input-formats}
 
@@ -104,7 +104,7 @@ O SnapOtter suporta mais de 55 formatos de imagem para entrada e 13 formatos par
 | PAM | .pam | Sharp (nativo) | Mapa arbitrário |
 | PFM | .pfm | Sharp (nativo) | Mapa de ponto flutuante |
 
-## Formatos de Saída (13) {#output-formats-13}
+## Formatos de Saída (17) {#output-formats-13}
 
 | Formato | Codificador | Controle de Qualidade | Disponível Em |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ O SnapOtter suporta mais de 55 formatos de imagem para entrada e 13 formatos par
 | ICO | CLI ImageMagick | Sem perdas | Ferramenta de conversão |
 | JP2 | CLI opj_compress | Taxa de compressão | Ferramenta de conversão |
 | QOI | Codec inline | Sem perdas | Ferramenta de conversão |
+| PSD | CLI ImageMagick | Sem perdas | Ferramenta de conversão |
+| PPM | CLI ImageMagick | Sem perdas | Ferramenta de conversão |
+| EPS | CLI ImageMagick | Sem perdas | Ferramenta de conversão |
+| TGA | CLI ImageMagick | Sem perdas | Ferramenta de conversão |
 
 ## Formatos de Vídeo {#video-formats}
 

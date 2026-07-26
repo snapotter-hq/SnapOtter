@@ -11,7 +11,7 @@ SnapOtter bearbetar filer över fem modaliteter: bild, video, ljud, PDF och file
 
 ## Bildformat {#image-formats}
 
-SnapOtter stöder 55+ bildformat för inmatning och 13 format för utmatning.
+SnapOtter stöder 55+ bildformat för inmatning och 17 format för utmatning.
 
 ## Inmatningsformat {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter stöder 55+ bildformat för inmatning och 13 format för utmatning.
 | PAM | .pam | Sharp (native) | Godtycklig karta |
 | PFM | .pfm | Sharp (native) | Float-karta |
 
-## Utmatningsformat (13) {#output-formats-13}
+## Utmatningsformat (17) {#output-formats-13}
 
 | Format | Kodare | Kvalitetskontroll | Tillgängligt i |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter stöder 55+ bildformat för inmatning och 13 format för utmatning.
 | ICO | ImageMagick CLI | Förlustfri | Konverteringsverktyg |
 | JP2 | opj_compress CLI | Komprimeringsförhållande | Konverteringsverktyg |
 | QOI | Inbyggd codec | Förlustfri | Konverteringsverktyg |
+| PSD | ImageMagick CLI | Förlustfri | Konverteringsverktyg |
+| PPM | ImageMagick CLI | Förlustfri | Konverteringsverktyg |
+| EPS | ImageMagick CLI | Förlustfri | Konverteringsverktyg |
+| TGA | ImageMagick CLI | Förlustfri | Konverteringsverktyg |
 
 ## Videoformat {#video-formats}
 

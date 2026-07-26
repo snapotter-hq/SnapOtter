@@ -141,9 +141,9 @@ Para la aceleración NVIDIA CUDA mediante Docker Compose, añade la sección dep
 | Etiqueta | Descripción |
 |-----|------------|
 | `latest` | Última versión |
-| `1.11.0` | Versión exacta |
-| `1.11` | Último parche en 1.11.x |
-| `1` | Última versión menor en 1.x |
+| `2.1.0` | Versión exacta |
+| `2.1` | Último parche en 2.1.x |
+| `2` | Última versión menor en 2.x |
 
 ## Plataformas {#platforms}
 

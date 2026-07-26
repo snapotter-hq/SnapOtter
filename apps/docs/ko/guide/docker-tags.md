@@ -141,9 +141,9 @@ Docker Compose를 통한 NVIDIA CUDA 가속을 위해서는 SnapOtter 서비스�
 | Tag | Description |
 |-----|------------|
 | `latest` | 최신 릴리스 |
-| `1.11.0` | 정확한 버전 |
-| `1.11` | 1.11.x의 최신 패치 |
-| `1` | 1.x의 최신 마이너 |
+| `2.1.0` | 정확한 버전 |
+| `2.1` | 2.1.x의 최신 패치 |
+| `2` | 2.x의 최신 마이너 |
 
 ## Platforms {#platforms}
 

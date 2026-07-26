@@ -11,7 +11,7 @@ SnapOtter पाँच modalities में files process करता है: i
 
 ## Image Formats {#image-formats}
 
-SnapOtter input के लिए 55+ image formats और output के लिए 13 formats का समर्थन करता है।
+SnapOtter input के लिए 55+ image formats और output के लिए 17 formats का समर्थन करता है।
 
 ## Input Formats {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter input के लिए 55+ image formats और output के लि�
 | PAM | .pam | Sharp (native) | Arbitrary map |
 | PFM | .pfm | Sharp (native) | Float map |
 
-## Output Formats (13) {#output-formats-13}
+## Output Formats (17) {#output-formats-13}
 
 | Format | Encoder | Quality Control | Available In |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter input के लिए 55+ image formats और output के लि�
 | ICO | ImageMagick CLI | Lossless | Convert tool |
 | JP2 | opj_compress CLI | Compression ratio | Convert tool |
 | QOI | Inline codec | Lossless | Convert tool |
+| PSD | ImageMagick CLI | Lossless | Convert tool |
+| PPM | ImageMagick CLI | Lossless | Convert tool |
+| EPS | ImageMagick CLI | Lossless | Convert tool |
+| TGA | ImageMagick CLI | Lossless | Convert tool |
 
 ## Video Formats {#video-formats}
 

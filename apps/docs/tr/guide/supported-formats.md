@@ -11,7 +11,7 @@ SnapOtter dosyaları beş modalitede işler: görüntü, video, ses, PDF ve dosy
 
 ## Görüntü Formatları {#image-formats}
 
-SnapOtter giriş için 55+ görüntü formatını, çıkış için 13 formatı destekler.
+SnapOtter giriş için 55+ görüntü formatını, çıkış için 17 formatı destekler.
 
 ## Giriş Formatları {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter giriş için 55+ görüntü formatını, çıkış için 13 formatı d
 | PAM | .pam | Sharp (yerel) | Keyfi map |
 | PFM | .pfm | Sharp (yerel) | Float map |
 
-## Çıkış Formatları (13) {#output-formats-13}
+## Çıkış Formatları (17) {#output-formats-13}
 
 | Format | Kodlayıcı | Kalite Kontrolü | Kullanılabildiği Yer |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter giriş için 55+ görüntü formatını, çıkış için 13 formatı d
 | ICO | ImageMagick CLI | Kayıpsız | Dönüştürme aracı |
 | JP2 | opj_compress CLI | Sıkıştırma oranı | Dönüştürme aracı |
 | QOI | Satır içi codec | Kayıpsız | Dönüştürme aracı |
+| PSD | ImageMagick CLI | Kayıpsız | Dönüştürme aracı |
+| PPM | ImageMagick CLI | Kayıpsız | Dönüştürme aracı |
+| EPS | ImageMagick CLI | Kayıpsız | Dönüştürme aracı |
+| TGA | ImageMagick CLI | Kayıpsız | Dönüştürme aracı |
 
 ## Video Formatları {#video-formats}
 

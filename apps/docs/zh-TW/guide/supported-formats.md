@@ -11,7 +11,7 @@ SnapOtter 可處理五種模態的檔案：影像、video、audio、PDF 與檔�
 
 ## 影像格式 {#image-formats}
 
-SnapOtter 支援 55+ 種影像格式的輸入，以及 13 種格式的輸出。
+SnapOtter 支援 55+ 種影像格式的輸入，以及 17 種格式的輸出。
 
 ## 輸入格式 {#input-formats}
 
@@ -121,6 +121,10 @@ SnapOtter 支援 55+ 種影像格式的輸入，以及 13 種格式的輸出。
 | ICO | ImageMagick CLI | 無損 | Convert 工具 |
 | JP2 | opj_compress CLI | 壓縮比 | Convert 工具 |
 | QOI | 內嵌編解碼器 | 無損 | Convert 工具 |
+| PSD | ImageMagick CLI | 無損 | Convert 工具 |
+| PPM | ImageMagick CLI | 無損 | Convert 工具 |
+| EPS | ImageMagick CLI | 無損 | Convert 工具 |
+| TGA | ImageMagick CLI | 無損 | Convert 工具 |
 
 ## Video 格式 {#video-formats}
 

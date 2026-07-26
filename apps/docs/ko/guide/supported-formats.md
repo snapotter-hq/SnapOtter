@@ -11,7 +11,7 @@ SnapOtter는 이미지, 비디오, 오디오, PDF, 파일의 다섯 가지 모�
 
 ## 이미지 형식 {#image-formats}
 
-SnapOtter는 입력에 55개 이상, 출력에 13개 이미지 형식을 지원합니다.
+SnapOtter는 입력에 55개 이상, 출력에 17개 이미지 형식을 지원합니다.
 
 ## 입력 형식 {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtter는 입력에 55개 이상, 출력에 13개 이미지 형식을 지원�
 | PAM | .pam | Sharp (네이티브) | 임의 맵 |
 | PFM | .pfm | Sharp (네이티브) | 부동소수점 맵 |
 
-## 출력 형식 (13) {#output-formats-13}
+## 출력 형식 (17) {#output-formats-13}
 
 | 형식 | 인코더 | 품질 제어 | 사용 가능 위치 |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtter는 입력에 55개 이상, 출력에 13개 이미지 형식을 지원�
 | ICO | ImageMagick CLI | 무손실 | Convert 도구 |
 | JP2 | opj_compress CLI | 압축비 | Convert 도구 |
 | QOI | 인라인 코덱 | 무손실 | Convert 도구 |
+| PSD | ImageMagick CLI | 무손실 | Convert 도구 |
+| PPM | ImageMagick CLI | 무손실 | Convert 도구 |
+| EPS | ImageMagick CLI | 무손실 | Convert 도구 |
+| TGA | ImageMagick CLI | 무손실 | Convert 도구 |
 
 ## 비디오 형식 {#video-formats}
 

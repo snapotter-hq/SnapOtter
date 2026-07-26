@@ -11,7 +11,7 @@ SnapOtterは、画像、ビデオ、オーディオ、PDF、ファイルの5つ�
 
 ## 画像フォーマット {#image-formats}
 
-SnapOtterは入力で55種類以上、出力で13種類の画像フォーマットをサポートします。
+SnapOtterは入力で55種類以上、出力で17種類の画像フォーマットをサポートします。
 
 ## 入力フォーマット {#input-formats}
 
@@ -104,7 +104,7 @@ SnapOtterは入力で55種類以上、出力で13種類の画像フォーマッ�
 | PAM | .pam | Sharp (native) | 任意マップ |
 | PFM | .pfm | Sharp (native) | 浮動小数点マップ |
 
-## 出力フォーマット (13) {#output-formats-13}
+## 出力フォーマット (17) {#output-formats-13}
 
 | フォーマット | エンコーダ | 品質制御 | 利用可能なツール |
 |--------|---------|----------------|-------------|
@@ -121,6 +121,10 @@ SnapOtterは入力で55種類以上、出力で13種類の画像フォーマッ�
 | ICO | ImageMagick CLI | ロスレス | 変換ツール |
 | JP2 | opj_compress CLI | 圧縮率 | 変換ツール |
 | QOI | インラインコーデック | ロスレス | 変換ツール |
+| PSD | ImageMagick CLI | ロスレス | 変換ツール |
+| PPM | ImageMagick CLI | ロスレス | 変換ツール |
+| EPS | ImageMagick CLI | ロスレス | 変換ツール |
+| TGA | ImageMagick CLI | ロスレス | 変換ツール |
 
 ## ビデオフォーマット {#video-formats}
 
