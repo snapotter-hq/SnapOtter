@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ Lỗi khi khởi động nêu tên chính xác UID cần dùng, nên con đườ
 | `AUTH_ENABLED` | `true` | Bật/tắt yêu cầu đăng nhập |
 | `DEFAULT_USERNAME` | `admin` | Tên người dùng quản trị ban đầu |
 | `DEFAULT_PASSWORD` | `admin` | Mật khẩu quản trị ban đầu (buộc đổi ở lần đăng nhập đầu tiên) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Giới hạn tải lên trên mỗi tập tin |
-| `MAX_BATCH_SIZE` | `100` | Số tập tin tối đa mỗi yêu cầu lô |
+| `MAX_UPLOAD_SIZE_MB` | `0` (không giới hạn) | Giới hạn tải lên trên mỗi tập tin tính bằng MB. Image xuất xưởng với `0`; bản dựng từ mã nguồn bắt đầu ở 100 |
+| `MAX_BATCH_SIZE` | `0` (không giới hạn) | Số tập tin tối đa mỗi yêu cầu lô. Image xuất xưởng với `0`; bản dựng từ mã nguồn bắt đầu ở 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu API mỗi phút trên mỗi IP (đặt 0 để tắt) |
 | `MAX_USERS` | `0` (không giới hạn) | Số tài khoản người dùng tối đa |
-| `TRUST_PROXY` | `true` | Tin cậy các header X-Forwarded-For từ reverse proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Mặc định chỉ các mạng riêng |
 | `PUID` | `999` | Chạy dưới danh nghĩa UID này (cho quyền bind mount) |
 | `PGID` | `999` | Chạy dưới danh nghĩa GID này (cho quyền bind mount) |
 | `LOG_LEVEL` | `info` | Mức độ chi tiết của log: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-SnapOtter mặc định đặt `TRUST_PROXY=true` để việc giới hạn tần suất và ghi log sử dụng IP client thực từ các header `X-Forwarded-For`.
+`TRUST_PROXY` mặc định là `loopback,linklocal,uniquelocal`, nên SnapOtter chỉ tin `X-Forwarded-For` khi nó đến từ một peer thuộc mạng riêng. Một reverse proxy trên cùng máy chủ, trên mạng Docker hoặc trong mạng LAN của bạn được tin cậy ngay từ đầu, nghĩa là việc giới hạn tần suất, bộ hạn chế dò mật khẩu khi đăng nhập, nhật ký kiểm toán và danh sách IP được phép của bản enterprise đều thấy IP thật của client mà không cần cấu hình gì.
+
+Chỉ đặt `TRUST_PROXY=true` khi proxy phía trước tiếp cận SnapOtter từ một địa chỉ **công khai**, chẳng hạn một bộ cân bằng tải trên đám mây nằm ở mạng khác. Trên một thực thể phơi ra trực tiếp, giá trị đó khiến `request.ip` nằm trong tay kẻ tấn công, vì người gọi liên tục đổi header sẽ có một bộ đếm giới hạn tần suất mới ở mỗi yêu cầu.
+
+Có hai điều cần biết trước khi bạn bắt tay đo IP của client. Docker Desktop trên macOS và Windows phục vụ cổng đã công bố thông qua một proxy ở không gian người dùng, nó viết lại mọi địa chỉ nguồn thành cổng vào của máy ảo `192.168.65.1`, nên ở đó không giá trị `TRUST_PROXY` nào lấy lại được client thật; hãy triển khai trên Linux với mọi thứ hướng ra internet. Và trên bất kỳ nền tảng nào, việc truy cập cổng đã công bố qua `localhost` được ghi nhận là cổng vào của cầu nối chứ không phải client của bạn, nên một phép thử qua localhost chẳng nói lên điều gì về cách một client thật được quy gán. Bảng đầy đủ các giá trị `TRUST_PROXY` và lưu ý về Docker Desktop nằm trong [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Hai điều quan trọng đối với mọi proxy bên dưới: cho phép nội dung yêu cầu lớn (tải lên) và không đệm phản hồi. Proxy đệm phản hồi sẽ phá vỡ tiến trình SSE và rõ ràng hơn là khiến quá trình tải xuống tệp lớn "bắt đầu nhưng không bao giờ kết thúc", vì proxy giữ toàn bộ tệp trước khi chuyển nó đi. SnapOtter gửi `X-Accel-Buffering: no` khi tải xuống để nginx truyền phát chúng ngay cả khi bộ đệm được để ở nơi khác, nhưng các proxy khác ngoài nginx cần tắt bộ đệm phản hồi một cách rõ ràng (hiển thị trong từng cấu hình bên dưới). Nếu quá trình tải xuống bị đình trệ giữa chừng, proxy đệm ở phía trước là điều đầu tiên cần kiểm tra.
 

@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ El error de arranque nombra el UID exacto que hay que usar, así que la vía má
 | `AUTH_ENABLED` | `true` | Habilita/deshabilita el requisito de inicio de sesión |
 | `DEFAULT_USERNAME` | `admin` | Nombre de usuario inicial del administrador |
 | `DEFAULT_PASSWORD` | `admin` | Contraseña inicial del administrador (cambio forzado en el primer inicio de sesión) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Límite de subida por archivo |
-| `MAX_BATCH_SIZE` | `100` | Máximo de archivos por solicitud de lote |
+| `MAX_UPLOAD_SIZE_MB` | `0` (ilimitado) | Límite de subida por archivo en MB. La imagen viene con `0`; una compilación desde el código fuente arranca en 100 |
+| `MAX_BATCH_SIZE` | `0` (ilimitado) | Máximo de archivos por solicitud de lote. La imagen viene con `0`; una compilación desde el código fuente arranca en 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | Solicitudes de API por minuto por IP (configura 0 para deshabilitar) |
 | `MAX_USERS` | `0` (ilimitado) | Máximo de cuentas de usuario |
-| `TRUST_PROXY` | `true` | Confiar en las cabeceras X-Forwarded-For del proxy inverso |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Qué pares pueden establecer la IP del cliente mediante `X-Forwarded-For`. Solo redes privadas de forma predeterminada |
 | `PUID` | `999` | Ejecutar como este UID (para permisos de montajes de enlace) |
 | `PGID` | `999` | Ejecutar como este GID (para permisos de montajes de enlace) |
 | `LOG_LEVEL` | `info` | Verbosidad del registro: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Proxy inverso {#reverse-proxy}
 
-SnapOtter establece `TRUST_PROXY=true` por defecto para que la limitación de tasa y el registro usen la IP real del cliente de las cabeceras `X-Forwarded-For`.
+`TRUST_PROXY` vale `loopback,linklocal,uniquelocal` de forma predeterminada, así que SnapOtter solo cree la cabecera `X-Forwarded-For` de un par que esté en una red privada. Un proxy inverso en el mismo host, en una red de Docker o en tu LAN es de confianza desde el primer momento, de modo que la limitación de tasa, el limitador de fuerza bruta del inicio de sesión, el registro de auditoría y la lista de IP permitidas de la edición enterprise ven la IP real del cliente sin configurar nada.
+
+Pon `TRUST_PROXY=true` solo cuando el proxy que tienes delante llegue a SnapOtter desde una dirección **pública**, por ejemplo un balanceador de carga en la nube situado en otra red. En una instancia expuesta directamente, ese valor deja `request.ip` en manos del atacante, porque quien va rotando la cabecera consigue un contador de límite de tasa nuevo en cada solicitud.
+
+Dos cosas conviene saber antes de ponerse a medir IP de cliente. Docker Desktop en macOS y Windows sirve un puerto publicado a través de un proxy en espacio de usuario que reescribe todas las direcciones de origen a la puerta de enlace de la VM `192.168.65.1`, así que ahí ningún valor de `TRUST_PROXY` recupera al cliente real; despliega en Linux cualquier cosa expuesta a internet. Y en cualquier plataforma, llegar a un puerto publicado por `localhost` se observa como la puerta de enlace del puente y no como tu cliente, de manera que una prueba en localhost no dice nada sobre cómo se atribuye un cliente real. La tabla completa de valores de `TRUST_PROXY` y la advertencia sobre Docker Desktop están en [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Dos cosas importan para cada proxy a continuación: permitir cuerpos de solicitud (cargas) de gran tamaño y no almacenar en búfer las respuestas. Un proxy de almacenamiento en búfer de respuesta interrumpe el progreso de SSE y, de manera más visible, hace que la descarga de un archivo grande "comience pero nunca termine", porque el proxy retiene el archivo completo antes de pasarlo. SnapOtter envía `X-Accel-Buffering: no` en las descargas para que nginx las transmita incluso si el almacenamiento en búfer se deja activado en otro lugar, pero los servidores proxy distintos de nginx necesitan que el búfer de respuesta esté deshabilitado explícitamente (se muestra en cada configuración a continuación). Si una descarga se detiene parcialmente, lo primero que debe verificar es un proxy de almacenamiento en búfer al frente.
 

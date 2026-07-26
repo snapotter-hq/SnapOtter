@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ De opstartfout noemt de exacte UID die je moet gebruiken, dus de snelste weg is 
 | `AUTH_ENABLED` | `true` | Inlogvereiste in-/uitschakelen |
 | `DEFAULT_USERNAME` | `admin` | Initiële beheerdersgebruikersnaam |
 | `DEFAULT_PASSWORD` | `admin` | Initieel beheerderswachtwoord (wijziging verplicht bij eerste login) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Uploadlimiet per bestand |
-| `MAX_BATCH_SIZE` | `100` | Max. bestanden per batchverzoek |
+| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Uploadlimiet per bestand in MB. De image wordt met `0` geleverd; een build vanaf de broncode begint bij 100 |
+| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Max. bestanden per batchverzoek. De image wordt met `0` geleverd; een build vanaf de broncode begint bij 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | API-verzoeken per minuut per IP (stel 0 in om uit te schakelen) |
 | `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal gebruikersaccounts |
-| `TRUST_PROXY` | `true` | Vertrouw X-Forwarded-For-headers van reverse proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP via `X-Forwarded-For` mogen zetten. Standaard alleen privénetwerken |
 | `PUID` | `999` | Draaien onder deze UID (voor bind-mount-permissies) |
 | `PGID` | `999` | Draaien onder deze GID (voor bind-mount-permissies) |
 | `LOG_LEVEL` | `info` | Logbreedsprakigheid: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse proxy {#reverse-proxy}
 
-SnapOtter stelt `TRUST_PROXY=true` standaard in zodat ratelimiting en logging het echte client-IP uit de `X-Forwarded-For`-headers gebruiken.
+`TRUST_PROXY` staat standaard op `loopback,linklocal,uniquelocal`, dus SnapOtter gelooft `X-Forwarded-For` alleen van een peer in een privénetwerk. Een reverse proxy op dezelfde host, op een Docker-netwerk of in je LAN wordt meteen vertrouwd, waardoor ratelimiting, de brute-force-begrenzer bij het inloggen, het auditlogboek en de enterprise-IP-allowlist allemaal zonder configuratie het echte client-IP zien.
+
+Stel `TRUST_PROXY=true` alleen in wanneer de proxy ervoor SnapOtter bereikt vanaf een **openbaar** adres, bijvoorbeeld een cloudloadbalancer op een ander netwerk. Op een rechtstreeks blootgestelde instantie maakt die waarde `request.ip` stuurbaar voor een aanvaller, want wie de header steeds wisselt, krijgt per verzoek een verse ratelimit-teller.
+
+Twee dingen om te weten voordat je client-IP's gaat meten. Docker Desktop op macOS en Windows bedient een gepubliceerde poort via een userland-proxy die elk bronadres herschrijft naar de VM-gateway `192.168.65.1`; daar haalt geen enkele waarde van `TRUST_PROXY` de echte client terug, dus draai alles wat aan het internet hangt op Linux. En op elk platform wordt een gepubliceerde poort benaderen via `localhost` gezien als de bridge-gateway in plaats van als jouw client, zodat een test op localhost je niets vertelt over hoe een echte client wordt toegekend. De volledige tabel met `TRUST_PROXY`-waarden en het voorbehoud rond Docker Desktop staan in [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Voor elke onderstaande proxy zijn twee dingen van belang: sta grote verzoekinstanties (uploads) toe en buffer geen antwoorden. Een proxy die antwoorden buffert, onderbreekt de SSE-voortgang en, beter zichtbaar, zorgt ervoor dat het downloaden van grote bestanden "start maar nooit eindigt", omdat de proxy het hele bestand vasthoudt voordat het wordt doorgegeven. SnapOtter verzendt `X-Accel-Buffering: no` bij downloads, zodat nginx deze streamt, zelfs als de buffering elders is ingeschakeld, maar voor andere proxy's dan nginx moet de responsbuffering expliciet zijn uitgeschakeld (weergegeven in elke configuratie hieronder). Als een download halverwege vastloopt, is een bufferproxy ervoor het eerste wat u moet controleren.
 

@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ Başlangıç hatası kullanılacak tam UID'yi belirtir, bu nedenle en hızlı yo
 | `AUTH_ENABLED` | `true` | Oturum açma gereksinimini etkinleştir/devre dışı bırak |
 | `DEFAULT_USERNAME` | `admin` | Başlangıç yönetici kullanıcı adı |
 | `DEFAULT_PASSWORD` | `admin` | Başlangıç yönetici parolası (ilk oturum açmada zorunlu değişiklik) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Dosya başına yükleme limiti |
-| `MAX_BATCH_SIZE` | `100` | Grup isteği başına maksimum dosya |
+| `MAX_UPLOAD_SIZE_MB` | `0` (sınırsız) | Dosya başına MB cinsinden yükleme limiti. İmaj `0` ile gelir; kaynaktan yapılan bir derleme 100 ile başlar |
+| `MAX_BATCH_SIZE` | `0` (sınırsız) | Grup isteği başına maksimum dosya. İmaj `0` ile gelir; kaynaktan yapılan bir derleme 100 ile başlar |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP başına dakikada API isteği (devre dışı bırakmak için 0 ayarlayın) |
 | `MAX_USERS` | `0` (sınırsız) | Maksimum kullanıcı hesabı |
-| `TRUST_PROXY` | `true` | Ters proxy'den gelen X-Forwarded-For başlıklarına güven |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Hangi uçların istemci IP'sini `X-Forwarded-For` üzerinden belirleyebileceği. Varsayılan olarak yalnızca özel ağlar |
 | `PUID` | `999` | Bu UID olarak çalıştır (bağlama noktası izinleri için) |
 | `PGID` | `999` | Bu GID olarak çalıştır (bağlama noktası izinleri için) |
 | `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Ters Proxy {#reverse-proxy}
 
-SnapOtter, hız sınırlaması ve günlüğe kaydetmenin `X-Forwarded-For` başlıklarından gerçek istemci IP'sini kullanması için varsayılan olarak `TRUST_PROXY=true` ayarlar.
+`TRUST_PROXY` varsayılan olarak `loopback,linklocal,uniquelocal` değerindedir; bu yüzden SnapOtter `X-Forwarded-For` başlığına yalnızca özel ağdaki bir uçtan geldiğinde inanır. Aynı makinedeki, bir Docker ağındaki ya da LAN'ınızdaki bir ters proxy kutudan çıktığı haliyle güvenilir sayılır; böylece hız sınırlaması, oturum açmadaki kaba kuvvet sınırlayıcısı, denetim günlüğü ve enterprise sürümün IP izin listesi hiçbir yapılandırma olmadan gerçek istemci IP'sini görür.
+
+`TRUST_PROXY=true` değerini yalnızca öndeki proxy SnapOtter'a **herkese açık** bir adresten ulaşıyorsa ayarlayın; örneğin başka bir ağdaki bir bulut yük dengeleyicisi. Doğrudan açığa çıkmış bir örnekte bu değer `request.ip` alanını saldırganın denetimine bırakır, çünkü başlığı sürekli değiştiren biri her istekte taze bir hız sınırı sayacı elde eder.
+
+İstemci IP'lerini ölçmeye girişmeden önce bilinmesi gereken iki şey var. macOS ve Windows üzerindeki Docker Desktop, yayımlanan bir bağlantı noktasını her kaynak adresini `192.168.65.1` sanal makine ağ geçidine yeniden yazan bir kullanıcı alanı proxy'si üzerinden sunar; orada `TRUST_PROXY` değerlerinin hiçbiri gerçek istemciyi geri getirmez, internete açılan her şeyi Linux üzerinde dağıtın. Ayrıca her platformda, yayımlanan bir bağlantı noktasına `localhost` üzerinden erişmek sizin istemciniz yerine köprü ağ geçidi olarak görülür; dolayısıyla localhost testi gerçek bir istemcinin nasıl ilişkilendirildiği hakkında hiçbir şey söylemez. `TRUST_PROXY` değerlerinin tam tablosu ve Docker Desktop uyarısı [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy) içinde yer alır.
 
 Aşağıdaki her proxy için iki şey önemlidir: büyük istek gövdelerine (yüklemeler) izin verin ve yanıtları ara belleğe almayın. Yanıt arabelleğe alan bir proxy, SSE ilerlemesini keser ve daha görünür bir şekilde büyük bir dosya indirme işlemini "başlatır ancak hiçbir zaman bitirmez" çünkü proxy, aktarmadan önce tüm dosyayı tutar. SnapOtter, indirmelerde `X-Accel-Buffering: no`'yi gönderir, böylece ara belleğe alma başka bir yerde bırakılsa bile nginx bunları akışa alır, ancak nginx dışındaki proxy'lerin yanıt arabelleğe almanın açıkça devre dışı bırakılması gerekir (aşağıdaki her yapılandırmada gösterilmiştir). İndirme işlemi yarıda durursa, kontrol edilecek ilk şey öndeki ara belleğe alma proxy'sidir.
 

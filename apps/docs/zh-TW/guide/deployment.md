@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ securityContext:
 | `AUTH_ENABLED` | `true` | 啟用/停用登入需求 |
 | `DEFAULT_USERNAME` | `admin` | 初始管理員使用者名稱 |
 | `DEFAULT_PASSWORD` | `admin` | 初始管理員密碼（首次登入時強制變更） |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 每個檔案的上傳限制 |
-| `MAX_BATCH_SIZE` | `100` | 每個批次請求的最大檔案數 |
+| `MAX_UPLOAD_SIZE_MB` | `0`（無限制） | 每個檔案的上傳限制（MB）。映像檔出廠即為 `0`；從原始碼建置則從 100 起 |
+| `MAX_BATCH_SIZE` | `0`（無限制） | 每個批次請求的最大檔案數。映像檔出廠即為 `0`；從原始碼建置則從 100 起 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 以停用） |
 | `MAX_USERS` | `0`（無限制） | 最大使用者帳號數 |
-| `TRUST_PROXY` | `true` | 信任來自反向代理的 X-Forwarded-For 標頭 |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 允許哪些對端透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私有網路 |
 | `PUID` | `999` | 以此 UID 執行（用於繫結掛載權限） |
 | `PGID` | `999` | 以此 GID 執行（用於繫結掛載權限） |
 | `LOG_LEVEL` | `info` | 記錄詳細程度：fatal、error、warn、info、debug、trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## 反向代理 {#reverse-proxy}
 
-SnapOtter 預設會設定 `TRUST_PROXY=true`，使速率限制與記錄使用來自 `X-Forwarded-For` 標頭的真實用戶端 IP。
+`TRUST_PROXY` 預設為 `loopback,linklocal,uniquelocal`，因此 SnapOtter 只相信來自私有網路對端的 `X-Forwarded-For`。同一主機、Docker 網路或區域網路中的反向代理開箱即受信任，這表示速率限制、登入暴力破解限制、稽核記錄以及 enterprise 版的 IP 允許清單，都不必設定就能看到真實的用戶端 IP。
+
+只有當前置代理從**公開**位址連到 SnapOtter 時才設為 `TRUST_PROXY=true`，例如位於另一個網路的雲端負載平衡器。在直接曝露的執行個體上，這個值會讓 `request.ip` 落入攻擊者手中，因為不斷更換該標頭的呼叫端每次請求都能拿到全新的速率限制計數。
+
+動手量測用戶端 IP 之前，有兩件事要知道。macOS 與 Windows 上的 Docker Desktop 透過使用者空間代理提供已發布的連接埠，會把所有來源位址改寫成虛擬機閘道 `192.168.65.1`，因此在那裡無論 `TRUST_PROXY` 設成什麼都拿不回真實用戶端；面向網際網路的部署請放在 Linux 上。而且在任何平台上，經由 `localhost` 連到已發布的連接埠都會被視為橋接閘道而非你的用戶端，所以 localhost 測試完全說明不了真實用戶端是如何歸屬的。`TRUST_PROXY` 各種取值的完整表格與 Docker Desktop 注意事項請見 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy)。
 
 對於下面的每個代理來說，有兩件事很重要：允許大型請求正文（上傳），並且不緩衝回應。響應緩衝代理會破壞 SSE 進度，更明顯的是，使大文件下載“開始但永遠不會完成”，因為代理在傳遞之前保存整個文件。 SnapOtter 在下載時發送 `X-Accel-Buffering: no`，因此即使在其他地方保留緩衝，nginx 也會對它們進行串流傳輸，但除 nginx 之外的代理需要明確停用回應緩衝（如下面的每個配置所示）。如果下載中途停止，首先要檢查前面的緩衝代理。
 

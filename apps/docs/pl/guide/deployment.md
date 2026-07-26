@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ Błąd przy uruchamianiu nazywa dokładny UID do użycia, więc najszybszą drog
 | `AUTH_ENABLED` | `true` | Włącz/wyłącz wymóg logowania |
 | `DEFAULT_USERNAME` | `admin` | Początkowa nazwa użytkownika administratora |
 | `DEFAULT_PASSWORD` | `admin` | Początkowe hasło administratora (wymuszona zmiana przy pierwszym logowaniu) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Limit przesyłania na plik |
-| `MAX_BATCH_SIZE` | `100` | Maksymalna liczba plików na żądanie wsadowe |
+| `MAX_UPLOAD_SIZE_MB` | `0` (bez limitu) | Limit przesyłania na plik w MB. Obraz dostarczany jest z wartością `0`; kompilacja ze źródeł zaczyna od 100 |
+| `MAX_BATCH_SIZE` | `0` (bez limitu) | Maksymalna liczba plików na żądanie wsadowe. Obraz dostarczany jest z wartością `0`; kompilacja ze źródeł zaczyna od 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | Żądania API na minutę na IP (ustaw 0, aby wyłączyć) |
 | `MAX_USERS` | `0` (bez limitu) | Maksymalna liczba kont użytkowników |
-| `TRUST_PROXY` | `true` | Ufaj nagłówkom X-Forwarded-For z reverse proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Które węzły mogą ustawiać IP klienta przez nagłówek `X-Forwarded-For`. Domyślnie tylko sieci prywatne |
 | `PUID` | `999` | Uruchom jako ten UID (dla uprawnień montowań bind) |
 | `PGID` | `999` | Uruchom jako ten GID (dla uprawnień montowań bind) |
 | `LOG_LEVEL` | `info` | Szczegółowość logów: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-SnapOtter domyślnie ustawia `TRUST_PROXY=true`, aby ograniczanie szybkości i logowanie używały rzeczywistego adresu IP klienta z nagłówków `X-Forwarded-For`.
+`TRUST_PROXY` ma domyślnie wartość `loopback,linklocal,uniquelocal`, więc SnapOtter wierzy nagłówkowi `X-Forwarded-For` tylko wtedy, gdy przychodzi on od węzła z sieci prywatnej. Zwrotne proxy na tym samym hoście, w sieci Dockera albo w twojej sieci LAN jest zaufane od razu, dzięki czemu ograniczanie szybkości, blokada logowania metodą siłową, dziennik audytu i lista dozwolonych adresów IP w edycji enterprise widzą prawdziwy adres IP klienta bez żadnej konfiguracji.
+
+Ustaw `TRUST_PROXY=true` tylko wtedy, gdy stojące z przodu proxy dociera do SnapOttera z **publicznego** adresu, na przykład chmurowy load balancer w innej sieci. Na instancji wystawionej bezpośrednio ta wartość oddaje `request.ip` w ręce atakującego, ponieważ ktoś, kto podmienia nagłówek przy każdym żądaniu, dostaje świeży licznik limitu.
+
+Dwie rzeczy warto wiedzieć, zanim zaczniesz mierzyć adresy IP klientów. Docker Desktop na macOS i Windows obsługuje opublikowany port przez proxy w przestrzeni użytkownika, które przepisuje każdy adres źródłowy na bramę maszyny wirtualnej `192.168.65.1`, więc żadna wartość `TRUST_PROXY` nie odzyska tam prawdziwego klienta; wszystko, co ma być widoczne w internecie, wdrażaj na Linuksie. Na każdej platformie połączenie z opublikowanym portem przez `localhost` jest widziane jako brama mostka, a nie jako twój klient, więc test na localhoście nic nie mówi o tym, jak przypisywany jest prawdziwy klient. Pełna tabela wartości `TRUST_PROXY` oraz zastrzeżenie dotyczące Docker Desktop znajdują się w [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Dla każdego serwera proxy poniżej ważne są dwie rzeczy: zezwalaj na duże treści żądań (przesyłanie) i nie buforuj odpowiedzi. Serwer proxy buforujący odpowiedzi przerywa postęp SSE i, co bardziej widoczne, powoduje, że pobieranie dużego pliku „rozpoczyna się, ale nigdy nie kończy”, ponieważ serwer proxy przechowuje cały plik przed przekazaniem go dalej. SnapOtter wysyła `X-Accel-Buffering: no` podczas pobierania, więc nginx przesyła je strumieniowo, nawet jeśli buforowanie jest włączone gdzie indziej, ale serwery proxy inne niż nginx wymagają jawnego wyłączenia buforowania odpowiedzi (pokazane w każdej konfiguracji poniżej). Jeśli pobieranie zostanie wstrzymane, pierwszą rzeczą do sprawdzenia jest buforujący serwer proxy z przodu.
 

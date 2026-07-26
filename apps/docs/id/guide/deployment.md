@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ Kesalahan startup menyebutkan UID persis yang harus digunakan, jadi jalur tercep
 | `AUTH_ENABLED` | `true` | Aktifkan/nonaktifkan persyaratan login |
 | `DEFAULT_USERNAME` | `admin` | Username admin awal |
 | `DEFAULT_PASSWORD` | `admin` | Kata sandi admin awal (dipaksa ganti saat login pertama) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Batas unggahan per file |
-| `MAX_BATCH_SIZE` | `100` | Maksimum file per permintaan batch |
+| `MAX_UPLOAD_SIZE_MB` | `0` (tak terbatas) | Batas unggahan per file dalam MB. Image dikirim dengan `0`; build dari kode sumber mulai dari 100 |
+| `MAX_BATCH_SIZE` | `0` (tak terbatas) | Maksimum file per permintaan batch. Image dikirim dengan `0`; build dari kode sumber mulai dari 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | Permintaan API per menit per IP (atur 0 untuk menonaktifkan) |
 | `MAX_USERS` | `0` (tak terbatas) | Maksimum akun pengguna |
-| `TRUST_PROXY` | `true` | Percayai header X-Forwarded-For dari reverse proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien lewat `X-Forwarded-For`. Hanya jaringan privat secara default |
 | `PUID` | `999` | Jalankan sebagai UID ini (untuk izin bind mount) |
 | `PGID` | `999` | Jalankan sebagai GID ini (untuk izin bind mount) |
 | `LOG_LEVEL` | `info` | Verbositas log: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-SnapOtter mengatur `TRUST_PROXY=true` secara default sehingga pembatasan laju dan logging menggunakan IP klien sebenarnya dari header `X-Forwarded-For`.
+`TRUST_PROXY` secara default bernilai `loopback,linklocal,uniquelocal`, jadi SnapOtter hanya memercayai `X-Forwarded-For` dari peer di jaringan privat. Reverse proxy di host yang sama, di jaringan Docker, atau di LAN Anda langsung dipercaya, sehingga pembatasan laju, pembatas brute force pada login, log audit, dan daftar IP yang diizinkan di edisi enterprise semuanya melihat IP klien yang sebenarnya tanpa konfigurasi apa pun.
+
+Setel `TRUST_PROXY=true` hanya jika proxy di depan menjangkau SnapOtter dari alamat **publik**, misalnya load balancer cloud di jaringan lain. Pada instance yang terekspos langsung, nilai itu membuat `request.ip` dikendalikan penyerang, karena pemanggil yang terus mengganti header mendapat penghitung batas laju baru di setiap permintaan.
+
+Ada dua hal yang perlu diketahui sebelum Anda mulai mengukur IP klien. Docker Desktop di macOS dan Windows menyajikan port yang dipublikasikan lewat proxy di ruang pengguna yang menulis ulang setiap alamat sumber menjadi gateway VM `192.168.65.1`, jadi di sana tidak ada nilai `TRUST_PROXY` yang bisa mengembalikan klien aslinya; terapkan di Linux untuk apa pun yang menghadap internet. Dan di platform mana pun, mencapai port yang dipublikasikan lewat `localhost` terlihat sebagai gateway bridge, bukan sebagai klien Anda, sehingga uji coba lewat localhost tidak memberi tahu apa pun tentang cara klien sungguhan diatribusikan. Tabel lengkap nilai `TRUST_PROXY` dan catatan tentang Docker Desktop ada di [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Ada dua hal yang penting untuk setiap proxy di bawah ini: izinkan badan permintaan yang besar (unggahan), dan jangan melakukan buffering terhadap tanggapan. Proksi buffering respons menghentikan kemajuan SSE dan, yang lebih terlihat, membuat pengunduhan file besar "mulai tetapi tidak pernah selesai", karena proksi menyimpan seluruh file sebelum meneruskannya. SnapOtter mengirimkan `X-Accel-Buffering: no` pada unduhan sehingga nginx mengalirkannya meskipun buffering dibiarkan di tempat lain, namun proxy selain nginx memerlukan buffering respons yang dinonaktifkan secara eksplisit (ditunjukkan pada setiap konfigurasi di bawah). Jika pengunduhan terhenti di tengah jalan, proxy buffering di depan adalah hal pertama yang harus diperiksa.
 

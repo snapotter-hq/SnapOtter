@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ securityContext:
 | `AUTH_ENABLED` | `true` | 로그인 요구 활성화/비활성화 |
 | `DEFAULT_USERNAME` | `admin` | 초기 관리자 사용자 이름 |
 | `DEFAULT_PASSWORD` | `admin` | 초기 관리자 비밀번호 (첫 로그인 시 강제 변경) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 파일당 업로드 제한 |
-| `MAX_BATCH_SIZE` | `100` | 배치 요청당 최대 파일 수 |
+| `MAX_UPLOAD_SIZE_MB` | `0` (무제한) | 파일당 업로드 제한(MB). 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다 |
+| `MAX_BATCH_SIZE` | `0` (무제한) | 배치 요청당 최대 파일 수. 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다 |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 API 요청 수 (0으로 설정 시 비활성화) |
 | `MAX_USERS` | `0` (무제한) | 최대 사용자 계정 수 |
-| `TRUST_PROXY` | `true` | 리버스 프록시의 X-Forwarded-For 헤더 신뢰 |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어. 기본값은 사설 네트워크만 |
 | `PUID` | `999` | 이 UID로 실행 (바인드 마운트 권한용) |
 | `PGID` | `999` | 이 GID로 실행 (바인드 마운트 권한용) |
 | `LOG_LEVEL` | `info` | 로그 상세도: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## 리버스 프록시 {#reverse-proxy}
 
-SnapOtter는 속도 제한과 로깅이 `X-Forwarded-For` 헤더에서 실제 클라이언트 IP를 사용하도록 기본적으로 `TRUST_PROXY=true`를 설정한다.
+`TRUST_PROXY`의 기본값은 `loopback,linklocal,uniquelocal`이므로 SnapOtter는 사설 네트워크의 피어가 보낸 `X-Forwarded-For`만 믿습니다. 같은 호스트, Docker 네트워크, 또는 LAN에 있는 리버스 프록시는 기본적으로 신뢰되며, 그래서 속도 제한, 로그인 무차별 대입 차단, 감사 로그, enterprise 판의 IP 허용 목록이 모두 설정 없이 실제 클라이언트 IP를 봅니다.
+
+앞단의 프록시가 **공개** 주소에서 SnapOtter에 접근할 때만, 예를 들어 다른 네트워크에 있는 클라우드 로드 밸런서일 때만 `TRUST_PROXY=true`로 설정하세요. 직접 노출된 인스턴스에서 이 값은 `request.ip`를 공격자가 좌우하게 만듭니다. 헤더를 계속 바꿔 보내는 호출자는 요청마다 새 속도 제한 버킷을 받기 때문입니다.
+
+클라이언트 IP를 재보기 전에 알아 둘 것이 두 가지 있습니다. macOS와 Windows의 Docker Desktop은 게시된 포트를 사용자 공간 프록시로 제공하면서 모든 출발지 주소를 VM 게이트웨이 `192.168.65.1`로 다시 씁니다. 그곳에서는 `TRUST_PROXY`를 어떤 값으로 두어도 실제 클라이언트를 되살릴 수 없으니, 인터넷에 노출되는 것은 Linux에 배포하세요. 그리고 어느 플랫폼에서든 게시된 포트에 `localhost`로 접속하면 여러분의 클라이언트가 아니라 브리지 게이트웨이로 관측되므로, localhost 테스트는 실제 클라이언트가 어떻게 귀속되는지 아무것도 알려 주지 않습니다. `TRUST_PROXY` 값의 전체 표와 Docker Desktop 관련 주의 사항은 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy)에 있습니다.
 
 아래의 모든 프록시에 대해 두 가지 중요한 사항은 대규모 요청 본문(업로드)을 허용하고 응답을 버퍼링하지 않는다는 것입니다. 응답 버퍼링 프록시는 SSE 진행을 중단시키고 보다 가시적으로는 대용량 파일 다운로드를 "시작하지만 완료되지 않음"으로 만듭니다. 왜냐하면 프록시가 파일을 전달하기 전에 전체 파일을 보유하기 때문입니다. SnapOtter는 다운로드 시 `X-Accel-Buffering: no`를 전송하므로 nginx는 버퍼링이 다른 곳에 남아 있어도 스트리밍하지만 nginx 이외의 프록시는 응답 버퍼링을 명시적으로 비활성화해야 합니다(아래 각 구성에 표시됨). 다운로드가 도중에 중단되는 경우 가장 먼저 확인해야 할 것은 앞에 있는 버퍼링 프록시입니다.
 

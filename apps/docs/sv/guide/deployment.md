@@ -48,7 +48,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -441,11 +441,11 @@ Startfelet namnger det exakta UID:t som ska användas, så den snabbaste vägen 
 | `AUTH_ENABLED` | `true` | Aktivera/inaktivera inloggningskrav |
 | `DEFAULT_USERNAME` | `admin` | Ursprungligt administratörsanvändarnamn |
 | `DEFAULT_PASSWORD` | `admin` | Ursprungligt administratörslösenord (tvingad ändring vid första inloggningen) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Uppladdningsgräns per fil |
-| `MAX_BATCH_SIZE` | `100` | Max antal filer per batchförfrågan |
+| `MAX_UPLOAD_SIZE_MB` | `0` (obegränsat) | Uppladdningsgräns per fil i MB. Avbilden levereras med `0`; ett bygge från källkoden börjar på 100 |
+| `MAX_BATCH_SIZE` | `0` (obegränsat) | Max antal filer per batchförfrågan. Avbilden levereras med `0`; ett bygge från källkoden börjar på 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | API-förfrågningar per minut per IP (ange 0 för att inaktivera) |
 | `MAX_USERS` | `0` (obegränsat) | Maximalt antal användarkonton |
-| `TRUST_PROXY` | `true` | Lita på X-Forwarded-For-huvuden från omvänd proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka motparter som får sätta klientens IP via `X-Forwarded-For`. Endast privata nät som standard |
 | `PUID` | `999` | Kör som detta UID (för bind-monteringsbehörigheter) |
 | `PGID` | `999` | Kör som detta GID (för bind-monteringsbehörigheter) |
 | `LOG_LEVEL` | `info` | Loggutförlighet: fatal, error, warn, info, debug, trace |
@@ -488,7 +488,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Omvänd proxy {#reverse-proxy}
 
-SnapOtter anger `TRUST_PROXY=true` som standard så att hastighetsbegränsning och loggning använder den verkliga klient-IP:n från `X-Forwarded-For`-huvuden.
+`TRUST_PROXY` är som standard `loopback,linklocal,uniquelocal`, så SnapOtter tror på `X-Forwarded-For` bara från en motpart i ett privat nät. En omvänd proxy på samma värd, på ett Docker-nätverk eller i ditt LAN är betrodd direkt, vilket gör att hastighetsbegränsningen, brute force-spärren vid inloggning, granskningsloggen och enterprise-utgåvans IP-tillåtlista alla ser den verkliga klient-IP:n utan någon konfiguration.
+
+Sätt `TRUST_PROXY=true` bara när proxyn framför når SnapOtter från en **publik** adress, till exempel en molnlastbalanserare i ett annat nät. På en direkt exponerad instans gör det värdet `request.ip` styrbart av en angripare, eftersom den som roterar huvudet får en ny hink för hastighetsbegränsning vid varje förfrågan.
+
+Två saker är värda att veta innan du börjar mäta klient-IP:n. Docker Desktop på macOS och Windows betjänar en publicerad port via en proxy i användarrymden som skriver om varje källadress till VM-gatewayen `192.168.65.1`, så där återfår inget värde på `TRUST_PROXY` den verkliga klienten; kör allt som vetter mot internet på Linux. Och på alla plattformar ses en publicerad port som nås över `localhost` som bryggans gateway i stället för som din klient, så ett test mot localhost säger ingenting om hur en verklig klient tillskrivs. Hela tabellen över `TRUST_PROXY`-värden och förbehållet om Docker Desktop finns i [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Två saker spelar roll för varje proxy nedan: tillåt stora begäranden (uppladdningar) och buffra inte svar. En svarsbuffrande proxy bryter SSE-förloppet och, mer synligt, gör att en stor filnedladdning "startar men slutar aldrig", eftersom proxyn håller hela filen innan den skickas vidare. SnapOtter skickar `X-Accel-Buffering: no` vid nedladdningar så nginx streamar dem även om buffring lämnas på någon annanstans, men andra proxyservrar än nginx behöver explicit inaktivera svarsbuffring (visas i varje konfiguration nedan). Om en nedladdning stannar halvvägs är en buffrande proxy framför det första att kontrollera.
 
