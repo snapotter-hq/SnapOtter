@@ -14,11 +14,12 @@
 //
 // QA_EXPECT=gated inverts the assertion: every tool must be REFUSED because its
 // bundle is not installed. That is how the uninstall/reset path is proven.
-import { readFile } from "node:fs/promises";
+
 import { appendFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { apiToolPath } from "../../packages/shared/src/constants.js";
 import { FEATURE_BUNDLES, getRequiredBundlesForTool } from "../../packages/shared/src/features.js";
 import { buildCenteredRectMask, meanAbsoluteDifference } from "../helpers/ai-fixture-builders.js";
-import { apiToolPath } from "../../packages/shared/src/constants.js";
 import {
   expectAnimatedFrames,
   expectBackgroundBlurEnergyReduced,
@@ -26,7 +27,6 @@ import {
   expectCanvasExpanded,
   expectColorAdded,
   expectConfiguredBackground,
-  expectCropped,
   expectForegroundPreserved,
   expectHighFrequencyEnergyReduced,
   expectJapaneseScript,
@@ -53,6 +53,21 @@ const REQUEST_TIMEOUT_MS = Number(process.env.QA_REQUEST_TIMEOUT_MS ?? 180_000);
 if (!BASE || !PASSWORD) throw new Error("QA_BASE_URL and QA_PASSWORD are required");
 
 const FIXTURES = "tests/fixtures";
+
+/** Terminal or intermediate frame on the job SSE stream. */
+interface ProgressFrame {
+  error?: string;
+  jobId?: string;
+  phase?: string;
+  result?: { downloadUrl?: string; processedSize?: number };
+  type?: string;
+}
+
+/** The body of a 200 or 202 tool submission. */
+interface AcceptedPayload {
+  downloadUrl?: string;
+  jobId?: string;
+}
 
 interface ToolCase {
   /**
@@ -87,16 +102,7 @@ const SPEECH_WAV = `${FIXTURES}/audio/valid/speech-10s.wav`;
 const SPEECH_MP4 = `${FIXTURES}/video/valid/speech-10s.mp4`;
 
 /** The English OCR fixture's known answer, checked word by word. */
-const OCR_ENGLISH_TERMS = [
-  "the",
-  "quick",
-  "brown",
-  "fox",
-  "jumps",
-  "over",
-  "lazy",
-  "dog",
-] as const;
+const OCR_ENGLISH_TERMS = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"] as const;
 
 const CASES: ToolCase[] = [
   {
@@ -170,11 +176,14 @@ const CASES: ToolCase[] = [
         "image/jpeg",
         {},
       );
-      if (status !== 200) throw new Error(`passport-photo analyze HTTP ${status}: ${body.slice(0, 300)}`);
-      const payload = JSON.parse(body) as Record<string, any>;
-      const landmarks = payload.landmarks;
+      if (status !== 200)
+        throw new Error(`passport-photo analyze HTTP ${status}: ${body.slice(0, 300)}`);
+      const payload = JSON.parse(body) as Record<string, unknown>;
+      const landmarks = payload.landmarks as Record<string, unknown> | undefined;
       if (!landmarks || Object.keys(landmarks).length < 4) {
-        throw new Error(`passport-photo analyze returned ${Object.keys(landmarks ?? {}).length} landmark groups`);
+        throw new Error(
+          `passport-photo analyze returned ${Object.keys(landmarks ?? {}).length} landmark groups`,
+        );
       }
       if (typeof payload.preview !== "string" || payload.preview.length < 1000) {
         throw new Error("passport-photo analyze returned no usable preview");
@@ -247,11 +256,15 @@ const CASES: ToolCase[] = [
       const trim = await run({ mode: "trim", width: 256, height: 256, padding: 10 });
       const stats = await expectNonDegenerateImage(face);
       if (stats.width !== 256 || stats.height !== 256) {
-        throw new Error(`smart-crop returned ${stats.width}x${stats.height}, not the requested 256x256`);
+        throw new Error(
+          `smart-crop returned ${stats.width}x${stats.height}, not the requested 256x256`,
+        );
       }
       const delta = await meanAbsoluteDifference(face, trim);
       if (!(delta > 2)) {
-        throw new Error(`face-guided and geometry-only crops are near identical (mean abs diff ${delta.toFixed(3)})`);
+        throw new Error(
+          `face-guided and geometry-only crops are near identical (mean abs diff ${delta.toFixed(3)})`,
+        );
       }
     },
   },
@@ -478,7 +491,7 @@ async function readTerminal(
       for (const raw of lines) {
         const line = raw.trim();
         if (!line.startsWith("data:")) continue;
-        const frame = JSON.parse(line.slice(5).trim()) as Record<string, any>;
+        const frame = JSON.parse(line.slice(5).trim()) as ProgressFrame;
         if (frame.type === "heartbeat") continue;
         if (frame.phase === "failed") throw new Error(`job failed: ${frame.error ?? "unknown"}`);
         if (frame.phase === "complete") {
@@ -515,7 +528,15 @@ export type PostFn = (
   discreteFields?: boolean,
 ) => Promise<{ body: string; status: number }>;
 
-const post: PostFn = async (path, file, filename, contentType, settings, extras, discreteFields) => {
+const post: PostFn = async (
+  path,
+  file,
+  filename,
+  contentType,
+  settings,
+  extras,
+  discreteFields,
+) => {
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(file)], { type: contentType }), filename);
   for (const extra of extras ?? []) {
@@ -545,16 +566,13 @@ const post: PostFn = async (path, file, filename, contentType, settings, extras,
 };
 
 /** Resolve a 200 or 202 submission into the artifact bytes. */
-async function downloadArtifact(
-  accepted: Record<string, any>,
-  status: number,
-): Promise<Buffer> {
+async function downloadArtifact(accepted: AcceptedPayload, status: number): Promise<Buffer> {
   const { bytes } = await downloadArtifactWithMime(accepted, status);
   return bytes;
 }
 
 async function downloadArtifactWithMime(
-  accepted: Record<string, any>,
+  accepted: AcceptedPayload,
   status: number,
 ): Promise<{ bytes: Buffer; mime: string }> {
   let downloadUrl: string;
@@ -602,7 +620,8 @@ async function runCase(token: string, spec: ToolCase): Promise<void> {
       status: gated ? "pass" : "fail",
       durationS: Number(((Date.now() - started) / 1000).toFixed(1)),
     });
-    if (!gated) throw new Error(`${spec.toolId} was NOT gated: HTTP ${status} ${body.slice(0, 200)}`);
+    if (!gated)
+      throw new Error(`${spec.toolId} was NOT gated: HTTP ${status} ${body.slice(0, 200)}`);
     return;
   }
 
@@ -669,7 +688,9 @@ async function main(): Promise<void> {
   for (const id of installed) installedBundleIds.add(id);
 
   const requested = process.env.QA_BUNDLES
-    ? process.env.QA_BUNDLES.split(",").map((s) => s.trim()).filter(Boolean)
+    ? process.env.QA_BUNDLES.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
     : EXPECT === "gated"
       ? Object.keys(FEATURE_BUNDLES)
       : [...installed];
@@ -713,7 +734,14 @@ async function main(): Promise<void> {
     );
   }
 
-  record({ cell: "plan", expect: EXPECT, requestedBundles: requested, installedBundles: [...installed], toolCount: runnable.length, skipped });
+  record({
+    cell: "plan",
+    expect: EXPECT,
+    requestedBundles: requested,
+    installedBundles: [...installed],
+    toolCount: runnable.length,
+    skipped,
+  });
 
   let failures = 0;
   for (const spec of runnable) {

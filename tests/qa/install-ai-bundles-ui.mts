@@ -21,7 +21,8 @@ const USERNAME = process.env.QA_USERNAME || "admin";
 const PASSWORD = process.env.QA_PASSWORD || "admin";
 // QA_SHOT_DIR lets a campaign lane file the screenshots straight into its own
 // evidence directory instead of the default scratch path.
-const SHOT_DIR = process.env.QA_SHOT_DIR || path.join("tests", "e2e", "screenshots", "qa", "ai-install");
+const SHOT_DIR =
+  process.env.QA_SHOT_DIR || path.join("tests", "e2e", "screenshots", "qa", "ai-install");
 // Chrome is not installed on every runner; fall back to the bundled Chromium.
 const BROWSER_CHANNEL = process.env.QA_BROWSER_CHANNEL || "chrome";
 fs.mkdirSync(SHOT_DIR, { recursive: true });
