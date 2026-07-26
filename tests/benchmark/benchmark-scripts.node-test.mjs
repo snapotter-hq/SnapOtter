@@ -100,6 +100,44 @@ test("resource-limit benchmarks own labeled containers on dynamic loopback ports
   assert.match(cleanup, /docker rm -f/);
 });
 
+test("container memory readings are normalised to MiB whatever unit Docker prints", () => {
+  const metrics = new URL("lib/metrics.sh", import.meta.url).pathname;
+  const probe = `
+    set -eu
+    source "$1"
+    docker() { printf '%s\\n' "$FAKE_STATS"; }
+    FAKE_STATS='1.68GiB / 6GiB'
+    test "$(docker_mem_mb any)" = "1720.32"
+    FAKE_STATS='512MiB / 6GiB'
+    test "$(docker_mem_mb any)" = "512.00"
+    FAKE_STATS='980KiB / 6GiB'
+    test "$(docker_mem_mb any)" = "0.96"
+    FAKE_STATS=''
+    test "$(docker_mem_mb any)" = "0"
+    test "$(docker_mem_mb "")" = "0"
+  `;
+
+  execFileSync("bash", ["-c", probe, "probe", metrics]);
+});
+
+test("the resource-limit sweep never submits a request it knows will be rejected", () => {
+  const source = readFileSync(new URL("bench-limits.sh", import.meta.url), "utf8");
+
+  // A multi-file tool called with no files always 400s, which pinned
+  // BENCHMARK_FAILURES above zero and made the sweep unable to ever exit 0.
+  assert.doesNotMatch(source, /run_bench[^\n]+"NONE"/);
+});
+
+test("benchmarked operations assert the property their settings asked for", () => {
+  const bench = readFileSync(new URL("bench.sh", import.meta.url), "utf8");
+  const limits = readFileSync(new URL("bench-limits.sh", import.meta.url), "utf8");
+
+  assert.match(bench, /'\{"width":800,"fit":"cover"\}' '\{"width":800\}'/);
+  assert.match(bench, /'\{"zipEach":\{"width":800\}\}'/);
+  assert.match(bench, /'\{"pages":3\}'/);
+  assert.match(limits, /'\{"width":800\}'/);
+});
+
 test("benchmark results are run-scoped and never overwrite an existing JSONL file", () => {
   for (const script of SCRIPTS) {
     const source = readFileSync(new URL(script, import.meta.url), "utf8");

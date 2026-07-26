@@ -11,7 +11,7 @@ BENCH_EXPECTED_ROWS=0
 resolve_benchmark_response() {
   local base_url="$1" token="$2" status="$3" mime="$4" body_file="$5" output_file="$6"
   local admission_latency="$7" timeout_ms="${8:-$BENCH_JOB_TIMEOUT_MS}"
-  local expected_mime="${9:-}" expected_zip_entries="${10:-}"
+  local expected_mime="${9:-}" expected_zip_entries="${10:-}" oracle="${11:-}"
   local resolution rc
   local resolver_args=(
     --base-url "$base_url"
@@ -28,6 +28,9 @@ resolve_benchmark_response() {
   fi
   if [ -n "$expected_zip_entries" ]; then
     resolver_args+=(--expected-zip-entries "$expected_zip_entries")
+  fi
+  if [ -n "$oracle" ]; then
+    resolver_args+=(--oracle "$oracle")
   fi
 
   if resolution=$(node "$JOB_AWARE_NODE" "${resolver_args[@]}"); then

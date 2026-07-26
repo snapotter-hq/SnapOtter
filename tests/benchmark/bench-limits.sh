@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/job-aware.sh"
+source "${SCRIPT_DIR}/lib/metrics.sh"
 
 SYSTEM="${1:?Usage: bench-limits.sh <system-name> <fixture-dir> <docker-image>}"
 FIXTURE_DIR="${2:?}"
@@ -108,7 +109,7 @@ start_container() {
 }
 
 run_bench() {
-  local cpus="$1" memory="$2" tool="$3" variant="$4" file="$5" settings="${6:-}"
+  local cpus="$1" memory="$2" tool="$3" variant="$4" file="$5" settings="${6:-}" oracle="${7:-}"
   local admission_file artifact_file time_s http_code response_mime pass output_size mem_after
 
   admission_file=$(mktemp)
@@ -131,12 +132,12 @@ run_bench() {
 
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" 120000 || true
+    "$admission_file" "$artifact_file" "$time_s" 120000 "" "" "$oracle" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
 
-  mem_after=$(docker stats "$CONTAINER_NAME" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}' || echo "0")
+  mem_after=$(docker_mem_mb "$CONTAINER_NAME")
 
   printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"%s","variant":"%s","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
     "$SYSTEM" "$cpus" "$memory" "$tool" "$variant" "$time_s" "$pass" "$output_size" "$mem_after" "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME" >> "$RESULTS_FILE"
@@ -166,12 +167,13 @@ run_batch_bench() {
 
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" 180000 "application/zip" "$count" || true
+    "$admission_file" "$artifact_file" "$time_s" 180000 "application/zip" "$count" \
+    '{"zipEach":{"width":100}}' || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
 
-  mem_after=$(docker stats "$CONTAINER_NAME" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}' || echo "0")
+  mem_after=$(docker_mem_mb "$CONTAINER_NAME")
 
   printf '{"system":"%s","tier":"resource-limit","cpus":"%s","memory":"%s","tool":"batch-resize","variant":"b%d","time_s":%s,"pass":%s,"output_size":%s,"mem_mb":%s,"admission_status":%s,"completion_status":"%s","completion_latency_s":%s,"output_mime":"%s"}\n' \
     "$SYSTEM" "$cpus" "$memory" "$count" "$time_s" "$pass" "$output_size" "$mem_after" "$BENCH_ADMISSION_STATUS" "$BENCH_COMPLETION_STATUS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_OUTPUT_MIME" >> "$RESULTS_FILE"
@@ -203,14 +205,13 @@ for config in "${configs[@]}"; do
   if start_container "$cpus" "$memory"; then
     sleep 2
 
-    run_bench "$cpus" "$memory" "image/resize" "large" "$L" '{"width":800,"fit":"cover"}'
-    run_bench "$cpus" "$memory" "image/compress" "targetSize" "$L" '{"mode":"targetSize","targetSizeKb":500}'
+    run_bench "$cpus" "$memory" "image/resize" "large" "$L" '{"width":800,"fit":"cover"}' \
+      '{"width":800}'
+    run_bench "$cpus" "$memory" "image/compress" "targetSize" "$L" '{"mode":"targetSize","targetSizeKb":500}' \
+      '{"maxBytes":512000}'
     run_bench "$cpus" "$memory" "image/convert" "avif" "$L" '{"format":"avif","quality":50}'
 
     run_batch_bench "$cpus" "$memory" 5
-
-    run_bench "$cpus" "$memory" "image/collage" "4img" "NONE" '' \
-      || log "Collage test skipped (needs multi-file support)"
 
     cleanup
   else

@@ -1,0 +1,138 @@
+# Isolated stack for the non-functional performance, load and recovery lane.
+#
+# It mirrors the *shipped* `docker/docker-compose.yml` resource envelope on
+# purpose: mem_limit 6g / cpus 4 / pids_limit 512 on the app, 1g/2cpu on
+# Postgres and Redis. The whole point of this lane is to find out whether the
+# shipped 6 GB app ceiling survives concurrent load, so the ceiling has to be
+# real. Only three things deviate from the shipped file, each deliberate:
+#
+#   1. RATE_LIMIT_PER_MIN is lifted. The shipped 1000/min would throttle a
+#      20-client tier and the resulting number would measure the limiter, not
+#      the processing engine.
+#   2. PROCESSING_TIMEOUT_S is pinned to a finite 600 so a wedged job fails
+#      loudly instead of hanging the harness.
+#   3. Names, ports and volumes are prefixed so this stack can never collide
+#      with an operator install or another QA lane on the same host.
+#
+# PERF_IMAGE must be an image reference that already resolves locally; the
+# harness proves the running container's image ID before it records anything.
+#
+#   PERF_IMAGE=snapotter-qa-f4c2bde9:arm64-20260726 \
+#     docker compose -p snapotter-qa-perf -f tests/benchmark/perf-stack.compose.yml up -d
+name: ${PERF_PROJECT:-snapotter-qa-perf}
+
+services:
+  app:
+    image: ${PERF_IMAGE:?PERF_IMAGE must name the image under test}
+    container_name: ${PERF_PROJECT:-snapotter-qa-perf}-app
+    ports:
+      - "127.0.0.1:${PERF_APP_PORT:-13496}:1349"
+    volumes:
+      - perf-data:/data
+      - perf-workspace:/tmp/workspace
+    environment:
+      - AUTH_ENABLED=true
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=${PERF_ADMIN_PASSWORD:?PERF_ADMIN_PASSWORD must be set}
+      - SKIP_MUST_CHANGE_PASSWORD=true
+      - RATE_LIMIT_PER_MIN=${PERF_RATE_LIMIT:-100000}
+      - PROCESSING_TIMEOUT_S=600
+      - MAX_UPLOAD_SIZE_MB=0
+      - MAX_BATCH_SIZE=0
+      - MAX_MEGAPIXELS=0
+      - CONCURRENT_JOBS=0
+      - MAX_WORKER_THREADS=0
+      - MAX_PIPELINE_STEPS=50
+      - ANALYTICS_ENABLED=false
+      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      - REDIS_URL=redis://:snapotter@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Shipped envelope, verbatim.
+    mem_limit: ${PERF_APP_MEM:-6g}
+    memswap_limit: ${PERF_APP_MEM:-6g}
+    cpus: ${PERF_APP_CPUS:-4}
+    pids_limit: 512
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+    security_opt:
+      - no-new-privileges:true
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "5", "http://localhost:1349/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  postgres:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    container_name: ${PERF_PROJECT:-snapotter-qa-perf}-postgres
+    environment:
+      POSTGRES_USER: snapotter
+      POSTGRES_PASSWORD: snapotter
+      POSTGRES_DB: snapotter
+    volumes:
+      - perf-pgdata:/var/lib/postgresql/data
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapotter"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+    container_name: ${PERF_PROJECT:-snapotter-qa-perf}-redis
+    command:
+      [
+        "redis-server",
+        "--maxmemory-policy",
+        "noeviction",
+        "--maxmemory",
+        "512mb",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "snapotter",
+      ]
+    volumes:
+      - perf-redisdata:/data
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "snapotter", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  perf-data:
+  perf-workspace:
+  perf-pgdata:
+  perf-redisdata:

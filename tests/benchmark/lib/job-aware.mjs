@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import AdmZip from "adm-zip";
+import { assertOracle } from "./oracles.mjs";
 
 const MIN_ARTIFACT_BYTES = 16;
 const SUPPORTED_EXACT_MIMES = new Set([
@@ -170,13 +171,20 @@ export function validateArtifact(output, contentType, options = {}) {
   }
   if (mime === "application/zip" || mime.endsWith("+zip") || mime.includes("openxmlformats")) {
     const entries = validatedZipEntries(bytes);
-    if (
-      options.expectedZipEntries !== undefined &&
-      entries.filter((entry) => !entry.isDirectory).length !== options.expectedZipEntries
-    ) {
+    const files = entries.filter((entry) => !entry.isDirectory);
+    if (options.expectedZipEntries !== undefined && files.length !== options.expectedZipEntries) {
       throw new Error(
-        `expected ${options.expectedZipEntries} ZIP entries but received ${entries.filter((entry) => !entry.isDirectory).length}`,
+        `expected ${options.expectedZipEntries} ZIP entries but received ${files.length}`,
       );
+    }
+    if (options.oracle?.zipEach) {
+      for (const entry of files) {
+        try {
+          assertOracle(entry.getData(), options.oracle.zipEach);
+        } catch (error) {
+          throw new Error(`ZIP entry ${entry.entryName}: ${errorMessage(error)}`);
+        }
+      }
     }
   }
 
@@ -199,6 +207,8 @@ export function validateArtifact(output, contentType, options = {}) {
   if (mime.startsWith("text/") && bytes.toString("utf8").trim().length === 0) {
     throw new Error(`text artifact is empty for ${mime}`);
   }
+
+  assertOracle(bytes, options.oracle);
 
   return { output: bytes, outputMime: mime, outputSize: bytes.length };
 }
@@ -305,6 +315,7 @@ async function fetchArtifact({
   fetchImpl,
   expectedMime,
   expectedZipEntries,
+  oracle,
 }) {
   const url = sameOriginUrl(baseUrl, downloadUrl, "artifact");
   const response = await fetchImpl(url, {
@@ -317,6 +328,7 @@ async function fetchArtifact({
   return validateArtifact(output, response.headers.get("content-type"), {
     expectedMime,
     expectedZipEntries,
+    oracle,
   });
 }
 
@@ -353,6 +365,7 @@ export async function resolveBenchmarkResponse({
   fetchImpl = globalThis.fetch,
   expectedMime,
   expectedZipEntries,
+  oracle,
 }) {
   const started = performance.now();
   let artifact;
@@ -370,17 +383,20 @@ export async function resolveBenchmarkResponse({
           fetchImpl,
           expectedMime,
           expectedZipEntries,
+          oracle,
         });
       } else {
         artifact = validateArtifact(admissionBody, admissionMime, {
           expectedMime,
           expectedZipEntries,
+          oracle,
         });
       }
     } else {
       artifact = validateArtifact(admissionBody, admissionMime, {
         expectedMime,
         expectedZipEntries,
+        oracle,
       });
     }
   } else if (admissionStatus === 202) {
@@ -442,6 +458,7 @@ export async function resolveBenchmarkResponse({
       expectedZipEntries:
         expectedZipEntries ??
         (Number.isFinite(totalFiles) && totalFiles > 0 ? totalFiles : undefined),
+      oracle,
     });
   } else {
     throw new Error(`admission returned HTTP ${admissionStatus}`);
@@ -490,6 +507,7 @@ async function main() {
         args["expected-zip-entries"] === undefined
           ? undefined
           : Number(args["expected-zip-entries"]),
+      oracle: args.oracle === undefined ? undefined : JSON.parse(args.oracle),
     });
     if (args.output) await writeFile(args.output, result.output);
     process.stdout.write(

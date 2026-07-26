@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/job-aware.sh"
+source "${SCRIPT_DIR}/lib/metrics.sh"
 
 SYSTEM="${1:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode] [container]}"
 FIXTURE_DIR="${2:?Usage: bench-ai.sh <system-name> <fixture-dir> [port] [gpu-mode] [container]}"
@@ -43,22 +44,6 @@ get_container_id() {
   running=$(docker inspect --type container --format '{{.State.Running}}' "$cid" 2>/dev/null) || return 1
   [ "$running" = "true" ] || return 1
   printf '%s\n' "$cid"
-}
-
-docker_mem_mb() {
-  local cid="$1"
-  if [ -z "$cid" ]; then echo "0"; return; fi
-  docker stats "$cid" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}'
-}
-
-docker_cpu_pct() {
-  local cid="$1"
-  if [ -z "$cid" ]; then echo "0"; return; fi
-  docker stats "$cid" --no-stream --format "{{.CPUPerc}}" 2>/dev/null | tr -d '%'
-}
-
-gpu_vram_mb() {
-  nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null || echo "0"
 }
 
 record() {

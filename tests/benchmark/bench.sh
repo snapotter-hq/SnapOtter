@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/job-aware.sh"
+source "${SCRIPT_DIR}/lib/metrics.sh"
 
 SYSTEM="${1:?Usage: bench.sh <system-name> <fixture-dir> [port] [container]}"
 FIXTURE_DIR="${2:?Usage: bench.sh <system-name> <fixture-dir> [port] [container]}"
@@ -40,18 +41,6 @@ get_container_id() {
   printf '%s\n' "$cid"
 }
 
-docker_mem_mb() {
-  local cid="$1"
-  if [ -z "$cid" ]; then echo "0"; return; fi
-  docker stats "$cid" --no-stream --format "{{.MemUsage}}" 2>/dev/null | awk -F/ '{gsub(/[^0-9.]/, "", $1); if($1+0 > 0) print $1; else print 0}'
-}
-
-docker_cpu_pct() {
-  local cid="$1"
-  if [ -z "$cid" ]; then echo "0"; return; fi
-  docker stats "$cid" --no-stream --format "{{.CPUPerc}}" 2>/dev/null | tr -d '%'
-}
-
 record() {
   local tier="$1" tool="$2" variant="$3" time_s="$4" pass="$5" output_size="${6:-0}" mem_mb="${7:-0}" cpu_pct="${8:-0}"
   local admission_status="${9:-0}" completion_status="${10:-failed}" completion_latency_s="${11:-0}" output_mime="${12:-unknown}"
@@ -60,7 +49,7 @@ record() {
 }
 
 bench_tool() {
-  local tier="$1" tool="$2" variant="$3" file="$4" settings="${5:-}"
+  local tier="$1" tool="$2" variant="$3" file="$4" settings="${5:-}" oracle="${6:-}"
   local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
 
   cid="$BENCH_CONTAINER_ID"
@@ -84,7 +73,7 @@ bench_tool() {
 
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" || true
+    "$admission_file" "$artifact_file" "$time_s" "$BENCH_JOB_TIMEOUT_MS" "" "" "$oracle" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
@@ -101,8 +90,8 @@ bench_tool() {
 }
 
 bench_tool_multifile() {
-  local tier="$1" tool="$2" variant="$3" settings="${4:-}"
-  shift 4
+  local tier="$1" tool="$2" variant="$3" settings="${4:-}" oracle="${5:-}"
+  shift 5
   local files=("$@")
 
   local cid time_s http_code response_mime mem_after cpu admission_file artifact_file pass output_size
@@ -128,7 +117,7 @@ bench_tool_multifile() {
 
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" || true
+    "$admission_file" "$artifact_file" "$time_s" "$BENCH_JOB_TIMEOUT_MS" "" "" "$oracle" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
@@ -192,14 +181,14 @@ log "=== TIER 1: Core Tool Benchmarks ==="
 for run in 1 2 3; do
   log "--- Run $run of 3 ---"
 
-  bench_tool "core" "image/resize" "small-r${run}" "$S" '{"width":100,"fit":"cover"}'
-  bench_tool "core" "image/resize" "large-r${run}" "$L" '{"width":800,"fit":"cover"}'
+  bench_tool "core" "image/resize" "small-r${run}" "$S" '{"width":100,"fit":"cover"}' '{"width":100}'
+  bench_tool "core" "image/resize" "large-r${run}" "$L" '{"width":800,"fit":"cover"}' '{"width":800}'
 
-  bench_tool "core" "image/crop" "small-r${run}" "$S" '{"left":10,"top":10,"width":100,"height":100}'
-  bench_tool "core" "image/crop" "large-r${run}" "$L" '{"left":10,"top":10,"width":100,"height":100}'
+  bench_tool "core" "image/crop" "small-r${run}" "$S" '{"left":10,"top":10,"width":100,"height":100}' '{"width":100,"height":100}'
+  bench_tool "core" "image/crop" "large-r${run}" "$L" '{"left":10,"top":10,"width":100,"height":100}' '{"width":100,"height":100}'
 
-  bench_tool "core" "image/rotate" "small-r${run}" "$S" '{"angle":90}'
-  bench_tool "core" "image/rotate" "large-r${run}" "$L" '{"angle":90}'
+  bench_tool "core" "image/rotate" "small-r${run}" "$S" '{"angle":90}' '{"width":150,"height":200}'
+  bench_tool "core" "image/rotate" "large-r${run}" "$L" '{"angle":90}' '{"width":3000,"height":4000}'
 
   bench_tool "core" "image/convert" "jpg-webp-small-r${run}" "$J" '{"format":"webp","quality":80}'
   bench_tool "core" "image/convert" "jpg-webp-large-r${run}" "$L" '{"format":"webp","quality":80}'
@@ -225,14 +214,14 @@ for run in 1 2 3; do
   bench_tool "core" "image/watermark-text" "small-r${run}" "$S" '{"text":"BENCHMARK","position":"tiled"}'
   bench_tool "core" "image/watermark-text" "large-r${run}" "$L" '{"text":"BENCHMARK","position":"tiled"}'
 
-  bench_tool_multifile "core" "image/compose" "small-r${run}" '{"blendMode":"overlay"}' "$S" "$J"
-  bench_tool_multifile "core" "image/compose" "large-r${run}" '{"blendMode":"overlay"}' "$L" "$P"
+  bench_tool_multifile "core" "image/compose" "small-r${run}" '{"blendMode":"overlay"}' '' "$S" "$J"
+  bench_tool_multifile "core" "image/compose" "large-r${run}" '{"blendMode":"overlay"}' '' "$L" "$P"
 
-  bench_tool_multifile "core" "image/collage" "4img-small-r${run}" '{"templateId":"4-grid"}' "$S" "$J" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-100x100.svg"
-  bench_tool_multifile "core" "image/collage" "4img-large-r${run}" '{"templateId":"4-grid"}' "$L" "$P" "$BW" "${F}/image/valid/watermark.jpg"
+  bench_tool_multifile "core" "image/collage" "4img-small-r${run}" '{"templateId":"4-grid"}' '' "$S" "$J" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-100x100.svg"
+  bench_tool_multifile "core" "image/collage" "4img-large-r${run}" '{"templateId":"4-grid"}' '' "$L" "$P" "$BW" "${F}/image/valid/watermark.jpg"
 
-  bench_tool_multifile "core" "image/stitch" "3img-small-r${run}" '{"direction":"horizontal"}' "$S" "$J" "${F}/image/valid/test-50x50.webp"
-  bench_tool_multifile "core" "image/stitch" "3img-large-r${run}" '{"direction":"horizontal"}' "$L" "$P" "$BW"
+  bench_tool_multifile "core" "image/stitch" "3img-small-r${run}" '{"direction":"horizontal"}' '' "$S" "$J" "${F}/image/valid/test-50x50.webp"
+  bench_tool_multifile "core" "image/stitch" "3img-large-r${run}" '{"direction":"horizontal"}' '' "$L" "$P" "$BW"
 
   bench_tool "core" "image/split" "small-r${run}" "$S" '{"columns":2,"rows":2}'
   bench_tool "core" "image/split" "large-r${run}" "$L" '{"columns":2,"rows":2}'
@@ -240,7 +229,7 @@ for run in 1 2 3; do
   bench_tool "core" "image/border" "small-r${run}" "$S" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
   bench_tool "core" "image/border" "large-r${run}" "$L" '{"borderWidth":20,"cornerRadius":10,"shadow":true}'
 
-  bench_tool "core" "image/svg-to-raster" "small-r${run}" "${F}/image/valid/test-100x100.svg" '{"width":2000,"dpi":300}'
+  bench_tool "core" "image/svg-to-raster" "small-r${run}" "${F}/image/valid/test-100x100.svg" '{"width":2000,"dpi":300}' '{"width":2000}'
 
   bench_tool "core" "image/vectorize" "small-r${run}" "$S" '{"colorMode":"color"}'
   bench_tool "core" "image/vectorize" "large-r${run}" "$P" '{"colorMode":"color"}'
@@ -249,12 +238,12 @@ for run in 1 2 3; do
 
   bench_tool "core" "pdf/pdf-to-image" "r${run}" "$PDF" '{"format":"png","dpi":300}'
 
-  bench_tool "core" "image/optimize-for-web" "large-r${run}" "$L" '{"format":"webp","quality":80,"maxWidth":1920}'
+  bench_tool "core" "image/optimize-for-web" "large-r${run}" "$L" '{"format":"webp","quality":80,"maxWidth":1920}' '{"width":1920}'
 
   bench_tool "core" "image/favicon" "small-r${run}" "$S" ''
   bench_tool "core" "image/favicon" "large-r${run}" "$P" ''
 
-  bench_tool_multifile "core" "image/image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' "$S" "$J" "${F}/image/valid/test-50x50.webp"
+  bench_tool_multifile "core" "image/image-to-pdf" "3img-r${run}" '{"pageSize":"A4"}' '{"pages":3}' "$S" "$J" "${F}/image/valid/test-50x50.webp"
 
   bench_tool "core" "image/replace-color" "small-r${run}" "$S" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
   bench_tool "core" "image/replace-color" "large-r${run}" "$L" '{"sourceColor":"#FFFFFF","targetColor":"#FF0000","tolerance":30}'
@@ -262,10 +251,10 @@ for run in 1 2 3; do
   bench_tool "core" "image/info" "small-r${run}" "$S" ''
   bench_tool "core" "image/info" "large-r${run}" "$L" ''
 
-  bench_tool_multifile "core" "image/compare" "small-r${run}" '' "$S" "$S"
-  bench_tool_multifile "core" "image/compare" "large-r${run}" '' "$L" "$L"
+  bench_tool_multifile "core" "image/compare" "small-r${run}" '' '' "$S" "$S"
+  bench_tool_multifile "core" "image/compare" "large-r${run}" '' '' "$L" "$L"
 
-  bench_tool_multifile "core" "image/find-duplicates" "5img-r${run}" '{"threshold":5}' "$S" "$J" "${F}/image/valid/test-50x50.webp" "$S" "$J"
+  bench_tool_multifile "core" "image/find-duplicates" "5img-r${run}" '{"threshold":5}' '' "$S" "$J" "${F}/image/valid/test-50x50.webp" "$S" "$J"
 
   bench_tool "core" "image/color-palette" "small-r${run}" "$P" ''
   bench_tool "core" "image/color-palette" "large-r${run}" "$L" ''
@@ -275,8 +264,8 @@ for run in 1 2 3; do
   bench_tool "core" "image/image-to-base64" "small-r${run}" "$S" '{"outputFormat":"webp"}'
   bench_tool "core" "image/image-to-base64" "large-r${run}" "$L" '{"outputFormat":"webp"}'
 
-  bench_tool "core" "image/content-aware-resize" "small-r${run}" "$S" '{"width":100}'
-  bench_tool "core" "image/content-aware-resize" "large-r${run}" "$L" '{"width":100}'
+  bench_tool "core" "image/content-aware-resize" "small-r${run}" "$S" '{"width":100}' '{"width":100}'
+  bench_tool "core" "image/content-aware-resize" "large-r${run}" "$L" '{"width":100}' '{"width":100}'
 
   bench_tool "core" "image/image-enhancement" "small-r${run}" "$S" '{"mode":"auto","intensity":50}'
   bench_tool "core" "image/image-enhancement" "large-r${run}" "$L" '{"mode":"auto","intensity":50}'
@@ -310,7 +299,8 @@ for concurrency in 1 3 5 10 20; do
         || result=$'000\t0.000\tapplication/octet-stream'
       IFS=$'\t' read -r http_code admission_time response_mime <<< "$result"
       resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
-        "$admission_file" "$artifact_file" "$admission_time" || true
+        "$admission_file" "$artifact_file" "$admission_time" "$BENCH_JOB_TIMEOUT_MS" "" "" \
+        '{"width":800}' || true
       printf '%s\t%s\t%s\n' "$BENCH_PASS" "$BENCH_COMPLETION_LATENCY_S" "$BENCH_ADMISSION_STATUS"
       rm -f "$admission_file" "$artifact_file"
       [ "$BENCH_PASS" = "true" ]
@@ -364,7 +354,7 @@ cid="$BENCH_CONTAINER_ID"
 mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 
 for i in $(seq 1 50); do
-  bench_tool "sustained" "image/resize" "seq-${i}" "$L" '{"width":800}'
+  bench_tool "sustained" "image/resize" "seq-${i}" "$L" '{"width":800}' '{"width":800}'
 done
 
 mem_end=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
@@ -380,7 +370,7 @@ for batch_size in 3 5 10; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$S")
   done
-  bench_tool_multifile "batch" "image/resize" "small-b${batch_size}" '{"width":100}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize" "small-b${batch_size}" '{"width":100}' '{"zipEach":{"width":100}}' "${files[@]}"
 done
 
 for batch_size in 3 5; do
@@ -388,15 +378,15 @@ for batch_size in 3 5; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$L")
   done
-  bench_tool_multifile "batch" "image/resize" "large-b${batch_size}" '{"width":800}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize" "large-b${batch_size}" '{"width":800}' '{"zipEach":{"width":800}}' "${files[@]}"
 done
 
-bench_tool_multifile "batch" "image/convert" "mixed-5" '{"format":"webp","quality":80}' \
+bench_tool_multifile "batch" "image/convert" "mixed-5" '{"format":"webp","quality":80}' '' \
   "$J" "$S" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-200x150.heic" "${F}/image/formats/sample.avif"
 
 log "=== TIER 4: Pipeline Benchmarks ==="
 
-bench_tool "pipeline" "image/resize" "1step" "$L" '{"width":800}'
+bench_tool "pipeline" "image/resize" "1step" "$L" '{"width":800}' '{"width":800}'
 
 log "=== Container Cold Start ==="
 # Record current time as baseline
