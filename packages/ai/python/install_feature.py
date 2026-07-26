@@ -12,6 +12,7 @@ Progress is reported via JSON lines on stderr (parsed by the Node bridge).
 Final result is a JSON object on stdout.
 """
 
+import csv
 import errno
 import glob
 import hashlib
@@ -19,6 +20,7 @@ import importlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -604,6 +606,268 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
         sys.stderr.flush()
 
 
+# -- Distribution reconciliation (one version per distribution) --
+
+DIST_INFO_SUFFIX = ".dist-info"
+
+
+def canonical_dist_name(name: str) -> str:
+    """Normalize a distribution name the way PEP 503 does, so the same project
+    compares equal however its wheel spelled it (`hf-xet`, `hf_xet`, `HF.Xet`)."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def list_distributions(sp_dir: str) -> dict:
+    """Map canonical distribution name -> [(version, dist-info dir name), ...].
+
+    A healthy site-packages holds exactly one entry per name. A venv merged by
+    an installer that never uninstalls can hold several, which is the corruption
+    this section exists to prevent: `move_tree` copies file over file, so the
+    two versions overlay and CPython can end up loading one version's compiled
+    extension underneath the other's Python modules.
+    """
+    found = {}
+    if not os.path.isdir(sp_dir):
+        return found
+    for entry in os.listdir(sp_dir):
+        if not entry.endswith(DIST_INFO_SUFFIX):
+            continue
+        name, sep, version = entry[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+        if not sep or not name:
+            continue
+        found.setdefault(canonical_dist_name(name), []).append((version, entry))
+    return found
+
+
+def distribution_files(sp_dir: str, dist_info: str) -> list:
+    """Relative paths a distribution owns, read from its RECORD.
+
+    Entries that point outside site-packages (console scripts are recorded as
+    `../../bin/<name>`) are skipped: they cannot shadow an import, and deleting
+    outside the directory we were handed is not this function's business.
+    """
+    record = os.path.join(sp_dir, dist_info, "RECORD")
+    if not os.path.exists(record):
+        return []
+    paths = []
+    with open(record, newline="", errors="replace") as f:
+        for row in csv.reader(f):
+            if not row:
+                continue
+            rel = row[0].strip().replace("\\", "/")
+            if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                continue
+            paths.append(rel)
+    return paths
+
+
+def _is_inside(root: str, path: str) -> bool:
+    return not os.path.relpath(os.path.abspath(path), os.path.abspath(root)).startswith("..")
+
+
+def _relocate(src_root: str, dst_root: str, rel_path: str) -> bool:
+    """Move one relative entry between two trees, keeping its relative position."""
+    src = os.path.join(src_root, rel_path)
+    if not os.path.exists(src) and not os.path.islink(src):
+        return False
+    dst = os.path.join(dst_root, rel_path)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    try:
+        os.replace(src, dst)
+    except OSError as e:
+        if getattr(e, "errno", None) != errno.EXDEV:
+            raise
+        shutil.move(src, dst)
+    return True
+
+
+def _prune_empty_parents(root: str, rel_path: str) -> None:
+    """Drop directories emptied by a removal, stopping at root and at the first
+    directory that still holds something (another distribution's files)."""
+    directory = os.path.dirname(os.path.join(root, rel_path))
+    while _is_inside(root, directory) and os.path.abspath(directory) != os.path.abspath(root):
+        try:
+            os.rmdir(directory)
+        except OSError:
+            return
+        directory = os.path.dirname(directory)
+
+
+def _discard_stale_bytecode(root: str, rel_path: str) -> None:
+    """Remove the cached bytecode of a source file that just left the tree.
+
+    A `.pyc` whose `.py` is gone is not importable, but it does keep the package
+    directory non-empty, which would stop `_prune_empty_parents` from clearing
+    the way for the incoming version.
+    """
+    if not rel_path.endswith(".py"):
+        return
+    directory, base = os.path.split(os.path.join(root, rel_path))
+    cache = os.path.join(directory, "__pycache__")
+    for stale in glob.glob(os.path.join(cache, base[:-3] + ".*.pyc")):
+        try:
+            os.unlink(stale)
+        except OSError:
+            pass
+    try:
+        os.rmdir(cache)
+    except OSError:
+        pass
+
+
+def plan_reconciliation(staging_sp: str, sp_dir: str) -> list:
+    """Work out, per distribution the bundle is about to place, what it displaces.
+
+    One entry per staged distribution that will actually change the venv:
+
+        {"name", "version", "dist_info", "files", "superseded": [(version, dir)]}
+
+    `superseded` holds every copy already installed under a different version.
+    A distribution already present at the staged version is left out entirely:
+    placing it is a no-op, so there is nothing to remove and nothing to undo.
+    """
+    staged = list_distributions(staging_sp)
+    installed = list_distributions(sp_dir)
+    plan = []
+    for name in sorted(staged):
+        version, dist_info = sorted(staged[name])[-1]
+        existing = installed.get(name, [])
+        superseded = [copy for copy in existing if copy[0] != version]
+        if existing and not superseded:
+            continue
+        plan.append(
+            {
+                "name": name,
+                "version": version,
+                "dist_info": dist_info,
+                "files": distribution_files(staging_sp, dist_info),
+                "superseded": superseded,
+            }
+        )
+    return plan
+
+
+def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int:
+    """Uninstall every superseded version, holding its files for a rollback.
+
+    Files move to `quarantine_dir/<name>/<version>/` rather than being deleted
+    outright, so a failed verification can put the venv back exactly as it was
+    instead of leaving it half-way between two bundles.
+    """
+    removed = 0
+    for item in plan:
+        for version, dist_info in item["superseded"]:
+            destination = os.path.join(quarantine_dir, item["name"], version)
+            for rel in distribution_files(sp_dir, dist_info):
+                if _relocate(sp_dir, destination, rel):
+                    _discard_stale_bytecode(sp_dir, rel)
+                    _prune_empty_parents(sp_dir, rel)
+            # RECORD does not always list every file pip wrote into the metadata
+            # directory (INSTALLER and REQUESTED are frequently absent), so sweep
+            # whatever is left before dropping the directory itself.
+            leftover = os.path.join(sp_dir, dist_info)
+            if os.path.isdir(leftover):
+                for root, _dirs, files in os.walk(leftover):
+                    for name in files:
+                        rel = os.path.relpath(os.path.join(root, name), sp_dir)
+                        _relocate(sp_dir, destination, rel)
+                shutil.rmtree(leftover, ignore_errors=True)
+            removed += 1
+            sys.stderr.write(
+                f"[install] replacing {item['name']} {version} with {item['version']}: "
+                f"removed the superseded version so only one stays in the venv\n"
+            )
+    if removed:
+        sys.stderr.flush()
+    return removed
+
+
+def restore_superseded(sp_dir: str, quarantine_dir: str) -> None:
+    """Put every quarantined version back where it came from."""
+    if not os.path.isdir(quarantine_dir):
+        return
+    for name in os.listdir(quarantine_dir):
+        holder = os.path.join(quarantine_dir, name)
+        if not os.path.isdir(holder):
+            continue
+        for version in os.listdir(holder):
+            version_root = os.path.join(holder, version)
+            if not os.path.isdir(version_root):
+                continue
+            for root, _dirs, files in os.walk(version_root):
+                for entry in files:
+                    rel = os.path.relpath(os.path.join(root, entry), version_root)
+                    _relocate(version_root, sp_dir, rel)
+    shutil.rmtree(quarantine_dir, ignore_errors=True)
+
+
+def discard_placed_distributions(sp_dir: str, plan: list) -> None:
+    """Remove the files this bundle placed, for the distributions it changed.
+
+    Only distributions the plan actually touched are removed. One already
+    present at the staged version never entered the plan, so a rollback cannot
+    delete a version that was there before this install and is still correct.
+    """
+    for item in plan:
+        for rel in item["files"]:
+            target = os.path.join(sp_dir, rel)
+            try:
+                if os.path.isdir(target) and not os.path.islink(target):
+                    shutil.rmtree(target, ignore_errors=True)
+                else:
+                    os.unlink(target)
+            except OSError:
+                pass
+            _prune_empty_parents(sp_dir, rel)
+
+
+def rollback_reconciliation(sp_dir: str, plan: list, quarantine_dir: str) -> None:
+    """Undo a merge: drop what this bundle placed, restore what it displaced."""
+    discard_placed_distributions(sp_dir, plan)
+    restore_superseded(sp_dir, quarantine_dir)
+
+
+def mark_venv_writing(marker_path: str, bundle_id: str) -> None:
+    """Breadcrumb a destructive write to the shared venv.
+
+    If the process dies while the marker exists, recoverInterruptedInstalls
+    reseeds the venv from the image base on next boot. That is the blunt
+    fallback for a tear this installer could not undo itself.
+    """
+    with open(marker_path, "w") as f:
+        json.dump({"bundleId": bundle_id, "startedAt": datetime.now(timezone.utc).isoformat()}, f)
+
+
+def clear_venv_writing(marker_path: str) -> None:
+    if os.path.exists(marker_path):
+        os.unlink(marker_path)
+
+
+def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
+    """Put the venv back the way it was before this bundle was merged.
+
+    A refused install must leave nothing behind: without this, a bundle that
+    fails verification would keep the versions it displaced from the bundles
+    that were already working, so one bad install would break tools that used
+    to run. Runs under the crash breadcrumb, and deliberately leaves the
+    breadcrumb in place if the rollback itself fails, so a venv this installer
+    could not repair still gets reseeded on next boot.
+    """
+    if not sp_dir or (not plan and not os.path.isdir(quarantine_dir)):
+        return
+    try:
+        mark_venv_writing(marker_path, bundle_id)
+        rollback_reconciliation(sp_dir, plan, quarantine_dir)
+        clear_venv_writing(marker_path)
+        sys.stderr.write("[install] rolled the venv back to its state before this bundle\n")
+    except OSError as e:
+        sys.stderr.write(
+            f"[install] could not roll the venv back ({e}); the AI environment will be "
+            f"reseeded on next restart\n"
+        )
+    sys.stderr.flush()
+
+
 # -- Fixups (NCCL wheel) --
 
 def apply_fixups(staging_dir: str, venv_path: str) -> None:
@@ -865,6 +1129,12 @@ def _install() -> None:
     emit_progress(92, "Installing packages...")
     site_packages_dir = get_site_packages_dir(venv_path)
     venv_writing_marker = os.path.join(ai_dir, "venv.writing")
+    # Superseded versions wait here until the install is verified. It sits inside
+    # the venv so every move is a same-filesystem rename rather than a copy of
+    # several GB, and outside site-packages so a quarantined dist-info cannot be
+    # picked up by importlib.metadata while it waits.
+    quarantine_dir = os.path.join(venv_path, ".superseded")
+    reconciliation_plan = []
 
     try:
         if os.path.isdir(staging_sp) and site_packages_dir:
@@ -875,18 +1145,19 @@ def _install() -> None:
             # reseeds the venv back to a known-good base. We clear it the instant
             # the site-packages move completes, since the venv is consistent
             # again then (a later models-move failure can't tear the venv).
-            with open(venv_writing_marker, "w") as mf:
-                json.dump(
-                    {
-                        "bundleId": bundle_id,
-                        "startedAt": datetime.now(timezone.utc).isoformat(),
-                    },
-                    mf,
-                )
+            mark_venv_writing(venv_writing_marker, bundle_id)
+            shutil.rmtree(quarantine_dir, ignore_errors=True)
+            # Flavor first: `onnxruntime` and `onnxruntime-gpu` are two different
+            # distributions writing the same package directory, so which one wins
+            # is not a version question and the general pass below cannot decide
+            # it. Running it first also means that when the CPU build is dropped
+            # from staging, the general pass never sees it and so never uninstalls
+            # the GPU build the venv is keeping (#490).
             reconcile_onnxruntime(staging_sp, site_packages_dir)
+            reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
+            supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
             move_tree(staging_sp, site_packages_dir)
-            if os.path.exists(venv_writing_marker):
-                os.unlink(venv_writing_marker)
+            clear_venv_writing(venv_writing_marker)
 
         # -- Move models --
         emit_progress(95, "Installing models...")
@@ -896,6 +1167,10 @@ def _install() -> None:
             move_tree(staging_models, models_dir)
     except OSError as e:
         shutil.rmtree(staging_dir, ignore_errors=True)
+        abandon_merge(
+            site_packages_dir, reconciliation_plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
         if getattr(e, "errno", None) == errno.ENOSPC:
             fail("Ran out of disk space while installing the bundle. Free up space and retry.")
         fail(f"Failed to install bundle files: {e}")
@@ -924,9 +1199,17 @@ def _install() -> None:
                 )
             except subprocess.TimeoutExpired:
                 shutil.rmtree(staging_dir, ignore_errors=True)
+                abandon_merge(
+                    site_packages_dir, reconciliation_plan, quarantine_dir,
+                    venv_writing_marker, bundle_id,
+                )
                 fail("Installation verification timed out. Please retry the install.")
             if proc.returncode != 0:
                 shutil.rmtree(staging_dir, ignore_errors=True)
+                abandon_merge(
+                    site_packages_dir, reconciliation_plan, quarantine_dir,
+                    venv_writing_marker, bundle_id,
+                )
                 tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
                 fail(
                     "Installation verification failed: the bundle installed but its "
@@ -948,6 +1231,9 @@ def _install() -> None:
     write_installed_atomic(ai_dir, installed)
 
     # -- Cleanup --
+    # The install is recorded, so the versions this bundle displaced are never
+    # coming back and their quarantine copy is just disk.
+    shutil.rmtree(quarantine_dir, ignore_errors=True)
     if os.path.exists(staging_dir):
         shutil.rmtree(staging_dir, ignore_errors=True)
     # Clean up downloaded tar (but not if local override)

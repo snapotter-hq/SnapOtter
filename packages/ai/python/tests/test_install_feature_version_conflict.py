@@ -1,10 +1,10 @@
 """Regression reproduction for the shared-venv version conflict (AI-20260726-001).
 
-`reconcile_onnxruntime` fixes exactly one package pair. Every OTHER distribution
-that two bundles both provide is merged by `move_tree` file-by-file, with no
-uninstall of the version already in the venv, so two versions end up overlaid:
-the pure-Python modules come from whichever bundle wrote last while the compiled
-extension CPython actually imports can come from the other.
+`reconcile_onnxruntime` fixed exactly one package pair. Every OTHER distribution
+that two bundles both provided was merged by `move_tree` file-by-file, with no
+uninstall of the version already in the venv, so two versions ended up overlaid:
+the pure-Python modules came from whichever bundle wrote last while the compiled
+extension CPython actually imports could come from the other.
 
 Observed live on ubuntu-gpu-amd64 after Settings > AI Features > Install All:
 seventeen distributions carried two or three versions at once. Three of them
@@ -23,12 +23,10 @@ broke a tool.
   huggingface_hub 0.36.2, 1.19.0 and 1.22.0 -> transformers refuses to import,
   the high-quality Object Eraser path fails.
 
-The invariant these tests assert is deliberately modest and does not presume a
-particular fix: after a bundle's site-packages has been merged into the venv,
-exactly ONE version of any given distribution should remain, and no extension
-module belonging to the superseded version should survive. Both are xfail today.
-Marked strict, so whoever implements general reconciliation gets a failing test
-telling them to remove the marker rather than a silently passing one.
+The invariant is deliberately modest and does not presume a particular winner:
+after a bundle's site-packages has been merged into the venv, exactly ONE
+version of any given distribution remains, and no file belonging to the
+superseded version survives to shadow it.
 """
 
 import importlib.util
@@ -36,14 +34,12 @@ import os
 
 import pytest
 
-PACKAGE = "tokenizers"
-OLD_VERSION = "0.20.3"
-NEW_VERSION = "0.23.1"
-# The two extension-module names the real bundles ship. CPython's importer
-# prefers the platform-specific suffix over the stable-ABI one, which is why the
-# older binary wins even when the newer package files land last.
-OLD_EXTENSION = "tokenizers.cpython-312-x86_64-linux-gnu.so"
-NEW_EXTENSION = "tokenizers.abi3.so"
+CASES = {
+    # distribution, older version, newer version, older extension, newer extension
+    "tokenizers": ("0.20.3", "0.23.1", "tokenizers.cpython-312-x86_64-linux-gnu.so", "tokenizers.abi3.so"),
+    "scipy": ("1.12.0", "1.17.1", "_lib/_ccallback_c.cpython-312-x86_64-linux-gnu.so", "_lib/_ccallback_c.abi3.so"),
+    "huggingface_hub": ("0.36.2", "1.22.0", None, None),
+}
 
 
 def load_installer():
@@ -55,88 +51,130 @@ def load_installer():
     return module
 
 
-def make_distribution(site_packages, version, extension):
+def make_distribution(site_packages, package, version, extension):
     """Lay out one version of the package, the way a bundle archive carries it."""
-    package_dir = site_packages / PACKAGE
+    package_dir = site_packages / package
     (package_dir / "decoders").mkdir(parents=True, exist_ok=True)
     (package_dir / "__init__.py").write_text(f"__version__ = {version!r}\n")
     (package_dir / "decoders" / "__init__.py").write_text(f"# decoders for {version}\n")
-    (package_dir / extension).write_text(f"native {version}")
-    dist_info = site_packages / f"{PACKAGE}-{version}.dist-info"
+    owned = [
+        f"{package}/__init__.py",
+        f"{package}/decoders/__init__.py",
+    ]
+    if extension:
+        target = package_dir / extension
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"native {version}")
+        owned.append(f"{package}/{extension}")
+    dist_info = site_packages / f"{package}-{version}.dist-info"
     dist_info.mkdir(parents=True, exist_ok=True)
-    (dist_info / "METADATA").write_text(f"Name: {PACKAGE}\nVersion: {version}\n")
-    (dist_info / "RECORD").write_text(
-        "\n".join(
-            [
-                f"{PACKAGE}/__init__.py,,",
-                f"{PACKAGE}/decoders/__init__.py,,",
-                f"{PACKAGE}/{extension},,",
-                f"{PACKAGE}-{version}.dist-info/METADATA,,",
-                f"{PACKAGE}-{version}.dist-info/RECORD,,",
-            ]
-        )
-        + "\n"
+    (dist_info / "METADATA").write_text(f"Name: {package}\nVersion: {version}\n")
+    owned += [
+        f"{package}-{version}.dist-info/METADATA",
+        f"{package}-{version}.dist-info/RECORD",
+    ]
+    (dist_info / "RECORD").write_text("\n".join(f"{path},," for path in owned) + "\n")
+
+
+def merge_bundle(tmp_path, package, installed_version, incoming_version,
+                 installed_extension, incoming_extension):
+    """Run the installer's real merge sequence for a second bundle."""
+    installer = load_installer()
+    site_packages = tmp_path / "venv-site-packages"
+    staging = tmp_path / "staging-site-packages"
+    quarantine = tmp_path / "quarantine"
+    site_packages.mkdir()
+    staging.mkdir()
+
+    make_distribution(site_packages, package, installed_version, installed_extension)
+    make_distribution(staging, package, incoming_version, incoming_extension)
+
+    installer.reconcile_onnxruntime(str(staging), str(site_packages))
+    plan = installer.plan_reconciliation(str(staging), str(site_packages))
+    installer.supersede_distributions(str(site_packages), plan, str(quarantine))
+    installer.move_tree(str(staging), str(site_packages))
+    return site_packages
+
+
+def dist_info_versions(site_packages, package):
+    return sorted(
+        entry.name.removesuffix(".dist-info").split("-", 1)[1]
+        for entry in site_packages.iterdir()
+        if entry.name.startswith(f"{package}-") and entry.name.endswith(".dist-info")
     )
 
 
-def merge_bundle(tmp_path):
-    """Run the installer's real merge sequence for a second bundle."""
+@pytest.mark.parametrize("package", sorted(CASES))
+@pytest.mark.parametrize("upgrade", [True, False], ids=["upgrade", "downgrade"])
+def test_merging_a_second_bundle_leaves_one_distribution_version(tmp_path, package, upgrade):
+    """Whichever direction the second bundle moves the version, only one remains.
+
+    Both directions matter: Install All has no fixed order, and the field
+    failure needed only that two bundles disagreed, not that the newer one
+    landed second.
+    """
+    older, newer, older_ext, newer_ext = CASES[package]
+    installed, incoming = (older, newer) if upgrade else (newer, older)
+    installed_ext, incoming_ext = (older_ext, newer_ext) if upgrade else (newer_ext, older_ext)
+
+    site_packages = merge_bundle(
+        tmp_path, package, installed, incoming, installed_ext, incoming_ext
+    )
+
+    assert dist_info_versions(site_packages, package) == [incoming]
+    assert incoming in (site_packages / package / "__init__.py").read_text()
+
+
+@pytest.mark.parametrize("package", ["tokenizers", "scipy"])
+def test_merging_a_second_bundle_removes_the_superseded_extension(tmp_path, package):
+    """The exact tokenizers mechanism: CPython prefers the platform-specific
+    suffix, so a surviving `.cpython-312-*.so` from the old version would be
+    loaded under the new version's Python modules."""
+    older, newer, older_ext, newer_ext = CASES[package]
+
+    site_packages = merge_bundle(tmp_path, package, older, newer, older_ext, newer_ext)
+
+    package_dir = site_packages / package
+    assert (package_dir / newer_ext).exists()
+    assert not (package_dir / older_ext).exists()
+
+
+def test_a_reinstall_of_the_same_version_is_left_alone(tmp_path):
+    """Placing what is already there must not churn the venv: nothing is
+    superseded, so nothing is removed and nothing can be torn."""
     installer = load_installer()
     site_packages = tmp_path / "venv-site-packages"
     staging = tmp_path / "staging-site-packages"
     site_packages.mkdir()
     staging.mkdir()
+    make_distribution(site_packages, "tokenizers", "0.20.3", None)
+    make_distribution(staging, "tokenizers", "0.20.3", None)
 
-    make_distribution(site_packages, OLD_VERSION, OLD_EXTENSION)
-    make_distribution(staging, NEW_VERSION, NEW_EXTENSION)
+    plan = installer.plan_reconciliation(str(staging), str(site_packages))
 
-    installer.reconcile_onnxruntime(str(staging), str(site_packages))
-    installer.move_tree(str(staging), str(site_packages))
-    return site_packages
-
-
-def dist_info_versions(site_packages):
-    return sorted(
-        entry.name.removesuffix(".dist-info").split("-", 1)[1]
-        for entry in site_packages.iterdir()
-        if entry.name.startswith(f"{PACKAGE}-") and entry.name.endswith(".dist-info")
-    )
+    assert plan == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="AI-20260726-001: only onnxruntime is reconciled, so both versions survive the merge",
-)
-def test_merging_a_second_bundle_leaves_one_distribution_version(tmp_path):
-    site_packages = merge_bundle(tmp_path)
-    assert dist_info_versions(site_packages) == [NEW_VERSION]
+def test_reinstalling_a_bundle_repairs_a_venv_already_carrying_both_versions(tmp_path):
+    """Self-heal for hosts that ran the broken installer.
 
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="AI-20260726-001: the superseded native extension survives and CPython imports it first",
-)
-def test_merging_a_second_bundle_removes_the_superseded_extension(tmp_path):
-    site_packages = merge_bundle(tmp_path)
-    package_dir = site_packages / PACKAGE
-    assert (package_dir / NEW_EXTENSION).exists()
-    assert not (package_dir / OLD_EXTENSION).exists()
-
-
-def test_the_conflict_reproduces_exactly_as_observed_in_the_field(tmp_path):
-    """Positive control: this documents today's behaviour and must stay green.
-
-    It fails only if the merge stops producing the overlaid state, which is the
-    same event that flips the two xfails above. Keeping it lets the reproduction
-    be read without running the broken case.
+    Someone who already clicked Install All has a venv with both versions
+    overlaid. Reinstalling any bundle that provides the distribution has to
+    clear the other version rather than add a third.
     """
-    site_packages = merge_bundle(tmp_path)
-    package_dir = site_packages / PACKAGE
+    installer = load_installer()
+    site_packages = tmp_path / "venv-site-packages"
+    staging = tmp_path / "staging-site-packages"
+    quarantine = tmp_path / "quarantine"
+    site_packages.mkdir()
+    staging.mkdir()
+    make_distribution(site_packages, "tokenizers", "0.20.3", "tokenizers.cpython-312-x86_64-linux-gnu.so")
+    make_distribution(site_packages, "tokenizers", "0.23.1", "tokenizers.abi3.so")
+    make_distribution(staging, "tokenizers", "0.23.1", "tokenizers.abi3.so")
 
-    assert dist_info_versions(site_packages) == [OLD_VERSION, NEW_VERSION]
-    assert (package_dir / OLD_EXTENSION).exists()
-    assert (package_dir / NEW_EXTENSION).exists()
-    # The pure-Python half comes from the incoming bundle...
-    assert NEW_VERSION in (package_dir / "__init__.py").read_text()
-    # ...while the binary CPython would load first is the superseded one.
-    assert OLD_VERSION in (package_dir / OLD_EXTENSION).read_text()
+    plan = installer.plan_reconciliation(str(staging), str(site_packages))
+    installer.supersede_distributions(str(site_packages), plan, str(quarantine))
+    installer.move_tree(str(staging), str(site_packages))
+
+    assert dist_info_versions(site_packages, "tokenizers") == ["0.23.1"]
+    assert not (site_packages / "tokenizers" / "tokenizers.cpython-312-x86_64-linux-gnu.so").exists()

@@ -16,28 +16,51 @@ All configuration is done through environment variables. Every variable has a se
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Trust `X-Forwarded-For` headers from a reverse proxy. Set to `false` if not behind a proxy. |
+| `TRUST_PROXY` | `true` | Trust `X-Forwarded-For` headers from a reverse proxy. Set to `false` if not behind a proxy. The published image ships `true`; a source build starts at `false`. |
 
 ### Authentication {#authentication}
 
+The two booleans below accept only `true` and `false`. Anything else, `1` or `yes` or `on`, fails validation and the server exits before it starts listening.
+
 | Variable | Default | Description |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Set to `true` to require login. The Docker image defaults to `true`. |
+| `AUTH_ENABLED` | `true` | Require a login. Set to `false` to run with no accounts at all, which grants every request admin rights, so keep that to a trusted network. |
 | `DEFAULT_USERNAME` | `admin` | Username for the initial admin account. Only used on first run. |
 | `DEFAULT_PASSWORD` | `admin` | Password for the initial admin account. Change this after first login. |
 | `MAX_USERS` | `0` (unlimited) | Maximum number of registered user accounts. Set to 0 for unlimited. |
 | `SESSION_DURATION_HOURS` | `168` | Login session lifetime in hours (default is 7 days). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Set to any non-empty value to bypass the forced password-change prompt on first login |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Set to `true` to skip the forced password-change prompt on first login. |
 
 ### Storage {#storage}
 
 | Variable | Default | Description |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` or `s3`. S3/MinIO requires a license with the s3_storage feature. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL connection string. |
-| `REDIS_URL` | `redis://redis:6379` | Redis connection string (used for BullMQ job queues). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. |
-| `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). |
+| `STORAGE_MODE` | `local` | `local` or `s3`. S3 and MinIO need a license with the s3_storage feature plus the `S3_*` variables below. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string. The Compose stack points this at its `postgres` service; leave it unset (together with `REDIS_URL`) to get embedded mode. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection string (used for BullMQ job queues). Compose points this at its `redis` service. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. The image sets `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). The image sets `/data/files`. |
+
+### S3 object storage {#s3-object-storage}
+
+Only read when `STORAGE_MODE=s3`. Miss any of the three required ones and startup fails with the name of the variable you left out.
+
+| Variable | Default | Description |
+|---|---|---|
+| `S3_BUCKET` | (empty) | Bucket that holds uploads and outputs. Required. |
+| `S3_ACCESS_KEY_ID` | (empty) | Access key. Required. In the container you can mount it instead, via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (empty) | Secret key. Required. Same file convention: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Bucket region. |
+| `S3_ENDPOINT` | (empty) | Custom endpoint for MinIO, R2, Backblaze, and other S3-compatible stores. Empty means AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Set to `true` for MinIO and anything else that wants `endpoint/bucket/key` instead of virtual-host addressing. |
+| `S3_PREFIX` | (empty) | Key prefix, so one bucket can hold several instances. |
+
+### Encryption at rest {#encryption-at-rest}
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (empty) | 64 hex characters (32 bytes). Encrypts sensitive settings stored in the database. Anything that is not 64 hex characters is rejected at startup. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (empty) | The key you are rotating away from, same format. Set both during a rotation so existing rows still decrypt, then drop this one. |
 
 ### Embedded mode {#embedded-mode}
 
@@ -56,16 +79,15 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Maximum file size per upload in megabytes. Set to 0 for unlimited. |
-| `MAX_BATCH_SIZE` | `100` | Maximum number of files in a single batch request. Set to 0 for unlimited. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Maximum file size per upload in megabytes. Set to 0 for unlimited. The published image ships `0`; a source build starts at 100. |
+| `MAX_BATCH_SIZE` | `0` (unlimited) | Maximum number of files in a single batch request. Set to 0 for unlimited. The published image ships `0`; a source build starts at 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Number of batch jobs that run in parallel. Set to 0 to auto-detect based on available CPU cores. |
 | `MAX_MEGAPIXELS` | `0` (unlimited) | Maximum image resolution allowed in megapixels. Set to 0 for unlimited. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maximum worker threads for image processing. Set to 0 to auto-detect based on available CPU cores. |
 | `PROCESSING_TIMEOUT_S` | `0` (no limit) | Maximum processing time per request in seconds. Set to 0 for no timeout. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximum number of steps in a pipeline. Set to 0 for no limit. |
 | `MAX_CANVAS_PIXELS` | `0` (no limit) | Maximum canvas size in pixels for output images. Set to 0 for no limit. |
-| `MAX_SVG_SIZE_MB` | `0` (unlimited) | Maximum SVG file size in megabytes. Set to 0 for unlimited. |
-| `MAX_SPLIT_GRID` | `100` | Maximum grid dimension for the image split tool. |
+| `MAX_SVG_SIZE_MB` | `50` | Largest SVG accepted before sanitizing, in megabytes. `0` behaves differently here than in the rows around it. It removes the pre-parse size cap entirely rather than raising it, so leave this one set. |
 | `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
 
 ### Cleanup {#cleanup}
@@ -79,7 +101,7 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 
 | Variable | Default | Description |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Default theme for new sessions. `light` or `dark`. |
+| `DEFAULT_THEME` | `light` | Default theme for new sessions. `light`, `dark`, or `system`. |
 | `DEFAULT_LOCALE` | `en` | Default interface language. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Default tool layout. `sidebar` or `fullscreen`. |
 
