@@ -38,6 +38,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       landing: ${{ steps.filter.outputs.landing }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - id: filter
@@ -53,10 +54,12 @@ jobs:
             base="$PUSH_BEFORE_SHA"
           fi
           # `code`: anything outside the docs/landing surfaces changed (gates the
-          # main pipeline). `landing`: the landing's own surface changed (gates the
-          # landing e2e job). Both fail open to true when the base is unknown.
+          # main pipeline). `landing` and `docs`: that surface's own files changed
+          # (gates its e2e job). All three fail open to true when the base is
+          # unknown.
           code=true
           landing=true
+          docs=true
           if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ]; then
             if git fetch --no-tags --depth=1 origin "$base" && git cat-file -e "$base" 2>/dev/null; then
               changed=$(git diff --name-only "$base" HEAD)
@@ -75,6 +78,12 @@ jobs:
                   apps/landing/*|tests/e2e-landing/*|playwright.landing.config.ts|packages/shared/*) landing=true; break ;;
                 esac
               done
+              docs=false
+              for f in $changed; do
+                case "$f" in
+                  apps/docs/*|tests/e2e-docs/*|playwright.docs.config.ts) docs=true; break ;;
+                esac
+              done
             else
               echo "Base commit unavailable; running the full pipeline"
             fi
@@ -83,6 +92,7 @@ jobs:
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "landing=$landing" >> "$GITHUB_OUTPUT"
+          echo "docs=$docs" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -370,6 +380,44 @@ jobs:
         if: failure()
         with:
           name: e2e-landing-report
+          path: playwright-report/
+          retention-days: 7
+
+  test-e2e-docs:
+    name: E2E Docs (Chromium)
+    runs-on: ubuntu-latest
+    # vitepress build renders ~3,800 pages and then runs Pagefind over them,
+    # which the config allows up to 10 minutes for on a loaded machine.
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright Chromium
+        run: pnpm playwright install --with-deps chromium
+      - name: Run docs e2e suite
+        # Static VitePress site with no database, so no Postgres/Redis services.
+        # The suite's webServer builds the site and serves the preview itself.
+        # This job is path-filtered like the landing one, so a docs-only PR gets
+        # a real check instead of the nothing it used to get, and a code-only PR
+        # still reports a conclusion via the skip.
+        run: pnpm test:e2e:docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload report on failure
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: e2e-docs-report
           path: playwright-report/
           retention-days: 7
 
