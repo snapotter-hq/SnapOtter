@@ -10,7 +10,7 @@
  * Terminal events are cached in a Redis key (10-min TTL) so that
  * SSE reconnects can replay the final frame without polling the DB.
  */
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
@@ -202,15 +202,30 @@ async function persistSingleFileProgress(
     .where(eq(schema.jobs.id, progress.jobId));
 
   if (existing) {
+    const isTerminalFrame = status === "completed" || status === "failed";
     await executor
       .update(schema.jobs)
       .set({
         status,
         progress: progressJsonb,
         error: progress.error ? { message: progress.error } : null,
-        completedAt: status === "completed" || status === "failed" ? new Date() : null,
+        completedAt: isTerminalFrame ? new Date() : null,
       })
-      .where(eq(schema.jobs.id, progress.jobId));
+      // Progress is published fire and forget, so a nonterminal frame can still
+      // be in flight when the job finishes, is cancelled or fails. Without this
+      // guard a late frame resurrects the row: status back to processing,
+      // completedAt and error wiped, and nothing ever revisits it. The worker's
+      // cancel and failure writes go straight to the DB instead of through the
+      // per-job persist queue, so they cannot rely on ordering the way the
+      // completion path does.
+      .where(
+        isTerminalFrame
+          ? eq(schema.jobs.id, progress.jobId)
+          : and(
+              eq(schema.jobs.id, progress.jobId),
+              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+            ),
+      );
   } else {
     await executor.insert(schema.jobs).values({
       id: progress.jobId,

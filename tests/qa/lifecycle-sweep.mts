@@ -103,7 +103,11 @@ async function checkSyncContract(): Promise<void> {
   }
   const facts = outcome.bytes ? await inspectOutput(outcome.bytes, "o.png", "image/png") : null;
   if (facts?.image?.width !== 80) {
-    report("sync-200-envelope", "fail", `sync output width was ${facts?.image?.width}, expected 80`);
+    report(
+      "sync-200-envelope",
+      "fail",
+      `sync output width was ${facts?.image?.width}, expected 80`,
+    );
     return;
   }
   const state = await sql(`select status from jobs where id = '${json.jobId}'`);
@@ -204,8 +208,10 @@ async function checkCancellation(): Promise<void> {
     ["cancel-before-start", 0],
     ["cancel-in-flight", 2_500],
   ] as const) {
+    // Stabilization is two ffmpeg passes, so it stays in flight long enough
+    // for an in-flight cancel to land on a running job rather than a finished one.
     const submit = await client.submit({
-      path: "/api/v1/tools/video/compress-video",
+      path: "/api/v1/tools/video/stabilize-video",
       files: [{ field: "file", path: MP4 }],
       settings: {},
       timeoutMs: 10_000,
@@ -222,10 +228,10 @@ async function checkCancellation(): Promise<void> {
 
     // Poll the row until it settles or a bounded deadline passes.
     let state = "";
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 90; attempt++) {
       state = await sql(`select status from jobs where id = '${jobId}'`);
       if (state && !["queued", "processing", "pending", "active"].includes(state)) break;
-      await sleep(1_000);
+      await sleep(2_000);
     }
     const terminal = ["cancelled", "canceled", "failed", "completed"].includes(state);
     report(
@@ -334,13 +340,13 @@ async function checkBatch(): Promise<void> {
 async function checkPipeline(): Promise<void> {
   const steps = [
     { toolId: "resize", settings: { width: 120 } },
-    { toolId: "grayscale", settings: {} },
+    { toolId: "adjust-colors", settings: { grayscale: true } },
     { toolId: "convert", settings: { format: "jpeg" } },
   ];
   const outcome = await client.submit({
     path: "/api/v1/pipeline/execute",
     files: [{ field: "file", path: PNG }],
-    fields: { steps: JSON.stringify(steps) },
+    fields: { pipeline: JSON.stringify({ steps }) },
     timeoutMs: 180_000,
   });
   let bytes = outcome.bytes;
@@ -379,7 +385,7 @@ async function checkPipelineCrossModality(): Promise<void> {
   const outcome = await client.submit({
     path: "/api/v1/pipeline/execute",
     files: [{ field: "file", path: PNG }],
-    fields: { steps: JSON.stringify(steps) },
+    fields: { pipeline: JSON.stringify({ steps }) },
     timeoutMs: 120_000,
   });
   let terminal = outcome.asyncOutcome;
