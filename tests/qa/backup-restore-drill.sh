@@ -49,6 +49,13 @@ export QA_IMAGE_REF="$CANDIDATE_IMAGE"
 export QA_PROJECT_NAME="snapotter-backup-$RUN_ID"
 export QA_APP_PORT=${QA_APP_PORT:-0}
 BACKUP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/snapotter-backup-drill.XXXXXX")
+# Where the volume archives are staged. Docker Desktop on macOS serves bind
+# mounts over virtiofs, which reproducibly hands back a corrupt multi-hundred-MB
+# tar even when it hashed correctly moments earlier, so the default is a Docker
+# volume the daemon owns end to end. Set QA_BACKUP_STAGING=bind to put the
+# archives on the host filesystem instead.
+BACKUP_VOLUME="snapotter-backup-stage-$RUN_ID"
+BACKUP_STAGING=${QA_BACKUP_STAGING:-volume}
 KEEP_BACKUP=${KEEP_QA_BACKUP:-0}
 RESULTS=${QA_RESULTS:-"$BACKUP_DIR/drill-results.jsonl"}
 BASE_URL=""
@@ -91,8 +98,20 @@ fail() {
   exit 1
 }
 
+# Mount arguments for the archive staging area, whichever backend is in use.
+stage_mount() {
+  if [ "$BACKUP_STAGING" = "volume" ]; then
+    printf '%s\n' "-v" "$BACKUP_VOLUME:/backup"
+  else
+    printf '%s\n' "-v" "$BACKUP_DIR:/backup"
+  fi
+}
+
 cleanup() {
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  if [ "$BACKUP_STAGING" = "volume" ] && [ "$KEEP_BACKUP" != "1" ]; then
+    docker volume rm -f "$BACKUP_VOLUME" >/dev/null 2>&1 || true
+  fi
   for project in "${LEGACY_PROJECTS[@]:-}"; do
     [ -n "$project" ] || continue
     compose_project "$project" down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -207,16 +226,31 @@ APP_CONTAINER=$(compose ps -aq app)
 REDIS_CONTAINER=$(compose ps -aq redis)
 [ -n "$APP_CONTAINER" ] && [ -n "$REDIS_CONTAINER" ] || fail "snapshot" "container ids missing"
 
+mapfile -t STAGE < <(stage_mount)
+if [ "$BACKUP_STAGING" = "volume" ]; then
+  docker volume create "$BACKUP_VOLUME" >/dev/null
+  docker run --rm --entrypoint /bin/sh "${STAGE[@]}" -v "$BACKUP_DIR:/host:ro" "$CANDIDATE_IMAGE" \
+    -c 'cp /host/snapotter.dump /backup/snapotter.dump' || fail "snapshot" "could not stage the dump"
+fi
+
 docker run --rm --entrypoint /bin/sh \
-  --volumes-from "$APP_CONTAINER" -v "$BACKUP_DIR:/backup" "$CANDIDATE_IMAGE" \
+  --volumes-from "$APP_CONTAINER" "${STAGE[@]}" "$CANDIDATE_IMAGE" \
   -c 'tar czf /backup/snapotter-data.tar.gz -C /data .' || fail "snapshot" "data archive failed"
 docker run --rm --entrypoint /bin/sh \
-  --volumes-from "$REDIS_CONTAINER" -v "$BACKUP_DIR:/backup" "$CANDIDATE_IMAGE" \
+  --volumes-from "$REDIS_CONTAINER" "${STAGE[@]}" "$CANDIDATE_IMAGE" \
   -c 'tar czf /backup/snapotter-redis.tar.gz -C /data .' || fail "snapshot" "redis archive failed"
-docker run --rm --entrypoint /bin/sh -v "$BACKUP_DIR:/backup" "$CANDIDATE_IMAGE" \
+docker run --rm --entrypoint /bin/sh "${STAGE[@]}" "$CANDIDATE_IMAGE" \
   -c 'cd /backup && sha256sum snapotter.dump snapotter-data.tar.gz snapotter-redis.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS' \
   >/dev/null || fail "snapshot" "checksum manifest failed"
-record "snapshot" "pass" "app and redis stopped before the tar; SHA256SUMS verified"
+
+# Read the archives back from a container that did not write them, before
+# anything irreversible happens. A backup you have not read is not a backup,
+# and the next stage destroys the source volumes. macOS bind mounts in
+# particular can hand back bytes that hashed correctly moments earlier.
+docker run --rm --entrypoint /bin/sh "${STAGE[@]}" "$CANDIDATE_IMAGE" \
+  -c 'cd /backup && sha256sum -c SHA256SUMS && tar tzf snapotter-data.tar.gz >/dev/null && tar tzf snapotter-redis.tar.gz >/dev/null' \
+  >/dev/null 2>&1 || fail "snapshot" "archives do not read back intact; refusing to destroy the source volumes"
+record "snapshot" "pass" "app and redis stopped before the tar; archives re-read and listed from a second container"
 
 # ── Stage 4: destroy and restore ─────────────────────────────────────────────
 compose down --volumes --remove-orphans >/dev/null
@@ -225,11 +259,11 @@ APP_CONTAINER=$(compose ps -aq app)
 REDIS_CONTAINER=$(compose ps -aq redis)
 
 docker run --rm --entrypoint /bin/sh \
-  --volumes-from "$APP_CONTAINER" -v "$BACKUP_DIR:/backup:ro" "$CANDIDATE_IMAGE" \
+  --volumes-from "$APP_CONTAINER" "${STAGE[@]}" "$CANDIDATE_IMAGE" \
   -c 'find /data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + && tar xzf /backup/snapotter-data.tar.gz -C /data' \
   || fail "restore" "data restore failed"
 docker run --rm --entrypoint /bin/sh \
-  --volumes-from "$REDIS_CONTAINER" -v "$BACKUP_DIR:/backup:ro" "$CANDIDATE_IMAGE" \
+  --volumes-from "$REDIS_CONTAINER" "${STAGE[@]}" "$CANDIDATE_IMAGE" \
   -c 'find /data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + && tar xzf /backup/snapotter-redis.tar.gz -C /data' \
   || fail "restore" "redis restore failed"
 
