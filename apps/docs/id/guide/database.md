@@ -146,6 +146,17 @@ Log aksi yang relevan dengan keamanan.
 | `details` | jsonb | Data khusus aksi |
 | `createdAt` | timestamp | Waktu aksi |
 
+### user_preferences {#user-preferences}
+
+Status UI per pengguna, dikunci berdasarkan nama preferensi. Menyimpan alat yang disematkan di halaman beranda, yang ditulis melalui `PUT /api/v1/preferences`.
+
+| Kolom | Tipe | Catatan |
+|---|---|---|
+| `userId` | text | FK ke users, menghapus secara berantai. Primary key bersama `key` |
+| `key` | text | Nama preferensi. Primary key bersama `userId` |
+| `value` | jsonb | Muatan preferensi |
+| `updatedAt` | timestamp | Penulisan terakhir |
+
 ## Migrasi {#migrations}
 
 Drizzle menangani migrasi skema. File migrasi berada di `apps/api/drizzle/`. Selama pengembangan:

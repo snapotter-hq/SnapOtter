@@ -146,6 +146,17 @@ i18n_hash_version: 2
 | `details` | jsonb | بيانات خاصة بالإجراء |
 | `createdAt` | timestamp | وقت الإجراء |
 
+### user_preferences {#user-preferences}
+
+حالة الواجهة لكل مستخدم، مفهرسة باسم التفضيل. تخزن الأدوات المثبّتة في الصفحة الرئيسية، وتُكتب عبر `PUT /api/v1/preferences`.
+
+| العمود | النوع | ملاحظات |
+|---|---|---|
+| `userId` | text | مفتاح خارجي إلى users، مع حذف متتالٍ. جزء من المفتاح الأساسي مع `key` |
+| `key` | text | اسم التفضيل. جزء من المفتاح الأساسي مع `userId` |
+| `value` | jsonb | محتوى التفضيل |
+| `updatedAt` | timestamp | وقت آخر كتابة |
+
 ## عمليات الترحيل {#migrations}
 
 يتولى Drizzle ترحيلات المخطط. تقع ملفات الترحيل في `apps/api/drizzle/`. أثناء التطوير:

@@ -146,6 +146,17 @@ Registro de acciones relevantes para la seguridad.
 | `details` | jsonb | Datos específicos de la acción |
 | `createdAt` | timestamp | Momento de la acción |
 
+### user_preferences {#user-preferences}
+
+Estado de la interfaz por usuario, indexado por nombre de preferencia. Almacena las herramientas fijadas de la página de inicio, que se escriben a través de `PUT /api/v1/preferences`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `userId` | text | FK a users, con borrado en cascada. Clave primaria junto con `key` |
+| `key` | text | Nombre de la preferencia. Clave primaria junto con `userId` |
+| `value` | jsonb | Contenido de la preferencia |
+| `updatedAt` | timestamp | Última escritura |
+
 ## Migraciones {#migrations}
 
 Drizzle gestiona las migraciones del esquema. Los archivos de migración están en `apps/api/drizzle/`. Durante el desarrollo:

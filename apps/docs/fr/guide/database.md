@@ -146,6 +146,17 @@ Journal des actions pertinentes pour la sécurité.
 | `details` | jsonb | Données spécifiques à l'action |
 | `createdAt` | timestamp | Date de l'action |
 
+### user_preferences {#user-preferences}
+
+État de l'interface propre à chaque utilisateur, indexé par nom de préférence. Alimente les outils épinglés de la page d'accueil via `PUT /api/v1/preferences`.
+
+| Colonne | Type | Notes |
+|---|---|---|
+| `userId` | text | FK vers users, suppression en cascade. Clé primaire avec `key` |
+| `key` | text | Nom de la préférence. Clé primaire avec `userId` |
+| `value` | jsonb | Contenu de la préférence |
+| `updatedAt` | timestamp | Dernière écriture |
+
 ## Migrations {#migrations}
 
 Drizzle gère les migrations de schéma. Les fichiers de migration se trouvent dans `apps/api/drizzle/`. Pendant le développement :

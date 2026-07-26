@@ -146,6 +146,17 @@ Registro delle azioni rilevanti per la sicurezza.
 | `details` | jsonb | Dati specifici dell'azione |
 | `createdAt` | timestamp | Data dell'azione |
 
+### user_preferences {#user-preferences}
+
+Stato dell'interfaccia per singolo utente, indicizzato per nome della preferenza. Conserva gli strumenti fissati della pagina iniziale, scritti tramite `PUT /api/v1/preferences`.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `userId` | text | FK verso users, con eliminazione a cascata. Chiave primaria insieme a `key` |
+| `key` | text | Nome della preferenza. Chiave primaria insieme a `userId` |
+| `value` | jsonb | Contenuto della preferenza |
+| `updatedAt` | timestamp | Ultima scrittura |
+
 ## Migrazioni {#migrations}
 
 Drizzle gestisce le migrazioni dello schema. I file di migrazione risiedono in `apps/api/drizzle/`. Durante lo sviluppo:

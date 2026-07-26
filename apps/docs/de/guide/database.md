@@ -146,6 +146,17 @@ Protokoll sicherheitsrelevanter Aktionen.
 | `details` | jsonb | Aktionsspezifische Daten |
 | `createdAt` | timestamp | Zeitpunkt der Aktion |
 
+### user_preferences {#user-preferences}
+
+Oberflächenzustand pro Benutzer, abgelegt unter einem Präferenznamen. Speichert die angehefteten Tools der Startseite, die über `PUT /api/v1/preferences` geschrieben werden.
+
+| Spalte | Typ | Hinweise |
+|---|---|---|
+| `userId` | text | FK auf users, kaskadierendes Löschen. Zusammen mit `key` der Primärschlüssel |
+| `key` | text | Name der Präferenz. Zusammen mit `userId` der Primärschlüssel |
+| `value` | jsonb | Inhalt der Präferenz |
+| `updatedAt` | timestamp | Zeitpunkt des letzten Schreibvorgangs |
+
 ## Migrationen {#migrations}
 
 Drizzle übernimmt die Schema-Migrationen. Die Migrationsdateien liegen in `apps/api/drizzle/`. Während der Entwicklung:

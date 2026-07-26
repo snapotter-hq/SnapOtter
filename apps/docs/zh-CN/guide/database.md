@@ -146,6 +146,17 @@ SnapOtter 使用 PostgreSQL 17 配合 [Drizzle ORM](https://orm.drizzle.team/)�
 | `details` | jsonb | 特定于操作的数据 |
 | `createdAt` | timestamp | 操作时间 |
 
+### user_preferences {#user-preferences}
+
+按偏好名称存储的每用户界面状态。首页的已固定工具通过 `PUT /api/v1/preferences` 写入这里。
+
+| 列 | 类型 | 备注 |
+|---|---|---|
+| `userId` | text | 指向 users 的外键，级联删除。与 `key` 共同构成主键 |
+| `key` | text | 偏好名称。与 `userId` 共同构成主键 |
+| `value` | jsonb | 偏好内容 |
+| `updatedAt` | timestamp | 最后写入时间 |
+
 ## 迁移 {#migrations}
 
 Drizzle 负责处理架构迁移。迁移文件位于 `apps/api/drizzle/`。开发期间：

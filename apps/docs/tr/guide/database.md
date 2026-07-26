@@ -146,6 +146,17 @@ Güvenlikle ilgili eylem günlüğü.
 | `details` | jsonb | Eyleme özgü veri |
 | `createdAt` | timestamp | Eylem zamanı |
 
+### user_preferences {#user-preferences}
+
+Kullanıcı başına arayüz durumu, tercih adına göre anahtarlanır. Ana sayfadaki sabitlenmiş araçları saklar; bunlar `PUT /api/v1/preferences` üzerinden yazılır.
+
+| Sütun | Tür | Notlar |
+|---|---|---|
+| `userId` | text | users tablosuna FK, silmede CASCADE. `key` ile birlikte birincil anahtar |
+| `key` | text | Tercihin adı. `userId` ile birlikte birincil anahtar |
+| `value` | jsonb | Tercihin içeriği |
+| `updatedAt` | timestamp | Son yazma zamanı |
+
 ## Migration'lar {#migrations}
 
 Şema migration'larını Drizzle yürütür. Migration dosyaları `apps/api/drizzle/` dizininde bulunur. Geliştirme sırasında:

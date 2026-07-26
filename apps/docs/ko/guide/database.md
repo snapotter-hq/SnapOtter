@@ -146,6 +146,17 @@ SnapOtter는 데이터 영속성을 위해 PostgreSQL 17과 [Drizzle ORM](https:
 | `details` | jsonb | 작업별 데이터 |
 | `createdAt` | timestamp | 작업 시각 |
 
+### user_preferences {#user-preferences}
+
+사용자별 UI 상태를 환경설정 이름으로 키를 잡아 저장합니다. 홈페이지에 고정된 도구는 `PUT /api/v1/preferences`를 통해 여기에 기록됩니다.
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `userId` | text | users에 대한 FK, 삭제 시 연쇄 적용. `key`와 함께 기본 키 |
+| `key` | text | 환경설정 이름. `userId`와 함께 기본 키 |
+| `value` | jsonb | 환경설정 내용 |
+| `updatedAt` | timestamp | 마지막 쓰기 시각 |
+
 ## 마이그레이션 {#migrations}
 
 Drizzle이 스키마 마이그레이션을 처리합니다. 마이그레이션 파일은 `apps/api/drizzle/`에 있습니다. 개발 중에는:

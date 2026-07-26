@@ -146,6 +146,17 @@ Logg över säkerhetsrelevanta åtgärder.
 | `details` | jsonb | Åtgärdsspecifika data |
 | `createdAt` | timestamp | Åtgärdstidpunkt |
 
+### user_preferences {#user-preferences}
+
+Gränssnittstillstånd per användare, nycklat på inställningens namn. Lagrar startsidans fästa verktyg, som skrivs via `PUT /api/v1/preferences`.
+
+| Kolumn | Typ | Anmärkningar |
+|---|---|---|
+| `userId` | text | FK till users, kaskaderande borttagning. Primärnyckel tillsammans med `key` |
+| `key` | text | Inställningens namn. Primärnyckel tillsammans med `userId` |
+| `value` | jsonb | Inställningens innehåll |
+| `updatedAt` | timestamp | Senaste skrivning |
+
 ## Migrationer {#migrations}
 
 Drizzle sköter schemamigrationer. Migrationsfiler ligger i `apps/api/drizzle/`. Under utveckling:

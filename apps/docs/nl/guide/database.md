@@ -146,6 +146,17 @@ Logboek van beveiligingsrelevante acties.
 | `details` | jsonb | Actiespecifieke gegevens |
 | `createdAt` | timestamp | Tijd van de actie |
 
+### user_preferences {#user-preferences}
+
+UI-status per gebruiker, gesleuteld op voorkeursnaam. Bewaart de vastgezette tools van de startpagina, die via `PUT /api/v1/preferences` worden geschreven.
+
+| Kolom | Type | Opmerkingen |
+|---|---|---|
+| `userId` | text | FK naar users, cascaderend verwijderen. Samen met `key` de primaire sleutel |
+| `key` | text | Naam van de voorkeur. Samen met `userId` de primaire sleutel |
+| `value` | jsonb | Inhoud van de voorkeur |
+| `updatedAt` | timestamp | Laatste schrijfactie |
+
 ## Migraties {#migrations}
 
 Drizzle verzorgt schemamigraties. Migratiebestanden staan in `apps/api/drizzle/`. Tijdens ontwikkeling:

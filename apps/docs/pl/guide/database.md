@@ -146,6 +146,17 @@ Dziennik działań istotnych dla bezpieczeństwa.
 | `details` | jsonb | Dane specyficzne dla działania |
 | `createdAt` | timestamp | Czas działania |
 
+### user_preferences {#user-preferences}
+
+Stan interfejsu dla poszczególnych użytkowników, kluczowany nazwą preferencji. Przechowuje przypięte narzędzia strony głównej, zapisywane przez `PUT /api/v1/preferences`.
+
+| Kolumna | Typ | Uwagi |
+|---|---|---|
+| `userId` | text | Klucz obcy do users, kasowanie kaskadowe. Razem z `key` tworzy klucz główny |
+| `key` | text | Nazwa preferencji. Razem z `userId` tworzy klucz główny |
+| `value` | jsonb | Zawartość preferencji |
+| `updatedAt` | timestamp | Ostatni zapis |
+
 ## Migracje {#migrations}
 
 Drizzle zajmuje się migracjami schematu. Pliki migracji znajdują się w `apps/api/drizzle/`. Podczas developmentu:

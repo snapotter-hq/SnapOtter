@@ -146,6 +146,17 @@ SnapOtter はデータの永続化に PostgreSQL 17 と [Drizzle ORM](https://or
 | `details` | jsonb | アクション固有のデータ |
 | `createdAt` | timestamp | アクション日時 |
 
+### user_preferences {#user-preferences}
+
+ユーザーごとの UI 状態を、設定名をキーとして保持します。ホームページのピン留めしたツールは `PUT /api/v1/preferences` 経由でここに書き込まれます。
+
+| カラム | 型 | 備考 |
+|---|---|---|
+| `userId` | text | users への FK、削除時にカスケード。`key` と合わせて主キー |
+| `key` | text | 設定の名前。`userId` と合わせて主キー |
+| `value` | jsonb | 設定の内容 |
+| `updatedAt` | timestamp | 最終書き込み日時 |
+
 ## マイグレーション {#migrations}
 
 Drizzle がスキーマのマイグレーションを処理します。マイグレーションファイルは `apps/api/drizzle/` にあります。開発中は次のとおりです。

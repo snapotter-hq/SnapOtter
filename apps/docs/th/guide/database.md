@@ -146,6 +146,17 @@ SnapOtter ใช้ PostgreSQL 17 กับ [Drizzle ORM](https://orm.drizzle.te
 | `details` | jsonb | ข้อมูลเฉพาะการกระทำ |
 | `createdAt` | timestamp | เวลาที่กระทำ |
 
+### user_preferences {#user-preferences}
+
+สถานะ UI ของผู้ใช้แต่ละคน โดยใช้ชื่อการตั้งค่าเป็นคีย์ เก็บเครื่องมือที่ปักหมุดบนหน้าหลัก ซึ่งเขียนผ่าน `PUT /api/v1/preferences`
+
+| คอลัมน์ | ชนิด | หมายเหตุ |
+|---|---|---|
+| `userId` | text | FK ไปยัง users ลบแบบต่อเนื่อง เป็นคีย์หลักร่วมกับ `key` |
+| `key` | text | ชื่อการตั้งค่า เป็นคีย์หลักร่วมกับ `userId` |
+| `value` | jsonb | ข้อมูลของการตั้งค่า |
+| `updatedAt` | timestamp | เวลาที่เขียนล่าสุด |
+
 ## การย้ายข้อมูล (Migrations) {#migrations}
 
 Drizzle จัดการการย้ายสคีมา ไฟล์การย้ายข้อมูลอยู่ใน `apps/api/drizzle/` ระหว่างการพัฒนา:

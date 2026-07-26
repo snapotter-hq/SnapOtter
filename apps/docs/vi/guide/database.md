@@ -146,6 +146,17 @@ Nhật ký các hành động liên quan đến bảo mật.
 | `details` | jsonb | Dữ liệu riêng cho hành động |
 | `createdAt` | timestamp | Thời điểm hành động |
 
+### user_preferences {#user-preferences}
+
+Trạng thái giao diện của từng người dùng, lấy tên thiết lập làm khóa. Lưu các công cụ đã ghim trên trang chủ, được ghi qua `PUT /api/v1/preferences`.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `userId` | text | FK tới users, xóa theo tầng. Khóa chính cùng với `key` |
+| `key` | text | Tên thiết lập. Khóa chính cùng với `userId` |
+| `value` | jsonb | Nội dung thiết lập |
+| `updatedAt` | timestamp | Lần ghi gần nhất |
+
 ## Di trú {#migrations}
 
 Drizzle xử lý việc di trú lược đồ. Các tệp di trú nằm trong `apps/api/drizzle/`. Trong quá trình phát triển:
