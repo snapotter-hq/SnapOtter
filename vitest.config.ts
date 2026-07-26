@@ -88,6 +88,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
+      // Vitest defaults this to false, which silently throws away the entire
+      // report (text table, lcov, html) and the threshold check below the
+      // moment any test fails. The run then reads as "tests failed" when the
+      // ratchet in fact never ran, so a coverage regression can hide behind an
+      // unrelated failure. Always emit; the exit code still comes from the
+      // tests.
+      reportOnFailure: true,
       // Ratchet: measured 2026-06-10 at lines 77.7 / branches 83.7 /
       // functions 86.5 over unit+integration. Raise when coverage rises;
       // never lower without a written reason.
