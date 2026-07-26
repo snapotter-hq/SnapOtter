@@ -1,0 +1,163 @@
+/**
+ * Snapshots the LIVE tool contract for the container QA sweep.
+ *
+ * The sweep runs against a production container and must not need a database,
+ * but the settings schemas it exercises only exist inside the API process
+ * (createToolRoute populates toolRegistry at registration time). This script
+ * registers every tool route against a stub Fastify instance, reads the real
+ * Zod schemas back out, derives pairwise axes and invalid-value probes from
+ * them, and writes tests/qa/tool-contract.json.
+ *
+ * Nothing here is hand-maintained: catalog, modality, accepted inputs,
+ * execution hint, AI mapping, multi-input arity and settings axes all come
+ * from code. Re-run whenever the catalog or a schema changes.
+ *
+ * Needs a Postgres reachable at DATABASE_URL only because registerToolRoutes
+ * reads the disabledTools/enableExperimentalTools settings rows. It performs
+ * two SELECTs and no writes.
+ *
+ * Run: ./apps/api/node_modules/.bin/tsx tests/qa/extract-tool-contract.mts
+ */
+
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { FastifyInstance } from "fastify";
+import { PYTHON_SIDECAR_TOOLS, TOOLS } from "../../packages/shared/src/constants.js";
+import { deriveAxes, type PictAxis } from "../helpers/zod-pict.js";
+
+process.env.DATA_DIR ||= "/tmp/qa-tool-contract";
+process.env.DATABASE_URL ||= "postgres://snapotter:snapotter@localhost:5432/snapotter";
+process.env.REDIS_URL ||= "redis://127.0.0.1:6379";
+process.env.AUTH_ENABLED ||= "true";
+
+export interface ToolContract {
+  id: string;
+  name: string;
+  modality: string;
+  section: string;
+  acceptedInputs: string[];
+  executionHint: string;
+  outputModality?: string;
+  isAI: boolean;
+  registered: boolean;
+  maxInputs?: number;
+  inputKinds?: string[];
+  skipStructuralValidation?: boolean;
+  /** Pairwise axes derived from the live Zod schema. */
+  axes: PictAxis[];
+  /** Settings values the live schema must reject, derived from the axes. */
+  invalidProbes: Array<{ key: string; value: unknown; why: string }>;
+}
+
+/** Values a bounded numeric or enum axis must refuse. */
+function invalidProbesFor(axes: PictAxis[]): ToolContract["invalidProbes"] {
+  const probes: ToolContract["invalidProbes"] = [];
+  for (const axis of axes) {
+    const defined = axis.values.filter((value) => value !== undefined);
+    if (defined.length === 0) continue;
+    const numbers = defined.filter((value): value is number => typeof value === "number");
+    if (numbers.length > 0) {
+      const min = Math.min(...numbers);
+      const max = Math.max(...numbers);
+      if (Number.isFinite(min)) probes.push({ key: axis.key, value: min - 1, why: "below min" });
+      if (Number.isFinite(max) && max !== min) {
+        probes.push({ key: axis.key, value: max + 1, why: "above max" });
+      }
+      probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
+      continue;
+    }
+    if (defined.every((value) => typeof value === "string")) {
+      probes.push({ key: axis.key, value: "__snapotter_qa_not_a_member__", why: "enum outsider" });
+      probes.push({ key: axis.key, value: 12345, why: "wrong type" });
+      continue;
+    }
+    if (defined.every((value) => typeof value === "boolean")) {
+      probes.push({ key: axis.key, value: "yes-please", why: "wrong type" });
+    }
+  }
+  return probes;
+}
+
+async function main(): Promise<void> {
+  const repo = join(import.meta.dirname, "..", "..");
+  const fastifyModule = await import(
+    join(repo, "apps", "api", "node_modules", "fastify", "fastify.js")
+  );
+  const app = fastifyModule.default({ logger: false }) as FastifyInstance;
+  // The tool factory only needs these decorators to exist; the sweep drives the
+  // real auth stack over HTTP against the container, not through this stub.
+  app.decorate("authenticate", async () => {});
+  app.decorate("requirePermission", () => async () => {});
+
+  const { registerToolRoutes } = await import(join(repo, "apps/api/src/routes/tools/index.js"));
+  await registerToolRoutes(app);
+
+  const { getToolConfig, getRegisteredToolIds } = await import(
+    join(repo, "apps/api/src/routes/tool-factory.js")
+  );
+  const registeredIds = new Set<string>(getRegisteredToolIds());
+  const aiTools = new Set<string>(PYTHON_SIDECAR_TOOLS as readonly string[]);
+
+  const { toolSection } = await import(join(repo, "packages/shared/src/section.js"));
+
+  const contracts: ToolContract[] = TOOLS.map((tool) => {
+    const config = getToolConfig(tool.id) as
+      | {
+          settingsSchema?: Parameters<typeof deriveAxes>[0];
+          maxInputs?: number;
+          inputKinds?: string[];
+          skipStructuralValidation?: boolean;
+        }
+      | undefined;
+    let axes: PictAxis[] = [];
+    if (config?.settingsSchema) {
+      try {
+        axes = deriveAxes(config.settingsSchema);
+      } catch (error) {
+        // A Zod upgrade that breaks axis derivation must be visible, not silent.
+        console.error(`axis derivation failed for ${tool.id}: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    }
+    return {
+      id: tool.id,
+      name: tool.name,
+      modality: tool.modality,
+      section: toolSection(tool),
+      acceptedInputs: [...tool.acceptedInputs],
+      executionHint: tool.executionHint,
+      outputModality: tool.outputModality,
+      isAI: aiTools.has(tool.id),
+      registered: registeredIds.has(tool.id),
+      maxInputs: config?.maxInputs,
+      inputKinds: config?.inputKinds,
+      skipStructuralValidation: config?.skipStructuralValidation,
+      axes,
+      invalidProbes: invalidProbesFor(axes),
+    };
+  });
+
+  const outPath = join(import.meta.dirname, "tool-contract.json");
+  writeFileSync(outPath, `${JSON.stringify(contracts, null, 2)}\n`);
+
+  const bySection: Record<string, number> = {};
+  for (const contract of contracts) {
+    bySection[contract.section] = (bySection[contract.section] ?? 0) + 1;
+  }
+  console.log(`wrote ${contracts.length} tool contracts to ${outPath}`);
+  console.log("by section:", JSON.stringify(bySection));
+  console.log("registered (process-fn):", contracts.filter((c) => c.registered).length);
+  console.log("registry-exempt:", contracts.filter((c) => !c.registered).length);
+  console.log("AI:", contracts.filter((c) => c.isAI).length);
+  console.log("with derived axes:", contracts.filter((c) => c.axes.length > 0).length);
+  console.log(
+    "total axis values:",
+    contracts.reduce((sum, c) => sum + c.axes.reduce((n, a) => n + a.values.length, 0), 0),
+  );
+  process.exit(process.exitCode ?? 0);
+}
+
+main().catch((error) => {
+  console.error("FATAL:", error);
+  process.exit(2);
+});
