@@ -205,7 +205,15 @@ describe("surface Playwright harness isolation", () => {
     }
     expect(web.url).toBe("http://127.0.0.1:45149");
     expect(web.reuseExistingServer).toBe(false);
-    expect(web.command).toContain("@snapotter/web build");
+    // Intent, not the script name: the editor harness has to build the web app and
+    // then preview what it built. Pinning the literal "@snapotter/web build" broke
+    // the moment the command moved to an explicit `vite build --outDir`, which was
+    // an isolation improvement rather than a regression.
+    const webBuildAt = web.command.indexOf("vite build");
+    const webServeAt = web.command.indexOf("vite preview");
+    expect(webBuildAt, "editor harness never builds the web app").toBeGreaterThanOrEqual(0);
+    expect(webServeAt, "editor harness never previews its build").toBeGreaterThan(webBuildAt);
+    expect(web.command).not.toContain("vite dev");
     expect(web.command).toContain("&& exec pnpm");
     expect(web.command).toContain("--strictPort");
     expect(web.env.VITE_API_URL).toBe("http://127.0.0.1:44191");
