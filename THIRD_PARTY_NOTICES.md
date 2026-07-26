@@ -66,7 +66,7 @@ Package authors retain all rights granted by their respective licenses.
 - [@aws/lambda-invoke-store@0.3.0](https://github.com/awslabs/aws-lambda-invoke-store)
 - [@grpc/grpc-js@1.14.4](https://grpc.io/)
 - [@grpc/proto-loader@0.8.1](https://grpc.io/)
-- [@img/sharp-darwin-arm64@0.35.3](https://sharp.pixelplumbing.com)
+- [@img/sharp@0.35.3](https://sharp.pixelplumbing.com)
 - [@opentelemetry/api@1.9.1](https://github.com/open-telemetry/opentelemetry-js/tree/main/api)
 - [@opentelemetry/api-logs@0.213.0,0.220.0](https://github.com/open-telemetry/opentelemetry-js/tree/main/experimental/packages/api-logs)
 - [@opentelemetry/configuration@0.220.0](https://github.com/open-telemetry/opentelemetry-js/tree/main/experimental/packages/configuration)
@@ -228,13 +228,12 @@ Package authors retain all rights granted by their respective licenses.
 
 ## LGPL-3.0-or-later
 
-- [@img/sharp-libvips-darwin-arm64@1.3.2](https://sharp.pixelplumbing.com)
+- [@img/sharp-libvips@1.3.2](https://sharp.pixelplumbing.com)
 
 ## MIT
 
 - [@apm-js-collab/code-transformer-bundler-plugins@0.6.2](https://github.com/apm-js-collab/code-transformer-bundler-plugins#readme)
 - [@astrojs/compiler-binding@0.3.1](https://astro.build)
-- [@astrojs/compiler-binding-darwin-arm64@0.3.1](https://astro.build)
 - [@astrojs/compiler-rs@0.3.1](https://astro.build)
 - [@astrojs/internal-helpers@0.10.1](https://github.com/withastro/astro#readme)
 - [@astrojs/markdown-satteri@0.3.4](https://astro.build)
@@ -246,7 +245,7 @@ Package authors retain all rights granted by their respective licenses.
 - [@babel/parser@7.29.7](https://babel.dev/docs/en/next/babel-parser)
 - [@babel/runtime@7.29.7](https://babel.dev/docs/en/next/babel-runtime)
 - [@babel/types@7.29.7](https://babel.dev/docs/en/next/babel-types)
-- [@bruits/satteri-darwin-arm64@0.9.5](https://github.com/bruits/satteri#readme)
+- [@bruits/satteri@0.9.5](https://github.com/bruits/satteri#readme)
 - [@capsizecss/unpack@4.0.1](https://github.com/seek-oss/capsize#readme)
 - [@clack/core@1.4.3](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme)
 - [@clack/prompts@1.7.0](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme)
@@ -254,7 +253,7 @@ Package authors retain all rights granted by their respective licenses.
 - [@dnd-kit/core@6.3.1](https://github.com/clauderic/dnd-kit#readme)
 - [@dnd-kit/sortable@10.0.0](https://github.com/clauderic/dnd-kit#readme)
 - [@dnd-kit/utilities@3.2.2](https://github.com/clauderic/dnd-kit#readme)
-- [@esbuild/darwin-arm64@0.28.1](https://github.com/evanw/esbuild#readme)
+- [@esbuild@0.28.1](https://github.com/evanw/esbuild#readme)
 - [@fast-csv/format@4.3.5](http://c2fo.github.com/fast-csv/packages/format)
 - [@fast-csv/parse@4.3.6](http://c2fo.github.com/fast-csv/packages/parse)
 - [@fastify/accept-negotiator@2.0.1](https://github.com/fastify/accept-negotiator#readme)
@@ -308,11 +307,9 @@ Package authors retain all rights granted by their respective licenses.
 - [@jridgewell/sourcemap-codec@1.5.5](https://github.com/jridgewell/sourcemaps/tree/main/packages/sourcemap-codec)
 - [@js-sdsl/ordered-map@4.4.2](https://js-sdsl.org)
 - [@lukeed/ms@2.0.2](https://github.com/lukeed/ms#readme)
-- [@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4](https://github.com/kriszyp/msgpackr-extract#readme)
+- [@msgpackr-extract/msgpackr-extract@3.0.4](https://github.com/kriszyp/msgpackr-extract#readme)
 - [@napi-rs/canvas@1.0.2](https://github.com/Brooooooklyn/canvas#readme)
-- [@napi-rs/canvas-darwin-arm64@1.0.2](https://github.com/Brooooooklyn/canvas#readme)
 - [@neplex/vectorizer@0.1.0](https://github.com/neplextech/vectorizer#readme)
-- [@neplex/vectorizer-darwin-arm64@0.1.0](https://github.com/neplextech/vectorizer#readme)
 - [@noble/ciphers@1.3.0](https://paulmillr.com/noble/)
 - [@noble/hashes@1.8.0,2.2.0](https://paulmillr.com/noble/)
 - [@nodable/entities@3.0.0](https://github.com/nodable/val-parsers#readme)
@@ -322,10 +319,10 @@ Package authors retain all rights granted by their respective licenses.
 - [@pinojs/redact@0.4.0](https://github.com/pinojs/redact#readme)
 - [@posthog/core@1.43.1](https://github.com/PostHog/posthog-js#readme)
 - [@posthog/types@1.397.0](https://github.com/PostHog/posthog-js#readme)
-- [@rolldown/binding-darwin-arm64@1.1.5](https://rolldown.rs/)
+- [@rolldown/binding@1.1.5](https://rolldown.rs/)
 - [@rolldown/pluginutils@1.0.1](https://github.com/rolldown/plugins/tree/main/packages/pluginutils#readme)
 - [@rollup/pluginutils@5.4.0](https://github.com/rollup/plugins/tree/master/packages/pluginutils#readme)
-- [@rollup/rollup-darwin-arm64@4.62.2](https://rollupjs.org/)
+- [@rollup/rollup@4.62.2](https://rollupjs.org/)
 - [@scalar/client-side-rendering@0.3.4](https://github.com/scalar/scalar)
 - [@scalar/fastify-api-reference@1.62.9](https://github.com/scalar/scalar)
 - [@scalar/helpers@0.9.2](https://github.com/scalar/scalar)
@@ -781,7 +778,6 @@ Package authors retain all rights granted by their respective licenses.
 ## MPL-2.0
 
 - [lightningcss@1.33.0](https://github.com/parcel-bundler/lightningcss#readme)
-- [lightningcss-darwin-arm64@1.33.0](https://github.com/parcel-bundler/lightningcss#readme)
 
 ## Python-2.0
 

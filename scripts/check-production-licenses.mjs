@@ -49,6 +49,26 @@ export function validateInventory(inventory, policy) {
   return violations.sort();
 }
 
+// Native bindings ship one package per platform and arch, so `pnpm licenses
+// list` returns whichever set the current machine installed. Rendering those
+// verbatim makes the notices file describe the developer's laptop: it is
+// regenerated on macOS, then the Linux CI runner resolves the x64 bindings
+// instead and fails the very check that produced it.
+//
+// Collapse each family to its base name for the notices. The policy check above
+// still sees every package the current platform installed, so an unacceptable
+// license in a binding is caught wherever it is installed; only the attribution
+// list is normalized, and the upstream project is still credited once.
+// Two shapes in the wild: a suffix on the package name (@img/sharp-darwin-arm64)
+// and the whole unscoped name (@esbuild/darwin-arm64), which collapses to the
+// scope alone.
+const PLATFORM_SUFFIX =
+  /[-/](?:darwin|linux|win32|freebsd|openbsd|android|sunos)(?:-(?:x64|arm64|arm|ia32|ppc64|s390x|riscv64|loong64))?(?:-(?:musl|gnu|gnueabihf|msvc))?$/;
+
+function platformFamily(name) {
+  return String(name).replace(PLATFORM_SUFFIX, "");
+}
+
 export function renderNotices(inventory) {
   const lines = [
     "# Third-Party Production Node Dependency Notices",
@@ -62,11 +82,19 @@ export function renderNotices(inventory) {
 
   for (const expression of Object.keys(inventory).sort()) {
     lines.push(`## ${expression}`, "");
-    const entries = [...inventory[expression]].sort((left, right) =>
-      String(left.name).localeCompare(String(right.name)),
+    const families = new Map();
+    for (const entry of inventory[expression]) {
+      const name = platformFamily(entry.name);
+      const family = families.get(name) ?? { name, versions: new Set(), homepage: entry.homepage };
+      for (const version of entry.versions) family.versions.add(String(version));
+      family.homepage ??= entry.homepage;
+      families.set(name, family);
+    }
+    const entries = [...families.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
     );
     for (const entry of entries) {
-      const versions = [...entry.versions].map(String).sort().join(",");
+      const versions = [...entry.versions].sort().join(",");
       const label = `${entry.name}@${versions}`;
       lines.push(entry.homepage ? `- [${label}](${entry.homepage})` : `- ${label}`);
     }
