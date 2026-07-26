@@ -1,7 +1,8 @@
-import { apiToolPath, TOOLS } from "@snapotter/shared";
+import { apiToolPath, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getRegisteredToolIds, getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
-import { buildTestApp, loginAsAdmin, type TestApp } from "./test-server.js";
+import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 /**
  * Drift guards between the shared TOOLS catalog and the API.
@@ -119,6 +120,32 @@ describe("tool route drift", () => {
         payload: {},
       });
       expect(res.statusCode, `tool "${tool.id}" has no live POST route (got 404)`).not.toBe(404);
+    }
+  }, 60_000);
+
+  /**
+   * ConversionPresetSettings posts 2+ files to `<toolPath>/batch` for every
+   * preset outside MULTI_FILE_TOOLS. Presets on a custom base (image-to-pdf,
+   * pdf-to-image, svg-to-raster) never enter the registry the generic
+   * `:section/:toolId/batch` route reads, so a base that neither joins
+   * MULTI_FILE_TOOLS nor registers its own /batch 404s on the second file.
+   * That shipped twice: issue #627 (image-to-pdf) and issue #632
+   * (pdf-to-image). An empty body is enough to prove the route resolves.
+   */
+  it("every batch-dispatched conversion preset answers on POST .../batch", async () => {
+    const { body, contentType } = createMultipartPayload([{ name: "settings", content: "{}" }]);
+    for (const preset of CONVERSION_PRESETS) {
+      if (MULTI_FILE_TOOLS.has(preset.id)) continue;
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: `${apiToolPath(preset.id)}/batch`,
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(
+        res.statusCode,
+        `preset "${preset.id}" (base "${preset.base}") has no live /batch route: ${res.body.slice(0, 200)}`,
+      ).not.toBe(404);
     }
   }, 60_000);
 });

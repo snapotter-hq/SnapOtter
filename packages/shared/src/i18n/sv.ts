@@ -3961,6 +3961,7 @@ export const sv: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Kortkommandon",
       focusSearchBar: "Fokusera sökfält",
+      typeToSearch: "Börja skriva för att söka",
       goToTools: "Gå till verktyg",
       toggleTheme: "Växla tema",
       goToResize: "Gå till Ändra storlek",

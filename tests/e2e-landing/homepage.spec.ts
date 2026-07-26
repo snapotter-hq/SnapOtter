@@ -50,6 +50,67 @@ test.describe("Landing Homepage", () => {
     await expect(page.getByPlaceholder("Search tools")).toBeVisible();
   });
 
+  test("typing with nothing focused fills the hero search", async ({ page }) => {
+    const search = page.getByPlaceholder("Search tools");
+    await expect(search).toBeVisible();
+
+    await page.keyboard.type("pdf");
+
+    await expect(search).toHaveValue("pdf");
+    await expect(search).toBeFocused();
+    await expect(page.locator("#hero-search-results")).toBeVisible();
+  });
+
+  test("pressing space scrolls the page instead of starting a search", async ({ page }) => {
+    const search = page.getByPlaceholder("Search tools");
+    await expect(search).toBeVisible();
+
+    await page.keyboard.press("Space");
+
+    await expect(search).toHaveValue("");
+    // Assert the behaviour the rule exists for, not just its side effect.
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+
+  test("typing after blurring appends to the existing hero query", async ({ page }) => {
+    // The append and caret logic is per-surface, not shared, so the web test for
+    // this does not cover the landing script.
+    const search = page.getByPlaceholder("Search tools");
+    await search.fill("pdf");
+    await search.blur();
+
+    await page.keyboard.type("x");
+
+    await expect(search).toHaveValue("pdfx");
+    await expect(page.locator("#hero-search-results")).toBeVisible();
+  });
+
+  test("typing does nothing once the hero search is scrolled out of view", async ({ page }) => {
+    const search = page.getByPlaceholder("Search tools");
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
+    });
+    // Assert the precondition rather than trusting the scroll landed, so this
+    // cannot pass for the wrong reason.
+    await expect(search).not.toBeInViewport();
+
+    await page.keyboard.type("pdf");
+
+    await expect(search).toHaveValue("");
+  });
+
+  test("editing inside the hero search keeps the native caret position", async ({ page }) => {
+    const search = page.getByPlaceholder("Search tools");
+    await search.click();
+    await page.keyboard.type("ab");
+
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.type("x");
+
+    // Appending instead of honouring the caret would produce "abx".
+    await expect(search).toHaveValue("axb");
+  });
+
   test("hero modality cards render", async ({ page }) => {
     const cards = ["Image Tools", "Video Tools", "Audio Tools", "PDF & Documents", "File Tools"];
     for (const card of cards) {

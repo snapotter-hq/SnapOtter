@@ -3694,6 +3694,7 @@ export const zhTW: TranslationKeys = {
     keyboardShortcuts: {
       heading: "鍵盤快速鍵",
       focusSearchBar: "聚焦搜尋列",
+      typeToSearch: "輸入即可搜尋",
       goToTools: "前往工具",
       toggleTheme: "切換佈景主題",
       goToResize: "前往調整大小",

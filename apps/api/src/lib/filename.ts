@@ -122,3 +122,28 @@ export function sanitizeFilename(raw: string): string {
 
   return name;
 }
+
+/**
+ * Give each output a name unique within one batch response.
+ *
+ * Two uploads may share a filename, and clients key results by name
+ * (the X-File-Results map), so a collision would drop a result rather than
+ * show it. Collisions get a `_1`, `_2`, ... suffix before the extension.
+ */
+export function createUniqueNamer(): (name: string) => string {
+  const used = new Set<string>();
+  return (name) => {
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+    const dotIdx = name.lastIndexOf(".");
+    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+    let counter = 1;
+    while (used.has(`${base}_${counter}${ext}`)) counter++;
+    const candidate = `${base}_${counter}${ext}`;
+    used.add(candidate);
+    return candidate;
+  };
+}

@@ -3957,6 +3957,7 @@ export const vi: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Phím tắt",
       focusSearchBar: "Lấy nét thanh tìm kiếm",
+      typeToSearch: "Bắt đầu nhập để tìm kiếm",
       goToTools: "Đến công cụ",
       toggleTheme: "Chuyển đổi giao diện",
       goToResize: "Đến Thay đổi kích thước",

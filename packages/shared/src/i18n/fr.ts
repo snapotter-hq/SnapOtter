@@ -3992,6 +3992,7 @@ export const fr: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Raccourcis clavier",
       focusSearchBar: "Focus sur la barre de recherche",
+      typeToSearch: "Commencer à taper pour rechercher",
       goToTools: "Aller aux outils",
       toggleTheme: "Changer de thème",
       goToResize: "Aller à Redimensionner",

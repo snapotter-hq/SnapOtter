@@ -1,0 +1,88 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { TESTIMONIAL_ROWS } from "@/data/testimonials";
+import { t } from "@/i18n";
+import SectionHeading from "./SectionHeading.astro";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+// Each row is rendered twice so translating the track by -50% lands exactly on
+// the start of the copy, which is what makes the loop seamless. The second pass
+// is aria-hidden so screen readers and crawlers see each quote once.
+const rows = TESTIMONIAL_ROWS.map((items, i) => ({
+  items,
+  reverse: i % 2 === 1,
+  // Duration scales with item count so both rows move at the same visual speed.
+  duration: `${items.length * 9}s`,
+}));
+---
+
+<section class="overflow-hidden bg-primary-subtle px-6 py-20 md:py-28" id="testimonials">
+  <SectionHeading
+    title={t(locale, "home.testimonials.title")}
+    subtitle={t(locale, "home.testimonials.subtitle")}
+  />
+
+  <!--
+    The strip is pinned to LTR in every locale. Quotes are user-submitted and
+    never translated, so they are always Latin script; under dir="rtl" the flex
+    track laid out from the right and drifted itself off-screen, and handles like
+    "@amn-96" bidi-reordered into "amn-96@". The heading above stays RTL.
+  -->
+  <div class="reveal marquee -mx-6 mt-4 flex flex-col gap-5" dir="ltr">
+    {
+      rows.map((row) => (
+        <div class="marquee-viewport">
+          <ul
+            class:list={["marquee-track", row.reverse && "marquee-track-reverse"]}
+            style={`--marquee-duration: ${row.duration}`}
+          >
+            {[false, true].map((isClone) =>
+              row.items.map((item) => (
+                <li class="marquee-item" aria-hidden={isClone ? "true" : undefined}>
+                  <figure class="flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface p-6 shadow-[0_1px_2px_rgba(26,24,20,0.04)]">
+                    <div class="flex gap-0.5 text-primary" aria-hidden="true">
+                      {Array.from({ length: 5 }).map(() => (
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 1.5l2.47 5.16 5.68.78-4.12 3.95 1.02 5.61L10 14.35l-5.05 2.65 1.02-5.61L1.85 7.44l5.68-.78L10 1.5z" />
+                        </svg>
+                      ))}
+                    </div>
+
+                    <blockquote
+                      class="grow text-sm leading-relaxed text-foreground"
+                      lang={item.lang}
+                    >
+                      {item.quote}
+                    </blockquote>
+
+                    <figcaption class="flex items-baseline justify-between gap-3 text-xs">
+                      <span class="font-semibold text-foreground">{item.author}</span>
+                      {item.url ? (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          class="shrink-0 font-medium text-primary-ink underline-offset-2 hover:text-primary-ink-strong hover:underline"
+                          tabindex={isClone ? -1 : undefined}
+                        >
+                          {item.context}
+                        </a>
+                      ) : (
+                        <span class="shrink-0 text-muted">{item.context}</span>
+                      )}
+                    </figcaption>
+                  </figure>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ))
+    }
+  </div>
+</section>

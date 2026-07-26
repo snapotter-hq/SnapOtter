@@ -3974,6 +3974,7 @@ export const nl: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Sneltoetsen",
       focusSearchBar: "Zoekbalk focussen",
+      typeToSearch: "Typen om te zoeken",
       goToTools: "Naar gereedschap",
       toggleTheme: "Thema wisselen",
       goToResize: "Naar Formaat wijzigen",

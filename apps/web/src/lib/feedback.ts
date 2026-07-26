@@ -38,7 +38,10 @@ export type FeedbackPromptVariant =
   | "settings-card-v1"
   | "search-empty-v1"
   | "search-results-v1"
-  | "onboarding-overlay-v1";
+  // onboarding-overlay-v1 was the blocking full-screen version. It is retained
+  // so historical events stay typed; the live prompt is the non-blocking card.
+  | "onboarding-overlay-v1"
+  | "onboarding-card-v1";
 
 export interface FeedbackPayload {
   source: FeedbackSource;
@@ -107,7 +110,7 @@ export function promptVariantForSource(source: FeedbackSource): FeedbackPromptVa
     case "global":
       return "nav-v1";
     case "onboarding":
-      return "onboarding-overlay-v1";
+      return "onboarding-card-v1";
   }
 }
 

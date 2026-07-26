@@ -3761,6 +3761,7 @@ export const hi: TranslationKeys = {
     keyboardShortcuts: {
       heading: "कीबोर्ड शॉर्टकट",
       focusSearchBar: "सर्च बार पर फोकस",
+      typeToSearch: "खोजने के लिए टाइप करें",
       goToTools: "टूल्स पर जाएं",
       toggleTheme: "थीम बदलें",
       goToResize: "रीसाइज़ पर जाएं",

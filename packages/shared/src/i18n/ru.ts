@@ -3970,6 +3970,7 @@ export const ru: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Горячие клавиши",
       focusSearchBar: "Фокус на строке поиска",
+      typeToSearch: "Начните вводить для поиска",
       goToTools: "Перейти к инструментам",
       toggleTheme: "Переключить тему",
       goToResize: "Перейти к изменению размера",

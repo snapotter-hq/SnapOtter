@@ -1,0 +1,87 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { t } from "@/i18n";
+
+// Required rather than optional-with-an-"en"-default: an omitted prop would
+// typecheck, lint, render, and quietly serve English on all 20 localized page
+// trees. LanguageSwitcher, three lines away in the same footer cluster,
+// declares locale the same way.
+interface Props {
+  locale: string;
+}
+const { locale } = Astro.props;
+
+// Every label is resolved server-side and handed to the script, so the client
+// never needs a second request or a translation table of its own.
+const labels = {
+  checking: t(locale, "footer.status.checking"),
+  operational: t(locale, "footer.status.operational"),
+  partial: t(locale, "footer.status.partial"),
+  down: t(locale, "footer.status.down"),
+};
+---
+
+<span
+  class="flex items-center gap-2 text-xs text-muted"
+  data-status-indicator
+  data-status="checking"
+  title="snapotter.com, demo.snapotter.com, docs.snapotter.com"
+>
+  <span class="status-dot" data-status-dot aria-hidden="true"></span>
+  <span data-status-label>{labels.checking}</span>
+</span>
+
+<style>
+  /* The dot carries every state color and the label never does. --color-success
+     is 4.498:1 on --color-background-alt, the footer's background, just under
+     AA's 4.5. palette-contrast.test.ts does not cover that pair: it checks
+     success against --color-background, where it passes at 4.967. So the guard
+     here is the toHaveCSS assertion in tests/e2e-landing/status-indicator.spec.ts,
+     not the unit test. Adding the pair to the unit test would fail by design,
+     since success-as-text-on-alt is not a supported combination.
+
+     Every state clears WCAG 1.4.11's 3:1 floor for non-text against
+     --color-background-alt: muted 4.97, success 4.50, primary-ink 4.57,
+     danger 4.73. */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--color-muted);
+  }
+  [data-status="operational"] .status-dot {
+    background: var(--color-success);
+  }
+  [data-status="partial"] .status-dot {
+    background: var(--color-primary-ink);
+  }
+  [data-status="down"] .status-dot {
+    background: var(--color-danger);
+  }
+</style>
+
+<script is:inline define:vars={{ labels }}>
+  (() => {
+    const root = document.querySelector("[data-status-indicator]");
+    if (!root) return;
+    fetch("/api/status")
+      .then((res) => (res.ok ? res.json() : null))
+      // Route unreachable or body unparseable: stay grey rather than guess.
+      // Scoped to the fetch alone. A trailing catch would also swallow a DOM
+      // bug in the handler below and pin the badge on "Checking status" with
+      // nothing in the console.
+      .catch(() => null)
+      .then((data) => {
+        const status = data?.status ?? "";
+        // Own properties only. A payload of {"status":"toString"} would
+        // otherwise resolve up the prototype chain and render the function.
+        const label = Object.hasOwn(labels, status) ? labels[status] : null;
+        // An unknown or absent verdict leaves the grey default alone. The badge
+        // never claims a state nothing told it.
+        if (!label) return;
+        root.dataset.status = status;
+        root.querySelector("[data-status-label]").textContent = label;
+      });
+  })();
+</script>

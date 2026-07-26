@@ -726,8 +726,11 @@ describe("Batch edge cases — extended", () => {
     expect(json.errors.length).toBe(2);
   });
 
-  it("handles batch with zero-byte files (skipped as empty)", async () => {
-    // Batch processing silently skips zero-byte parts (buffer.length === 0)
+  it("rejects a zero-byte file and names it (issue #645)", async () => {
+    // Zero-byte parts used to be dropped during parsing, which answered "No
+    // files provided" for a request that did provide one and, in a mixed
+    // batch, shifted every later result onto the wrong file. They now keep
+    // their slot and fail in place with a reason.
     const res = await postBatch("resize", [
       {
         name: "file",
@@ -738,10 +741,12 @@ describe("Batch edge cases — extended", () => {
       { name: "settings", content: JSON.stringify({ width: 50 }) },
     ]);
 
-    // The zero-byte file is skipped, resulting in 0 valid files
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/no file/i);
+    expect(json.error).toMatch(/all files failed/i);
+    expect(json.errors).toHaveLength(1);
+    expect(json.errors[0].filename).toBe("empty.png");
+    expect(json.errors[0].error).toMatch(/empty/i);
   });
 });
 
@@ -1273,7 +1278,7 @@ describe("Settings boundary values", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // MULTI-FORMAT ZERO-BYTE BATCH
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Batch with only zero-byte files", () => {
+describe("Batch where every file is zero-byte", () => {
   it("rejects batch where all files are zero-byte", async () => {
     const res = await postBatch("resize", [
       {
@@ -1291,10 +1296,15 @@ describe("Batch with only zero-byte files", () => {
       { name: "settings", content: JSON.stringify({ width: 50 }) },
     ]);
 
-    // Zero-byte files are skipped during parsing, so 0 valid files
-    expect(res.statusCode).toBe(400);
+    // Still rejected outright, nothing processed, but the caller is now told
+    // which files were empty instead of being told it sent none (issue #645).
+    expect(res.statusCode).toBe(422);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/no file/i);
+    expect(json.error).toMatch(/all files failed/i);
+    expect(json.errors.map((e: { filename: string }) => e.filename)).toEqual([
+      "empty1.png",
+      "empty2.png",
+    ]);
   });
 });
 

@@ -3965,6 +3965,7 @@ export const id: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Pintasan Keyboard",
       focusSearchBar: "Fokus ke bilah pencarian",
+      typeToSearch: "Mulai mengetik untuk mencari",
       goToTools: "Ke halaman alat",
       toggleTheme: "Ganti tema",
       goToResize: "Ke Ubah Ukuran",

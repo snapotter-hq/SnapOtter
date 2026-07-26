@@ -47,6 +47,7 @@ import { registerMfa } from "../../apps/api/src/plugins/mfa.js";
 import { oidcRoutes } from "../../apps/api/src/plugins/oidc.js";
 import { registerPerUserRateLimit } from "../../apps/api/src/plugins/per-user-rate-limit.js";
 import { registerSaml } from "../../apps/api/src/plugins/saml.js";
+import { toolAccessMiddleware } from "../../apps/api/src/plugins/tool-access.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
 import { adminOpsRoutes } from "../../apps/api/src/routes/admin-ops.js";
 import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
@@ -154,6 +155,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // Auth middleware (must be registered before routes)
   await authMiddleware(app);
+
+  // Tool access gate (mirrors index.ts: after auth, before routes)
+  await toolAccessMiddleware(app);
 
   // Per-user rate limiting (after auth so request.user is populated)
   try {

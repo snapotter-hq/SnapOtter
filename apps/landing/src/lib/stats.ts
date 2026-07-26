@@ -4,17 +4,44 @@
 // fetchers degrade to a maintained constant if the upstream API is unreachable
 // (or rate-limited), so a build never ships an empty number.
 
-// ghcr.io exposes no public pull-count API, so the GitHub Container Registry
-// portion is a manually maintained estimate. Update it as it grows.
-const GHCR_ESTIMATE = 36_000;
+// ghcr.io exposes no pull-count API (`gh api orgs/snapotter-hq/packages/
+// container/snapotter` 404s), but the count IS visible on the package page at
+// github.com/orgs/snapotter-hq/packages. So this is read off by hand and cannot
+// be fetched at build time like the Docker Hub figure below.
+//
+// OBSERVED 2026-07-25: 77,000. The previous value sat at 36,000 long enough to
+// understate the real number by more than half, so re-read the package page
+// whenever you touch this file and update the date with it.
+const GHCR_ESTIMATE = 77_000;
 
-// Fallbacks used when an upstream fetch fails. Keep roughly current so a
-// degraded build still shows a believable figure.
-const STAR_FALLBACK = 1720;
-const DOCKER_FALLBACK = 104_000;
+// Fallbacks for when an upstream fetch fails. These are a safety net, not a
+// source of truth: a successful build overwrites them with live values, and the
+// scheduled rebuild keeps that fresh. Because formatPulls rounds DOWN and adds
+// "+", a stale constant understates rather than overstates, so a degraded build
+// is never a false claim, just a quieter one.
+//
+// REFRESHED 2026-07-25 against the live APIs. They had drifted badly before
+// that (104K against a real 232K, understating pulls by ~55%), because a failed
+// fetch degraded silently and nothing ever surfaced the gap. `warnStale` below
+// now puts it in the build log. Re-check these whenever you touch this file.
+const STAR_FALLBACK = 2_080; // live 2026-07-25: 2,086
+const DOCKER_FALLBACK = 232_000; // live 2026-07-25: 232,478
 
 const GITHUB_REPO = "snapotter-hq/SnapOtter";
 const DOCKERHUB_REPO = "snapotter/snapotter";
+
+/**
+ * Announce that a build is shipping a hardcoded constant instead of a live
+ * figure. The fetches used to swallow every failure, so a rate-limited or down
+ * upstream produced a quietly wrong number with nothing in the log to show for
+ * it. That is how the fallbacks drifted ~55% out of date unnoticed.
+ */
+function warnStale(source: string, reason: string, value: number): void {
+  console.warn(
+    `[stats] ${source} unavailable (${reason}); falling back to the hardcoded ${value.toLocaleString()}. ` +
+      "This figure is probably stale; refresh the constant in apps/landing/src/lib/stats.ts.",
+  );
+}
 
 /** Compact integer formatting: 1720 -> "1.7k", 2_300_000 -> "2.3M". */
 export function formatCompact(n: number): string {
@@ -33,12 +60,27 @@ export function formatPulls(total: number): string {
   return `${Math.floor(total / 10_000) * 10}K+`;
 }
 
+// Both stats are read from Astro frontmatter, and Navbar/TrustSignals render on
+// every page, so an un-memoized fetch fires once PER PAGE: ~800 GitHub calls per
+// full build. That blows through the unauthenticated 60 req/hr limit almost
+// immediately, and GitHub starts returning 403, so early pages got the live
+// count while every later page silently baked in the fallback and the site
+// shipped two different star numbers. Caching the promise (not the value) means
+// concurrent page renders share one in-flight request per build.
+let starCountPromise: Promise<number> | undefined;
+let imagePullsPromise: Promise<{ total: number; display: string }> | undefined;
+
 /**
- * GitHub star count, fetched at build time. Sends an Authorization header when
+ * GitHub star count, fetched once per build. Sends an Authorization header when
  * GITHUB_TOKEN is set (CI), lifting the unauthenticated 60 req/hr limit that
  * otherwise pins the count to the fallback. Returns STAR_FALLBACK on failure.
  */
-export async function getStarCount(): Promise<number> {
+export function getStarCount(): Promise<number> {
+  starCountPromise ??= fetchStarCount();
+  return starCountPromise;
+}
+
+async function fetchStarCount(): Promise<number> {
   try {
     const token = process.env.GITHUB_TOKEN;
     const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
@@ -51,9 +93,12 @@ export async function getStarCount(): Promise<number> {
     if (res.ok) {
       const data = await res.json();
       if (typeof data.stargazers_count === "number") return data.stargazers_count;
+      warnStale("GitHub stars", "response missing stargazers_count", STAR_FALLBACK);
+    } else {
+      warnStale("GitHub stars", `HTTP ${res.status}`, STAR_FALLBACK);
     }
-  } catch {
-    // Network/JSON failure: fall through to the fallback below.
+  } catch (err) {
+    warnStale("GitHub stars", err instanceof Error ? err.message : "fetch threw", STAR_FALLBACK);
   }
   return STAR_FALLBACK;
 }
@@ -63,7 +108,12 @@ export async function getStarCount(): Promise<number> {
  * Returns the raw total and a display string. Docker Hub degrades to
  * DOCKER_FALLBACK if the API is unreachable.
  */
-export async function getImagePulls(): Promise<{ total: number; display: string }> {
+export function getImagePulls(): Promise<{ total: number; display: string }> {
+  imagePullsPromise ??= fetchImagePulls();
+  return imagePullsPromise;
+}
+
+async function fetchImagePulls(): Promise<{ total: number; display: string }> {
   let dockerPulls = DOCKER_FALLBACK;
   try {
     const res = await fetch(`https://hub.docker.com/v2/repositories/${DOCKERHUB_REPO}/`);
@@ -71,10 +121,18 @@ export async function getImagePulls(): Promise<{ total: number; display: string 
       const data = await res.json();
       if (typeof data.pull_count === "number" && data.pull_count > 0) {
         dockerPulls = data.pull_count;
+      } else {
+        warnStale("Docker Hub pulls", "response missing pull_count", DOCKER_FALLBACK);
       }
+    } else {
+      warnStale("Docker Hub pulls", `HTTP ${res.status}`, DOCKER_FALLBACK);
     }
-  } catch {
-    // Network/JSON failure: keep the Docker fallback.
+  } catch (err) {
+    warnStale(
+      "Docker Hub pulls",
+      err instanceof Error ? err.message : "fetch threw",
+      DOCKER_FALLBACK,
+    );
   }
   const total = dockerPulls + GHCR_ESTIMATE;
   return { total, display: formatPulls(total) };

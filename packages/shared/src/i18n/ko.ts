@@ -3891,6 +3891,7 @@ export const ko: TranslationKeys = {
     keyboardShortcuts: {
       heading: "키보드 단축키",
       focusSearchBar: "검색바로 포커스",
+      typeToSearch: "입력하여 검색",
       goToTools: "도구로 이동",
       toggleTheme: "테마 전환",
       goToResize: "리사이즈로 이동",

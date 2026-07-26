@@ -9,7 +9,7 @@ import { env } from "../../config.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -130,13 +130,14 @@ export function registerSvgToRasterRoute(
           for await (const chunk of part.file) {
             chunks.push(chunk);
           }
-          const buf = Buffer.concat(chunks);
-          if (buf.length > 0) {
-            files.push({
-              buffer: buf,
-              filename: sanitizeFilename(part.filename ?? "output"),
-            });
-          }
+          // Empty parts keep their slot: the client maps results back onto its
+          // own file list by index, so dropping one would label a converted
+          // file with a different file's name (issue #645). The per-file loop
+          // below fails it in place.
+          files.push({
+            buffer: Buffer.concat(chunks),
+            filename: sanitizeFilename(part.filename ?? "output"),
+          });
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
@@ -165,7 +166,13 @@ export function registerSvgToRasterRoute(
 
     if (opts.accept) {
       const accept = opts.accept;
-      const invalid = files.find((file) => !matchesAccept(file.filename, accept));
+      // Empty parts are exempt: they now keep their slot rather than being
+      // dropped (issue #645), and a nameless one would otherwise fail this
+      // whole-request check and take every valid file down with it. They fail
+      // on their own below, where the reason reaches the file it belongs to.
+      const invalid = files.find(
+        (file) => file.buffer.length > 0 && !matchesAccept(file.filename, accept),
+      );
       if (invalid) {
         return reply.status(400).send({
           error: "File is not a valid SVG. This tool only accepts SVG files.",
@@ -312,24 +319,7 @@ export function registerSvgToRasterRoute(
     }
 
     // Deduplicate filenames and build X-File-Results header
-    const usedNames = new Set<string>();
-    function getUniqueName(name: string): string {
-      if (!usedNames.has(name)) {
-        usedNames.add(name);
-        return name;
-      }
-      const dotIdx = name.lastIndexOf(".");
-      const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-      const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-      let counter = 1;
-      let candidate = `${base}_${counter}${ext}`;
-      while (usedNames.has(candidate)) {
-        counter++;
-        candidate = `${base}_${counter}${ext}`;
-      }
-      usedNames.add(candidate);
-      return candidate;
-    }
+    const getUniqueName = createUniqueNamer();
 
     const fileResultsMap: Record<string, string> = {};
     for (let i = 0; i < results.length; i++) {
@@ -354,22 +344,41 @@ export function registerSvgToRasterRoute(
 
     const archive = archiver("zip", { zlib: { level: 5 } });
 
-    archive.on("error", (err) => {
-      request.log.error({ err }, "Archiver error during SVG batch processing");
-      if (!reply.raw.writableEnded) {
-        reply.raw.end();
-      }
-    });
+    // Headers are already out, so this cannot change the status. Destroying
+    // the socket is the only way to tell the client the archive is incomplete:
+    // ending it cleanly reads as success and hands back a ZIP with no central
+    // directory. Entries here are in-memory buffers, so unlike the other batch
+    // routes there is no storage read to fail, but an archiver fault still has
+    // to reach the client.
+    let streamFailed = false;
+    const failStream = (err: Error, msg: string) => {
+      if (streamFailed) return;
+      streamFailed = true;
+      request.log.error({ err, jobId }, msg);
+      archive.abort();
+      reply.raw.destroy(err);
+    };
+
+    archive.on("error", (err) => failStream(err, "Archiver error during SVG batch processing"));
 
     archive.pipe(reply.raw);
 
-    for (const result of results) {
-      if (result) {
-        archive.append(result.buffer, { name: result.filename });
+    // A throw past this point cannot be answered: the reply is hijacked, so
+    // Fastify logs and walks away, leaving the socket neither ended nor
+    // destroyed and the client waiting forever.
+    try {
+      for (const result of results) {
+        if (result) {
+          archive.append(result.buffer, { name: result.filename });
+        }
       }
+      await archive.finalize();
+    } catch (err) {
+      failStream(
+        err instanceof Error ? err : new Error(String(err)),
+        "Failed to finalize ZIP during SVG batch processing",
+      );
     }
-
-    await archive.finalize();
   });
 
   // --- Single-file endpoint ---

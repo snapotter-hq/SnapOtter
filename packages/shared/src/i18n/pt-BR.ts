@@ -3973,6 +3973,7 @@ export const ptBR: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Atalhos de teclado",
       focusSearchBar: "Focar na barra de busca",
+      typeToSearch: "Comece a digitar para buscar",
       goToTools: "Ir para ferramentas",
       toggleTheme: "Alternar tema",
       goToResize: "Ir para Redimensionar",

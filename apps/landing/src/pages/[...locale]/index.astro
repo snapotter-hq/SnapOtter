@@ -9,6 +9,7 @@ import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import OpenSource from "@/components/OpenSource.astro";
 import Pricing from "@/components/Pricing.astro";
+import Testimonials from "@/components/Testimonials.astro";
 import ToolGrid from "@/components/ToolGrid.astro";
 import { LANDING_LOCALES } from "@/i18n";
 import Base from "@/layouts/Base.astro";
@@ -133,6 +134,7 @@ const navSchema = {
     <ToolGrid locale={locale} />
     <EnterpriseSection locale={locale} />
     <FeatureHighlights locale={locale} />
+    <Testimonials locale={locale} />
     <Pricing locale={locale} />
     <OpenSource locale={locale} />
   </main>

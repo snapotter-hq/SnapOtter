@@ -3968,6 +3968,7 @@ export const uk: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Гарячі клавіші",
       focusSearchBar: "Фокус на рядку пошуку",
+      typeToSearch: "Почніть вводити для пошуку",
       goToTools: "Перейти до інструментів",
       toggleTheme: "Перемкнути тему",
       goToResize: "Перейти до зміни розміру",

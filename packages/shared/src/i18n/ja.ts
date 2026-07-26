@@ -3912,6 +3912,7 @@ export const ja: TranslationKeys = {
     keyboardShortcuts: {
       heading: "キーボードショートカット",
       focusSearchBar: "検索バーにフォーカス",
+      typeToSearch: "入力して検索",
       goToTools: "ツールへ移動",
       toggleTheme: "テーマ切り替え",
       goToResize: "リサイズへ移動",

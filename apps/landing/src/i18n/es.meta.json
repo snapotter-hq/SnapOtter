@@ -1367,6 +1367,30 @@
     "outputHash": "2d072a23e553",
     "stale": false
   },
+  "footer.status.checking": {
+    "sourceHash": "a4a534f1f446",
+    "provenance": "machine",
+    "outputHash": "d32b32586b62",
+    "stale": false
+  },
+  "footer.status.down": {
+    "sourceHash": "653599e07324",
+    "provenance": "machine",
+    "outputHash": "c4a2ba37ea1c",
+    "stale": false
+  },
+  "footer.status.operational": {
+    "sourceHash": "39bd8d494d8d",
+    "provenance": "machine",
+    "outputHash": "f27b36cd7197",
+    "stale": false
+  },
+  "footer.status.partial": {
+    "sourceHash": "5b1fb8ceb794",
+    "provenance": "machine",
+    "outputHash": "a4f51d3ff14a",
+    "stale": false
+  },
   "footer.tagline": {
     "sourceHash": "3b1e77c7b8b6",
     "provenance": "machine",

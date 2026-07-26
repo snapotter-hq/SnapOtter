@@ -3932,6 +3932,7 @@ export const ar: TranslationKeys = {
     keyboardShortcuts: {
       heading: "اختصارات لوحة المفاتيح",
       focusSearchBar: "التركيز على شريط البحث",
+      typeToSearch: "ابدأ الكتابة للبحث",
       goToTools: "الانتقال للأدوات",
       toggleTheme: "تبديل السمة",
       goToResize: "الانتقال لتغيير الحجم",

@@ -129,34 +129,33 @@ describe("svg-to-raster", () => {
     expect(meta.height).toBeLessThanOrEqual(50);
   });
 
-  it.each([
-    "png",
-    "jpg",
-    "webp",
-  ] as const)("converts to output format: %s", async (outputFormat) => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat }) },
-    ]);
+  it.each(["png", "jpg", "webp"] as const)(
+    "converts to output format: %s",
+    async (outputFormat) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/svg-to-raster",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    const dlRes = await app.inject({
-      method: "GET",
-      url: json.downloadUrl,
-      headers: { authorization: `Bearer ${adminToken}` },
-    });
-    const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
-    const expectedFormat = outputFormat === "jpg" ? "jpeg" : outputFormat;
-    expect(meta.format).toBe(expectedFormat);
-  });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      const dlRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
+      const expectedFormat = outputFormat === "jpg" ? "jpeg" : outputFormat;
+      expect(meta.format).toBe(expectedFormat);
+    },
+  );
 
   it("respects DPI setting", async () => {
     const { body, contentType } = createMultipartPayload([
@@ -572,6 +571,33 @@ describe("svg-to-raster", () => {
   // ── Batch endpoint coverage ────────────────────────────────────────
 
   describe("batch", () => {
+    it("keeps index alignment when an upload is empty (issue #645)", async () => {
+      // The client pairs results with its own file list by index, so a
+      // dropped zero-byte part would pin this SVG's output to the empty slot.
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "empty.svg",
+          contentType: "image/svg+xml",
+          content: Buffer.alloc(0),
+        },
+        { name: "file", filename: "real.svg", contentType: "image/svg+xml", content: SVG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster/batch",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+      expect(fileResults["0"]).toBeUndefined();
+      expect(fileResults["1"]).toMatch(/real/);
+    });
+
     it("converts multiple SVGs in a single batch request", async () => {
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },

@@ -214,6 +214,32 @@ describe("Filename deduplication in batch", () => {
 
 // ── X-File-Results header ───────────────────────────────────────
 describe("X-File-Results header", () => {
+  it("keeps index alignment when an upload is empty (issue #645)", async () => {
+    // The client maps results back onto its own file list by index, so
+    // dropping a zero-byte part would shift every later index and label a
+    // converted file with a different file's name.
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "file", filename: "real.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 80 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+    expect(fileResults["0"]).toBeUndefined();
+    expect(fileResults["1"]).toMatch(/real/);
+
+    const zip = new AdmZip(res.rawPayload);
+    expect(zip.getEntries()).toHaveLength(1);
+  });
+
   it("maps file indices to output filenames", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "first.png", contentType: "image/png", content: PNG },
