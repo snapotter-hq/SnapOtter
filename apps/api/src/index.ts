@@ -38,6 +38,7 @@ import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-ru
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
+import { parseTrustProxy } from "./lib/trust-proxy.js";
 import { waitForService } from "./lib/wait-for-service.js";
 import { requirePermission } from "./permissions.js";
 import {
@@ -309,14 +310,6 @@ startInterruptedInstallRecovery({
   },
 });
 if (initialOcrRuntimeReconciliation) await initialOcrRuntimeReconciliation;
-
-function parseTrustProxy(value: string): boolean | number | string {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  const asNum = Number(value);
-  if (!Number.isNaN(asNum)) return asNum;
-  return value; // CIDR list
-}
 
 const app = Fastify({
   genReqId: (req) => (req.headers["x-request-id"] as string) ?? randomUUID(),
