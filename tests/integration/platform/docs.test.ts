@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { apiToolPath, TOOLS } from "@snapotter/shared";
+import { apiToolPath, TOOLS, toolSection } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, type TestApp } from "../test-server";
 
@@ -120,11 +120,27 @@ describe("API docs", () => {
     const deployment = readFileSync(join(root, "apps/docs/guide/deployment.md"), "utf8");
     const architecture = readFileSync(join(root, "apps/docs/guide/architecture.md"), "utf8");
 
-    expect(gettingStarted).toContain("| **Image** | 107 |");
-    expect(gettingStarted).toContain("| **Video** | 57 |");
-    expect(gettingStarted).toContain("| **Audio** | 27 |");
-    expect(gettingStarted).toContain("| **PDF / Document** | 42 |");
-    expect(gettingStarted).toContain("| **Files** | 10 |");
+    // The table lists what a reader sees in the UI, so it counts by section,
+    // not by modality. Those agree for image, video and audio and diverge for
+    // the rest: the document modality splits across the PDF and Files sections
+    // by whether a tool accepts .pdf. Hard-coding both taxonomies is what let
+    // this guard drift out of step with the page it guards, so derive them.
+    const perSection = new Map<string, number>();
+    for (const tool of TOOLS) {
+      const section = toolSection(tool);
+      perSection.set(section, (perSection.get(section) ?? 0) + 1);
+    }
+    const rows: Array<[string, string]> = [
+      ["Image", "image"],
+      ["Video", "video"],
+      ["Audio", "audio"],
+      ["PDF / Document", "pdf"],
+      ["Files", "files"],
+    ];
+    for (const [label, section] of rows) {
+      expect(gettingStarted).toContain(`| **${label}** | ${perSection.get(section)} |`);
+    }
+    expect([...perSection.values()].reduce((sum, count) => sum + count, 0)).toBe(TOOLS.length);
     expect(deployment).not.toContain("All 138 non-AI tools");
     expect(architecture).toContain("243 tool routes");
   });
