@@ -1,0 +1,93 @@
+# Unfixed CRITICAL findings we ship knowingly.
+#
+# Read with .trivyignore, which does the opposite job. That file hides findings
+# that are absent from the artifact. This one keeps findings that are PRESENT
+# and have no upstream fix visible: the release scan still reports every ID
+# below in the job summary and in the published JSON report, it just does not
+# fail the build on them. Anything not listed here does fail.
+#
+# The release workflow's blocking scan uses ignore-unfixed, which is right for
+# what it gates (a fix exists and we did not take it) and blind to everything
+# here. Without this file the count of unfixed criticals in a shipped image was
+# structurally zero.
+#
+# Adding an entry means claiming three things and writing down the evidence:
+# the finding is present, no fix exists in any channel we can consume, and you
+# have checked whether user input can reach the vulnerable code. Re-check on
+# every release. Removing the cause beats adding a line.
+#
+# Every entry below is Debian 12 (arm64). amd64 is on Ubuntu 24.04 and carries
+# none of them, so the amd64 release jobs will report the whole list as absent.
+# That gap is the real fix for most of this: see IMG-20260726-005.
+
+# ---------------------------------------------------------------------------
+# Reachable from a user upload. These are the ones that matter.
+# ---------------------------------------------------------------------------
+
+# OpenEXR 3.1.5. ImageMagick's exr.so coder links libOpenEXR-3_1.so.30, and an
+# .exr upload reaches it through decodeExr, so a malformed EXR gets to the
+# vulnerable parser. CVE-2023-5841 is fixed in Debian trixie (3.1.13) but has
+# no bookworm backport. The other two are unfixed in every Debian suite
+# including sid (3.4.6) and untriaged by Ubuntu, so the amd64 image is equally
+# exposed and reports zero for them. Fixing this means either rebuilding
+# ImageMagick against a patched OpenEXR or dropping the EXR coder; neither is a
+# release-window change. Re-check when Debian or upstream ships a fix.
+CVE-2023-5841
+CVE-2026-42216
+CVE-2026-42217
+
+# libxml2 2.9.14, use-after-free on crafted XML, denial of service. Linked into
+# convert, tesseract and LibreOffice, all of which run on user-supplied files.
+# No confirmed path from an upload to the affected parser (SVG goes through
+# Sharp, not ImageMagick's MSVG coder) but it is not ruled out either, so it is
+# filed as reachable rather than argued away. Debian has deferred the fix.
+CVE-2026-6653
+
+# ---------------------------------------------------------------------------
+# Present in a process that handles user input, but the vulnerable code is not
+# on any path user input can take.
+# ---------------------------------------------------------------------------
+
+# perl 5.36, all four via libimage-exiftool-perl. exiftool runs on uploads, so
+# perl itself is in the path; these specific defects are not.
+#   CVE-2026-8376  heap overflow compiling regexes, 32-bit builds only. Both
+#                  shipped architectures are 64-bit.
+#   CVE-2026-42496 Archive::Tar path traversal. Nothing in the image runs it.
+#   CVE-2026-57433 Storable signed integer overflow, needs untrusted Storable
+#                  input to deserialize. Nothing deserializes Storable.
+#   CVE-2026-13221 silently incorrect regex results. A correctness bug, not a
+#                  memory-safety one, and NVD's 9.1 does not reflect that.
+CVE-2026-8376
+CVE-2026-42496
+CVE-2026-57433
+CVE-2026-13221
+
+# glib 2.74, integer underflow in g_dbus_node_info_new_for_xml. Needs
+# attacker-controlled D-Bus introspection XML. The container runs no D-Bus
+# broker and nothing feeds it introspection data.
+CVE-2026-58016
+
+# sqlite 3.40, integer overflow. Needs attacker-controlled SQL. The app is on
+# Postgres; libsqlite3 is here as a python3 and LibreOffice dependency.
+CVE-2025-7458
+
+# ---------------------------------------------------------------------------
+# Not loaded or not present at all. These inflate the count and nothing else.
+# ---------------------------------------------------------------------------
+
+# zlib1g, integer overflow in minizip's zipOpenNewFileInZip4_6. Debian does not
+# build minizip into zlib1g: `dpkg -L zlib1g` ships no minizip file. That is
+# why the status is will_not_fix. The vulnerable function is not in the image.
+CVE-2023-45853
+
+# libaom3, heap overflow on frame size change. aom is pulled in only as a
+# dependency of the distro libheif1, which is shadowed at runtime by the
+# libheif 1.21.2 built in this Dockerfile (LD_LIBRARY_PATH=/usr/local/lib) and
+# configured with WITH_AOM_DECODER=OFF. ffmpeg is a self-contained static
+# build. Nothing loads libaom.
+CVE-2023-6879
+
+# openssh-client, use-after-free during client-side host key re-exchange. It
+# arrives as a dependency of git in the node base image. Nothing in the
+# application shells out to ssh or scp. amd64 does not ship it at all.
+CVE-2026-60002

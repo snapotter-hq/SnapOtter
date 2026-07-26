@@ -400,6 +400,8 @@ jobs:
           syft scan dir:/tmp/prebuilt-root/snapotter \
             -o "spdx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.spdx.json"
 
+      # Blocks on CRITICAL/HIGH that have a fix available. The unfixed gate
+      # below covers what this one cannot see.
       - name: Scan archive filesystem
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -419,7 +421,15 @@ jobs:
           scan-ref: /tmp/prebuilt-root/snapotter
           format: json
           output: snapotter-v${{ needs.release.outputs.new_version }}-archive-linux-${{ matrix.arch }}-trivy.json
-          ignore-unfixed: true
+
+      - name: Gate unfixed CRITICAL findings
+        if: always()
+        env:
+          REPORT: snapotter-v${{ needs.release.outputs.new_version }}-archive-linux-${{ matrix.arch }}-trivy.json
+          LABEL: archive linux/${{ matrix.arch }}
+        run: |
+          node scripts/trivy-unfixed-gate.mjs "${REPORT}" \
+            --label "${LABEL}" --summary "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish verified immutable archive assets
         env:
@@ -979,13 +989,16 @@ jobs:
           }
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout for trivyignore
+      - name: Checkout scan policy
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
           persist-credentials: false
-          sparse-checkout: .trivyignore
+          sparse-checkout: |
+            .trivyignore
+            .trivy-unfixed-allow
+            scripts/trivy-unfixed-gate.mjs
           sparse-checkout-cone-mode: false
 
       - name: Verify immutable release tag binding
@@ -1000,6 +1013,9 @@ jobs:
               exit 1
             }
 
+      # Blocks on CRITICAL/HIGH that have a fix available: a patch exists and we
+      # did not take it. Findings with no fix are invisible here by design; the
+      # unfixed gate below is what covers them.
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -1027,6 +1043,8 @@ jobs:
           sarif_file: "trivy-results.sarif"
           category: trivy-${{ matrix.platform }}
 
+      # No ignore-unfixed here: this report is the published record of what the
+      # image actually contains, and it feeds the unfixed gate below.
       - name: Run Trivy (JSON report)
         if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -1034,7 +1052,15 @@ jobs:
           image-ref: "ghcr.io/snapotter-hq/snapotter@sha256:${{ steps.digest.outputs.sha }}"
           format: "json"
           output: "snapotter-v${{ needs.release.outputs.new_version }}-image-${{ matrix.platform }}-trivy.json"
-          ignore-unfixed: true
+
+      - name: Gate unfixed CRITICAL findings
+        if: always()
+        env:
+          REPORT: "snapotter-v${{ needs.release.outputs.new_version }}-image-${{ matrix.platform }}-trivy.json"
+          LABEL: "image ${{ matrix.platform }}"
+        run: |
+          node scripts/trivy-unfixed-gate.mjs "${REPORT}" \
+            --label "${LABEL}" --summary "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload Trivy report to GitHub Release
         if: always()
