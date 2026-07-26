@@ -33,10 +33,10 @@ Questo avvia due dev server:
 
 | Servizio  | URL                      | Note                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Dev server Vite, fa da proxy a /api      |
+| Frontend | http://localhost:1351     | Dev server Vite, fa da proxy a /api      |
 | Backend  | http://localhost:13490    | API Fastify (accessibile via proxy)   |
 
-Apri http://localhost:1349 nel tuo browser. Accedi con `admin` / `admin`. Ti verrà chiesto di cambiare la password al primo login.
+Apri http://localhost:1351 nel tuo browser. Accedi con `admin` / `admin`. Ti verrà chiesto di cambiare la password al primo login.
 
 ## Struttura del progetto {#project-structure}
 

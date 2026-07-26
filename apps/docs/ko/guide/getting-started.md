@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- 프론트엔드: [http://localhost:1349](http://localhost:1349)
+- 프론트엔드: [http://localhost:1351](http://localhost:1351)
 - 백엔드: [http://localhost:13490](http://localhost:13490)
 
 ## 할 수 있는 것 {#what-you-can-do}

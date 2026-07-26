@@ -29,10 +29,10 @@ This starts two dev servers:
 
 | Service  | URL                      | Notes                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Vite dev server, proxies /api      |
+| Frontend | http://localhost:1351     | Vite dev server, proxies /api      |
 | Backend  | http://localhost:13490    | Fastify API (accessed via proxy)   |
 
-Open http://localhost:1349 in your browser. Login with `admin` / `admin`. You will be prompted to change the password on first login.
+Open http://localhost:1351 in your browser. Login with `admin` / `admin`. You will be prompted to change the password on first login.
 
 ## Project structure {#project-structure}
 

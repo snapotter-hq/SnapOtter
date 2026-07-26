@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- Фронтенд: [http://localhost:1349](http://localhost:1349)
+- Фронтенд: [http://localhost:1351](http://localhost:1351)
 - Бекенд: [http://localhost:13490](http://localhost:13490)
 
 ## Що ви можете робити {#what-you-can-do}

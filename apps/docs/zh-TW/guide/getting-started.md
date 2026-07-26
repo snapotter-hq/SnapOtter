@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- 前端：[http://localhost:1349](http://localhost:1349)
+- 前端：[http://localhost:1351](http://localhost:1351)
 - 後端：[http://localhost:13490](http://localhost:13490)
 
 ## 你可以做什麼 {#what-you-can-do}

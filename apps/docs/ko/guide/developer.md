@@ -33,10 +33,10 @@ pnpm dev
 
 | 서비스  | URL                      | 비고                              |
 |----------|--------------------------|------------------------------------|
-| 프론트엔드 | http://localhost:1349     | Vite 개발 서버, /api 프록시      |
+| 프론트엔드 | http://localhost:1351     | Vite 개발 서버, /api 프록시      |
 | 백엔드  | http://localhost:13490    | Fastify API (프록시를 통해 접근)   |
 
-브라우저에서 http://localhost:1349를 여세요. `admin` / `admin`으로 로그인하세요. 첫 로그인 시 비밀번호를 변경하라는 안내가 표시됩니다.
+브라우저에서 http://localhost:1351를 여세요. `admin` / `admin`으로 로그인하세요. 첫 로그인 시 비밀번호를 변경하라는 안내가 표시됩니다.
 
 ## 프로젝트 구조 {#project-structure}
 

@@ -61,7 +61,7 @@ cd snapotter
 # Install dependencies
 pnpm install
 
-# Start dev servers (web on :1349, API on :13490)
+# Start dev servers (web on :1351, API on :13490)
 pnpm dev
 ```
 

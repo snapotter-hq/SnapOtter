@@ -33,10 +33,10 @@ pnpm dev
 
 | Dịch vụ  | URL                      | Ghi chú                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Máy chủ dev Vite, proxy /api      |
+| Frontend | http://localhost:1351     | Máy chủ dev Vite, proxy /api      |
 | Backend  | http://localhost:13490    | API Fastify (truy cập qua proxy)   |
 
-Mở http://localhost:1349 trong trình duyệt của bạn. Đăng nhập bằng `admin` / `admin`. Bạn sẽ được nhắc đổi mật khẩu ở lần đăng nhập đầu tiên.
+Mở http://localhost:1351 trong trình duyệt của bạn. Đăng nhập bằng `admin` / `admin`. Bạn sẽ được nhắc đổi mật khẩu ở lần đăng nhập đầu tiên.
 
 ## Cấu trúc dự án {#project-structure}
 

@@ -33,10 +33,10 @@ Uruchamia to dwa serwery developerskie:
 
 | Usługa  | URL                      | Uwagi                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Serwer dev Vite, przekazuje /api      |
+| Frontend | http://localhost:1351     | Serwer dev Vite, przekazuje /api      |
 | Backend  | http://localhost:13490    | API Fastify (dostępne przez proxy)   |
 
-Otwórz http://localhost:1349 w przeglądarce. Zaloguj się przez `admin` / `admin`. Przy pierwszym logowaniu zostaniesz poproszony o zmianę hasła.
+Otwórz http://localhost:1351 w przeglądarce. Zaloguj się przez `admin` / `admin`. Przy pierwszym logowaniu zostaniesz poproszony o zmianę hasła.
 
 ## Struktura projektu {#project-structure}
 

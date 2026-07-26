@@ -33,10 +33,10 @@ pnpm dev
 
 | บริการ  | URL                      | หมายเหตุ                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Vite dev server, proxy /api      |
+| Frontend | http://localhost:1351     | Vite dev server, proxy /api      |
 | Backend  | http://localhost:13490    | Fastify API (เข้าถึงผ่าน proxy)   |
 
-เปิด http://localhost:1349 ในเบราว์เซอร์ของคุณ เข้าสู่ระบบด้วย `admin` / `admin` คุณจะได้รับแจ้งให้เปลี่ยนรหัสผ่านตอนเข้าสู่ระบบครั้งแรก
+เปิด http://localhost:1351 ในเบราว์เซอร์ของคุณ เข้าสู่ระบบด้วย `admin` / `admin` คุณจะได้รับแจ้งให้เปลี่ยนรหัสผ่านตอนเข้าสู่ระบบครั้งแรก
 
 ## โครงสร้างโปรเจกต์ {#project-structure}
 

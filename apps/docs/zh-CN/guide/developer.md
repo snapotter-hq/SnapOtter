@@ -33,10 +33,10 @@ pnpm dev
 
 | 服务  | URL                      | 备注                              |
 |----------|--------------------------|------------------------------------|
-| 前端 | http://localhost:1349     | Vite 开发服务器，代理 /api      |
+| 前端 | http://localhost:1351     | Vite 开发服务器，代理 /api      |
 | 后端  | http://localhost:13490    | Fastify API（通过代理访问）   |
 
-在浏览器中打开 http://localhost:1349。使用 `admin` / `admin` 登录。首次登录时会提示你修改密码。
+在浏览器中打开 http://localhost:1351。使用 `admin` / `admin` 登录。首次登录时会提示你修改密码。
 
 ## 项目结构 {#project-structure}
 

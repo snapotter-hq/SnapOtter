@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- Ön yüz: [http://localhost:1349](http://localhost:1349)
+- Ön yüz: [http://localhost:1351](http://localhost:1351)
 - Arka uç: [http://localhost:13490](http://localhost:13490)
 
 ## Neler Yapabilirsiniz {#what-you-can-do}

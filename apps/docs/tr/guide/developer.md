@@ -33,10 +33,10 @@ Bu, iki geliştirme sunucusunu başlatır:
 
 | Servis  | URL                      | Notlar                              |
 |----------|--------------------------|------------------------------------|
-| Ön uç | http://localhost:1349     | Vite geliştirme sunucusu, /api proxy'ler      |
+| Ön uç | http://localhost:1351     | Vite geliştirme sunucusu, /api proxy'ler      |
 | Arka uç  | http://localhost:13490    | Fastify API (proxy üzerinden erişilir)   |
 
-Tarayıcınızda http://localhost:1349 adresini açın. `admin` / `admin` ile oturum açın. İlk oturum açmada parolayı değiştirmeniz istenir.
+Tarayıcınızda http://localhost:1351 adresini açın. `admin` / `admin` ile oturum açın. İlk oturum açmada parolayı değiştirmeniz istenir.
 
 ## Proje yapısı {#project-structure}
 

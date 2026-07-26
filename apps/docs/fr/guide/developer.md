@@ -33,10 +33,10 @@ Cela démarre deux serveurs de développement :
 
 | Service  | URL                      | Notes                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Serveur de développement Vite, proxifie /api      |
+| Frontend | http://localhost:1351     | Serveur de développement Vite, proxifie /api      |
 | Backend  | http://localhost:13490    | API Fastify (accédée via le proxy)   |
 
-Ouvrez http://localhost:1349 dans votre navigateur. Connectez-vous avec `admin` / `admin`. Il vous sera demandé de changer le mot de passe à la première connexion.
+Ouvrez http://localhost:1351 dans votre navigateur. Connectez-vous avec `admin` / `admin`. Il vous sera demandé de changer le mot de passe à la première connexion.
 
 ## Structure du projet {#project-structure}
 

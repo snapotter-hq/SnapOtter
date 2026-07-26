@@ -33,10 +33,10 @@ Ini memulai dua server dev:
 
 | Layanan  | URL                      | Catatan                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Server dev Vite, mem-proxy /api      |
+| Frontend | http://localhost:1351     | Server dev Vite, mem-proxy /api      |
 | Backend  | http://localhost:13490    | Fastify API (diakses melalui proxy)   |
 
-Buka http://localhost:1349 di browser Anda. Login dengan `admin` / `admin`. Anda akan diminta untuk mengubah kata sandi saat login pertama.
+Buka http://localhost:1351 di browser Anda. Login dengan `admin` / `admin`. Anda akan diminta untuk mengubah kata sandi saat login pertama.
 
 ## Struktur proyek {#project-structure}
 

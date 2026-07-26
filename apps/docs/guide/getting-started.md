@@ -84,7 +84,7 @@ pnpm install
 pnpm dev
 ```
 
-- Frontend: [http://localhost:1349](http://localhost:1349)
+- Frontend: [http://localhost:1351](http://localhost:1351)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
 ## What You Can Do {#what-you-can-do}

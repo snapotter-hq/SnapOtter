@@ -33,10 +33,10 @@ Detta startar två utvecklingsservrar:
 
 | Tjänst  | URL                      | Anmärkningar                              |
 |----------|--------------------------|------------------------------------|
-| Frontend | http://localhost:1349     | Vite-utvecklingsserver, proxar /api      |
+| Frontend | http://localhost:1351     | Vite-utvecklingsserver, proxar /api      |
 | Backend  | http://localhost:13490    | Fastify API (nås via proxy)   |
 
-Öppna http://localhost:1349 i din webbläsare. Logga in med `admin` / `admin`. Du kommer att uppmanas att byta lösenord vid första inloggningen.
+Öppna http://localhost:1351 i din webbläsare. Logga in med `admin` / `admin`. Du kommer att uppmanas att byta lösenord vid första inloggningen.
 
 ## Projektstruktur {#project-structure}
 

@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- الواجهة الأمامية: [http://localhost:1349](http://localhost:1349)
+- الواجهة الأمامية: [http://localhost:1351](http://localhost:1351)
 - الواجهة الخلفية: [http://localhost:13490](http://localhost:13490)
 
 ## ما يمكنك فعله {#what-you-can-do}

@@ -88,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-- फ़्रंटएंड: [http://localhost:1349](http://localhost:1349)
+- फ़्रंटएंड: [http://localhost:1351](http://localhost:1351)
 - बैकएंड: [http://localhost:13490](http://localhost:13490)
 
 ## What You Can Do {#what-you-can-do}
