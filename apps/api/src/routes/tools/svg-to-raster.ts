@@ -130,13 +130,14 @@ export function registerSvgToRasterRoute(
           for await (const chunk of part.file) {
             chunks.push(chunk);
           }
-          const buf = Buffer.concat(chunks);
-          if (buf.length > 0) {
-            files.push({
-              buffer: buf,
-              filename: sanitizeFilename(part.filename ?? "output"),
-            });
-          }
+          // Empty parts keep their slot: the client maps results back onto its
+          // own file list by index, so dropping one would label a converted
+          // file with a different file's name (issue #645). The per-file loop
+          // below fails it in place.
+          files.push({
+            buffer: Buffer.concat(chunks),
+            filename: sanitizeFilename(part.filename ?? "output"),
+          });
         } else if (part.fieldname === "settings") {
           settingsRaw = part.value as string;
         } else if (part.fieldname === "clientJobId") {
@@ -337,11 +338,16 @@ export function registerSvgToRasterRoute(
 
     const archive = archiver("zip", { zlib: { level: 5 } });
 
+    // Headers are already out, so this cannot change the status. Destroying
+    // the socket is the only way to tell the client the archive is incomplete:
+    // ending it cleanly reads as success and hands back a ZIP with no central
+    // directory. Entries here are in-memory buffers, so unlike the other batch
+    // routes there is no storage read to fail, but an archiver fault still has
+    // to reach the client.
     archive.on("error", (err) => {
-      request.log.error({ err }, "Archiver error during SVG batch processing");
-      if (!reply.raw.writableEnded) {
-        reply.raw.end();
-      }
+      request.log.error({ err, jobId }, "Archiver error during SVG batch processing");
+      archive.abort();
+      reply.raw.destroy(err);
     });
 
     archive.pipe(reply.raw);

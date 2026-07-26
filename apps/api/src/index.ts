@@ -53,6 +53,7 @@ import { registerMfa } from "./plugins/mfa.js";
 import { oidcRoutes } from "./plugins/oidc.js";
 import { registerSaml } from "./plugins/saml.js";
 import { registerStatic } from "./plugins/static.js";
+import { toolAccessMiddleware } from "./plugins/tool-access.js";
 import { registerUpload } from "./plugins/upload.js";
 import { adminOpsRoutes } from "./routes/admin-ops.js";
 import { analyticsRoutes } from "./routes/analytics.js";
@@ -455,6 +456,11 @@ await preferencesRoutes(app);
 
 // Auth middleware (must be registered before routes it protects)
 await authMiddleware(app);
+
+// Tool access gate (after auth so request.user is populated). Covers every
+// per-tool endpoint including the hand-written routes, which each used to
+// have to remember the check themselves.
+await toolAccessMiddleware(app);
 
 // Per-user rate limiting (after auth so request.user is populated)
 await registerPerUserRateLimit(app);

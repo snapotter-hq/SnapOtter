@@ -591,7 +591,10 @@ export function registerPdfToImageRoute(
       // Destroy the socket rather than end() it: a clean end on a chunked
       // response is indistinguishable from success, and the client would keep
       // a truncated ZIP believing it complete.
+      let streamFailed = false;
       const failStream = (err: Error, msg: string) => {
+        if (streamFailed) return;
+        streamFailed = true;
         request.log.error({ err, jobId }, msg);
         archive.abort();
         reply.raw.destroy(err);
@@ -603,7 +606,14 @@ export function registerPdfToImageRoute(
       try {
         for (const entry of results) {
           if (!entry) continue;
-          archive.append(await getObjectStream(entry.key), { name: entry.filename });
+          const stream = await getObjectStream(entry.key);
+          // The local backend resolves the stream and only then emits ENOENT,
+          // so the catch below never sees it. Without this listener the error
+          // is unhandled and the request hangs instead of terminating.
+          stream.on("error", (err: Error) =>
+            failStream(err, "Object stream error during PDF batch processing"),
+          );
+          archive.append(stream, { name: entry.filename });
         }
         await archive.finalize();
       } catch (err) {

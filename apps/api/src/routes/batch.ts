@@ -138,7 +138,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       413,
                     );
                   }
-                  if (file.size > 0) files.push({ kind: "path", ...file });
+                  // Empty parts keep their slot: the client maps results back
+                  // onto its own file list by index, so dropping one here
+                  // would label a converted file with a different file's name
+                  // (issue #645). They fail in place in the loop below.
+                  files.push({ kind: "path", ...file });
                 } else {
                   const chunks: Buffer[] = [];
                   for await (const chunk of part.file) {
@@ -154,14 +158,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     chunks.push(chunk);
                   }
                   const buffer = Buffer.concat(chunks);
-                  if (buffer.length > 0) {
-                    files.push({
-                      kind: "buffer",
-                      buffer,
-                      filename: sanitizeFilename(part.filename ?? "file"),
-                      size: buffer.length,
-                    });
-                  }
+                  files.push({
+                    kind: "buffer",
+                    buffer,
+                    filename: sanitizeFilename(part.filename ?? "file"),
+                    size: buffer.length,
+                  });
                 }
                 filePartIndex++;
               } else if (part.fieldname === "settings") {
@@ -284,6 +286,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             let processFilename = file.filename;
             const childId = `${parentId}-f${flowChildIndex}`;
             let key = `uploads/${childId}/${processFilename}`;
+
+            // Reported against the slot it arrived in, so every later result
+            // stays paired with the file it came from.
+            if (file.size === 0) {
+              preFailures.push({
+                originalIndex: i,
+                filename: file.filename,
+                error: "File is empty",
+              });
+              if (file.kind === "path") await rm(file.path, { force: true }).catch(() => {});
+              continue;
+            }
 
             if (file.kind === "path") {
               try {
@@ -573,12 +587,20 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           const archive = archiver("zip", { zlib: { level: 5 } });
 
-          archive.on("error", (err) => {
-            request.log.error({ err }, "Archiver error during batch processing");
-            if (!reply.raw.writableEnded) {
-              reply.raw.end();
-            }
-          });
+          // The 200 headers are already out, so nothing here can change the
+          // status. Destroy the socket rather than end() it: a clean end on a
+          // chunked response is indistinguishable from success, so the client
+          // would keep a ZIP with no central directory believing it complete.
+          let streamFailed = false;
+          const failStream = (err: Error, msg: string) => {
+            if (streamFailed) return;
+            streamFailed = true;
+            request.log.error({ err, jobId: parentId }, msg);
+            archive.abort();
+            reply.raw.destroy(err);
+          };
+
+          archive.on("error", (err) => failStream(err, "Archiver error during batch processing"));
 
           archive.pipe(reply.raw);
 
@@ -587,16 +609,22 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             for (const entry of successEntries) {
               if (!entry.outputRef) continue;
               const stream = await getObjectStream(entry.outputRef);
+              // A backend that resolves the stream and only then fails (local
+              // createReadStream emitting ENOENT) never rejects here, so the
+              // catch below cannot see it. Without this listener that error is
+              // unhandled and the request hangs instead of terminating.
+              stream.on("error", (err: Error) =>
+                failStream(err, "Object stream error during batch processing"),
+              );
               archive.append(stream, { name: entry.filename });
             }
 
             await archive.finalize();
           } catch (err) {
-            request.log.error({ err }, "Failed to stream ZIP entries during batch processing");
-            archive.abort();
-            if (!reply.raw.writableEnded) {
-              reply.raw.end();
-            }
+            failStream(
+              err instanceof Error ? err : new Error(String(err)),
+              "Failed to stream ZIP entries during batch processing",
+            );
           }
         } finally {
           request.raw.removeListener("aborted", abortIngress);
