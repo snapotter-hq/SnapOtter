@@ -507,11 +507,22 @@ function rotate(list, offset) {
   return [...list.slice(index), ...list.slice(0, index)];
 }
 
+function selectedWorkloads(args) {
+  const requested = args.workloads;
+  if (!requested) return MIXED;
+  const keys = requested.split(",");
+  for (const key of keys) {
+    if (!WORKLOADS[key]) throw new Error(`unknown workload ${key}`);
+  }
+  return keys;
+}
+
 async function commandConcurrency(cfg, args) {
   const clients = String(args.clients ?? "1,3,5,10,20")
     .split(",")
     .map(Number);
   const iterations = Number(args.iterations ?? 2);
+  const mix = selectedWorkloads(args);
   const token = await login(cfg);
   const fixtures = await loadFixtures();
   const identity = await proveImage(cfg, args["expect-image"]);
@@ -526,13 +537,13 @@ async function commandConcurrency(cfg, args) {
     const started = performance.now();
     await Promise.all(
       Array.from({ length: count }, (_, index) =>
-        client(cfg, token, fixtures, rotate(MIXED, index), iterations, results),
+        client(cfg, token, fixtures, rotate(mix, index), iterations, results),
       ),
     );
     const wallS = (performance.now() - started) / 1000;
     const samples = await sampler.stop();
     const summary = tierSummary(
-      `concurrency-c${count}`,
+      `${args.label ?? "concurrency"}-c${count}`,
       count,
       results,
       samples,
@@ -619,6 +630,7 @@ async function commandIsolation(cfg, args) {
 async function commandSustained(cfg, args) {
   const minutes = Number(args.minutes ?? 20);
   const concurrency = Number(args.concurrency ?? 2);
+  const mix = selectedWorkloads(args);
   const token = await login(cfg);
   const fixtures = await loadFixtures();
   const identity = await proveImage(cfg, args["expect-image"]);
@@ -632,7 +644,7 @@ async function commandSustained(cfg, args) {
   const started = performance.now();
   await Promise.all(
     Array.from({ length: concurrency }, async (_, index) => {
-      const keys = rotate(MIXED, index);
+      const keys = rotate(mix, index);
       let cursor = 0;
       while (Date.now() < deadline) {
         const key = keys[cursor % keys.length];

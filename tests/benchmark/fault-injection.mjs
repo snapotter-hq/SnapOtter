@@ -182,22 +182,30 @@ async function waitHealthy(timeoutMs = 180_000) {
   return null;
 }
 
-/** Downloads a completed job's output and proves it is still valid bytes. */
+/**
+ * Downloads a completed job's output and proves it is still valid bytes.
+ *
+ * The download URL comes out of the job row, not out of whatever the client
+ * saw. Half these scenarios destroy the client's connection on purpose, so the
+ * database is the only place the answer reliably survives. (`output-meta.json`
+ * is written for batch and pipeline results only; a plain tool job stores its
+ * URL in progress.result.downloadUrl and its object key in output_refs.)
+ */
 async function verifyArtifact(token, jobId) {
-  const metaResponse = await fetch(
-    new URL(`/api/v1/download/${jobId}/output-meta.json`, cfg.baseUrl),
-    { headers: { authorization: `Bearer ${token}` } },
+  const stored = await psql(
+    `select coalesce(progress->'result'->>'downloadUrl', '/api/v1/download/' || id || '/' || regexp_replace(coalesce(output_refs->>0,''), '^.*/', '')) from jobs where id = '${jobId}'`,
   );
-  if (!metaResponse.ok) return { jobId, ok: false, error: `meta HTTP ${metaResponse.status}` };
-  const meta = await metaResponse.json();
-  const fileResponse = await fetch(
-    new URL(`/api/v1/download/${jobId}/${encodeURIComponent(meta.filename)}`, cfg.baseUrl),
-    { headers: { authorization: `Bearer ${token}` } },
-  );
-  if (!fileResponse.ok) return { jobId, ok: false, error: `download HTTP ${fileResponse.status}` };
-  const bytes = Buffer.from(await fileResponse.arrayBuffer());
+  const downloadUrl = stored.trim();
+  if (!downloadUrl || downloadUrl.endsWith("/")) {
+    return { jobId, ok: false, error: "job row carries no output reference" };
+  }
+  const response = await fetch(new URL(downloadUrl, cfg.baseUrl), {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return { jobId, ok: false, error: `download HTTP ${response.status}` };
+  const bytes = Buffer.from(await response.arrayBuffer());
   try {
-    const artifact = validateArtifact(bytes, fileResponse.headers.get("content-type"));
+    const artifact = validateArtifact(bytes, response.headers.get("content-type"));
     return { jobId, ok: true, bytes: artifact.outputSize, mime: artifact.outputMime };
   } catch (error) {
     return { jobId, ok: false, error: String(error?.message ?? error) };
