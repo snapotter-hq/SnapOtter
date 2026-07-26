@@ -71,12 +71,12 @@
       {
         "key": "width",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 16384,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -86,12 +86,12 @@
       {
         "key": "height",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "height",
         "value": 16384,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -116,12 +116,12 @@
       {
         "key": "percentage",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "percentage",
         "value": 1001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "percentage",
@@ -202,12 +202,7 @@
       {
         "key": "left",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "left",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "left",
@@ -217,12 +212,7 @@
       {
         "key": "top",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "top",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "top",
@@ -232,12 +222,7 @@
       {
         "key": "width",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "width",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "width",
@@ -247,12 +232,7 @@
       {
         "key": "height",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "height",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "height",
@@ -332,16 +312,6 @@
       }
     ],
     "invalidProbes": [
-      {
-        "key": "angle",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "angle",
-        "value": 101,
-        "why": "above max"
-      },
       {
         "key": "angle",
         "value": "not-a-number",
@@ -447,12 +417,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -535,12 +505,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -550,12 +520,7 @@
       {
         "key": "targetSizeKb",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "targetSizeKb",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "targetSizeKb",
@@ -650,12 +615,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -665,12 +630,7 @@
       {
         "key": "maxWidth",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "maxWidth",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "maxWidth",
@@ -680,12 +640,7 @@
       {
         "key": "maxHeight",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "maxHeight",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "maxHeight",
@@ -877,12 +832,12 @@
       {
         "key": "gpsLatitude",
         "value": -91,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "gpsLatitude",
         "value": 91,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "gpsLatitude",
@@ -892,27 +847,17 @@
       {
         "key": "gpsLongitude",
         "value": -181,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "gpsLongitude",
         "value": 181,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "gpsLongitude",
         "value": "not-a-number",
         "why": "wrong type"
-      },
-      {
-        "key": "gpsAltitude",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "gpsAltitude",
-        "value": 101,
-        "why": "above max"
       },
       {
         "key": "gpsAltitude",
@@ -1179,12 +1124,12 @@
       {
         "key": "brightness",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "brightness",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "brightness",
@@ -1194,12 +1139,12 @@
       {
         "key": "contrast",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "contrast",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "contrast",
@@ -1209,12 +1154,12 @@
       {
         "key": "exposure",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "exposure",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "exposure",
@@ -1224,12 +1169,12 @@
       {
         "key": "saturation",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "saturation",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "saturation",
@@ -1239,12 +1184,12 @@
       {
         "key": "temperature",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "temperature",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "temperature",
@@ -1254,12 +1199,12 @@
       {
         "key": "tint",
         "value": -101,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "tint",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "tint",
@@ -1269,12 +1214,12 @@
       {
         "key": "hue",
         "value": -181,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "hue",
         "value": 181,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "hue",
@@ -1284,12 +1229,12 @@
       {
         "key": "sharpness",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sharpness",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sharpness",
@@ -1299,12 +1244,12 @@
       {
         "key": "red",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "red",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "red",
@@ -1314,12 +1259,12 @@
       {
         "key": "green",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "green",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "green",
@@ -1329,12 +1274,12 @@
       {
         "key": "blue",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blue",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blue",
@@ -1467,12 +1412,12 @@
       {
         "key": "sigma",
         "value": -0.5,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sigma",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sigma",
@@ -1482,12 +1427,12 @@
       {
         "key": "m1",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "m1",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "m1",
@@ -1497,12 +1442,12 @@
       {
         "key": "m2",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "m2",
         "value": 21,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "m2",
@@ -1512,12 +1457,12 @@
       {
         "key": "x1",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "x1",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "x1",
@@ -1527,12 +1472,12 @@
       {
         "key": "y2",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "y2",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "y2",
@@ -1542,12 +1487,12 @@
       {
         "key": "y3",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "y3",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "y3",
@@ -1557,12 +1502,12 @@
       {
         "key": "amount",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "amount",
         "value": 1001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "amount",
@@ -1572,12 +1517,12 @@
       {
         "key": "radius",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "radius",
         "value": 6,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "radius",
@@ -1587,12 +1532,12 @@
       {
         "key": "threshold",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "threshold",
         "value": 256,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "threshold",
@@ -1602,30 +1547,15 @@
       {
         "key": "strength",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "strength",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "strength",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "kernelSize",
-        "value": 2,
-        "why": "below min"
-      },
-      {
-        "key": "kernelSize",
-        "value": 6,
-        "why": "above max"
-      },
-      {
-        "key": "kernelSize",
         "value": "not-a-number",
         "why": "wrong type"
       },
@@ -1706,12 +1636,12 @@
       {
         "key": "tolerance",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "tolerance",
         "value": 256,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "tolerance",
@@ -1892,16 +1822,6 @@
       },
       {
         "key": "gradientAngle",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "gradientAngle",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "gradientAngle",
         "value": "not-a-number",
         "why": "wrong type"
       },
@@ -1913,12 +1833,12 @@
       {
         "key": "blurIntensity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blurIntensity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blurIntensity",
@@ -1933,12 +1853,12 @@
       {
         "key": "shadowOpacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOpacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOpacity",
@@ -1958,12 +1878,12 @@
       {
         "key": "edgeRefine",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "edgeRefine",
         "value": 4,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "edgeRefine",
@@ -2043,28 +1963,18 @@
       },
       {
         "key": "gradientAngle",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "gradientAngle",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "gradientAngle",
         "value": "not-a-number",
         "why": "wrong type"
       },
       {
         "key": "blurIntensity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blurIntensity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blurIntensity",
@@ -2079,12 +1989,12 @@
       {
         "key": "shadowOpacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOpacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOpacity",
@@ -2094,12 +2004,12 @@
       {
         "key": "edgeRefine",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "edgeRefine",
         "value": 4,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "edgeRefine",
@@ -2165,23 +2075,7 @@
         "values": [0, 50, 100, null]
       }
     ],
-    "invalidProbes": [
-      {
-        "key": "scale",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "scale",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "scale",
-        "value": "not-a-number",
-        "why": "wrong type"
-      }
-    ]
+    "invalidProbes": []
   },
   {
     "id": "erase-object",
@@ -2461,12 +2355,12 @@
       {
         "key": "blurRadius",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blurRadius",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blurRadius",
@@ -2476,12 +2370,12 @@
       {
         "key": "sensitivity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sensitivity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sensitivity",
@@ -2606,12 +2500,7 @@
       {
         "key": "width",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "width",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "width",
@@ -2621,12 +2510,7 @@
       {
         "key": "height",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "height",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "height",
@@ -2636,12 +2520,12 @@
       {
         "key": "padding",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "padding",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "padding",
@@ -2661,12 +2545,12 @@
       {
         "key": "sensitivity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sensitivity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sensitivity",
@@ -2676,12 +2560,12 @@
       {
         "key": "threshold",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "threshold",
         "value": 256,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "threshold",
@@ -2696,12 +2580,7 @@
       {
         "key": "targetSize",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "targetSize",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "targetSize",
@@ -2711,12 +2590,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -2799,12 +2678,12 @@
       {
         "key": "intensity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "intensity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "intensity",
@@ -2896,12 +2775,12 @@
       {
         "key": "strength",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "strength",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "strength",
@@ -2916,12 +2795,12 @@
       {
         "key": "sensitivity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sensitivity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sensitivity",
@@ -2990,12 +2869,12 @@
       {
         "key": "intensity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "intensity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "intensity",
@@ -3098,51 +2977,6 @@
         "why": "wrong type"
       },
       {
-        "key": "strength",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "strength",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "strength",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "detailPreservation",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "detailPreservation",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "detailPreservation",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "colorNoise",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "colorNoise",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "colorNoise",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
         "key": "format",
         "value": "__snapotter_qa_not_a_member__",
         "why": "enum outsider"
@@ -3150,21 +2984,6 @@
       {
         "key": "format",
         "value": 12345,
-        "why": "wrong type"
-      },
-      {
-        "key": "quality",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "quality",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "quality",
-        "value": "not-a-number",
         "why": "wrong type"
       }
     ]
@@ -3233,12 +3052,12 @@
       {
         "key": "sensitivity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sensitivity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sensitivity",
@@ -3248,12 +3067,12 @@
       {
         "key": "strength",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "strength",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "strength",
@@ -3263,12 +3082,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -3367,12 +3186,12 @@
       {
         "key": "fidelity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fidelity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fidelity",
@@ -3387,12 +3206,12 @@
       {
         "key": "denoiseStrength",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "denoiseStrength",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "denoiseStrength",
@@ -3407,12 +3226,12 @@
       {
         "key": "colorizeStrength",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "colorizeStrength",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "colorizeStrength",
@@ -3480,28 +3299,8 @@
     "invalidProbes": [
       {
         "key": "adjustX",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "adjustX",
-        "value": 101,
-        "why": "above max"
-      },
-      {
-        "key": "adjustX",
         "value": "not-a-number",
         "why": "wrong type"
-      },
-      {
-        "key": "adjustY",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "adjustY",
-        "value": 101,
-        "why": "above max"
       },
       {
         "key": "adjustY",
@@ -3586,12 +3385,7 @@
       {
         "key": "width",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "width",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "width",
@@ -3601,12 +3395,7 @@
       {
         "key": "height",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "height",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "height",
@@ -3621,12 +3410,12 @@
       {
         "key": "blurRadius",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blurRadius",
         "value": 21,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blurRadius",
@@ -3636,12 +3425,12 @@
       {
         "key": "sobelThreshold",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "sobelThreshold",
         "value": 21,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "sobelThreshold",
@@ -3748,12 +3537,7 @@
       {
         "key": "extendTop",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "extendTop",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "extendTop",
@@ -3763,12 +3547,7 @@
       {
         "key": "extendRight",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "extendRight",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "extendRight",
@@ -3778,12 +3557,7 @@
       {
         "key": "extendBottom",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "extendBottom",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "extendBottom",
@@ -3793,12 +3567,7 @@
       {
         "key": "extendLeft",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "extendLeft",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "extendLeft",
@@ -3828,12 +3597,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -3960,12 +3729,12 @@
       {
         "key": "defringe",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "defringe",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "defringe",
@@ -4155,12 +3924,12 @@
       {
         "key": "fontSize",
         "value": 7,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 1001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -4170,12 +3939,12 @@
       {
         "key": "opacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "opacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "opacity",
@@ -4195,12 +3964,12 @@
       {
         "key": "rotation",
         "value": -361,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "rotation",
         "value": 361,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "rotation",
@@ -4326,12 +4095,12 @@
       {
         "key": "fontSize",
         "value": 7,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -4510,12 +4279,12 @@
       {
         "key": "fontSize",
         "value": 7,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -5154,12 +4923,12 @@
       {
         "key": "columns",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "columns",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "columns",
@@ -5169,12 +4938,12 @@
       {
         "key": "rows",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "rows",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "rows",
@@ -5184,12 +4953,7 @@
       {
         "key": "tileWidth",
         "value": 9,
-        "why": "below min"
-      },
-      {
-        "key": "tileWidth",
-        "value": 111,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "tileWidth",
@@ -5199,12 +4963,7 @@
       {
         "key": "tileHeight",
         "value": 9,
-        "why": "below min"
-      },
-      {
-        "key": "tileHeight",
-        "value": 111,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "tileHeight",
@@ -5224,12 +4983,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -5322,12 +5081,12 @@
       {
         "key": "borderWidth",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "borderWidth",
         "value": 2001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "borderWidth",
@@ -5337,12 +5096,12 @@
       {
         "key": "padding",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "padding",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "padding",
@@ -5352,12 +5111,12 @@
       {
         "key": "cornerRadius",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "cornerRadius",
         "value": 2001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "cornerRadius",
@@ -5372,12 +5131,12 @@
       {
         "key": "shadowBlur",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowBlur",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowBlur",
@@ -5387,12 +5146,12 @@
       {
         "key": "shadowOffsetX",
         "value": -51,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOffsetX",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOffsetX",
@@ -5402,12 +5161,12 @@
       {
         "key": "shadowOffsetY",
         "value": -51,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOffsetY",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOffsetY",
@@ -5417,12 +5176,12 @@
       {
         "key": "shadowOpacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOpacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOpacity",
@@ -5573,12 +5332,12 @@
       {
         "key": "gradientAngle",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "gradientAngle",
         "value": 361,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "gradientAngle",
@@ -5588,12 +5347,12 @@
       {
         "key": "padding",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "padding",
         "value": 257,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "padding",
@@ -5603,12 +5362,12 @@
       {
         "key": "borderRadius",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "borderRadius",
         "value": 65,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "borderRadius",
@@ -5628,12 +5387,12 @@
       {
         "key": "shadowBlur",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowBlur",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowBlur",
@@ -5643,12 +5402,12 @@
       {
         "key": "shadowOffsetX",
         "value": -51,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOffsetX",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOffsetX",
@@ -5658,12 +5417,12 @@
       {
         "key": "shadowOffsetY",
         "value": -51,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOffsetY",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOffsetY",
@@ -5673,12 +5432,12 @@
       {
         "key": "shadowOpacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "shadowOpacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "shadowOpacity",
@@ -5718,12 +5477,12 @@
       {
         "key": "watermarkOpacity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "watermarkOpacity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "watermarkOpacity",
@@ -5814,12 +5573,12 @@
       {
         "key": "zoom",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "zoom",
         "value": 6,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "zoom",
@@ -5829,12 +5588,12 @@
       {
         "key": "offsetX",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "offsetX",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "offsetX",
@@ -5844,12 +5603,12 @@
       {
         "key": "offsetY",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "offsetY",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "offsetY",
@@ -5859,12 +5618,12 @@
       {
         "key": "borderWidth",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "borderWidth",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "borderWidth",
@@ -5874,12 +5633,12 @@
       {
         "key": "outputSize",
         "value": 15,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "outputSize",
         "value": 4097,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "outputSize",
@@ -5978,12 +5737,12 @@
       {
         "key": "cornerRadius",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "cornerRadius",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "cornerRadius",
@@ -5993,12 +5752,12 @@
       {
         "key": "zoom",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "zoom",
         "value": 6,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "zoom",
@@ -6008,12 +5767,12 @@
       {
         "key": "offsetX",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "offsetX",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "offsetX",
@@ -6023,12 +5782,12 @@
       {
         "key": "offsetY",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "offsetY",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "offsetY",
@@ -6038,12 +5797,12 @@
       {
         "key": "borderWidth",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "borderWidth",
         "value": 201,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "borderWidth",
@@ -6053,12 +5812,12 @@
       {
         "key": "outputSize",
         "value": 15,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "outputSize",
         "value": 4097,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "outputSize",
@@ -6123,12 +5882,12 @@
       {
         "key": "intensity",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "intensity",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "intensity",
@@ -6219,12 +5978,12 @@
       {
         "key": "ratioW",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "ratioW",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "ratioW",
@@ -6234,12 +5993,12 @@
       {
         "key": "ratioH",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "ratioH",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "ratioH",
@@ -6259,12 +6018,12 @@
       {
         "key": "padding",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "padding",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "padding",
@@ -6329,12 +6088,12 @@
       {
         "key": "blockSize",
         "value": 1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blockSize",
         "value": 129,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blockSize",
@@ -6419,12 +6178,12 @@
       {
         "key": "strength",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "strength",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "strength",
@@ -6434,12 +6193,12 @@
       {
         "key": "radius",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "radius",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "radius",
@@ -6449,12 +6208,12 @@
       {
         "key": "softness",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "softness",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "softness",
@@ -6464,12 +6223,12 @@
       {
         "key": "roundness",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "roundness",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "roundness",
@@ -6479,12 +6238,12 @@
       {
         "key": "centerX",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "centerX",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "centerX",
@@ -6494,12 +6253,12 @@
       {
         "key": "centerY",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "centerY",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "centerY",
@@ -6535,12 +6294,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -6555,12 +6314,12 @@
       {
         "key": "resizePercent",
         "value": 9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "resizePercent",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "resizePercent",
@@ -6706,30 +6465,15 @@
       {
         "key": "width",
         "value": 3,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 65,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "blur",
-        "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "blur",
-        "value": 21,
-        "why": "above max"
-      },
-      {
-        "key": "blur",
         "value": "not-a-number",
         "why": "wrong type"
       },
@@ -6756,12 +6500,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -6839,12 +6583,12 @@
       {
         "key": "columns",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "columns",
         "value": 17,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "columns",
@@ -6854,12 +6598,12 @@
       {
         "key": "padding",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "padding",
         "value": 65,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "padding",
@@ -6879,12 +6623,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -6999,12 +6743,12 @@
       {
         "key": "threshold",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "threshold",
         "value": 256,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "threshold",
@@ -7014,12 +6758,12 @@
       {
         "key": "colorPrecision",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "colorPrecision",
         "value": 17,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "colorPrecision",
@@ -7029,12 +6773,12 @@
       {
         "key": "layerDifference",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "layerDifference",
         "value": 129,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "layerDifference",
@@ -7044,12 +6788,12 @@
       {
         "key": "filterSpeckle",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "filterSpeckle",
         "value": 257,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "filterSpeckle",
@@ -7069,12 +6813,12 @@
       {
         "key": "cornerThreshold",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "cornerThreshold",
         "value": 181,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "cornerThreshold",
@@ -7218,12 +6962,12 @@
       {
         "key": "width",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 16384,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -7233,12 +6977,12 @@
       {
         "key": "height",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "height",
         "value": 16384,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -7248,12 +6992,12 @@
       {
         "key": "percentage",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "percentage",
         "value": 501,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "percentage",
@@ -7263,12 +7007,12 @@
       {
         "key": "colors",
         "value": 1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "colors",
         "value": 257,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "colors",
@@ -7278,12 +7022,12 @@
       {
         "key": "dither",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "dither",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "dither",
@@ -7293,12 +7037,12 @@
       {
         "key": "effort",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "effort",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "effort",
@@ -7308,12 +7052,12 @@
       {
         "key": "speedFactor",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "speedFactor",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "speedFactor",
@@ -7333,12 +7077,7 @@
       {
         "key": "frameNumber",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "frameNumber",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "frameNumber",
@@ -7348,12 +7087,7 @@
       {
         "key": "frameStart",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "frameStart",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "frameStart",
@@ -7363,12 +7097,7 @@
       {
         "key": "frameEnd",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "frameEnd",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "frameEnd",
@@ -7383,21 +7112,6 @@
       {
         "key": "extractFormat",
         "value": 12345,
-        "why": "wrong type"
-      },
-      {
-        "key": "angle",
-        "value": 89,
-        "why": "below min"
-      },
-      {
-        "key": "angle",
-        "value": 271,
-        "why": "above max"
-      },
-      {
-        "key": "angle",
-        "value": "not-a-number",
         "why": "wrong type"
       },
       {
@@ -7413,12 +7127,12 @@
       {
         "key": "loop",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "loop",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "loop",
@@ -7599,12 +7313,7 @@
       {
         "key": "startS",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "startS",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "startS",
@@ -7614,12 +7323,7 @@
       {
         "key": "endS",
         "value": -0.999999,
-        "why": "below min"
-      },
-      {
-        "key": "endS",
-        "value": 101.000001,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "endS",
@@ -7709,12 +7413,12 @@
       {
         "key": "fps",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fps",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fps",
@@ -7724,12 +7428,12 @@
       {
         "key": "width",
         "value": 63,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 1281,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -7739,12 +7443,7 @@
       {
         "key": "startS",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "startS",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "startS",
@@ -7754,12 +7453,12 @@
       {
         "key": "durationS",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "durationS",
         "value": 61,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "durationS",
@@ -7811,12 +7510,12 @@
       {
         "key": "width",
         "value": 15,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 7681,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -7826,12 +7525,12 @@
       {
         "key": "height",
         "value": 15,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "height",
         "value": 4321,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -7897,12 +7596,7 @@
       {
         "key": "width",
         "value": 15,
-        "why": "below min"
-      },
-      {
-        "key": "width",
-        "value": 117,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "width",
@@ -7912,12 +7606,7 @@
       {
         "key": "height",
         "value": 15,
-        "why": "below min"
-      },
-      {
-        "key": "height",
-        "value": 117,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "height",
@@ -7927,12 +7616,7 @@
       {
         "key": "x",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "x",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "x",
@@ -7942,12 +7626,7 @@
       {
         "key": "y",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "y",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "y",
@@ -8035,12 +7714,12 @@
       {
         "key": "fps",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fps",
         "value": 121,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fps",
@@ -8096,12 +7775,12 @@
       {
         "key": "brightness",
         "value": -2,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "brightness",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "brightness",
@@ -8111,12 +7790,12 @@
       {
         "key": "contrast",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "contrast",
         "value": 5,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "contrast",
@@ -8126,12 +7805,12 @@
       {
         "key": "saturation",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "saturation",
         "value": 4,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "saturation",
@@ -8141,12 +7820,12 @@
       {
         "key": "gamma",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "gamma",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "gamma",
@@ -8194,12 +7873,12 @@
       {
         "key": "factor",
         "value": -0.75,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "factor",
         "value": 5,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "factor",
@@ -8362,12 +8041,12 @@
       {
         "key": "blur",
         "value": 1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "blur",
         "value": 51,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "blur",
@@ -8429,12 +8108,12 @@
       {
         "key": "fontSize",
         "value": 7,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 121,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -8444,12 +8123,12 @@
       {
         "key": "opacity",
         "value": -0.95,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "opacity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "opacity",
@@ -8493,12 +8172,12 @@
       {
         "key": "smoothing",
         "value": 4,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "smoothing",
         "value": 61,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "smoothing",
@@ -8583,12 +8262,12 @@
       {
         "key": "fps",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fps",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fps",
@@ -8598,12 +8277,12 @@
       {
         "key": "width",
         "value": 15,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 1921,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -8613,12 +8292,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -8686,12 +8365,12 @@
       {
         "key": "n",
         "value": 1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "n",
         "value": 1001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "n",
@@ -8820,12 +8499,12 @@
       {
         "key": "fontSize",
         "value": 7,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 73,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -8962,12 +8641,12 @@
       {
         "key": "secondsPerImage",
         "value": -0.5,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "secondsPerImage",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "secondsPerImage",
@@ -8987,12 +8666,12 @@
       {
         "key": "fps",
         "value": 9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fps",
         "value": 61,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fps",
@@ -9078,30 +8757,15 @@
       {
         "key": "bitrateKbps",
         "value": 31,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "bitrateKbps",
         "value": 321,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "bitrateKbps",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "sampleRate",
-        "value": 7999,
-        "why": "below min"
-      },
-      {
-        "key": "sampleRate",
-        "value": 96001,
-        "why": "above max"
-      },
-      {
-        "key": "sampleRate",
         "value": "not-a-number",
         "why": "wrong type"
       }
@@ -9142,12 +8806,7 @@
       {
         "key": "startS",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "startS",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "startS",
@@ -9157,12 +8816,7 @@
       {
         "key": "endS",
         "value": -0.999999,
-        "why": "below min"
-      },
-      {
-        "key": "endS",
-        "value": 101.000001,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "endS",
@@ -9247,12 +8901,12 @@
       {
         "key": "gainDb",
         "value": -31,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "gainDb",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "gainDb",
@@ -9320,12 +8974,12 @@
       {
         "key": "fadeInS",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fadeInS",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fadeInS",
@@ -9335,12 +8989,12 @@
       {
         "key": "fadeOutS",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fadeOutS",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fadeOutS",
@@ -9404,12 +9058,12 @@
       {
         "key": "factor",
         "value": -0.75,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "factor",
         "value": 5,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "factor",
@@ -9449,12 +9103,12 @@
       {
         "key": "semitones",
         "value": -13,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "semitones",
         "value": 13,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "semitones",
@@ -9538,12 +9192,12 @@
       {
         "key": "thresholdDb",
         "value": -81,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "thresholdDb",
         "value": -19,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "thresholdDb",
@@ -9553,12 +9207,12 @@
       {
         "key": "minSilenceS",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "minSilenceS",
         "value": 6,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "minSilenceS",
@@ -9705,12 +9359,12 @@
       {
         "key": "segmentS",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "segmentS",
         "value": 3601,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "segmentS",
@@ -9720,12 +9374,12 @@
       {
         "key": "parts",
         "value": 1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "parts",
         "value": 21,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "parts",
@@ -9735,12 +9389,12 @@
       {
         "key": "thresholdDb",
         "value": -81,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "thresholdDb",
         "value": -19,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "thresholdDb",
@@ -9750,12 +9404,12 @@
       {
         "key": "minSilenceS",
         "value": -0.9,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "minSilenceS",
         "value": 11,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "minSilenceS",
@@ -9799,12 +9453,7 @@
       {
         "key": "startS",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "startS",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "startS",
@@ -9814,12 +9463,12 @@
       {
         "key": "durationS",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "durationS",
         "value": 31,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "durationS",
@@ -9864,12 +9513,12 @@
       {
         "key": "width",
         "value": 255,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 3841,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -9879,12 +9528,12 @@
       {
         "key": "height",
         "value": 63,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "height",
         "value": 1081,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -9974,12 +9623,12 @@
       {
         "key": "everyN",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "everyN",
         "value": 501,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "everyN",
@@ -10025,12 +9674,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -10040,12 +9689,7 @@
       {
         "key": "targetSizeKb",
         "value": -1,
-        "why": "below min"
-      },
-      {
-        "key": "targetSizeKb",
-        "value": 101,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "targetSizeKb",
@@ -10069,23 +9713,7 @@
         "values": [90, 180, 270, null]
       }
     ],
-    "invalidProbes": [
-      {
-        "key": "angle",
-        "value": 89,
-        "why": "below min"
-      },
-      {
-        "key": "angle",
-        "value": 271,
-        "why": "above max"
-      },
-      {
-        "key": "angle",
-        "value": "not-a-number",
-        "why": "wrong type"
-      }
-    ]
+    "invalidProbes": []
   },
   {
     "id": "convert-document",
@@ -10323,12 +9951,12 @@
       {
         "key": "margin",
         "value": -1,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "margin",
         "value": 2001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "margin",
@@ -10352,23 +9980,7 @@
         "values": [2, 3, 4, 8, 9, 12, 16, null]
       }
     ],
-    "invalidProbes": [
-      {
-        "key": "perSheet",
-        "value": 1,
-        "why": "below min"
-      },
-      {
-        "key": "perSheet",
-        "value": 17,
-        "why": "above max"
-      },
-      {
-        "key": "perSheet",
-        "value": "not-a-number",
-        "why": "wrong type"
-      }
-    ]
+    "invalidProbes": []
   },
   {
     "id": "booklet-pdf",
@@ -10385,23 +9997,7 @@
         "values": [2, 4, 6, 8, null]
       }
     ],
-    "invalidProbes": [
-      {
-        "key": "perSheet",
-        "value": 1,
-        "why": "below min"
-      },
-      {
-        "key": "perSheet",
-        "value": 9,
-        "why": "above max"
-      },
-      {
-        "key": "perSheet",
-        "value": "not-a-number",
-        "why": "wrong type"
-      }
-    ]
+    "invalidProbes": []
   },
   {
     "id": "watermark-pdf",
@@ -10444,12 +10040,12 @@
       {
         "key": "fontSize",
         "value": 5,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 73,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -10459,12 +10055,12 @@
       {
         "key": "opacity",
         "value": -0.95,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "opacity",
         "value": 2,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "opacity",
@@ -10474,12 +10070,12 @@
       {
         "key": "rotation",
         "value": -181,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "rotation",
         "value": 181,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "rotation",
@@ -10521,12 +10117,12 @@
       {
         "key": "fontSize",
         "value": 5,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "fontSize",
         "value": 25,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "fontSize",
@@ -10757,12 +10353,12 @@
       {
         "key": "width",
         "value": 319,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "width",
         "value": 2049,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -10772,12 +10368,12 @@
       {
         "key": "height",
         "value": 239,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "height",
         "value": 1537,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -10805,12 +10401,7 @@
       {
         "key": "sheet",
         "value": 0,
-        "why": "below min"
-      },
-      {
-        "key": "sheet",
-        "value": 102,
-        "why": "above max"
+        "why": "below declared min"
       },
       {
         "key": "sheet",
@@ -10888,12 +10479,12 @@
       {
         "key": "rowsPerFile",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "rowsPerFile",
         "value": 1000001,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "rowsPerFile",
@@ -10988,12 +10579,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11021,12 +10612,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11054,12 +10645,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11087,12 +10678,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11120,12 +10711,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11153,12 +10744,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11186,12 +10777,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11219,12 +10810,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11252,12 +10843,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11285,12 +10876,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11318,12 +10909,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11351,12 +10942,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11384,12 +10975,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11417,12 +11008,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11450,12 +11041,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11483,12 +11074,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11516,12 +11107,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11549,12 +11140,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11582,12 +11173,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11615,12 +11206,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11648,12 +11239,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11681,12 +11272,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11714,12 +11305,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11747,12 +11338,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11780,12 +11371,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11813,12 +11404,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",
@@ -11846,12 +11437,12 @@
       {
         "key": "quality",
         "value": 0,
-        "why": "below min"
+        "why": "below declared min"
       },
       {
         "key": "quality",
         "value": 101,
-        "why": "above max"
+        "why": "above declared max"
       },
       {
         "key": "quality",

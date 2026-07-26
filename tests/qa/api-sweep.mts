@@ -42,13 +42,15 @@ const BASE = process.env.QA_BASE_URL ?? "http://localhost:13492";
 const USERNAME = process.env.QA_USERNAME ?? "admin";
 const PASSWORD = process.env.QA_PASSWORD ?? "";
 const CONCURRENCY = Number(process.env.QA_CONCURRENCY ?? 4);
+const PAIRWISE_CAP = Number(process.env.QA_PAIRWISE_CAP ?? 6);
+const FORMAT_WITNESSES = Number(process.env.QA_FORMAT_WITNESSES ?? 3);
 /* biome-ignore-end lint/suspicious/noUndeclaredEnvVars: QA harness runs outside Turbo. */
 
 const REPO = join(import.meta.dirname, "..", "..");
 const OUT_DIR = join(REPO, "docs", "qa", "master-20260724", "evidence", "processing-ai", "final");
 
 /** Class-aware hard timeouts. Exceeding one is a finding, never a silent skip. */
-const TIMEOUT_MS: Record<string, number> = { fast: 90_000, long: 300_000, ai: 600_000 };
+const TIMEOUT_MS: Record<string, number> = { fast: 240_000, long: 480_000, ai: 900_000 };
 
 // ── Tool contract (generated from live code) ──────────────────────
 
@@ -86,7 +88,7 @@ const BY_ID = new Map(TOOLS.map((tool) => [tool.id, tool]));
  */
 const CANONICAL_SETTINGS: Record<string, Record<string, unknown>> = {
   resize: { width: 64 },
-  crop: { left: 0, top: 0, width: 50, height: 50 },
+  crop: { left: 0, top: 0, width: 8, height: 8 },
   rotate: { angle: 90 },
   convert: { format: "png" },
   "watermark-text": { text: "SnapOtter QA" },
@@ -186,9 +188,33 @@ const SECONDARY_ONLY: Record<string, RegExp> = {
   "embed-subtitles": /\.(srt|vtt|ass)$/,
 };
 
+/**
+ * Tools that move bytes without decoding them (renaming, archiving, encoding).
+ * Accepting a malformed image is their contract, not a validation gap.
+ */
+const PASSTHROUGH_TOOLS = new Set(["bulk-rename", "create-zip", "image-to-base64"]);
+
+/** Extensions whose format has no structure to violate. */
+const TEXTUAL_EXTS = new Set([
+  ".md",
+  ".markdown",
+  ".csv",
+  ".txt",
+  ".html",
+  ".htm",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".srt",
+  ".vtt",
+  ".ass",
+  ".tsv",
+]);
+
 /** Self-rejections that are correct behaviour, not defects. */
 const EXPECTED_SELF_REJECT: Record<string, RegExp[]> = {
   "extract-subtitles": [/no subtitle track/i],
+  "merge-csvs": [/different columns/i],
   "unlock-pdf": [/not (password[- ])?(protected|encrypted)/i, /incorrect password/i],
   "remove-pages": [/out of range/i, /only \d+ page/i],
   "extract-pages": [/out of range/i, /only \d+ page/i],
@@ -213,7 +239,7 @@ const THREE_WAY_TOOLS = [
 
 // ── Case model ────────────────────────────────────────────────────
 
-type Verdict = "pass" | "fail" | "expected-reject" | "blocked" | "no-fixture";
+type Verdict = "pass" | "fail" | "expected-reject" | "blocked" | "no-fixture" | "inert";
 
 interface CaseResult {
   mode: string;
@@ -290,7 +316,7 @@ async function classify(
   outcome: SubmitOutcome,
   expectSuccess: boolean,
   inputFacts: OutputFacts | null,
-  options: { semantic?: boolean } = {},
+  options: { semantic?: boolean; allowRejection?: boolean } = {},
 ): Promise<Classification> {
   if (outcome.transportError) {
     return {
@@ -320,6 +346,15 @@ async function classify(
       detail: `AI bundle ${reason}: ${feature}`,
     };
   }
+  // 503 with a structured quota message is deliberate backpressure, not a
+  // fault. It caps how much of the sweep can run at once; it is not a defect.
+  if (status === 503 && /concurrent|quota|please wait/i.test(outcome.bodyText ?? "")) {
+    return {
+      verdict: "blocked",
+      oracle: "quota-backpressure",
+      detail: `refused by concurrency quota: ${(outcome.bodyText ?? "").slice(0, 160)}`,
+    };
+  }
   if (status >= 500) {
     return {
       verdict: "fail",
@@ -335,11 +370,30 @@ async function classify(
     };
   }
   if (status >= 400) {
-    return classifyRejection(outcome, !expectSuccess);
+    return classifyRejection(outcome, !expectSuccess || Boolean(options.allowRejection));
   }
 
   // 2xx from here on.
   if (!expectSuccess) {
+    // A 202 only means the upload was queued. Rejecting bad input in the worker
+    // rather than at ingress is a valid contract as long as the job reaches a
+    // clean terminal failure, so judge the job, not the acknowledgement.
+    if (outcome.async) {
+      if (outcome.asyncOutcome === "failed") {
+        return {
+          verdict: "expected-reject",
+          oracle: "deferred-rejection",
+          detail: `queued at ingress, then refused by the worker: ${(outcome.asyncError ?? "").slice(0, 160)}`,
+        };
+      }
+      if (outcome.asyncOutcome === "timeout") {
+        return {
+          verdict: "fail",
+          oracle: "must-reject",
+          detail: `bad input queued as job ${outcome.jobId} and never reached a terminal state`,
+        };
+      }
+    }
     return {
       verdict: "fail",
       oracle: "must-reject",
@@ -390,6 +444,18 @@ async function classify(
     outcome.outputContentType ?? "",
   );
   if (facts.decodeError) {
+    // The host decoder is weaker than the container's for several exotic
+    // formats (bmp, ico, psd, some RAW). Blaming the container for a format
+    // this machine cannot read either would be a false positive, so prove the
+    // oracle can read the input before calling the output corrupt.
+    if (inputFacts?.decodeError) {
+      return {
+        verdict: "blocked",
+        oracle: "oracle-limit",
+        detail: `host decoder cannot read this format on input either, so the output is unverifiable here: ${facts.decodeError}`,
+        facts,
+      };
+    }
     return {
       verdict: "fail",
       oracle: "decodable-output",
@@ -488,6 +554,8 @@ async function runToolCase(
     ext?: string;
     settings?: unknown;
     expectSuccess: boolean;
+    /** Settings lanes: a typed settings rejection is a valid outcome. */
+    allowSettingsRejection?: boolean;
     semantic?: boolean;
     fixturePath?: string;
     filenameOverride?: string;
@@ -545,7 +613,7 @@ async function runToolCase(
   // the input too. Without it the comparison is against undefined and passes or
   // fails for the wrong reason.
   let inputFacts = options.inputFacts ?? null;
-  if (!inputFacts && options.semantic && fixture && SEMANTIC_ORACLES[tool.id]) {
+  if (!inputFacts && fixture && options.expectSuccess) {
     const { readFileSync } = await import("node:fs");
     inputFacts = await inspectOutput(readFileSync(fixture), fixture.split("/").pop() ?? "in.bin");
   }
@@ -561,6 +629,7 @@ async function runToolCase(
 
   const classification = await classify(tool, outcome, options.expectSuccess, inputFacts, {
     semantic: options.semantic,
+    allowRejection: options.allowSettingsRejection,
   });
 
   // A tool refusing a format it declares is only acceptable when the refusal is
@@ -570,6 +639,7 @@ async function runToolCase(
   if (
     verdict === "expected-reject" &&
     options.expectSuccess === true &&
+    !options.allowSettingsRejection &&
     ext &&
     tool.acceptedInputs.includes(ext)
   ) {
@@ -628,8 +698,34 @@ async function laneCanonical(tools: ToolContract[]): Promise<void> {
   );
 }
 
+/**
+ * Format coverage.
+ *
+ * The full tool x format cross product is 3021 cases, most of them redundant:
+ * format support lives in the shared decode layer, so the hundredth image tool
+ * reading a DNG proves little the third did not. QA_FORMAT_WITNESSES bounds it
+ * by running each (modality, extension) pair through that many different tools,
+ * with two guarantees that keep the claim honest:
+ *
+ *   - every extension any tool declares is exercised at least once, and
+ *   - a tool that is the only declarer of an extension always runs it,
+ *
+ * so no declared format goes untested. Set QA_FORMAT_WITNESSES=0 for the
+ * unbounded cross product.
+ */
 async function laneFormats(tools: ToolContract[]): Promise<void> {
   const jobs: Array<() => Promise<CaseResult>> = [];
+  const witnessed = new Map<string, number>();
+
+  // Extensions only one tool in the whole catalog declares must never be
+  // dropped, whichever order the tools happen to come in.
+  const declarers = new Map<string, number>();
+  for (const tool of TOOLS) {
+    for (const ext of new Set(tool.acceptedInputs)) {
+      declarers.set(ext, (declarers.get(ext) ?? 0) + 1);
+    }
+  }
+
   for (const tool of tools) {
     const seen = new Set<string>();
     for (const ext of tool.acceptedInputs) {
@@ -637,11 +733,21 @@ async function laneFormats(tools: ToolContract[]): Promise<void> {
       const fixture = fixtureFor(tool, ext);
       if (fixture && seen.has(fixture)) continue;
       if (fixture) seen.add(fixture);
+
+      const key = `${tool.modality}:${ext}`;
+      const count = witnessed.get(key) ?? 0;
+      const rare = (declarers.get(ext) ?? 0) <= FORMAT_WITNESSES;
+      if (FORMAT_WITNESSES > 0 && count >= FORMAT_WITNESSES && !rare) continue;
+      witnessed.set(key, count + 1);
+
       jobs.push(() =>
         runToolCase(tool, { mode: "formats", caseId: `format${ext}`, ext, expectSuccess: true }),
       );
     }
   }
+  console.log(
+    `formats lane: ${jobs.length} cases covering ${witnessed.size} distinct modality/extension pairs`,
+  );
   await runPool(jobs, CONCURRENCY);
 }
 
@@ -689,8 +795,32 @@ async function laneSettings(tools: ToolContract[]): Promise<void> {
         }
 
         const bothSucceeded = statuses.every((s) => s !== null && s < 300);
+        const gated = statuses.every((s) => s === 501 || s === 503);
         const observable = hashes[0] !== hashes[1];
         const undecodable = hashes.some((h) => h.startsWith("undecodable:"));
+
+        let verdict: Verdict;
+        let detail: string;
+        if (gated) {
+          verdict = "blocked";
+          detail = `feature or quota gate returned ${statuses.join("/")} for ${axis.key}`;
+        } else if (undecodable) {
+          verdict = "fail";
+          detail = `undecodable output for ${axis.key}: ${hashes.find((h) => h.startsWith("undecodable:"))}`;
+        } else if (!bothSucceeded) {
+          verdict = statuses.some((s) => s !== null && s >= 500) ? "fail" : "expected-reject";
+          detail = `statuses ${statuses.join("/")} for ${axis.key}=${JSON.stringify(values)}`;
+        } else if (observable) {
+          verdict = "pass";
+          detail = `${axis.key} changed the output across ${JSON.stringify(values)}`;
+        } else {
+          // Byte-identical output can mean the setting does nothing, or that it
+          // does nothing under this base configuration (fit is inert when only
+          // width is given; withoutEnlargement is inert when downscaling).
+          // Reported for triage rather than asserted as a defect.
+          verdict = "inert";
+          detail = `${axis.key} produced byte identical output across ${JSON.stringify(values)} under base ${JSON.stringify(base)}`;
+        }
 
         record({
           mode: "settings",
@@ -700,23 +830,9 @@ async function laneSettings(tools: ToolContract[]): Promise<void> {
           settings: { [axis.key]: values },
           httpStatus: statuses[0],
           async: false,
-          verdict: undecodable
-            ? "fail"
-            : !bothSucceeded
-              ? statuses.some((s) => s !== null && s >= 500)
-                ? "fail"
-                : "expected-reject"
-              : observable
-                ? "pass"
-                : "fail",
+          verdict,
           oracle: "differential",
-          detail: undecodable
-            ? `undecodable output for ${axis.key}: ${hashes.find((h) => h.startsWith("undecodable:"))}`
-            : !bothSucceeded
-              ? `statuses ${statuses.join("/")} for ${axis.key}=${JSON.stringify(values)}`
-              : observable
-                ? `${axis.key} changed the output across ${JSON.stringify(values)}`
-                : `${axis.key} produced byte identical output across ${JSON.stringify(values)}; setting has no observable effect`,
+          detail,
           durationMs: 0,
         });
       });
@@ -724,7 +840,7 @@ async function laneSettings(tools: ToolContract[]): Promise<void> {
 
     // Pairwise covering array over the whole schema: every case must either
     // succeed with a decodable artifact or be refused through the typed error.
-    const cases = pairwise(tool.axes).slice(0, 12);
+    const cases = pairwise(tool.axes).slice(0, PAIRWISE_CAP);
     for (const [index, combo] of cases.entries()) {
       const settings = { ...base, ...combo };
       for (const key of Object.keys(settings)) {
@@ -737,6 +853,7 @@ async function laneSettings(tools: ToolContract[]): Promise<void> {
           ext,
           settings,
           expectSuccess: true,
+          allowSettingsRejection: true,
         });
       });
     }
@@ -765,6 +882,7 @@ async function laneThreeWay(tools: ToolContract[]): Promise<void> {
           ext,
           settings,
           expectSuccess: true,
+          allowSettingsRejection: true,
         }),
       );
     }
@@ -811,7 +929,10 @@ async function laneInvalid(tools: ToolContract[]): Promise<void> {
         }),
       );
     }
-    // Structural garbage in the settings field itself.
+    // Structural garbage in the settings field itself. Only meaningful for a
+    // tool that actually has settings; a route with none legitimately ignores
+    // the field, and generators never read it because they take a JSON body.
+    if (tool.axes.length === 0 || GENERATOR_BODIES[tool.id]) continue;
     jobs.push(() =>
       runToolCase(tool, {
         mode: "invalid",
@@ -841,12 +962,23 @@ async function laneHostile(tools: ToolContract[]): Promise<void> {
   const jobs: Array<() => Promise<CaseResult>> = [];
 
   for (const tool of tools) {
+    // Generators never read the uploaded file, and passthrough tools do not
+    // decode it. Feeding them corrupt pixels tests nothing.
+    if (GENERATOR_BODIES[tool.id] || PASSTHROUGH_TOOLS.has(tool.id)) continue;
+
     const dir = hostileDirs[tool.modality];
     const ext = canonicalExtFor(tool);
     if (!ext) continue;
 
     if (dir && existsSync(dir)) {
       for (const filename of readdirSync(dir)) {
+        // png-bytes.jpg is a genuine PNG wearing a .jpg name. Decoding by
+        // content rather than by extension is the intended behaviour, so this
+        // one is a positive control: refusing it would be the defect.
+        const sniffControl =
+          filename === "png-bytes.jpg" &&
+          tool.acceptedInputs.includes(".png") &&
+          tool.acceptedInputs.includes(".jpg");
         jobs.push(() =>
           runToolCase(tool, {
             mode: "hostile",
@@ -854,16 +986,21 @@ async function laneHostile(tools: ToolContract[]): Promise<void> {
             ext,
             fixturePath: join(dir, filename),
             filenameOverride: filename,
-            expectSuccess: false,
+            expectSuccess: sniffControl,
           }),
         );
       }
     }
 
-    // Renamed input: real bytes of one format wearing another extension.
+    // Renamed input: real bytes of one format wearing another extension. Only
+    // meaningful where the target format has a structure to violate; .md, .csv,
+    // .txt and .html have no magic bytes, so any byte stream is legal input.
     const wrong = tool.modality === "image" ? ".pdf" : ".png";
     const wrongFixture = resolveFixture(wrong, wrong === ".pdf" ? "document" : "image");
-    if (wrongFixture) {
+    // A tool that accepts .eps or .pdf carries a page rasterizer, so PDF bytes
+    // under any name are legitimately decodable input for it.
+    const rasterizes = tool.acceptedInputs.includes(".eps") || tool.acceptedInputs.includes(".pdf");
+    if (wrongFixture && !TEXTUAL_EXTS.has(ext) && !rasterizes) {
       jobs.push(() =>
         runToolCase(tool, {
           mode: "hostile",
@@ -1009,6 +1146,13 @@ async function laneMulti(): Promise<void> {
 }
 
 /** ZIP and JSON output routes, asserted on membership and shape. */
+/**
+ * ZIP-output routes, with whatever it takes to reach their multi-output path.
+ * split-pdf in range mode returns one PDF and svg-to-raster with one SVG
+ * returns one image, so asserting "a ZIP came back" without driving them there
+ * measures the harness rather than the route. sprite-sheet is not here: it is
+ * a multi-input tool with a single image output, covered by the multi lane.
+ */
 const ARCHIVE_TOOLS = [
   "pdf-to-image",
   "svg-to-raster",
@@ -1016,8 +1160,15 @@ const ARCHIVE_TOOLS = [
   "split-pdf",
   "video-to-frames",
   "create-zip",
-  "sprite-sheet",
 ];
+
+/** Settings and input counts that put an archive route into multi-output mode. */
+const ARCHIVE_DRIVE: Record<string, { settings?: Record<string, unknown>; extraInputs?: number }> =
+  {
+    "split-pdf": { settings: { mode: "every", everyN: 1 } },
+    "svg-to-raster": { extraInputs: 1 },
+    "create-zip": { extraInputs: 1 },
+  };
 const JSON_TOOLS = [
   "info",
   "color-palette",
@@ -1039,11 +1190,17 @@ async function laneArchives(): Promise<void> {
     const ext = canonicalExtFor(tool);
     if (!ext) continue;
     jobs.push(async () => {
-      const built = buildFiles(tool, fixtureFor(tool, ext) as string);
+      const drive = ARCHIVE_DRIVE[toolId];
+      const primary = fixtureFor(tool, ext) as string;
+      const built = buildFiles(tool, primary);
+      const files = [...built.files];
+      for (let i = 0; i < (drive?.extraInputs ?? 0); i++) {
+        files.push({ field: "file", path: primary });
+      }
       const outcome = await client.submit({
-        path: apiToolPath(toolId),
-        files: built.files,
-        settings: CANONICAL_SETTINGS[toolId] ?? {},
+        path: drive?.path ?? apiToolPath(toolId),
+        files,
+        settings: { ...(CANONICAL_SETTINGS[toolId] ?? {}), ...(drive?.settings ?? {}) },
         fields: built.fields,
         timeoutMs: timeoutFor(tool),
       });

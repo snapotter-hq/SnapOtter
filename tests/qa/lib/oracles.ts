@@ -362,9 +362,9 @@ export type SemanticOracle = (facts: OutputFacts, input: OutputFacts | null) => 
 export const SEMANTIC_ORACLES: Record<string, SemanticOracle> = {
   resize: (out) => (out.image?.width === 64 ? null : `expected width 64, got ${out.image?.width}`),
   crop: (out) =>
-    out.image?.width === 50 && out.image?.height === 50
+    out.image?.width === 8 && out.image?.height === 8
       ? null
-      : `expected 50x50, got ${out.image?.width}x${out.image?.height}`,
+      : `expected 8x8, got ${out.image?.width}x${out.image?.height}`,
   "circle-crop": (out) => (out.image?.hasAlpha ? null : "circle crop produced no alpha channel"),
   "remove-bg": (out) => (out.image?.hasAlpha ? null : "background removal produced no alpha"),
   rotate: (out, input) =>

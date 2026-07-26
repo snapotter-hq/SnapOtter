@@ -19,7 +19,11 @@ import { chromium } from "@playwright/test";
 const BASE = process.env.QA_BASE_URL || "http://localhost:13499";
 const USERNAME = process.env.QA_USERNAME || "admin";
 const PASSWORD = process.env.QA_PASSWORD || "admin";
-const SHOT_DIR = path.join("tests", "e2e", "screenshots", "qa", "ai-install");
+// QA_SHOT_DIR lets a campaign lane file the screenshots straight into its own
+// evidence directory instead of the default scratch path.
+const SHOT_DIR = process.env.QA_SHOT_DIR || path.join("tests", "e2e", "screenshots", "qa", "ai-install");
+// Chrome is not installed on every runner; fall back to the bundled Chromium.
+const BROWSER_CHANNEL = process.env.QA_BROWSER_CHANNEL || "chrome";
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 async function shot(page: import("@playwright/test").Page, name: string) {
@@ -29,7 +33,9 @@ async function shot(page: import("@playwright/test").Page, name: string) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ channel: "chrome" });
+  const browser = await chromium.launch(
+    BROWSER_CHANNEL === "chromium" ? {} : { channel: BROWSER_CHANNEL },
+  );
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   // Don't interpolate the env-derived base URL / username into the log

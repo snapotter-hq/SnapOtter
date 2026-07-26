@@ -49,29 +49,89 @@ export interface ToolContract {
   invalidProbes: Array<{ key: string; value: unknown; why: string }>;
 }
 
-/** Values a bounded numeric or enum axis must refuse. */
-function invalidProbesFor(axes: PictAxis[]): ToolContract["invalidProbes"] {
+interface FieldBounds {
+  min?: number;
+  max?: number;
+  kind: "number" | "enum" | "boolean" | "other";
+}
+
+/**
+ * Reads the bounds a field actually declares.
+ *
+ * deriveAxes synthesizes an upper bound for unbounded numbers so the pairwise
+ * array has something to sample, which means "one past the largest axis value"
+ * is often a perfectly valid input. Boundary probes have to come from the real
+ * min and max checks or they accuse the container of accepting things it is
+ * supposed to accept.
+ */
+function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
+  const bounds = new Map<string, FieldBounds>();
+  const unwrap = (node: any): any => {
+    for (let i = 0; i < 10 && node?._def; i++) {
+      const def = node._def;
+      if (def.typeName === "ZodEffects" && def.schema) node = def.schema;
+      else if (def.typeName === "ZodPipeline" && def.in) node = def.in;
+      else if (
+        (def.typeName === "ZodDefault" ||
+          def.typeName === "ZodOptional" ||
+          def.typeName === "ZodNullable") &&
+        def.innerType
+      )
+        node = def.innerType;
+      else return node;
+    }
+    return node;
+  };
+
+  const root = unwrap(schema as any);
+  if (root?._def?.typeName !== "ZodObject" || typeof root._def.shape !== "function") return bounds;
+
+  for (const [key, field] of Object.entries(root._def.shape() as Record<string, any>)) {
+    const inner = unwrap(field);
+    const typeName = inner?._def?.typeName;
+    if (typeName === "ZodNumber") {
+      const entry: FieldBounds = { kind: "number" };
+      for (const check of inner._def.checks ?? []) {
+        if (check.kind === "min") entry.min = check.value;
+        if (check.kind === "max") entry.max = check.value;
+      }
+      bounds.set(key, entry);
+    } else if (typeName === "ZodEnum" || typeName === "ZodNativeEnum") {
+      bounds.set(key, { kind: "enum" });
+    } else if (typeName === "ZodBoolean") {
+      bounds.set(key, { kind: "boolean" });
+    } else {
+      bounds.set(key, { kind: "other" });
+    }
+  }
+  return bounds;
+}
+
+/** Settings values the live schema is obliged to refuse. */
+function invalidProbesFor(
+  axes: PictAxis[],
+  bounds: Map<string, FieldBounds>,
+): ToolContract["invalidProbes"] {
   const probes: ToolContract["invalidProbes"] = [];
   for (const axis of axes) {
-    const defined = axis.values.filter((value) => value !== undefined);
-    if (defined.length === 0) continue;
-    const numbers = defined.filter((value): value is number => typeof value === "number");
-    if (numbers.length > 0) {
-      const min = Math.min(...numbers);
-      const max = Math.max(...numbers);
-      if (Number.isFinite(min)) probes.push({ key: axis.key, value: min - 1, why: "below min" });
-      if (Number.isFinite(max) && max !== min) {
-        probes.push({ key: axis.key, value: max + 1, why: "above max" });
+    const field = bounds.get(axis.key);
+    if (!field) continue;
+    if (field.kind === "number") {
+      if (field.min !== undefined) {
+        probes.push({ key: axis.key, value: field.min - 1, why: "below declared min" });
+      }
+      if (field.max !== undefined) {
+        probes.push({ key: axis.key, value: field.max + 1, why: "above declared max" });
       }
       probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
       continue;
     }
-    if (defined.every((value) => typeof value === "string")) {
+    if (field.kind === "enum") {
       probes.push({ key: axis.key, value: "__snapotter_qa_not_a_member__", why: "enum outsider" });
       probes.push({ key: axis.key, value: 12345, why: "wrong type" });
       continue;
     }
-    if (defined.every((value) => typeof value === "boolean")) {
+    if (field.kind === "boolean") {
       probes.push({ key: axis.key, value: "yes-please", why: "wrong type" });
     }
   }
@@ -110,7 +170,9 @@ async function main(): Promise<void> {
         }
       | undefined;
     let axes: PictAxis[] = [];
+    let bounds = new Map<string, FieldBounds>();
     if (config?.settingsSchema) {
+      bounds = readFieldBounds(config.settingsSchema);
       try {
         axes = deriveAxes(config.settingsSchema);
       } catch (error) {
@@ -133,7 +195,7 @@ async function main(): Promise<void> {
       inputKinds: config?.inputKinds,
       skipStructuralValidation: config?.skipStructuralValidation,
       axes,
-      invalidProbes: invalidProbesFor(axes),
+      invalidProbes: invalidProbesFor(axes, bounds),
     };
   });
 
