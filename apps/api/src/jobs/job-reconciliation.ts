@@ -157,9 +157,9 @@ type StrandedRow = {
 
 async function recoverFromOutputs(
   row: StrandedRow,
+  artifacts: ObjectInfo[],
   objects: ObjectInfo[],
 ): Promise<StrandedJobOutcome> {
-  const artifacts = orderArtifacts(objects);
   const primary = artifacts[0];
   const filename = primary.key.slice(primary.key.lastIndexOf("/") + 1);
   const preview = objects.find((object) => isPreviewKey(object.key));
@@ -284,9 +284,10 @@ export async function reconcileStrandedJobs(
     }
 
     const objects = await listObjects(`outputs/${row.id}/`);
+    const artifacts = orderArtifacts(objects);
     const outcome =
-      orderArtifacts(objects).length > 0
-        ? await recoverFromOutputs(row, objects)
+      artifacts.length > 0
+        ? await recoverFromOutputs(row, artifacts, objects)
         : await failWithoutOutput(row);
 
     summary[outcome.resolution] += 1;
