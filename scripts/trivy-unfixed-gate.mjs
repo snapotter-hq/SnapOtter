@@ -106,7 +106,10 @@ function markdown(label, severities, findings, unexpected, stale) {
       "| --- | --- | --- | --- | --- |",
     );
     for (const f of findings) {
-      const summary = f.title.replace(/\|/g, "\\|").slice(0, 90);
+      // Backslashes first: escaping the pipe first would then re-escape the
+      // backslash we just added, and a title containing a literal \| would
+      // break out of the table cell.
+      const summary = f.title.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").slice(0, 90);
       const allowed = unexpected.some((u) => u.id === f.id) ? "**no**" : "yes";
       lines.push(
         `| ${f.id} | ${f.severity} | ${f.packages.join("<br>")} | ${allowed} | ${summary} |`,

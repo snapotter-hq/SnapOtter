@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import path from "node:path";
 
 export interface PlaywrightEndpoint {
@@ -36,7 +36,7 @@ function parsePort(value: string, envName: string): number {
 }
 
 function randomPort(floor: number): number {
-  return floor + (randomBytes(2).readUInt16BE(0) % 10_000);
+  return randomInt(floor, floor + 10_000);
 }
 
 export function resolvePlaywrightEndpoint(

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { resolvePlaywrightBackingState } from "./tests/playwright-backing-state.mjs";
@@ -31,7 +31,7 @@ function parsePort(value: string, envName: string): number {
 }
 
 function randomPort(min: number): number {
-  return min + (randomBytes(2).readUInt16BE(0) % 10_000);
+  return randomInt(min, min + 10_000);
 }
 
 function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndpoint {

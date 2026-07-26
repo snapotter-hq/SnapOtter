@@ -16,12 +16,17 @@
  * ownership-enforcement.test.ts. GATED below is therefore the complete set of
  * permissions that do decide a status code.
  */
+import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 const API = process.env.API_URL;
 if (!API) throw new Error("API_URL was not initialized by playwright.config.ts");
 
-const UID = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+// Only a uniquifier for the fixture accounts this spec creates, but this is the
+// permission matrix, so a Math.random() sitting here reads as a security token
+// to anyone scanning the file. Taking the real thing is cheaper than explaining
+// it every time someone looks.
+const UID = `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
 
 interface Probe {
   permission: string;
