@@ -16,7 +16,10 @@ export function getStaticPaths() {
 }
 
 const { uc } = Astro.props;
-const canonical = `https://snapotter.com/self-hosted/${uc.slug}`;
+// English-only page, so `path` also tells Base to skip the per-locale hreflang
+// fan-out. Trailing slash matches the emitted directory URL.
+const PATH = `/self-hosted/${uc.slug}/`;
+const canonical = `https://snapotter.com${PATH}`;
 const alt = uc.alternativeSlug
   ? ALTERNATIVES.find((a) => a.slug === uc.alternativeSlug)
   : undefined;
@@ -57,7 +60,7 @@ const faqJsonLd =
 const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
 ---
 
-<Base title={`${uc.pageTitle} | SnapOtter`} description={uc.metaDescription} canonical={canonical}>
+<Base title={`${uc.pageTitle} | SnapOtter`} description={uc.metaDescription} canonical={canonical} path={PATH}>
   <Fragment slot="head">
     <JsonLd data={allJsonLd} />
   </Fragment>

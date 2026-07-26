@@ -2,21 +2,9 @@ import sitemap from "@astrojs/sitemap";
 import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
+import { isEnglishOnlyUrl } from "./src/lib/en-only-paths.ts";
 
 const LOCALES = SUPPORTED_LOCALES.map((l) => l.code);
-
-// Tool DETAIL pages (/tools/<section>/<tool>/) are English-only, so they have no
-// localized variants. Match exactly two path segments after /tools/ (the /tools/
-// index and /tools/<section>/ section pages have zero and one, and stay localized).
-const TOOL_DETAIL_PATH = /^\/tools\/(?:image|video|audio|pdf|files)\/[^/]+\/$/;
-
-function isToolDetailUrl(url) {
-  try {
-    return TOOL_DETAIL_PATH.test(new URL(url).pathname);
-  } catch {
-    return false;
-  }
-}
 
 export default defineConfig({
   site: "https://snapotter.com",
@@ -38,12 +26,12 @@ export default defineConfig({
         defaultLocale: "en",
         locales: Object.fromEntries(LOCALES.map((c) => [c, c])),
       },
-      // English-only tool-detail pages have no localized variants, so drop the
-      // hreflang alternates the i18n integration would otherwise emit for them
-      // (they would point at non-existent /de/tools/<tool>/ URLs). All other
-      // pages keep their alternates.
+      // English-only pages have no localized variants, so drop the hreflang
+      // alternates the i18n integration would otherwise emit for them (they
+      // would point at non-existent /de/tools/<tool>/ URLs). All other pages
+      // keep their alternates. Same predicate the page head uses.
       serialize(item) {
-        if (isToolDetailUrl(item.url)) {
+        if (isEnglishOnlyUrl(item.url)) {
           const { links, ...rest } = item;
           return rest;
         }

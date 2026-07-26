@@ -1,6 +1,7 @@
 // apps/landing/src/lib/i18n-page.ts
 import { getRelativeLocaleUrl } from "astro:i18n";
 import { isRtl, LANDING_LOCALES } from "@/i18n";
+import { isEnglishOnlyPath } from "@/lib/en-only-paths";
 
 /** Absolute site origin used for canonical + hreflang hrefs. */
 export const SITE = "https://snapotter.com";
@@ -44,13 +45,25 @@ export function dirFor(locale: string): "ltr" | "rtl" {
 /**
  * Reciprocal hreflang alternates for one page path (same path across all locales),
  * plus an x-default pointing at English.
+ *
+ * English-only pages get the self-reference and x-default and nothing else. Fanning
+ * them out across every locale would advertise twenty URLs the build never wrote,
+ * which is a soft 404 per tag to a crawler and a dead link to anything following the
+ * head. The sitemap has always dropped these alternates; the head now agrees.
  */
 export function altLinks(path: string): Array<{ hreflang: string; href: string }> {
+  const english = `${SITE}${localizeHref("en", path)}`;
+  if (isEnglishOnlyPath(path)) {
+    return [
+      { hreflang: "en", href: english },
+      { hreflang: "x-default", href: english },
+    ];
+  }
   const links = LANDING_LOCALES.map((code) => ({
     hreflang: code,
     href: `${SITE}${localizeHref(code, path)}`,
   }));
-  links.push({ hreflang: "x-default", href: `${SITE}${localizeHref("en", path)}` });
+  links.push({ hreflang: "x-default", href: english });
   return links;
 }
 

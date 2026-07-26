@@ -25,10 +25,23 @@ test.describe("Self-hosted spokes", () => {
       const res = await page.goto(`/self-hosted/${slug}`);
       expect(res?.status()).toBeLessThan(400);
       await expect(page.locator("main h1")).toBeVisible();
-      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-        "href",
-        `https://snapotter.com/self-hosted/${slug}`,
-      );
+
+      // Both the slashed and un-slashed URL serve 200, so the canonical picks one.
+      // Trailing slash, matching the emitted directory and every other page.
+      const canonical = `https://snapotter.com/self-hosted/${slug}/`;
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", canonical);
+
+      // Google only honours an hreflang self-reference that matches the canonical,
+      // and these pages are English-only, so that pair is the whole alternate set.
+      const alternates = await page
+        .locator('link[rel="alternate"]')
+        .evaluateAll((nodes) =>
+          nodes.map((n) => [n.getAttribute("hreflang"), n.getAttribute("href")]),
+        );
+      expect(alternates).toEqual([
+        ["en", canonical],
+        ["x-default", canonical],
+      ]);
     });
   }
 });

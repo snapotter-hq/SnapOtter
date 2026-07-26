@@ -7,13 +7,16 @@ import Navbar from "@/components/Navbar.astro";
 import { USE_CASES } from "@/data/use-cases";
 import Base from "@/layouts/Base.astro";
 
-const canonical = "https://snapotter.com/self-hosted";
+// English-only page, so `path` also tells Base to skip the per-locale hreflang
+// fan-out. Trailing slash matches the emitted /self-hosted/index.html URL.
+const PATH = "/self-hosted/";
+const canonical = `https://snapotter.com${PATH}`;
 const title = "Self-Hosted File Processing | SnapOtter";
 const description =
   "Self-hosted, private alternatives to the online file tools your team pastes sensitive files into. Image compression, PDF OCR, video conversion, background removal, transcription, and a REST API, on infrastructure you control.";
 ---
 
-<Base title={title} description={description} canonical={canonical}>
+<Base title={title} description={description} canonical={canonical} path={PATH}>
   <Navbar />
   <main id="main">
     <section class="mx-auto max-w-4xl px-6 pt-28 pb-12 text-center md:pt-36">
