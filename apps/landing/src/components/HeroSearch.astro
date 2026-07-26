@@ -40,9 +40,16 @@ function renderIcon(iconName: string): string {
 <div class="hero-search animate-fade-up relative z-30 mx-auto mt-8 max-w-xl" style="animation-delay: 0.18s;">
   <div class="relative">
     <svg class="pointer-events-none absolute top-1/2 left-5 h-5 w-5 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <!-- role="combobox": aria-expanded and aria-controls are not allowed on a plain
+         textbox, which axe reports as a critical aria-allowed-attr failure on every
+         home page. The role is also what this control already is, a text field that
+         opens a result list below it. -->
     <input
       type="text"
       id="hero-tool-search"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-haspopup="listbox"
       autocomplete="off"
       placeholder={t(locale, "home.hero.searchPlaceholder")}
       class="w-full rounded-2xl border border-border bg-surface py-4 pe-4 ps-12 text-base shadow-sm outline-none transition-all placeholder:text-muted focus:border-primary-ink focus:shadow-md"

@@ -161,9 +161,14 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
               set:html={renderIcon(tool.icon)}
             />
           </div>
+          {/* The category colour tints the pill and the label takes --color-foreground,
+              which is the same rule the Otter palette already applies to orange: vivid
+              colours fill, ink labels. As 12px text on its own 8% tint, #3B82F6 came out
+              at 3.21:1. Ink on that tint is well over 12:1 and the pill still reads as
+              its category. */}
           <span
-            class="rounded-full px-3 py-1 text-xs font-semibold"
-            style={`background-color: ${catColor}14; color: ${catColor}`}
+            class="rounded-full px-3 py-1 text-xs font-semibold text-foreground"
+            style={`background-color: ${catColor}14`}
           >
             {category?.name}
           </span>

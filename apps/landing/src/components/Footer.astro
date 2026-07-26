@@ -119,7 +119,11 @@ const columns = [
     <!-- Link columns -->
     {columns.map((col) => (
       <div>
-        <h4 class="text-sm font-semibold text-foreground">{col.title}</h4>
+        {/* h2, not h4. The footer is a contentinfo landmark and every page has one
+            h1, so starting its headings at level 2 never skips. As an h4 it skipped
+            a level on every page in the site: h2 to h4 on the content pages and h1
+            to h4 on the tool section pages. The size comes from the class either way. */}
+        <h2 class="text-sm font-semibold text-foreground">{col.title}</h2>
         <ul class="mt-4 space-y-2.5">
           {col.links.map((link) => (
             <li>

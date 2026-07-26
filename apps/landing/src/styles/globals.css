@@ -63,6 +63,11 @@ html {
   /* Semantic */
   --color-success: #1E7B5C;
   --color-danger: #BE3A35;
+  /* Same split the orange already uses: the vivid token fills and draws (dots,
+     icons, which only owe 3:1 under 1.4.11), the ink token carries small text.
+     #BE3A35 as 14px text on the #F0E5DD callout wash measures 4.4:1, just under
+     AA; the ink is 5.0:1 there and higher on cream and white. */
+  --color-danger-ink: #B03430;
 
   /* Fonts */
   --font-display: "Bricolage Grotesque", system-ui, sans-serif;
