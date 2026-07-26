@@ -12,6 +12,20 @@ const SUBTITLE_EXT_SET = new Set<string>(SUBTITLE_INPUTS);
 const MAX_SUBTITLE_BYTES = 1 * 1024 * 1024; // 1 MiB
 
 /**
+ * True when the probe failed because the engine is missing or misconfigured,
+ * rather than because the file is bad. Two ways to get here: nothing on PATH
+ * and no override, which media-engine reports before spawning; or FFPROBE_PATH
+ * pointing somewhere that does not exist, which fails at spawn with ENOENT.
+ * Both are the operator's container. A real parse failure carries ffprobe's own
+ * stderr and must keep being treated as a client error.
+ */
+function isEngineUnavailable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (/\bffprobe binary not found\b/.test(err.message)) return true;
+  return (err as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+/**
  * Video/audio/image/subtitle validation via capped ffprobe (spec 4.7).
  * ffprobe needs a real file (mp4 moov atoms may trail), so the buffer
  * lands in the scratch dir for video/audio/image kinds.  Subtitle kind
@@ -37,7 +51,18 @@ export class MediaInputHandler implements InputHandler {
       let info: Awaited<ReturnType<typeof probeMedia>>;
       try {
         info = await probeMedia(probePath);
-      } catch {
+      } catch (err) {
+        // An absent engine is the operator's container, not the caller's file.
+        // Reporting it as a corrupt upload sends them to inspect a file that is
+        // perfectly fine, and hides the one fact that would fix it.
+        if (isEngineUnavailable(err)) {
+          throw new InputValidationError(
+            "Media processing is unavailable on this server because ffmpeg is not installed.",
+            503,
+            "Install ffmpeg in the container or set FFMPEG_PATH and FFPROBE_PATH.",
+            "ENGINE_UNAVAILABLE",
+          );
+        }
         // ffprobe could not parse the upload. Surface a clean message; the raw
         // tool error is intentionally not exposed to the client, and a bad
         // upload is not a server fault worth logging from this low-level handler.

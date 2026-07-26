@@ -4,6 +4,7 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isEngineUnavailableResponse,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
@@ -1216,6 +1217,14 @@ describe("settings variation matrix", () => {
               accounting.skip("optional-feature", `${String(payload.code)} for ${label}`);
               return;
             }
+          }
+
+          // A host without ffmpeg cannot run media tools at all. That is the
+          // operator's container, not a product failure, and CI shards ship
+          // without ffmpeg by design, so record it and move on.
+          if (isEngineUnavailableResponse(res.statusCode, res.body)) {
+            accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+            return;
           }
 
           // Core assertion: no 500 (internal server error / crash)

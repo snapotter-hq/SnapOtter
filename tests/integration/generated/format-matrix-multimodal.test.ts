@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isEngineUnavailableResponse,
 } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -261,6 +262,14 @@ describe("multi-modality tool x format matrix", () => {
               );
               return;
             }
+          }
+
+          // A host without ffmpeg cannot run media tools at all. That is the
+          // operator's container, not a product failure, and CI shards ship
+          // without ffmpeg by design, so record it and move on.
+          if (isEngineUnavailableResponse(res.statusCode, res.body)) {
+            accounting.skip("missing-host-binary", `engine unavailable for ${fixture.filename}`);
+            return;
           }
 
           expect(

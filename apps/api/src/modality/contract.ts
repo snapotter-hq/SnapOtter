@@ -7,11 +7,18 @@
 export class InputValidationError extends Error {
   statusCode: number;
   details?: string;
-  constructor(message: string, statusCode = 400, details?: string) {
+  /**
+   * Machine-readable reason, matching the codes the rest of the API already
+   * emits such as FEATURE_NOT_INSTALLED. Prose gets reworded; a caller deciding
+   * whether a failure is its own fault needs something that does not.
+   */
+  code?: string;
+  constructor(message: string, statusCode = 400, details?: string, code?: string) {
     super(message);
     this.name = "InputValidationError";
     this.statusCode = statusCode;
     if (details !== undefined) this.details = details;
+    if (code !== undefined) this.code = code;
   }
 }
 
