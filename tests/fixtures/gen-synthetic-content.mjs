@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // gen-synthetic-content.mjs -- Regenerates Category A & B content fixtures as CC0.
 //
 // Category A: Deterministically regenerable (QR codes, barcodes, OCR text, PDFs,
@@ -14,11 +15,11 @@
 // System deps on PATH:
 //   ffmpeg
 
-import { existsSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IMAGE_VALID = join(__dirname, "image/valid");
@@ -48,27 +49,109 @@ function writeIfMissing(path, data, label) {
 // Standard Code 128 bar patterns (11 modules each, stop = 13 modules).
 // Each string is a binary pattern: 1 = dark bar, 0 = light space.
 const CODE128 = [
-  "11011001100","11001101100","11001100110","10010011000","10010001100",
-  "10001001100","10011001000","10011000100","10001100100","11001001000",
-  "11001000100","11000100100","10110011100","10011011100","10011001110",
-  "10111001100","10011101100","10011100110","11001110010","11001011100",
-  "11001001110","11011100100","11001110100","11101101110","11101001100",
-  "11100101100","11100100110","11101100100","11100110100","11100110010",
-  "11011011000","11011000110","11000110110","10100011000","10001011000",
-  "10001000110","10110001000","10001101000","10001100010","11010001000",
-  "11000101000","11000100010","10110111000","10110001110","10001101110",
-  "10111011000","10111000110","10001110110","11101110110","11010001110",
-  "11000101110","11011101000","11011100010","11011101110","11101011000",
-  "11101000110","11100010110","11101101000","11101100010","11100011010",
-  "11101111010","11001000010","11110001010","10100110000","10100001100",
-  "10010110000","10010000110","10000101100","10000100110","10110010000",
-  "10110000100","10011010000","10011000010","10000110100","10000110010",
-  "11000010010","11001010000","11110111010","11000010100","10001111010",
-  "10100111100","10010111100","10010011110","10111100100","10011110100",
-  "10011110010","11110100100","11110010100","11110010010","11011011110",
-  "11011110110","11110110110","10101111000","10100011110","10001011110",
-  "10111101000","10111100010","11110101000","11110100010","10111011110",
-  "10111101110","11101011110","11110101110",
+  "11011001100",
+  "11001101100",
+  "11001100110",
+  "10010011000",
+  "10010001100",
+  "10001001100",
+  "10011001000",
+  "10011000100",
+  "10001100100",
+  "11001001000",
+  "11001000100",
+  "11000100100",
+  "10110011100",
+  "10011011100",
+  "10011001110",
+  "10111001100",
+  "10011101100",
+  "10011100110",
+  "11001110010",
+  "11001011100",
+  "11001001110",
+  "11011100100",
+  "11001110100",
+  "11101101110",
+  "11101001100",
+  "11100101100",
+  "11100100110",
+  "11101100100",
+  "11100110100",
+  "11100110010",
+  "11011011000",
+  "11011000110",
+  "11000110110",
+  "10100011000",
+  "10001011000",
+  "10001000110",
+  "10110001000",
+  "10001101000",
+  "10001100010",
+  "11010001000",
+  "11000101000",
+  "11000100010",
+  "10110111000",
+  "10110001110",
+  "10001101110",
+  "10111011000",
+  "10111000110",
+  "10001110110",
+  "11101110110",
+  "11010001110",
+  "11000101110",
+  "11011101000",
+  "11011100010",
+  "11011101110",
+  "11101011000",
+  "11101000110",
+  "11100010110",
+  "11101101000",
+  "11101100010",
+  "11100011010",
+  "11101111010",
+  "11001000010",
+  "11110001010",
+  "10100110000",
+  "10100001100",
+  "10010110000",
+  "10010000110",
+  "10000101100",
+  "10000100110",
+  "10110010000",
+  "10110000100",
+  "10011010000",
+  "10011000010",
+  "10000110100",
+  "10000110010",
+  "11000010010",
+  "11001010000",
+  "11110111010",
+  "11000010100",
+  "10001111010",
+  "10100111100",
+  "10010111100",
+  "10010011110",
+  "10111100100",
+  "10011110100",
+  "10011110010",
+  "11110100100",
+  "11110010100",
+  "11110010010",
+  "11011011110",
+  "11011110110",
+  "11110110110",
+  "10101111000",
+  "10100011110",
+  "10001011110",
+  "10111101000",
+  "10111100010",
+  "11110101000",
+  "11110100010",
+  "10111011110",
+  "10111101110",
+  "11101011110",
+  "11110101110",
   "11010000100", // 103 Start A
   "11010010000", // 104 Start B
   "11010011100", // 105 Start C
@@ -100,7 +183,9 @@ function barcodeSvg(text, width, height) {
   const bars = [];
   for (let i = 0; i < bits.length; i++) {
     if (bits[i] === "1") {
-      bars.push(`<rect x="${(quietZone + i * unitW).toFixed(2)}" y="10" width="${unitW.toFixed(2)}" height="${barH}" fill="black"/>`);
+      bars.push(
+        `<rect x="${(quietZone + i * unitW).toFixed(2)}" y="10" width="${unitW.toFixed(2)}" height="${barH}" fill="black"/>`,
+      );
     }
   }
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -134,14 +219,13 @@ function generatePdf(
     const sId = addObj(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     const pId = addObj(
       `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] ` +
-      `/Contents ${sId} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`,
+        `/Contents ${sId} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`,
     );
     pageIds.push(pId);
   }
 
   objects[0].content = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
-  objects[1].content =
-    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageCount} >>`;
+  objects[1].content = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageCount} >>`;
 
   let pdf = "%PDF-1.7\n%\x81\x81\x81\x81\n\n";
   const offsets = [];
@@ -211,8 +295,16 @@ function multiFaceSvg(w, h) {
   const cw = w / cols;
   const ch = h / rows;
   const colors = [
-    "#D4956A", "#C2885E", "#E8B88A", "#A67853", "#BF9570",
-    "#D9A87C", "#CB9068", "#E5C49E", "#B08060", "#C89878",
+    "#D4956A",
+    "#C2885E",
+    "#E8B88A",
+    "#A67853",
+    "#BF9570",
+    "#D9A87C",
+    "#CB9068",
+    "#E5C49E",
+    "#B08060",
+    "#C89878",
   ];
   const shapes = [];
   for (let r = 0; r < rows; r++) {
@@ -222,9 +314,15 @@ function multiFaceSvg(w, h) {
       const rx = cw * 0.3;
       const ry = ch * 0.38;
       const idx = r * cols + c;
-      shapes.push(`<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx.toFixed(0)}" ry="${ry.toFixed(0)}" fill="${colors[idx]}" stroke="#888" stroke-width="0.5"/>`);
-      shapes.push(`<circle cx="${(cx - rx * 0.3).toFixed(0)}" cy="${(cy - ry * 0.15).toFixed(0)}" r="3" fill="#333"/>`);
-      shapes.push(`<circle cx="${(cx + rx * 0.3).toFixed(0)}" cy="${(cy - ry * 0.15).toFixed(0)}" r="3" fill="#333"/>`);
+      shapes.push(
+        `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx.toFixed(0)}" ry="${ry.toFixed(0)}" fill="${colors[idx]}" stroke="#888" stroke-width="0.5"/>`,
+      );
+      shapes.push(
+        `<circle cx="${(cx - rx * 0.3).toFixed(0)}" cy="${(cy - ry * 0.15).toFixed(0)}" r="3" fill="#333"/>`,
+      );
+      shapes.push(
+        `<circle cx="${(cx + rx * 0.3).toFixed(0)}" cy="${(cy - ry * 0.15).toFixed(0)}" r="3" fill="#333"/>`,
+      );
     }
   }
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -269,13 +367,17 @@ function ffIfMissing(outPath, args, label) {
 
 async function main() {
   console.log("Regenerating Category A & B content fixtures...");
-  console.log(`Mode: ${FORCE ? "FORCE (overwrite all)" : "skip existing files (pass --force to overwrite)"}\n`);
+  console.log(
+    `Mode: ${FORCE ? "FORCE (overwrite all)" : "skip existing files (pass --force to overwrite)"}\n`,
+  );
 
   // ── QR codes (A) ──
   console.log("QR codes:");
   const qrData = "https://snapotter.com";
   const qrPng = await QRCode.toBuffer(qrData, {
-    width: 400, margin: 2, color: { dark: "#000000", light: "#ffffff" },
+    width: 400,
+    margin: 2,
+    color: { dark: "#000000", light: "#ffffff" },
   });
   writeIfMissing(join(IMAGE_VALID, "qr-code.png"), qrPng, "qr-code.png");
 
@@ -374,11 +476,11 @@ async function main() {
   ffIfMissing(
     audioTagsOut,
     `-f lavfi -i "sine=frequency=440:duration=1.2:sample_rate=8000" ` +
-    `-c:a libmp3lame -b:a 64k -ar 8000 -ac 1 ` +
-    `-metadata title="Test Song" -metadata artist="Test Artist" ` +
-    `-metadata album="Test Album" -metadata date="2026" ` +
-    `-metadata genre="Electronic" -metadata track="1/10" ` +
-    `-y "${audioTagsOut}"`,
+      `-c:a libmp3lame -b:a 64k -ar 8000 -ac 1 ` +
+      `-metadata title="Test Song" -metadata artist="Test Artist" ` +
+      `-metadata album="Test Album" -metadata date="2026" ` +
+      `-metadata genre="Electronic" -metadata track="1/10" ` +
+      `-y "${audioTagsOut}"`,
     "audio-with-tags.mp3",
   );
 
@@ -386,8 +488,8 @@ async function main() {
   ffIfMissing(
     videoMetaOut,
     `-f lavfi -i "color=c=0xE07832:s=64x64:d=1:rate=16" ` +
-    `-c:v libx264 -pix_fmt yuv420p -movflags +faststart ` +
-    `-y "${videoMetaOut}"`,
+      `-c:v libx264 -pix_fmt yuv420p -movflags +faststart ` +
+      `-y "${videoMetaOut}"`,
     "video-with-meta.mp4",
   );
 

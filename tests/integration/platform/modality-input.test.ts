@@ -1,5 +1,4 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { qpdfAvailable } from "@snapotter/doc-engine";

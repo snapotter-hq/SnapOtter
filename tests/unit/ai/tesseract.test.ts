@@ -130,22 +130,22 @@ describe("runTesseract", () => {
     await resultPromise;
   });
 
-  it.each([
-    "Hangul",
-    "kor",
-  ])("ignores legacy installed Korean model %s when resolving Fast auto languages", async (koreanModel) => {
-    const child = createMockChild();
-    const inventory = new Set(["eng", koreanModel, "osd"]);
-    mockGetCachedTesseractLanguages.mockReturnValueOnce(inventory);
-    mockSpawn.mockReturnValue(child);
+  it.each(["Hangul", "kor"])(
+    "ignores legacy installed Korean model %s when resolving Fast auto languages",
+    async (koreanModel) => {
+      const child = createMockChild();
+      const inventory = new Set(["eng", koreanModel, "osd"]);
+      mockGetCachedTesseractLanguages.mockReturnValueOnce(inventory);
+      mockSpawn.mockReturnValue(child);
 
-    const resultPromise = runTesseract("/tmp/mixed.png", { language: "auto" });
-    const language = mockSpawn.mock.calls[0]?.[1]?.[3];
-    child.emit("close", 0, null);
+      const resultPromise = runTesseract("/tmp/mixed.png", { language: "auto" });
+      const language = mockSpawn.mock.calls[0]?.[1]?.[3];
+      child.emit("close", 0, null);
 
-    await resultPromise;
-    expect(language).toBe("eng");
-  });
+      await resultPromise;
+      expect(language).toBe("eng");
+    },
+  );
 
   it("uses the installed supported subset for auto on a partial native host", async () => {
     const child = createMockChild();
@@ -188,19 +188,16 @@ describe("runTesseract", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "Hangul",
-    "kor",
-    "jpn+Hangul",
-    "Hangul/../../eng",
-    "Hangul+kor",
-  ])("rejects unsafe internal language set %s before spawning", async (tesseractLanguages) => {
-    mockGetCachedTesseractLanguages.mockReturnValueOnce(new Set(["eng", "osd"]));
-    await expect(
-      runTesseract("/tmp/input.png", { language: "auto", tesseractLanguages }),
-    ).rejects.toThrow("Unsupported internal Tesseract language set");
-    expect(mockSpawn).not.toHaveBeenCalled();
-  });
+  it.each(["Hangul", "kor", "jpn+Hangul", "Hangul/../../eng", "Hangul+kor"])(
+    "rejects unsafe internal language set %s before spawning",
+    async (tesseractLanguages) => {
+      mockGetCachedTesseractLanguages.mockReturnValueOnce(new Set(["eng", "osd"]));
+      await expect(
+        runTesseract("/tmp/input.png", { language: "auto", tesseractLanguages }),
+      ).rejects.toThrow("Unsupported internal Tesseract language set");
+      expect(mockSpawn).not.toHaveBeenCalled();
+    },
+  );
 
   it("fails auto clearly when no supported traineddata is installed", async () => {
     mockGetCachedTesseractLanguages.mockReturnValueOnce(new Set(["osd"]));

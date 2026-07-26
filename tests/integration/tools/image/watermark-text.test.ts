@@ -77,30 +77,26 @@ describe("watermark-text", () => {
     expect(Buffer.from(dlRes.rawPayload).equals(PNG)).toBe(false);
   });
 
-  it.each([
-    "center",
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right",
-    "tiled",
-  ] as const)("supports position: %s", async (position) => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: JSON.stringify({ text: "Pos", position }) },
-    ]);
+  it.each(["center", "top-left", "top-right", "bottom-left", "bottom-right", "tiled"] as const)(
+    "supports position: %s",
+    async (position) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ text: "Pos", position }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/watermark-text",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/watermark-text",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-  });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toBeDefined();
+    },
+  );
 
   it("respects custom opacity and font size", async () => {
     const { body, contentType } = createMultipartPayload([

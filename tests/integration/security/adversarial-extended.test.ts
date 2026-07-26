@@ -9,8 +9,6 @@
  * and concurrent.test.ts.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";

@@ -58,8 +58,9 @@ describe.skipIf(!sofficeAvailable())("convert-presentation (requires soffice)", 
     expect(res.statusCode).toBe(202);
     const { jobId } = JSON.parse(res.body);
     const row = await pollJob(jobId);
-    expect(row?.status).toBe("completed");
-    const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+    if (!row) throw new Error("job row not found after polling");
+    expect(row.status).toBe("completed");
+    const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
     const dl = await testApp.app.inject({
       method: "GET",
       url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,

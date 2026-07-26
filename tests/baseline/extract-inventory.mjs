@@ -22,5 +22,12 @@ for (const file of report.testResults ?? []) {
 }
 testIds.sort();
 passSet.sort();
-writeFileSync(outPath, JSON.stringify({ testIds, passSet, counts: { total: testIds.length, passed: passSet.length } }, null, 2));
+writeFileSync(
+  outPath,
+  JSON.stringify(
+    { testIds, passSet, counts: { total: testIds.length, passed: passSet.length } },
+    null,
+    2,
+  ),
+);
 console.log(`inventory: ${testIds.length} tests, ${passSet.length} passed -> ${outPath}`);

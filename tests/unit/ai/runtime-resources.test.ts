@@ -279,27 +279,30 @@ describe("OCR runtime memory compatibility", () => {
         "31 29 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw",
       ],
     ],
-  ])("ignores a hidden old child when its replacement has the same mountpoint (%s)", (_label, mounts) => {
-    const files = new Map([
-      ["/proc/self/cgroup", "0::/child/job\n"],
-      ["/proc/self/mountinfo", mounts.join("\n")],
-      ["/sys/fs/cgroup/child/job/memory.max", String(5 * GiB)],
-      ["/sys/fs/cgroup/child/memory.max", String(6 * GiB)],
-      ["/sys/fs/cgroup/memory.max", String(7 * GiB)],
-    ]);
+  ])(
+    "ignores a hidden old child when its replacement has the same mountpoint (%s)",
+    (_label, mounts) => {
+      const files = new Map([
+        ["/proc/self/cgroup", "0::/child/job\n"],
+        ["/proc/self/mountinfo", mounts.join("\n")],
+        ["/sys/fs/cgroup/child/job/memory.max", String(5 * GiB)],
+        ["/sys/fs/cgroup/child/memory.max", String(6 * GiB)],
+        ["/sys/fs/cgroup/memory.max", String(7 * GiB)],
+      ]);
 
-    expect(
-      getOcrRuntimeEffectiveMemoryBytes({
-        hostPlatform: "linux",
-        physicalMemoryBytes: 8 * GiB,
-        readTextFile: (path) => {
-          const value = files.get(path);
-          if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
-          return value;
-        },
-      }),
-    ).toBe(5 * GiB);
-  });
+      expect(
+        getOcrRuntimeEffectiveMemoryBytes({
+          hostPlatform: "linux",
+          physicalMemoryBytes: 8 * GiB,
+          readTextFile: (path) => {
+            const value = files.get(path);
+            if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+            return value;
+          },
+        }),
+      ).toBe(5 * GiB);
+    },
+  );
 
   it("fails closed when two reachable mounts claim the same mountpoint", () => {
     const files = new Map([
@@ -610,30 +613,30 @@ describe("OCR runtime memory compatibility", () => {
     ).toBe(5 * GiB);
   });
 
-  it.each([
-    "ENOENT",
-    "EACCES",
-  ])("fails closed when an absent v2 limit cannot be verified against its cgroup directory (%s)", (coreErrorCode) => {
-    const files = new Map([
-      ["/proc/self/cgroup", "0::/deleted\n"],
-      [
-        "/proc/self/mountinfo",
-        "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n",
-      ],
-    ]);
+  it.each(["ENOENT", "EACCES"])(
+    "fails closed when an absent v2 limit cannot be verified against its cgroup directory (%s)",
+    (coreErrorCode) => {
+      const files = new Map([
+        ["/proc/self/cgroup", "0::/deleted\n"],
+        [
+          "/proc/self/mountinfo",
+          "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n",
+        ],
+      ]);
 
-    expect(() =>
-      getOcrRuntimeEffectiveMemoryBytes({
-        physicalMemoryBytes: 8 * GiB,
-        readTextFile: (path) => {
-          const value = files.get(path);
-          if (value !== undefined) return value;
-          const code = path.endsWith("/cgroup.controllers") ? coreErrorCode : "ENOENT";
-          throw Object.assign(new Error("unavailable"), { code });
-        },
-      }),
-    ).toThrow("cgroup memory capacity");
-  });
+      expect(() =>
+        getOcrRuntimeEffectiveMemoryBytes({
+          physicalMemoryBytes: 8 * GiB,
+          readTextFile: (path) => {
+            const value = files.get(path);
+            if (value !== undefined) return value;
+            const code = path.endsWith("/cgroup.controllers") ? coreErrorCode : "ENOENT";
+            throw Object.assign(new Error("unavailable"), { code });
+          },
+        }),
+      ).toThrow("cgroup memory capacity");
+    },
+  );
 
   it("fails closed when a cgroup v2 ancestor limit is unreadable", () => {
     const files = new Map([
@@ -869,33 +872,32 @@ describe("OCR runtime memory compatibility", () => {
     ).toThrow("cgroup memory capacity");
   });
 
-  it.each([
-    "x::/job\n",
-    "1::/job\n",
-    "0:memory:/job\n",
-  ])("rejects invalid Linux cgroup hierarchy metadata: %s", (membership) => {
-    const files = new Map([
-      ["/proc/self/cgroup", membership],
-      [
-        "/proc/self/mountinfo",
-        "29 23 0:26 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime - cgroup cgroup rw,memory\n",
-      ],
-      ["/sys/fs/cgroup/memory/job/memory.limit_in_bytes", String(5 * GiB)],
-      ["/sys/fs/cgroup/memory/memory.limit_in_bytes", String(8 * GiB)],
-    ]);
+  it.each(["x::/job\n", "1::/job\n", "0:memory:/job\n"])(
+    "rejects invalid Linux cgroup hierarchy metadata: %s",
+    (membership) => {
+      const files = new Map([
+        ["/proc/self/cgroup", membership],
+        [
+          "/proc/self/mountinfo",
+          "29 23 0:26 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime - cgroup cgroup rw,memory\n",
+        ],
+        ["/sys/fs/cgroup/memory/job/memory.limit_in_bytes", String(5 * GiB)],
+        ["/sys/fs/cgroup/memory/memory.limit_in_bytes", String(8 * GiB)],
+      ]);
 
-    expect(() =>
-      getOcrRuntimeEffectiveMemoryBytes({
-        hostPlatform: "linux",
-        physicalMemoryBytes: 8 * GiB,
-        readTextFile: (path) => {
-          const value = files.get(path);
-          if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
-          return value;
-        },
-      }),
-    ).toThrow("cgroup memory capacity");
-  });
+      expect(() =>
+        getOcrRuntimeEffectiveMemoryBytes({
+          hostPlatform: "linux",
+          physicalMemoryBytes: 8 * GiB,
+          readTextFile: (path) => {
+            const value = files.get(path);
+            if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+            return value;
+          },
+        }),
+      ).toThrow("cgroup memory capacity");
+    },
+  );
 
   it("accepts a legitimate v1 named hierarchy without treating it as cgroup v2", () => {
     let membershipReads = 0;

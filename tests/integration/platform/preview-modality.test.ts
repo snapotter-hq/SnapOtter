@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { resolveGs } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import { describe, expect, it } from "vitest";

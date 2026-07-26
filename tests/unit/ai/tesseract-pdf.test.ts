@@ -111,18 +111,12 @@ describe("parsePdfPageSpec", () => {
     expect(parsePdfPageSpec("5, 1-3, 2, 7-8", 10)).toEqual([1, 2, 3, 5, 7, 8]);
   });
 
-  it.each([
-    "",
-    "1,,2",
-    "0",
-    "-1",
-    "3-1",
-    "1-a",
-    "1-2-3",
-    "2,",
-  ])("rejects invalid page selection %j", (spec) => {
-    expect(() => parsePdfPageSpec(spec, 10)).toThrow(/Invalid|No pages/);
-  });
+  it.each(["", "1,,2", "0", "-1", "3-1", "1-a", "1-2-3", "2,"])(
+    "rejects invalid page selection %j",
+    (spec) => {
+      expect(() => parsePdfPageSpec(spec, 10)).toThrow(/Invalid|No pages/);
+    },
+  );
 
   it("rejects pages outside the document", () => {
     expect(() => parsePdfPageSpec("1,11", 10)).toThrow("document has 10 pages");

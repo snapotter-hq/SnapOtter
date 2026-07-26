@@ -15,8 +15,6 @@
  * - Concurrent: 10 resize with large file, data integrity verification
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";

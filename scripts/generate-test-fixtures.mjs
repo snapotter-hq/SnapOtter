@@ -163,9 +163,13 @@ if (existsSync(encPdf)) {
   const qpdf = whichBin("QPDF_PATH", "qpdf");
   if (qpdf) {
     const srcPdf = join(root, "tests/fixtures/document/valid/test-3page.pdf");
-    const qres = spawnSync(qpdf, [srcPdf, "--encrypt", "test123", "owner123", "256", "--", encPdf], {
-      stdio: "inherit",
-    });
+    const qres = spawnSync(
+      qpdf,
+      [srcPdf, "--encrypt", "test123", "owner123", "256", "--", encPdf],
+      {
+        stdio: "inherit",
+      },
+    );
     if (qres.status !== 0) {
       console.error("qpdf encryption failed");
       process.exit(1);
@@ -200,4 +204,6 @@ A paragraph with **bold** and a list:
 `,
 );
 
-console.log("Fixtures written to tests/fixtures/{video,audio}/formats and tests/fixtures/document/formats");
+console.log(
+  "Fixtures written to tests/fixtures/{video,audio}/formats and tests/fixtures/document/formats",
+);

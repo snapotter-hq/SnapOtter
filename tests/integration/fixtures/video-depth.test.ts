@@ -89,8 +89,9 @@ async function resolveResult(res: Awaited<ReturnType<typeof postTool>>): Promise
     if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
     await new Promise((r) => setTimeout(r, 500));
   }
-  expect(row?.status).toBe("completed");
-  const outName = (row?.outputRefs as string[])[0].split("/").pop() as string;
+  if (!row) throw new Error("job row not found after polling");
+  expect(row.status).toBe("completed");
+  const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
   const dl = await app.inject({
     method: "GET",
     url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,

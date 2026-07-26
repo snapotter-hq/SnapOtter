@@ -6,10 +6,6 @@
  * inputs, numeric validation, SVG label escaping, and invalid kind rejection.
  */
 
-import { randomUUID } from "node:crypto";
-import { writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -157,7 +153,7 @@ describe("Chart Maker", () => {
 
     expect(res.statusCode).toBe(422);
     const result = JSON.parse(res.body);
-    expect(result.error + " " + (result.details ?? "")).toMatch(/numeric/i);
+    expect(`${result.error} ${result.details ?? ""}`).toMatch(/numeric/i);
   });
 
   it("escapes SVG-injection labels and produces valid PNG", async () => {

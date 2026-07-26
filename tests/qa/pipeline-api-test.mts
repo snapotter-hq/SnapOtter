@@ -10,7 +10,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,7 +41,7 @@ async function executePipeline(
     body: form,
   });
 
-  const body = await res.json() as Record<string, unknown>;
+  const body = (await res.json()) as Record<string, unknown>;
   return {
     status: res.status,
     body,
@@ -64,18 +64,46 @@ async function downloadToFile(downloadUrl: string): Promise<string> {
 function imageInfo(file: string): { width: number; height: number; codec: string; pixFmt: string } {
   const out = execFileSync(
     "ffprobe",
-    ["-v", "quiet", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name,pix_fmt", "-print_format", "json", file],
+    [
+      "-v",
+      "quiet",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=width,height,codec_name,pix_fmt",
+      "-print_format",
+      "json",
+      file,
+    ],
     { encoding: "utf8", timeout: 20_000 },
   );
   const s = (JSON.parse(out).streams ?? [])[0] ?? {};
-  return { width: s.width ?? 0, height: s.height ?? 0, codec: s.codec_name ?? "", pixFmt: s.pix_fmt ?? "" };
+  return {
+    width: s.width ?? 0,
+    height: s.height ?? 0,
+    codec: s.codec_name ?? "",
+    pixFmt: s.pix_fmt ?? "",
+  };
 }
 
 function imageSaturation(file: string): number {
   const esc = file.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
   const out = execFileSync(
     "ffprobe",
-    ["-v", "quiet", "-f", "lavfi", "-i", `movie=${esc},signalstats`, "-show_entries", "frame_tags=lavfi.signalstats.SATAVG", "-read_intervals", "%+#1", "-print_format", "json"],
+    [
+      "-v",
+      "quiet",
+      "-f",
+      "lavfi",
+      "-i",
+      `movie=${esc},signalstats`,
+      "-show_entries",
+      "frame_tags=lavfi.signalstats.SATAVG",
+      "-read_intervals",
+      "%+#1",
+      "-print_format",
+      "json",
+    ],
     { encoding: "utf8", timeout: 20_000 },
   );
   const tags = (JSON.parse(out).frames ?? [])[0]?.tags ?? {};
@@ -83,7 +111,10 @@ function imageSaturation(file: string): number {
 }
 
 function magicIsWebp(buf: Buffer): boolean {
-  return buf.subarray(0, 4).toString("latin1") === "RIFF" && buf.subarray(8, 12).toString("latin1") === "WEBP";
+  return (
+    buf.subarray(0, 4).toString("latin1") === "RIFF" &&
+    buf.subarray(8, 12).toString("latin1") === "WEBP"
+  );
 }
 
 // ── Test results ────────────────────────────────────────────────
@@ -123,33 +154,58 @@ async function testChain1() {
   }
 
   if (result.status !== 200) {
-    report({ chain, severity: "BUG", expected: "200 OK", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
     return;
   }
 
   if (!result.downloadUrl) {
-    report({ chain, severity: "BUG", expected: "downloadUrl present", actual: "No downloadUrl in response" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "downloadUrl present",
+      actual: "No downloadUrl in response",
+    });
     return;
   }
 
   // Verify stepsCompleted
   const stepsCompleted = result.body.stepsCompleted;
   if (stepsCompleted !== 3) {
-    report({ chain, severity: "BUG", expected: "stepsCompleted=3", actual: `stepsCompleted=${stepsCompleted}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "stepsCompleted=3",
+      actual: `stepsCompleted=${stepsCompleted}`,
+    });
   }
 
   let filePath: string;
   try {
     filePath = await downloadToFile(result.downloadUrl);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Download succeeds", actual: `Download failed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Download succeeds",
+      actual: `Download failed: ${err}`,
+    });
     return;
   }
 
   // Check 1: Width must be 100
   const info = imageInfo(filePath);
   if (info.width !== 100) {
-    report({ chain, severity: "BUG", expected: "width=100 (resize applied)", actual: `width=${info.width}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "width=100 (resize applied)",
+      actual: `width=${info.width}`,
+    });
   } else {
     report({ chain, severity: "PASS", expected: "width=100", actual: `width=${info.width}` });
   }
@@ -157,7 +213,13 @@ async function testChain1() {
   // Check 2: Grayscale -- saturation must be near 0
   const sat = imageSaturation(filePath);
   if (sat > 5) {
-    report({ chain, severity: "BUG", expected: "saturation ~0 (grayscale applied)", actual: `saturation=${sat}`, detail: "The adjust-colors grayscale step was likely dropped -- output still has color" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "saturation ~0 (grayscale applied)",
+      actual: `saturation=${sat}`,
+      detail: "The adjust-colors grayscale step was likely dropped -- output still has color",
+    });
   } else {
     report({ chain, severity: "PASS", expected: "saturation ~0", actual: `saturation=${sat}` });
   }
@@ -165,13 +227,21 @@ async function testChain1() {
   // Check 3: WebP magic bytes
   const buf = readFileSync(filePath);
   if (!magicIsWebp(buf)) {
-    report({ chain, severity: "BUG", expected: "WebP magic bytes (convert applied)", actual: `First bytes: ${buf.subarray(0, 12).toString("hex")}`, detail: "The convert step was likely dropped -- output is not WebP" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "WebP magic bytes (convert applied)",
+      actual: `First bytes: ${buf.subarray(0, 12).toString("hex")}`,
+      detail: "The convert step was likely dropped -- output is not WebP",
+    });
   } else {
     report({ chain, severity: "PASS", expected: "WebP format", actual: "WebP magic confirmed" });
   }
 
   // Cleanup
-  try { rmSync(join(filePath, ".."), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(filePath, ".."), { recursive: true, force: true });
+  } catch {}
 }
 
 // ── Chain 2: crop -> border -> watermark-text ──────────────────
@@ -193,12 +263,22 @@ async function testChain2() {
   }
 
   if (result.status !== 200) {
-    report({ chain, severity: "BUG", expected: "200 OK", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
     return;
   }
 
   if (!result.downloadUrl) {
-    report({ chain, severity: "BUG", expected: "downloadUrl present", actual: "No downloadUrl in response" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "downloadUrl present",
+      actual: "No downloadUrl in response",
+    });
     return;
   }
 
@@ -206,7 +286,12 @@ async function testChain2() {
   try {
     filePath = await downloadToFile(result.downloadUrl);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Download succeeds", actual: `Download failed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Download succeeds",
+      actual: `Download failed: ${err}`,
+    });
     return;
   }
 
@@ -222,10 +307,20 @@ async function testChain2() {
       severity: "BUG",
       expected: `width=${expectedW} (crop 200 + border 2*20)`,
       actual: `width=${info.width}`,
-      detail: info.width === 200 ? "Border step was likely dropped" : info.width === 640 ? "Crop step was likely dropped" : "Unexpected dimension",
+      detail:
+        info.width === 200
+          ? "Border step was likely dropped"
+          : info.width === 640
+            ? "Crop step was likely dropped"
+            : "Unexpected dimension",
     });
   } else {
-    report({ chain, severity: "PASS", expected: `width=${expectedW}`, actual: `width=${info.width}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: `width=${expectedW}`,
+      actual: `width=${info.width}`,
+    });
   }
 
   if (info.height !== expectedH) {
@@ -236,19 +331,36 @@ async function testChain2() {
       actual: `height=${info.height}`,
     });
   } else {
-    report({ chain, severity: "PASS", expected: `height=${expectedH}`, actual: `height=${info.height}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: `height=${expectedH}`,
+      actual: `height=${info.height}`,
+    });
   }
 
   // File size must be > 0 (watermark applied -- hard to verify pixel content via ffprobe,
   // but at minimum the pipeline should complete all 3 steps)
   const stepsCompleted = result.body.stepsCompleted;
   if (stepsCompleted !== 3) {
-    report({ chain, severity: "BUG", expected: "stepsCompleted=3", actual: `stepsCompleted=${stepsCompleted}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "stepsCompleted=3",
+      actual: `stepsCompleted=${stepsCompleted}`,
+    });
   } else {
-    report({ chain, severity: "PASS", expected: "3 steps completed", actual: `stepsCompleted=${stepsCompleted}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "3 steps completed",
+      actual: `stepsCompleted=${stepsCompleted}`,
+    });
   }
 
-  try { rmSync(join(filePath, ".."), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(filePath, ".."), { recursive: true, force: true });
+  } catch {}
 }
 
 // ── Chain 3: rotate(90) -> resize(width=50) ────────────────────
@@ -270,12 +382,22 @@ async function testChain3() {
   }
 
   if (result.status !== 200) {
-    report({ chain, severity: "BUG", expected: "200 OK", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
     return;
   }
 
   if (!result.downloadUrl) {
-    report({ chain, severity: "BUG", expected: "downloadUrl present", actual: "No downloadUrl in response" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "downloadUrl present",
+      actual: "No downloadUrl in response",
+    });
     return;
   }
 
@@ -283,7 +405,12 @@ async function testChain3() {
   try {
     filePath = await downloadToFile(result.downloadUrl);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Download succeeds", actual: `Download failed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Download succeeds",
+      actual: `Download failed: ${err}`,
+    });
     return;
   }
 
@@ -291,7 +418,12 @@ async function testChain3() {
 
   // Width must be 50 (resize applied)
   if (info.width !== 50) {
-    report({ chain, severity: "BUG", expected: "width=50 (resize applied)", actual: `width=${info.width}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "width=50 (resize applied)",
+      actual: `width=${info.width}`,
+    });
   } else {
     report({ chain, severity: "PASS", expected: "width=50", actual: `width=${info.width}` });
   }
@@ -299,20 +431,30 @@ async function testChain3() {
   // Height should reflect aspect ratio after 90-degree rotation.
   // Original 640x426 rotated 90 = 426x640. Resize width=50 with contain => height = round(50 * 640/426) = 75
   // Allow +/-1 for rounding
-  const expectedH = Math.round(50 * 640 / 426);
+  const expectedH = Math.round((50 * 640) / 426);
   if (Math.abs(info.height - expectedH) > 1) {
     report({
       chain,
       severity: "BUG",
       expected: `height ~${expectedH} (rotation then resize)`,
       actual: `height=${info.height}`,
-      detail: info.height === Math.round(50 * 426 / 640) ? "Rotation step was likely dropped -- aspect ratio matches un-rotated image" : "Unexpected height",
+      detail:
+        info.height === Math.round((50 * 426) / 640)
+          ? "Rotation step was likely dropped -- aspect ratio matches un-rotated image"
+          : "Unexpected height",
     });
   } else {
-    report({ chain, severity: "PASS", expected: `height ~${expectedH}`, actual: `height=${info.height}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: `height ~${expectedH}`,
+      actual: `height=${info.height}`,
+    });
   }
 
-  try { rmSync(join(filePath, ".."), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(filePath, ".."), { recursive: true, force: true });
+  } catch {}
 }
 
 // ── Chain 4: Edge case -- incompatible step formats ──
@@ -332,7 +474,12 @@ async function testChain4_incompatibleFormat() {
       { toolId: "trim-video", settings: { start: 0, end: 5 } },
     ]);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Error response (not a crash)", actual: `Request crashed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Error response (not a crash)",
+      actual: `Request crashed: ${err}`,
+    });
     return;
   }
 
@@ -379,16 +526,19 @@ async function testChain5_singleStep() {
 
   let result: PipelineResult;
   try {
-    result = await executePipeline(FIXTURE, [
-      { toolId: "resize", settings: { width: 200 } },
-    ]);
+    result = await executePipeline(FIXTURE, [{ toolId: "resize", settings: { width: 200 } }]);
   } catch (err) {
     report({ chain, severity: "BUG", expected: "200 OK", actual: `Request failed: ${err}` });
     return;
   }
 
   if (result.status !== 200) {
-    report({ chain, severity: "BUG", expected: "200 OK", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
     return;
   }
 
@@ -401,7 +551,12 @@ async function testChain5_singleStep() {
   try {
     filePath = await downloadToFile(result.downloadUrl);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Download succeeds", actual: `Download failed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Download succeeds",
+      actual: `Download failed: ${err}`,
+    });
     return;
   }
 
@@ -412,7 +567,9 @@ async function testChain5_singleStep() {
     report({ chain, severity: "PASS", expected: "width=200", actual: `width=${info.width}` });
   }
 
-  try { rmSync(join(filePath, ".."), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(filePath, ".."), { recursive: true, force: true });
+  } catch {}
 }
 
 // ── Chain 6: Empty pipeline ──────────────────────────────────
@@ -425,16 +582,36 @@ async function testChain6_emptyPipeline() {
   try {
     result = await executePipeline(FIXTURE, []);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "400 Bad Request", actual: `Request crashed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "400 Bad Request",
+      actual: `Request crashed: ${err}`,
+    });
     return;
   }
 
   if (result.status === 400) {
-    report({ chain, severity: "PASS", expected: "400 for empty pipeline", actual: `HTTP ${result.status}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "400 for empty pipeline",
+      actual: `HTTP ${result.status}`,
+    });
   } else if (result.status >= 500) {
-    report({ chain, severity: "BUG", expected: "400 (not 5xx)", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "400 (not 5xx)",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
   } else {
-    report({ chain, severity: "PASS", expected: "Error for empty pipeline", actual: `HTTP ${result.status}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "Error for empty pipeline",
+      actual: `HTTP ${result.status}`,
+    });
   }
 }
 
@@ -452,16 +629,36 @@ async function testChain7_invalidTool() {
       { toolId: "convert", settings: { format: "webp" } },
     ]);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "400 Bad Request", actual: `Request crashed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "400 Bad Request",
+      actual: `Request crashed: ${err}`,
+    });
     return;
   }
 
   if (result.status === 400) {
-    report({ chain, severity: "PASS", expected: "400 for invalid tool", actual: `HTTP ${result.status}: ${JSON.stringify(result.body).slice(0, 200)}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "400 for invalid tool",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body).slice(0, 200)}`,
+    });
   } else if (result.status >= 500) {
-    report({ chain, severity: "BUG", expected: "400 (not 5xx)", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "400 (not 5xx)",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
   } else {
-    report({ chain, severity: "WARN", expected: "400 for invalid tool", actual: `HTTP ${result.status}` });
+    report({
+      chain,
+      severity: "WARN",
+      expected: "400 for invalid tool",
+      actual: `HTTP ${result.status}`,
+    });
   }
 }
 
@@ -485,7 +682,12 @@ async function testChain8_saturationGrayscale() {
   }
 
   if (result.status !== 200) {
-    report({ chain, severity: "BUG", expected: "200 OK", actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK",
+      actual: `HTTP ${result.status}: ${JSON.stringify(result.body)}`,
+    });
     return;
   }
 
@@ -498,7 +700,12 @@ async function testChain8_saturationGrayscale() {
   try {
     filePath = await downloadToFile(result.downloadUrl);
   } catch (err) {
-    report({ chain, severity: "BUG", expected: "Download succeeds", actual: `Download failed: ${err}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Download succeeds",
+      actual: `Download failed: ${err}`,
+    });
     return;
   }
 
@@ -511,19 +718,32 @@ async function testChain8_saturationGrayscale() {
 
   const sat = imageSaturation(filePath);
   if (sat > 5) {
-    report({ chain, severity: "BUG", expected: "saturation ~0 (desaturated)", actual: `saturation=${sat}`, detail: "saturation=-100 step was likely dropped" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "saturation ~0 (desaturated)",
+      actual: `saturation=${sat}`,
+      detail: "saturation=-100 step was likely dropped",
+    });
   } else {
     report({ chain, severity: "PASS", expected: "saturation ~0", actual: `saturation=${sat}` });
   }
 
   const buf = readFileSync(filePath);
   if (!magicIsWebp(buf)) {
-    report({ chain, severity: "BUG", expected: "WebP format", actual: `Not WebP: ${buf.subarray(0, 12).toString("hex")}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "WebP format",
+      actual: `Not WebP: ${buf.subarray(0, 12).toString("hex")}`,
+    });
   } else {
     report({ chain, severity: "PASS", expected: "WebP format", actual: "WebP confirmed" });
   }
 
-  try { rmSync(join(filePath, ".."), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(filePath, ".."), { recursive: true, force: true });
+  } catch {}
 }
 
 // ── Chain 9: Save, list, load, delete pipeline ──────────────────
@@ -547,45 +767,90 @@ async function testPipelineCRUD() {
   });
 
   if (saveRes.status === 201) {
-    report({ chain, severity: "PASS", expected: "Save returns 201", actual: `HTTP ${saveRes.status}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "Save returns 201",
+      actual: `HTTP ${saveRes.status}`,
+    });
   } else {
-    report({ chain, severity: "BUG", expected: "Save returns 201", actual: `HTTP ${saveRes.status}: ${await saveRes.text()}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Save returns 201",
+      actual: `HTTP ${saveRes.status}: ${await saveRes.text()}`,
+    });
     return;
   }
 
-  const saved = await saveRes.json() as { id: string };
+  const saved = (await saveRes.json()) as { id: string };
 
   // List
   const listRes = await fetch(`${BASE}/api/v1/pipeline/list`);
   if (listRes.ok) {
-    const data = await listRes.json() as { pipelines: Array<{ id: string; name: string }> };
+    const data = (await listRes.json()) as { pipelines: Array<{ id: string; name: string }> };
     const found = data.pipelines.find((p) => p.id === saved.id);
     if (found) {
-      report({ chain, severity: "PASS", expected: "Saved pipeline in list", actual: `Found "${found.name}"` });
+      report({
+        chain,
+        severity: "PASS",
+        expected: "Saved pipeline in list",
+        actual: `Found "${found.name}"`,
+      });
     } else {
-      report({ chain, severity: "BUG", expected: "Saved pipeline in list", actual: "Not found in list" });
+      report({
+        chain,
+        severity: "BUG",
+        expected: "Saved pipeline in list",
+        actual: "Not found in list",
+      });
     }
   } else {
-    report({ chain, severity: "BUG", expected: "List returns 200", actual: `HTTP ${listRes.status}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "List returns 200",
+      actual: `HTTP ${listRes.status}`,
+    });
   }
 
   // Delete
   const delRes = await fetch(`${BASE}/api/v1/pipeline/${saved.id}`, { method: "DELETE" });
   if (delRes.ok) {
-    report({ chain, severity: "PASS", expected: "Delete returns 200", actual: `HTTP ${delRes.status}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "Delete returns 200",
+      actual: `HTTP ${delRes.status}`,
+    });
   } else {
-    report({ chain, severity: "BUG", expected: "Delete returns 200", actual: `HTTP ${delRes.status}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Delete returns 200",
+      actual: `HTTP ${delRes.status}`,
+    });
   }
 
   // Verify deletion
   const listRes2 = await fetch(`${BASE}/api/v1/pipeline/list`);
   if (listRes2.ok) {
-    const data2 = await listRes2.json() as { pipelines: Array<{ id: string }> };
+    const data2 = (await listRes2.json()) as { pipelines: Array<{ id: string }> };
     const still = data2.pipelines.find((p) => p.id === saved.id);
     if (!still) {
-      report({ chain, severity: "PASS", expected: "Pipeline removed after delete", actual: "Confirmed removed" });
+      report({
+        chain,
+        severity: "PASS",
+        expected: "Pipeline removed after delete",
+        actual: "Confirmed removed",
+      });
     } else {
-      report({ chain, severity: "BUG", expected: "Pipeline removed after delete", actual: "Still present in list" });
+      report({
+        chain,
+        severity: "BUG",
+        expected: "Pipeline removed after delete",
+        actual: "Still present in list",
+      });
     }
   }
 }
@@ -603,12 +868,15 @@ async function testBatchPipeline() {
   const form = new FormData();
   form.append("file", blob1, "img1.png");
   form.append("file", blob2, "img2.png");
-  form.append("pipeline", JSON.stringify({
-    steps: [
-      { toolId: "resize", settings: { width: 80 } },
-      { toolId: "convert", settings: { format: "webp" } },
-    ],
-  }));
+  form.append(
+    "pipeline",
+    JSON.stringify({
+      steps: [
+        { toolId: "resize", settings: { width: 80 } },
+        { toolId: "convert", settings: { format: "webp" } },
+      ],
+    }),
+  );
 
   const res = await fetch(`${BASE}/api/v1/pipeline/batch`, {
     method: "POST",
@@ -617,22 +885,47 @@ async function testBatchPipeline() {
 
   if (res.status !== 200) {
     const text = await res.text();
-    report({ chain, severity: "BUG", expected: "200 OK (ZIP)", actual: `HTTP ${res.status}: ${text.slice(0, 300)}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "200 OK (ZIP)",
+      actual: `HTTP ${res.status}: ${text.slice(0, 300)}`,
+    });
     return;
   }
 
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("zip")) {
-    report({ chain, severity: "BUG", expected: "Content-Type: application/zip", actual: `Content-Type: ${contentType}` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Content-Type: application/zip",
+      actual: `Content-Type: ${contentType}`,
+    });
   } else {
-    report({ chain, severity: "PASS", expected: "ZIP response", actual: `Content-Type: ${contentType}` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "ZIP response",
+      actual: `Content-Type: ${contentType}`,
+    });
   }
 
   const zipBuf = Buffer.from(await res.arrayBuffer());
   if (zipBuf.length < 100) {
-    report({ chain, severity: "BUG", expected: "Non-trivial ZIP size", actual: `ZIP size: ${zipBuf.length} bytes` });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "Non-trivial ZIP size",
+      actual: `ZIP size: ${zipBuf.length} bytes`,
+    });
   } else {
-    report({ chain, severity: "PASS", expected: "ZIP with content", actual: `ZIP size: ${zipBuf.length} bytes` });
+    report({
+      chain,
+      severity: "PASS",
+      expected: "ZIP with content",
+      actual: `ZIP size: ${zipBuf.length} bytes`,
+    });
   }
 
   // Check X-File-Results header
@@ -642,15 +935,35 @@ async function testBatchPipeline() {
       const decoded = JSON.parse(decodeURIComponent(xFileResults));
       const keys = Object.keys(decoded);
       if (keys.length === 2) {
-        report({ chain, severity: "PASS", expected: "2 results in header", actual: `${keys.length} results: ${JSON.stringify(decoded)}` });
+        report({
+          chain,
+          severity: "PASS",
+          expected: "2 results in header",
+          actual: `${keys.length} results: ${JSON.stringify(decoded)}`,
+        });
       } else {
-        report({ chain, severity: "BUG", expected: "2 results in X-File-Results", actual: `${keys.length} results` });
+        report({
+          chain,
+          severity: "BUG",
+          expected: "2 results in X-File-Results",
+          actual: `${keys.length} results`,
+        });
       }
     } catch {
-      report({ chain, severity: "WARN", expected: "Valid X-File-Results header", actual: `Could not parse: ${xFileResults}` });
+      report({
+        chain,
+        severity: "WARN",
+        expected: "Valid X-File-Results header",
+        actual: `Could not parse: ${xFileResults}`,
+      });
     }
   } else {
-    report({ chain, severity: "BUG", expected: "X-File-Results header present", actual: "Header missing" });
+    report({
+      chain,
+      severity: "BUG",
+      expected: "X-File-Results header present",
+      actual: "Header missing",
+    });
   }
 }
 
@@ -709,7 +1022,14 @@ async function main() {
   }
 
   // Write JSON results
-  const resultsPath = join(import.meta.dirname, "..", "..", "docs", "qa", "pipeline-api-results.json");
+  const resultsPath = join(
+    import.meta.dirname,
+    "..",
+    "..",
+    "docs",
+    "qa",
+    "pipeline-api-results.json",
+  );
   writeFileSync(resultsPath, JSON.stringify(findings, null, 2));
   console.log(`\nResults written to: ${resultsPath}`);
 

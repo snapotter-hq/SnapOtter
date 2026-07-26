@@ -108,35 +108,35 @@ describe("extractText error and progress behavior", () => {
     expect(runOcrRuntime).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "balanced",
-    "best",
-  ] as const)("keeps explicit Korean on the %s accurate tier without silent rerouting", async (quality) => {
-    vi.mocked(runOcrRuntime).mockResolvedValueOnce(
-      runtimeResponse({
-        success: true,
-        text: "한글",
-        engine: "rapidocr-onnx",
-        requestedQuality: quality,
-        actualQuality: quality,
-        device: "cpu",
-        provider: "CPUExecutionProvider",
-        degraded: false,
-        warnings: [],
-      }),
-    );
+  it.each(["balanced", "best"] as const)(
+    "keeps explicit Korean on the %s accurate tier without silent rerouting",
+    async (quality) => {
+      vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+        runtimeResponse({
+          success: true,
+          text: "한글",
+          engine: "rapidocr-onnx",
+          requestedQuality: quality,
+          actualQuality: quality,
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
+      );
 
-    const result = await extractText(INPUT, "/tmp/ocr", { quality, language: "ko" });
+      const result = await extractText(INPUT, "/tmp/ocr", { quality, language: "ko" });
 
-    expect(result.requestedQuality).toBe(quality);
-    expect(result.actualQuality).toBe(quality);
-    expect(runAdaptiveTesseract).not.toHaveBeenCalled();
-    expect(runOcrRuntime).toHaveBeenCalledTimes(1);
-    const runtimeOptions = JSON.parse(
-      vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
-    ) as Record<string, unknown>;
-    expect(runtimeOptions).toMatchObject({ language: "ko", quality });
-  });
+      expect(result.requestedQuality).toBe(quality);
+      expect(result.actualQuality).toBe(quality);
+      expect(runAdaptiveTesseract).not.toHaveBeenCalled();
+      expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+      const runtimeOptions = JSON.parse(
+        vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
+      ) as Record<string, unknown>;
+      expect(runtimeOptions).toMatchObject({ language: "ko", quality });
+    },
+  );
 
   it("applies requested local-contrast preprocessing for Fast OCR", async () => {
     const recognitionPipeline = {

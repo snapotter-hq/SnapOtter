@@ -15,7 +15,7 @@ describe("conversion presets", () => {
   it("every expanded preset is a valid Tool with route, keywords, modality", () => {
     for (const tool of expandConversionPresets()) {
       expect(tool.route).toBe(`/${tool.id}`);
-      expect(tool.keywords && tool.keywords.length).toBeGreaterThan(3);
+      expect(tool.keywords?.length).toBeGreaterThan(3);
       expect(tool.modality).toBeTruthy();
       expect(tool.executionHint).toMatch(/fast|long/);
     }

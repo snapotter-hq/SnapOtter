@@ -17,8 +17,6 @@
  * 10. Request body edge cases: empty multipart, form-urlencoded, no content-type
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

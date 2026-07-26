@@ -1,9 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { basename } from "node:path";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // ---------------------------------------------------------------------------

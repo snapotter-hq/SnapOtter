@@ -58,28 +58,28 @@ describe("resolveOcrIngressSettings", () => {
     expect(getCapability).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "ocr",
-    "ocr-pdf",
-  ])("rejects explicit Fast Korean %s before reading or queueing an accurate runtime", (toolId) => {
-    const getCapability = vi.fn(() => readyCapability(["balanced", "best"]));
+  it.each(["ocr", "ocr-pdf"])(
+    "rejects explicit Fast Korean %s before reading or queueing an accurate runtime",
+    (toolId) => {
+      const getCapability = vi.fn(() => readyCapability(["balanced", "best"]));
 
-    expect(
-      resolveOcrIngressSettings(
-        toolId,
-        { quality: "fast", language: "ko" },
-        { readCapability: getCapability },
-      ),
-    ).toEqual({
-      ok: false,
-      code: "FEATURE_INCOMPATIBLE",
-      reason: "fast-korean-unsupported",
-      requestedQuality: "fast",
-      guidance:
-        "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.",
-    });
-    expect(getCapability).not.toHaveBeenCalled();
-  });
+      expect(
+        resolveOcrIngressSettings(
+          toolId,
+          { quality: "fast", language: "ko" },
+          { readCapability: getCapability },
+        ),
+      ).toEqual({
+        ok: false,
+        code: "FEATURE_INCOMPATIBLE",
+        reason: "fast-korean-unsupported",
+        requestedQuality: "fast",
+        guidance:
+          "Fast OCR does not support Korean. Install the Accurate OCR bundle and choose Balanced or Best.",
+      });
+      expect(getCapability).not.toHaveBeenCalled();
+    },
+  );
 
   it("resolves an omitted tier to Best when the healthy runtime supports it", () => {
     expect(

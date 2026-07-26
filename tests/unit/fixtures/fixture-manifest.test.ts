@@ -13,21 +13,19 @@ describe("fixture manifest is consistent with disk", () => {
   // Phase 1 hard-checks bytes + sha256; license may be "UNVERIFIED" (tracked in
   // LICENSES.md). Phase 2 does the real provenance audit and removes that tolerance.
   const ALLOWED = ["CC0", "CC-BY", "CC-BY-SA", "public-domain", "UNVERIFIED", "UNVERIFIED-REVIEW"];
-  it.each(manifest.assets)("$path matches sha256 + bytes and declares a license", (asset: {
-    path: string;
-    bytes: number;
-    sha256: string;
-    license: string;
-  }) => {
-    const buf = readFileSync(join(ROOT, asset.path));
-    expect(buf.length, `${asset.path} byte mismatch`).toBe(asset.bytes);
-    expect(createHash("sha256").update(buf).digest("hex"), `${asset.path} sha256 mismatch`).toBe(
-      asset.sha256,
-    );
-    expect(ALLOWED, `${asset.path} license '${asset.license}' not allowed`).toContain(
-      asset.license,
-    );
-  });
+  it.each(manifest.assets)(
+    "$path matches sha256 + bytes and declares a license",
+    (asset: { path: string; bytes: number; sha256: string; license: string }) => {
+      const buf = readFileSync(join(ROOT, asset.path));
+      expect(buf.length, `${asset.path} byte mismatch`).toBe(asset.bytes);
+      expect(createHash("sha256").update(buf).digest("hex"), `${asset.path} sha256 mismatch`).toBe(
+        asset.sha256,
+      );
+      expect(ALLOWED, `${asset.path} license '${asset.license}' not allowed`).toContain(
+        asset.license,
+      );
+    },
+  );
 
   it("reports how many assets still need provenance (Phase 2 drives this to 0)", () => {
     const unverified = manifest.assets

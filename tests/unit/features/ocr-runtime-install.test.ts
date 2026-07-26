@@ -861,74 +861,76 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it.each([
-    408, 425, 429, 500, 502, 503, 504,
-  ])("retries the explicitly allowed transient HTTP status %i", async (status) => {
-    const fixture = signedIndex();
-    const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-http-${status}-`));
-    temporaryDirectories.push(directory);
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(null, { status }))
-      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
-      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+  it.each([408, 425, 429, 500, 502, 503, 504])(
+    "retries the explicitly allowed transient HTTP status %i",
+    async (status) => {
+      const fixture = signedIndex();
+      const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-http-${status}-`));
+      temporaryDirectories.push(directory);
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(null, { status }))
+        .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+        .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
 
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [fixture.trustKey],
-        fetchImpl,
-        retry: {
-          maxAttempts: 2,
-          baseDelayMs: 0,
-          maxDelayMs: 0,
-          maxTotalDelayMs: 0,
-          sleep: async () => {},
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [fixture.trustKey],
+          fetchImpl,
+          retry: {
+            maxAttempts: 2,
+            baseDelayMs: 0,
+            maxDelayMs: 0,
+            maxTotalDelayMs: 0,
+            sleep: async () => {},
+          },
+        }),
+      ).resolves.toMatchObject({ archiveSize: ARCHIVE_BYTES.length });
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it.each([400, 401, 403, 404, 409, 422, 501, 505])(
+    "does not retry the permanent HTTP status %i",
+    async (status) => {
+      const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-http-${status}-`));
+      temporaryDirectories.push(directory);
+      const canceled = vi.fn();
+      const responseBody = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(Buffer.from("permanent failure"));
         },
-      }),
-    ).resolves.toMatchObject({ archiveSize: ARCHIVE_BYTES.length });
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-  });
+        cancel: canceled,
+      });
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(responseBody, { status }));
 
-  it.each([
-    400, 401, 403, 404, 409, 422, 501, 505,
-  ])("does not retry the permanent HTTP status %i", async (status) => {
-    const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-http-${status}-`));
-    temporaryDirectories.push(directory);
-    const canceled = vi.fn();
-    const responseBody = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(Buffer.from("permanent failure"));
-      },
-      cancel: canceled,
-    });
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response(responseBody, { status }));
-
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        retry: {
-          maxAttempts: 3,
-          baseDelayMs: 0,
-          maxDelayMs: 0,
-          maxTotalDelayMs: 0,
-          sleep: async () => {},
-        },
-      }),
-    ).rejects.toThrow(`HTTP ${status}`);
-    expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(canceled).toHaveBeenCalledOnce();
-  });
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          retry: {
+            maxAttempts: 3,
+            baseDelayMs: 0,
+            maxDelayMs: 0,
+            maxTotalDelayMs: 0,
+            sleep: async () => {},
+          },
+        }),
+      ).rejects.toThrow(`HTTP ${status}`);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(canceled).toHaveBeenCalledOnce();
+    },
+  );
 
   it("accepts zero to disable both download watchdogs", async () => {
     const fixture = signedIndex();

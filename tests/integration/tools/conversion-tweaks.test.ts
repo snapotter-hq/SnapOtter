@@ -46,8 +46,9 @@ describe.skipIf(!ffmpegAvailable())("engine tweaks", () => {
     });
     expect(res.statusCode).toBe(202);
     const row = await poll(JSON.parse(res.body).jobId);
-    expect(row?.status).toBe("completed");
-    expect((row?.outputRefs as string[])[0].endsWith(".avi")).toBe(true);
+    if (!row) throw new Error("job row not found after polling");
+    expect(row.status).toBe("completed");
+    expect((row.outputRefs as string[])[0].endsWith(".avi")).toBe(true);
   }, 90_000);
 
   it("convert-video outputs mkv", async () => {
@@ -62,8 +63,9 @@ describe.skipIf(!ffmpegAvailable())("engine tweaks", () => {
       body,
     });
     const row = await poll(JSON.parse(res.body).jobId);
-    expect(row?.status).toBe("completed");
-    expect((row?.outputRefs as string[])[0].endsWith(".mkv")).toBe(true);
+    if (!row) throw new Error("job row not found after polling");
+    expect(row.status).toBe("completed");
+    expect((row.outputRefs as string[])[0].endsWith(".mkv")).toBe(true);
   }, 90_000);
 
   it("extract-audio outputs ogg", async () => {
@@ -78,7 +80,8 @@ describe.skipIf(!ffmpegAvailable())("engine tweaks", () => {
       body,
     });
     const row = await poll(JSON.parse(res.body).jobId);
-    expect(row?.status).toBe("completed");
-    expect((row?.outputRefs as string[])[0].endsWith(".ogg")).toBe(true);
+    if (!row) throw new Error("job row not found after polling");
+    expect(row.status).toBe("completed");
+    expect((row.outputRefs as string[])[0].endsWith(".ogg")).toBe(true);
   }, 90_000);
 });

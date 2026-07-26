@@ -80,28 +80,25 @@ describe("watermark-image", () => {
     expect(Buffer.from(dlRes.rawPayload).equals(PNG)).toBe(false);
   });
 
-  it.each([
-    "center",
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right",
-  ] as const)("supports position: %s", async (position) => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
-      { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
-      { name: "settings", content: JSON.stringify({ position }) },
-    ]);
+  it.each(["center", "top-left", "top-right", "bottom-left", "bottom-right"] as const)(
+    "supports position: %s",
+    async (position) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+        { name: "watermark", filename: "wm.png", contentType: "image/png", content: SMALL_PNG },
+        { name: "settings", content: JSON.stringify({ position }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/watermark-image",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/watermark-image",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    expect(res.statusCode).toBe(200);
-  });
+      expect(res.statusCode).toBe(200);
+    },
+  );
 
   it("respects custom opacity and scale", async () => {
     const { body, contentType } = createMultipartPayload([

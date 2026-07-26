@@ -158,33 +158,33 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
     }
   });
 
-  it.each([
-    "file-first",
-    "field-first",
-  ] as const)("rejects oversized pipeline OCR PDFs with %s multipart ordering", async (ordering) => {
-    const originalLimit = env.MAX_UPLOAD_SIZE_MB;
-    env.MAX_UPLOAD_SIZE_MB = 1 / (1024 * 1024);
-    try {
-      const oversized = {
-        name: "file",
-        filename: "oversized.pdf",
-        contentType: "application/pdf",
-        content: Buffer.from("12"),
-      };
-      const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
-      const parts =
-        ordering === "file-first" ? [oversized, pipelinePart] : [pipelinePart, oversized];
+  it.each(["file-first", "field-first"] as const)(
+    "rejects oversized pipeline OCR PDFs with %s multipart ordering",
+    async (ordering) => {
+      const originalLimit = env.MAX_UPLOAD_SIZE_MB;
+      env.MAX_UPLOAD_SIZE_MB = 1 / (1024 * 1024);
+      try {
+        const oversized = {
+          name: "file",
+          filename: "oversized.pdf",
+          contentType: "application/pdf",
+          content: Buffer.from("12"),
+        };
+        const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
+        const parts =
+          ordering === "file-first" ? [oversized, pipelinePart] : [pipelinePart, oversized];
 
-      const execute = await postMultipart("/api/v1/pipeline/execute", parts);
-      const batch = await postMultipart("/api/v1/pipeline/batch", parts);
+        const execute = await postMultipart("/api/v1/pipeline/execute", parts);
+        const batch = await postMultipart("/api/v1/pipeline/batch", parts);
 
-      expect(execute.statusCode).toBe(413);
-      expect(batch.statusCode).toBe(413);
-      expect(prepareSpy).not.toHaveBeenCalled();
-    } finally {
-      env.MAX_UPLOAD_SIZE_MB = originalLimit;
-    }
-  });
+        expect(execute.statusCode).toBe(413);
+        expect(batch.statusCode).toBe(413);
+        expect(prepareSpy).not.toHaveBeenCalled();
+      } finally {
+        env.MAX_UPLOAD_SIZE_MB = originalLimit;
+      }
+    },
+  );
 
   it("enforces the OCR stream cap before a trailing pipeline field reveals the modality", async () => {
     const originalLimit = env.MAX_UPLOAD_SIZE_MB;
@@ -254,39 +254,39 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
     expect(prepareSpy).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "file-first",
-    "field-first",
-  ] as const)("validates execute-pipeline OCR PDF input by path with %s multipart ordering", async (ordering) => {
-    const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
-    const parts =
-      ordering === "file-first"
-        ? [invalidPdfPart(), pipelinePart]
-        : [pipelinePart, invalidPdfPart()];
+  it.each(["file-first", "field-first"] as const)(
+    "validates execute-pipeline OCR PDF input by path with %s multipart ordering",
+    async (ordering) => {
+      const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
+      const parts =
+        ordering === "file-first"
+          ? [invalidPdfPart(), pipelinePart]
+          : [pipelinePart, invalidPdfPart()];
 
-    const response = await postMultipart("/api/v1/pipeline/execute", parts);
+      const response = await postMultipart("/api/v1/pipeline/execute", parts);
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body).error).toMatch(/PDF header/i);
-    expect(prepareSpy).not.toHaveBeenCalled();
-  });
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.body).error).toMatch(/PDF header/i);
+      expect(prepareSpy).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each([
-    "file-first",
-    "field-first",
-  ] as const)("validates batch-pipeline OCR PDF files by path with %s multipart ordering", async (ordering) => {
-    const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
-    const parts =
-      ordering === "file-first"
-        ? [invalidPdfPart(), pipelinePart]
-        : [pipelinePart, invalidPdfPart()];
+  it.each(["file-first", "field-first"] as const)(
+    "validates batch-pipeline OCR PDF files by path with %s multipart ordering",
+    async (ordering) => {
+      const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
+      const parts =
+        ordering === "file-first"
+          ? [invalidPdfPart(), pipelinePart]
+          : [pipelinePart, invalidPdfPart()];
 
-    const response = await postMultipart("/api/v1/pipeline/batch", parts);
+      const response = await postMultipart("/api/v1/pipeline/batch", parts);
 
-    expect(response.statusCode).toBe(422);
-    expect(JSON.parse(response.body).errors[0].error).toMatch(/PDF header/i);
-    expect(prepareSpy).not.toHaveBeenCalled();
-  });
+      expect(response.statusCode).toBe(422);
+      expect(JSON.parse(response.body).errors[0].error).toMatch(/PDF header/i);
+      expect(prepareSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it("rolls back tool-batch OCR objects when BullMQ rejects the flow handoff", async () => {
     mocks.flowAdd.mockRejectedValueOnce(new Error("Redis unavailable"));

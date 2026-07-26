@@ -5,8 +5,6 @@
  * the factory (route registration, file collection, per-file prepare,
  * inputRefs on the durable row, and the too-many-files rejection).
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -150,9 +148,10 @@ describe("Factory multi-input (maxInputs)", () => {
     // Verify the durable DB row has 3 inputRefs
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, result.jobId));
     expect(row).toBeDefined();
-    expect(row?.status).toBe("completed");
-    expect(row?.inputRefs).toBeDefined();
-    expect((row?.inputRefs as string[]).length).toBe(3);
+    if (!row) throw new Error("job row not found after polling");
+    expect(row.status).toBe("completed");
+    expect(row.inputRefs).toBeDefined();
+    expect((row.inputRefs as string[]).length).toBe(3);
   }, 30_000);
 
   it("rejects 2 files on a tool without maxInputs (default 1)", async () => {

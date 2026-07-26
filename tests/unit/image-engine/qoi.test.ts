@@ -1,4 +1,3 @@
-import path from "node:path";
 import { qoiDecode, qoiEncode } from "@snapotter/image-engine";
 import { describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";

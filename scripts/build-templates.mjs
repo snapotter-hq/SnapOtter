@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -148,7 +148,7 @@ function generateTags(name) {
 
 async function downloadImage(url, dest) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error("HTTP " + res.status);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   writeFileSync(dest, buf);
 }
@@ -167,7 +167,7 @@ async function main() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    const filename = slug + ".jpg";
+    const filename = `${slug}.jpg`;
     const destPath = join(FULL_DIR, filename);
 
     if (!existsSync(destPath)) {

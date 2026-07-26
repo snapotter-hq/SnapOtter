@@ -181,39 +181,40 @@ describe("ocr tier execution coverage", () => {
     expect(maxActive).toBe(1);
   });
 
-  it.each(
-    OCR_FORMAT_FIXTURES,
-  )("prepares %s through the real image ingress before mocked recognition", async (fixture) => {
-    mocks.getOcrRuntimeCapability.mockReturnValue({
-      available: false,
-      qualities: [],
-      providers: [],
-    });
-    mocks.extractText.mockImplementationOnce(async (_input, _scratch, options) => ({
-      text: "format accepted",
-      engine: "tesseract",
-      requestedQuality: options.quality,
-      actualQuality: options.quality,
-      device: "cpu",
-      provider: "tesseract",
-      degraded: false,
-      warnings: [],
-    }));
+  it.each(OCR_FORMAT_FIXTURES)(
+    "prepares %s through the real image ingress before mocked recognition",
+    async (fixture) => {
+      mocks.getOcrRuntimeCapability.mockReturnValue({
+        available: false,
+        qualities: [],
+        providers: [],
+      });
+      mocks.extractText.mockImplementationOnce(async (_input, _scratch, options) => ({
+        text: "format accepted",
+        engine: "tesseract",
+        requestedQuality: options.quality,
+        actualQuality: options.quality,
+        device: "cpu",
+        provider: "tesseract",
+        degraded: false,
+        warnings: [],
+      }));
 
-    const response = await postOcrFile(
-      { quality: "fast", language: "en" },
-      readFileSync(join(fixtureDir.formats, fixture)),
-      fixture,
-    );
-    const result = await awaitAcceptedOcr(response);
+      const response = await postOcrFile(
+        { quality: "fast", language: "en" },
+        readFileSync(join(fixtureDir.formats, fixture)),
+        fixture,
+      );
+      const result = await awaitAcceptedOcr(response);
 
-    expect(result).toMatchObject({
-      text: "format accepted",
-      requestedQuality: "fast",
-      actualQuality: "fast",
-    });
-    expect(mocks.extractText).toHaveBeenCalledTimes(1);
-  });
+      expect(result).toMatchObject({
+        text: "format accepted",
+        requestedQuality: "fast",
+        actualQuality: "fast",
+      });
+      expect(mocks.extractText).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("fails closed when the selected best runtime crashes", async () => {
     mocks.extractText.mockRejectedValueOnce(new Error("OCR runtime exited unexpectedly"));

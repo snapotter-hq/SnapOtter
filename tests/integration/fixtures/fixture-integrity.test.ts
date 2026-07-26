@@ -45,11 +45,11 @@ describe("real fixtures decode through their real tools", () => {
     });
   });
 
-  it.each([
-    fixtures.document.pdfMulti,
-    fixtures.document.pdfScanned,
-  ])("qpdf reports pages for %s", (path) => {
-    const out = execFileSync(qpdf, ["--show-npages", path], { encoding: "utf8" });
-    expect(Number.parseInt(out.trim(), 10)).toBeGreaterThan(0);
-  });
+  it.each([fixtures.document.pdfMulti, fixtures.document.pdfScanned])(
+    "qpdf reports pages for %s",
+    (path) => {
+      const out = execFileSync(qpdf, ["--show-npages", path], { encoding: "utf8" });
+      expect(Number.parseInt(out.trim(), 10)).toBeGreaterThan(0);
+    },
+  );
 });

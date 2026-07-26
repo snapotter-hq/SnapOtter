@@ -1,5 +1,4 @@
-import sharp from "sharp";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../../test-server.js";
 
 // Mock the browser service -- Chromium may not be available in CI

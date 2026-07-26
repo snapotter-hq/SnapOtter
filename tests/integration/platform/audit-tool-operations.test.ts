@@ -6,7 +6,6 @@
  * is disabled (the default).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,

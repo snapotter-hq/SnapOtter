@@ -242,23 +242,23 @@ describe("compress", () => {
 });
 
 describe("sharp format compatibility", () => {
-  it.each(SHARP_FORMAT_CASES)("convert accepts $sharpFormat", async ({
-    operationFormat,
-    expectedFormat,
-  }) => {
-    const result = await convert(tinyTestImage(), { format: operationFormat });
-    const buf = await result.toBuffer();
-    await expectOutputFormat(buf, expectedFormat);
-  });
+  it.each(SHARP_FORMAT_CASES)(
+    "convert accepts $sharpFormat",
+    async ({ operationFormat, expectedFormat }) => {
+      const result = await convert(tinyTestImage(), { format: operationFormat });
+      const buf = await result.toBuffer();
+      await expectOutputFormat(buf, expectedFormat);
+    },
+  );
 
-  it.each(SHARP_FORMAT_CASES)("compress accepts $sharpFormat", async ({
-    operationFormat,
-    expectedFormat,
-  }) => {
-    const result = await compress(tinyTestImage(), { quality: 80, format: operationFormat });
-    const buf = await result.toBuffer();
-    await expectOutputFormat(buf, expectedFormat);
-  });
+  it.each(SHARP_FORMAT_CASES)(
+    "compress accepts $sharpFormat",
+    async ({ operationFormat, expectedFormat }) => {
+      const result = await compress(tinyTestImage(), { quality: 80, format: operationFormat });
+      const buf = await result.toBuffer();
+      await expectOutputFormat(buf, expectedFormat);
+    },
+  );
 });
 
 describe("grayscale", () => {

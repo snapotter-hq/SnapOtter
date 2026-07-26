@@ -7,7 +7,7 @@
 
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { fixtureDir, fixtures, readFixture } from "../../../fixtures/index.js";
+import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -15,7 +15,6 @@ import {
   type TestApp,
 } from "../../test-server.js";
 
-const FORMATS = fixtureDir.formats;
 const PNG = readFixture(fixtures.image.base.png200);
 const _JPG = readFixture(fixtures.image.base.jpg100);
 const WEBP = readFixture(fixtures.image.base.webp50);

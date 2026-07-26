@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "lint": "biome check src/",
+    "lint": "biome check src/ tests/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist",

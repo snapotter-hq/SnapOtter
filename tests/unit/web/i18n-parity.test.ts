@@ -20,20 +20,6 @@
 import { en, loadTranslations, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
-/** Recursively collect all dot-separated key paths from an object tree. */
-function getKeyPaths(obj: Record<string, unknown>, prefix = ""): string[] {
-  const keys: string[] = [];
-  for (const [k, v] of Object.entries(obj)) {
-    const path = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      keys.push(...getKeyPaths(v as Record<string, unknown>, path));
-    } else {
-      keys.push(path);
-    }
-  }
-  return keys;
-}
-
 /** Recursively collect dot-separated key paths for array-valued leaves too. */
 function getStructuralKeys(obj: Record<string, unknown>, prefix = ""): string[] {
   const keys: string[] = [];
@@ -56,36 +42,37 @@ describe("i18n cross-locale parity", () => {
     expect(enKeys.size).toBeGreaterThan(100);
   });
 
-  it.each(
-    SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => [l.code, l.name]),
-  )("%s (%s) has the same key set as en", async (code) => {
-    const translations = await loadTranslations(code);
+  it.each(SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => [l.code, l.name]))(
+    "%s (%s) has the same key set as en",
+    async (code) => {
+      const translations = await loadTranslations(code);
 
-    // If loadTranslations fell back to en, we get en back. That is a real
-    // problem (the locale file failed to load). Detect this by checking
-    // whether the returned object is literally the en reference.
-    expect(
-      translations !== en || code === "en",
-      `locale "${code}" fell back to English -- check the file exports a default or named export matching the locale code`,
-    ).toBe(true);
+      // If loadTranslations fell back to en, we get en back. That is a real
+      // problem (the locale file failed to load). Detect this by checking
+      // whether the returned object is literally the en reference.
+      expect(
+        translations !== en || code === "en",
+        `locale "${code}" fell back to English -- check the file exports a default or named export matching the locale code`,
+      ).toBe(true);
 
-    const localeKeys = new Set(
-      getStructuralKeys(translations as unknown as Record<string, unknown>),
-    );
+      const localeKeys = new Set(
+        getStructuralKeys(translations as unknown as Record<string, unknown>),
+      );
 
-    const missing = [...enKeys].filter((k) => !localeKeys.has(k));
-    const extra = [...localeKeys].filter((k) => !enKeys.has(k));
+      const missing = [...enKeys].filter((k) => !localeKeys.has(k));
+      const extra = [...localeKeys].filter((k) => !enKeys.has(k));
 
-    expect(
-      missing,
-      `locale "${code}" is missing ${missing.length} keys from en:\n  ${missing.slice(0, 20).join("\n  ")}${missing.length > 20 ? `\n  ... and ${missing.length - 20} more` : ""}`,
-    ).toEqual([]);
+      expect(
+        missing,
+        `locale "${code}" is missing ${missing.length} keys from en:\n  ${missing.slice(0, 20).join("\n  ")}${missing.length > 20 ? `\n  ... and ${missing.length - 20} more` : ""}`,
+      ).toEqual([]);
 
-    expect(
-      extra,
-      `locale "${code}" has ${extra.length} extra keys not in en:\n  ${extra.slice(0, 20).join("\n  ")}${extra.length > 20 ? `\n  ... and ${extra.length - 20} more` : ""}`,
-    ).toEqual([]);
-  });
+      expect(
+        extra,
+        `locale "${code}" has ${extra.length} extra keys not in en:\n  ${extra.slice(0, 20).join("\n  ")}${extra.length > 20 ? `\n  ... and ${extra.length - 20} more` : ""}`,
+      ).toEqual([]);
+    },
+  );
 
   it("all dashed locales load their own translations (not en fallback)", async () => {
     const dashedLocales = SUPPORTED_LOCALES.filter((l) => l.code.includes("-"));

@@ -11,12 +11,7 @@ const existing = JSON.parse(readFileSync(join(ROOT, "manifest.json"), "utf8"));
 const byPath = new Map(existing.assets.map((a) => [a.path, a]));
 
 // Scan each modality valid dir (replaces the old content/ scan)
-const SCAN_DIRS = [
-  "image/valid",
-  "video/valid",
-  "audio/valid",
-  "document/valid",
-];
+const SCAN_DIRS = ["image/valid", "video/valid", "audio/valid", "document/valid"];
 
 for (const dir of SCAN_DIRS) {
   const absDir = join(ROOT, dir);
@@ -25,7 +20,12 @@ for (const dir of SCAN_DIRS) {
     const rel = `${dir}/${name}`;
     const bytes = readFileSync(join(absDir, name));
     const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const prev = byPath.get(rel) ?? { path: rel, sourceUrl: "UNVERIFIED", license: "UNVERIFIED", toolsServed: [] };
+    const prev = byPath.get(rel) ?? {
+      path: rel,
+      sourceUrl: "UNVERIFIED",
+      license: "UNVERIFIED",
+      toolsServed: [],
+    };
     byPath.set(rel, { ...prev, sha256, bytes: bytes.length });
   }
 }

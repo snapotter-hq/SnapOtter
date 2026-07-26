@@ -139,40 +139,40 @@ describe("extractPdfText tier routing", () => {
     expect(runOcrRuntime).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "balanced",
-    "best",
-  ] as const)("keeps explicit Korean PDF OCR on the %s accurate tier", async (quality) => {
-    vi.mocked(runOcrRuntime).mockResolvedValueOnce(
-      runtimeResponse({
-        success: true,
-        text: "정확한 PDF 텍스트",
-        pages: 2,
-        engine: "rapidocr-onnx",
-        requestedQuality: quality,
-        actualQuality: quality,
-        device: "cpu",
-        provider: "CPUExecutionProvider",
-        degraded: false,
-        warnings: [],
-      }),
-    );
+  it.each(["balanced", "best"] as const)(
+    "keeps explicit Korean PDF OCR on the %s accurate tier",
+    async (quality) => {
+      vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+        runtimeResponse({
+          success: true,
+          text: "정확한 PDF 텍스트",
+          pages: 2,
+          engine: "rapidocr-onnx",
+          requestedQuality: quality,
+          actualQuality: quality,
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
+      );
 
-    const result = await extractPdfText("/tmp/job/document.pdf", {
-      quality,
-      language: "ko",
-    });
+      const result = await extractPdfText("/tmp/job/document.pdf", {
+        quality,
+        language: "ko",
+      });
 
-    expect(result.requestedQuality).toBe(quality);
-    expect(result.actualQuality).toBe(quality);
-    expect(runTesseractPdf).not.toHaveBeenCalled();
-    expect(preparePdfOcrPages).toHaveBeenCalledTimes(1);
-    expect(runOcrRuntime).toHaveBeenCalledTimes(1);
-    const runtimeOptions = JSON.parse(
-      vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
-    ) as Record<string, unknown>;
-    expect(runtimeOptions).toMatchObject({ language: "ko", quality });
-  });
+      expect(result.requestedQuality).toBe(quality);
+      expect(result.actualQuality).toBe(quality);
+      expect(runTesseractPdf).not.toHaveBeenCalled();
+      expect(preparePdfOcrPages).toHaveBeenCalledTimes(1);
+      expect(runOcrRuntime).toHaveBeenCalledTimes(1);
+      const runtimeOptions = JSON.parse(
+        vi.mocked(runOcrRuntime).mock.calls[0]?.[1][1] ?? "null",
+      ) as Record<string, unknown>;
+      expect(runtimeOptions).toMatchObject({ language: "ko", quality });
+    },
+  );
 
   it("keeps Fast PDF OCR jobs alive while native processing is quiet", async () => {
     vi.useFakeTimers();

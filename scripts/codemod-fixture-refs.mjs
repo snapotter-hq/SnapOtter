@@ -5,8 +5,8 @@
  * Usage: node scripts/codemod-fixture-refs.mjs [--dry-run]
  */
 
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { join, relative, dirname } from "node:path";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const ROOT = process.cwd();
@@ -99,8 +99,19 @@ const PATH_TO_REGISTRY = {
   "security/svg-xxe-ssrf.svg": "fixtures.security.svgXxeSsrf",
 };
 
-const VIDEO_EXTS = new Set(["mp4", "mov", "webm", "mkv", "avi", "flv", "wmv", "m4v", "mpg", "mpeg", "ogv", "3gp", "m2ts", "mts"]);
-const AUDIO_EXTS = new Set(["mp3", "wav", "flac", "ogg", "m4a", "aac", "opus", "wma", "aiff", "amr", "ac3"]);
+const AUDIO_EXTS = new Set([
+  "mp3",
+  "wav",
+  "flac",
+  "ogg",
+  "m4a",
+  "aac",
+  "opus",
+  "wma",
+  "aiff",
+  "amr",
+  "ac3",
+]);
 
 function tinyAccessor(dir, file) {
   if (!file.startsWith("tiny.")) return null;
@@ -158,7 +169,9 @@ function collectTestFiles(dir) {
         result.push(full);
       }
     }
-  } catch (_) { /* dir doesn't exist */ }
+  } catch (_) {
+    /* dir doesn't exist */
+  }
   return result;
 }
 
@@ -181,7 +194,7 @@ for (const file of allTestFiles) {
   let needsFixtureRoot = false;
   const fileDir = dirname(file);
   let relPath = relative(fileDir, join(ROOT, "tests/fixtures/index.js"));
-  if (!relPath.startsWith(".")) relPath = "./" + relPath;
+  if (!relPath.startsWith(".")) relPath = `./${relPath}`;
 
   // ── PASS 1: Inline buffer reads ────────────────────────────
   // readFileSync(join(__dirname, "..", "fixtures", "dir", "file"))
@@ -192,18 +205,26 @@ for (const file of allTestFiles) {
     /readFileSync\(join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)",\s*"([^"]+)"\)\)/g,
     (match, dir, file) => {
       const reg = resolveFixturePath([dir, file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
   // One segment inline buffer read
   src = src.replace(
     /readFileSync\(join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)"\)\)/g,
     (match, file) => {
       const reg = resolveFixturePath([file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
 
   // await readFile(join(__dirname, "..", "fixtures", ...))
@@ -211,17 +232,25 @@ for (const file of allTestFiles) {
     /await readFile\(join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)",\s*"([^"]+)"\)\)/g,
     (match, dir, file) => {
       const reg = resolveFixturePath([dir, file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
   src = src.replace(
     /await readFile\(join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)"\)\)/g,
     (match, file) => {
       const reg = resolveFixturePath([file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
 
   // ── PASS 1b: Inline path-only refs ─────────────────────────
@@ -230,18 +259,21 @@ for (const file of allTestFiles) {
     /join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)",\s*"([^"]+)"\)/g,
     (match, dir, file) => {
       const reg = resolveFixturePath([dir, file]);
-      if (reg) { needsFixtures = true; return reg; }
+      if (reg) {
+        needsFixtures = true;
+        return reg;
+      }
       return match;
-    }
+    },
   );
-  src = src.replace(
-    /join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)"\)/g,
-    (match, file) => {
-      const reg = resolveFixturePath([file]);
-      if (reg) { needsFixtures = true; return reg; }
-      return match;
+  src = src.replace(/join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"([^"]+)"\)/g, (match, file) => {
+    const reg = resolveFixturePath([file]);
+    if (reg) {
+      needsFixtures = true;
+      return reg;
     }
-  );
+    return match;
+  });
 
   // ── PASS 1c: Inline dir-level refs ─────────────────────────
   // join(__dirname, "..", "fixtures", "formats") -> fixtureDir.formats
@@ -249,20 +281,26 @@ for (const file of allTestFiles) {
   // join(__dirname, "..", "fixtures") -> fixtureRoot
   src = src.replace(
     /join\(__dirname,\s*"[^"]+",\s*"fixtures",\s*"(formats|hostile|media|documents|data|content|security)"\)/g,
-    (match, dir) => { needsFixtureDir = true; return `fixtureDir.${dir}`; }
+    (_match, dir) => {
+      needsFixtureDir = true;
+      return `fixtureDir.${dir}`;
+    },
   );
   src = src.replace(
     /join\(__dirname,\s*"[^"]+",\s*"[^"]+",\s*"fixtures",\s*"(formats|hostile|media|documents|data|content|security)"\)/g,
-    (match, dir) => { needsFixtureDir = true; return `fixtureDir.${dir}`; }
+    (_match, dir) => {
+      needsFixtureDir = true;
+      return `fixtureDir.${dir}`;
+    },
   );
-  src = src.replace(
-    /join\(__dirname,\s*"[^"]+",\s*"fixtures"\)/g,
-    () => { needsFixtureRoot = true; return "fixtureRoot"; }
-  );
-  src = src.replace(
-    /join\(__dirname,\s*"[^"]+",\s*"[^"]+",\s*"fixtures"\)/g,
-    () => { needsFixtureRoot = true; return "fixtureRoot"; }
-  );
+  src = src.replace(/join\(__dirname,\s*"[^"]+",\s*"fixtures"\)/g, () => {
+    needsFixtureRoot = true;
+    return "fixtureRoot";
+  });
+  src = src.replace(/join\(__dirname,\s*"[^"]+",\s*"[^"]+",\s*"fixtures"\)/g, () => {
+    needsFixtureRoot = true;
+    return "fixtureRoot";
+  });
 
   // ── PASS 2: FIXTURES/FIXTURES_DIR const-level patterns ─────
   // readFileSync(join(FIXTURES, "dir", "file"))
@@ -270,18 +308,26 @@ for (const file of allTestFiles) {
     /(?:readFileSync|await readFile)\(join\((?:FIXTURES|FIXTURES_DIR|FIXTURES_ROOT),\s*"([^"]+)",\s*"([^"]+)"\)\)/g,
     (match, dir, file) => {
       const reg = resolveFixturePath([dir, file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
   // readFileSync(join(FIXTURES, "file"))
   src = src.replace(
     /(?:readFileSync|await readFile)\(join\((?:FIXTURES|FIXTURES_DIR|FIXTURES_ROOT),\s*"([^"]+)"\)\)/g,
     (match, file) => {
       const reg = resolveFixturePath([file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
 
   // readFileSync(join(FORMATS_DIR, "sample.ext"))
@@ -289,18 +335,23 @@ for (const file of allTestFiles) {
     /readFileSync\((?:path\.)?join\(FORMATS_DIR,\s*"([^"]+)"\)\)/g,
     (match, file) => {
       const reg = resolveFixturePath(["formats", file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
 
   // readFileSync(join(FORMATS, `sample.${ext}`))
   src = src.replace(
     /readFileSync\(join\(FORMATS,\s*`sample\.\$\{([^}]+)\}`\)\)/g,
-    (match, ext) => {
-      needsFixtures = true; needsReadFixture = true;
+    (_match, ext) => {
+      needsFixtures = true;
+      needsReadFixture = true;
       return `readFixture(fixtures.image.formats(${ext}))`;
-    }
+    },
   );
 
   // ── PASS 3: path-only join(FIXTURES, ...) ──────────────────
@@ -309,44 +360,52 @@ for (const file of allTestFiles) {
     /join\((?:FIXTURES|FIXTURES_DIR|FIXTURES_ROOT),\s*"([^"]+)",\s*"([^"]+)"\)/g,
     (match, dir, file) => {
       const reg = resolveFixturePath([dir, file]);
-      if (reg) { needsFixtures = true; return reg; }
+      if (reg) {
+        needsFixtures = true;
+        return reg;
+      }
       return match;
-    }
+    },
   );
   // join(FIXTURES, "file")
   src = src.replace(
     /join\((?:FIXTURES|FIXTURES_DIR|FIXTURES_ROOT),\s*"([^"]+)"\)/g,
     (match, file) => {
       const reg = resolveFixturePath([file]);
-      if (reg) { needsFixtures = true; return reg; }
+      if (reg) {
+        needsFixtures = true;
+        return reg;
+      }
       // Directory refs
-      if (["formats", "hostile", "media", "documents", "data", "content", "security"].includes(file)) {
+      if (
+        ["formats", "hostile", "media", "documents", "data", "content", "security"].includes(file)
+      ) {
         needsFixtureDir = true;
         return `fixtureDir.${file}`;
       }
       return match;
-    }
+    },
   );
 
   // ── PASS 4: FORMATS_DIR path-only ──────────────────────────
-  src = src.replace(
-    /(?:path\.)?join\(FORMATS_DIR,\s*"([^"]+)"\)/g,
-    (match, file) => {
-      const reg = resolveFixturePath(["formats", file]);
-      if (reg) { needsFixtures = true; return reg; }
-      return match;
+  src = src.replace(/(?:path\.)?join\(FORMATS_DIR,\s*"([^"]+)"\)/g, (match, file) => {
+    const reg = resolveFixturePath(["formats", file]);
+    if (reg) {
+      needsFixtures = true;
+      return reg;
     }
-  );
+    return match;
+  });
 
   // ── PASS 5: MEDIA path refs ────────────────────────────────
-  src = src.replace(
-    /join\(MEDIA,\s*"([^"]+)"\)/g,
-    (match, file) => {
-      const reg = resolveFixturePath(["media", file]);
-      if (reg) { needsFixtures = true; return reg; }
-      return match;
+  src = src.replace(/join\(MEDIA,\s*"([^"]+)"\)/g, (match, file) => {
+    const reg = resolveFixturePath(["media", file]);
+    if (reg) {
+      needsFixtures = true;
+      return reg;
     }
-  );
+    return match;
+  });
 
   // ── PASS 6: process.cwd() patterns ─────────────────────────
   src = src.replace(
@@ -354,96 +413,129 @@ for (const file of allTestFiles) {
     (match, path) => {
       const segments = path.split("/");
       const reg = resolveFixturePath(segments);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
-  src = src.replace(
-    /join\(process\.cwd\(\),\s*"tests\/fixtures\/([^"]+)"\)/g,
-    (match, path) => {
-      const segments = path.split("/");
-      const reg = resolveFixturePath(segments);
-      if (reg) { needsFixtures = true; return reg; }
-      return match;
+  src = src.replace(/join\(process\.cwd\(\),\s*"tests\/fixtures\/([^"]+)"\)/g, (match, path) => {
+    const segments = path.split("/");
+    const reg = resolveFixturePath(segments);
+    if (reg) {
+      needsFixtures = true;
+      return reg;
     }
-  );
+    return match;
+  });
 
   // ── PASS 7: path.resolve(__dirname, "../../fixtures/formats") etc ──
-  src = src.replace(
-    /path\.resolve\(__dirname,\s*"[^"]*fixtures\/formats"\)/g,
-    () => { needsFixtureDir = true; return "fixtureDir.formats"; }
-  );
-  src = src.replace(
-    /path\.resolve\(__dirname,\s*"[^"]*fixtures"\)/g,
-    () => { needsFixtureRoot = true; return "fixtureRoot"; }
-  );
+  src = src.replace(/path\.resolve\(__dirname,\s*"[^"]*fixtures\/formats"\)/g, () => {
+    needsFixtureDir = true;
+    return "fixtureDir.formats";
+  });
+  src = src.replace(/path\.resolve\(__dirname,\s*"[^"]*fixtures"\)/g, () => {
+    needsFixtureRoot = true;
+    return "fixtureRoot";
+  });
 
   // ── PASS 8: path.join(FIXTURES_DIR, "file") in unit tests ──
   src = src.replace(
     /readFileSync\(path\.join\((?:FIXTURES_DIR|fixtureRoot),\s*"([^"]+)"\)\)/g,
     (match, p) => {
       const reg = resolveFixturePath([p]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       // formats/sample.xxx as single string
       const segs = p.split("/");
       if (segs.length === 2) {
         const r2 = resolveFixturePath(segs);
-        if (r2) { needsFixtures = true; needsReadFixture = true; return `readFixture(${r2})`; }
+        if (r2) {
+          needsFixtures = true;
+          needsReadFixture = true;
+          return `readFixture(${r2})`;
+        }
       }
       return match;
-    }
+    },
   );
-  src = src.replace(
-    /path\.join\((?:FIXTURES_DIR|fixtureRoot),\s*"([^"]+)"\)/g,
-    (match, p) => {
-      const reg = resolveFixturePath([p]);
-      if (reg) { needsFixtures = true; return reg; }
-      const segs = p.split("/");
-      if (segs.length === 2) {
-        const r2 = resolveFixturePath(segs);
-        if (r2) { needsFixtures = true; return r2; }
+  src = src.replace(/path\.join\((?:FIXTURES_DIR|fixtureRoot),\s*"([^"]+)"\)/g, (match, p) => {
+    const reg = resolveFixturePath([p]);
+    if (reg) {
+      needsFixtures = true;
+      return reg;
+    }
+    const segs = p.split("/");
+    if (segs.length === 2) {
+      const r2 = resolveFixturePath(segs);
+      if (r2) {
+        needsFixtures = true;
+        return r2;
       }
-      return match;
     }
-  );
+    return match;
+  });
 
   // readFileSync(path.join(FORMATS_DIR|fixtureDir.formats, "sample.ext"))
   src = src.replace(
     /readFileSync\(path\.join\((?:FORMATS_DIR|fixtureDir\.formats),\s*"([^"]+)"\)\)/g,
     (match, file) => {
       const reg = resolveFixturePath(["formats", file]);
-      if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
+      }
       return match;
-    }
+    },
   );
   src = src.replace(
     /path\.join\((?:FORMATS_DIR|fixtureDir\.formats),\s*"([^"]+)"\)/g,
     (match, file) => {
       const reg = resolveFixturePath(["formats", file]);
-      if (reg) { needsFixtures = true; return reg; }
+      if (reg) {
+        needsFixtures = true;
+        return reg;
+      }
       return match;
-    }
+    },
   );
 
   // ── PASS 9: FIXTURE singular (media-engine.test.ts) ────────
   src = src.replace(
     /const FIXTURE = join\(process\.cwd\(\), "tests\/fixtures\/media\/tiny\.mp4"\);?\n?/g,
-    () => { needsFixtures = true; return ""; }
+    () => {
+      needsFixtures = true;
+      return "";
+    },
   );
   // Replace FIXTURE usage (only if the def was removed)
-  if (origSrc.includes('const FIXTURE = join(process.cwd(), "tests/fixtures/media/tiny.mp4")') &&
-      !src.includes("const FIXTURE")) {
+  if (
+    origSrc.includes('const FIXTURE = join(process.cwd(), "tests/fixtures/media/tiny.mp4")') &&
+    !src.includes("const FIXTURE")
+  ) {
     src = src.replace(/\bFIXTURE\b/g, 'fixtures.video.tiny("mp4")');
   }
 
   // ── PASS 10: Remove now-orphaned const defs ────────────────
   // Remove const FIXTURES = join(...) if FIXTURES is no longer used
-  const removeConstIfOrphaned = (constName, replacement) => {
+  const removeConstIfOrphaned = (constName, _replacement) => {
     const defPatterns = [
       new RegExp(`const ${constName} = join\\(__dirname,\\s*"[^"]+",\\s*"fixtures"\\);?\\n?`, "g"),
-      new RegExp(`const ${constName} = join\\(__dirname,\\s*"[^"]+",\\s*"[^"]+",\\s*"fixtures"\\);?\\n?`, "g"),
+      new RegExp(
+        `const ${constName} = join\\(__dirname,\\s*"[^"]+",\\s*"[^"]+",\\s*"fixtures"\\);?\\n?`,
+        "g",
+      ),
       new RegExp(`const ${constName} = join\\(__dirname,\\s*"[^"]*fixtures"\\);?\\n?`, "g"),
-      new RegExp(`const ${constName} = join\\(import\\.meta\\.dirname,\\s*"[^"]+",\\s*"[^"]+",\\s*"fixtures"\\);?\\n?`, "g"),
+      new RegExp(
+        `const ${constName} = join\\(import\\.meta\\.dirname,\\s*"[^"]+",\\s*"[^"]+",\\s*"fixtures"\\);?\\n?`,
+        "g",
+      ),
       new RegExp(`const ${constName} = join\\(import\\.meta\\.dirname,\\s*"[^"]+"\\);?\\n?`, "g"),
     ];
     for (const pat of defPatterns) {
@@ -517,7 +609,10 @@ for (const file of allTestFiles) {
   src = src.replace(/const FORMATS = join\(FIXTURES, "formats"\);?\n?/g, () => {
     return "";
   });
-  if (origSrc.includes('const FORMATS = join(FIXTURES, "formats")') && !src.includes("const FORMATS")) {
+  if (
+    origSrc.includes('const FORMATS = join(FIXTURES, "formats")') &&
+    !src.includes("const FORMATS")
+  ) {
     if (/\bFORMATS\b/.test(src.replace(/\bFORMATS_/g, "").replace(/"FORMATS/g, ""))) {
       src = src.replace(/\bFORMATS\b(?!_|")/g, "fixtureDir.formats");
       needsFixtureDir = true;
@@ -525,7 +620,11 @@ for (const file of allTestFiles) {
   }
 
   // Remove MEDIA_DIR, DOCUMENTS_DIR, DATA_DIR from multimodal etc
-  for (const [vname, dir] of [["MEDIA_DIR", "media"], ["DOCUMENTS_DIR", "documents"], ["DATA_DIR", "data"]]) {
+  for (const [vname, dir] of [
+    ["MEDIA_DIR", "media"],
+    ["DOCUMENTS_DIR", "documents"],
+    ["DATA_DIR", "data"],
+  ]) {
     const p1 = new RegExp(`const ${vname} = join\\(FIXTURES_ROOT, "${dir}"\\);?\\n?`, "g");
     const p2 = new RegExp(`const ${vname} = join\\(fixtureRoot, "${dir}"\\);?\\n?`, "g");
     for (const p of [p1, p2]) {
@@ -590,25 +689,30 @@ for (const file of allTestFiles) {
   }
 
   // Remaining FIXTURES usages
-  if (src.includes("FIXTURES") && !src.includes("const FIXTURES") &&
-      !src.includes("fixtures.") && !src.includes("BY_EXT")) {
+  if (
+    src.includes("FIXTURES") &&
+    !src.includes("const FIXTURES") &&
+    !src.includes("fixtures.") &&
+    !src.includes("BY_EXT")
+  ) {
     // Check for lingering join(FIXTURES, ...) that wasn't caught
-    src = src.replace(
-      /readFileSync\(join\(FIXTURES,\s*"([^"]+)"\)\)/g,
-      (match, p) => {
-        const reg = resolveFixturePath([p]);
-        if (reg) { needsFixtures = true; needsReadFixture = true; return `readFixture(${reg})`; }
-        return match;
+    src = src.replace(/readFileSync\(join\(FIXTURES,\s*"([^"]+)"\)\)/g, (match, p) => {
+      const reg = resolveFixturePath([p]);
+      if (reg) {
+        needsFixtures = true;
+        needsReadFixture = true;
+        return `readFixture(${reg})`;
       }
-    );
-    src = src.replace(
-      /join\(FIXTURES,\s*"([^"]+)"\)/g,
-      (match, p) => {
-        const reg = resolveFixturePath([p]);
-        if (reg) { needsFixtures = true; return reg; }
-        return match;
+      return match;
+    });
+    src = src.replace(/join\(FIXTURES,\s*"([^"]+)"\)/g, (match, p) => {
+      const reg = resolveFixturePath([p]);
+      if (reg) {
+        needsFixtures = true;
+        return reg;
       }
-    );
+      return match;
+    });
   }
 
   if (src === origSrc) continue;
@@ -624,10 +728,7 @@ for (const file of allTestFiles) {
     const importLine = `import { ${importParts.join(", ")} } from "${relPath}";`;
 
     if (src.includes('fixtures/index.js"')) {
-      src = src.replace(
-        /import \{[^}]+\} from "[^"]*fixtures\/index\.js";?/,
-        importLine
-      );
+      src = src.replace(/import \{[^}]+\} from "[^"]*fixtures\/index\.js";?/, importLine);
     } else {
       const lines = src.split("\n");
       let lastImportIdx = -1;
@@ -640,7 +741,7 @@ for (const file of allTestFiles) {
         lines.splice(lastImportIdx + 1, 0, importLine);
         src = lines.join("\n");
       } else {
-        src = importLine + "\n" + src;
+        src = `${importLine}\n${src}`;
       }
     }
   }
@@ -650,10 +751,13 @@ for (const file of allTestFiles) {
   if (!/readFileSync\s*\(/.test(src) && /import\s*\{[^}]*readFileSync/.test(src)) {
     src = src.replace(
       /(import\s*\{[^}]*)readFileSync,?\s*([^}]*\}\s*from\s*"node:fs")/,
-      (match, before, after) => {
-        const cleaned = (before + after).replace(/,\s*,/g, ",").replace(/\{\s*,/g, "{ ").replace(/,\s*\}/g, " }");
+      (_match, before, after) => {
+        const cleaned = (before + after)
+          .replace(/,\s*,/g, ",")
+          .replace(/\{\s*,/g, "{ ")
+          .replace(/,\s*\}/g, " }");
         return cleaned;
-      }
+      },
     );
   }
 
@@ -661,10 +765,13 @@ for (const file of allTestFiles) {
   if (!/\bjoin\s*\(/.test(src) && /import\s*\{[^}]*\bjoin\b/.test(src)) {
     src = src.replace(
       /(import\s*\{[^}]*)\bjoin\b,?\s*([^}]*\}\s*from\s*"node:path")/,
-      (match, before, after) => {
-        const cleaned = (before + after).replace(/,\s*,/g, ",").replace(/\{\s*,/g, "{ ").replace(/,\s*\}/g, " }");
+      (_match, before, after) => {
+        const cleaned = (before + after)
+          .replace(/,\s*,/g, ",")
+          .replace(/\{\s*,/g, "{ ")
+          .replace(/,\s*\}/g, " }");
         return cleaned;
-      }
+      },
     );
   }
 

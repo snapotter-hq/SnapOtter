@@ -18,7 +18,16 @@ import { fileURLToPath } from "node:url";
 import AdmZip from "adm-zip";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = join(__dirname, "..", "..", "tests", "fixtures", "document", "formats", "tiny.pptx");
+const outPath = join(
+  __dirname,
+  "..",
+  "..",
+  "tests",
+  "fixtures",
+  "document",
+  "formats",
+  "tiny.pptx",
+);
 
 const zip = new AdmZip();
 

@@ -23,7 +23,13 @@ const out = resolve(repoRoot, "branding/social-preview.png");
 const htmlPath = resolve(repoRoot, "branding/.og.html");
 
 // Trust badges (subset of Hero.astro's trustBadges list).
-const BADGES = ["Self-hosted", "Privacy-sensitive", "Compliance-friendly", "Air-gap capable", "Open source"];
+const BADGES = [
+  "Self-hosted",
+  "Privacy-sensitive",
+  "Compliance-friendly",
+  "Air-gap capable",
+  "Open source",
+];
 
 // lucide icon inner-SVG (stroke), matching the icons used in CategoryCards.astro.
 const ICON = {
@@ -141,14 +147,14 @@ try {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 640 } });
   const page = await ctx.newPage();
-  await page.goto("file://" + htmlPath, { waitUntil: "load" });
+  await page.goto(`file://${htmlPath}`, { waitUntil: "load" });
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
   await page.waitForTimeout(150);
   await page.screenshot({ path: out });
   await browser.close();
-  console.log("wrote " + out);
+  console.log(`wrote ${out}`);
 } finally {
   rmSync(htmlPath, { force: true });
 }
