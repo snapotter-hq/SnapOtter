@@ -125,6 +125,74 @@ test.describe("landing emitted output", () => {
     ).toBe(0);
   });
 
+  test("no page loads a subresource from a third-party host", () => {
+    // PostHog and Sentry are the only destinations this project is allowed to
+    // talk to, and both are reached from inline script at runtime, never as a
+    // tag in the markup. So every fetching tag in the emitted HTML has to point
+    // at our own origin. A hot-linked badge or a font CDN leaks the visitor's IP,
+    // Referer, and UA to a third party on every single page view.
+    const emitted = readEmitted();
+
+    // Tags the browser fetches without being asked. `<a href>` and the
+    // non-fetching <link rel> values (canonical, alternate) are navigation
+    // metadata, not egress, so they stay out.
+    const FETCHING_REL = new Set([
+      "stylesheet",
+      "preload",
+      "prefetch",
+      "modulepreload",
+      "preconnect",
+      "dns-prefetch",
+      "icon",
+      "shortcut icon",
+      "apple-touch-icon",
+      "manifest",
+    ]);
+    const TAG_RE = /<(script|img|iframe|source|video|audio|track|embed|link)\b([^>]*)>/gi;
+    const ATTR_RE = /\s(src|srcset|href|rel)\s*=\s*("([^"]*)"|'([^']*)')/gi;
+
+    const offenders = new Map<string, { count: number; sources: Set<string> }>();
+
+    for (const rel of emitted.htmlFiles) {
+      const html = fs.readFileSync(path.join(DIST, rel), "utf8");
+      for (const tag of html.matchAll(TAG_RE)) {
+        const name = tag[1].toLowerCase();
+        const attrs: Record<string, string> = {};
+        for (const a of tag[2].matchAll(ATTR_RE)) {
+          attrs[a[1].toLowerCase()] = a[3] ?? a[4] ?? "";
+        }
+        if (name === "link" && !FETCHING_REL.has((attrs.rel ?? "").toLowerCase())) continue;
+
+        const raw = [attrs.src, attrs.srcset, name === "link" ? attrs.href : undefined];
+        for (const value of raw) {
+          if (!value) continue;
+          for (const candidate of value.split(",").map((v) => v.trim().split(/\s+/)[0])) {
+            if (!candidate || /^(data:|blob:|#)/i.test(candidate)) continue;
+            let url: URL;
+            try {
+              url = new URL(candidate, "http://local/");
+            } catch {
+              continue;
+            }
+            if (url.hostname === "local" || url.origin === SITE_ORIGIN) continue;
+            const key = `${url.origin} (${name})`;
+            const entry = offenders.get(key) ?? { count: 0, sources: new Set<string>() };
+            entry.count += 1;
+            entry.sources.add(rel);
+            offenders.set(key, entry);
+          }
+        }
+      }
+    }
+
+    const detail = [...offenders.entries()]
+      .map(([origin, v]) => `${origin} on ${v.count} page(s), e.g. ${[...v.sources][0]}`)
+      .join("\n  ");
+    expect([...offenders.keys()], `third-party subresources in the build:\n  ${detail}`).toEqual(
+      [],
+    );
+  });
+
   test("English-only pages advertise no localized alternate that was never built", () => {
     const emitted = readEmitted();
     // Tool-detail pages and /self-hosted/ are built in English only. Their

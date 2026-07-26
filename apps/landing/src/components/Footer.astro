@@ -137,7 +137,11 @@ const columns = [
     ))}
   </div>
 
-  <!-- Featured-on badges -->
+  <!-- Featured-on badges. All three images are served from our own origin: a
+       hot-linked badge would hand the visitor's IP, Referer, and UA to the
+       badge host on every page view, and PostHog and Sentry are the only
+       destinations this project talks to. -->
+
   <div class="section-divider mx-auto mt-12 max-w-6xl"></div>
   <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-5 pt-8">
     <a href="https://twelve.tools" target="_blank" rel="noopener noreferrer" aria-label="Featured on Twelve Tools">
@@ -147,7 +151,7 @@ const columns = [
       <img src="/badges/wired-business.svg" alt="Featured on Wired Business" width="200" height="54" class="h-9 w-auto" />
     </a>
     <a href="https://lift-off.sh/p/snapotter" target="_blank" rel="noopener noreferrer" aria-label="Launched on LiftOff">
-      <img src="https://lift-off.sh/images/badges/badgeLaunchedLightBAR.webp" alt="Launched on LiftOff" width="360" height="120" class="h-9 w-auto" />
+      <img src="/badges/lift-off-launched.webp" alt="Launched on LiftOff" width="360" height="120" class="h-9 w-auto" />
     </a>
   </div>
 
