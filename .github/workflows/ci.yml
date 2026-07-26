@@ -435,31 +435,23 @@ jobs:
 
       - run: pip install "pip-audit==2.10.0"
       - name: Run pip-audit (ignoring CVEs blocked by dependency constraints)
-        # CVE-2025-3000: torch 2.12.0, no fixed release available as of 2026-06-11
+        # Three entries, each one live against the current lock. 19 others were
+        # dropped after a re-audit showed the pins had moved past them: five
+        # Pillow (all fixed at or below 12.2.0, lock pins 12.3.0), twelve torch
+        # (all last_affected at or below 2.10.0, resolves to 2.13.0), joblib
+        # (not in the closure), markdown (last_affected 3.8, resolves 3.10.2).
+        # PYSEC-2025-194 was a duplicate of CVE-2025-3000, which is itself now
+        # dead. Re-check the three below whenever requirements.txt moves.
+        #
+        # CVE-2024-27763: basicsr, no fixed release exists in any channel.
+        # CVE-2026-40086 + GHSA-55v6-g8pm-pw4c: rembg 2.0.69. The fix is
+        #   rembg 2.0.75, held back by the numpy 1.26.4 pin (see the rationale
+        #   in packages/ai/python/requirements.txt).
         run: >-
           pip-audit -r packages/ai/python/requirements.txt
           --ignore-vuln CVE-2024-27763
-          --ignore-vuln CVE-2025-3000
           --ignore-vuln CVE-2026-40086
-          --ignore-vuln CVE-2026-25990
-          --ignore-vuln CVE-2026-40192
           --ignore-vuln GHSA-55v6-g8pm-pw4c
-          --ignore-vuln CVE-2026-42308
-          --ignore-vuln CVE-2026-42310
-          --ignore-vuln CVE-2026-42311
-          --ignore-vuln PYSEC-2025-189
-          --ignore-vuln PYSEC-2025-190
-          --ignore-vuln PYSEC-2025-191
-          --ignore-vuln PYSEC-2025-192
-          --ignore-vuln PYSEC-2025-193
-          --ignore-vuln PYSEC-2025-194
-          --ignore-vuln PYSEC-2025-195
-          --ignore-vuln PYSEC-2025-196
-          --ignore-vuln PYSEC-2025-197
-          --ignore-vuln PYSEC-2025-210
-          --ignore-vuln PYSEC-2026-139
-          --ignore-vuln PYSEC-2024-277
-          --ignore-vuln PYSEC-2026-89
 
       - name: Audit exact OCR runtime dependency locks
         run: |

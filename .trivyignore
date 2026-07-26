@@ -1,52 +1,21 @@
-# pnpm 9.x and its bundled dependencies
-# These are build-time tool internals, not runtime application code.
-# pnpm is only used for dependency installation and process management.
-# All require upgrading to pnpm 10.x (major breaking change).
-# Tracked: https://github.com/pnpm/pnpm/releases/tag/v10.0.0
-
-# pnpm core
-CVE-2025-69262
-CVE-2025-69263
-
-# glob (bundled in pnpm 9.x, not our dependency)
-CVE-2025-64756
-
-# minimatch (bundled in pnpm 9.x)
-CVE-2026-26996
-CVE-2026-27903
-CVE-2026-27904
-
-# picomatch (bundled in pnpm 9.x)
-CVE-2026-33671
-
-# tar (bundled in pnpm 9.x)
-CVE-2026-23745
-CVE-2026-23950
-CVE-2026-24842
-CVE-2026-26960
-CVE-2026-29786
-CVE-2026-31802
-
-# pnpm 9.x core (2026 rescan) -- same build-time-tool rationale as above; every
-# one of these is fixed only in pnpm 10.x (10.0.0 / 10.28.1 / 10.28.2), a major
-# breaking migration tracked separately. pnpm runs only at install/start time.
-CVE-2024-47829
-CVE-2026-23888
-CVE-2026-23889
-CVE-2026-23890
-CVE-2026-24056
-CVE-2026-24131
-
-# brace-expansion: build-toolchain transitive of minimatch/glob. The patched
-# instance (5.0.6) is already present; the only flagged copy is the 2.x line
-# pulled by glob, whose fix is a major-version bump (5.0.5) the glob ecosystem
-# has not adopted. Not reachable from user input.
-CVE-2026-33750
-
-# npm bundled sigstore (build-time tool internal, not runtime-reachable).
-# CVE-2026-48815: sigstore certificateOIDs verification constraints silently dropped.
-# This is the npm CLI vendored copy (node_modules/npm/node_modules/sigstore), used
-# only for npm package provenance at build time; SnapOtter never runs npm provenance
-# verification at runtime. Same build-tool rationale as the pnpm entries above.
-# Re-evaluate when the Node base image ships a fixed npm.
-CVE-2026-48815
+# Trivy suppressions for the release and bundle scans.
+#
+# This file is empty on purpose. Every entry it used to hold (21 IDs covering
+# pnpm 9.x and its bundled glob/minimatch/picomatch/tar, plus npm's vendored
+# sigstore) suppressed something that is not in any shipped artifact: the
+# production image purges pnpm and npm before the final layer, so raw and
+# policy-filtered scans of both architectures return identical counts. Two of
+# the rationales were also wrong on their own terms. A suppression list that
+# suppresses nothing still costs review attention and hides the next real one.
+#
+# Before adding an ID here, check that it fires against a shipped artifact:
+#
+#   trivy image --ignorefile /dev/null <ref>
+#
+# If it does, the entry needs three things in a comment directly above it: who
+# owns getting it fixed, what unblocks the fix, and the date to re-check.
+#
+# Suppression is for findings that are genuinely absent from what we ship. For
+# findings that ARE present and have no upstream fix, do not suppress them. Add
+# the ID to .trivy-unfixed-allow instead, so the release scan keeps reporting
+# it and a new one still fails the build.
