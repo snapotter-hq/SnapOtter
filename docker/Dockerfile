@@ -195,6 +195,43 @@ RUN curl --fail --location --silent --show-error --retry 3 \
     && cmake --install build
 
 # ============================================
+# Stage 2c: Build LibRaw (camera RAW decoder)
+# ============================================
+# Debian 12 ships LibRaw 0.20.2, which the Debian tracker marks vulnerable to
+# five unfixed advisories with no backport planned: CVE-2026-20884,
+# CVE-2026-24450 and CVE-2026-24660 (arbitrary code execution, CVSS 9.8) plus
+# CVE-2026-20889 and CVE-2026-21413. Trixie's 0.21.4 is still marked vulnerable,
+# so a base bump would not clear them; upstream fixed the set in 0.22.1.
+# dcraw_emu is the first-choice decoder for user-supplied camera RAW uploads
+# (decodeRaw in apps/api/src/lib/format-decoders.ts), which puts attacker bytes
+# straight into LibRaw, so both architectures build the fixed line from source
+# and the distro package is left out of the runtime entirely.
+# Base images match production to avoid shared-library ABI mismatches.
+ARG TARGETARCH
+FROM libheif-base-${TARGETARCH} AS libraw-builder
+
+ARG LIBRAW_VERSION=0.22.2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ make curl ca-certificates pkg-config \
+    libjpeg-dev liblcms2-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 \
+      --output /tmp/libraw.tar.gz \
+      "https://www.libraw.org/data/LibRaw-${LIBRAW_VERSION}.tar.gz" \
+    && printf '%s  %s\n' \
+      "de86b035655accff8d4010f1a221fdf50d353cb7b1422ba26f14a0db92612cfa" \
+      /tmp/libraw.tar.gz | sha256sum --check --strict - \
+    && tar -xzf /tmp/libraw.tar.gz -C /tmp \
+    && cd "/tmp/LibRaw-${LIBRAW_VERSION}" \
+    && ./configure --prefix=/opt/libraw --disable-static \
+      --enable-openmp --enable-jpeg --enable-lcms \
+    && make -j"$(nproc)" \
+    && make install
+
+# ============================================
 # Stage 3: Platform-specific base images
 # Pin tags to a stable upstream series; release digests provide artifact provenance.
 # ============================================
@@ -256,7 +293,6 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     tini \
     imagemagick \
     libjxl-tools \
-    libraw-dev libraw-bin \
     libopenexr-dev \
     potrace \
     ghostscript \
@@ -399,8 +435,20 @@ COPY --from=pdfcpu-builder /tmp/pdfcpu /usr/local/bin/pdfcpu
 # LD_LIBRARY_PATH ensures our custom 1.21.2 libs take precedence over distro libheif1.
 COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
 COPY --from=libheif-builder /opt/libheif/lib/ /usr/local/lib/
+
+# LibRaw's dcraw_emu, built from source (see the libraw-builder stage). No
+# distro libraw is installed, so this is the only RAW decoder in the image.
+COPY --from=libraw-builder /opt/libraw/bin/dcraw_emu /usr/local/bin/
+COPY --from=libraw-builder /opt/libraw/lib/ /usr/local/lib/
 ENV LD_LIBRARY_PATH=/usr/local/lib
-RUN ldconfig
+
+# Assert the RAW decoder resolves to the source build and its runtime deps are
+# satisfied. Without this a missing shared library would only surface when a
+# user uploaded a RAW file, as a silent fall-through to the embedded preview.
+RUN ldconfig \
+    && [ "$(command -v dcraw_emu)" = "/usr/local/bin/dcraw_emu" ] \
+    && ldd /usr/local/bin/dcraw_emu | grep -Eq 'libraw\.so\.[0-9]+ => /usr/local/lib/' \
+    && dcraw_emu 2>&1 | grep -q 'dcraw emulator'
 
 # Python venv - Base packages (rarely change, cached aggressively)
 # Uses pre-built manylinux wheels where available; gcc/g++ above covers the rest.
@@ -504,7 +552,6 @@ RUN apt-get purge -y --auto-remove \
         gcc \
         g++ \
         python3-dev \
-        libraw-dev \
         libopenexr-dev \
         libcurl4-openssl-dev \
         libdb-dev \
@@ -532,7 +579,10 @@ RUN apt-get purge -y --auto-remove \
         /usr/local/share/corepack /root/.cache/node/corepack /root/.cache/pip \
     && rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx \
         /usr/local/bin/pnpm /usr/local/bin/pnpx \
-    && rm -rf /var/lib/apt/lists/* /tmp/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* \
+    # --auto-remove can take a shared library the source-built dcraw_emu needs
+    # (libgomp1, liblcms2-2) with it. Re-assert the decoder still runs.
+    && dcraw_emu 2>&1 | grep -q 'dcraw emulator'
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
 COPY apps/api/src ./apps/api/src

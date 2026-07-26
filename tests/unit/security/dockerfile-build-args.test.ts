@@ -115,10 +115,32 @@ describe("Dockerfile build args", () => {
       "8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785",
       "6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae",
       "59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478",
+      "de86b035655accff8d4010f1a221fdf50d353cb7b1422ba26f14a0db92612cfa",
     ]) {
       expect(dockerfile, `Dockerfile is missing literal SHA-256 ${digest}`).toContain(digest);
     }
     expect(dockerfile).not.toContain('curl -fsSL -O "${base}/${f}.sha256"');
+  });
+
+  it("decodes camera RAW with the source-built LibRaw, never the distro package", () => {
+    // Debian 12's libraw 0.20.2 carries unfixed arbitrary-code-execution CVEs
+    // and dcraw_emu runs on user-supplied uploads, so the distro package must
+    // not be installed and /usr/local/bin must win the PATH lookup.
+    expect(stageBody("libraw-builder")).toContain("LibRaw-${LIBRAW_VERSION}.tar.gz");
+
+    const production = stageBody("production");
+    expect(production).not.toContain("libraw-bin");
+    expect(production).not.toContain("libraw-dev");
+    expect(production).toContain(
+      "COPY --from=libraw-builder /opt/libraw/bin/dcraw_emu /usr/local/bin/",
+    );
+    expect(production).toContain('[ "$(command -v dcraw_emu)" = "/usr/local/bin/dcraw_emu" ]');
+
+    // The purge step's --auto-remove can strip a shared library the source
+    // build needs; the decoder has to be re-checked after it runs.
+    const purgeIndex = production.indexOf("apt-get purge -y --auto-remove");
+    expect(purgeIndex).toBeGreaterThanOrEqual(0);
+    expect(production.slice(purgeIndex)).toContain("dcraw_emu 2>&1 | grep -q 'dcraw emulator'");
   });
 
   it("pins Compose infrastructure images while keeping their major-version labels", () => {
@@ -186,7 +208,6 @@ describe("Dockerfile build args", () => {
     expect(production.slice(purgeIndex)).toContain("python3-dev");
     expect(production.slice(purgeIndex)).toContain("gcc");
     expect(production.slice(purgeIndex)).toContain("g++");
-    expect(production.slice(purgeIndex)).toContain("libraw-dev");
     expect(production.slice(purgeIndex)).toContain("libopenexr-dev");
     expect(production.slice(purgeIndex)).toContain("libcurl4-openssl-dev");
     expect(production.slice(purgeIndex)).toContain("libffi-dev");
