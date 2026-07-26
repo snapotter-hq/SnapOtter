@@ -1,6 +1,6 @@
 # SnapOtter
 
-SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 241 tool routes across the five modalities, plus a layer-based image editor.
+SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 243 tool routes across the five modalities, plus a layer-based image editor.
 
 All processing happens locally. Files never leave your infrastructure.
 
@@ -19,7 +19,7 @@ For production, run alongside PostgreSQL 17 and Redis 8 with Compose. Minimal co
       environment:
         DATABASE_URL: postgres://snapotter:snapotter@postgres:5432/snapotter
         REDIS_URL: redis://redis:6379
-      volumes: ["snapotter-data:/data"]
+      volumes: ["SnapOtter-data:/data"]
       depends_on: [postgres, redis]
     postgres:
       image: postgres:17-alpine
@@ -27,40 +27,40 @@ For production, run alongside PostgreSQL 17 and Redis 8 with Compose. Minimal co
         POSTGRES_USER: snapotter
         POSTGRES_PASSWORD: snapotter
         POSTGRES_DB: snapotter
-      volumes: ["snapotter-pgdata:/var/lib/postgresql/data"]
+      volumes: ["SnapOtter-pgdata:/var/lib/postgresql/data"]
     redis:
       image: redis:8-alpine
-      volumes: ["snapotter-redisdata:/data"]
+      volumes: ["SnapOtter-redisdata:/data"]
   volumes:
-    snapotter-data:
-    snapotter-pgdata:
-    snapotter-redisdata:
+    SnapOtter-data:
+    SnapOtter-pgdata:
+    SnapOtter-redisdata:
 
 Then run docker compose up -d, open http://localhost:1349, and log in with admin / admin (you must change it on first login). Add an NVIDIA GPU device reservation to the snapotter service for AI acceleration. Multi-arch: AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi).
 
 ## Tools
 
-241 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
+243 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
 ### Image
 
-Resize, Crop, Rotate & Flip, Convert, Compress, Optimize for Web, Remove Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator, Adjust Colors, Sharpening, Replace & Invert Color, Color Blindness Simulation, Remove Background, Image Upscaling, Object Eraser, Extract Text from Image (OCR), Face / PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo, Content-Aware Resize, AI Canvas Expand, PNG Transparency Fixer, Background Replace, Blur Background, Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator, Image Info, Image Compare, Find Duplicates, Color Palette, QR Code Generator, HTML to Image, Barcode Reader, Image to Base64, Barcode Generator, Collage / Grid, Stitch / Combine, Image Splitting, Border & Frame, Beautify Screenshot, Circle Crop, Duotone, Image Pad, Pixelate, Vignette, GIF/WebP Converter, Histogram, LQIP Placeholder, Sprite Sheet, SVG to Raster, Image to SVG, GIF Tools. Plus format converters: JPG to PNG, PNG to JPG, JPG to WebP, PNG to WebP, WebP to JPG, WebP to PNG, JPG to AVIF, PNG to AVIF, WebP to AVIF, HEIC to JPG, HEIC to PNG, HEIC to AVIF, JPG to GIF, PNG to GIF, GIF to JPG, GIF to PNG, WebP to GIF, JPG to TIFF, PNG to TIFF, TIFF to JPG, TIFF to PNG, PSD to JPG, PSD to PNG, PNG to EPS, JPG to EPS, EPS to PNG, EPS to JPG, PNG to SVG, JPG to SVG, TIFF to SVG, PSD to SVG, EPS to SVG, SVG to PNG, SVG to JPG, JPG to PDF, PNG to PDF, HEIC to PDF, TIFF to PDF, WebP to PDF, GIF to PDF, EPS to PDF.
+Resize Image, Crop Image, Rotate & Flip Image, Convert Image, Compress Image, Optimize for Web, Remove Image Metadata, Edit Image Metadata, Bulk Rename, Image to PDF, Favicon Generator, Adjust Colors, Sharpen Image, Replace & Invert Color, Color Blindness Simulation, Remove Background, Remove GIF Background, Image Upscaling, Object Eraser, Extract Text from Image (OCR), Blur Faces & PII, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo, Content-Aware Resize, AI Canvas Expand, PNG Transparency Fixer, Background Replace, Blur Background, Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator, Image Info, Image Compare, Find Duplicates, Color Palette, QR Code Generator, HTML to Image, Barcode Reader, Image to Base64, Barcode Generator, Collage & Grid, Stitch Images, Split Image, Border & Frame, Beautify Screenshot, Circle Crop, Rounded Crop, Duotone, Image Pad, Pixelate, Vignette, GIF/WebP Converter, Histogram, LQIP Placeholder, Sprite Sheet, SVG to Raster, Image to SVG, GIF Tools. Plus format converters: JPG to PNG, PNG to JPG, JPG to WebP, PNG to WebP, WebP to JPG, WebP to PNG, JPG to AVIF, PNG to AVIF, WebP to AVIF, HEIC to JPG, HEIC to PNG, HEIC to AVIF, JPG to GIF, PNG to GIF, GIF to JPG, GIF to PNG, WebP to GIF, JPG to TIFF, PNG to TIFF, TIFF to JPG, TIFF to PNG, PSD to JPG, PSD to PNG, PNG to EPS, JPG to EPS, EPS to PNG, EPS to JPG, PNG to SVG, JPG to SVG, TIFF to SVG, PSD to SVG, EPS to SVG, SVG to PNG, SVG to JPG, JPG to PDF, PNG to PDF, HEIC to PDF, TIFF to PDF, WebP to PDF, GIF to PDF, EPS to PDF.
 
 ### Video
 
-Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to GIF, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Audio, Aspect Pad, Blur Pad, Watermark Video, Stabilize Video, GIF to Video, Video to WebP, Video to Frames, Merge Videos, Replace Audio, Burn Subtitles, Embed Subtitles, Extract Subtitles, Images to Video, Clean Video Metadata, Extract Audio. Plus format converters: MOV to MP4, WEBM to MP4, MKV to MP4, AVI to MP4, MP4 to MOV, MP4 to WEBM, WEBM to MOV, MKV to MOV, AVI to MOV, MP4 to AVI, MOV to AVI, MKV to AVI, AVI to MKV, MP4 to GIF, MOV to GIF, MKV to GIF, AVI to GIF, GIF to MP4, GIF to WEBM, GIF to MOV, MP4 to MP3, MOV to MP3, MKV to MP3, WEBM to MP3, AVI to MP3, MP4 to WAV, MOV to WAV, MP4 to OGG.
+Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to GIF, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Video Audio, Aspect Pad, Blur Pad, Watermark Video, Stabilize Video, GIF to Video, Video to WebP, Video to Frames, Merge Videos, Replace Audio, Burn Subtitles, Embed Subtitles, Extract Subtitles, Images to Video, Clean Video Metadata, Extract Audio. Plus format converters: MOV to MP4, WEBM to MP4, MKV to MP4, AVI to MP4, MP4 to MOV, MP4 to WEBM, WEBM to MOV, MKV to MOV, AVI to MOV, MP4 to AVI, MOV to AVI, MKV to AVI, AVI to MKV, MP4 to GIF, MOV to GIF, MKV to GIF, AVI to GIF, GIF to MP4, GIF to WEBM, GIF to MOV, MP4 to MP3, MOV to MP3, MKV to MP3, WEBM to MP3, AVI to MP3, MP4 to WAV, MOV to WAV, MP4 to OGG.
 
 ### Audio
 
-Transcribe Audio, Convert Audio, Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels, Silence Removal, Noise Reduction, Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata. Plus format converters: M4A to MP3, M4A to WAV, AAC to MP3, AAC to WAV, AAC to FLAC, OGG to MP3, OGG to WAV, WAV to MP3, MP3 to WAV, FLAC to MP3.
+Transcribe Audio, Convert Audio, Trim Audio, Adjust Volume, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels, Silence Removal, Noise Reduction, Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata. Plus format converters: M4A to MP3, M4A to WAV, AAC to MP3, AAC to WAV, AAC to FLAC, OGG to MP3, OGG to WAV, WAV to MP3, MP3 to WAV, FLAC to MP3.
 
 ### PDF
 
-PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Convert, Crop PDF, N-up PDF, Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF Metadata, PDF to JPG, PDF to PNG, PDF to TIFF.
+PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Converter, Crop PDF, Pages Per Sheet (N-up), Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF Metadata. Plus format converters: PDF to JPG, PDF to PNG, PDF to TIFF.
 
 ### Files
 
-Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Excel to PDF, Word to PDF, PowerPoint to PDF, HTML to PDF, Markdown to Word, Markdown to HTML, Markdown to PDF, Convert EPUB, Convert to EPUB, Chart Maker, CSV to Excel, CSV to JSON, JSON to XML, YAML / JSON, XML to CSV, Split CSV, Merge CSVs, Excel to CSV, Create ZIP, Extract ZIP.
+Convert Document, Convert Presentation, Convert Spreadsheet, Excel to PDF, Word to PDF, PowerPoint to PDF, HTML to PDF, Markdown to Word, Markdown to HTML, Markdown to PDF, Convert from EPUB, Convert to EPUB, Chart Maker, CSV to Excel, CSV to JSON, JSON to XML, Split CSV, Merge CSVs, Convert YAML / JSON, XML to CSV, Create ZIP, Extract ZIP. Plus format converters: Excel to CSV.
 
 ## Local AI (all on your hardware, no cloud APIs)
 
@@ -107,7 +107,7 @@ Surrounding APIs:
 
 ## Tech Stack
 
-Frontend: React 19, Vite 6, Tailwind CSS 4, Zustand
+Frontend: React 19, Vite 8, Tailwind CSS 4, Zustand
 Backend: Fastify 5; Sharp (images), FFmpeg (video/audio), qpdf and LibreOffice (documents); Drizzle ORM on PostgreSQL 17; BullMQ on Redis 8 for durable async jobs
 AI/ML: Python sidecar (rembg, RealESRGAN, RapidOCR/ONNX Runtime, faster-whisper, MediaPipe, LaMa) plus native Tesseract OCR
 Auth: Session-based with OIDC/SSO support (Google, GitHub, Okta, any OIDC provider)

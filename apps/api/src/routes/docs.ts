@@ -63,8 +63,10 @@ function generateLlmsTxt(spec: OpenAPISpec): string {
   };
   lines.push(`# ${spec.info.title}`);
   lines.push("");
+  // Counted from the catalog, like the per-section counts below. Written as a
+  // literal it went stale twice.
   lines.push(
-    "> Self-hosted file processing API with 241 catalog tool routes across image, video, audio, document, and file workflows. Convert, compress, edit, transcribe, OCR, and more.",
+    `> Self-hosted file processing API with ${TOOLS.length} catalog tool routes across image, video, audio, document, and file workflows. Convert, compress, edit, transcribe, OCR, and more.`,
   );
   lines.push("");
   lines.push("Base URL: `/api/v1`");

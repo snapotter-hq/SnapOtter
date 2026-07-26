@@ -14,17 +14,17 @@ SnapOtter runs entirely on your own infrastructure. Files are processed locally 
 
 ## Image Tools
 
-Core: Resize, Crop, Rotate & Flip, Convert (JPEG/PNG/WebP/AVIF/TIFF/GIF/HEIC/RAW), Compress, Optimize for Web, Strip Metadata, Edit Metadata, Bulk Rename, Image to PDF, Favicon Generator.
+Core: Resize Image, Crop Image, Rotate & Flip Image, Convert Image (JPEG/PNG/WebP/AVIF/TIFF/GIF/HEIC/RAW), Compress Image, Optimize for Web, Remove Image Metadata, Edit Image Metadata, Bulk Rename, Image to PDF, Favicon Generator.
 
-Adjustments: Adjust Colors (brightness/contrast/saturation/temperature), Sharpening, Replace Color, Color Blindness Simulation, Duotone, Vignette, Pixelate.
+Adjustments: Adjust Colors (brightness/contrast/saturation/temperature), Sharpen Image, Replace & Invert Color, Color Blindness Simulation, Duotone, Vignette, Pixelate.
 
-AI-Powered: Remove Background (rembg), Upscale 2x/4x (RealESRGAN), Object Eraser (LaMa), local OCR (built-in Tesseract plus optional RapidOCR/PP-OCR ONNX accuracy tiers), Face/PII Blur, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo (30+ countries), Content-Aware Resize, AI Canvas Expand, Background Replace, Blur Background, PNG Transparency Fixer.
+AI-Powered: Remove Background (rembg), Remove GIF Background, Image Upscaling (2x/4x, RealESRGAN), Object Eraser (LaMa), Extract Text from Image (OCR) (built-in Tesseract plus optional RapidOCR/PP-OCR ONNX accuracy tiers), Blur Faces & PII, Smart Crop, Image Enhancement, Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Passport Photo (30+ countries), Content-Aware Resize, AI Canvas Expand, Background Replace, Blur Background, PNG Transparency Fixer.
 
 Watermark & Overlay: Text Watermark, Image Watermark, Text Overlay, Image Composition, Meme Generator.
 
-Analysis: Image Info, Compare, Find Duplicates, Color Palette, Histogram, LQIP Placeholder.
+Analysis: Image Info, Image Compare, Find Duplicates, Color Palette, Histogram, LQIP Placeholder.
 
-Layout: Collage (25+ templates), Stitch/Combine, Split, Border & Frame, Beautify Screenshot, Circle Crop, Image Pad, Sprite Sheet.
+Layout: Collage & Grid (25+ templates), Stitch Images, Split Image, Border & Frame, Beautify Screenshot, Circle Crop, Rounded Crop, Image Pad, Sprite Sheet.
 
 Format: SVG to Raster, Image to SVG (vectorize), GIF Tools, GIF/WebP Converter, Image to Base64.
 
@@ -32,25 +32,27 @@ Generators: QR Code Generator, Barcode Generator, Barcode Reader, HTML to Image.
 
 ## Video Tools
 
-Convert Video (MP4/MOV/WebM), Compress Video, Trim Video, Mute Video, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color Adjust, Video Speed, Reverse Video, Normalize Audio, Stabilize Video, Aspect Pad, Blur Pad, Watermark Video, Merge Videos, Replace Audio, Extract Audio, Video to GIF, GIF to Video, Video to WebP, Video to Frames, Images to Video, Auto Subtitles (AI transcription), Burn Subtitles, Embed Subtitles, Extract Subtitles, Clean Video Metadata.
+Convert Video (MP4/MOV/WebM), Compress Video, Trim Video, Mute Video, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Video Audio, Stabilize Video, Aspect Pad, Blur Pad, Watermark Video, Merge Videos, Replace Audio, Extract Audio, Video to GIF, GIF to Video, Video to WebP, Video to Frames, Images to Video, Auto Subtitles (AI transcription), Burn Subtitles, Embed Subtitles, Extract Subtitles, Clean Video Metadata.
 
 ## Audio Tools
 
-Transcribe Audio (AI speech-to-text), Convert Audio (MP3/WAV/OGG/FLAC/AAC), Trim Audio, Volume Adjust, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels (mono/stereo), Silence Removal, Noise Reduction (FFT), Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata.
+Transcribe Audio (AI speech-to-text), Convert Audio (MP3/WAV/OGG/FLAC/AAC), Trim Audio, Adjust Volume, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels (mono/stereo), Silence Removal, Noise Reduction (FFT), Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata.
 
 ## PDF Tools
 
-PDF: Merge, Split, Compress, Rotate, Extract Pages, Remove Pages, Organize, Protect (AES-256), Unlock, Repair, Web-Optimize (linearize), Grayscale, PDF/A Convert, Crop, N-up, Booklet, Watermark, Page Numbers, Flatten, Redact, PDF to Text, PDF to Word, PDF to Image, PDF Metadata, PDF OCR (AI).
+PDF: Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF (AES-256), Unlock PDF, Repair PDF, Web-Optimize PDF (linearize), Grayscale PDF, PDF/A Converter, Crop PDF, Pages Per Sheet (N-up), Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF to Image, PDF Metadata, PDF OCR (AI).
 
-Conversion: Word to PDF, Excel to PDF, PowerPoint to PDF, HTML to PDF, Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Markdown to Word, Markdown to HTML, Markdown to PDF, Convert EPUB, Convert to EPUB.
+Conversion: Word to PDF, Excel to PDF, PowerPoint to PDF, HTML to PDF, Convert Document (Word/ODT/RTF), Convert Presentation (PPTX/ODP), Convert Spreadsheet (Excel/ODS/CSV), Markdown to Word, Markdown to HTML, Markdown to PDF, Convert from EPUB, Convert to EPUB.
 
 ## File Tools
 
-Chart Maker (bar/line/pie from CSV/JSON), CSV to Excel, CSV to JSON, JSON to XML, YAML to JSON, XML to CSV, Split CSV, Merge CSVs, Create ZIP, Extract ZIP.
+Chart Maker (bar/line/pie from CSV/JSON), CSV to Excel, CSV to JSON, JSON to XML, Convert YAML / JSON, XML to CSV, Split CSV, Merge CSVs, Excel to CSV, Create ZIP, Extract ZIP.
 
-## AI Models (15, all running locally)
+## AI Models (all running locally)
 
-Background Removal (rembg), Super-Resolution (RealESRGAN 2x/4x), Object Eraser (LaMa inpainting), local image/PDF OCR (Tesseract or RapidOCR with PP-OCR ONNX models), Speech Transcription (faster-whisper), Face Detection (MediaPipe), Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Smart Crop, Content-Aware Resize, AI Canvas Expand (outpainting).
+Background Removal (rembg), Super-Resolution (RealESRGAN 2x/4x), Object Eraser (LaMa inpainting), local image/PDF OCR (Tesseract or RapidOCR with PP-OCR ONNX models), Speech Transcription (faster-whisper), Face Detection (MediaPipe), Face Enhancement, AI Colorization, Noise Removal, Red Eye Removal, Photo Restoration, Smart Crop, Content-Aware Resize, AI Canvas Expand (outpainting), Background Replace, Blur Background, PNG Transparency Fixer, Passport Photo.
+
+Models install on demand as feature bundles, so a fresh instance downloads only what you turn on.
 
 Fast OCR is built into the image and adds about 25 MiB. The optional signed RapidOCR pack adds Balanced and Best tiers on Linux amd64 and arm64, uses CPU on CPU-only and NVIDIA hosts, and is about 208-234 MiB to download / 409-488 MiB installed depending on the target. The signed release index binds the exact compressed and extracted sizes used during verification. Explicit OCR tiers never silently downgrade.
 
@@ -63,7 +65,7 @@ SAML SSO (Okta, Azure AD, Google Workspace, any OIDC), SCIM Provisioning, Multi-
 - Self-hosted: all processing on your infrastructure, no cloud dependency
 - Privacy-first: files never leave your network, air-gapped capable
 - 200+ tools across 5 modalities (image, video, audio, PDF, files)
-- 15 local AI models, no external API calls
+- Local AI models, no external API calls
 - Batch processing with ZIP output
 - Pipeline automation: chain tools sequentially
 - Full REST API with OpenAPI documentation
