@@ -33,7 +33,10 @@ describe("served /llms.txt generator", () => {
     const src = read("apps/api/src/routes/docs.ts");
     const line = src.split("\n").find((l) => l.includes("catalog tool routes"));
     expect(line).toBeDefined();
-    expect(line).toContain("${TOOLS.length}");
+    // Assembled rather than written inline so the linter does not read it as a
+    // stray template placeholder in this file.
+    const interpolation = ["$", "{", "TOOLS.length", "}"].join("");
+    expect(line).toContain(interpolation);
     expect(line).not.toMatch(/\b\d{2,} catalog tool routes/);
   });
 });
