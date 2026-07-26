@@ -9,13 +9,14 @@
  * harness that only watched its own sockets would call a correctly recovered
  * job a loss.
  *
- * Verdict per scenario is built from six independent checks:
+ * Verdict per scenario is built from seven independent checks:
  *   terminal          every job created in the window reached a terminal state
  *   artifacts         every completed job still serves valid output bytes
  *   noOrphanedOutputs no job's output bytes are stranded on disk unreferenced
  *   noDuplicates      no job completed more than once (one output set per job)
  *   drained           every queue returned to zero waiting and zero active
  *   healthy           the API answered /health again, and how long that took
+ *   eventsLive        both completion paths still signal, not just finish
  *
  * noOrphanedOutputs was added for PERF-20260726-006. `terminal` alone does not
  * pin that finding: a fix that marked the stranded jobs failed would satisfy
@@ -23,6 +24,16 @@
  * would not notice because it only visits completed jobs. So the workspace is
  * read directly and every job whose output directory holds real bytes must be
  * completed and must reference them.
+ *
+ * eventsLive was added for PERF-20260726-007, where every other check passed
+ * while the application had quietly stopped signalling completion: jobs ran,
+ * wrote correct output and reached terminal rows, but no client was ever told.
+ * Reconciling against the database cannot see that, because the database is
+ * exactly what stayed right. So both paths are exercised after the stack
+ * settles: a job that finishes in milliseconds has to come back 200 inside the
+ * sync window (which only the BullMQ QueueEvents stream can deliver), and a
+ * client attached to a job that is still running has to be released by a live
+ * pub/sub frame rather than by replay-on-connect.
  *
  *   node tests/benchmark/fault-injection.mjs --scenario all --out faults.jsonl
  */
@@ -33,7 +44,7 @@ import { loadavg } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { validateArtifact } from "./lib/job-aware.mjs";
+import { validateArtifact, waitForTerminalEvent } from "./lib/job-aware.mjs";
 
 const execFileAsync = promisify(execFile);
 const FIXTURE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures");
@@ -61,6 +72,30 @@ const JOB_MIX = [
   { tool: "pdf/rotate-pdf", file: "document/valid/multipage-6.pdf", settings: { angle: 180 } },
   { tool: "audio/trim-audio", file: "audio/valid/media-30s.wav", settings: { startS: 0, endS: 8 } },
 ];
+
+/**
+ * The two probes behind the `eventsLive` check.
+ *
+ * `sync` is milliseconds of real work, so a 202 can only mean the sync window
+ * expired without the completion event arriving. `live` cannot finish inside
+ * the window, so the client attaches while it is still running and only a live
+ * pub/sub frame can end the stream; a frame that arrives instantly came from
+ * replay-on-connect and proves nothing, which is why the wait is recorded.
+ */
+const SYNC_PROBE = {
+  tool: "files/csv-json",
+  file: "data/valid/tiny.csv",
+  settings: { pretty: true },
+};
+const LIVE_PROBE = {
+  tool: "image/convert",
+  file: "image/valid/stress-large.jpg",
+  settings: { format: "avif", quality: 50 },
+};
+/** Below this, the terminal frame was replayed rather than delivered live. */
+const LIVE_FRAME_FLOOR_S = 0.5;
+/** How long the pools get to drain once every job row is terminal. */
+const DRAIN_TIMEOUT_MS = 120_000;
 
 function parseArgs(argv) {
   const args = {};
@@ -136,6 +171,50 @@ async function submit(token, spec, fixtures) {
   } catch (error) {
     return { tool: spec.tool, status: 0, clientError: String(error?.message ?? error) };
   }
+}
+
+/**
+ * Prove the application can still tell a client that a job finished.
+ *
+ * Both paths run over Redis connections that only ever read once they are
+ * established, which is what made PERF-20260726-007 invisible to every
+ * database-side check: a consumer whose socket died without a reset keeps the
+ * jobs running and the rows correct while nobody is ever notified.
+ */
+async function probeEventPaths(token, fixtures) {
+  const syncStarted = performance.now();
+  const sync = await submit(token, SYNC_PROBE, fixtures);
+  const syncS = Number(((performance.now() - syncStarted) / 1000).toFixed(3));
+
+  const live = await submit(token, LIVE_PROBE, fixtures);
+  let liveTerminal = live.status === 200 ? "inline" : null;
+  let liveWaitS = 0;
+  if (live.status === 202) {
+    const jobId = JSON.parse(live.body).jobId;
+    const started = performance.now();
+    liveTerminal = await waitForTerminalEvent({
+      baseUrl: cfg.baseUrl,
+      token,
+      jobId,
+      timeoutMs: 120_000,
+      fetchImpl: fetch,
+    })
+      .then(() => "complete")
+      .catch((error) => `error:${String(error?.message ?? error)}`);
+    liveWaitS = Number(((performance.now() - started) / 1000).toFixed(3));
+  }
+
+  return {
+    syncStatus: sync.status,
+    syncS,
+    syncClientError: sync.clientError,
+    liveStatus: live.status,
+    liveTerminal,
+    liveWaitS,
+    // "inline" means the encode beat the sync window, so no client ever
+    // attached and the live path was not exercised. Rare, and not a pass.
+    ok: sync.status === 200 && liveTerminal === "complete" && liveWaitS > LIVE_FRAME_FLOOR_S,
+  };
 }
 
 async function jobsSince(iso) {
@@ -289,12 +368,7 @@ const SCENARIOS = {
       // the app off the network would also tear down its published-port
       // endpoint, so the harness would be measuring a lost port mapping rather
       // than how the application copes with unreachable dependencies.
-      const network = await docker(
-        "inspect",
-        "--format",
-        "{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}",
-        cfg.pg,
-      );
+      const network = await networkOf(cfg.pg);
       await docker("network", "disconnect", network, cfg.pg);
       await docker("network", "disconnect", network, cfg.redis);
       await sleep(20_000);
@@ -302,7 +376,54 @@ const SCENARIOS = {
       await docker("network", "connect", "--alias", "redis", network, cfg.redis);
     },
   },
+  "redis-readdress": {
+    what: "Redis leaves the network for 20s and comes back at a different address",
+    /**
+     * The minimal form of PERF-20260726-007, and the reason that finding was
+     * filed as needing isolation: it is what "network-partition" degenerates
+     * into whenever Docker hands Postgres the address Redis had. A connection
+     * parked on a blocking read has nothing left to send, so it never draws a
+     * reset, so ioredis never reconnects it. Moving Redis explicitly makes that
+     * deterministic instead of dependent on reattachment order, and it is the
+     * harsher half of the pair: with the old address vacated rather than taken
+     * over by a live host, not even a write draws a reset.
+     */
+    inject: async () => {
+      const network = await networkOf(cfg.redis);
+      const subnet = await docker(
+        "network",
+        "inspect",
+        "--format",
+        "{{(index .IPAM.Config 0).Subnet}}",
+        network,
+      );
+      const base = subnet.split("/")[0].split(".").slice(0, 3).join(".");
+      const current = await containerAddress(cfg.redis);
+      const target = current.endsWith(".200") ? `${base}.201` : `${base}.200`;
+      await docker("network", "disconnect", network, cfg.redis);
+      await sleep(20_000);
+      await docker("network", "connect", "--alias", "redis", "--ip", target, network, cfg.redis);
+    },
+  },
 };
+
+async function networkOf(container) {
+  return docker(
+    "inspect",
+    "--format",
+    "{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}",
+    container,
+  );
+}
+
+async function containerAddress(container) {
+  return docker(
+    "inspect",
+    "--format",
+    "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+    container,
+  );
+}
 
 async function restartCount(container) {
   return Number(await docker("inspect", "--format", "{{.RestartCount}}", container));
@@ -356,10 +477,31 @@ async function runScenario(name, fixtures) {
   for (const job of completed) {
     artifacts.push(await verifyArtifact(freshToken, job.id));
   }
-  const depths = await queueDepths().catch(() => ({}));
-  const drained = Object.values(depths).every((d) => d.waiting === 0 && d.active === 0);
+  // BullMQ can still hold an active entry after every row is terminal, when a
+  // completion landed on a connection that had to be re-established, and its
+  // stalled-detection reaps that on its own schedule. Sampling once made this a
+  // race, so wait for the drain the same way terminal state is waited for. An
+  // unreadable depth is not a drain: an empty object would satisfy `every`.
+  const drainStarted = performance.now();
+  const drainDeadline = Date.now() + DRAIN_TIMEOUT_MS;
+  let depths = {};
+  let drained = false;
+  while (Date.now() < drainDeadline) {
+    depths = await queueDepths().catch(() => ({}));
+    const pools = Object.values(depths);
+    drained = pools.length > 0 && pools.every((d) => d.waiting === 0 && d.active === 0);
+    if (drained) break;
+    await sleep(3000);
+  }
+  const drainedInS = Number(((performance.now() - drainStarted) / 1000).toFixed(2));
   const duplicated = completed.filter((job) => job.outputs > 1);
   const orphanedOutputs = await findOrphanedOutputs(jobs);
+  // Last, on a settled stack: the queues are empty by now, so a slow admission
+  // here is the notification path failing rather than a busy pool.
+  const eventPaths = await probeEventPaths(freshToken, fixtures).catch((error) => ({
+    ok: false,
+    probeError: String(error?.message ?? error),
+  }));
 
   const checks = {
     terminal: stuck.length === 0,
@@ -368,6 +510,7 @@ async function runScenario(name, fixtures) {
     noDuplicates: duplicated.length === 0,
     drained,
     healthy: recoveredInS !== null,
+    eventsLive: eventPaths.ok,
   };
   const record = {
     kind: "fault",
@@ -396,6 +539,8 @@ async function runScenario(name, fixtures) {
     orphanedOutputs,
     duplicatedOutputs: duplicated.length,
     queueDepths: depths,
+    drainedInS,
+    eventPaths,
     recoveredInS,
     settledInS,
     restartsBefore,
@@ -415,7 +560,7 @@ async function runScenario(name, fixtures) {
 async function main() {
   if (!cfg.password) throw new Error("--password is required");
   const fixtures = new Map();
-  for (const spec of JOB_MIX) {
+  for (const spec of [...JOB_MIX, SYNC_PROBE, LIVE_PROBE]) {
     if (!fixtures.has(spec.file))
       fixtures.set(spec.file, await readFile(join(FIXTURE_ROOT, spec.file)));
   }

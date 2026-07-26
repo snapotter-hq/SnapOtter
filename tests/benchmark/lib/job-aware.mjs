@@ -266,7 +266,7 @@ function terminalEventFromBuffer(buffer) {
   return terminal;
 }
 
-async function waitForTerminalEvent({ baseUrl, token, jobId, timeoutMs, fetchImpl }) {
+export async function waitForTerminalEvent({ baseUrl, token, jobId, timeoutMs, fetchImpl }) {
   const progressUrl = sameOriginUrl(
     baseUrl,
     `/api/v1/jobs/${encodeURIComponent(jobId)}/progress`,
