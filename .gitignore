@@ -27,6 +27,7 @@ __pycache__/
 .next/
 .astro/
 **/.vitepress/cache/
+**/.vitepress/.temp/
 out/
 coverage/
 *.tsbuildinfo

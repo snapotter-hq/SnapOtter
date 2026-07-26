@@ -7,6 +7,7 @@ const RELEASE_PROJECTS = [
   "chromium",
   "firefox",
   "webkit",
+  "chromium-widths",
   "mobile-chromium",
   "mobile-webkit",
   "tablet-chromium",
@@ -28,7 +29,9 @@ export function buildMainE2ePlan(platform = process.platform, coreOnly = false) 
   if (!visualBaselinesAvailable) standard.push("--grep-invert=@visual");
 
   const plan = [standard, ["test", "--project=chromium-serial", "--workers=1"]];
-  if (visualBaselinesAvailable) plan.push(["test", "--project=chromium-visual"]);
+  if (visualBaselinesAvailable) {
+    plan.push(["test", "--project=chromium-visual", "--project=chromium-legacy-visual"]);
+  }
   return plan;
 }
 

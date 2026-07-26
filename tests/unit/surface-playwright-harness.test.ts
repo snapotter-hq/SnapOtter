@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -161,6 +162,26 @@ test("editor diagnostic screenshots use Playwright-owned test output", () => {
   );
   expect(source).toContain("testInfo.outputPath");
   expect(source).not.toContain('path.join(__dirname, "screenshots")');
+});
+
+test("docs Playwright collection includes explicit Axe coverage", () => {
+  const output = execFileSync(
+    "pnpm",
+    ["exec", "playwright", "test", "--config", "playwright.docs.config.ts", "--list"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PLAYWRIGHT_RUN_ID: "docs_a11y_contract" },
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: "pipe",
+    },
+  );
+
+  expect(output).toContain("a11y.spec.ts");
+  for (const pageName of ["homepage", "getting started", "configuration", "REST API"]) {
+    expect(output).toContain(`${pageName} has no Axe violations`);
+  }
+  expect(output).toContain("Total: 53 tests in 6 files");
 });
 
 test("Turbo passes surface harness overrides through task boundaries", () => {

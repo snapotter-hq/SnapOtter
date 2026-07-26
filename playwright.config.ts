@@ -103,7 +103,17 @@ const SERIAL_SPECS =
 // platform-specific: they run locally (darwin baselines) and via the
 // update-visual-baselines workflow, but not in the nightly linux run until
 // linux baselines are committed.
-const VISUAL_SPECS = /visual-regression|gui-visual-/;
+const VISUAL_SPECS = /gui-visual-/;
+const LEGACY_VISUAL_SPECS = /visual-regression\.spec\.ts/;
+
+// Stable, engine-neutral coverage shared by Firefox and WebKit. Broader specs
+// remain Chromium-owned when they rely on engine-specific browser behavior.
+const CROSS_BROWSER_SPECS =
+  /(?:^|[/\\])(?:gui-cross-browser|smoke|navigation|home-page)\.spec\.ts$/;
+
+// Exact CSS boundary and wide-screen ownership lives in one small project so
+// these widths cannot disappear inside device presets or ad-hoc test overrides.
+const WIDTH_SPECS = /viewport-widths\.spec\.ts/;
 
 // Device-emulated specs (real touch, UA, DPR). Tagged @mobile or @tablet
 // and routed to the dedicated device projects below.
@@ -148,7 +158,7 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         storageState: authFile,
       },
-      testIgnore: [SERIAL_SPECS, VISUAL_SPECS, DEVICE_SPECS],
+      testIgnore: [SERIAL_SPECS, VISUAL_SPECS, LEGACY_VISUAL_SPECS, DEVICE_SPECS, WIDTH_SPECS],
       dependencies: ["setup"],
     },
     {
@@ -170,12 +180,24 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      // The older broad screenshot matrix has no maintained platform baselines
+      // yet. Keep it explicitly runnable and collectible without silently
+      // skipping based on CI/DOCKER environment variables.
+      name: "chromium-legacy-visual",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      testMatch: LEGACY_VISUAL_SPECS,
+      dependencies: ["setup"],
+    },
+    {
       name: "firefox",
       use: {
         ...devices["Desktop Firefox"],
         storageState: authFile,
       },
-      testMatch: /gui-cross-browser\.spec\.ts/,
+      testMatch: CROSS_BROWSER_SPECS,
       dependencies: ["setup"],
     },
     {
@@ -184,7 +206,16 @@ export default defineConfig({
         ...devices["Desktop Safari"],
         storageState: authFile,
       },
-      testMatch: /gui-cross-browser\.spec\.ts/,
+      testMatch: CROSS_BROWSER_SPECS,
+      dependencies: ["setup"],
+    },
+    {
+      name: "chromium-widths",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      testMatch: WIDTH_SPECS,
       dependencies: ["setup"],
     },
 

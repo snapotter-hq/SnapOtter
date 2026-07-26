@@ -61,6 +61,28 @@ async function loadAnalyticsLocalConfig(overrides: Record<string, string>) {
   return (await import("../../playwright.analytics-local.config.js")).default;
 }
 
+function collectPlaywright(
+  configPath: string,
+  args: string[] = [],
+  env: Record<string, string> = {},
+): string {
+  return execFileSync(
+    "pnpm",
+    ["exec", "playwright", "test", "--config", configPath, ...args, "--list"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PLAYWRIGHT_RUN_ID: "collection_contract",
+        ...env,
+      },
+      maxBuffer: 20 * 1024 * 1024,
+      stdio: "pipe",
+    },
+  );
+}
+
 function mutablePaths(config: Awaited<ReturnType<typeof loadConfig>>) {
   const [apiServer] = config.webServer as Array<{ env: Record<string, string> }>;
   const chromium = config.projects?.find((project) => project.name === "chromium");
@@ -287,25 +309,33 @@ test("main E2E consumers use the resolved run endpoint and artifact root", () =>
   expect.soft(authSetup).not.toContain(":2349");
 });
 
-test("Docker E2E specs collect with tracked fixture references", () => {
-  const output = execFileSync(
-    "pnpm",
-    ["exec", "playwright", "test", "--config", dockerPlaywrightConfigPath, "--list"],
-    {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        BASE_URL: "http://127.0.0.1:1349",
-        CI: "1",
-        PLAYWRIGHT_RUN_ID: "docker_fixture_contract",
-      },
-      maxBuffer: 10 * 1024 * 1024,
-      stdio: "pipe",
-    },
+test("canonical Docker commands collect the complete app and production release suites", () => {
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
+    scripts: Record<string, string>;
+  };
+
+  expect(packageJson.scripts["test:e2e:docker"]).toBe(
+    "playwright test --config playwright.analytics.config.ts",
+  );
+  expect(packageJson.scripts["test:e2e:production"]).toBe(
+    "playwright test --config tests/qa/playwright.qa.config.ts",
   );
 
-  expect(output).toMatch(/Total: \d+ tests in \d+ files/);
+  const dockerOutput = collectPlaywright(dockerPlaywrightConfigPath, [], {
+    BASE_URL: "http://127.0.0.1:1349",
+    CI: "1",
+  });
+  expect(dockerOutput).toContain("adjustment-tools.spec.ts");
+  expect(dockerOutput).toContain("analytics-no-data-leak.spec.ts");
+  expect(dockerOutput).toContain("pipeline-advanced.spec.ts");
+  expect(dockerOutput).toContain("Total: 1072 tests in 30 files");
+
+  const productionOutput = collectPlaywright(
+    path.join(root, "tests", "qa", "playwright.qa.config.ts"),
+  );
+  expect(productionOutput).toContain("crosscutting.qa.spec.ts");
+  expect(productionOutput).toContain("settings-extended.qa.spec.ts");
+  expect(productionOutput).toContain("Total: 397 tests in 9 files");
 });
 
 test("embedded lifecycle tests use exact labeled resources and dynamic loopback ports", () => {
@@ -507,11 +537,84 @@ test("the canonical E2E command exactly covers every release browser and device 
     .filter((name) => name !== "setup");
 
   expect(packageJson.scripts["test:e2e:core"]).toBeTruthy();
+  expect(packageJson.scripts["test:e2e:visual"]).toBe(
+    "playwright test --project=chromium-visual --project=chromium-legacy-visual",
+  );
   expect(new Set(selectedProjects)).toEqual(new Set(configuredProjects));
   expect(selectedProjects).toHaveLength(configuredProjects?.length ?? 0);
   expect(linuxPlan.flat()).not.toContain("--project=chromium-visual");
+  expect(darwinPlan.flat()).toContain("--project=chromium-legacy-visual");
   expect(linuxPlan[0]).toContain("--grep-invert=@visual");
   expect(linuxPlan[1]).toEqual(["test", "--project=chromium-serial", "--workers=1"]);
+});
+
+test("Firefox and WebKit collect the supported cross-browser core suite", () => {
+  for (const project of ["firefox", "webkit"]) {
+    const output = collectPlaywright(path.join(root, "playwright.config.ts"), [
+      `--project=${project}`,
+    ]);
+
+    expect(output, project).toContain("gui-cross-browser.spec.ts");
+    expect(output, project).toContain("smoke.spec.ts");
+    expect(output, project).toContain("navigation.spec.ts");
+    expect(output, project).toContain("home-page.spec.ts");
+    expect(output, project).toContain("Total: 49 tests in 5 files");
+  }
+});
+
+test("the dedicated width project owns every required browser width", () => {
+  const output = collectPlaywright(path.join(root, "playwright.config.ts"), [
+    "--project=chromium-widths",
+  ]);
+
+  for (const width of [320, 768, 1024, 1536, 2560]) {
+    expect(output).toContain(`${width}px viewport has no horizontal overflow`);
+  }
+  expect(output).toContain("Total: 6 tests in 2 files");
+});
+
+test("legacy visual coverage is runnable only through its dedicated collected project", () => {
+  const output = execFileSync(
+    "pnpm",
+    [
+      "exec",
+      "playwright",
+      "test",
+      "tests/e2e/visual-regression.spec.ts",
+      "--config",
+      path.join(root, "playwright.config.ts"),
+      "--project=chromium-legacy-visual",
+      "--list",
+      "--reporter=json",
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PLAYWRIGHT_RUN_ID: "legacy_visual_contract" },
+      maxBuffer: 20 * 1024 * 1024,
+      stdio: "pipe",
+    },
+  );
+  const report = JSON.parse(output) as { suites: unknown[] };
+  const projectTests: Array<{ annotations?: Array<{ type?: string }>; projectName?: string }> = [];
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if (record.projectName === "chromium-legacy-visual") {
+      projectTests.push(record as { annotations?: Array<{ type?: string }>; projectName?: string });
+    }
+    for (const entry of Object.values(record)) visit(entry);
+  };
+  visit(report.suites);
+
+  expect(projectTests).toHaveLength(14);
+  expect(
+    projectTests.flatMap((entry) => entry.annotations ?? []).some((entry) => entry.type === "skip"),
+  ).toBe(false);
 });
 
 test("Turbo passes every main harness endpoint override through task boundaries", () => {
