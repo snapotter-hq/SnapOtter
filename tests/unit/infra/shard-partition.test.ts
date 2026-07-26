@@ -19,12 +19,14 @@ function integrationSpecs(): string[] {
   return out.sort();
 }
 
-const HEAVYWEIGHTS = [
-  "tests/integration/generated/format-matrix-comprehensive.test.ts",
-  "tests/integration/generated/format-matrix.test.ts",
-  "tests/integration/generated/format-matrix-generated.test.ts",
-  "tests/integration/generated/format-matrix-exotic.test.ts",
-];
+/**
+ * The four costliest specs, read from the table rather than hardcoded so this
+ * survives specs being split, renamed, or reweighted.
+ */
+const HEAVYWEIGHTS = Object.entries(FILE_COST_SECONDS)
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 4)
+  .map(([file]) => file);
 
 describe("partitionByCost", () => {
   // The whole point of the helper: a shard must never silently drop a spec.
@@ -95,9 +97,10 @@ describe("partitionByCost", () => {
   });
 
   describe("costOf", () => {
-    it("returns the measured cost for a known-heavy spec", () => {
-      const known = "tests/integration/generated/format-matrix-comprehensive.test.ts";
-      expect(costOf(known)).toBe(FILE_COST_SECONDS[known]);
+    it("returns the measured cost for every listed spec", () => {
+      for (const [file, seconds] of Object.entries(FILE_COST_SECONDS)) {
+        expect(costOf(file)).toBe(seconds);
+      }
     });
 
     it("falls back to a default for unmeasured specs", () => {
@@ -105,7 +108,7 @@ describe("partitionByCost", () => {
     });
 
     it("matches regardless of leading slash or absolute prefix", () => {
-      const known = "tests/integration/generated/format-matrix.test.ts";
+      const known = HEAVYWEIGHTS[0];
       expect(costOf(`/${known}`)).toBe(costOf(known));
       expect(costOf(path.join(repoRoot, known))).toBe(costOf(known));
     });

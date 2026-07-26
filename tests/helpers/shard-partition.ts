@@ -27,11 +27,19 @@
  * Refresh by parsing per-test durations out of the Integration job logs.
  */
 export const FILE_COST_SECONDS: Record<string, number> = {
-  "tests/integration/generated/format-matrix-comprehensive.test.ts": 1365,
-  "tests/integration/generated/format-matrix.test.ts": 1130,
-  "tests/integration/generated/format-matrix-generated.test.ts": 779,
   "tests/integration/generated/format-matrix-exotic.test.ts": 370,
+  "tests/integration/generated/format-matrix-comprehensive-2.test.ts": 348,
+  "tests/integration/generated/format-matrix-comprehensive-1.test.ts": 343,
+  "tests/integration/generated/format-matrix-comprehensive-3.test.ts": 343,
+  "tests/integration/generated/format-matrix-comprehensive-4.test.ts": 343,
   "tests/integration/generated/format-matrix-expanded.test.ts": 319,
+  "tests/integration/generated/format-matrix-1.test.ts": 309,
+  "tests/integration/generated/format-matrix-2.test.ts": 309,
+  "tests/integration/generated/format-matrix-generated-1.test.ts": 269,
+  "tests/integration/generated/format-matrix-generated-2.test.ts": 269,
+  "tests/integration/generated/format-matrix-generated-3.test.ts": 269,
+  "tests/integration/generated/format-matrix-3.test.ts": 267,
+  "tests/integration/generated/format-matrix-4.test.ts": 261,
   "tests/integration/tools/image/image-enhancement.test.ts": 226,
   "tests/integration/generated/new-formats.test.ts": 202,
   "tests/integration/generated/format-matrix-multimodal.test.ts": 126,
