@@ -9,12 +9,20 @@
  * harness that only watched its own sockets would call a correctly recovered
  * job a loss.
  *
- * Verdict per scenario is built from five independent checks:
- *   terminal      every job created in the window reached a terminal state
- *   artifacts     every completed job still serves valid output bytes
- *   noDuplicates  no job completed more than once (one output set per job)
- *   drained       every queue returned to zero waiting and zero active
- *   healthy       the API answered /health again, and how long that took
+ * Verdict per scenario is built from six independent checks:
+ *   terminal          every job created in the window reached a terminal state
+ *   artifacts         every completed job still serves valid output bytes
+ *   noOrphanedOutputs no job's output bytes are stranded on disk unreferenced
+ *   noDuplicates      no job completed more than once (one output set per job)
+ *   drained           every queue returned to zero waiting and zero active
+ *   healthy           the API answered /health again, and how long that took
+ *
+ * noOrphanedOutputs was added for PERF-20260726-006. `terminal` alone does not
+ * pin that finding: a fix that marked the stranded jobs failed would satisfy
+ * it while the finished AVIF still on disk stayed unreachable, and `artifacts`
+ * would not notice because it only visits completed jobs. So the workspace is
+ * read directly and every job whose output directory holds real bytes must be
+ * completed and must reference them.
  *
  *   node tests/benchmark/fault-injection.mjs --scenario all --out faults.jsonl
  */
@@ -212,6 +220,38 @@ async function verifyArtifact(token, jobId) {
   }
 }
 
+/**
+ * Finds output bytes that survived the fault but are unreachable through the
+ * API because their job row never learned about them.
+ *
+ * The workspace is read from inside the app container rather than through the
+ * API on purpose: the whole failure mode is a row that does not know its own
+ * result, so asking the API would ask the very record that is wrong. Previews
+ * are excluded because they are a derived convenience file, never the result.
+ * Local storage only, which is what every scenario in this file runs on.
+ */
+async function findOrphanedOutputs(jobs) {
+  const orphaned = [];
+  for (const job of jobs) {
+    const listing = await docker(
+      "exec",
+      cfg.app,
+      "sh",
+      "-c",
+      `ls -1 /tmp/workspace/outputs/${job.id} 2>/dev/null || true`,
+    ).catch(() => "");
+    const files = listing
+      .split("\n")
+      .map((name) => name.trim())
+      .filter((name) => name && !/^preview\./.test(name));
+    if (files.length === 0) continue;
+    if (job.status !== "completed" || job.outputs === 0) {
+      orphaned.push({ id: job.id, status: job.status, outputRefs: job.outputs, files });
+    }
+  }
+  return orphaned;
+}
+
 const SCENARIOS = {
   "app-restart": {
     what: "docker restart of the application container with jobs mid-flight",
@@ -297,6 +337,7 @@ async function runScenario(name, fixtures) {
   // Reconcile against the database: several scenarios kill the client's socket
   // on purpose, so the HTTP replies are evidence about the client, not the job.
   const freshToken = await login().catch(() => token);
+  const settleStarted = performance.now();
   const deadline = Date.now() + cfg.settleMs;
   let jobs = [];
   let stuck = [];
@@ -306,6 +347,9 @@ async function runScenario(name, fixtures) {
     if (jobs.length > 0 && stuck.length === 0) break;
     await sleep(3000);
   }
+  // How long the last job took to reach a terminal state. Recovery that leans
+  // on a periodic reconciler is legitimate but not free, so record the cost.
+  const settledInS = Number(((performance.now() - settleStarted) / 1000).toFixed(2));
 
   const completed = jobs.filter((job) => job.status === "completed");
   const artifacts = [];
@@ -315,10 +359,12 @@ async function runScenario(name, fixtures) {
   const depths = await queueDepths().catch(() => ({}));
   const drained = Object.values(depths).every((d) => d.waiting === 0 && d.active === 0);
   const duplicated = completed.filter((job) => job.outputs > 1);
+  const orphanedOutputs = await findOrphanedOutputs(jobs);
 
   const checks = {
     terminal: stuck.length === 0,
     artifacts: artifacts.every((a) => a.ok),
+    noOrphanedOutputs: orphanedOutputs.length === 0,
     noDuplicates: duplicated.length === 0,
     drained,
     healthy: recoveredInS !== null,
@@ -347,9 +393,11 @@ async function runScenario(name, fixtures) {
     clientLosses: admissions.filter((a) => a.status === 0).length,
     artifactsVerified: artifacts.length,
     artifactFailures: artifacts.filter((a) => !a.ok),
+    orphanedOutputs,
     duplicatedOutputs: duplicated.length,
     queueDepths: depths,
     recoveredInS,
+    settledInS,
     restartsBefore,
     restartsAfter: {
       app: await restartCount(cfg.app),
