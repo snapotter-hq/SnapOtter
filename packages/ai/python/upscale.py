@@ -41,6 +41,29 @@ GFPGAN_MODEL_PATH = os.environ.get(
 )
 
 
+def realesrgan_failure_message(error: BaseException) -> str:
+    """Say what actually went wrong with Real-ESRGAN, and what to do about it.
+
+    Telling someone to install what they already installed sends them in a
+    circle (AI-20260726-002): on a venv where scipy was carrying two versions
+    this path fired on an ImportError raised deep inside a package that had been
+    present the whole time. A missing module or missing weights is the only
+    shape that really means "not installed"; anything else is an install that is
+    there and broken, which needs a reinstall rather than an install.
+    """
+    missing = isinstance(error, (ModuleNotFoundError, FileNotFoundError))
+    remedy = (
+        "Install the upscale-enhance feature"
+        if missing
+        else (
+            "The upscale-enhance libraries are present but did not load, which usually "
+            "means a partial or conflicting install. Reinstall it from Settings > AI "
+            "Features, or use Reset AI Environment if that does not help"
+        )
+    )
+    return f"Real-ESRGAN is not available: {error}. {remedy}, or use model=lanczos for basic upscaling."
+
+
 def apply_denoise(img, strength):
     """Apply denoising to a PIL image. Uses OpenCV when available, falls back to PIL."""
     if strength <= 0:
@@ -236,10 +259,7 @@ def main():
                 traceback.print_exc(file=sys.stderr)
                 print(json.dumps({
                     "success": False,
-                    "error": (
-                        f"Real-ESRGAN is not available: {e}. "
-                        "Install the upscale-enhance feature or use model=lanczos for basic upscaling."
-                    ),
+                    "error": realesrgan_failure_message(e),
                 }))
                 sys.exit(1)
 
