@@ -115,8 +115,6 @@ const CANONICAL_SETTINGS: Record<string, Record<string, unknown>> = {
   "epub-convert": { format: "html" },
   "convert-presentation": { format: "odp" },
   "convert-spreadsheet": { format: "ods" },
-  ocr: { quality: "balanced" },
-  "ocr-pdf": { quality: "balanced" },
 };
 
 /** Generators take a JSON body and no file at all. */
@@ -170,6 +168,15 @@ const EXTRA_FIELDS: Record<string, Record<string, string>> = {
 const TOOL_FIXTURES: Record<string, Record<string, string>> = {
   "chart-maker": { ".json": join(REPO, "tests/fixtures/data/valid/chart.json") },
   "extract-subtitles": { ".mkv": join(REPO, "tests/fixtures/video/formats/tiny-subs.mkv") },
+};
+
+/**
+ * Declared formats that are the meaningful canonical case for a tool. Without
+ * this, extract-subtitles gets an MP4 with no subtitle track and its canonical
+ * case is a correct refusal rather than a demonstration that it works.
+ */
+const CANONICAL_EXT: Record<string, string> = {
+  "extract-subtitles": ".mkv",
 };
 
 /** Formats a multi-input tool only accepts on its SECONDARY field. */
@@ -254,12 +261,10 @@ function classifyRejection(outcome: SubmitOutcome, expected: boolean): Classific
       detail: `${outcome.httpStatus} leaked a stack trace or internal path: ${body.slice(0, 200)}`,
     };
   }
-  const message =
-    typeof outcome.json?.error === "string"
-      ? outcome.json.error
-      : typeof outcome.json?.message === "string"
-        ? outcome.json.message
-        : "";
+  const message = ["error", "details", "message"]
+    .map((key) => outcome.json?.[key])
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" | ");
   if (!outcome.json || !message) {
     return {
       verdict: "fail",
@@ -299,12 +304,20 @@ async function classify(
     return { verdict: "fail", oracle: "transport", detail: "no HTTP response" };
   }
 
-  if (status === 501 && outcome.json?.code === "FEATURE_NOT_INSTALLED") {
+  if (
+    status === 501 &&
+    (outcome.json?.code === "FEATURE_NOT_INSTALLED" ||
+      outcome.json?.code === "FEATURE_INCOMPATIBLE")
+  ) {
     const feature = String(outcome.json.featureName ?? outcome.json.feature ?? "AI bundle");
+    const reason =
+      outcome.json.code === "FEATURE_INCOMPATIBLE"
+        ? `unavailable on this host (${String(outcome.json.compatibilityReason ?? "incompatible")})`
+        : "not installed on this container";
     return {
       verdict: "blocked",
       oracle: "feature-gate",
-      detail: `AI bundle not installed on this container: ${feature}`,
+      detail: `AI bundle ${reason}: ${feature}`,
     };
   }
   if (status >= 500) {
@@ -433,6 +446,10 @@ function fixtureFor(tool: ToolContract, ext: string): string | null {
 }
 
 function canonicalExtFor(tool: ToolContract): string | null {
+  const preferred = CANONICAL_EXT[tool.id];
+  if (preferred && fixtureFor(tool, preferred)) return preferred;
+  // An empty acceptedInputs means "any file"; give those tools a real one.
+  if (tool.acceptedInputs.length === 0) return ".png";
   for (const ext of tool.acceptedInputs) {
     if (SECONDARY_ONLY[tool.id]?.test(ext)) continue;
     if (fixtureFor(tool, ext)) return ext;
@@ -524,6 +541,15 @@ async function runToolCase(
   const settings =
     options.settings !== undefined ? options.settings : (CANONICAL_SETTINGS[tool.id] ?? {});
 
+  // Differential oracles (rotate swapping axes, for instance) need to measure
+  // the input too. Without it the comparison is against undefined and passes or
+  // fails for the wrong reason.
+  let inputFacts = options.inputFacts ?? null;
+  if (!inputFacts && options.semantic && fixture && SEMANTIC_ORACLES[tool.id]) {
+    const { readFileSync } = await import("node:fs");
+    inputFacts = await inspectOutput(readFileSync(fixture), fixture.split("/").pop() ?? "in.bin");
+  }
+
   const outcome = await client.submit({
     path: apiToolPath(tool.id),
     files: generatorBody ? undefined : files,
@@ -533,13 +559,9 @@ async function runToolCase(
     timeoutMs: timeoutFor(tool),
   });
 
-  const classification = await classify(
-    tool,
-    outcome,
-    options.expectSuccess,
-    options.inputFacts ?? null,
-    { semantic: options.semantic },
-  );
+  const classification = await classify(tool, outcome, options.expectSuccess, inputFacts, {
+    semantic: options.semantic,
+  });
 
   // A tool refusing a format it declares is only acceptable when the refusal is
   // one this catalog documents as correct.

@@ -374,7 +374,15 @@ export const SEMANTIC_ORACLES: Record<string, SemanticOracle> = {
   "protect-pdf": (out) => (out.pdf?.encrypted ? null : "protect-pdf returned an unencrypted PDF"),
   "extract-pages": (out) =>
     out.pdf?.pages === 1 ? null : `expected 1 page, got ${out.pdf?.pages}`,
-  "split-pdf": (out) => (out.zip && out.zip.count > 0 ? null : "split-pdf returned no members"),
+  // Range mode returns one PDF; parts and every-page modes return an archive.
+  "split-pdf": (out) =>
+    out.zip
+      ? out.zip.count > 0
+        ? null
+        : "split-pdf archive has no members"
+      : out.pdf && out.pdf.pages === 1
+        ? null
+        : `split-pdf range "1" returned ${out.kind} with ${out.pdf?.pages ?? "?"} pages`,
   "mute-video": (out) =>
     out.media?.streams.some((s) => s.type === "audio")
       ? "mute-video left an audio stream in the output"

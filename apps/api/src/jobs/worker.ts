@@ -77,6 +77,7 @@ import {
 import { recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
+import { createMonotonicReporter } from "./monotonic-progress.js";
 import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
 import { runSystemJob } from "./system-jobs.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -300,9 +301,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         signal,
       );
 
-      // Progress reporter: emits both Redis pub/sub and BullMQ job progress
+      // Progress reporter: emits both Redis pub/sub and BullMQ job progress.
+      // Wrapped so a tool that reports from more than one source (a two-pass
+      // ffmpeg run, or a sidecar with its own scale) cannot send the client's
+      // progress bar backwards. One reporter per attempt, so retries restart.
       const progressJobId = data.clientJobId ?? jobId;
-      const report = (percent: number, stage?: string) => {
+      const report = createMonotonicReporter((percent: number, stage?: string) => {
         void updateSingleFileProgress({
           jobId: progressJobId,
           phase: "processing",
@@ -310,7 +314,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           stage,
         });
         void job.updateProgress({ percent, stage });
-      };
+      });
 
       // Check for cancellation before dispatching
       if (signal.aborted) throw new Error("Canceled");
