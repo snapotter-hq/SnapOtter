@@ -20,28 +20,51 @@ Tutta la configurazione avviene tramite variabili d'ambiente. Ogni variabile ha 
 | `RATE_LIMIT_PER_MIN` | `1000` | Numero massimo di richieste al minuto per IP. Imposta a 0 per disabilitare il rate limiting. |
 | `CORS_ORIGIN` | (vuoto) | Origini consentite per CORS separate da virgola, oppure vuoto per solo same-origin. |
 | `LOG_LEVEL` | `info` | Verbosità dei log. Uno tra: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Considera attendibili le intestazioni `X-Forwarded-For` da un reverse proxy. Imposta a `false` se non sei dietro un proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quali peer possono impostare l'IP del client tramite `X-Forwarded-For`. Il valore predefinito crede solo a un peer su rete privata, quindi un reverse proxy su una rete Docker o su una LAN è attendibile, mentre l'intestazione falsificata di un client pubblico non lo è. Imposta `true` solo quando davanti c'è un proxy che controlli tu, su un indirizzo pubblico. |
 
 ### Autenticazione {#authentication}
 
+I due booleani qui sotto accettano solo `true` e `false`. Qualsiasi altro valore, che sia `1`, `yes` oppure `on`, non supera la validazione e il server termina prima di mettersi in ascolto.
+
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Imposta a `true` per richiedere il login. L'immagine Docker ha come predefinito `true`. |
+| `AUTH_ENABLED` | `true` | Richiede il login. Imposta a `false` per funzionare senza alcun account, il che concede a ogni richiesta i diritti di admin, quindi tienilo su una rete fidata. |
 | `DEFAULT_USERNAME` | `admin` | Nome utente per l'account admin iniziale. Usato solo alla prima esecuzione. |
 | `DEFAULT_PASSWORD` | `admin` | Password per l'account admin iniziale. Cambiala dopo il primo login. |
 | `MAX_USERS` | `0` (illimitato) | Numero massimo di account utente registrati. Imposta a 0 per illimitato. |
 | `SESSION_DURATION_HOURS` | `168` | Durata della sessione di login in ore (il predefinito è 7 giorni). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Imposta a un qualsiasi valore non vuoto per bypassare la richiesta forzata di cambio password al primo login |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Imposta a `true` per saltare la richiesta forzata di cambio password al primo login. |
 
 ### Archiviazione {#storage}
 
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` o `s3`. S3/MinIO richiede una licenza con la funzionalità s3_storage. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | Stringa di connessione PostgreSQL. |
-| `REDIS_URL` | `redis://redis:6379` | Stringa di connessione Redis (usata per le code di lavori BullMQ). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Directory per i file temporanei durante l'elaborazione. Pulita automaticamente. |
-| `FILES_STORAGE_PATH` | `./data/files` | Directory per i file utente persistenti (immagini caricate, risultati salvati). |
+| `STORAGE_MODE` | `local` | `local` o `s3`. S3 e MinIO richiedono una licenza con la funzionalità s3_storage, oltre alle variabili `S3_*` qui sotto. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Stringa di connessione PostgreSQL. Lo stack Compose la punta al suo servizio `postgres`; lasciala non impostata (insieme a `REDIS_URL`) per ottenere la modalità embedded. |
+| `REDIS_URL` | `redis://localhost:6379` | Stringa di connessione Redis (usata per le code di lavori BullMQ). Compose la punta al suo servizio `redis`. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Directory per i file temporanei durante l'elaborazione. Pulita automaticamente. L'immagine imposta `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Directory per i file utente persistenti (immagini caricate, risultati salvati). L'immagine imposta `/data/files`. |
+
+### Archiviazione oggetti S3 {#s3-object-storage}
+
+Lette solo quando `STORAGE_MODE=s3`. Se manca una delle tre obbligatorie, l'avvio fallisce indicando il nome della variabile che hai tralasciato.
+
+| Variabile | Predefinito | Descrizione |
+|---|---|---|
+| `S3_BUCKET` | (vuoto) | Bucket che contiene upload e output. Obbligatorio. |
+| `S3_ACCESS_KEY_ID` | (vuoto) | Access key. Obbligatoria. Nel container puoi invece montarla, tramite `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (vuoto) | Secret key. Obbligatoria. Stessa convenzione per i file: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Regione del bucket. |
+| `S3_ENDPOINT` | (vuoto) | Endpoint personalizzato per MinIO, R2, Backblaze e altri store compatibili con S3. Vuoto significa AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Imposta a `true` per MinIO e per qualsiasi altro servizio che si aspetta `endpoint/bucket/key` invece dell'indirizzamento virtual-host. |
+| `S3_PREFIX` | (vuoto) | Prefisso delle chiavi, così un solo bucket può ospitare più istanze. |
+
+### Crittografia a riposo {#encryption-at-rest}
+
+| Variabile | Predefinito | Descrizione |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (vuoto) | 64 caratteri esadecimali (32 byte). Cifra le impostazioni sensibili salvate nel database. Qualsiasi cosa che non sia di 64 caratteri esadecimali viene rifiutata all'avvio. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (vuoto) | La chiave che stai abbandonando durante una rotazione, nello stesso formato. Impostale entrambe durante la rotazione così le righe esistenti restano decifrabili, poi rimuovi questa. |
 
 ### Modalità embedded {#embedded-mode}
 
@@ -60,16 +83,15 @@ Nota sulla telemetria: la modalità embedded eredita il valore predefinito delle
 
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Dimensione massima del file per upload in megabyte. Imposta a 0 per illimitato. |
-| `MAX_BATCH_SIZE` | `100` | Numero massimo di file in una singola richiesta batch. Imposta a 0 per illimitato. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (illimitato) | Dimensione massima del file per upload in megabyte. Imposta a 0 per illimitato. L'immagine pubblicata viene fornita con `0`; una build dai sorgenti parte da 100. |
+| `MAX_BATCH_SIZE` | `0` (illimitato) | Numero massimo di file in una singola richiesta batch. Imposta a 0 per illimitato. L'immagine pubblicata viene fornita con `0`; una build dai sorgenti parte da 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Numero di lavori batch che girano in parallelo. Imposta a 0 per rilevarlo automaticamente in base ai core CPU disponibili. |
 | `MAX_MEGAPIXELS` | `0` (illimitato) | Risoluzione massima dell'immagine consentita in megapixel. Imposta a 0 per illimitato. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Numero massimo di thread worker per l'elaborazione delle immagini. Imposta a 0 per rilevarlo automaticamente in base ai core CPU disponibili. |
 | `PROCESSING_TIMEOUT_S` | `0` (nessun limite) | Tempo massimo di elaborazione per richiesta in secondi. Imposta a 0 per nessun timeout. |
 | `MAX_PIPELINE_STEPS` | `20` | Numero massimo di passaggi in una pipeline. Imposta a 0 per nessun limite. |
 | `MAX_CANVAS_PIXELS` | `0` (nessun limite) | Dimensione massima del canvas in pixel per le immagini di output. Imposta a 0 per nessun limite. |
-| `MAX_SVG_SIZE_MB` | `0` (illimitato) | Dimensione massima del file SVG in megabyte. Imposta a 0 per illimitato. |
-| `MAX_SPLIT_GRID` | `100` | Dimensione massima della griglia per lo strumento di divisione delle immagini. |
+| `MAX_SVG_SIZE_MB` | `50` | Il più grande SVG accettato prima della sanificazione, in megabyte. Qui `0` si comporta diversamente rispetto alle righe vicine. Rimuove del tutto il limite di dimensione applicato prima del parsing invece di alzarlo, quindi lascia questo valore impostato. |
 | `MAX_PDF_PAGES` | `0` (illimitato) | Numero massimo di pagine PDF per la conversione PDF-a-immagine. Imposta a 0 per illimitato. |
 
 ### Pulizia {#cleanup}
@@ -83,7 +105,7 @@ Nota sulla telemetria: la modalità embedded eredita il valore predefinito delle
 
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Tema predefinito per le nuove sessioni. `light` o `dark`. |
+| `DEFAULT_THEME` | `light` | Tema predefinito per le nuove sessioni. `light`, `dark` o `system`. |
 | `DEFAULT_LOCALE` | `en` | Lingua predefinita dell'interfaccia. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Layout predefinito degli strumenti. `sidebar` o `fullscreen`. |
 

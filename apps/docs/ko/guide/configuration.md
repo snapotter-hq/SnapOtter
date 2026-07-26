@@ -20,28 +20,51 @@ i18n_hash_version: 2
 | `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 최대 요청 수입니다. 속도 제한을 비활성화하려면 0으로 설정합니다. |
 | `CORS_ORIGIN` | (비어 있음) | CORS에 대해 허용된 오리진의 쉼표 구분 목록이며, 동일 오리진만 허용하려면 비워 둡니다. |
 | `LOG_LEVEL` | `info` | 로그 상세 수준입니다. 다음 중 하나: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | 리버스 프록시의 `X-Forwarded-For` 헤더를 신뢰합니다. 프록시 뒤에 있지 않으면 `false`로 설정합니다. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어를 지정합니다. 기본값은 사설 네트워크의 피어만 믿으므로 Docker 네트워크나 LAN의 리버스 프록시는 신뢰되고, 공개 클라이언트가 위조한 헤더는 신뢰되지 않습니다. 공개 주소에서 직접 관리하는 프록시를 앞에 둔 경우에만 `true`로 설정하세요. |
 
 ### 인증 {#authentication}
 
+아래 두 불리언 값은 `true`와 `false`만 허용합니다. `1`, `yes`, `on` 같은 그 밖의 값은 검증에 실패하며, 서버는 수신 대기를 시작하기 전에 종료됩니다.
+
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | 로그인을 요구하려면 `true`로 설정합니다. Docker 이미지의 기본값은 `true`입니다. |
+| `AUTH_ENABLED` | `true` | 로그인을 요구합니다. 계정을 전혀 두지 않고 실행하려면 `false`로 설정합니다. 이 경우 모든 요청에 관리자 권한이 부여되므로 신뢰할 수 있는 네트워크에서만 사용하세요. |
 | `DEFAULT_USERNAME` | `admin` | 초기 관리자 계정의 사용자 이름입니다. 첫 실행 시에만 사용됩니다. |
 | `DEFAULT_PASSWORD` | `admin` | 초기 관리자 계정의 비밀번호입니다. 첫 로그인 후 변경하세요. |
 | `MAX_USERS` | `0` (무제한) | 등록된 사용자 계정의 최대 수입니다. 무제한으로 하려면 0으로 설정합니다. |
 | `SESSION_DURATION_HOURS` | `168` | 로그인 세션 수명(시간 단위, 기본값은 7일)입니다. |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | 첫 로그인 시 강제 비밀번호 변경 프롬프트를 우회하려면 비어 있지 않은 값으로 설정합니다 |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | 첫 로그인 시 강제 비밀번호 변경 프롬프트를 건너뛰려면 `true`로 설정합니다. |
 
 ### 스토리지 {#storage}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` 또는 `s3`. S3/MinIO에는 s3_storage 기능이 포함된 라이선스가 필요합니다. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL 연결 문자열입니다. |
-| `REDIS_URL` | `redis://redis:6379` | Redis 연결 문자열(BullMQ 작업 큐에 사용)입니다. |
-| `WORKSPACE_PATH` | `./tmp/workspace` | 처리 중 임시 파일을 위한 디렉터리입니다. 자동으로 정리됩니다. |
-| `FILES_STORAGE_PATH` | `./data/files` | 영구 사용자 파일(업로드된 이미지, 저장된 결과)을 위한 디렉터리입니다. |
+| `STORAGE_MODE` | `local` | `local` 또는 `s3`. S3와 MinIO에는 s3_storage 기능이 포함된 라이선스와 아래의 `S3_*` 변수가 필요합니다. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 연결 문자열입니다. Compose 스택은 이 값을 자체 `postgres` 서비스로 지정합니다. (`REDIS_URL`과 함께) 설정하지 않은 채로 두면 임베디드 모드가 됩니다. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis 연결 문자열(BullMQ 작업 큐에 사용)입니다. Compose는 이 값을 자체 `redis` 서비스로 지정합니다. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | 처리 중 임시 파일을 위한 디렉터리입니다. 자동으로 정리됩니다. 이미지는 `/tmp/workspace`로 설정합니다. |
+| `FILES_STORAGE_PATH` | `./data/files` | 영구 사용자 파일(업로드된 이미지, 저장된 결과)을 위한 디렉터리입니다. 이미지는 `/data/files`로 설정합니다. |
+
+### S3 오브젝트 스토리지 {#s3-object-storage}
+
+`STORAGE_MODE=s3`일 때만 읽습니다. 필수인 세 가지 중 하나라도 빠지면 시작이 실패하며, 빠뜨린 변수 이름을 알려줍니다.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `S3_BUCKET` | (비어 있음) | 업로드와 출력을 담는 버킷입니다. 필수입니다. |
+| `S3_ACCESS_KEY_ID` | (비어 있음) | 액세스 키입니다. 필수입니다. 컨테이너에서는 `S3_ACCESS_KEY_ID_FILE`을 통해 대신 마운트할 수 있습니다. |
+| `S3_SECRET_ACCESS_KEY` | (비어 있음) | 시크릿 키입니다. 필수입니다. 같은 파일 규칙을 씁니다: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | 버킷 리전입니다. |
+| `S3_ENDPOINT` | (비어 있음) | MinIO, R2, Backblaze를 비롯한 S3 호환 스토리지를 위한 사용자 지정 엔드포인트입니다. 비워 두면 AWS를 뜻합니다. |
+| `S3_FORCE_PATH_STYLE` | `false` | MinIO처럼 가상 호스트 주소 지정 대신 `endpoint/bucket/key`를 요구하는 경우 `true`로 설정합니다. |
+| `S3_PREFIX` | (비어 있음) | 키 접두사입니다. 버킷 하나에 여러 인스턴스를 담을 수 있습니다. |
+
+### 저장 데이터 암호화 {#encryption-at-rest}
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (비어 있음) | 16진수 64자(32바이트)입니다. 데이터베이스에 저장된 민감한 설정을 암호화합니다. 16진수 64자가 아니면 시작 시 거부됩니다. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (비어 있음) | 교체해서 물러나는 이전 키이며 형식은 같습니다. 교체 중에는 둘 다 설정해 기존 행이 계속 복호화되도록 한 뒤, 이 값을 제거하세요. |
 
 ### 임베디드 모드 {#embedded-mode}
 
@@ -60,16 +83,15 @@ i18n_hash_version: 2
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | 업로드당 최대 파일 크기(메가바이트)입니다. 무제한으로 하려면 0으로 설정합니다. |
-| `MAX_BATCH_SIZE` | `100` | 단일 배치 요청의 최대 파일 수입니다. 무제한으로 하려면 0으로 설정합니다. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (무제한) | 업로드당 최대 파일 크기(메가바이트)입니다. 무제한으로 하려면 0으로 설정합니다. 게시된 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다. |
+| `MAX_BATCH_SIZE` | `0` (무제한) | 단일 배치 요청의 최대 파일 수입니다. 무제한으로 하려면 0으로 설정합니다. 게시된 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다. |
 | `CONCURRENT_JOBS` | `0` (자동) | 병렬로 실행되는 배치 작업 수입니다. 사용 가능한 CPU 코어를 기준으로 자동 감지하려면 0으로 설정합니다. |
 | `MAX_MEGAPIXELS` | `0` (무제한) | 허용되는 최대 이미지 해상도(메가픽셀)입니다. 무제한으로 하려면 0으로 설정합니다. |
 | `MAX_WORKER_THREADS` | `0` (자동) | 이미지 처리를 위한 최대 워커 스레드 수입니다. 사용 가능한 CPU 코어를 기준으로 자동 감지하려면 0으로 설정합니다. |
 | `PROCESSING_TIMEOUT_S` | `0` (제한 없음) | 요청당 최대 처리 시간(초)입니다. 시간 초과 없음으로 하려면 0으로 설정합니다. |
 | `MAX_PIPELINE_STEPS` | `20` | 파이프라인의 최대 단계 수입니다. 제한 없음으로 하려면 0으로 설정합니다. |
 | `MAX_CANVAS_PIXELS` | `0` (제한 없음) | 출력 이미지의 최대 캔버스 크기(픽셀)입니다. 제한 없음으로 하려면 0으로 설정합니다. |
-| `MAX_SVG_SIZE_MB` | `0` (무제한) | 최대 SVG 파일 크기(메가바이트)입니다. 무제한으로 하려면 0으로 설정합니다. |
-| `MAX_SPLIT_GRID` | `100` | 이미지 분할 도구의 최대 그리드 차원입니다. |
+| `MAX_SVG_SIZE_MB` | `50` | 새니타이즈하기 전에 허용하는 최대 SVG 크기(메가바이트)입니다. 여기서 `0`은 주변 행과 다르게 동작합니다. 상한을 높이는 것이 아니라 파싱 전 크기 제한을 아예 없애므로, 이 값은 설정된 상태로 두세요. |
 | `MAX_PDF_PAGES` | `0` (무제한) | PDF-to-image 변환의 최대 PDF 페이지 수입니다. 무제한으로 하려면 0으로 설정합니다. |
 
 ### 정리 {#cleanup}
@@ -83,7 +105,7 @@ i18n_hash_version: 2
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | 새 세션의 기본 테마입니다. `light` 또는 `dark`. |
+| `DEFAULT_THEME` | `light` | 새 세션의 기본 테마입니다. `light`, `dark` 또는 `system`. |
 | `DEFAULT_LOCALE` | `en` | 기본 인터페이스 언어입니다. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | 기본 도구 레이아웃입니다. `sidebar` 또는 `fullscreen`. |
 

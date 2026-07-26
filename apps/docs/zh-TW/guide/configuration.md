@@ -20,28 +20,51 @@ i18n_hash_version: 2
 | `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的最大請求數。設為 0 可停用速率限制。 |
 | `CORS_ORIGIN` | （空） | CORS 允許來源的逗號分隔清單，留空則僅限同源。 |
 | `LOG_LEVEL` | `info` | 日誌詳細程度。可為下列其中之一：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
-| `TRUST_PROXY` | `true` | 信任來自反向代理的 `X-Forwarded-For` 標頭。若不在代理後方，請設為 `false`。 |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 允許哪些對端透過 `X-Forwarded-For` 設定用戶端 IP。預設值只相信來自私有網路的對端，因此 Docker 網路或區域網路中的反向代理會被信任，而公開用戶端偽造的標頭則不會。只有當你自己掌控的代理以公開位址位於前方時，才設為 `true`。 |
 
 ### 驗證 {#authentication}
 
+下方兩個布林值只接受 `true` 與 `false`。其他任何值，例如 `1`、`yes` 或 `on`，都會驗證失敗，伺服器會在開始監聽之前結束。
+
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | 設為 `true` 以要求登入。Docker 映像檔預設為 `true`。 |
+| `AUTH_ENABLED` | `true` | 要求登入。設為 `false` 可在完全沒有帳號的情況下執行，此時每個請求都具有 admin 權限，因此請僅限於可信任的網路。 |
 | `DEFAULT_USERNAME` | `admin` | 初始 admin 帳號的使用者名稱。僅於首次執行時使用。 |
 | `DEFAULT_PASSWORD` | `admin` | 初始 admin 帳號的密碼。請於首次登入後變更。 |
 | `MAX_USERS` | `0`（無上限） | 註冊使用者帳號的最大數量。設為 0 為無上限。 |
 | `SESSION_DURATION_HOURS` | `168` | 登入工作階段的存活時間（小時）（預設為 7 天）。 |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | 設為任何非空值即可略過首次登入時強制變更密碼的提示 |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | 設為 `true` 可略過首次登入時強制變更密碼的提示。 |
 
 ### 儲存 {#storage}
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` 或 `s3`。S3/MinIO 需要具備 s3_storage 功能的授權。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL 連線字串。 |
-| `REDIS_URL` | `redis://redis:6379` | Redis 連線字串（用於 BullMQ 工作佇列）。 |
-| `WORKSPACE_PATH` | `./tmp/workspace` | 處理期間暫存檔案的目錄。會自動清理。 |
-| `FILES_STORAGE_PATH` | `./data/files` | 持久化使用者檔案（已上傳影像、已儲存結果）的目錄。 |
+| `STORAGE_MODE` | `local` | `local` 或 `s3`。S3 與 MinIO 需要具備 s3_storage 功能的授權，以及下方的 `S3_*` 變數。 |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 連線字串。Compose 堆疊會將它指向自己的 `postgres` 服務；把它（連同 `REDIS_URL`）留著不設定，即可進入內嵌模式。 |
+| `REDIS_URL` | `redis://localhost:6379` | Redis 連線字串（用於 BullMQ 工作佇列）。Compose 會將它指向自己的 `redis` 服務。 |
+| `WORKSPACE_PATH` | `./tmp/workspace` | 處理期間暫存檔案的目錄。會自動清理。映像檔會設為 `/tmp/workspace`。 |
+| `FILES_STORAGE_PATH` | `./data/files` | 持久化使用者檔案（已上傳影像、已儲存結果）的目錄。映像檔會設為 `/data/files`。 |
+
+### S3 物件儲存 {#s3-object-storage}
+
+僅在 `STORAGE_MODE=s3` 時才會讀取。三個必填項只要漏掉任何一個，啟動就會失敗，並指出你漏掉的變數名稱。
+
+| 變數 | 預設值 | 說明 |
+|---|---|---|
+| `S3_BUCKET` | （空） | 存放上傳檔案與輸出的儲存桶。必填。 |
+| `S3_ACCESS_KEY_ID` | （空） | 存取金鑰。必填。在容器中也可以改用 `S3_ACCESS_KEY_ID_FILE` 掛載它。 |
+| `S3_SECRET_ACCESS_KEY` | （空） | 祕密金鑰。必填。同樣的檔案慣例：`S3_SECRET_ACCESS_KEY_FILE`。 |
+| `S3_REGION` | `us-east-1` | 儲存桶所在區域。 |
+| `S3_ENDPOINT` | （空） | 供 MinIO、R2、Backblaze 及其他 S3 相容儲存使用的自訂端點。留空表示 AWS。 |
+| `S3_FORCE_PATH_STYLE` | `false` | 對 MinIO 以及其他需要 `endpoint/bucket/key` 而非虛擬主機定址的儲存，請設為 `true`。 |
+| `S3_PREFIX` | （空） | 金鑰前綴，可讓一個儲存桶容納多個執行個體。 |
+
+### 靜態資料加密 {#encryption-at-rest}
+
+| 變數 | 預設值 | 說明 |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | （空） | 64 個十六進位字元（32 位元組）。用來加密資料庫中儲存的機敏設定。不是 64 個十六進位字元的值會在啟動時被拒絕。 |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | （空） | 你正在輪替掉的舊金鑰，格式相同。輪替期間請同時設定兩者，讓既有資料列仍可解密，之後再移除這一個。 |
 
 ### 內嵌模式 {#embedded-mode}
 
@@ -60,16 +83,15 @@ i18n_hash_version: 2
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | 每次上傳的最大檔案大小（MB）。設為 0 為無上限。 |
-| `MAX_BATCH_SIZE` | `100` | 單一批次請求中的最大檔案數。設為 0 為無上限。 |
+| `MAX_UPLOAD_SIZE_MB` | `0`（無上限） | 每次上傳的最大檔案大小（MB）。設為 0 為無上限。已發布的映像檔出廠即為 `0`；從原始碼建置則是從 100 開始。 |
+| `MAX_BATCH_SIZE` | `0`（無上限） | 單一批次請求中的最大檔案數。設為 0 為無上限。已發布的映像檔出廠即為 `0`；從原始碼建置則是從 100 開始。 |
 | `CONCURRENT_JOBS` | `0`（自動） | 平行執行的批次工作數。設為 0 可根據可用 CPU 核心自動偵測。 |
 | `MAX_MEGAPIXELS` | `0`（無上限） | 允許的最大影像解析度（百萬像素）。設為 0 為無上限。 |
 | `MAX_WORKER_THREADS` | `0`（自動） | 影像處理的最大工作執行緒。設為 0 可根據可用 CPU 核心自動偵測。 |
 | `PROCESSING_TIMEOUT_S` | `0`（無限制） | 每個請求的最大處理時間（秒）。設為 0 為無逾時。 |
 | `MAX_PIPELINE_STEPS` | `20` | 管線中的最大步驟數。設為 0 為無限制。 |
 | `MAX_CANVAS_PIXELS` | `0`（無限制） | 輸出影像的最大畫布尺寸（像素）。設為 0 為無限制。 |
-| `MAX_SVG_SIZE_MB` | `0`（無上限） | 最大 SVG 檔案大小（MB）。設為 0 為無上限。 |
-| `MAX_SPLIT_GRID` | `100` | 影像分割工具的最大格線維度。 |
+| `MAX_SVG_SIZE_MB` | `50` | 淨化處理之前可接受的最大 SVG 大小（MB）。這裡的 `0` 與前後各列的含義不同：它不是把上限調高，而是完全移除解析前的大小限制，因此這一項請保持設定。 |
 | `MAX_PDF_PAGES` | `0`（無上限） | PDF 轉影像時的最大 PDF 頁數。設為 0 為無上限。 |
 
 ### 清理 {#cleanup}
@@ -83,7 +105,7 @@ i18n_hash_version: 2
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | 新工作階段的預設主題。`light` 或 `dark`。 |
+| `DEFAULT_THEME` | `light` | 新工作階段的預設主題。`light`、`dark` 或 `system`。 |
 | `DEFAULT_LOCALE` | `en` | 預設介面語言。 |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | 預設工具版面。`sidebar` 或 `fullscreen`。 |
 

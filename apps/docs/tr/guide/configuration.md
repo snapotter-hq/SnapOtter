@@ -20,28 +20,51 @@ Tüm yapılandırma ortam değişkenleri aracılığıyla yapılır. Her değiş
 | `RATE_LIMIT_PER_MIN` | `1000` | IP başına dakikada maksimum istek. Hız sınırlamayı devre dışı bırakmak için 0'a ayarlayın. |
 | `CORS_ORIGIN` | (boş) | CORS için virgülle ayrılmış izin verilen kökenler veya yalnızca aynı köken için boş. |
 | `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi. Şunlardan biri: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Bir ters proxy'den gelen `X-Forwarded-For` başlıklarına güven. Bir proxy arkasında değilseniz `false` olarak ayarlayın. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Hangi uçların istemci IP'sini `X-Forwarded-For` üzerinden belirleyebileceği. Varsayılan yalnızca özel ağdaki bir uca inanır; böylece Docker ağındaki ya da LAN'daki bir ters proxy güvenilir sayılır, herkese açık bir istemcinin sahte başlığı ise sayılmaz. `true` değerini yalnızca önde, herkese açık bir adreste sizin denetlediğiniz bir proxy varsa ayarlayın. |
 
 ### Kimlik doğrulama {#authentication}
 
+Aşağıdaki iki mantıksal değişken yalnızca `true` ve `false` kabul eder. `1`, `yes` ya da `on` gibi başka her değer doğrulamayı geçemez ve sunucu daha dinlemeye başlamadan kapanır.
+
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Oturum açmayı gerektirmek için `true` olarak ayarlayın. Docker imajı `true` olarak varsayılır. |
+| `AUTH_ENABLED` | `true` | Oturum açmayı zorunlu kılar. Hiç hesap olmadan çalıştırmak için `false` olarak ayarlayın: bu durumda her istek admin yetkisi kazanır, o yüzden bunu güvenilir bir ağla sınırlı tutun. |
 | `DEFAULT_USERNAME` | `admin` | İlk admin hesabı için kullanıcı adı. Yalnızca ilk çalıştırmada kullanılır. |
 | `DEFAULT_PASSWORD` | `admin` | İlk admin hesabı için parola. İlk oturum açmadan sonra bunu değiştirin. |
 | `MAX_USERS` | `0` (sınırsız) | Kayıtlı maksimum kullanıcı hesabı sayısı. Sınırsız için 0'a ayarlayın. |
 | `SESSION_DURATION_HOURS` | `168` | Oturum açma oturumu ömrü, saat cinsinden (varsayılan 7 gündür). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | İlk oturum açmada zorunlu parola değiştirme istemini atlamak için boş olmayan herhangi bir değere ayarlayın |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | İlk oturum açmada zorunlu parola değiştirme istemini atlamak için `true` olarak ayarlayın. |
 
 ### Depolama {#storage}
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` veya `s3`. S3/MinIO, s3_storage özelliğine sahip bir lisans gerektirir. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL bağlantı dizesi. |
-| `REDIS_URL` | `redis://redis:6379` | Redis bağlantı dizesi (BullMQ iş kuyrukları için kullanılır). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | İşleme sırasında geçici dosyalar için dizin. Otomatik olarak temizlenir. |
-| `FILES_STORAGE_PATH` | `./data/files` | Kalıcı kullanıcı dosyaları (yüklenen görüntüler, kaydedilen sonuçlar) için dizin. |
+| `STORAGE_MODE` | `local` | `local` veya `s3`. S3 ve MinIO, s3_storage özelliğine sahip bir lisansın yanı sıra aşağıdaki `S3_*` değişkenlerini gerektirir. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL bağlantı dizesi. Compose yığını bunu kendi `postgres` servisine yönlendirir; gömülü modu elde etmek için (`REDIS_URL` ile birlikte) ayarlanmamış bırakın. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis bağlantı dizesi (BullMQ iş kuyrukları için kullanılır). Compose bunu kendi `redis` servisine yönlendirir. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | İşleme sırasında geçici dosyalar için dizin. Otomatik olarak temizlenir. İmaj bunu `/tmp/workspace` olarak ayarlar. |
+| `FILES_STORAGE_PATH` | `./data/files` | Kalıcı kullanıcı dosyaları (yüklenen görüntüler, kaydedilen sonuçlar) için dizin. İmaj bunu `/data/files` olarak ayarlar. |
+
+### S3 nesne depolama {#s3-object-storage}
+
+Yalnızca `STORAGE_MODE=s3` olduğunda okunur. Zorunlu üç değişkenden birini atlarsanız başlatma, eksik bıraktığınız değişkenin adını vererek başarısız olur.
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `S3_BUCKET` | (boş) | Yüklemeleri ve çıktıları tutan kova. Zorunlu. |
+| `S3_ACCESS_KEY_ID` | (boş) | Erişim anahtarı. Zorunlu. Konteynerde bunun yerine `S3_ACCESS_KEY_ID_FILE` ile dosya olarak bağlayabilirsiniz. |
+| `S3_SECRET_ACCESS_KEY` | (boş) | Gizli anahtar. Zorunlu. Aynı dosya kuralı geçerli: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Kovanın bölgesi. |
+| `S3_ENDPOINT` | (boş) | MinIO, R2, Backblaze ve diğer S3 uyumlu depolar için özel uç nokta. Boş bırakmak AWS demektir. |
+| `S3_FORCE_PATH_STYLE` | `false` | MinIO ve sanal ana bilgisayar adreslemesi yerine `endpoint/bucket/key` bekleyen her şey için `true` olarak ayarlayın. |
+| `S3_PREFIX` | (boş) | Anahtar öneki; böylece tek bir kova birkaç örneği barındırabilir. |
+
+### Beklemedeki verilerin şifrelenmesi {#encryption-at-rest}
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (boş) | 64 onaltılık karakter (32 bayt). Veritabanında saklanan hassas ayarları şifreler. 64 onaltılık karakter olmayan her değer başlatmada reddedilir. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (boş) | Rotasyonla geride bıraktığınız anahtar, aynı biçimde. Mevcut satırlar hâlâ çözülebilsin diye rotasyon boyunca ikisini de ayarlayın, sonra bunu kaldırın. |
 
 ### Gömülü mod {#embedded-mode}
 
@@ -60,16 +83,15 @@ Telemetri notu: gömülü mod, diğer herhangi bir yapılandırma gibi imajın a
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Yükleme başına maksimum dosya boyutu, megabayt cinsinden. Sınırsız için 0'a ayarlayın. |
-| `MAX_BATCH_SIZE` | `100` | Tek bir toplu istekteki maksimum dosya sayısı. Sınırsız için 0'a ayarlayın. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (sınırsız) | Yükleme başına maksimum dosya boyutu, megabayt cinsinden. Sınırsız için 0'a ayarlayın. Yayınlanan imaj `0` ile gelir; kaynaktan derleme 100 ile başlar. |
+| `MAX_BATCH_SIZE` | `0` (sınırsız) | Tek bir toplu istekteki maksimum dosya sayısı. Sınırsız için 0'a ayarlayın. Yayınlanan imaj `0` ile gelir; kaynaktan derleme 100 ile başlar. |
 | `CONCURRENT_JOBS` | `0` (otomatik) | Paralel çalışan toplu iş sayısı. Kullanılabilir CPU çekirdeklerine göre otomatik algılamak için 0'a ayarlayın. |
 | `MAX_MEGAPIXELS` | `0` (sınırsız) | Megapiksel cinsinden izin verilen maksimum görüntü çözünürlüğü. Sınırsız için 0'a ayarlayın. |
 | `MAX_WORKER_THREADS` | `0` (otomatik) | Görüntü işleme için maksimum işçi iş parçacığı. Kullanılabilir CPU çekirdeklerine göre otomatik algılamak için 0'a ayarlayın. |
 | `PROCESSING_TIMEOUT_S` | `0` (sınır yok) | İstek başına maksimum işleme süresi, saniye cinsinden. Zaman aşımı olmaması için 0'a ayarlayın. |
 | `MAX_PIPELINE_STEPS` | `20` | Bir işlem hattındaki maksimum adım sayısı. Sınır olmaması için 0'a ayarlayın. |
 | `MAX_CANVAS_PIXELS` | `0` (sınır yok) | Çıktı görüntüleri için piksel cinsinden maksimum tuval boyutu. Sınır olmaması için 0'a ayarlayın. |
-| `MAX_SVG_SIZE_MB` | `0` (sınırsız) | Megabayt cinsinden maksimum SVG dosya boyutu. Sınırsız için 0'a ayarlayın. |
-| `MAX_SPLIT_GRID` | `100` | Görüntü bölme aracı için maksimum ızgara boyutu. |
+| `MAX_SVG_SIZE_MB` | `50` | Temizlemeden önce kabul edilen en büyük SVG, megabayt cinsinden. `0` burada çevresindeki satırlardan farklı davranır: sınırı yükseltmek yerine ayrıştırma öncesi boyut sınırını tamamen kaldırır, bu yüzden bunu ayarlı bırakın. |
 | `MAX_PDF_PAGES` | `0` (sınırsız) | PDF-to-image dönüşümü için maksimum PDF sayfası sayısı. Sınırsız için 0'a ayarlayın. |
 
 ### Temizleme {#cleanup}
@@ -83,7 +105,7 @@ Telemetri notu: gömülü mod, diğer herhangi bir yapılandırma gibi imajın a
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Yeni oturumlar için varsayılan tema. `light` veya `dark`. |
+| `DEFAULT_THEME` | `light` | Yeni oturumlar için varsayılan tema. `light`, `dark` veya `system`. |
 | `DEFAULT_LOCALE` | `en` | Varsayılan arayüz dili. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Varsayılan araç düzeni. `sidebar` veya `fullscreen`. |
 

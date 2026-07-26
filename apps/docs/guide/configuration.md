@@ -16,7 +16,7 @@ All configuration is done through environment variables. Every variable has a se
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Trust `X-Forwarded-For` headers from a reverse proxy. Set to `false` if not behind a proxy. The published image ships `true`; a source build starts at `false`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. The default believes only a private-network peer, so a reverse proxy on a Docker network or a LAN is trusted and a public client's forged header is not. Set `true` only when a proxy you control sits in front on a public address. |
 
 ### Authentication {#authentication}
 

@@ -20,28 +20,51 @@ Toda la configuración se realiza mediante variables de entorno. Cada variable t
 | `RATE_LIMIT_PER_MIN` | `1000` | Máximo de solicitudes por minuto por IP. Ponlo a 0 para desactivar la limitación de tasa. |
 | `CORS_ORIGIN` | (vacío) | Orígenes permitidos para CORS separados por comas, o vacío para solo el mismo origen. |
 | `LOG_LEVEL` | `info` | Verbosidad del registro. Uno de: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Confía en las cabeceras `X-Forwarded-For` de un proxy inverso. Ponlo a `false` si no está detrás de un proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Qué pares pueden establecer la IP del cliente mediante `X-Forwarded-For`. El valor predeterminado solo cree a un par de una red privada, así que un proxy inverso en una red de Docker o en una LAN sí es de confianza y la cabecera falsificada de un cliente público no. Pon `true` solo cuando delante haya un proxy bajo tu control en una dirección pública. |
 
 ### Autenticación {#authentication}
 
+Los dos valores booleanos de abajo solo aceptan `true` y `false`. Cualquier otra cosa, ya sea `1`, `yes` u `on`, no supera la validación y el servidor termina antes de ponerse a escuchar.
+
 | Variable | Predeterminado | Descripción |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Ponlo a `true` para requerir inicio de sesión. La imagen de Docker usa `true` por defecto. |
+| `AUTH_ENABLED` | `true` | Exige un inicio de sesión. Ponlo a `false` para funcionar sin ninguna cuenta, lo que concede permisos de administrador a todas las solicitudes, así que resérvalo para una red de confianza. |
 | `DEFAULT_USERNAME` | `admin` | Nombre de usuario de la cuenta de administrador inicial. Solo se usa en la primera ejecución. |
 | `DEFAULT_PASSWORD` | `admin` | Contraseña de la cuenta de administrador inicial. Cámbiala tras el primer inicio de sesión. |
 | `MAX_USERS` | `0` (ilimitado) | Número máximo de cuentas de usuario registradas. Ponlo a 0 para ilimitado. |
 | `SESSION_DURATION_HOURS` | `168` | Duración de la sesión de inicio de sesión en horas (el valor predeterminado es 7 días). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Ponlo a cualquier valor no vacío para omitir el aviso obligatorio de cambio de contraseña en el primer inicio de sesión |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ponlo a `true` para omitir el aviso obligatorio de cambio de contraseña en el primer inicio de sesión. |
 
 ### Almacenamiento {#storage}
 
 | Variable | Predeterminado | Descripción |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` o `s3`. S3/MinIO requiere una licencia con la función s3_storage. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | Cadena de conexión de PostgreSQL. |
-| `REDIS_URL` | `redis://redis:6379` | Cadena de conexión de Redis (usada para las colas de tareas de BullMQ). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Directorio para archivos temporales durante el procesamiento. Se limpia automáticamente. |
-| `FILES_STORAGE_PATH` | `./data/files` | Directorio para archivos de usuario persistentes (imágenes subidas, resultados guardados). |
+| `STORAGE_MODE` | `local` | `local` o `s3`. S3 y MinIO necesitan una licencia con la función s3_storage, además de las variables `S3_*` de abajo. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Cadena de conexión de PostgreSQL. La pila de Compose la apunta a su servicio `postgres`; déjala sin establecer (junto con `REDIS_URL`) para obtener el modo embebido. |
+| `REDIS_URL` | `redis://localhost:6379` | Cadena de conexión de Redis (usada para las colas de tareas de BullMQ). Compose la apunta a su servicio `redis`. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Directorio para archivos temporales durante el procesamiento. Se limpia automáticamente. La imagen establece `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Directorio para archivos de usuario persistentes (imágenes subidas, resultados guardados). La imagen establece `/data/files`. |
+
+### Almacenamiento de objetos S3 {#s3-object-storage}
+
+Solo se leen cuando `STORAGE_MODE=s3`. Si falta alguna de las tres obligatorias, el arranque falla indicando el nombre de la variable que omitiste.
+
+| Variable | Predeterminado | Descripción |
+|---|---|---|
+| `S3_BUCKET` | (vacío) | Bucket que contiene las subidas y las salidas. Obligatorio. |
+| `S3_ACCESS_KEY_ID` | (vacío) | Clave de acceso. Obligatoria. En el contenedor puedes montarla en su lugar, mediante `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (vacío) | Clave secreta. Obligatoria. Misma convención de archivo: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Región del bucket. |
+| `S3_ENDPOINT` | (vacío) | Endpoint personalizado para MinIO, R2, Backblaze y otros almacenes compatibles con S3. Vacío significa AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Ponlo a `true` para MinIO y para cualquier otro que espere `endpoint/bucket/key` en lugar del direccionamiento por host virtual. |
+| `S3_PREFIX` | (vacío) | Prefijo de clave, para que un mismo bucket pueda alojar varias instancias. |
+
+### Cifrado en reposo {#encryption-at-rest}
+
+| Variable | Predeterminado | Descripción |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (vacío) | 64 caracteres hexadecimales (32 bytes). Cifra los ajustes sensibles almacenados en la base de datos. Cualquier cosa que no sean 64 caracteres hexadecimales se rechaza al arrancar. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (vacío) | La clave que estás dejando atrás en una rotación, con el mismo formato. Establece ambas durante la rotación para que las filas existentes se sigan descifrando, y luego elimina esta. |
 
 ### Modo embebido {#embedded-mode}
 
@@ -60,16 +83,15 @@ Nota sobre telemetría: el modo embebido hereda el valor predeterminado de anal�
 
 | Variable | Predeterminado | Descripción |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Tamaño máximo de archivo por subida en megabytes. Ponlo a 0 para ilimitado. |
-| `MAX_BATCH_SIZE` | `100` | Número máximo de archivos en una sola solicitud por lotes. Ponlo a 0 para ilimitado. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (ilimitado) | Tamaño máximo de archivo por subida en megabytes. Ponlo a 0 para ilimitado. La imagen publicada se distribuye con `0`; una compilación desde el código fuente empieza en 100. |
+| `MAX_BATCH_SIZE` | `0` (ilimitado) | Número máximo de archivos en una sola solicitud por lotes. Ponlo a 0 para ilimitado. La imagen publicada se distribuye con `0`; una compilación desde el código fuente empieza en 100. |
 | `CONCURRENT_JOBS` | `0` (automático) | Número de tareas por lotes que se ejecutan en paralelo. Ponlo a 0 para detectarlo automáticamente según los núcleos de CPU disponibles. |
 | `MAX_MEGAPIXELS` | `0` (ilimitado) | Resolución máxima de imagen permitida en megapíxeles. Ponlo a 0 para ilimitado. |
 | `MAX_WORKER_THREADS` | `0` (automático) | Máximo de hilos de trabajo para el procesamiento de imágenes. Ponlo a 0 para detectarlo automáticamente según los núcleos de CPU disponibles. |
 | `PROCESSING_TIMEOUT_S` | `0` (sin límite) | Tiempo máximo de procesamiento por solicitud en segundos. Ponlo a 0 para que no haya tiempo de espera. |
 | `MAX_PIPELINE_STEPS` | `20` | Número máximo de pasos en una canalización. Ponlo a 0 para que no haya límite. |
 | `MAX_CANVAS_PIXELS` | `0` (sin límite) | Tamaño máximo del lienzo en píxeles para las imágenes de salida. Ponlo a 0 para que no haya límite. |
-| `MAX_SVG_SIZE_MB` | `0` (ilimitado) | Tamaño máximo de archivo SVG en megabytes. Ponlo a 0 para ilimitado. |
-| `MAX_SPLIT_GRID` | `100` | Dimensión máxima de la cuadrícula para la herramienta de división de imágenes. |
+| `MAX_SVG_SIZE_MB` | `50` | El SVG más grande que se acepta antes de sanearlo, en megabytes. Aquí `0` se comporta de forma distinta que en las filas de alrededor. Elimina por completo el límite de tamaño previo al análisis en lugar de subirlo, así que deja esta variable con un valor. |
 | `MAX_PDF_PAGES` | `0` (ilimitado) | Número máximo de páginas de PDF para la conversión de PDF a imagen. Ponlo a 0 para ilimitado. |
 
 ### Limpieza {#cleanup}
@@ -83,7 +105,7 @@ Nota sobre telemetría: el modo embebido hereda el valor predeterminado de anal�
 
 | Variable | Predeterminado | Descripción |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Tema predeterminado para las sesiones nuevas. `light` o `dark`. |
+| `DEFAULT_THEME` | `light` | Tema predeterminado para las sesiones nuevas. `light`, `dark` o `system`. |
 | `DEFAULT_LOCALE` | `en` | Idioma predeterminado de la interfaz. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Diseño de herramienta predeterminado. `sidebar` o `fullscreen`. |
 

@@ -20,28 +20,51 @@ Semua konfigurasi dilakukan melalui variabel lingkungan. Setiap variabel memilik
 | `RATE_LIMIT_PER_MIN` | `1000` | Permintaan maksimum per menit per IP. Setel ke 0 untuk menonaktifkan pembatasan laju. |
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma untuk CORS, atau kosong untuk hanya same-origin. |
 | `LOG_LEVEL` | `info` | Verbositas log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Percayai header `X-Forwarded-For` dari reverse proxy. Setel ke `false` jika tidak di belakang proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien lewat `X-Forwarded-For`. Nilai default hanya memercayai peer di jaringan privat, jadi reverse proxy di jaringan Docker atau di LAN dipercaya sedangkan header palsu dari klien publik tidak. Setel `true` hanya jika di depan ada proxy yang Anda kendalikan pada alamat publik. |
 
 ### Autentikasi {#authentication}
 
+Dua boolean di bawah ini hanya menerima `true` dan `false`. Apa pun selain itu, `1` atau `yes` atau `on`, gagal validasi dan server keluar sebelum mulai mendengarkan.
+
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Setel ke `true` untuk mewajibkan login. Image Docker default ke `true`. |
+| `AUTH_ENABLED` | `true` | Wajibkan login. Setel ke `false` untuk berjalan tanpa akun sama sekali, yang memberi setiap permintaan hak admin, jadi batasi itu pada jaringan tepercaya. |
 | `DEFAULT_USERNAME` | `admin` | Nama pengguna untuk akun admin awal. Hanya digunakan pada run pertama. |
 | `DEFAULT_PASSWORD` | `admin` | Kata sandi untuk akun admin awal. Ubah ini setelah login pertama. |
 | `MAX_USERS` | `0` (tak terbatas) | Jumlah maksimum akun pengguna terdaftar. Setel ke 0 untuk tak terbatas. |
 | `SESSION_DURATION_HOURS` | `168` | Masa hidup sesi login dalam jam (default adalah 7 hari). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Setel ke nilai apa pun yang tidak kosong untuk melewati prompt ganti-kata-sandi paksa pada login pertama |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Setel ke `true` untuk melewati prompt ganti-kata-sandi paksa pada login pertama. |
 
 ### Penyimpanan {#storage}
 
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` atau `s3`. S3/MinIO memerlukan lisensi dengan fitur s3_storage. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | String koneksi PostgreSQL. |
-| `REDIS_URL` | `redis://redis:6379` | String koneksi Redis (digunakan untuk antrean job BullMQ). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan secara otomatis. |
-| `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna persisten (gambar yang diunggah, hasil yang disimpan). |
+| `STORAGE_MODE` | `local` | `local` atau `s3`. S3 dan MinIO memerlukan lisensi dengan fitur s3_storage plus variabel `S3_*` di bawah. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | String koneksi PostgreSQL. Stack Compose mengarahkan ini ke layanan `postgres` miliknya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode tertanam. |
+| `REDIS_URL` | `redis://localhost:6379` | String koneksi Redis (digunakan untuk antrean job BullMQ). Compose mengarahkan ini ke layanan `redis` miliknya. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan secara otomatis. Image menyetelnya ke `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna persisten (gambar yang diunggah, hasil yang disimpan). Image menyetelnya ke `/data/files`. |
+
+### Penyimpanan objek S3 {#s3-object-storage}
+
+Hanya dibaca saat `STORAGE_MODE=s3`. Lewatkan salah satu dari tiga yang wajib dan startup gagal dengan menyebut nama variabel yang Anda tinggalkan.
+
+| Variabel | Default | Deskripsi |
+|---|---|---|
+| `S3_BUCKET` | (kosong) | Bucket yang menyimpan unggahan dan keluaran. Wajib. |
+| `S3_ACCESS_KEY_ID` | (kosong) | Access key. Wajib. Di dalam kontainer Anda bisa memasangnya sebagai file, lewat `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (kosong) | Secret key. Wajib. Konvensi file yang sama: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Region bucket. |
+| `S3_ENDPOINT` | (kosong) | Endpoint kustom untuk MinIO, R2, Backblaze, dan penyimpanan lain yang kompatibel dengan S3. Kosong berarti AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Setel ke `true` untuk MinIO dan apa pun yang menginginkan `endpoint/bucket/key` alih-alih pengalamatan virtual-host. |
+| `S3_PREFIX` | (kosong) | Prefiks key, sehingga satu bucket bisa menampung beberapa instans. |
+
+### Enkripsi saat disimpan {#encryption-at-rest}
+
+| Variabel | Default | Deskripsi |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (kosong) | 64 karakter heksadesimal (32 byte). Mengenkripsi pengaturan sensitif yang disimpan di basis data. Apa pun yang bukan 64 karakter heksadesimal ditolak saat startup. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (kosong) | Kunci yang sedang Anda tinggalkan dalam rotasi, format yang sama. Setel keduanya selama rotasi agar baris yang ada tetap bisa didekripsi, lalu hapus yang ini. |
 
 ### Mode tertanam {#embedded-mode}
 
@@ -60,16 +83,15 @@ Catatan telemetri: mode tertanam mewarisi default analitik image seperti konfigu
 
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Ukuran file maksimum per unggahan dalam megabyte. Setel ke 0 untuk tak terbatas. |
-| `MAX_BATCH_SIZE` | `100` | Jumlah maksimum file dalam satu permintaan batch. Setel ke 0 untuk tak terbatas. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (tak terbatas) | Ukuran file maksimum per unggahan dalam megabyte. Setel ke 0 untuk tak terbatas. Image yang diterbitkan dikirim dengan `0`; build dari sumber dimulai pada 100. |
+| `MAX_BATCH_SIZE` | `0` (tak terbatas) | Jumlah maksimum file dalam satu permintaan batch. Setel ke 0 untuk tak terbatas. Image yang diterbitkan dikirim dengan `0`; build dari sumber dimulai pada 100. |
 | `CONCURRENT_JOBS` | `0` (otomatis) | Jumlah job batch yang berjalan secara paralel. Setel ke 0 untuk deteksi otomatis berdasarkan inti CPU yang tersedia. |
 | `MAX_MEGAPIXELS` | `0` (tak terbatas) | Resolusi gambar maksimum yang diizinkan dalam megapiksel. Setel ke 0 untuk tak terbatas. |
 | `MAX_WORKER_THREADS` | `0` (otomatis) | Thread worker maksimum untuk pemrosesan gambar. Setel ke 0 untuk deteksi otomatis berdasarkan inti CPU yang tersedia. |
 | `PROCESSING_TIMEOUT_S` | `0` (tanpa batas) | Waktu pemrosesan maksimum per permintaan dalam detik. Setel ke 0 untuk tanpa timeout. |
 | `MAX_PIPELINE_STEPS` | `20` | Jumlah maksimum langkah dalam sebuah pipeline. Setel ke 0 untuk tanpa batas. |
 | `MAX_CANVAS_PIXELS` | `0` (tanpa batas) | Ukuran kanvas maksimum dalam piksel untuk gambar keluaran. Setel ke 0 untuk tanpa batas. |
-| `MAX_SVG_SIZE_MB` | `0` (tak terbatas) | Ukuran file SVG maksimum dalam megabyte. Setel ke 0 untuk tak terbatas. |
-| `MAX_SPLIT_GRID` | `100` | Dimensi kisi maksimum untuk tool split gambar. |
+| `MAX_SVG_SIZE_MB` | `50` | SVG terbesar yang diterima sebelum disanitasi, dalam megabyte. `0` berperilaku berbeda di sini dibanding baris-baris di sekitarnya. Ia menghapus batas ukuran pra-parse sepenuhnya alih-alih menaikkannya, jadi biarkan yang satu ini tetap disetel. |
 | `MAX_PDF_PAGES` | `0` (tak terbatas) | Jumlah maksimum halaman PDF untuk konversi PDF-ke-image. Setel ke 0 untuk tak terbatas. |
 
 ### Pembersihan {#cleanup}
@@ -83,7 +105,7 @@ Catatan telemetri: mode tertanam mewarisi default analitik image seperti konfigu
 
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Tema default untuk sesi baru. `light` atau `dark`. |
+| `DEFAULT_THEME` | `light` | Tema default untuk sesi baru. `light`, `dark`, atau `system`. |
 | `DEFAULT_LOCALE` | `en` | Bahasa antarmuka default. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Tata letak tool default. `sidebar` atau `fullscreen`. |
 

@@ -20,28 +20,51 @@ Mọi cấu hình được thực hiện qua các biến môi trường. Mỗi b
 | `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu tối đa mỗi phút cho mỗi IP. Đặt thành 0 để tắt giới hạn tốc độ. |
 | `CORS_ORIGIN` | (trống) | Danh sách các origin được phép cho CORS, phân tách bằng dấu phẩy, hoặc để trống chỉ cho phép cùng origin. |
 | `LOG_LEVEL` | `info` | Mức độ chi tiết của nhật ký. Một trong: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Tin tưởng các header `X-Forwarded-For` từ một reverse proxy. Đặt thành `false` nếu không đứng sau proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Giá trị mặc định chỉ tin một peer thuộc mạng riêng, nên một reverse proxy trên mạng Docker hoặc trong mạng LAN thì được tin, còn header giả mạo từ một client công khai thì không. Chỉ đặt `true` khi có một proxy do bạn kiểm soát đứng phía trước trên một địa chỉ công khai. |
 
 ### Xác thực {#authentication}
 
+Hai giá trị boolean bên dưới chỉ chấp nhận `true` và `false`. Bất kỳ giá trị nào khác, `1` hay `yes` hay `on`, đều không qua được kiểm tra và máy chủ thoát trước khi bắt đầu lắng nghe.
+
 | Biến | Mặc định | Mô tả |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Đặt thành `true` để yêu cầu đăng nhập. Image Docker mặc định là `true`. |
+| `AUTH_ENABLED` | `true` | Yêu cầu đăng nhập. Đặt thành `false` để chạy hoàn toàn không có tài khoản nào, điều này cấp quyền admin cho mọi yêu cầu, nên chỉ dùng trong một mạng đáng tin cậy. |
 | `DEFAULT_USERNAME` | `admin` | Tên đăng nhập cho tài khoản admin ban đầu. Chỉ dùng ở lần chạy đầu tiên. |
 | `DEFAULT_PASSWORD` | `admin` | Mật khẩu cho tài khoản admin ban đầu. Đổi mật khẩu này sau lần đăng nhập đầu. |
 | `MAX_USERS` | `0` (không giới hạn) | Số tài khoản người dùng đã đăng ký tối đa. Đặt thành 0 để không giới hạn. |
 | `SESSION_DURATION_HOURS` | `168` | Thời gian sống của phiên đăng nhập tính bằng giờ (mặc định là 7 ngày). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Đặt thành bất kỳ giá trị không rỗng nào để bỏ qua lời nhắc buộc đổi mật khẩu ở lần đăng nhập đầu |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Đặt thành `true` để bỏ qua lời nhắc buộc đổi mật khẩu ở lần đăng nhập đầu. |
 
 ### Lưu trữ {#storage}
 
 | Biến | Mặc định | Mô tả |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` hoặc `s3`. S3/MinIO yêu cầu một giấy phép có tính năng s3_storage. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | Chuỗi kết nối PostgreSQL. |
-| `REDIS_URL` | `redis://redis:6379` | Chuỗi kết nối Redis (dùng cho các hàng đợi công việc BullMQ). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Thư mục cho các tệp tạm thời trong quá trình xử lý. Được dọn dẹp tự động. |
-| `FILES_STORAGE_PATH` | `./data/files` | Thư mục cho các tệp người dùng bền vững (ảnh đã tải lên, kết quả đã lưu). |
+| `STORAGE_MODE` | `local` | `local` hoặc `s3`. S3 và MinIO cần một giấy phép có tính năng s3_storage cùng các biến `S3_*` bên dưới. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Chuỗi kết nối PostgreSQL. Ngăn xếp Compose trỏ biến này tới dịch vụ `postgres` của nó; hãy để nó không được đặt (cùng với `REDIS_URL`) để dùng chế độ nhúng. |
+| `REDIS_URL` | `redis://localhost:6379` | Chuỗi kết nối Redis (dùng cho các hàng đợi công việc BullMQ). Compose trỏ biến này tới dịch vụ `redis` của nó. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Thư mục cho các tệp tạm thời trong quá trình xử lý. Được dọn dẹp tự động. Image đặt thành `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Thư mục cho các tệp người dùng bền vững (ảnh đã tải lên, kết quả đã lưu). Image đặt thành `/data/files`. |
+
+### Lưu trữ đối tượng S3 {#s3-object-storage}
+
+Chỉ được đọc khi `STORAGE_MODE=s3`. Thiếu bất kỳ biến nào trong ba biến bắt buộc thì quá trình khởi động thất bại và nêu tên biến bạn đã bỏ sót.
+
+| Biến | Mặc định | Mô tả |
+|---|---|---|
+| `S3_BUCKET` | (trống) | Bucket chứa các tệp tải lên và đầu ra. Bắt buộc. |
+| `S3_ACCESS_KEY_ID` | (trống) | Access key. Bắt buộc. Trong container bạn có thể gắn nó dưới dạng tệp, qua `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (trống) | Secret key. Bắt buộc. Cùng quy ước tệp: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Vùng của bucket. |
+| `S3_ENDPOINT` | (trống) | Endpoint tùy chỉnh cho MinIO, R2, Backblaze và các kho lưu trữ tương thích S3 khác. Để trống nghĩa là AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Đặt thành `true` cho MinIO và bất kỳ thứ gì khác cần `endpoint/bucket/key` thay vì địa chỉ kiểu virtual-host. |
+| `S3_PREFIX` | (trống) | Tiền tố key, để một bucket có thể chứa nhiều instance. |
+
+### Mã hóa khi lưu trữ {#encryption-at-rest}
+
+| Biến | Mặc định | Mô tả |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (trống) | 64 ký tự hex (32 byte). Mã hóa các cài đặt nhạy cảm được lưu trong cơ sở dữ liệu. Bất cứ giá trị nào không phải 64 ký tự hex đều bị từ chối khi khởi động. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (trống) | Khóa mà bạn đang xoay vòng để rời khỏi, cùng định dạng. Hãy đặt cả hai trong lúc xoay khóa để các hàng hiện có vẫn giải mã được, rồi bỏ khóa này đi. |
 
 ### Chế độ nhúng {#embedded-mode}
 
@@ -60,16 +83,15 @@ Lưu ý về đo lường từ xa: chế độ nhúng thừa hưởng mặc đ�
 
 | Biến | Mặc định | Mô tả |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Kích thước tệp tối đa cho mỗi lần tải lên tính bằng megabyte. Đặt thành 0 để không giới hạn. |
-| `MAX_BATCH_SIZE` | `100` | Số tệp tối đa trong một yêu cầu hàng loạt. Đặt thành 0 để không giới hạn. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (không giới hạn) | Kích thước tệp tối đa cho mỗi lần tải lên tính bằng megabyte. Đặt thành 0 để không giới hạn. Image được phát hành đi kèm `0`; bản build từ mã nguồn bắt đầu ở 100. |
+| `MAX_BATCH_SIZE` | `0` (không giới hạn) | Số tệp tối đa trong một yêu cầu hàng loạt. Đặt thành 0 để không giới hạn. Image được phát hành đi kèm `0`; bản build từ mã nguồn bắt đầu ở 100. |
 | `CONCURRENT_JOBS` | `0` (tự động) | Số công việc hàng loạt chạy song song. Đặt thành 0 để tự động phát hiện dựa trên số lõi CPU khả dụng. |
 | `MAX_MEGAPIXELS` | `0` (không giới hạn) | Độ phân giải ảnh tối đa được phép tính bằng megapixel. Đặt thành 0 để không giới hạn. |
 | `MAX_WORKER_THREADS` | `0` (tự động) | Số luồng worker tối đa cho xử lý ảnh. Đặt thành 0 để tự động phát hiện dựa trên số lõi CPU khả dụng. |
 | `PROCESSING_TIMEOUT_S` | `0` (không giới hạn) | Thời gian xử lý tối đa cho mỗi yêu cầu tính bằng giây. Đặt thành 0 để không có thời gian chờ. |
 | `MAX_PIPELINE_STEPS` | `20` | Số bước tối đa trong một pipeline. Đặt thành 0 để không giới hạn. |
 | `MAX_CANVAS_PIXELS` | `0` (không giới hạn) | Kích thước khung vẽ tối đa tính bằng pixel cho các ảnh đầu ra. Đặt thành 0 để không giới hạn. |
-| `MAX_SVG_SIZE_MB` | `0` (không giới hạn) | Kích thước tệp SVG tối đa tính bằng megabyte. Đặt thành 0 để không giới hạn. |
-| `MAX_SPLIT_GRID` | `100` | Kích thước lưới tối đa cho công cụ chia ảnh. |
+| `MAX_SVG_SIZE_MB` | `50` | Tệp SVG lớn nhất được chấp nhận trước khi làm sạch, tính bằng megabyte. `0` ở đây hành xử khác với các hàng xung quanh. Nó gỡ bỏ hoàn toàn giới hạn kích thước trước khi phân tích thay vì nâng giới hạn lên, nên hãy luôn đặt giá trị cho biến này. |
 | `MAX_PDF_PAGES` | `0` (không giới hạn) | Số trang PDF tối đa cho việc chuyển đổi PDF-to-image. Đặt thành 0 để không giới hạn. |
 
 ### Dọn dẹp {#cleanup}
@@ -83,7 +105,7 @@ Lưu ý về đo lường từ xa: chế độ nhúng thừa hưởng mặc đ�
 
 | Biến | Mặc định | Mô tả |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Chủ đề mặc định cho các phiên mới. `light` hoặc `dark`. |
+| `DEFAULT_THEME` | `light` | Chủ đề mặc định cho các phiên mới. `light`, `dark` hoặc `system`. |
 | `DEFAULT_LOCALE` | `en` | Ngôn ngữ giao diện mặc định. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Bố cục công cụ mặc định. `sidebar` hoặc `fullscreen`. |
 

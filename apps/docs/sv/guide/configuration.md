@@ -20,28 +20,51 @@ All konfiguration görs via miljövariabler. Varje variabel har ett vettigt stan
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximalt antal förfrågningar per minut per IP. Sätt till 0 för att inaktivera hastighetsbegränsning. |
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung för CORS, eller tom för endast samma ursprung. |
 | `LOG_LEVEL` | `info` | Loggutförlighet. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Lita på `X-Forwarded-For`-huvuden från en omvänd proxy. Sätt till `false` om du inte är bakom en proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka motparter som får sätta klientens IP via `X-Forwarded-For`. Standardvärdet tror bara på en motpart i ett privat nät, så en omvänd proxy på ett Docker-nätverk eller i ett LAN är betrodd medan en publik klients förfalskade huvud inte är det. Sätt `true` bara när en proxy du själv styr står framför på en publik adress. |
 
 ### Autentisering {#authentication}
 
+De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, `1` eller `yes` eller `on`, klarar inte valideringen och servern avslutas innan den börjar lyssna.
+
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Sätt till `true` för att kräva inloggning. Docker-avbildningen har som standard `true`. |
+| `AUTH_ENABLED` | `true` | Kräver inloggning. Sätt till `false` för att köra helt utan konton, vilket ger varje förfrågan adminrättigheter, så håll det till ett betrott nätverk. |
 | `DEFAULT_USERNAME` | `admin` | Användarnamn för det initiala admin-kontot. Används endast vid första körningen. |
 | `DEFAULT_PASSWORD` | `admin` | Lösenord för det initiala admin-kontot. Ändra detta efter första inloggningen. |
 | `MAX_USERS` | `0` (obegränsat) | Maximalt antal registrerade användarkonton. Sätt till 0 för obegränsat. |
 | `SESSION_DURATION_HOURS` | `168` | Livslängd för inloggningssession i timmar (standard är 7 dagar). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Sätt till valfritt icke-tomt värde för att kringgå den tvingade uppmaningen om lösenordsbyte vid första inloggningen |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Sätt till `true` för att hoppa över den tvingade uppmaningen om lösenordsbyte vid första inloggningen. |
 
 ### Lagring {#storage}
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` eller `s3`. S3/MinIO kräver en licens med funktionen s3_storage. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL-anslutningssträng. |
-| `REDIS_URL` | `redis://redis:6379` | Redis-anslutningssträng (används för BullMQ-jobbköer). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för tillfälliga filer under bearbetning. Rensas automatiskt. |
-| `FILES_STORAGE_PATH` | `./data/files` | Katalog för beständiga användarfiler (uppladdade bilder, sparade resultat). |
+| `STORAGE_MODE` | `local` | `local` eller `s3`. S3 och MinIO kräver en licens med funktionen s3_storage plus `S3_*`-variablerna nedan. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-anslutningssträng. Compose-stacken pekar den mot sin `postgres`-tjänst; lämna den osatt (tillsammans med `REDIS_URL`) för att få inbäddat läge. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis-anslutningssträng (används för BullMQ-jobbköer). Compose pekar den mot sin `redis`-tjänst. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för tillfälliga filer under bearbetning. Rensas automatiskt. Avbildningen sätter `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Katalog för beständiga användarfiler (uppladdade bilder, sparade resultat). Avbildningen sätter `/data/files`. |
+
+### S3-objektlagring {#s3-object-storage}
+
+Läses bara när `STORAGE_MODE=s3`. Missar du någon av de tre obligatoriska misslyckas starten med namnet på variabeln du utelämnade.
+
+| Variabel | Standard | Beskrivning |
+|---|---|---|
+| `S3_BUCKET` | (tom) | Bucket som håller uppladdningar och utdata. Obligatorisk. |
+| `S3_ACCESS_KEY_ID` | (tom) | Åtkomstnyckel. Obligatorisk. I containern kan du montera den i stället, via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (tom) | Hemlig nyckel. Obligatorisk. Samma filkonvention: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Bucketens region. |
+| `S3_ENDPOINT` | (tom) | Egen endpoint för MinIO, R2, Backblaze och andra S3-kompatibla lagringar. Tom betyder AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Sätt till `true` för MinIO och allt annat som vill ha `endpoint/bucket/key` i stället för adressering via virtuell värd. |
+| `S3_PREFIX` | (tom) | Nyckelprefix, så att en bucket kan rymma flera instanser. |
+
+### Kryptering i vila {#encryption-at-rest}
+
+| Variabel | Standard | Beskrivning |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (tom) | 64 hexadecimala tecken (32 byte). Krypterar känsliga inställningar som lagras i databasen. Allt som inte är 64 hexadecimala tecken avvisas vid start. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (tom) | Nyckeln du roterar bort från, samma format. Sätt båda under en rotation så att befintliga rader fortfarande går att dekryptera, och ta sedan bort den här. |
 
 ### Inbäddat läge {#embedded-mode}
 
@@ -60,16 +83,15 @@ Telemetrinotering: inbäddat läge ärver avbildningens analysstandard som all a
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Maximal filstorlek per uppladdning i megabyte. Sätt till 0 för obegränsat. |
-| `MAX_BATCH_SIZE` | `100` | Maximalt antal filer i en enda batchförfrågan. Sätt till 0 för obegränsat. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (obegränsat) | Maximal filstorlek per uppladdning i megabyte. Sätt till 0 för obegränsat. Den publicerade avbildningen levereras med `0`; ett bygge från källkoden börjar på 100. |
+| `MAX_BATCH_SIZE` | `0` (obegränsat) | Maximalt antal filer i en enda batchförfrågan. Sätt till 0 för obegränsat. Den publicerade avbildningen levereras med `0`; ett bygge från källkoden börjar på 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Antal batchjobb som körs parallellt. Sätt till 0 för att detektera automatiskt baserat på tillgängliga CPU-kärnor. |
 | `MAX_MEGAPIXELS` | `0` (obegränsat) | Maximal bildupplösning tillåten i megapixlar. Sätt till 0 för obegränsat. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maximalt antal worker-trådar för bildbehandling. Sätt till 0 för att detektera automatiskt baserat på tillgängliga CPU-kärnor. |
 | `PROCESSING_TIMEOUT_S` | `0` (ingen gräns) | Maximal bearbetningstid per förfrågan i sekunder. Sätt till 0 för ingen timeout. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximalt antal steg i en pipeline. Sätt till 0 för ingen gräns. |
 | `MAX_CANVAS_PIXELS` | `0` (ingen gräns) | Maximal arbetsytestorlek i pixlar för utdatabilder. Sätt till 0 för ingen gräns. |
-| `MAX_SVG_SIZE_MB` | `0` (obegränsat) | Maximal SVG-filstorlek i megabyte. Sätt till 0 för obegränsat. |
-| `MAX_SPLIT_GRID` | `100` | Maximal rutnätsdimension för verktyget för bilddelning. |
+| `MAX_SVG_SIZE_MB` | `50` | Största SVG som accepteras före sanering, i megabyte. `0` beter sig annorlunda här än i raderna omkring. Det tar bort storleksgränsen före parsning helt i stället för att höja den, så låt den här vara satt. |
 | `MAX_PDF_PAGES` | `0` (obegränsat) | Maximalt antal PDF-sidor för PDF-till-bild-konvertering. Sätt till 0 för obegränsat. |
 
 ### Rensning {#cleanup}
@@ -83,7 +105,7 @@ Telemetrinotering: inbäddat läge ärver avbildningens analysstandard som all a
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Standardtema för nya sessioner. `light` eller `dark`. |
+| `DEFAULT_THEME` | `light` | Standardtema för nya sessioner. `light`, `dark` eller `system`. |
 | `DEFAULT_LOCALE` | `en` | Standardgränssnittsspråk. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Standardverktygslayout. `sidebar` eller `fullscreen`. |
 

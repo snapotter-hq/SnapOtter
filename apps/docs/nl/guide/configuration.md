@@ -20,28 +20,51 @@ Alle configuratie gebeurt via omgevingsvariabelen. Elke variabele heeft een vers
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
 | `CORS_ORIGIN` | (leeg) | Door komma's gescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
 | `LOG_LEVEL` | `info` | Uitgebreidheid van logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `true` | Vertrouw `X-Forwarded-For`-headers van een reverse proxy. Stel in op `false` als er geen proxy vóór zit. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP via `X-Forwarded-For` mogen zetten. De standaardwaarde gelooft alleen een peer uit een privénetwerk, dus een reverse proxy op een Docker-netwerk of in een LAN wordt vertrouwd en de vervalste header van een publieke client niet. Stel alleen `true` in wanneer er een proxy die jij beheert vóór zit op een openbaar adres. |
 
 ### Authenticatie {#authentication}
 
+De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `1` of `yes` of `on`, komt niet door de validatie en de server stopt voordat hij begint te luisteren.
+
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `AUTH_ENABLED` | `false` | Stel in op `true` om aanmelden te vereisen. De Docker-image gebruikt standaard `true`. |
+| `AUTH_ENABLED` | `true` | Vereist aanmelden. Stel in op `false` om helemaal zonder accounts te draaien, wat elk verzoek adminrechten geeft, dus houd dat op een vertrouwd netwerk. |
 | `DEFAULT_USERNAME` | `admin` | Gebruikersnaam voor het initiële adminaccount. Wordt alleen bij de eerste keer opstarten gebruikt. |
 | `DEFAULT_PASSWORD` | `admin` | Wachtwoord voor het initiële adminaccount. Wijzig dit na de eerste keer aanmelden. |
 | `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal geregistreerde gebruikersaccounts. Stel in op 0 voor onbeperkt. |
 | `SESSION_DURATION_HOURS` | `168` | Levensduur van de aanmeldsessie in uren (standaard 7 dagen). |
-| `SKIP_MUST_CHANGE_PASSWORD` | - | Stel in op een niet-lege waarde om de verplichte wachtwoordwijzigingsprompt bij de eerste aanmelding over te slaan |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Stel in op `true` om de verplichte wachtwoordwijzigingsprompt bij de eerste aanmelding over te slaan. |
 
 ### Opslag {#storage}
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` of `s3`. S3/MinIO vereist een licentie met de s3_storage-functie. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@postgres:5432/snapotter` | PostgreSQL-connectiestring. |
-| `REDIS_URL` | `redis://redis:6379` | Redis-connectiestring (gebruikt voor BullMQ-taakwachtrijen). |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeschoond. |
-| `FILES_STORAGE_PATH` | `./data/files` | Map voor persistente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). |
+| `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de s3_storage-functie plus de `S3_*`-variabelen hieronder. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-connectiestring. De Compose-stack wijst deze naar zijn `postgres`-service; laat hem leeg (samen met `REDIS_URL`) om de ingebedde modus te krijgen. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis-connectiestring (gebruikt voor BullMQ-taakwachtrijen). Compose wijst deze naar zijn `redis`-service. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeschoond. De image stelt `/tmp/workspace` in. |
+| `FILES_STORAGE_PATH` | `./data/files` | Map voor persistente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
+
+### S3-objectopslag {#s3-object-storage}
+
+Wordt alleen gelezen wanneer `STORAGE_MODE=s3`. Ontbreekt een van de drie verplichte variabelen, dan mislukt het opstarten met de naam van de variabele die je hebt weggelaten.
+
+| Variabele | Standaard | Beschrijving |
+|---|---|---|
+| `S3_BUCKET` | (leeg) | Bucket die uploads en uitvoer bevat. Verplicht. |
+| `S3_ACCESS_KEY_ID` | (leeg) | Access key. Verplicht. In de container kun je hem in plaats daarvan koppelen, via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (leeg) | Secret key. Verplicht. Dezelfde bestandsconventie: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Regio van de bucket. |
+| `S3_ENDPOINT` | (leeg) | Aangepast endpoint voor MinIO, R2, Backblaze en andere S3-compatibele opslag. Leeg betekent AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Stel in op `true` voor MinIO en al het andere dat `endpoint/bucket/key` wil in plaats van virtual-hostadressering. |
+| `S3_PREFIX` | (leeg) | Sleutelprefix, zodat één bucket meerdere instanties kan bevatten. |
+
+### Versleuteling in rust {#encryption-at-rest}
+
+| Variabele | Standaard | Beschrijving |
+|---|---|---|
+| `DATA_ENCRYPTION_KEY` | (leeg) | 64 hexadecimale tekens (32 bytes). Versleutelt gevoelige instellingen die in de database zijn opgeslagen. Alles wat geen 64 hexadecimale tekens is, wordt bij het opstarten geweigerd. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (leeg) | De sleutel waar je vanaf roteert, met dezelfde indeling. Stel beide in tijdens een rotatie zodat bestaande rijen nog steeds ontsleuteld worden, en verwijder deze daarna. |
 
 ### Ingebedde modus {#embedded-mode}
 
@@ -60,16 +83,15 @@ Opmerking over telemetrie: de ingebedde modus erft de analytics-standaard van de
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `100` | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. |
-| `MAX_BATCH_SIZE` | `100` | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. De gepubliceerde image wordt geleverd met `0`; een build vanaf de broncode begint op 100. |
+| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. De gepubliceerde image wordt geleverd met `0`; een build vanaf de broncode begint op 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Aantal batchtaken dat parallel draait. Stel in op 0 om automatisch te detecteren op basis van beschikbare CPU-cores. |
 | `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane beeldresolutie in megapixels. Stel in op 0 voor onbeperkt. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maximaal aantal worker-threads voor beeldverwerking. Stel in op 0 om automatisch te detecteren op basis van beschikbare CPU-cores. |
 | `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Maximale verwerkingstijd per verzoek in seconden. Stel in op 0 voor geen timeout. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximaal aantal stappen in een pijplijn. Stel in op 0 voor geen limiet. |
 | `MAX_CANVAS_PIXELS` | `0` (geen limiet) | Maximale canvasgrootte in pixels voor uitvoerafbeeldingen. Stel in op 0 voor geen limiet. |
-| `MAX_SVG_SIZE_MB` | `0` (onbeperkt) | Maximale SVG-bestandsgrootte in megabytes. Stel in op 0 voor onbeperkt. |
-| `MAX_SPLIT_GRID` | `100` | Maximale rasterdimensie voor de tool om afbeeldingen te splitsen. |
+| `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van hem te verhogen, dus laat deze ingesteld staan. |
 | `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-image-conversie. Stel in op 0 voor onbeperkt. |
 
 ### Opschoning {#cleanup}
@@ -83,7 +105,7 @@ Opmerking over telemetrie: de ingebedde modus erft de analytics-standaard van de
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | Standaardthema voor nieuwe sessies. `light` of `dark`. |
+| `DEFAULT_THEME` | `light` | Standaardthema voor nieuwe sessies. `light`, `dark` of `system`. |
 | `DEFAULT_LOCALE` | `en` | Standaardtaal van de interface. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Standaard toollay-out. `sidebar` of `fullscreen`. |
 
