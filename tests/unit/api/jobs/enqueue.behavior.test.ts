@@ -5,6 +5,9 @@ const insertedValues = vi.hoisted(() => vi.fn());
 const queueAdd = vi.hoisted(() => vi.fn());
 const getJob = vi.hoisted(() => vi.fn());
 const queueEventClose = vi.hoisted(() => vi.fn());
+const queueEventRun = vi.hoisted(() => vi.fn());
+const queueEventOn = vi.hoisted(() => vi.fn());
+const queueEventsCtor = vi.hoisted(() => vi.fn());
 const flowProducerClose = vi.hoisted(() => vi.fn());
 const assertAiJobQuotaMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
@@ -50,8 +53,15 @@ async function loadEnqueueModule(
   updateSetMock.mockReset();
   updateMock.mockReset();
 
+  queueEventRun.mockReset();
+  queueEventOn.mockReset();
+  queueEventsCtor.mockReset();
+
   queueAdd.mockResolvedValue({ id: "job-1" });
   queueEventClose.mockResolvedValue(undefined);
+  // run() resolves only when the consumer is closing; a never-settling promise
+  // is the honest stand-in for a loop that stays up for the process's life.
+  queueEventRun.mockReturnValue(new Promise(() => {}));
   flowProducerClose.mockResolvedValue(undefined);
   assertAiJobQuotaMock.mockResolvedValue(undefined);
   isFeatureEnabledMock.mockReturnValue(options.teamRetentionEnabled ?? false);
@@ -73,10 +83,15 @@ async function loadEnqueueModule(
   });
 
   vi.doMock("bullmq", () => ({
-    QueueEvents: vi.fn(() => ({
-      close: queueEventClose,
-      waitUntilReady: vi.fn().mockResolvedValue(undefined),
-    })),
+    QueueEvents: vi.fn((name: string, opts: Record<string, unknown>) => {
+      queueEventsCtor(name, opts);
+      return {
+        close: queueEventClose,
+        waitUntilReady: vi.fn().mockResolvedValue(undefined),
+        run: queueEventRun,
+        on: queueEventOn,
+      };
+    }),
     FlowProducer: vi.fn(() => ({
       close: flowProducerClose,
     })),
@@ -283,6 +298,65 @@ describe("job enqueue helpers", () => {
 
     expect(queueEventClose).toHaveBeenCalled();
     expect(flowProducerClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("drives the consumer loop itself rather than relying on BullMQ autorun", async () => {
+    const { mod } = await loadEnqueueModule();
+
+    await mod.warmQueueEvents();
+
+    // One consumer per pool, each opted out of autorun and started here.
+    expect(queueEventsCtor).toHaveBeenCalledTimes(5);
+    expect(queueEventsCtor).toHaveBeenCalledWith(
+      expect.stringMatching(/-image$/),
+      expect.objectContaining({ autorun: false }),
+    );
+    expect(queueEventRun).toHaveBeenCalledTimes(5);
+    expect(queueEventOn).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("restarts a consumer loop that stops, instead of leaving the pool deaf", async () => {
+    vi.useFakeTimers();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { mod } = await loadEnqueueModule();
+      // BullMQ's autorun would emit 'error' here and never run again, so every
+      // later sync request on this pool would burn the whole SYNC_WAIT_MS window.
+      queueEventRun
+        .mockImplementationOnce(() => Promise.reject(new Error("consumer connection lost")))
+        .mockReturnValue(new Promise(() => {}));
+
+      getJob.mockResolvedValueOnce(undefined);
+      await mod.waitForJob("image", "job-1");
+      await vi.advanceTimersByTimeAsync(1100);
+
+      expect(queueEventRun).toHaveBeenCalledTimes(2);
+      expect(errors).toHaveBeenCalledWith(
+        expect.stringContaining("consumer stopped; restarting"),
+        expect.any(Error),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops supervising once the consumer has been closed", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { mod } = await loadEnqueueModule();
+      queueEventRun.mockImplementation(() => Promise.reject(new Error("consumer connection lost")));
+
+      getJob.mockResolvedValueOnce(undefined);
+      await mod.waitForJob("image", "job-1");
+      await mod.closeQueueEvents();
+      const runsAtClose = queueEventRun.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(queueEventRun).toHaveBeenCalledTimes(runsAtClose);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("getFlowProducer returns the same cached instance on repeated calls", async () => {

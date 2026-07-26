@@ -11,6 +11,41 @@ import Redis from "ioredis";
 import { env } from "../config.js";
 
 /**
+ * How long a connection may hear nothing while it is waiting for a reply
+ * before ioredis destroys the socket and reconnects.
+ *
+ * A Redis socket can die without either end noticing. If the server comes back
+ * at a different address while a consumer is parked on a blocking read (BullMQ's
+ * QueueEvents XREAD, or a pub/sub subscriber waiting for a push), that socket
+ * has nothing left to send, so it never draws a reset, ioredis never sees a
+ * disconnect, and no event is ever delivered again. Connections that keep
+ * issuing commands heal themselves, because their next write draws the reset
+ * from whatever holds the old address. Consumers are the ones that stay dead,
+ * stranding both the sync-wait window and live SSE delivery until the process
+ * is restarted (PERF-20260726-007).
+ *
+ * socketTimeout closes that hole: while a command is outstanding ioredis arms a
+ * timer and destroys the socket if no byte arrives before it fires, which drops
+ * the connection into the ordinary reconnect path (unfulfilled commands are
+ * resent, subscriptions restored). It has to clear the longest legitimate
+ * silence on any of these connections. BullMQ caps every blocking read at 10 s,
+ * so 30 s leaves room for that plus a busy event loop.
+ */
+const SOCKET_TIMEOUT_MS = 30_000;
+
+/**
+ * How often a subscriber connection pings.
+ *
+ * Once SUBSCRIBE returns, a subscriber never writes again, so socketTimeout has
+ * nothing to time: ioredis only arms it while a command is outstanding. PING is
+ * the one probe RESP allows in subscriber mode, and it serves both recovery
+ * paths. The write draws an immediate reset from whatever took the old address
+ * over, and if nothing did, the unanswered PING is what socketTimeout kills the
+ * socket for.
+ */
+const SUBSCRIBER_PING_INTERVAL_MS = 10_000;
+
+/**
  * Create a new ioredis connection from REDIS_URL.
  * Each caller gets an independent connection (BullMQ requires separate
  * connections for Queue, Worker, and QueueEvents).
@@ -19,6 +54,7 @@ export function createRedisConnection(): Redis {
   return new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
+    socketTimeout: SOCKET_TIMEOUT_MS,
   });
 }
 
@@ -28,10 +64,29 @@ export function createRedisConnection(): Redis {
  * ioredis ready checks that issue INFO during reconnects.
  */
 export function createRedisSubscriberConnection(): Redis {
-  return new Redis(env.REDIS_URL, {
+  const connection = new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    socketTimeout: SOCKET_TIMEOUT_MS,
   });
+  keepSubscriberSocketProbed(connection);
+  return connection;
+}
+
+/**
+ * Keep a command in flight on an otherwise silent subscriber socket.
+ *
+ * The interval is unref'd so it never holds the process open, and a rejected
+ * ping needs no handling: it means ioredis is already tearing the connection
+ * down, which is the outcome the ping was there to provoke. Nothing here can
+ * wedge on a dead socket, because the detection is a timer rather than a reply.
+ */
+function keepSubscriberSocketProbed(connection: Redis): void {
+  const timer = setInterval(() => {
+    void connection.ping().catch(() => {});
+  }, SUBSCRIBER_PING_INTERVAL_MS);
+  timer.unref();
+  connection.once("end", () => clearInterval(timer));
 }
 
 // ioredis 5.11 vs BullMQ's bundled 5.10 type mismatch

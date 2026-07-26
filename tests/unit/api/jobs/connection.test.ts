@@ -4,21 +4,37 @@ type RedisStub = {
   ping: ReturnType<typeof vi.fn>;
   quit: ReturnType<typeof vi.fn>;
   info: ReturnType<typeof vi.fn>;
+  once: ReturnType<typeof vi.fn>;
+  /** Fires the handler registered for an event, as ioredis would. */
+  emitOnce: (event: string) => void;
 };
 
 const { RedisMock, stubs } = vi.hoisted(() => {
   const created: RedisStub[] = [];
   const mock = vi.fn(function RedisMock() {
+    const handlers = new Map<string, () => void>();
     const stub: RedisStub = {
       ping: vi.fn().mockResolvedValue("PONG"),
       quit: vi.fn().mockResolvedValue("OK"),
       info: vi.fn().mockResolvedValue("# Server\r\nredis_version:8.0.1\r\n"),
+      once: vi.fn((event: string, handler: () => void) => {
+        handlers.set(event, handler);
+        return stub;
+      }),
+      emitOnce: (event: string) => handlers.get(event)?.(),
     };
     created.push(stub);
     return stub;
   });
   return { RedisMock: mock, stubs: created };
 });
+
+/**
+ * Every connection carries an inactivity timeout so a socket whose peer moved
+ * away cannot sit there forever waiting for a reply that will never come
+ * (PERF-20260726-007). It has to clear BullMQ's 10 s blocking reads.
+ */
+const SOCKET_TIMEOUT_MS = 30_000;
 
 vi.mock("ioredis", () => ({
   default: RedisMock,
@@ -49,6 +65,7 @@ describe("Redis connection factory", () => {
     expect(RedisMock).toHaveBeenCalledWith(expect.any(String), {
       enableReadyCheck: true,
       maxRetriesPerRequest: null,
+      socketTimeout: SOCKET_TIMEOUT_MS,
     });
   });
 
@@ -60,7 +77,25 @@ describe("Redis connection factory", () => {
     expect(RedisMock).toHaveBeenCalledWith(expect.any(String), {
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
+      socketTimeout: SOCKET_TIMEOUT_MS,
     });
+  });
+
+  it("gives every connection an inactivity timeout clear of BullMQ's blocking reads", async () => {
+    const { createRedisConnection, createRedisSubscriberConnection } = await freshModule();
+
+    createRedisConnection();
+    createRedisSubscriberConnection();
+
+    // A socket the server stopped answering has to be destroyed by something,
+    // or a consumer parked on a blocking read waits on it forever.
+    for (const call of RedisMock.mock.calls) {
+      const options = call[1] as { socketTimeout?: number };
+      expect(options.socketTimeout).toBe(SOCKET_TIMEOUT_MS);
+      // BullMQ caps every blocking read at 10 s, so anything at or under that
+      // would kill healthy idle consumers.
+      expect(options.socketTimeout).toBeGreaterThan(10_000);
+    }
   });
 
   it("createBullMQConnection builds a command connection and returns the ioredis instance", async () => {
@@ -73,9 +108,63 @@ describe("Redis connection factory", () => {
     expect(RedisMock).toHaveBeenCalledWith(expect.any(String), {
       enableReadyCheck: true,
       maxRetriesPerRequest: null,
+      socketTimeout: SOCKET_TIMEOUT_MS,
     });
     // ...and hands the raw instance straight through (cast only).
     expect(conn).toBe(stubs[0]);
+  });
+
+  it("keeps a subscriber socket probed so a dead one can be noticed", async () => {
+    vi.useFakeTimers();
+    try {
+      const { createRedisSubscriberConnection } = await freshModule();
+
+      const subscriber = createRedisSubscriberConnection();
+      expect(subscriber.ping).not.toHaveBeenCalled();
+
+      // Nothing writes on a subscriber after SUBSCRIBE, so without this ping
+      // there is no outstanding command for the inactivity timeout to time.
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(subscriber.ping).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(subscriber.ping).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops probing once the subscriber connection has ended", async () => {
+    vi.useFakeTimers();
+    try {
+      const { createRedisSubscriberConnection } = await freshModule();
+
+      const subscriber = createRedisSubscriberConnection();
+      subscriber.emitOnce("end");
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(subscriber.ping).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("swallows a rejected probe, because a rejection is the reconnect starting", async () => {
+    vi.useFakeTimers();
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const { createRedisSubscriberConnection } = await freshModule();
+
+      const subscriber = createRedisSubscriberConnection();
+      subscriber.ping.mockRejectedValue(new Error("Connection is closed."));
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(subscriber.ping).toHaveBeenCalledTimes(1);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      vi.useRealTimers();
+    }
   });
 
   it("sharedRedis memoizes a single connection across calls", async () => {

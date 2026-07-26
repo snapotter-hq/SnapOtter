@@ -36,15 +36,53 @@ function stripNulBytes<T>(value: T): T {
   return value;
 }
 
+/** Delay before a stopped consumer loop is started again. */
+const QUEUE_EVENTS_RESTART_DELAY_MS = 1000;
+
 function getQueueEvents(pool: Pool): QueueEvents {
   let qe = queueEventsMap.get(pool);
   if (!qe) {
     qe = new QueueEvents(queueName(pool), {
       connection: createBullMQConnection(),
+      autorun: false,
+    });
+    // QueueEvents is an EventEmitter, and BullMQ swallows an unlistened 'error'
+    // into a bare console.error of the raw object. A named line is worth more
+    // when a consumer is misbehaving.
+    qe.on("error", (err) => {
+      console.error(`[queue-events] ${queueName(pool)} consumer error`, err);
     });
     queueEventsMap.set(pool, qe);
+    void superviseQueueEvents(pool, qe);
   }
   return qe;
+}
+
+/**
+ * Keep a pool's QueueEvents consumer loop running.
+ *
+ * BullMQ's `autorun` starts the loop from the constructor and, if it ever
+ * rejects, does nothing but emit 'error': `running` is left false and nothing
+ * restarts it, so that pool stops delivering completion events for the rest of
+ * the process's life while every other Redis path still looks healthy. Every
+ * synchronous tool request on the pool then burns the full SYNC_WAIT_MS window
+ * and falls back to 202. Driving run() from here means a rejection is logged
+ * and retried instead of being terminal. run() resolves only once the consumer
+ * is closing, so the loop below exits exactly once, and the map identity check
+ * stops a replaced consumer from being supervised twice.
+ */
+async function superviseQueueEvents(pool: Pool, qe: QueueEvents): Promise<void> {
+  while (queueEventsMap.get(pool) === qe) {
+    try {
+      await qe.run();
+      return;
+    } catch (err) {
+      console.error(`[queue-events] ${queueName(pool)} consumer stopped; restarting`, err);
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, QUEUE_EVENTS_RESTART_DELAY_MS).unref();
+      });
+    }
+  }
 }
 
 export async function closeQueueEvents(): Promise<void> {
