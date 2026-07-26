@@ -28,7 +28,7 @@
  *
  *   node tests/benchmark/limits-profile.mjs --profiles baseline,mem-2g,cpu-1
  */
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -193,22 +193,54 @@ async function jobRowCount() {
   return Number(raw.trim());
 }
 
-/** Kernel-level OOM kills, counted from the Docker event log for this window. */
-async function oomEventsSince(since) {
-  const raw = await docker(
+/**
+ * Watch for the container dying, live, for as long as the profile runs.
+ *
+ * Getting this after the fact does not work. `.State.OOMKilled` belongs to the
+ * run that ended, and `restart: unless-stopped` has already replaced it with a
+ * fresh run whose flag is false before anything can ask. Polling `docker inspect`
+ * is no better, because Docker goes restarting -> running inside a second.
+ * Replaying `docker events` with `--since/--until` in the past is no better
+ * either: Docker Desktop keeps only about thirty seconds of history, so the query
+ * returns an empty result that reads exactly like "nothing died".
+ *
+ * A live subscription started before the load catches every death and carries the
+ * exit code with it, which is what separates an OOM kill (137) from anything
+ * else. The dedicated `oom` event is subscribed alongside it and agrees, but the
+ * exit code is the one to reason from: it is present whatever the cause.
+ */
+function watchDeaths() {
+  const child = spawn("docker", [
     "events",
-    "--since",
-    since,
-    "--until",
-    new Date().toISOString(),
     "--filter",
     `container=${cfg.appContainer}`,
     "--filter",
+    "event=die",
+    "--filter",
     "event=oom",
     "--format",
-    "{{.Time}}",
-  );
-  return raw ? raw.split("\n").filter(Boolean).length : 0;
+    '{{.Action}} {{index .Actor.Attributes "exitCode"}}',
+  ]);
+  const lines = [];
+  child.stdout.on("data", (chunk) => {
+    for (const line of String(chunk).split("\n")) {
+      if (line.trim()) lines.push(line.trim());
+    }
+  });
+  child.on("error", () => {});
+  return {
+    stop() {
+      child.kill();
+      const exitCodes = lines
+        .filter((line) => line.startsWith("die"))
+        .map((line) => Number(line.split(" ")[1]));
+      return {
+        dieExitCodes: exitCodes,
+        oomKills: exitCodes.filter((code) => code === 137).length,
+        oomEvents: lines.filter((line) => line.startsWith("oom")).length,
+      };
+    },
+  };
 }
 
 function rotate(list, offset) {
@@ -265,7 +297,7 @@ function classifyFailures(results) {
 async function runProfile(name) {
   const profile = PROFILES[name];
   if (!profile) throw new Error(`unknown profile ${name}`);
-  const since = new Date(Date.now() - 1000).toISOString();
+  const deaths = watchDeaths();
   log(`profile ${name}: recreating app at mem=${profile.mem} cpus=${profile.cpus}`);
   await compose(
     { PERF_APP_MEM: profile.mem, PERF_APP_CPUS: profile.cpus },
@@ -296,7 +328,7 @@ async function runProfile(name) {
       bootHealthS: null,
       booted: false,
       restartsDuringBoot: (await readBackLimits()).restarts - limits.restarts,
-      oomEvents: await oomEventsSince(since).catch(() => -1),
+      ...deaths.stop(),
       tailLog: logs.split("\n").slice(-6).join(" | ").slice(0, 600),
       hostLoad: hostLoad(),
     };
@@ -348,7 +380,7 @@ async function runProfile(name) {
     peakOfLimitPct: Number(((peakRssMiB / limits.memLimitMiB) * 100).toFixed(1)),
     restartsDelta: after.restarts - limits.restarts,
     oomFlagAtEnd: after.oomKilled,
-    oomEvents: await oomEventsSince(since).catch(() => -1),
+    ...deaths.stop(),
     jobsBefore,
     jobsAfter,
     strandedBefore,
