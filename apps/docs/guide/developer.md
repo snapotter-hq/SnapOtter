@@ -13,7 +13,7 @@ How to set up a local development environment and contribute code to SnapOtter.
 - [Docker](https://www.docker.com/) (required for local Postgres + Redis, container builds, and AI features)
 - Git
 
-Python 3.10+ is only needed if you are working on the AI/ML sidecar (background removal, upscaling, OCR).
+Python 3.11+ is only needed if you are working on the AI/ML sidecar (background removal, upscaling, OCR).
 
 ## Setup {#setup}
 

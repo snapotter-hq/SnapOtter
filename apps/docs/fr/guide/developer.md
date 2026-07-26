@@ -17,7 +17,7 @@ Comment configurer un environnement de développement local et contribuer au cod
 - [Docker](https://www.docker.com/) (requis pour Postgres + Redis en local, les builds de conteneur et les fonctionnalités d'IA)
 - Git
 
-Python 3.10+ n'est nécessaire que si vous travaillez sur le sidecar IA/ML (suppression d'arrière-plan, agrandissement, OCR).
+Python 3.11+ n'est nécessaire que si vous travaillez sur le sidecar IA/ML (suppression d'arrière-plan, agrandissement, OCR).
 
 ## Configuration {#setup}
 

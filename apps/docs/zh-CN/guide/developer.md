@@ -17,7 +17,7 @@ i18n_hash_version: 2
 - [Docker](https://www.docker.com/)（本地 Postgres + Redis、容器构建和 AI 功能所必需）
 - Git
 
-仅当你在开发 AI/ML sidecar（背景移除、放大、OCR）时才需要 Python 3.10+。
+仅当你在开发 AI/ML sidecar（背景移除、放大、OCR）时才需要 Python 3.11+。
 
 ## 搭建环境 {#setup}
 

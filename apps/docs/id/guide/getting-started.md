@@ -78,7 +78,7 @@ Lihat [Konfigurasi](/id/guide/configuration) untuk semua variabel lingkungan dan
 
 ## Membangun dari Sumber {#build-from-source}
 
-**Prasyarat:** Node.js 22.22+, pnpm 9+, Docker (untuk Postgres + Redis), Python 3.10+ (untuk fitur AI), Git.
+**Prasyarat:** Node.js 22.22+, pnpm 9+, Docker (untuk Postgres + Redis), Python 3.11+ (untuk fitur AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Gambar** | 107 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, preset format |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, preset format |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, preset format |
-| **PDF / Dokumen** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **File** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| **PDF / Dokumen** | 29 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
+| **File** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipeline {#pipelines}
 

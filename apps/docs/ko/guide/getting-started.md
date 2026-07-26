@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## 소스에서 빌드 {#build-from-source}
 
-**전제 조건:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis용), Python 3.10+ (AI 기능용), Git.
+**전제 조건:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis용), Python 3.11+ (AI 기능용), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **이미지** | 107 | 크기 조정, 자르기, 압축, 변환, 배경 제거, 업스케일, OCR, 워터마크, 콜라주, 컬러화, GIF 도구, 형식 프리셋 |
 | **비디오** | 57 | 트림, 자르기, 압축, 변환, 병합, 오디오 추출, 자동 자막, 비디오→GIF, 크기 조정, 안정화, 형식 프리셋 |
 | **오디오** | 27 | 트림, 병합, 변환, 노멀라이즈, 노이즈 감소, 전사, 피치 시프트, 페이드, 벨소리 제작기, 형식 프리셋 |
-| **PDF / 문서** | 42 | 병합, 분할, 압축, OCR, 워터마크, 편집(리댁트), Word→PDF, Excel→PDF, 회전, 보호, 복구 |
-| **파일** | 10 | CSV→JSON, JSON→XML, CSV 병합, CSV 분할, ZIP 생성, ZIP 추출, 차트 제작기, YAML/JSON |
+| **PDF / 문서** | 29 | 병합, 분할, 압축, OCR, 워터마크, 편집(리댁트), Word→PDF, Excel→PDF, 회전, 보호, 복구 |
+| **파일** | 23 | CSV→JSON, JSON→XML, CSV 병합, CSV 분할, ZIP 생성, ZIP 추출, 차트 제작기, YAML/JSON |
 
 ### 파이프라인 {#pipelines}
 

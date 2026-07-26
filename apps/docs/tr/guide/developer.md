@@ -17,7 +17,7 @@ Yerel bir geliştirme ortamı kurma ve SnapOtter'a kod katkısında bulunma.
 - [Docker](https://www.docker.com/) (yerel Postgres + Redis, container derlemeleri ve AI özellikleri için gerekli)
 - Git
 
-Python 3.10+ yalnızca AI/ML yardımcı işlemi (arka plan kaldırma, ölçek büyütme, OCR) üzerinde çalışıyorsanız gereklidir.
+Python 3.11+ yalnızca AI/ML yardımcı işlemi (arka plan kaldırma, ölçek büyütme, OCR) üzerinde çalışıyorsanız gereklidir.
 
 ## Kurulum {#setup}
 

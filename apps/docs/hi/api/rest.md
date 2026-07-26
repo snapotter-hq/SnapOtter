@@ -27,9 +27,11 @@ curl -X POST http://localhost:1349/api/auth/login \
   -d '{"username":"admin","password":"admin"}'
 # Returns: {"token":"<session-token>"}
 
-# Use token
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer <session-token>"
+# Use token (tool routes are POST multipart)
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer <session-token>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 सेशन 7 दिनों के बाद समाप्त हो जाते हैं (`SESSION_DURATION_HOURS` के माध्यम से कॉन्फ़िगर करने योग्य)।
@@ -45,8 +47,10 @@ curl -X POST http://localhost:1349/api/v1/api-keys \
 # Returns: {"key":"si_<96 hex chars>","id":"...","name":"my-script"}
 
 # Use the key
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer si_<your-key>"
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer si_<your-key>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 कीज़ के आगे `si_` उपसर्ग लगा होता है और उन्हें scrypt हैश के रूप में संग्रहीत किया जाता है - कच्ची की एक बार दिखाई जाती है और फिर कभी पुनः प्राप्त नहीं की जा सकती।

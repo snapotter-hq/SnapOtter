@@ -78,7 +78,7 @@ Siehe [Konfiguration](/de/guide/configuration) für alle Umgebungsvariablen und 
 
 ## Aus dem Quellcode bauen {#build-from-source}
 
-**Voraussetzungen:** Node.js 22.22+, pnpm 9+, Docker (für Postgres + Redis), Python 3.10+ (für KI-Funktionen), Git.
+**Voraussetzungen:** Node.js 22.22+, pnpm 9+, Docker (für Postgres + Redis), Python 3.11+ (für KI-Funktionen), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Bild** | 107 | Größe ändern, zuschneiden, komprimieren, konvertieren, Hintergrund entfernen, hochskalieren, OCR, Wasserzeichen, Collage, kolorieren, GIF-Tools, Format-Vorlagen |
 | **Video** | 57 | Trimmen, zuschneiden, komprimieren, konvertieren, zusammenführen, Audio extrahieren, Auto-Untertitel, Video zu GIF, Größe ändern, stabilisieren, Format-Vorlagen |
 | **Audio** | 27 | Trimmen, zusammenführen, konvertieren, normalisieren, Rauschunterdrückung, transkribieren, Tonhöhenverschiebung, Ein-/Ausblenden, Klingelton-Ersteller, Format-Vorlagen |
-| **PDF / Dokument** | 42 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |
-| **Dateien** | 10 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP entpacken, Diagramm-Ersteller, YAML/JSON |
+| **PDF / Dokument** | 29 | Zusammenführen, teilen, komprimieren, OCR, Wasserzeichen, schwärzen, Word zu PDF, Excel zu PDF, drehen, schützen, reparieren |
+| **Dateien** | 23 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP entpacken, Diagramm-Ersteller, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

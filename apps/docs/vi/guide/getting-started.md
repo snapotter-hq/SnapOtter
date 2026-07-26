@@ -78,7 +78,7 @@ Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến m
 
 ## Build từ mã nguồn {#build-from-source}
 
-**Điều kiện tiên quyết:** Node.js 22.22+, pnpm 9+, Docker (cho Postgres + Redis), Python 3.10+ (cho các tính năng AI), Git.
+**Điều kiện tiên quyết:** Node.js 22.22+, pnpm 9+, Docker (cho Postgres + Redis), Python 3.11+ (cho các tính năng AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Hình ảnh** | 107 | Thay đổi kích thước, Cắt, Nén, Chuyển đổi, Xóa nền, Nâng cấp độ phân giải, OCR, Đóng dấu, Ghép ảnh, Tô màu, Công cụ GIF, preset định dạng |
 | **Video** | 57 | Cắt, Cắt khung, Nén, Chuyển đổi, Gộp, Trích xuất âm thanh, Phụ đề tự động, Video sang GIF, Thay đổi kích thước, Ổn định, preset định dạng |
 | **Âm thanh** | 27 | Cắt, Gộp, Chuyển đổi, Chuẩn hóa, Giảm nhiễu, Phiên âm, Dịch cao độ, Fade, Tạo nhạc chuông, preset định dạng |
-| **PDF / Tài liệu** | 42 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |
-| **Tập tin** | 10 | CSV sang JSON, JSON sang XML, Gộp CSV, Tách CSV, Tạo ZIP, Giải nén ZIP, Tạo biểu đồ, YAML/JSON |
+| **PDF / Tài liệu** | 29 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |
+| **Tập tin** | 23 | CSV sang JSON, JSON sang XML, Gộp CSV, Tách CSV, Tạo ZIP, Giải nén ZIP, Tạo biểu đồ, YAML/JSON |
 
 ### Pipeline {#pipelines}
 

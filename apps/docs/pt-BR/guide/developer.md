@@ -17,7 +17,7 @@ Como configurar um ambiente de desenvolvimento local e contribuir com código pa
 - [Docker](https://www.docker.com/) (necessário para Postgres + Redis locais, builds de contêiner e recursos de IA)
 - Git
 
-Python 3.10+ só é necessário se você estiver trabalhando no sidecar de IA/ML (remoção de fundo, upscaling, OCR).
+Python 3.11+ só é necessário se você estiver trabalhando no sidecar de IA/ML (remoção de fundo, upscaling, OCR).
 
 ## Configuração {#setup}
 

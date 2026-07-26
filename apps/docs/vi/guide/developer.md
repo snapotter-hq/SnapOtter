@@ -17,7 +17,7 @@ Cách thiết lập một môi trường phát triển cục bộ và đóng gó
 - [Docker](https://www.docker.com/) (bắt buộc cho Postgres + Redis cục bộ, dựng container, và các tính năng AI)
 - Git
 
-Python 3.10+ chỉ cần thiết nếu bạn đang làm việc trên sidecar AI/ML (xóa nền, phóng đại, OCR).
+Python 3.11+ chỉ cần thiết nếu bạn đang làm việc trên sidecar AI/ML (xóa nền, phóng đại, OCR).
 
 ## Thiết lập {#setup}
 

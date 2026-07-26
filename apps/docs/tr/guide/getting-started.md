@@ -78,7 +78,7 @@ Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration)'ya ve 
 
 ## Kaynaktan Derleme {#build-from-source}
 
-**Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.10+ (AI özellikleri için), Git.
+**Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.11+ (AI özellikleri için), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Görsel** | 107 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
 | **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazılar, Video'dan GIF'e, Yeniden Boyutlandır, Sabitle, format ön ayarları |
 | **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Transkribe Et, Perde Kaydırma, Kısılma, Zil Sesi Oluşturucu, format ön ayarları |
-| **PDF / Belge** | 42 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Sansürle, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
-| **Dosyalar** | 10 | CSV'den JSON'a, JSON'dan XML'e, CSV'leri Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
+| **PDF / Belge** | 29 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Sansürle, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
+| **Dosyalar** | 23 | CSV'den JSON'a, JSON'dan XML'e, CSV'leri Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
 
 ### Ardışık Düzenler {#pipelines}
 

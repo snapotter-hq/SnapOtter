@@ -2,7 +2,7 @@
 description: Extract text from images locally with built-in Tesseract or the optional high-accuracy RapidOCR runtime.
 ---
 
-# OCR / Text Extraction {#ocr-text-extraction}
+# Extract Text from Image (OCR) {#ocr-text-extraction}
 
 Extract text from images without sending the image to an external service. The built-in `fast` tier uses Tesseract. The optional `balanced` and `best` tiers use RapidOCR with pinned PP-OCR ONNX models.
 

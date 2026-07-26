@@ -24,9 +24,11 @@ curl -X POST http://localhost:1349/api/auth/login \
   -d '{"username":"admin","password":"admin"}'
 # Returns: {"token":"<session-token>"}
 
-# Use token
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer <session-token>"
+# Use token (tool routes are POST multipart)
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer <session-token>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 Sessions expire after 7 days (configurable via `SESSION_DURATION_HOURS`).
@@ -42,8 +44,10 @@ curl -X POST http://localhost:1349/api/v1/api-keys \
 # Returns: {"key":"si_<96 hex chars>","id":"...","name":"my-script"}
 
 # Use the key
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer si_<your-key>"
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer si_<your-key>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 Keys are prefixed `si_` and stored as scrypt hashes - the raw key is shown once and never retrievable again.

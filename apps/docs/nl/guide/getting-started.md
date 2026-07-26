@@ -78,7 +78,7 @@ Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen en [Be
 
 ## Bouwen vanaf broncode {#build-from-source}
 
-**Vereisten:** Node.js 22.22+, pnpm 9+, Docker (voor Postgres + Redis), Python 3.10+ (voor AI-functies), Git.
+**Vereisten:** Node.js 22.22+, pnpm 9+, Docker (voor Postgres + Redis), Python 3.11+ (voor AI-functies), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Afbeelding** | 107 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Upscale, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
 | **Video** | 57 | Trimmen, Bijsnijden, Comprimeren, Converteren, Samenvoegen, Audio extraheren, Automatische ondertitels, Video naar GIF, Formaat wijzigen, Stabiliseren, formaatpresets |
 | **Audio** | 27 | Trimmen, Samenvoegen, Converteren, Normaliseren, Ruisonderdrukking, Transcriberen, Pitch verschuiven, Fade, Beltoonmaker, formaatpresets |
-| **PDF / Document** | 42 | Samenvoegen, Splitsen, Comprimeren, OCR, Watermerk, Redigeren, Word naar PDF, Excel naar PDF, Roteren, Beveiligen, Repareren |
-| **Bestanden** | 10 | CSV naar JSON, JSON naar XML, CSV's samenvoegen, CSV splitsen, ZIP maken, ZIP uitpakken, Grafiekmaker, YAML/JSON |
+| **PDF / Document** | 29 | Samenvoegen, Splitsen, Comprimeren, OCR, Watermerk, Redigeren, Word naar PDF, Excel naar PDF, Roteren, Beveiligen, Repareren |
+| **Bestanden** | 23 | CSV naar JSON, JSON naar XML, CSV's samenvoegen, CSV splitsen, ZIP maken, ZIP uitpakken, Grafiekmaker, YAML/JSON |
 
 ### Pijplijnen {#pipelines}
 

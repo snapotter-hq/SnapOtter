@@ -17,7 +17,7 @@ i18n_hash_version: 2
 - [Docker](https://www.docker.com/) (로컬 Postgres + Redis, 컨테이너 빌드, AI 기능에 필요)
 - Git
 
-Python 3.10+는 AI/ML 사이드카(배경 제거, 업스케일링, OCR)를 작업하는 경우에만 필요합니다.
+Python 3.11+는 AI/ML 사이드카(배경 제거, 업스케일링, OCR)를 작업하는 경우에만 필요합니다.
 
 ## 설정 {#setup}
 

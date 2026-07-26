@@ -27,9 +27,11 @@ curl -X POST http://localhost:1349/api/auth/login \
   -d '{"username":"admin","password":"admin"}'
 # Returns: {"token":"<session-token>"}
 
-# Use token
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer <session-token>"
+# Use token (tool routes are POST multipart)
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer <session-token>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 세션은 7일 후 만료됩니다(`SESSION_DURATION_HOURS`로 구성 가능).
@@ -45,8 +47,10 @@ curl -X POST http://localhost:1349/api/v1/api-keys \
 # Returns: {"key":"si_<96 hex chars>","id":"...","name":"my-script"}
 
 # Use the key
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer si_<your-key>"
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer si_<your-key>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 키는 `si_` 접두사가 붙으며 scrypt 해시로 저장됩니다. 원본 키는 한 번만 표시되며 이후 다시 조회할 수 없습니다.

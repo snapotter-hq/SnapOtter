@@ -17,7 +17,7 @@ Wie man eine lokale Entwicklungsumgebung einrichtet und Code zu SnapOtter beitr�
 - [Docker](https://www.docker.com/) (erforderlich für lokales Postgres + Redis, Container-Builds und AI-Features)
 - Git
 
-Python 3.10+ wird nur benötigt, wenn du am AI/ML-Sidecar arbeitest (Hintergrundentfernung, Hochskalierung, OCR).
+Python 3.11+ wird nur benötigt, wenn du am AI/ML-Sidecar arbeitest (Hintergrundentfernung, Hochskalierung, OCR).
 
 ## Setup {#setup}
 

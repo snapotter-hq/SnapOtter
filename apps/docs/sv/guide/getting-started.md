@@ -78,7 +78,7 @@ Se [Configuration](/sv/guide/configuration) för alla miljövariabler och [Secur
 
 ## Bygg från källkod {#build-from-source}
 
-**Förutsättningar:** Node.js 22.22+, pnpm 9+, Docker (för Postgres + Redis), Python 3.10+ (för AI-funktioner), Git.
+**Förutsättningar:** Node.js 22.22+, pnpm 9+, Docker (för Postgres + Redis), Python 3.11+ (för AI-funktioner), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Bild** | 107 | Ändra storlek, beskär, komprimera, konvertera, ta bort bakgrund, uppskala, OCR, vattenmärke, collage, färglägg, GIF-verktyg, formatförinställningar |
 | **Video** | 57 | Klipp, beskär, komprimera, konvertera, slå samman, extrahera ljud, autotextning, video till GIF, ändra storlek, stabilisera, formatförinställningar |
 | **Ljud** | 27 | Klipp, slå samman, konvertera, normalisera, brusreducering, transkribera, tonhöjdsskift, tona, ringsignalsskapare, formatförinställningar |
-| **PDF / dokument** | 42 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
-| **Filer** | 10 | CSV till JSON, JSON till XML, slå samman CSV-filer, dela CSV, skapa ZIP, extrahera ZIP, diagramskapare, YAML/JSON |
+| **PDF / dokument** | 29 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
+| **Filer** | 23 | CSV till JSON, JSON till XML, slå samman CSV-filer, dela CSV, skapa ZIP, extrahera ZIP, diagramskapare, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

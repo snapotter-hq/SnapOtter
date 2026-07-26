@@ -27,9 +27,11 @@ curl -X POST http://localhost:1349/api/auth/login \
   -d '{"username":"admin","password":"admin"}'
 # Returns: {"token":"<session-token>"}
 
-# Use token
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer <session-token>"
+# Use token (tool routes are POST multipart)
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer <session-token>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 会话在 7 天后过期（可通过 `SESSION_DURATION_HOURS` 配置）。
@@ -45,8 +47,10 @@ curl -X POST http://localhost:1349/api/v1/api-keys \
 # Returns: {"key":"si_<96 hex chars>","id":"...","name":"my-script"}
 
 # Use the key
-curl http://localhost:1349/api/v1/tools/image/resize \
-  -H "Authorization: Bearer si_<your-key>"
+curl -X POST http://localhost:1349/api/v1/tools/image/resize \
+  -H "Authorization: Bearer si_<your-key>" \
+  -F "file=@photo.jpg" \
+  -F 'settings={"width":800}'
 ```
 
 密钥以 `si_` 为前缀，并以 scrypt 哈希形式存储，原始密钥只显示一次，之后再也无法取回。

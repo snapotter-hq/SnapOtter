@@ -17,7 +17,7 @@ Cara menyiapkan lingkungan pengembangan lokal dan berkontribusi kode ke SnapOtte
 - [Docker](https://www.docker.com/) (diperlukan untuk Postgres + Redis lokal, build kontainer, dan fitur AI)
 - Git
 
-Python 3.10+ hanya diperlukan jika Anda mengerjakan sidecar AI/ML (penghapusan latar belakang, upscaling, OCR).
+Python 3.11+ hanya diperlukan jika Anda mengerjakan sidecar AI/ML (penghapusan latar belakang, upscaling, OCR).
 
 ## Penyiapan {#setup}
 

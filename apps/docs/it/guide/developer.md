@@ -17,7 +17,7 @@ Come configurare un ambiente di sviluppo locale e contribuire con codice a SnapO
 - [Docker](https://www.docker.com/) (richiesto per Postgres + Redis locali, build dei container e funzionalità AI)
 - Git
 
-Python 3.10+ è necessario solo se stai lavorando sul sidecar AI/ML (rimozione dello sfondo, upscaling, OCR).
+Python 3.11+ è necessario solo se stai lavorando sul sidecar AI/ML (rimozione dello sfondo, upscaling, OCR).
 
 ## Configurazione {#setup}
 

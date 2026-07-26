@@ -78,7 +78,7 @@ Zobacz [Konfiguracja](/pl/guide/configuration) w celu uzyskania wszystkich zmien
 
 ## Budowanie ze źródeł {#build-from-source}
 
-**Wymagania wstępne:** Node.js 22.22+, pnpm 9+, Docker (dla Postgres + Redis), Python 3.10+ (dla funkcji AI), Git.
+**Wymagania wstępne:** Node.js 22.22+, pnpm 9+, Docker (dla Postgres + Redis), Python 3.11+ (dla funkcji AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Obraz** | 107 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Skalowanie w górę, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, szablony formatów |
 | **Wideo** | 57 | Przycinanie, Kadrowanie, Kompresja, Konwersja, Łączenie, Wyodrębnianie audio, Automatyczne napisy, Wideo do GIF, Zmiana rozmiaru, Stabilizacja, szablony formatów |
 | **Audio** | 27 | Przycinanie, Łączenie, Konwersja, Normalizacja, Redukcja szumów, Transkrypcja, Zmiana wysokości dźwięku, Wyciszanie, Kreator dzwonków, szablony formatów |
-| **PDF / Dokument** | 42 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redagowanie, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |
-| **Pliki** | 10 | CSV do JSON, JSON do XML, Łączenie CSV, Dzielenie CSV, Tworzenie ZIP, Wyodrębnianie ZIP, Kreator wykresów, YAML/JSON |
+| **PDF / Dokument** | 29 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redagowanie, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |
+| **Pliki** | 23 | CSV do JSON, JSON do XML, Łączenie CSV, Dzielenie CSV, Tworzenie ZIP, Wyodrębnianie ZIP, Kreator wykresów, YAML/JSON |
 
 ### Potoki {#pipelines}
 

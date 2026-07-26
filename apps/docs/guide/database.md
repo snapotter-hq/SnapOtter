@@ -142,6 +142,17 @@ Security-relevant action log.
 | `details` | jsonb | Action-specific data |
 | `createdAt` | timestamp | Action time |
 
+### user_preferences {#user-preferences}
+
+Per-user UI state, keyed by preference name. Backs the dashboard's pinned tools through `PUT /api/v1/preferences`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `userId` | text | FK to users, cascades on delete. Primary key with `key` |
+| `key` | text | Preference name. Primary key with `userId` |
+| `value` | jsonb | Preference payload |
+| `updatedAt` | timestamp | Last write |
+
 ## Migrations {#migrations}
 
 Drizzle handles schema migrations. Migration files live in `apps/api/drizzle/`. During development:

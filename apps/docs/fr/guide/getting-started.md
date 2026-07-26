@@ -78,7 +78,7 @@ Voir [Configuration](/fr/guide/configuration) pour toutes les variables d'enviro
 
 ## Construire depuis les sources {#build-from-source}
 
-**Prérequis :** Node.js 22.22+, pnpm 9+, Docker (pour Postgres + Redis), Python 3.10+ (pour les fonctionnalités IA), Git.
+**Prérequis :** Node.js 22.22+, pnpm 9+, Docker (pour Postgres + Redis), Python 3.11+ (pour les fonctionnalités IA), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Image** | 107 | Redimensionner, Rogner, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
 | **Vidéo** | 57 | Couper, Rogner, Compresser, Convertir, Fusionner, Extraire l'audio, Sous-titres automatiques, Vidéo vers GIF, Redimensionner, Stabiliser, préréglages de format |
 | **Audio** | 27 | Couper, Fusionner, Convertir, Normaliser, Réduction du bruit, Transcrire, Décalage de hauteur, Fondu, Créateur de sonnerie, préréglages de format |
-| **PDF / Document** | 42 | Fusionner, Diviser, Compresser, OCR, Filigrane, Caviarder, Word vers PDF, Excel vers PDF, Pivoter, Protéger, Réparer |
-| **Fichiers** | 10 | CSV vers JSON, JSON vers XML, Fusionner des CSV, Diviser un CSV, Créer un ZIP, Extraire un ZIP, Créateur de graphiques, YAML/JSON |
+| **PDF / Document** | 29 | Fusionner, Diviser, Compresser, OCR, Filigrane, Caviarder, Word vers PDF, Excel vers PDF, Pivoter, Protéger, Réparer |
+| **Fichiers** | 23 | CSV vers JSON, JSON vers XML, Fusionner des CSV, Diviser un CSV, Créer un ZIP, Extraire un ZIP, Créateur de graphiques, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

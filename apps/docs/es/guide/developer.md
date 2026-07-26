@@ -17,7 +17,7 @@ Cómo configurar un entorno de desarrollo local y contribuir con código a SnapO
 - [Docker](https://www.docker.com/) (requerido para Postgres + Redis locales, construcciones de contenedores y funciones de IA)
 - Git
 
-Python 3.10+ solo es necesario si trabajas en el sidecar de IA/ML (eliminación de fondo, escalado, OCR).
+Python 3.11+ solo es necesario si trabajas en el sidecar de IA/ML (eliminación de fondo, escalado, OCR).
 
 ## Configuración {#setup}
 

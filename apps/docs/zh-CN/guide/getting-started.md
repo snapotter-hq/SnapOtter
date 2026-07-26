@@ -78,7 +78,7 @@ docker compose -f docker-compose.yml up -d --no-build
 
 ## 从源码构建 {#build-from-source}
 
-**前置条件：** Node.js 22.22+、pnpm 9+、Docker（用于 Postgres + Redis）、Python 3.10+（用于 AI 功能）、Git。
+**前置条件：** Node.js 22.22+、pnpm 9+、Docker（用于 Postgres + Redis）、Python 3.11+（用于 AI 功能）、Git。
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **图像** | 107 | 缩放、裁剪、压缩、转换、背景移除、放大、OCR、水印、拼贴、上色、GIF 工具、格式预设 |
 | **视频** | 57 | 剪辑、裁剪、压缩、转换、合并、提取音频、自动字幕、视频转 GIF、缩放、防抖、格式预设 |
 | **音频** | 27 | 剪辑、合并、转换、归一化、降噪、转录、变调、淡入淡出、铃声制作、格式预设 |
-| **PDF / 文档** | 42 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、加密、修复 |
-| **文件** | 10 | CSV 转 JSON、JSON 转 XML、合并 CSV、拆分 CSV、创建 ZIP、解压 ZIP、图表制作、YAML/JSON |
+| **PDF / 文档** | 29 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、加密、修复 |
+| **文件** | 23 | CSV 转 JSON、JSON 转 XML、合并 CSV、拆分 CSV、创建 ZIP、解压 ZIP、图表制作、YAML/JSON |
 
 ### 流水线 {#pipelines}
 

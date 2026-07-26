@@ -17,7 +17,7 @@ Jak skonfigurować lokalne środowisko developerskie i wnieść wkład w kod Sna
 - [Docker](https://www.docker.com/) (wymagany dla lokalnego Postgresa + Redisa, budowania kontenerów i funkcji AI)
 - Git
 
-Python 3.10+ jest potrzebny tylko wtedy, gdy pracujesz nad sidecarem AI/ML (usuwanie tła, skalowanie w górę, OCR).
+Python 3.11+ jest potrzebny tylko wtedy, gdy pracujesz nad sidecarem AI/ML (usuwanie tła, skalowanie w górę, OCR).
 
 ## Konfiguracja {#setup}
 

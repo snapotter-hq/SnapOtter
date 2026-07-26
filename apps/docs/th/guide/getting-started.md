@@ -78,7 +78,7 @@ Canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtte
 
 ## Build from Source {#build-from-source}
 
-**ข้อกำหนดเบื้องต้น:** Node.js 22.22+, pnpm 9+, Docker (สำหรับ Postgres + Redis), Python 3.10+ (สำหรับฟีเจอร์ AI), Git
+**ข้อกำหนดเบื้องต้น:** Node.js 22.22+, pnpm 9+, Docker (สำหรับ Postgres + Redis), Python 3.11+ (สำหรับฟีเจอร์ AI), Git
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **รูปภาพ** | 107 | ปรับขนาด, ครอป, บีบอัด, แปลง, ลบพื้นหลัง, ขยายภาพ, OCR, ลายน้ำ, คอลลาจ, ลงสี, เครื่องมือ GIF, พรีเซ็ตรูปแบบ |
 | **วิดีโอ** | 57 | ตัด, ครอป, บีบอัด, แปลง, รวม, แยกเสียง, คำบรรยายอัตโนมัติ, วิดีโอเป็น GIF, ปรับขนาด, ทำให้ภาพนิ่ง, พรีเซ็ตรูปแบบ |
 | **เสียง** | 27 | ตัด, รวม, แปลง, นอร์มัลไลซ์, ลดสัญญาณรบกวน, ถอดเสียง, ปรับระดับเสียง, เฟด, สร้างริงโทน, พรีเซ็ตรูปแบบ |
-| **PDF / เอกสาร** | 42 | รวม, แยก, บีบอัด, OCR, ลายน้ำ, ปกปิดข้อมูล, Word เป็น PDF, Excel เป็น PDF, หมุน, ป้องกัน, ซ่อมแซม |
-| **ไฟล์** | 10 | CSV เป็น JSON, JSON เป็น XML, รวม CSV, แยก CSV, สร้าง ZIP, แตก ZIP, สร้างแผนภูมิ, YAML/JSON |
+| **PDF / เอกสาร** | 29 | รวม, แยก, บีบอัด, OCR, ลายน้ำ, ปกปิดข้อมูล, Word เป็น PDF, Excel เป็น PDF, หมุน, ป้องกัน, ซ่อมแซม |
+| **ไฟล์** | 23 | CSV เป็น JSON, JSON เป็น XML, รวม CSV, แยก CSV, สร้าง ZIP, แตก ZIP, สร้างแผนภูมิ, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

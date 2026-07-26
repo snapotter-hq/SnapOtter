@@ -78,7 +78,7 @@ Consulta [Configurazione](/it/guide/configuration) per tutte le variabili di amb
 
 ## Compilazione dal codice sorgente {#build-from-source}
 
-**Prerequisiti:** Node.js 22.22+, pnpm 9+, Docker (per Postgres + Redis), Python 3.10+ (per le funzionalità AI), Git.
+**Prerequisiti:** Node.js 22.22+, pnpm 9+, Docker (per Postgres + Redis), Python 3.11+ (per le funzionalità AI), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Immagine** | 107 | Ridimensiona, Ritaglia, Comprimi, Converti, Rimuovi sfondo, Upscaling, OCR, Filigrana, Collage, Colorizza, Strumenti GIF, preset di formato |
 | **Video** | 57 | Taglia, Ritaglia, Comprimi, Converti, Unisci, Estrai audio, Sottotitoli automatici, Da video a GIF, Ridimensiona, Stabilizza, preset di formato |
 | **Audio** | 27 | Taglia, Unisci, Converti, Normalizza, Riduzione del rumore, Trascrivi, Cambio di tonalità, Dissolvenza, Creatore di suonerie, preset di formato |
-| **PDF / Documenti** | 42 | Unisci, Dividi, Comprimi, OCR, Filigrana, Oscura, Da Word a PDF, Da Excel a PDF, Ruota, Proteggi, Ripara |
-| **File** | 10 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON |
+| **PDF / Documenti** | 29 | Unisci, Dividi, Comprimi, OCR, Filigrana, Oscura, Da Word a PDF, Da Excel a PDF, Ruota, Proteggi, Ripara |
+| **File** | 23 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON |
 
 ### Pipeline {#pipelines}
 

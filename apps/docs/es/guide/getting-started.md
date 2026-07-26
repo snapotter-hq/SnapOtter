@@ -78,7 +78,7 @@ Consulte [Configuración](/es/guide/configuration) para conocer todas las variab
 
 ## Compilar desde el código fuente {#build-from-source}
 
-**Requisitos previos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.10+ (para funciones de IA), Git.
+**Requisitos previos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.11+ (para funciones de IA), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -100,8 +100,8 @@ pnpm dev
 | **Imagen** | 107 | Redimensionar, Recortar, Comprimir, Convertir, Eliminar fondo, Escalar, OCR, Marca de agua, Collage, Colorizar, Herramientas GIF, ajustes de formato predefinidos |
 | **Vídeo** | 57 | Recortar, Recortar marco, Comprimir, Convertir, Combinar, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, ajustes de formato predefinidos |
 | **Audio** | 27 | Recortar, Combinar, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, ajustes de formato predefinidos |
-| **PDF / Documento** | 42 | Combinar, Dividir, Comprimir, OCR, Marca de agua, Redactar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
-| **Archivos** | 10 | CSV a JSON, JSON a XML, Combinar CSVs, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
+| **PDF / Documento** | 29 | Combinar, Dividir, Comprimir, OCR, Marca de agua, Redactar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
+| **Archivos** | 23 | CSV a JSON, JSON a XML, Combinar CSVs, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
 
 ### Canalizaciones {#pipelines}
 

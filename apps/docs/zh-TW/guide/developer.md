@@ -17,7 +17,7 @@ i18n_hash_version: 2
 - [Docker](https://www.docker.com/)（本機 Postgres + Redis、容器建置與 AI 功能所必需）
 - Git
 
-只有在你要處理 AI/ML 附屬程序（去背、放大、OCR）時，才需要 Python 3.10+。
+只有在你要處理 AI/ML 附屬程序（去背、放大、OCR）時，才需要 Python 3.11+。
 
 ## 設定 {#setup}
 

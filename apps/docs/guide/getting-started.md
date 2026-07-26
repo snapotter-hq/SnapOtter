@@ -74,7 +74,7 @@ See [Configuration](/guide/configuration) for all environment variables and [Sec
 
 ## Build from Source {#build-from-source}
 
-**Prerequisites:** Node.js 22.22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.10+ (for AI features), Git.
+**Prerequisites:** Node.js 22.22+, pnpm 9+, Docker (for Postgres + Redis), Python 3.11+ (for AI features), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -96,8 +96,8 @@ pnpm dev
 | **Image** | 107 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
 | **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
 | **Audio** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
-| **PDF / Document** | 42 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **Files** | 10 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| **PDF / Document** | 29 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
+| **Files** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipelines {#pipelines}
 
