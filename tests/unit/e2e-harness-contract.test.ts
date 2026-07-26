@@ -558,7 +558,7 @@ test("Firefox and WebKit collect the supported cross-browser core suite", () => 
     expect(output, project).toContain("smoke.spec.ts");
     expect(output, project).toContain("navigation.spec.ts");
     expect(output, project).toContain("home-page.spec.ts");
-    expect(output, project).toContain("Total: 49 tests in 5 files");
+    expect(output, project).toContain("Total: 57 tests in 5 files");
   }
 });
 

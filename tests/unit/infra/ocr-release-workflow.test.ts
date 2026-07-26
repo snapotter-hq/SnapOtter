@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
@@ -21,6 +22,41 @@ const ocrRequirementsPaths = [
 function readRequired(file: string): string {
   expect(existsSync(file), `${path.relative(root, file)} is missing`).toBe(true);
   return readFileSync(file, "utf8");
+}
+
+interface WorkflowDocument {
+  on: Record<string, unknown>;
+  jobs: Record<string, { if?: string; needs?: string | string[] }>;
+}
+
+/**
+ * Name of the job that gates Hugging Face publication behind a release commit,
+ * or null when publication is reachable without one.
+ *
+ * `publish` uploads feature bundles, so it must only ever run as part of a
+ * release. GitHub skips a job whose `needs` were skipped, so walking the
+ * dependency graph and finding a `release_commit` condition proves the manual
+ * and scheduled triggers cannot reach it.
+ */
+function publishGate(workflow: WorkflowDocument): string | null {
+  const seen = new Set<string>();
+  const queue = ["publish"];
+
+  while (queue.length > 0) {
+    const name = queue.shift() as string;
+    if (seen.has(name)) continue;
+    seen.add(name);
+
+    const definition = workflow.jobs[name];
+    expect(definition, `job ${name} is missing`).toBeTruthy();
+    if (definition.if?.includes("inputs.release_commit")) return name;
+
+    const needs = definition.needs;
+    if (typeof needs === "string") queue.push(needs);
+    else if (Array.isArray(needs)) queue.push(...needs);
+  }
+
+  return null;
 }
 
 function job(workflow: string, name: string, nextName?: string): string {
@@ -89,7 +125,6 @@ describe("OCR v3 bundle release workflow", () => {
   it("builds and verifies both portable targets on native runners", () => {
     const workflow = readRequired(bundlesWorkflowPath);
 
-    expect(workflow).not.toContain("workflow_dispatch:");
     expect(workflow).not.toContain("default: false");
     expect(job(workflow, "validate-inputs", "build-ocr")).toContain(
       `[[ "\${VERSION}" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+`,
@@ -120,6 +155,23 @@ describe("OCR v3 bundle release workflow", () => {
     expect(workflow).not.toContain("  verify-legacy:\n");
     expect(workflow).not.toMatch(/bundle: ocr\s+arch: (amd64-gpu|arm64-cpu)/);
     expect(workflow).not.toMatch(/paddleocr|onnxruntime-gpu/i);
+  });
+
+  it("keeps bundle publication reachable only from the release workflow", () => {
+    const workflow = load(readRequired(bundlesWorkflowPath)) as WorkflowDocument;
+
+    // The manual and scheduled triggers exist so the standalone
+    // installed-AI verification lane can run outside a release. They must not
+    // open a second route to the Hugging Face publish job.
+    expect(Object.keys(workflow.on)).toContain("workflow_dispatch");
+    expect(Object.keys(workflow.on)).toContain("schedule");
+    expect(publishGate(workflow)).toBe("validate-inputs");
+
+    // Negative control: strip the release-commit gate and the same walk must
+    // report the publish job as reachable from a manual dispatch.
+    const ungated = load(readRequired(bundlesWorkflowPath)) as WorkflowDocument;
+    delete ungated.jobs["validate-inputs"].if;
+    expect(publishGate(ungated)).toBeNull();
   });
 
   it("blocks release on the amd64 CPU pack running with a real NVIDIA GPU exposed", () => {
@@ -875,9 +927,13 @@ describe("OCR v3 bundle release workflow", () => {
   it("snapshots Hugging Face reads and publishes with a compare-and-swap parent", () => {
     const publishJob = job(readRequired(bundlesWorkflowPath), "publish");
 
+    // A shared group plus cancel-in-progress: false is the whole serialization
+    // contract. GitHub queues the second run behind the first, which is what
+    // keeps two releases off the one shared branch head. There is no `queue`
+    // concurrency key in Actions, so asserting one would only look reassuring.
     expect(publishJob).toContain("group: snapotter-hf-feature-bundles-publish");
     expect(publishJob).toContain("cancel-in-progress: false");
-    expect(publishJob).toContain("queue: max");
+    expect(publishJob).not.toMatch(/^\s*queue:/m);
     expect(publishJob).toContain("snapshot_revision = api.repo_info(");
     expect(publishJob).toContain('repo_id, repo_type="model", revision="main", token=token');
     expect(publishJob).toContain("revision=snapshot_revision");
