@@ -60,6 +60,7 @@ export default defineConfig({
       "tests/e2e-landing/**",
       "tests/e2e-docker/**",
       "tests/e2e-analytics/**",
+      "tests/e2e-noauth/**",
       // tests/qa/* are Playwright QA-sweep specs (and .mts harnesses), not
       // vitest tests; they import @playwright/test and break a bare `vitest run`.
       "tests/qa/**",

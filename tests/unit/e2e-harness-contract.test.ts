@@ -17,6 +17,7 @@ const embeddedModePath = path.join(root, "tests", "e2e-docker", "embedded-mode.m
 const packagePath = path.join(root, "package.json");
 const e2eRunnerPath = path.join(root, "scripts", "run-main-e2e.mjs");
 const turboPath = path.join(root, "turbo.json");
+const vitestConfigPath = path.join(root, "vitest.config.ts");
 
 const isolationEnvKeys = [
   "API_URL",
@@ -670,6 +671,23 @@ test("the canonical E2E command exactly covers every release browser and device 
   expect(darwinPlan.flat()).toContain("--project=chromium-legacy-visual");
   expect(linuxPlan[0]).toContain("--grep-invert=@visual");
   expect(linuxPlan[1]).toEqual(["test", "--project=chromium-serial", "--workers=1"]);
+});
+
+test("Vitest excludes every Playwright spec directory", () => {
+  const config = fs.readFileSync(vitestConfigPath, "utf8");
+  const playwrightDirs = fs
+    .readdirSync(path.join(root, "tests"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^e2e(-|$)/.test(entry.name))
+    .map((entry) => entry.name);
+
+  // Reading the directory rather than listing names keeps this honest: adding
+  // a new browser suite fails here until vitest.config.ts learns to skip it.
+  // Without the exclusion a bare `vitest run` imports @playwright/test and the
+  // whole unit lane dies on a spec it was never meant to collect.
+  expect(playwrightDirs.length).toBeGreaterThan(0);
+  for (const dir of playwrightDirs) {
+    expect(config, `vitest.config.ts must exclude tests/${dir}`).toContain(`"tests/${dir}/**"`);
+  }
 });
 
 test("Firefox and WebKit collect the supported cross-browser core suite", () => {
