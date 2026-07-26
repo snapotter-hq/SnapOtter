@@ -264,7 +264,7 @@
           "minSize": 1000000000
         }
       ],
-      "smokeImports": ["diffusers", "torch"],
+      "smokeImports": ["diffusers", "torch", "transformers"],
       "enablesTools": ["erase-object"]
     },
     "upscale-enhance": {
