@@ -223,6 +223,39 @@ def test_a_refused_install_does_not_take_a_siblings_shared_import_with_it(tmp_pa
     assert dist_infos(venv_sp, "opencv_contrib_python-") == []
 
 
+def test_files_the_incoming_copy_does_not_carry_are_left_where_they_are(tmp_path):
+    """Bundle archives are not always complete wheels.
+
+    Reproduced live: upscale-enhance carries setuptools 74.1.3 as `setuptools/`
+    plus its dist-info, and nothing else. The version it replaced also owned
+    `_distutils_hack/` and `distutils-precedence.pth`, the shim that gives
+    Python 3.12 a `distutils`. Removing everything the old RECORD listed deleted
+    the shim, nothing wrote it back, and basicsr, realesrgan and gfpgan all
+    stopped importing on a venv where every bundle reported installed.
+    """
+    installer = load_installer()
+    staging, venv_sp, quarantine = trees(tmp_path)
+    write_dist(
+        venv_sp, "setuptools", "78.1.1",
+        {
+            "setuptools/__init__.py": "78",
+            "setuptools/_vendor/old.py": "78-vendored",
+            "_distutils_hack/__init__.py": "shim",
+            "distutils-precedence.pth": "import _distutils_hack",
+        },
+    )
+    write_dist(staging, "setuptools", "74.1.3", {"setuptools/__init__.py": "74"})
+
+    merge(installer, staging, venv_sp, quarantine)
+
+    assert (venv_sp / "_distutils_hack" / "__init__.py").read_text() == "shim"
+    assert (venv_sp / "distutils-precedence.pth").read_text() == "import _distutils_hack"
+    # The part the incoming copy does cover is fully replaced, stale files and all.
+    assert (venv_sp / "setuptools" / "__init__.py").read_text() == "74"
+    assert not (venv_sp / "setuptools" / "_vendor" / "old.py").exists()
+    assert dist_infos(venv_sp, "setuptools-") == ["setuptools-74.1.3.dist-info"]
+
+
 def test_stale_bytecode_of_a_removed_module_is_discarded(tmp_path):
     """A `.pyc` orphaned by the uninstall keeps the package directory alive and
     would block the incoming version's directory from landing cleanly."""

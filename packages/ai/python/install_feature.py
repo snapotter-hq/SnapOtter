@@ -760,12 +760,14 @@ def plan_reconciliation(staging_sp: str, sp_dir: str) -> list:
         superseded = [copy for copy in existing if copy[0] != version]
         if existing and not superseded:
             continue
+        files = distribution_files(staging_sp, dist_info)
         plan.append(
             {
                 "name": name,
                 "version": version,
                 "dist_info": dist_info,
-                "files": distribution_files(staging_sp, dist_info),
+                "files": files,
+                "replaces": {rel.split("/")[0] for rel in files},
                 "superseded": superseded,
             }
         )
@@ -785,8 +787,17 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
     for item in plan:
         for version, dist_info in item["superseded"]:
             destination = os.path.join(quarantine_dir, item["name"], version)
+            # Only clear ground the incoming copy is going to cover. A bundle
+            # archive is not always a complete wheel: upscale-enhance carries
+            # setuptools 74.1.3 as `setuptools/` and its dist-info, without the
+            # `_distutils_hack/` and `distutils-precedence.pth` that the version
+            # it replaces owns. Removing everything the old RECORD listed took
+            # the distutils shim with it and basicsr, realesrgan and gfpgan all
+            # stopped importing, because nothing was going to write those files
+            # back. Anything the incoming copy does not carry stays put.
+            replaces = item["replaces"] | {dist_info}
             for rel in distribution_files(sp_dir, dist_info):
-                if rel in shared:
+                if rel in shared or rel.split("/")[0] not in replaces:
                     continue
                 if _relocate(sp_dir, destination, rel):
                     _discard_stale_bytecode(sp_dir, rel)
