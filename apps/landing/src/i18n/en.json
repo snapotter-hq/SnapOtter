@@ -28,6 +28,8 @@
   "banner.dismiss": "Dismiss",
   "faq.metaTitle": "FAQ | SnapOtter",
   "faq.metaDescription": "Frequently asked questions about SnapOtter, self-hosted file-processing infrastructure.",
+  "home.metaTitle": "SnapOtter | Self-Hosted File-Processing Infrastructure",
+  "home.metaDescription": "Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. The private, self-hosted alternative to CloudConvert, Smallpdf, and TinyPNG.",
   "faq.title": "Frequently Asked Questions",
   "faq.subtitle": "Everything you need to know about SnapOtter.",
   "faq.stillHave.title": "Still have questions?",

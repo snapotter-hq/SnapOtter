@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "ツールを検索",
   "home.hero.subtitle": "画像、動画、音声、PDF、ドキュメントを対象に、変換、圧縮、OCR、文字起こし、メタデータ削除、ローカル AI 処理を実行。UI、REST API、パイプラインを通じて、自分が所有するインフラ上で。",
   "home.hero.title": "ネットワークの外に出せないデータのための、プライベートなファイル処理。",
+  "home.metaDescription": "オープンソースのセルフホスト型ファイル処理基盤。画像、動画、音声、PDF、ドキュメントを対象に、変換、圧縮、OCR、文字起こし、ローカル AI 処理を実行できます。UI、REST API、パイプラインから利用可能。CloudConvert、Smallpdf、TinyPNG のプライベートなセルフホスト代替です。",
+  "home.metaTitle": "セルフホスト型ファイル処理基盤 | SnapOtter",
   "home.openSource.discord": "Discordに参加",
   "home.openSource.sponsor": "スポンサーになる",
   "home.openSource.star": "GitHubでスター",

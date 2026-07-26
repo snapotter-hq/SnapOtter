@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Cerca strumenti",
   "home.hero.subtitle": "Converti, comprimi, applica OCR, trascrivi, rimuovi i metadati ed esegui AI in locale su immagini, video, audio, PDF e documenti. Tramite UI, API REST e pipeline, sull'infrastruttura che possiedi.",
   "home.hero.title": "Elaborazione file privata per i dati che non possono uscire dalla tua rete.",
+  "home.metaDescription": "Infrastruttura open source e self-hosted per l'elaborazione dei file. Converti, comprimi, applica OCR, trascrivi ed esegui AI in locale su immagini, video, audio, PDF e documenti, tramite UI, API REST e pipeline. L'alternativa privata e self-hosted a CloudConvert, Smallpdf e TinyPNG.",
+  "home.metaTitle": "Elaborazione dei file self-hosted | SnapOtter",
   "home.openSource.discord": "Unisciti a Discord",
   "home.openSource.sponsor": "Sostieni",
   "home.openSource.star": "Metti una stella su GitHub",

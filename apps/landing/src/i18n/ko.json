@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "도구 검색",
   "home.hero.subtitle": "이미지, 동영상, 오디오, PDF, 문서 전반에서 변환, 압축, OCR, 전사, 메타데이터 제거를 하고 로컬 AI를 실행하세요. 직접 소유한 인프라에서 UI, REST API, 파이프라인으로.",
   "home.hero.title": "네트워크를 벗어날 수 없는 데이터를 위한 비공개 파일 처리.",
+  "home.metaDescription": "오픈 소스 셀프 호스팅 파일 처리 인프라. 이미지, 동영상, 오디오, PDF, 문서 전반에서 변환, 압축, OCR, 전사를 하고 로컬 AI를 실행하세요. UI, REST API, 파이프라인으로 사용할 수 있습니다. CloudConvert, Smallpdf, TinyPNG를 대체하는 비공개 셀프 호스팅 솔루션입니다.",
+  "home.metaTitle": "셀프 호스팅 파일 처리 인프라 | SnapOtter",
   "home.openSource.discord": "Discord 참여하기",
   "home.openSource.sponsor": "후원하기",
   "home.openSource.star": "GitHub에서 스타 누르기",

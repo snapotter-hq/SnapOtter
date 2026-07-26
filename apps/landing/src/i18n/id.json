@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Cari alat",
   "home.hero.subtitle": "Konversi, kompres, OCR, transkripsi, hapus metadata, dan jalankan AI lokal untuk gambar, video, audio, PDF, dan dokumen. Lewat UI, REST API, dan pipeline, di infrastruktur milik Anda sendiri.",
   "home.hero.title": "Pemrosesan file privat untuk data yang tidak boleh keluar dari jaringan Anda.",
+  "home.metaDescription": "Infrastruktur pemrosesan file open source dan self-hosted. Konversi, kompres, OCR, transkripsi, dan jalankan AI lokal untuk gambar, video, audio, PDF, dan dokumen, lewat UI, REST API, dan pipeline. Alternatif privat dan self-hosted untuk CloudConvert, Smallpdf, dan TinyPNG.",
+  "home.metaTitle": "Infrastruktur Pemrosesan File Self-Hosted | SnapOtter",
   "home.openSource.discord": "Gabung Discord",
   "home.openSource.sponsor": "Jadi Sponsor",
   "home.openSource.star": "Beri Bintang di GitHub",

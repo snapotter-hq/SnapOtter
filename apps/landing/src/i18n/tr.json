@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Araç ara",
   "home.hero.subtitle": "Görüntü, video, ses, PDF ve belgelerde dönüştürün, sıkıştırın, OCR ve transkripsiyon yapın, meta verileri temizleyin ve yerel yapay zekâ çalıştırın. Bir arayüz, REST API ve işlem hatlarıyla, sahip olduğun altyapıda.",
   "home.hero.title": "Ağından çıkamayacak veriler için gizli dosya işleme.",
+  "home.metaDescription": "Açık kaynaklı, kendi sunucunuzda barındırılan dosya işleme altyapısı. Görüntü, video, ses, PDF ve belgelerde dönüştürün, sıkıştırın, OCR ve transkripsiyon yapın, yerel yapay zekâ çalıştırın; bir arayüz, REST API ve işlem hatlarıyla. CloudConvert, Smallpdf ve TinyPNG'ye gizli, kendi sunucunuzda barındırılan alternatif.",
+  "home.metaTitle": "Kendi Sunucunuzda Dosya İşleme Altyapısı | SnapOtter",
   "home.openSource.discord": "Discord'a Katıl",
   "home.openSource.sponsor": "Sponsor Ol",
   "home.openSource.star": "GitHub'da Yıldızla",

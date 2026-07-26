@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Buscar herramientas",
   "home.hero.subtitle": "Convierte, comprime, aplica OCR, transcribe, elimina metadatos y ejecuta IA local en imagen, vídeo, audio, PDF y documentos. A través de una interfaz, una REST API y pipelines, en la infraestructura que tú controlas.",
   "home.hero.title": "Procesamiento de archivos privado para datos que no pueden salir de tu red.",
+  "home.metaDescription": "Infraestructura autoalojada y de código abierto para el procesamiento de archivos. Convierte, comprime, aplica OCR, transcribe y ejecuta IA local en imagen, vídeo, audio, PDF y documentos, a través de una interfaz, una REST API y pipelines. La alternativa privada y autoalojada a CloudConvert, Smallpdf y TinyPNG.",
+  "home.metaTitle": "Procesamiento de archivos autoalojado | SnapOtter",
   "home.openSource.discord": "Únete a Discord",
   "home.openSource.sponsor": "Patrocinar",
   "home.openSource.star": "Dale una estrella en GitHub",

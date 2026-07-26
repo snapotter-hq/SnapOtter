@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Tìm công cụ",
   "home.hero.subtitle": "Chuyển đổi, nén, OCR, phiên âm, xóa metadata và chạy AI cục bộ trên ảnh, video, âm thanh, PDF và tài liệu. Qua giao diện, REST API và pipeline, trên hạ tầng bạn sở hữu.",
   "home.hero.title": "Xử lý tệp riêng tư cho dữ liệu không thể rời khỏi mạng của bạn.",
+  "home.metaDescription": "Hạ tầng xử lý tệp mã nguồn mở, tự lưu trữ. Chuyển đổi, nén, OCR, phiên âm và chạy AI cục bộ trên ảnh, video, âm thanh, PDF và tài liệu, qua giao diện, REST API và pipeline. Giải pháp thay thế riêng tư, tự lưu trữ cho CloudConvert, Smallpdf và TinyPNG.",
+  "home.metaTitle": "Hạ tầng xử lý tệp tự lưu trữ | SnapOtter",
   "home.openSource.discord": "Tham gia Discord",
   "home.openSource.sponsor": "Tài trợ",
   "home.openSource.star": "Gắn sao trên GitHub",

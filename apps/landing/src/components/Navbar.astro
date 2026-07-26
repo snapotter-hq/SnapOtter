@@ -42,7 +42,8 @@ const links: NavItem[] = [
   <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
     <!-- Logo -->
     <a href={localizeHref(locale, "/")} class="flex shrink-0 items-center gap-2.5">
-      <img src="/logo.png" alt="SnapOtter" class="h-8 w-8" width="32" height="32" />
+      <!-- Decorative: the adjacent span already gives the link its accessible name. -->
+      <img src="/logo.png" alt="" class="h-8 w-8" width="32" height="32" />
       <span class="font-display text-lg font-bold tracking-tight">SnapOtter</span>
     </a>
 

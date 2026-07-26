@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Tools suchen",
   "home.hero.subtitle": "Konvertieren, komprimieren, OCR, transkribieren, Metadaten entfernen und lokale KI ausführen für Bild, Video, Audio, PDF und Dokumente. Über eine UI, REST API und Pipelines, auf einer Infrastruktur, die dir gehört.",
   "home.hero.title": "Private Dateiverarbeitung für Daten, die dein Netzwerk nicht verlassen dürfen.",
+  "home.metaDescription": "Open-Source-Infrastruktur für die Dateiverarbeitung, selbst gehostet. Konvertieren, komprimieren, OCR, transkribieren und lokale KI ausführen für Bild, Video, Audio, PDF und Dokumente, über eine UI, REST API und Pipelines. Die private, selbst gehostete Alternative zu CloudConvert, Smallpdf und TinyPNG.",
+  "home.metaTitle": "Self-Hosted-Infrastruktur für Dateiverarbeitung | SnapOtter",
   "home.openSource.discord": "Discord beitreten",
   "home.openSource.sponsor": "Sponsern",
   "home.openSource.star": "Auf GitHub mit Stern versehen",

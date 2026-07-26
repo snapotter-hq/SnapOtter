@@ -11,7 +11,7 @@ import OpenSource from "@/components/OpenSource.astro";
 import Pricing from "@/components/Pricing.astro";
 import Testimonials from "@/components/Testimonials.astro";
 import ToolGrid from "@/components/ToolGrid.astro";
-import { LANDING_LOCALES } from "@/i18n";
+import { LANDING_LOCALES, t } from "@/i18n";
 import Base from "@/layouts/Base.astro";
 import { localizeHref } from "@/lib/i18n-page";
 
@@ -25,9 +25,10 @@ export function getStaticPaths() {
 const { locale } = Astro.props;
 const PATH = "/";
 
-const pageTitle = "SnapOtter | Self-Hosted File-Processing Infrastructure";
-const pageDescription =
-  "Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. The private, self-hosted alternative to CloudConvert, Smallpdf, and TinyPNG.";
+// Localized: these were English literals, so all 20 translated home pages
+// shipped an English <title> and meta description.
+const pageTitle = t(locale, "home.metaTitle");
+const pageDescription = t(locale, "home.metaDescription");
 
 const websiteSchema = {
   "@context": "https://schema.org",

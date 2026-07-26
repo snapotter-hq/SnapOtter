@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Sök verktyg",
   "home.hero.subtitle": "Konvertera, komprimera, kör OCR, transkribera, ta bort metadata och kör lokal AI för bild, video, ljud, PDF och dokument. Via ett gränssnitt, REST API och pipelines, på infrastruktur du själv äger.",
   "home.hero.title": "Privat filbearbetning för data som inte får lämna ditt nätverk.",
+  "home.metaDescription": "Självhostad infrastruktur för filbearbetning med öppen källkod. Konvertera, komprimera, kör OCR, transkribera och kör lokal AI för bild, video, ljud, PDF och dokument, via ett gränssnitt, REST API och pipelines. Det privata, självhostade alternativet till CloudConvert, Smallpdf och TinyPNG.",
+  "home.metaTitle": "Självhostad infrastruktur för filbearbetning | SnapOtter",
   "home.openSource.discord": "Gå med i Discord",
   "home.openSource.sponsor": "Sponsra",
   "home.openSource.star": "Ge en stjärna på GitHub",

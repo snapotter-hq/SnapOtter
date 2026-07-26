@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "ค้นหาเครื่องมือ",
   "home.hero.subtitle": "แปลง บีบอัด OCR ถอดเสียง ลบเมทาดาทา และรัน AI ในเครื่อง ครอบคลุมทั้งภาพ วิดีโอ เสียง PDF และเอกสาร ผ่าน UI, REST API และไปป์ไลน์ บนโครงสร้างพื้นฐานที่คุณเป็นเจ้าของ",
   "home.hero.title": "ประมวลผลไฟล์แบบส่วนตัว สำหรับข้อมูลที่ออกจากเครือข่ายของคุณไม่ได้",
+  "home.metaDescription": "โครงสร้างพื้นฐานสำหรับประมวลผลไฟล์แบบโอเพนซอร์สและโฮสต์เอง แปลง บีบอัด OCR ถอดเสียง และรัน AI ในเครื่อง ครอบคลุมทั้งภาพ วิดีโอ เสียง PDF และเอกสาร ผ่าน UI, REST API และไปป์ไลน์ ทางเลือกส่วนตัวแบบโฮสต์เองแทน CloudConvert, Smallpdf และ TinyPNG",
+  "home.metaTitle": "โครงสร้างพื้นฐานประมวลผลไฟล์แบบ self-hosted | SnapOtter",
   "home.openSource.discord": "เข้าร่วม Discord",
   "home.openSource.sponsor": "สนับสนุน",
   "home.openSource.star": "กด Star บน GitHub",

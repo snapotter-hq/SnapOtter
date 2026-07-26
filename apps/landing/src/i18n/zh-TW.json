@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "搜尋工具",
   "home.hero.subtitle": "在圖片、影片、音訊、PDF 與文件之間轉檔、壓縮、OCR、轉錄、清除中繼資料並運行本地 AI。透過 UI、REST API 與流程管線，全在你自己擁有的基礎設施上完成。",
   "home.hero.title": "私有檔案處理，讓不能離開內網的資料留在原處。",
+  "home.metaDescription": "開源、自架式的檔案處理基礎設施。在圖片、影片、音訊、PDF 與文件之間轉檔、壓縮、OCR、轉錄並運行本地 AI，可透過 UI、REST API 與流程管線使用。CloudConvert、Smallpdf 與 TinyPNG 的私有自架式替代方案。",
+  "home.metaTitle": "自架式檔案處理基礎設施 | SnapOtter",
   "home.openSource.discord": "加入 Discord",
   "home.openSource.sponsor": "贊助",
   "home.openSource.star": "在 GitHub 上給星星",

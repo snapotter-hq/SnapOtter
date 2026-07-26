@@ -320,6 +320,8 @@
   "home.hero.searchPlaceholder": "Rechercher des outils",
   "home.hero.subtitle": "Convertissez, compressez, appliquez l'OCR, transcrivez, supprimez les métadonnées et exécutez l'IA en local sur vos images, vidéos, fichiers audio, PDF et documents. Via une interface, une API REST et des pipelines, sur une infrastructure qui vous appartient.",
   "home.hero.title": "Traitement de fichiers privé pour les données qui ne peuvent pas quitter votre réseau.",
+  "home.metaDescription": "Infrastructure open source et auto-hébergée de traitement de fichiers. Convertissez, compressez, appliquez l'OCR, transcrivez et exécutez l'IA en local sur vos images, vidéos, fichiers audio, PDF et documents, via une interface, une API REST et des pipelines. L'alternative privée et auto-hébergée à CloudConvert, Smallpdf et TinyPNG.",
+  "home.metaTitle": "Traitement de fichiers auto-hébergé | SnapOtter",
   "home.openSource.discord": "Rejoindre Discord",
   "home.openSource.sponsor": "Devenir sponsor",
   "home.openSource.star": "Ajouter une étoile sur GitHub",
