@@ -661,6 +661,31 @@ def distribution_files(sp_dir: str, dist_info: str) -> list:
     return paths
 
 
+def paths_claimed_by_others(sp_dir: str, exclude: set) -> set:
+    """Every file some OTHER installed distribution says it owns.
+
+    Distributions are supposed to own disjoint files, and almost all of them do.
+    The exceptions are the ones that package the same import under different
+    project names: `opencv-python`, `opencv-python-headless` and
+    `opencv-contrib-python` all write `cv2/`, exactly as `onnxruntime` and
+    `onnxruntime-gpu` both write `onnxruntime/`. Uninstalling one of those by its
+    RECORD would take the shared import away from the siblings that are still
+    installed, and the merge only puts back the files of the distribution it is
+    placing, so `cv2` would simply vanish.
+
+    Shared files are therefore left where they are and let the merge overwrite
+    them, which is what pip does with these packages too. The version metadata
+    still ends up single-valued, which is the invariant that matters.
+    """
+    claimed = set()
+    if not os.path.isdir(sp_dir):
+        return claimed
+    for entry in os.listdir(sp_dir):
+        if entry.endswith(DIST_INFO_SUFFIX) and entry not in exclude:
+            claimed.update(distribution_files(sp_dir, entry))
+    return claimed
+
+
 def _is_inside(root: str, path: str) -> bool:
     return not os.path.relpath(os.path.abspath(path), os.path.abspath(root)).startswith("..")
 
@@ -755,10 +780,14 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
     instead of leaving it half-way between two bundles.
     """
     removed = 0
+    superseded_dist_infos = {info for item in plan for _v, info in item["superseded"]}
+    shared = paths_claimed_by_others(sp_dir, superseded_dist_infos)
     for item in plan:
         for version, dist_info in item["superseded"]:
             destination = os.path.join(quarantine_dir, item["name"], version)
             for rel in distribution_files(sp_dir, dist_info):
+                if rel in shared:
+                    continue
                 if _relocate(sp_dir, destination, rel):
                     _discard_stale_bytecode(sp_dir, rel)
                     _prune_empty_parents(sp_dir, rel)
@@ -808,8 +837,12 @@ def discard_placed_distributions(sp_dir: str, plan: list) -> None:
     present at the staged version never entered the plan, so a rollback cannot
     delete a version that was there before this install and is still correct.
     """
+    placed_dist_infos = {item["dist_info"] for item in plan}
+    shared = paths_claimed_by_others(sp_dir, placed_dist_infos)
     for item in plan:
         for rel in item["files"]:
+            if rel in shared:
+                continue
             target = os.path.join(sp_dir, rel)
             try:
                 if os.path.isdir(target) and not os.path.islink(target):

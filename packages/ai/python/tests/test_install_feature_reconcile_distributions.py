@@ -178,6 +178,51 @@ def test_a_directory_another_distribution_still_uses_is_not_pruned(tmp_path):
     assert (venv_sp / "google" / "api" / "__init__.py").read_text() == "api-new"
 
 
+def test_uninstalling_one_opencv_flavour_leaves_cv2_for_its_siblings(tmp_path):
+    """The three opencv projects all own `cv2/`, the way onnxruntime's two
+    flavours own `onnxruntime/`.
+
+    Reproduced live: superseding opencv-contrib-python deleted every file its
+    RECORD listed, which is the same `cv2/` that opencv-python and
+    opencv-python-headless were still claiming. The merge only puts back the
+    files of the distribution it is placing, so the venv lost cv2 outright and
+    rembg, mediapipe, basicsr, realesrgan and gfpgan all stopped importing.
+    """
+    installer = load_installer()
+    staging, venv_sp, quarantine = trees(tmp_path)
+    shared = {"cv2/__init__.py": "shared", "cv2/cv2.abi3.so": "shared-binary"}
+    write_dist(venv_sp, "opencv_python_headless", "4.10.0.84", dict(shared))
+    write_dist(venv_sp, "opencv_python", "4.11.0.86", dict(shared))
+    write_dist(venv_sp, "opencv_contrib_python", "4.11.0.86", dict(shared))
+    write_dist(staging, "opencv_contrib_python", "4.13.0.92",
+               {"cv2/__init__.py": "contrib-new", "cv2/cv2.abi3.so": "contrib-binary"})
+
+    merge(installer, staging, venv_sp, quarantine)
+
+    assert (venv_sp / "cv2" / "__init__.py").read_text() == "contrib-new"
+    assert (venv_sp / "cv2" / "cv2.abi3.so").read_text() == "contrib-binary"
+    assert dist_infos(venv_sp, "opencv_contrib_python-") == ["opencv_contrib_python-4.13.0.92.dist-info"]
+    assert dist_infos(venv_sp, "opencv_python-") == ["opencv_python-4.11.0.86.dist-info"]
+
+
+def test_a_refused_install_does_not_take_a_siblings_shared_import_with_it(tmp_path):
+    """The rollback has the same hazard from the other side: removing what the
+    bundle placed must not remove files another installed distribution owns."""
+    installer = load_installer()
+    staging, venv_sp, quarantine = trees(tmp_path)
+    write_dist(venv_sp, "opencv_python_headless", "4.10.0.84",
+               {"cv2/__init__.py": "headless", "cv2/cv2.abi3.so": "headless-binary"})
+    write_dist(staging, "opencv_contrib_python", "4.13.0.92",
+               {"cv2/__init__.py": "contrib", "cv2/cv2.abi3.so": "contrib-binary"})
+
+    plan = merge(installer, staging, venv_sp, quarantine)
+    installer.rollback_reconciliation(str(venv_sp), plan, str(quarantine))
+
+    assert (venv_sp / "cv2" / "__init__.py").exists()
+    assert dist_infos(venv_sp, "opencv_python_headless-") == ["opencv_python_headless-4.10.0.84.dist-info"]
+    assert dist_infos(venv_sp, "opencv_contrib_python-") == []
+
+
 def test_stale_bytecode_of_a_removed_module_is_discarded(tmp_path):
     """A `.pyc` orphaned by the uninstall keeps the package directory alive and
     would block the incoming version's directory from landing cleanly."""
