@@ -414,16 +414,12 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs:
-      [
-        changes,
-        lint,
-        typecheck,
-        test-unit,
-        test-integration,
-        test-e2e-smoke,
-        test-e2e-mobile-smoke,
-      ]
+    # Only `changes` is a real dependency (its output gates the `if` below).
+    # Gating on the test jobs used to save a runner minute on red PRs, but it
+    # put a 55s job behind the slowest integration shard and added that time to
+    # every green run. Build and the test jobs are independent required checks,
+    # so a green Build still can't merge past a red shard.
+    needs: [changes]
     if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
