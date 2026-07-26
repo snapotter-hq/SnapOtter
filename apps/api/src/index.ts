@@ -14,6 +14,7 @@ import { runMigrations } from "./db/migrate.js";
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { assertRedisCompatible, closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
+import { reconcileStrandedJobs } from "./jobs/job-reconciliation.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
@@ -738,6 +739,24 @@ void db
     if (n > 0) app.log.info({ count: n }, "Reconciled orphaned job rows at startup");
   })
   .catch((err) => app.log.warn({ err }, "Orphaned-job reconciliation failed"));
+
+// Reconcile stranded job rows: real jobs (tool_id set) that are still
+// 'queued'/'processing' but have no live BullMQ entry, because the terminal
+// write was lost -- a Postgres outage makes the worker's UPDATE fail outright
+// and the failure path cannot persist 'failed' either. Distinct from the
+// orphan sweep above, which deliberately only touches rows with no tool_id.
+// Also runs on a repeatable system job so recovery does not depend on a
+// restart. Non-blocking: boot must not wait on it.
+void reconcileStrandedJobs()
+  .then((summary) => {
+    if (summary.recovered > 0 || summary.failed > 0) {
+      app.log.info(
+        { recovered: summary.recovered, failed: summary.failed },
+        "Reconciled stranded job rows at startup",
+      );
+    }
+  })
+  .catch((err) => app.log.warn({ err }, "Stranded-job reconciliation failed"));
 
 // Warm the per-pool QueueEvents consumers so the first synchronous tool request
 // after boot does not pay the lazy-connect cost (and cannot miss a fast job's

@@ -28,6 +28,7 @@ export const SYSTEM_JOBS = {
   siemForward: "system:siem-forward",
   auditArchive: "system:audit-archive",
   storageReconciliation: "system:storage-reconciliation",
+  jobReconciliation: "system:job-reconciliation",
   gdprExport: "system:gdpr-export",
   alertEvaluator: "system:alert-evaluator",
 } as const;
@@ -59,6 +60,12 @@ export async function scheduleSystemJobs(): Promise<void> {
   });
   // Alert evaluator: every 60 seconds
   await q.upsertJobScheduler(SYSTEM_JOBS.alertEvaluator, { every: 60_000 });
+  // Stranded-job reconciliation: every 60 seconds. The interval is the recovery
+  // latency after a database outage swallows a terminal write, so it is short
+  // on purpose; the sweep is a single indexed query that normally matches
+  // nothing. Redis carries the schedule, so it survives the process that lost
+  // the write and fires again as soon as Postgres answers.
+  await q.upsertJobScheduler(SYSTEM_JOBS.jobReconciliation, { every: 60_000 });
 }
 
 /** Enqueue a one-shot system job (e.g. startup cleanup trigger). */
@@ -75,7 +82,8 @@ export async function enqueueSystemJob(name: string): Promise<void> {
 // maintainers' canonical hosted instance sets SENTRY_CRON_MONITORS=1, because
 // thousands of self-hosted installs checking into one org's monitors would make
 // a "missed" signal meaningless. High-frequency pollers (siemForward,
-// alertEvaluator) and on-demand jobs (gdprExport) are intentionally excluded.
+// alertEvaluator, jobReconciliation) and on-demand jobs (gdprExport) are
+// intentionally excluded.
 type MonitorSchedule =
   | { type: "crontab"; value: string }
   | { type: "interval"; value: number; unit: "minute" | "hour" | "day" };
@@ -161,6 +169,11 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
     case SYSTEM_JOBS.storageReconciliation: {
       const { storageReconciliationJob } = await import("./storage-reconciliation.js");
       return storageReconciliationJob();
+    }
+    case SYSTEM_JOBS.jobReconciliation: {
+      const { reconcileStrandedJobs } = await import("./job-reconciliation.js");
+      const { outcomes, ...counts } = await reconcileStrandedJobs();
+      return counts;
     }
     case SYSTEM_JOBS.gdprExport: {
       const { gdprExportJob } = await import("./gdpr-export.js");
