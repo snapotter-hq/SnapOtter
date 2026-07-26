@@ -56,6 +56,45 @@ interface FieldBounds {
 }
 
 /**
+ * Minimal view of the Zod v3 internals this walker touches, mirroring the
+ * approach in tests/helpers/zod-pict.ts. Reaching into `_def` is deliberate; a
+ * Zod upgrade that changes it should fail here loudly rather than silently
+ * producing an empty bounds map.
+ */
+interface ZodDefLike {
+  typeName?: string;
+  schema?: ZodNodeLike;
+  innerType?: ZodNodeLike;
+  in?: ZodNodeLike;
+  shape?: () => Record<string, ZodNodeLike>;
+  checks?: Array<{ kind: string; value?: number }>;
+}
+
+interface ZodNodeLike {
+  _def?: ZodDefLike;
+}
+
+/** Strips effects, pipelines, defaults, optionals and nullables. */
+function unwrapNode(node: ZodNodeLike): ZodNodeLike {
+  let current = node;
+  for (let i = 0; i < 10; i++) {
+    const def = current._def;
+    if (!def) return current;
+    if (def.typeName === "ZodEffects" && def.schema) current = def.schema;
+    else if (def.typeName === "ZodPipeline" && def.in) current = def.in;
+    else if (
+      (def.typeName === "ZodDefault" ||
+        def.typeName === "ZodOptional" ||
+        def.typeName === "ZodNullable") &&
+      def.innerType
+    )
+      current = def.innerType;
+    else return current;
+  }
+  return current;
+}
+
+/**
  * Reads the bounds a field actually declares.
  *
  * deriveAxes synthesizes an upper bound for unbounded numbers so the pairwise
@@ -66,32 +105,16 @@ interface FieldBounds {
  */
 function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
   const bounds = new Map<string, FieldBounds>();
-  const unwrap = (node: any): any => {
-    for (let i = 0; i < 10 && node?._def; i++) {
-      const def = node._def;
-      if (def.typeName === "ZodEffects" && def.schema) node = def.schema;
-      else if (def.typeName === "ZodPipeline" && def.in) node = def.in;
-      else if (
-        (def.typeName === "ZodDefault" ||
-          def.typeName === "ZodOptional" ||
-          def.typeName === "ZodNullable") &&
-        def.innerType
-      )
-        node = def.innerType;
-      else return node;
-    }
-    return node;
-  };
+  const root = unwrapNode(schema as ZodNodeLike);
+  const shape = root._def?.shape;
+  if (root._def?.typeName !== "ZodObject" || typeof shape !== "function") return bounds;
 
-  const root = unwrap(schema as any);
-  if (root?._def?.typeName !== "ZodObject" || typeof root._def.shape !== "function") return bounds;
-
-  for (const [key, field] of Object.entries(root._def.shape() as Record<string, any>)) {
-    const inner = unwrap(field);
-    const typeName = inner?._def?.typeName;
+  for (const [key, field] of Object.entries(shape())) {
+    const inner = unwrapNode(field);
+    const typeName = inner._def?.typeName;
     if (typeName === "ZodNumber") {
       const entry: FieldBounds = { kind: "number" };
-      for (const check of inner._def.checks ?? []) {
+      for (const check of inner._def?.checks ?? []) {
         if (check.kind === "min") entry.min = check.value;
         if (check.kind === "max") entry.max = check.value;
       }

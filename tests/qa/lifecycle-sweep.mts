@@ -412,11 +412,13 @@ async function checkPipelineCrossModality(): Promise<void> {
  * still reading "processing" after the restart is the defect.
  */
 async function checkWorkerRestartRecovery(): Promise<void> {
+  // OCR of a multi-page PDF runs for minutes on this host, so the restart lands
+  // while the job is genuinely in flight rather than after it has finished.
   const submit = await client.submit({
-    path: "/api/v1/tools/video/compress-video",
-    files: [{ field: "file", path: MP4 }],
+    path: "/api/v1/tools/pdf/ocr-pdf",
+    files: [{ field: "file", path: PDF }],
     settings: {},
-    timeoutMs: 10_000,
+    timeoutMs: 15_000,
     followAsync: false,
   });
   const jobId = submit.jobId;
@@ -424,7 +426,7 @@ async function checkWorkerRestartRecovery(): Promise<void> {
     report("worker-restart-recovery", "blocked", `could not start a job (${submit.httpStatus})`);
     return;
   }
-  await sleep(1_500);
+  await sleep(6_000);
   const before = await sql(`select status from jobs where id = '${jobId}'`);
 
   await run("docker", ["restart", "-t", "5", APP], { timeout: 120_000 });

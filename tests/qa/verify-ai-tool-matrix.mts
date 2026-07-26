@@ -688,6 +688,14 @@ async function main(): Promise<void> {
   for (const spec of [...CASES, ...(EXPECT === "installed" ? OCR_EXTRA_CASES : [])]) {
     if (!wanted.has(spec.toolId)) continue;
     const required = getRequiredBundlesForTool(spec.toolId);
+    if (EXPECT === "gated" && required.length === 0) {
+      // OCR's Fast tier ships inside the image and the `ocr` bundle is only an
+      // OPTIONAL pack (TOOL_OPTIONAL_BUNDLE_MAP), so ocr/ocr-pdf must stay
+      // reachable with nothing installed. Refusal of the optional Balanced and
+      // Best tiers is asserted separately.
+      skipped.push({ toolId: spec.toolId, reason: "no required bundle: tool is never gated" });
+      continue;
+    }
     if (EXPECT === "installed") {
       const missing = required.filter((id) => !installed.has(id));
       if (missing.length) {
