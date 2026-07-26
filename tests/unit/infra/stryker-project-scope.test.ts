@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import vitestConfig from "../../../vitest.config.ts";
 
 /**
  * The three workspace Stryker configs (image-engine, media-engine, doc-engine)
@@ -20,6 +21,14 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(import.meta.dirname, "../../..");
 
 const ROOT_STRYKER_CONFIGS = ["stryker.api.config.json", "stryker.shared.config.json"];
+
+const WORKSPACE_STRYKER_CONFIGS = [
+  "packages/image-engine/stryker.config.json",
+  "packages/media-engine/stryker.config.json",
+  "packages/doc-engine/stryker.config.json",
+];
+
+const ALL_STRYKER_CONFIGS = [...ROOT_STRYKER_CONFIGS, ...WORKSPACE_STRYKER_CONFIGS];
 
 /** Mirrors ALWAYS_IGNORE in @stryker-mutator/core's ProjectReader. */
 const ALWAYS_IGNORE = ["node_modules", ".git", ".next", ".nuxt", ".svelte-kit"];
@@ -44,7 +53,26 @@ const SUPPORTED_PATTERN = /^\/?[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 interface StrykerConfig {
   ignorePatterns?: string[];
   tempDirName?: string;
+  cleanTempDir?: string | boolean;
   thresholds?: { break?: number | null };
+}
+
+/**
+ * Does a Vitest exclude glob swallow everything under `directory`? Only the two
+ * shapes the exclude list actually uses are handled: "<dir>/**" and a leading
+ * "**\/" variant, with a single trailing "*" wildcard allowed on the directory
+ * segment.
+ */
+function excludesDirectory(patterns: string[], directory: string): boolean {
+  return patterns.some((pattern) => {
+    const glob = pattern.replace(/^\*\*\//, "");
+    if (!glob.endsWith("/**")) return false;
+    const segment = glob.slice(0, -"/**".length);
+    if (segment.includes("/")) return false;
+    return segment.endsWith("*")
+      ? directory.startsWith(segment.slice(0, -1))
+      : directory === segment;
+  });
 }
 
 function readStrykerConfig(file: string): StrykerConfig {
@@ -154,6 +182,26 @@ describe("root Stryker lanes see only source", () => {
     ];
     const escaped = gitignoredDirectories().filter((dir) => !isIgnored(dir, patterns));
     expect(escaped).toEqual([]);
+  });
+
+  it("deletes its sandbox even when the run crashes", () => {
+    // Stryker's default cleanTempDir is `true`, which skips cleanup on error.
+    // A crashed lane then leaves a full copy of the project on disk.
+    for (const file of ALL_STRYKER_CONFIGS) {
+      expect(readStrykerConfig(file).cleanTempDir, `${file} cleanTempDir`).toBe("always");
+    }
+  });
+
+  it("keeps every Stryker sandbox out of Vitest's file discovery", () => {
+    const exclude = vitestConfig.test?.exclude ?? [];
+    for (const file of ALL_STRYKER_CONFIGS) {
+      // Stryker's own default when a config omits tempDirName.
+      const tempDirName = readStrykerConfig(file).tempDirName ?? ".stryker-tmp";
+      expect(
+        excludesDirectory(exclude, tempDirName),
+        `vitest.config.ts must exclude ${tempDirName} (from ${file}); a live sandbox otherwise turns into phantom "Cannot find module" failures`,
+      ).toBe(true);
+    }
   });
 
   it("keeps the crawled project under the file and byte ceilings", () => {

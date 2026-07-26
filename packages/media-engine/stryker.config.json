@@ -6,8 +6,15 @@
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
   "reporters": ["html", "clear-text", "progress"],
-  "htmlReporter": { "fileName": "reports/mutation/mutation.html" },
-  "thresholds": { "high": 80, "low": 60, "break": null },
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
   "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always",
   "ignoreStatic": true
 }

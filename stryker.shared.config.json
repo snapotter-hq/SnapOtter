@@ -70,6 +70,7 @@
     "break": null
   },
   "tempDirName": ".stryker-tmp-shared",
+  "cleanTempDir": "always",
   "ignoreStatic": true,
   "concurrency": 8
 }

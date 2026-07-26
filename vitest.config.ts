@@ -69,6 +69,16 @@ export default defineConfig({
       "**/.{idea,git,cache,output,temp}/**",
       ".worktrees/**",
       ".claude/**",
+      // Stryker copies the whole project into .stryker-tmp*/sandbox-XXXX while a
+      // mutation run is in flight, and leaves it behind entirely if that run
+      // crashes. Without this, a concurrent `vitest run` discovers the copies and
+      // reports "Cannot find module" failures from a directory that is gitignored
+      // build scratch. Those phantom failures are indistinguishable from real
+      // ones at a glance, which is exactly the wrong thing to hand a release
+      // verdict. The configs also set cleanTempDir: "always" so the scratch does
+      // not survive a crash in the first place.
+      ".stryker-tmp*/**",
+      "**/.stryker-tmp*/**",
     ],
     env: {
       AUTH_ENABLED: "true",

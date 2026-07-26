@@ -84,6 +84,7 @@
     "break": null
   },
   "tempDirName": ".stryker-tmp-api",
+  "cleanTempDir": "always",
   "ignoreStatic": true,
   "concurrency": 6
 }

@@ -6,7 +6,12 @@
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
   "reporters": ["html", "clear-text", "progress"],
-  "thresholds": { "high": 80, "low": 60, "break": null },
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
   "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always",
   "ignoreStatic": true
 }
