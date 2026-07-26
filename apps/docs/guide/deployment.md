@@ -38,7 +38,7 @@ services:
       # - MAX_USERS=0              # Max user accounts
 
       # --- Networking ---
-      # - TRUST_PROXY=true         # Trust X-Forwarded-For headers (set false if not behind a proxy)
+      # - TRUST_PROXY=loopback,linklocal,uniquelocal  # Which peers may set the client IP via X-Forwarded-For (default shown)
 
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
@@ -431,11 +431,11 @@ The startup error names the exact UID to use, so the quickest path is to start t
 | `AUTH_ENABLED` | `true` | Enable/disable login requirement |
 | `DEFAULT_USERNAME` | `admin` | Initial admin username |
 | `DEFAULT_PASSWORD` | `admin` | Initial admin password (forced change on first login) |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Per-file upload limit |
-| `MAX_BATCH_SIZE` | `100` | Max files per batch request |
+| `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Per-file upload limit in MB. The image ships `0`; a source build starts at 100 |
+| `MAX_BATCH_SIZE` | `0` (unlimited) | Max files per batch request. The image ships `0`; a source build starts at 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP (set 0 to disable) |
 | `MAX_USERS` | `0` (unlimited) | Maximum user accounts |
-| `TRUST_PROXY` | `true` | Trust X-Forwarded-For headers from reverse proxy |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. Private networks only by default |
 | `PUID` | `999` | Run as this UID (for bind mount permissions) |
 | `PGID` | `999` | Run as this GID (for bind mount permissions) |
 | `LOG_LEVEL` | `info` | Log verbosity: fatal, error, warn, info, debug, trace |
@@ -478,7 +478,11 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-SnapOtter sets `TRUST_PROXY=true` by default so rate limiting and logging use the real client IP from `X-Forwarded-For` headers.
+`TRUST_PROXY` defaults to `loopback,linklocal,uniquelocal`, so SnapOtter believes `X-Forwarded-For` only from a peer on a private network. A reverse proxy on the same host, on a Docker network, or on your LAN is trusted out of the box, which means rate limiting, the login brute-force limiter, the audit log, and the enterprise IP allowlist all see the real client IP with no configuration.
+
+Set `TRUST_PROXY=true` only when the proxy in front reaches SnapOtter from a **public** address, a cloud load balancer on a different network for instance. On a directly exposed instance that value makes `request.ip` attacker-controlled, because a caller who rotates the header gets a fresh rate-limit bucket per request.
+
+Two things to know before you go measuring client IPs. Docker Desktop on macOS and Windows serves a published port through a userland proxy that rewrites every source address to the VM gateway `192.168.65.1`, so no value of `TRUST_PROXY` recovers the real client there; deploy on Linux for anything internet-facing. And on any platform, reaching a published port over `localhost` is observed as the bridge gateway rather than as your client, so a localhost test tells you nothing about how a real client is attributed. The full table of `TRUST_PROXY` values and the Docker Desktop caveat are in [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
 Two things matter for every proxy below: allow large request bodies (uploads), and do not buffer responses. A response-buffering proxy breaks SSE progress and, more visibly, makes a large file download "start but never finish", because the proxy holds the whole file before passing it on. SnapOtter sends `X-Accel-Buffering: no` on downloads so nginx streams them even if buffering is left on elsewhere, but proxies other than nginx need response buffering disabled explicitly (shown in each config below). If a download stalls partway, a buffering proxy in front is the first thing to check.
 

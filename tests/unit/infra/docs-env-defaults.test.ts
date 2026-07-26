@@ -4,38 +4,55 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * apps/docs/guide/configuration.md is a table of promises about env vars, and
- * every one of them drifted quietly. AUTH_ENABLED was documented as defaulting
- * to false when the schema defaults it to true, and SKIP_MUST_CHANGE_PASSWORD
- * was documented as taking "any non-empty value" when it is a two-member enum
- * that kills the process on anything else.
+ * The guide's env-var tables are promises, and they drifted quietly. AUTH_ENABLED
+ * was documented as defaulting to false when the schema defaults it to true, and
+ * SKIP_MUST_CHANGE_PASSWORD was documented as taking "any non-empty value" when
+ * it is a two-member enum that kills the process on anything else.
  *
- * So the table gets checked against the three places a default can come from:
+ * So the tables get checked against the three places a default can come from:
  * the Zod schema in apps/api/src/lib/env.ts, the ENV block in docker/Dockerfile,
  * and the shell layer for the handful of vars the entrypoint reads directly.
  */
 
 const ROOT = path.resolve(__dirname, "../../..");
-const DOC = path.join(ROOT, "apps/docs/guide/configuration.md");
+// Both pages carry an env-var table with the same shape. deployment.md kept
+// TRUST_PROXY=true in three places after the default moved to a trust list.
+const DOCS = ["apps/docs/guide/configuration.md", "apps/docs/guide/deployment.md"];
 
 interface Declared {
   default?: string;
+  /** Set when a `.default(...)` exists but its value could not be read. */
+  unresolvedDefault?: string;
   enum?: string[];
 }
 
-/** Every `NAME: z...` entry in the env schema, with its default and enum members. */
+/**
+ * Every `NAME: z...` entry in the env schema, with its default and enum members.
+ * A default can be a literal or an imported const (TRUST_PROXY holds its own in
+ * lib/trust-proxy.ts), so named constants are resolved rather than skipped.
+ */
 function zodSchema(): Map<string, Declared> {
   const src = readFileSync(path.join(ROOT, "apps/api/src/lib/env.ts"), "utf8");
+  const libSrc = globSync("apps/api/src/lib/*.ts", { cwd: ROOT })
+    .map((f) => readFileSync(path.join(ROOT, f), "utf8"))
+    .join("\n");
   const starts = [...src.matchAll(/^ {4}([A-Z][A-Z0-9_]*):\s*z\b/gm)];
   const out = new Map<string, Declared>();
   starts.forEach((match, i) => {
     const from = match.index ?? 0;
     const to = i + 1 < starts.length ? (starts[i + 1].index ?? src.length) : src.length;
     const chunk = src.slice(from, to);
-    const def = chunk.match(/\.default\(\s*("([^"]*)"|[\d_]+)\s*\)/);
+    const def = chunk.match(/\.default\(\s*("([^"]*)"|[\d_]+|[A-Z][A-Z0-9_]*)\s*\)/);
     const members = chunk.match(/\.enum\(\[([^\]]*)\]\)/);
+    let value: string | undefined;
+    if (def) {
+      if (def[2] !== undefined) value = def[2];
+      else if (/^[\d_]+$/.test(def[1])) value = def[1].replace(/_/g, "");
+      else value = libSrc.match(new RegExp(`export const ${def[1]} = "([^"]*)"`))?.[1];
+    }
     out.set(match[1], {
-      default: def ? (def[2] ?? def[1].replace(/_/g, "")) : undefined,
+      default: value,
+      unresolvedDefault: def !== null && value === undefined ? def[1] : undefined,
       enum: members ? [...members[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]) : undefined,
     });
   });
@@ -89,6 +106,7 @@ function isRead(name: string): boolean {
 }
 
 interface Row {
+  doc: string;
   name: string;
   defaultCell: string;
   description: string;
@@ -96,9 +114,13 @@ interface Row {
 
 function documentedRows(): Row[] {
   const rows: Row[] = [];
-  for (const line of readFileSync(DOC, "utf8").split("\n")) {
-    const match = line.match(/^\|\s*`([A-Z][A-Z0-9_]*)`\s*\|([^|]*)\|(.*)\|\s*$/);
-    if (match) rows.push({ name: match[1], defaultCell: match[2], description: match[3] });
+  for (const doc of DOCS) {
+    for (const line of readFileSync(path.join(ROOT, doc), "utf8").split("\n")) {
+      const match = line.match(/^\|\s*`([A-Z][A-Z0-9_]*)`\s*\|([^|]*)\|(.*)\|\s*$/);
+      if (match) {
+        rows.push({ doc, name: match[1], defaultCell: match[2], description: match[3] });
+      }
+    }
   }
   return rows;
 }
@@ -114,14 +136,23 @@ const SCHEMA = zodSchema();
 const IMAGE = dockerfileEnv();
 const ROWS = documentedRows();
 
-describe("configuration.md env-var table", () => {
+describe("guide env-var tables", () => {
   it("parsed all three sources", () => {
     // Without this, an empty parse would make every case below vacuous.
     expect(SCHEMA.size).toBeGreaterThan(80);
     expect(IMAGE.size).toBeGreaterThan(20);
-    expect(ROWS.length).toBeGreaterThan(30);
+    expect(ROWS.length).toBeGreaterThan(50);
     expect(SCHEMA.get("AUTH_ENABLED")).toEqual({ default: "true", enum: ["true", "false"] });
     expect(APP_SRC.length).toBeGreaterThan(1_000_000);
+  });
+
+  it("resolved every schema default it found", () => {
+    // A default this parser cannot read is silently exempt from the row checks
+    // below, which is how a documented value could go wrong unnoticed.
+    const unresolved = [...SCHEMA.entries()]
+      .filter(([, d]) => d.unresolvedDefault)
+      .map(([name, d]) => `${name}=${d.unresolvedDefault}`);
+    expect(unresolved).toEqual([]);
   });
 
   it("documents no variable that nothing reads", () => {
@@ -129,7 +160,7 @@ describe("configuration.md env-var table", () => {
   });
 
   it.each(ROWS.filter((r) => SCHEMA.get(r.name)?.default))(
-    "$name shows a default that some source actually produces",
+    "$doc $name shows a default that some source actually produces",
     ({ name, defaultCell }) => {
       const declared = SCHEMA.get(name)?.default;
       const allowed = new Set([declared, IMAGE.get(name)].filter((v) => v !== undefined));
@@ -145,7 +176,7 @@ describe("configuration.md env-var table", () => {
   );
 
   it.each(ROWS.filter((r) => SCHEMA.get(r.name)?.enum))(
-    "$name only offers values its enum accepts",
+    "$doc $name only offers values its enum accepts",
     ({ name, defaultCell, description }) => {
       const members = SCHEMA.get(name)?.enum ?? [];
       const shown = [...defaultCell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
