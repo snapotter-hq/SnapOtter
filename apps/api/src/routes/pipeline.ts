@@ -49,9 +49,41 @@ import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
-import { requireAuth } from "../plugins/auth.js";
+import { type AuthUser, requireAuth } from "../plugins/auth.js";
 import { updateJobProgress, updateSingleFileProgress } from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
+
+/**
+ * Gate the saved-pipeline routes on the pipeline permissions.
+ *
+ * Either grant is enough: `pipelines:all` is the broader one, so a holder of it
+ * is never locked out for lacking `pipelines:own`. Same rule as
+ * `requireApiKeyManagement` in routes/api-keys.ts and `requireFileAccess` in
+ * routes/user-files.ts.
+ *
+ * Only the stored-pipeline routes (save, list, delete) are gated. /execute and
+ * /batch persist nothing and are ad-hoc chains of tools, so they stay governed
+ * by `tools:use` and the per-tool access gate.
+ *
+ * See SEC-20260726-C01.
+ */
+async function requirePipelineAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<AuthUser | null> {
+  const user = requireAuth(request, reply);
+  if (!user) return null;
+
+  if (
+    !(await hasEffectivePermission(user, "pipelines:own")) &&
+    !(await hasEffectivePermission(user, "pipelines:all"))
+  ) {
+    reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
+    return null;
+  }
+
+  return user;
+}
 
 /** Schema for a single pipeline step. */
 const pipelineStepSchema = z.object({
@@ -684,7 +716,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     "/api/v1/pipeline/save",
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requirePipelineAccess(request, reply);
       if (!user) return;
 
       const body = request.body as unknown;
@@ -755,7 +787,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     "/api/v1/pipeline/list",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requirePipelineAccess(request, reply);
       if (!user) return;
 
       // Admins see all pipelines; regular users see their own + legacy (no owner)
@@ -785,7 +817,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     "/api/v1/pipeline/:id",
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requirePipelineAccess(request, reply);
       if (!user) return;
 
       const { id } = request.params;

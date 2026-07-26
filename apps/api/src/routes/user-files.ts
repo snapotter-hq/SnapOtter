@@ -34,7 +34,7 @@ import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission } from "../permissions.js";
-import { getAuthUser, requireAuth } from "../plugins/auth.js";
+import { type AuthUser, requireAuth } from "../plugins/auth.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -115,6 +115,38 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
     toolChain: row.toolChain ?? [],
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Gate the file-library routes on the file permissions.
+ *
+ * Either grant is enough: `files:all` is the broader one, so a holder of it is
+ * never locked out for lacking `files:own`. This is the same rule
+ * `requireApiKeyManagement` in routes/api-keys.ts already applies to the
+ * identical apikeys:own / apikeys:all pair, and the roles editor presents Files
+ * and API Keys as the same shape of group.
+ *
+ * Runs before the resource is resolved so a caller without the permission gets
+ * 403 rather than a 404 that would confirm whether an id exists.
+ *
+ * See SEC-20260726-C01.
+ */
+async function requireFileAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<AuthUser | null> {
+  const user = requireAuth(request, reply);
+  if (!user) return null;
+
+  if (
+    !(await hasEffectivePermission(user, "files:own")) &&
+    !(await hasEffectivePermission(user, "files:all"))
+  ) {
+    reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
+    return null;
+  }
+
+  return user;
 }
 
 /**
@@ -201,7 +233,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply,
     ) => {
-      const user = requireAuth(request, reply);
+      const user = await requireFileAccess(request, reply);
       if (!user) return;
 
       const limit = parseInt(request.query.limit ?? "50", 10) || 50;
@@ -260,8 +292,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/files/upload",
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = getAuthUser(request);
-      const userId = user?.id ?? null;
+      const user = await requireFileAccess(request, reply);
+      if (!user) return;
+      const userId = user.id;
 
       // Enforce per-user storage quota before accepting uploads
       try {
@@ -378,7 +411,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/files/:id",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requireFileAccess(request, reply);
       if (!user) return;
 
       const { id } = request.params;
@@ -465,7 +498,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/files/:id/download",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requireFileAccess(request, reply);
       if (!user) return;
 
       const { id } = request.params;
@@ -505,7 +538,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/files/:id/thumbnail",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requireFileAccess(request, reply);
       if (!user) return;
 
       const { id } = request.params;
@@ -606,7 +639,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/files",
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = requireAuth(request, reply);
+      const user = await requireFileAccess(request, reply);
       if (!user) return;
 
       const deleteSchema = z.object({
@@ -722,7 +755,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    *   toolId   — the tool that produced this result
    */
   app.post("/api/v1/files/save-result", async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = requireAuth(request, reply);
+    const user = await requireFileAccess(request, reply);
     if (!user) return;
     const userId = user.id;
 
