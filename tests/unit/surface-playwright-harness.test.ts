@@ -51,6 +51,54 @@ function expectScopedArtifacts(
   expect(serialized).not.toContain(path.join("docs", "qa"));
 }
 
+/**
+ * The release contract is that a public-surface suite tests the artifact we ship,
+ * which is the emitted static output. A dev server applies its own transforms and
+ * serves routes the build never writes, so a suite pointed at one can pass over a
+ * broken build. The landing harness ran `astro dev` until a QA sweep caught it.
+ */
+describe("surface harnesses serve built output, never a dev server", () => {
+  const DEV_SERVERS = ["astro dev", "vitepress dev", "vite dev", "vite serve", "pnpm dev"];
+
+  test.each([
+    ["landing", "../../playwright.landing.config.js", "PLAYWRIGHT_LANDING_PORT", "44361", "build"],
+    ["docs", "../../playwright.docs.config.js", "PLAYWRIGHT_DOCS_PORT", "44362", "docs:build"],
+    ["demo", "../../playwright.demo.config.js", "PLAYWRIGHT_DEMO_PORT", "44363", "build"],
+  ])("%s builds before it serves", async (scope, modulePath, portKey, port, buildScript) => {
+    const config = await loadConfig(modulePath, {
+      [portKey]: port,
+      PLAYWRIGHT_RUN_ID: `${scope}_built_output`,
+    });
+    const command = (config.webServer as { command: string }).command;
+
+    for (const dev of DEV_SERVERS) {
+      expect(command, `${scope} harness must not run "${dev}"`).not.toContain(dev);
+    }
+    // Order matters, not just presence: serving has to come after building.
+    const buildAt = command.indexOf(buildScript);
+    const serveAt = command.indexOf("preview");
+    expect(buildAt, `${scope} harness never builds`).toBeGreaterThanOrEqual(0);
+    expect(serveAt, `${scope} harness never serves a preview`).toBeGreaterThan(buildAt);
+    expect(command).toContain("&&");
+  });
+
+  /**
+   * A docs fixture once did `rm -rf` on the German locale and regenerated it, so
+   * running the suite rewrote 182 tracked translation files. A harness that edits
+   * tracked content cannot be trusted to report on it.
+   */
+  test("the docs harness runs no fixture script that could rewrite tracked content", async () => {
+    const config = await loadConfig("../../playwright.docs.config.js", {
+      PLAYWRIGHT_DOCS_PORT: "44364",
+      PLAYWRIGHT_RUN_ID: "docs_no_seed",
+    });
+    const command = (config.webServer as { command: string }).command;
+    expect(command).not.toMatch(/seed-|fixtures\//);
+    expect(command).not.toMatch(/\brm\b/);
+    expect(fs.existsSync(path.join(root, "tests/e2e-docs/fixtures"))).toBe(false);
+  });
+});
+
 describe("surface Playwright harness isolation", () => {
   test("landing and docs use owned IPv4 endpoints and run-scoped artifacts", async () => {
     const landing = await loadConfig("../../playwright.landing.config.js", {

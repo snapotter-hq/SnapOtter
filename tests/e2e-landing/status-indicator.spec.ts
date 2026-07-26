@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 import de from "../../apps/landing/src/i18n/de.json";
 
 /**
- * `astro dev` does not run _worker.js, so /api/status really is absent here.
- * Tests that need a verdict mock it; the ones that do not are exercising the
- * degraded path on purpose.
+ * The harness builds and then previews, and `astro preview` serves dist as flat
+ * files without running _worker.js, so /api/status really is absent here. Tests
+ * that need a verdict mock it; the ones that do not are exercising the degraded
+ * path on purpose. The worker's own behaviour is covered in worker.spec.ts.
  */
 
 const INDICATOR = "[data-status-indicator]";
