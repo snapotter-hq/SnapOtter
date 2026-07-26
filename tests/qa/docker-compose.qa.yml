@@ -35,7 +35,11 @@ services:
       - MAX_WORKER_THREADS=0
       - MAX_PIPELINE_STEPS=50
       - ANALYTICS_ENABLED=false
-      - TRUST_PROXY=true
+      # TRUST_PROXY is deliberately not pinned here. The other values in this
+      # block are lifted so a QA sweep is not throttled by a product limit, but
+      # pinning the proxy trust would mean QA containers stop exercising the
+      # shipped default, which is exactly the setting SEC-20260726-002 was
+      # about. Override it in the environment when a test needs a specific one.
       - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
       - REDIS_URL=redis://redis:6379
     depends_on:
