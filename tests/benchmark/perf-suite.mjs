@@ -136,7 +136,7 @@ function log(message) {
   process.stderr.write(`[${new Date().toISOString().slice(11, 19)}] ${message}\n`);
 }
 
-function hostLoad() {
+export function hostLoad() {
   const [one, five, fifteen] = loadavg();
   return {
     load1: Number(one.toFixed(2)),
@@ -145,7 +145,7 @@ function hostLoad() {
   };
 }
 
-async function login(cfg) {
+export async function login(cfg) {
   if (!cfg.password) throw new Error("--password is required");
   const response = await fetch(new URL("/api/auth/login", cfg.baseUrl), {
     method: "POST",
@@ -163,7 +163,7 @@ async function login(cfg) {
  * a number against an unidentified stack is how a QA campaign ends up
  * benchmarking last week's build.
  */
-async function proveImage(cfg, expectedImageId) {
+export async function proveImage(cfg, expectedImageId) {
   if (!cfg.appContainer) throw new Error("--app-container is required to prove image identity");
   const { stdout } = await execFileAsync("docker", [
     "inspect",
@@ -181,7 +181,7 @@ async function proveImage(cfg, expectedImageId) {
   return { imageId, imageRef, memoryBytes: Number(memory), nanoCpus: Number(nanoCpus) };
 }
 
-async function loadFixtures() {
+export async function loadFixtures() {
   const cache = new Map();
   for (const workload of Object.values(WORKLOADS)) {
     for (const relative of workload.files) {
@@ -197,7 +197,7 @@ async function loadFixtures() {
   return cache;
 }
 
-async function runWorkload(cfg, token, fixtures, key) {
+export async function runWorkload(cfg, token, fixtures, key) {
   const workload = WORKLOADS[key];
   const form = new FormData();
   for (const relative of workload.files) {
@@ -273,7 +273,7 @@ function percentile(sorted, fraction) {
   return sorted[Math.min(Math.max(rank, 0), sorted.length - 1)];
 }
 
-function latencyStats(values) {
+export function latencyStats(values) {
   const sorted = [...values].sort((a, b) => a - b);
   return {
     count: sorted.length,
@@ -285,7 +285,7 @@ function latencyStats(values) {
 }
 
 /** Periodic container, queue, database and disk readings taken during a tier. */
-class Sampler {
+export class Sampler {
   constructor(cfg) {
     this.cfg = cfg;
     this.samples = [];
@@ -532,7 +532,7 @@ export function growthReport(samples) {
   };
 }
 
-function summariseSamples(samples) {
+export function summariseSamples(samples) {
   const appName = Object.keys(samples[0]?.containers ?? {})[0];
   const memory = samples.map((s) => s.containers?.[appName]?.memMiB ?? 0).filter(Boolean);
   const cpu = samples.map((s) => s.containers?.[appName]?.cpuPct ?? 0);
