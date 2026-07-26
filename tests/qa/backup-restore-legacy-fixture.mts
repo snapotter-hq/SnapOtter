@@ -21,14 +21,7 @@
  *   node --experimental-strip-types tests/qa/backup-restore-legacy-fixture.mts <output-dir>
  */
 import { createHash } from "node:crypto";
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,7 +149,9 @@ function main(): void {
   const fullCount = countPipelines(join(fullDir, "snapotter.db"));
   const dbOnlyCount = countPipelines(join(dbOnlyDir, "snapotter.db"));
   if (fullCount !== checkpointed + WAL_ONLY_PIPELINES) {
-    throw new Error(`full copy sees ${fullCount} pipelines, expected ${checkpointed + WAL_ONLY_PIPELINES}`);
+    throw new Error(
+      `full copy sees ${fullCount} pipelines, expected ${checkpointed + WAL_ONLY_PIPELINES}`,
+    );
   }
   if (dbOnlyCount !== checkpointed) {
     throw new Error(
