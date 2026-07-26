@@ -2,6 +2,8 @@ import { readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
+import { BaseSequencer } from "vitest/node";
+import { partitionByCost } from "./tests/helpers/shard-partition.js";
 
 // Resolve api-workspace packages that pnpm only exposes under apps/api/node_modules.
 const apiNodeModules = path.resolve(__dirname, "apps/api/node_modules");
@@ -24,6 +26,29 @@ function findPnpmPackage(scope: string, name: string): string {
     throw new Error(`${scope}/${name} not found in pnpm store`);
   }
   return path.join(pnpmDir, entries[entries.length - 1], "node_modules", scope, name);
+}
+
+/**
+ * Shards by measured cost instead of by SHA1 of the file path.
+ *
+ * The stock BaseSequencer slices an equal number of FILES per shard, which took
+ * no account of the fact that four generated matrix specs carry most of the
+ * suite's runtime. See tests/helpers/shard-partition.ts for the measurements.
+ *
+ * `sort` is inherited untouched, and vitest only calls `shard` when --shard is
+ * passed, so unsharded runs (local, nightly full matrix) behave exactly as before.
+ */
+class CostAwareSequencer extends BaseSequencer {
+  async shard(specs: Parameters<BaseSequencer["shard"]>[0]) {
+    const shardConfig = this.ctx.config.shard;
+    if (!shardConfig) return specs;
+
+    const { index, count } = shardConfig;
+    const byModuleId = new Map(specs.map((spec) => [spec.moduleId, spec]));
+    const bin = partitionByCost([...byModuleId.keys()], count)[index - 1] ?? [];
+
+    return bin.map((moduleId) => byModuleId.get(moduleId)).filter((spec) => spec !== undefined);
+  }
 }
 
 export default defineConfig({
@@ -49,6 +74,9 @@ export default defineConfig({
           Number(process.env.VITEST_MAX_FORKS) ||
           (process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2))),
       },
+    },
+    sequence: {
+      sequencer: CostAwareSequencer,
     },
     globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup/per-fork-env.ts"],
