@@ -31,6 +31,15 @@ interface Probe {
   /** Status the route returns for a caller that holds the permission. */
   allowed: number[];
   /**
+   * Body the denial carries. Every guard that goes through requirePermission
+   * answers with code FORBIDDEN. requireToolAccess (apps/api/src/permissions.ts
+   * line 380) is the one exception: it sends 403 with a message and no code at
+   * all, so a client cannot tell a tool denial from any other 403
+   * programmatically. Asserted as it is rather than as it ought to be.
+   */
+  deniedCode?: string;
+  deniedError?: RegExp;
+  /**
    * Enterprise routes check the permission first and the licence second, so a
    * permitted caller on an unlicensed instance still gets 403. The permission
    * gate stays observable because only the permission denial carries FORBIDDEN.
@@ -62,7 +71,7 @@ const GATED: Probe[] = [
     permission: "security:manage",
     method: "POST",
     path: "/api/v1/roles",
-    body: { name: `matrix-role-${UID}`, permissions: ["settings:read"], description: "" },
+    body: { name: `matrix-role-${UID}`, permissions: ["security:manage"], description: "" },
     // 409 means the guard let the request through to the uniqueness check.
     allowed: [200, 201, 409],
   },
@@ -73,6 +82,7 @@ const GATED: Probe[] = [
     method: "POST",
     path: "/api/v1/tools/image/resize",
     allowed: [400, 415, 422],
+    deniedError: /permission to use this tool/i,
   },
   {
     permission: "webhooks:manage",
@@ -118,7 +128,10 @@ async function scopedKey(token: string, permissions: string[]): Promise<string> 
   return ((await res.json()) as { key: string }).key;
 }
 
-async function probe(key: string, entry: Probe): Promise<{ status: number; code?: string }> {
+async function probe(
+  key: string,
+  entry: Probe,
+): Promise<{ status: number; code?: string; error?: string }> {
   const res = await fetch(`${API}${entry.path}`, {
     method: entry.method,
     headers: {
@@ -128,7 +141,8 @@ async function probe(key: string, entry: Probe): Promise<{ status: number; code?
     ...(entry.body === undefined ? {} : { body: JSON.stringify(entry.body) }),
   });
   const parsed = await res.json().catch(() => ({}) as Record<string, unknown>);
-  return { status: res.status, code: (parsed as { code?: string }).code };
+  const body = parsed as { code?: string; error?: string };
+  return { status: res.status, code: body.code, error: body.error };
 }
 
 test.describe("RBAC permission matrix", () => {
@@ -138,7 +152,13 @@ test.describe("RBAC permission matrix", () => {
 
       const denied = await probe(await scopedKey(token, [NEUTRAL_PERMISSION]), entry);
       expect(denied.status, `a key without ${entry.permission} must be refused`).toBe(403);
-      expect(denied.code, `the refusal must come from the permission guard`).toBe("FORBIDDEN");
+      if (entry.deniedError) {
+        expect(denied.error, "the refusal must name the tool gate").toMatch(entry.deniedError);
+      } else {
+        expect(denied.code, "the refusal must come from the permission guard").toBe(
+          entry.deniedCode ?? "FORBIDDEN",
+        );
+      }
 
       const granted = await probe(await scopedKey(token, [entry.permission]), entry);
       expect(entry.allowed, `a key scoped to ${entry.permission} got ${granted.status}`).toContain(
