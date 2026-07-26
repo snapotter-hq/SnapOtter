@@ -23,8 +23,8 @@
  *   1. Every tool, batch and pipeline row is enqueued with `jobId` set to the
  *      row id, so `jobs.id` is also the BullMQ job id and "is there still a
  *      live queue entry" is a direct lookup. Rows of type `system`
- *      (gdpr-export) are the exception -- they enqueue without a jobId, so
- *      BullMQ generates its own -- and are excluded.
+ *      (gdpr-export) are the exception, because they enqueue without a jobId
+ *      and BullMQ generates its own, so they are excluded.
  *   2. Every write is guarded on the row still being non-terminal, so two
  *      reconcilers racing each other (or racing a worker that recovered)
  *      cannot double-resolve, and a genuinely canceled job is never
