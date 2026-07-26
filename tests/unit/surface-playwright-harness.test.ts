@@ -83,6 +83,36 @@ describe("surface harnesses serve built output, never a dev server", () => {
   });
 
   /**
+   * Building before serving only helps if the harness waits long enough for the
+   * build to finish. `vitepress build` over ~3,800 pages plus Pagefind indexing
+   * runs about two minutes on a warm machine, so a 120s startup budget failed the
+   * whole docs suite with "Timed out waiting 120000ms from config.webServer"
+   * before a single test ran. This is a startup ceiling, not a per-test timeout,
+   * so a generous value costs nothing when the server comes up quickly.
+   */
+  test("each harness allows enough startup time to finish its build", async () => {
+    const budgets: Array<[string, string, string, string, number]> = [
+      [
+        "landing",
+        "../../playwright.landing.config.js",
+        "PLAYWRIGHT_LANDING_PORT",
+        "44371",
+        120_000,
+      ],
+      ["docs", "../../playwright.docs.config.js", "PLAYWRIGHT_DOCS_PORT", "44372", 300_000],
+      ["demo", "../../playwright.demo.config.js", "PLAYWRIGHT_DEMO_PORT", "44373", 60_000],
+    ];
+    for (const [scope, modulePath, portKey, port, minimum] of budgets) {
+      const config = await loadConfig(modulePath, {
+        [portKey]: port,
+        PLAYWRIGHT_RUN_ID: `${scope}_startup_budget`,
+      });
+      const { timeout } = config.webServer as { timeout: number };
+      expect(timeout, `${scope} harness startup budget`).toBeGreaterThanOrEqual(minimum);
+    }
+  });
+
+  /**
    * A docs fixture once did `rm -rf` on the German locale and regenerated it, so
    * running the suite rewrote 182 tracked translation files. A harness that edits
    * tracked content cannot be trusted to report on it.

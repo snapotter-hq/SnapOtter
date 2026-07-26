@@ -51,12 +51,14 @@ function copyCommand() {
 </script>
 
 <template>
-  <div class="so-home">
+  <!-- <main>, not <div>: this page uses layout "page", which gives it no main
+       landmark of its own, so every element on it fell outside a landmark. -->
+  <main class="so-home">
     <section class="hero">
       <h1 class="hero-title">{{ tt("home.title") }}</h1>
       <p class="hero-sub">{{ tt("home.heroSub") }}</p>
       <div class="cmd" :title="tt('home.clickToCopy')" @click="copyCommand">
-        <code>$ {{ command }}</code>
+        <code tabindex="0">$ {{ command }}</code>
         <button class="copy" type="button" :aria-label="tt('home.copyCommandAria')" @click.stop="copyCommand">{{ copyLabel }}</button>
       </div>
       <p class="hero-meta">
@@ -112,7 +114,7 @@ function copyCommand() {
         <span>{{ tt(s.subKey) }}</span>
       </a>
     </section>
-  </div>
+  </main>
 </template>
 
 <style scoped>

@@ -128,6 +128,14 @@ export default defineConfig({
 
   sitemap: { hostname: "https://docs.snapotter.com" },
 
+  // VitePress defaults to shiki's `github-light`, whose comment (#6a737d, 4.45:1)
+  // and string (#22863a, 4.28:1) tokens both miss AA against the code-block
+  // background. The high-contrast variant is built for exactly this and is bundled
+  // with shiki already. Dark mode was never the failing side.
+  markdown: {
+    theme: { light: "github-light-high-contrast", dark: "github-dark" },
+  },
+
   head: [
     ["meta", { name: "theme-color", content: "#E07832" }],
     [

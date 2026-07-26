@@ -14,7 +14,25 @@
   --vp-button-brand-active-border: transparent;
   --vp-button-brand-active-text: #fff;
   --vp-button-brand-active-bg: #7A3D10;
+
+  /* Inline `code` never sits on white. VitePress tints it with --vp-c-default-soft
+     (#e7e9ec in tables and prose) and custom blocks tint it further (#f7dcca), which
+     drops brand-1 to 4.34:1 and 4.03:1. The darker ink clears AA on both: 5.62:1 and
+     5.22:1. This was 482 failures on the REST page alone. */
+  --vp-code-color: #8F4712;
+  /* The language label above a code block was #929295 on #f6f6f7, 2.87:1. */
+  --vp-code-lang-color: #5C5C60;
 }
+/* Inside a tip/info block VitePress paints inline code with brand-1 over the brand
+   tint directly, so --vp-code-color never reaches it: 4.03:1. Dark mode was fine. */
+.vp-doc .custom-block :not(pre) > code {
+  color: #8F4712;
+}
+
+.dark .vp-doc .custom-block :not(pre) > code {
+  color: var(--vp-c-brand-1);
+}
+
 .dark {
   --vp-c-brand-1: #F0A766;
   --vp-c-brand-2: #F09550;

@@ -29,6 +29,9 @@ export default defineConfig({
     command: `cd apps/docs && pnpm docs:build && exec pnpm exec vitepress preview . --host ${endpoint.host} --port ${endpoint.port}`,
     url: endpoint.url,
     reuseExistingServer: false,
-    timeout: 120_000,
+    // `vitepress build` renders ~3,800 pages and then runs Pagefind over them,
+    // which is about two minutes warm and longer on a loaded machine. At 120s the
+    // whole suite died on webServer startup before a single test ran.
+    timeout: 600_000,
   },
 });
