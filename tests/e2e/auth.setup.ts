@@ -40,6 +40,45 @@ setup("authenticate", async ({ page }) => {
     );
   }
 
+  // Prove the browser's /api proxy reaches THIS run's API rather than some other
+  // checkout's server that happens to answer on a shared port. A session token
+  // exists only in the run-owned database, so replaying the token the browser
+  // just obtained against the resolved API endpoint is an identity check: it
+  // passes only when both paths terminate at the same instance. Reaching "an
+  // API" would still satisfy a health probe, which is how an earlier sweep
+  // silently mutated an unrelated instance's settings, sessions and jobs.
+  const apiUrl = process.env.API_URL;
+  if (!apiUrl) {
+    throw new Error("API_URL was not initialized by playwright.config.ts");
+  }
+  const proxiedToken = await page.evaluate(() => localStorage.getItem("snapotter-token"));
+  if (!proxiedToken) {
+    throw new Error("Login through the web endpoint produced no session token");
+  }
+
+  const identity = await page.request.get(`${apiUrl}/api/auth/session`, {
+    headers: { authorization: `Bearer ${proxiedToken}` },
+  });
+  if (!identity.ok()) {
+    throw new Error(
+      `The session minted through ${process.env.PLAYWRIGHT_WEB_URL ?? "<unknown>"} is unknown to ` +
+        `the run-owned API at ${apiUrl} (status ${identity.status()}). That web endpoint is ` +
+        "proxying /api to a different instance.",
+    );
+  }
+
+  // Negative control: without it the check above would also pass against an API
+  // running with authentication disabled, which accepts any bearer value.
+  const forged = await page.request.get(`${apiUrl}/api/auth/session`, {
+    headers: { authorization: "Bearer not-a-real-session-token" },
+  });
+  if (forged.status() !== 401) {
+    throw new Error(
+      `The run-owned API at ${apiUrl} accepted a forged session token (status ${forged.status()}), ` +
+        "so the identity check above proves nothing. Expected 401.",
+    );
+  }
+
   // Save storage state (includes localStorage with the token)
   await page.context().storageState({ path: authFile });
 });

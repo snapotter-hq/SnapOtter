@@ -19,7 +19,11 @@ test.describe("All tool pages render", () => {
     test(`${tool.name} (/${tool.id}) renders its UI shell`, async ({ loggedInPage: page }) => {
       expect(displayMode, `tool "${tool.id}" missing from tool-display-modes.ts`).toBeTruthy();
 
-      await page.goto(`/${tool.modality}/${tool.id}`);
+      // Navigate by the catalog route, never by modality: toolSection() splits
+      // the "document" modality into pdf and files and maps "file" to files, so
+      // a modality-built URL sends 52 of the 243 tools to the catch-all and the
+      // assertions below then run against the 404 page.
+      await page.goto(tool.route);
 
       // Tool name should be visible (header renders the shared TOOLS name)
       await expect(page.getByText(tool.name, { exact: false }).first()).toBeVisible();
@@ -73,7 +77,8 @@ test.describe("Tool pages accept file upload", () => {
   for (const toolId of REPRESENTATIVE_TOOLS) {
     test(`${toolId} accepts file upload`, async ({ loggedInPage: page }) => {
       const tool = TOOLS.find((t) => t.id === toolId);
-      await page.goto(`/${tool?.modality ?? "image"}/${toolId}`);
+      expect(tool, `"${toolId}" is not in the shared TOOLS catalog`).toBeTruthy();
+      await page.goto(tool?.route ?? "");
       await uploadTestImage(page);
 
       // After upload, dropzone should be replaced with image viewer

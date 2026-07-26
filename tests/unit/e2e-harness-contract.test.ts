@@ -157,6 +157,29 @@ describe("main Playwright harness isolation", () => {
     expect(webServer.command).toContain("--strictPort");
   });
 
+  test("scopes the web build output to the run so concurrent runs cannot empty it", async () => {
+    const config = await loadConfig({
+      PLAYWRIGHT_API_PORT: "18130",
+      PLAYWRIGHT_API_URL: "http://127.0.0.1:18130",
+      PLAYWRIGHT_RUN_ID: "web_dist_contract",
+      PLAYWRIGHT_WEB_PORT: "28130",
+      PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28130",
+    });
+    const [, webServer] = config.webServer as Array<{ command: string }>;
+    const distDir = path.join(root, "test-results", "e2e-runs", "web_dist_contract", "web-dist");
+
+    // vite empties the output directory before writing it. Sharing the default
+    // apps/web/dist means a second run deletes the chunks the first run's
+    // preview server is still serving, and the first run then reports error
+    // boundaries that look like product defects.
+    expect(webServer.command).toContain(`vite build --outDir ${distDir} --emptyOutDir`);
+    expect(webServer.command).toContain(`vite preview --outDir ${distDir}`);
+    // pnpm does not forward extra args into a compound npm script, so routing
+    // the build through `pnpm --filter @snapotter/web build` would silently
+    // drop --outDir and write to the shared default again.
+    expect(webServer.command).not.toContain("@snapotter/web build");
+  });
+
   test("generates distinct endpoint pairs when no endpoint override is supplied", async () => {
     for (const key of isolationEnvKeys) delete process.env[key];
     const first = await loadConfig({});
@@ -285,6 +308,65 @@ test("loggedInPage does not mutate global settings for every test", () => {
   expect(fixture).not.toContain("settings heal");
 });
 
+describe("E2E navigation targets", () => {
+  // Paths that are meant to land on the catch-all. Anything else that does not
+  // resolve is a spec asserting against a 404 page it never intended to load,
+  // which passes vacuously and reports coverage the suite does not have.
+  const INTENTIONAL_NOT_FOUND = new Set([
+    "/image/nonexistent-tool-abc123",
+    "/image/nonexistent-tool-xyz",
+    "/image/this-tool-does-not-exist",
+    "/some/deep/nested/invalid/path",
+    "/this-route-does-not-exist-404",
+    "/this-tool-does-not-exist-xyz",
+    "/tools/resize",
+    "/zzz-nonexistent-tool-xyz",
+  ]);
+
+  function declaredStaticRoutes(): Set<string> {
+    const app = fs.readFileSync(path.join(root, "apps", "web", "src", "App.tsx"), "utf8");
+    const paths = [...app.matchAll(/\bpath="([^"]+)"/g)].map((match) => match[1]);
+    expect(paths, "App.tsx declared no routes; the parser is broken").not.toHaveLength(0);
+    return new Set(paths.filter((value) => value !== "*" && !value.includes(":")));
+  }
+
+  test("every literal e2e navigation resolves to a declared route", async () => {
+    const { TOOLS } = await import("@snapotter/shared");
+    const staticRoutes = declaredStaticRoutes();
+    const toolRoutes = new Set(TOOLS.map((tool) => tool.route));
+    const unresolved = new Map<string, string[]>();
+
+    for (const entry of fs.readdirSync(e2eDir)) {
+      if (!entry.endsWith(".ts")) continue;
+      const source = fs.readFileSync(path.join(e2eDir, entry), "utf8");
+      for (const match of source.matchAll(/\.goto\("(\/[^"]*)"/g)) {
+        const target = match[1].split("?")[0];
+        if (staticRoutes.has(target) || toolRoutes.has(target)) continue;
+        if (INTENTIONAL_NOT_FOUND.has(target)) continue;
+        // The a11y suite reaches the catch-all through a sentinel path.
+        if (target.startsWith("/__a11y-")) continue;
+        unresolved.set(target, [...(unresolved.get(target) ?? []), entry]);
+      }
+    }
+
+    expect(
+      Object.fromEntries(unresolved),
+      "these e2e navigations hit the catch-all route, so their assertions run against the 404 page",
+    ).toEqual({});
+  });
+
+  test("catalog-generated specs navigate by section route, not by modality", () => {
+    const source = fs.readFileSync(path.join(e2eDir, "tools-all.spec.ts"), "utf8");
+
+    // A tool's modality is not its URL section: "document" splits into pdf and
+    // files, and "file" maps to files. Building a URL from modality silently
+    // sends every document and file tool to the catch-all.
+    expect(source).not.toMatch(/goto\(`\/\$\{tool\??\.?\.?modality/);
+    expect(source).not.toContain("tool?.modality");
+    expect(source).toContain("tool.route");
+  });
+});
+
 test("main E2E consumers use the resolved run endpoint and artifact root", () => {
   const endpointOffenders: string[] = [];
   const artifactOffenders: string[] = [];
@@ -307,6 +389,28 @@ test("main E2E consumers use the resolved run endpoint and artifact root", () =>
   expect.soft(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
   expect.soft(authSetup).not.toContain(":13490");
   expect.soft(authSetup).not.toContain(":2349");
+});
+
+test("auth setup proves the web endpoint proxies to the run-owned API", () => {
+  const authSetup = fs.readFileSync(authSetupPath, "utf8");
+
+  // A health probe only shows that some API answered. The session token minted
+  // through the web endpoint exists solely in the run-owned database, so
+  // replaying it against process.env.API_URL is the identity check.
+  expect(authSetup).toContain("/api/auth/session");
+  expect(authSetup).toMatch(/authorization: `Bearer \$\{proxiedToken\}`/);
+  expect(authSetup).toContain("Bearer not-a-real-session-token");
+  expect(authSetup).toMatch(/forged\.status\(\)\s*!==\s*401/);
+
+  // The preview server, not just the build, must take its proxy target from the
+  // resolved endpoint. Configuring only the build leaves preview.proxy on its
+  // hard-coded default, which is how an earlier sweep drove another instance.
+  const viteConfig = fs.readFileSync(path.join(root, "apps", "web", "vite.config.ts"), "utf8");
+  const preview = viteConfig.slice(
+    viteConfig.indexOf("preview: {"),
+    viteConfig.indexOf("build: {"),
+  );
+  expect(preview).toContain("process.env.VITE_API_URL");
 });
 
 test("canonical Docker commands collect the complete app and production release suites", () => {

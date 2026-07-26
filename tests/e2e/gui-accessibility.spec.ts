@@ -996,8 +996,12 @@ test.describe("Focus Returns to Trigger After Dialog Close", () => {
 // 14.5 Main Landmark on All Major Pages
 // ---------------------------------------------------------------------------
 test.describe("Main Landmark on All Pages", () => {
-  test("fullscreen page has exactly one main landmark", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+  // /fullscreen was a 1.x route. It has not existed since 2.0 ("Fullscreen
+  // Grid" is now a defaultToolView setting), so this case used to assert
+  // against the catch-all 404 page. The editor is the major surface this block
+  // was actually missing.
+  test("editor page has exactly one main landmark", async ({ loggedInPage: page }) => {
+    await page.goto("/editor");
     await page.waitForLoadState("domcontentloaded");
     const mainCount = await page.locator("main").count();
     expect(mainCount).toBeLessThanOrEqual(1);

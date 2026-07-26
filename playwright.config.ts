@@ -17,6 +17,7 @@ function resolveRunId(): string {
 const runId = resolveRunId();
 const runRoot = path.join(__dirname, "test-results", "e2e-runs", runId);
 const authFile = path.join(runRoot, "auth", "user.json");
+const webDistDir = path.join(runRoot, "web-dist");
 process.env.PLAYWRIGHT_RUN_ROOT = runRoot;
 process.env.PLAYWRIGHT_AUTH_FILE = authFile;
 
@@ -315,7 +316,17 @@ export default defineConfig({
       // Production build + static preview: the dev server's on-demand
       // transform saturates under parallel workers and flakes 30s-timeout
       // tests. The build adds ~40s once per run and removes that whole class.
-      command: `pnpm --filter @snapotter/web build && pnpm --filter @snapotter/web exec vite preview --host ${webEndpoint.host} --port ${webEndpoint.port} --strictPort`,
+      //
+      // The build output is run-scoped like every other mutable path here. The
+      // default apps/web/dist is shared, and vite empties the output directory
+      // before writing it, so a second run of this config deletes the assets
+      // the first run's preview server is still serving. The first run then
+      // fails with "Failed to fetch dynamically imported module" and lands on
+      // the error boundary, which reads as a product defect anywhere the chunk
+      // happened to load during that window.
+      // The build runs as its two steps rather than the package's build script
+      // because pnpm does not forward --outDir into a compound npm script.
+      command: `pnpm --filter @snapotter/web exec tsc -b && pnpm --filter @snapotter/web exec vite build --outDir ${webDistDir} --emptyOutDir && pnpm --filter @snapotter/web exec vite preview --outDir ${webDistDir} --host ${webEndpoint.host} --port ${webEndpoint.port} --strictPort`,
       url: TEST_WEB_URL,
       reuseExistingServer: false,
       env: {

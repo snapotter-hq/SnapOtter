@@ -203,8 +203,10 @@ test.describe("Keyboard Shortcuts - Work From Any Page", () => {
     await expect(page).toHaveURL("/image/resize");
   });
 
-  test("Cmd/Ctrl+Shift+D toggles theme from /fullscreen", async ({ loggedInPage: page }) => {
-    await page.goto("/fullscreen");
+  // /fullscreen stopped being a route in 2.0, so this case used to prove only
+  // that the shortcut works on the 404 page. /files is a real second surface.
+  test("Cmd/Ctrl+Shift+D toggles theme from /files", async ({ loggedInPage: page }) => {
+    await page.goto("/files");
 
     const hadDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
 
