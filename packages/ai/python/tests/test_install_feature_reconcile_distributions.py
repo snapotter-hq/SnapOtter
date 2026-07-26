@@ -244,7 +244,13 @@ def test_files_the_incoming_copy_does_not_carry_are_left_where_they_are(tmp_path
             "distutils-precedence.pth": "import _distutils_hack",
         },
     )
-    write_dist(staging, "setuptools", "74.1.3", {"setuptools/__init__.py": "74"})
+    # The archive's RECORD is the wheel's, and claims files the archive does not
+    # actually carry. That is what made the first attempt at this guard fail on
+    # the real node: reading RECORD alone still cleared the shim.
+    write_dist(
+        staging, "setuptools", "74.1.3", {"setuptools/__init__.py": "74"},
+        extra_record=["_distutils_hack/__init__.py", "distutils-precedence.pth"],
+    )
 
     merge(installer, staging, venv_sp, quarantine)
 

@@ -760,7 +760,15 @@ def plan_reconciliation(staging_sp: str, sp_dir: str) -> list:
         superseded = [copy for copy in existing if copy[0] != version]
         if existing and not superseded:
             continue
-        files = distribution_files(staging_sp, dist_info)
+        # RECORD describes the wheel, not the archive. A bundle's copy of
+        # setuptools lists `_distutils_hack/` and `distutils-precedence.pth`
+        # while carrying neither, so trusting RECORD alone would clear ground
+        # that nothing is going to cover. Keep only what is really staged.
+        files = [
+            rel
+            for rel in distribution_files(staging_sp, dist_info)
+            if os.path.exists(os.path.join(staging_sp, rel))
+        ]
         plan.append(
             {
                 "name": name,
