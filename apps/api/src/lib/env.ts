@@ -1,5 +1,6 @@
 import { availableParallelism } from "node:os";
 import { z } from "zod";
+import { DEFAULT_TRUST_PROXY } from "./trust-proxy.js";
 
 const envSchema = z
   .object({
@@ -76,7 +77,11 @@ const envSchema = z
     LIBREOFFICE_TIMEOUT_S: z.coerce.number().default(120),
     SESSION_DURATION_HOURS: z.coerce.number().default(168),
     LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(10),
-    TRUST_PROXY: z.string().default("false"),
+    // One default everywhere. A source build that never goes through the
+    // Docker layer resolves to the same trust list the image bakes, so `pnpm
+    // dev` and a bare `node` deployment cannot end up on a different
+    // authentication boundary than a container. See lib/trust-proxy.ts.
+    TRUST_PROXY: z.string().default(DEFAULT_TRUST_PROXY),
     OIDC_ENABLED: z
       .enum(["true", "false"])
       .default("false")

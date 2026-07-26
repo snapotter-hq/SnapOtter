@@ -598,7 +598,7 @@ ENV PORT=1349 \
     LOGIN_ATTEMPT_LIMIT=30 \
     LOG_LEVEL=info \
     LOG_DIR=/data/logs \
-    TRUST_PROXY=true \
+    TRUST_PROXY=loopback,linklocal,uniquelocal \
     OIDC_ENABLED=false \
     EXTERNAL_URL=
 

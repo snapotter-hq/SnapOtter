@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_TRUST_PROXY } from "../../../apps/api/src/lib/trust-proxy.js";
 
 /**
  * Contract tests for the TRUST_PROXY default.
@@ -76,22 +77,39 @@ describe("TRUST_PROXY default", () => {
   });
 
   it("pins the shipped default so a change to it is deliberate", () => {
-    // `true` trusts X-Forwarded-For from ANY peer, which makes request.ip
-    // client-controlled on a directly exposed instance and lets a caller rotate
-    // the header to get a fresh rate-limit bucket per request. That is measured
-    // in SEC-20260726-002. This assertion is not an endorsement of `true`: it
-    // exists so that whoever changes the default has to update this test and
-    // state why.
+    // The shipped topology is `docker run -p 1349:1349` with nothing in front,
+    // so the previous `true` trusted X-Forwarded-For from ANY peer: request.ip
+    // became client-controlled and a caller could rotate the header for a fresh
+    // rate-limit bucket per request (SEC-20260726-002, measured at 100/100 past
+    // the global limiter and 40/40 past the login limiter).
+    //
+    // The private-network trust list keeps a reverse proxy on a Docker network
+    // or a LAN believed while ignoring a public client's forged header.
+    // Whoever changes this has to update this test and state why.
     const baked = /^\s*TRUST_PROXY=(\S+?)\s*\\?$/m.exec(dockerfile)?.[1];
-    expect(baked).toBe("true");
+    expect(baked).toBe("loopback,linklocal,uniquelocal");
   });
 
-  it("keeps the env-var default in lib/env.ts at the safe value", () => {
-    // A source build with no Docker layer must not inherit the permissive
-    // default; Zod's fallback is the last line of defence for `pnpm dev` and
-    // for any deployment that does not go through the image.
+  it("keeps the env-var default in lib/env.ts consistent with the image", () => {
+    // A source build with no Docker layer must not land on a different
+    // authentication boundary than a container. Zod's fallback is what `pnpm
+    // dev` and any non-image deployment actually get.
     const env = read("apps/api/src/lib/env.ts");
-    expect(env).toMatch(/TRUST_PROXY:\s*z\.string\(\)\.default\("false"\)/);
+    expect(env).toMatch(/TRUST_PROXY:\s*z\.string\(\)\.default\(DEFAULT_TRUST_PROXY\)/);
+  });
+
+  it("keeps the Dockerfile literal equal to the DEFAULT_TRUST_PROXY constant", () => {
+    // lib/trust-proxy.ts is the single source of truth. The Dockerfile and the
+    // Compose files have to repeat the literal because they are not TypeScript,
+    // so this is the assertion that stops them drifting apart.
+    const baked = /^\s*TRUST_PROXY=(\S+?)\s*\\?$/m.exec(dockerfile)?.[1];
+    expect(baked).toBe(DEFAULT_TRUST_PROXY);
+  });
+
+  it("uses the CIDR-list branch rather than a boolean or a hop count", () => {
+    // Guards against a well-meaning simplification back to a boolean: only the
+    // list form can distinguish a private-network proxy from a public client.
+    expect(classifyTrustProxy(DEFAULT_TRUST_PROXY)).toBe("cidr-list");
   });
 });
 
