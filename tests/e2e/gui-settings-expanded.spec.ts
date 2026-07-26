@@ -1,4 +1,5 @@
 import { test as base, expect } from "@playwright/test";
+import { authFile } from "../../playwright.config";
 import { login, openSettings, test } from "./helpers";
 
 const API = process.env.API_URL || "http://localhost:13490";
@@ -1381,7 +1382,9 @@ base.describe("RBAC API - User expanded endpoint checks", () => {
 // ===========================================================================
 
 base.describe("RBAC GUI - Admin admin-only tab deep access", () => {
-  base.use({ storageState: ".playwright/.auth/user.json" });
+  // The run-scoped auth file, not the pre-isolation .playwright path. A stale
+  // path leaves the block signed out, so every case here drove the login page.
+  base.use({ storageState: authFile });
 
   base.test("admin can open Roles tab and see Create Custom Role button", async ({ page }) => {
     await page.goto("/");

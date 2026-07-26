@@ -391,6 +391,26 @@ test("main E2E consumers use the resolved run endpoint and artifact root", () =>
   expect.soft(authSetup).not.toContain(":2349");
 });
 
+test("no spec pins storageState to a path outside the run", () => {
+  // A literal auth path survives the run that wrote it. The token inside then
+  // belongs to a database that no longer exists, so the block runs signed out
+  // and drives the login page instead of the surface it claims to cover.
+  const offenders: string[] = [];
+
+  for (const entry of fs.readdirSync(e2eDir)) {
+    if (!entry.endsWith(".ts")) continue;
+    const source = fs.readFileSync(path.join(e2eDir, entry), "utf8");
+    for (const match of source.matchAll(/storageState:\s*(["'][^"']+["'])/g)) {
+      offenders.push(`${entry}: ${match[1]}`);
+    }
+  }
+
+  expect(
+    offenders,
+    "use the authFile export from playwright.config.ts, or an explicit empty state",
+  ).toEqual([]);
+});
+
 test("auth setup proves the web endpoint proxies to the run-owned API", () => {
   const authSetup = fs.readFileSync(authSetupPath, "utf8");
 
