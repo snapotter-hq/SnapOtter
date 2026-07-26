@@ -132,7 +132,7 @@ async function submit(token, spec, fixtures) {
 
 async function jobsSince(iso) {
   const rows = await psql(
-    `select id || '|' || status || '|' || attempts || '|' || coalesce(tool_id,'-') || '|' || coalesce(array_length(array(select jsonb_array_elements_text(output_refs)),1),0) from jobs where created_at >= '${iso}'::timestamptz order by created_at`,
+    `select id || '|' || status || '|' || attempts || '|' || coalesce(tool_id,'-') || '|' || coalesce(jsonb_array_length(output_refs),0) from jobs where created_at >= '${iso}'::timestamptz order by created_at`,
   );
   if (!rows) return [];
   return rows
@@ -235,17 +235,23 @@ const SCENARIOS = {
     },
   },
   "network-partition": {
-    what: "app detached from the stack network for 20s, then reattached",
+    what: "Postgres and Redis detached from the stack network for 20s, then reattached",
     inject: async () => {
+      // Detaching the dependencies rather than the app is deliberate. Pulling
+      // the app off the network would also tear down its published-port
+      // endpoint, so the harness would be measuring a lost port mapping rather
+      // than how the application copes with unreachable dependencies.
       const network = await docker(
         "inspect",
         "--format",
         "{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}",
-        cfg.app,
+        cfg.pg,
       );
-      await docker("network", "disconnect", network, cfg.app);
+      await docker("network", "disconnect", network, cfg.pg);
+      await docker("network", "disconnect", network, cfg.redis);
       await sleep(20_000);
-      await docker("network", "connect", network, cfg.app);
+      await docker("network", "connect", "--alias", "postgres", network, cfg.pg);
+      await docker("network", "connect", "--alias", "redis", network, cfg.redis);
     },
   },
 };
@@ -319,7 +325,10 @@ async function runScenario(name, fixtures) {
     submitted: JOB_MIX.length,
     inFlightAtInjection: inFlight.length,
     jobRows: jobs.length,
-    byStatus: jobs.reduce((acc, job) => ({ ...acc, [job.status]: (acc[job.status] ?? 0) + 1 }), {}),
+    byStatus: jobs.reduce((acc, job) => {
+      acc[job.status] = (acc[job.status] ?? 0) + 1;
+      return acc;
+    }, {}),
     maxAttempts: Math.max(0, ...jobs.map((job) => job.attempts)),
     stuck: stuck.map((job) => ({ id: job.id, status: job.status, toolId: job.toolId })),
     admissions: admissions.map((a) => ({

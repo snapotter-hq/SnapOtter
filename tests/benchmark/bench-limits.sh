@@ -187,16 +187,10 @@ L="${F}/image/valid/stress-large.jpg"
 
 log "=== Resource Limit Sweep on ${SYSTEM} ==="
 
-configs=(
-  "1:512m"
-  "1:1g"
-  "1:2g"
-  "2:1g"
-  "2:2g"
-  "2:4g"
-  "4:2g"
-  "4:4g"
-)
+# Override with SNAPOTTER_BENCH_LIMIT_CONFIGS="2:2g 4:4g" to run a subset; each
+# entry costs a full cold container boot, so the whole sweep is not always what
+# a run needs.
+IFS=' ' read -r -a configs <<< "${SNAPOTTER_BENCH_LIMIT_CONFIGS:-1:512m 1:1g 1:2g 2:1g 2:2g 2:4g 4:2g 4:4g}"
 
 for config in "${configs[@]}"; do
   cpus="${config%%:*}"
@@ -224,7 +218,8 @@ done
 
 log "=== Cold Start Timing ==="
 
-for config in "1:512m" "2:2g" "4:4g"; do
+IFS=' ' read -r -a cold_start_configs <<< "${SNAPOTTER_BENCH_COLD_START_CONFIGS:-1:512m 2:2g 4:4g}"
+for config in "${cold_start_configs[@]}"; do
   cpus="${config%%:*}"
   memory="${config##*:}"
   cleanup

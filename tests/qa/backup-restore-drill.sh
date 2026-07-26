@@ -144,6 +144,13 @@ api() {
   curl -sS --max-time 60 "$@"
 }
 
+# macOS ships shasum, Linux ships sha256sum; the drill has to run on both.
+if command -v sha256sum >/dev/null 2>&1; then
+  host_sha256() { sha256sum | awk '{print $1}'; }
+else
+  host_sha256() { shasum -a 256 | awk '{print $1}'; }
+fi
+
 # ── Stage 1: seed ────────────────────────────────────────────────────────────
 record "boot-candidate" "start" "$CANDIDATE_IMAGE"
 compose up -d --wait --wait-timeout 300 || fail "boot-candidate" "stack did not come up"
@@ -171,7 +178,7 @@ LIBRARY_SOURCE="$BACKUP_DIR/library-object.png"
 compose exec -T app sh -c 'cat /app/apps/web/dist/logo.png 2>/dev/null || head -c 65536 /dev/urandom' \
   > "$LIBRARY_SOURCE"
 test -s "$LIBRARY_SOURCE" || fail "seed-library" "could not build a library upload payload"
-EXPECTED_LIBRARY_SHA=$(shasum -a 256 "$LIBRARY_SOURCE" | awk '{print $1}')
+EXPECTED_LIBRARY_SHA=$(host_sha256 < "$LIBRARY_SOURCE")
 UPLOAD_JSON=$(api -X POST "$BASE_URL/api/v1/files/upload" -F "file=@$LIBRARY_SOURCE") \
   || fail "seed-library" "upload request failed"
 LIBRARY_ID=$(printf '%s' "$UPLOAD_JSON" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
@@ -180,7 +187,7 @@ record "seed-library" "pass" "id=$LIBRARY_ID sha=$EXPECTED_LIBRARY_SHA"
 
 verify_library_object() {
   local stage="$1" actual
-  actual=$(api "$BASE_URL/api/v1/files/$LIBRARY_ID/download" | shasum -a 256 | awk '{print $1}')
+  actual=$(api "$BASE_URL/api/v1/files/$LIBRARY_ID/download" | host_sha256)
   [ "$actual" = "$EXPECTED_LIBRARY_SHA" ] || fail "$stage" "library checksum $actual != $EXPECTED_LIBRARY_SHA"
 }
 
