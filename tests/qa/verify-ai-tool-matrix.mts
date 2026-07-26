@@ -265,7 +265,13 @@ const CASES: ToolCase[] = [
     verify: () => {},
     customRun: async ({ input, post }) => {
       const { mask, region } = await buildCenteredRectMask(input, 0.3);
-      for (const qualityMode of ["fast", "hq"] as const) {
+      const artifacts: Record<string, Buffer> = {};
+      // The hq (diffusion) leg only applies where the optional inpaint-hq pack
+      // is installed; elsewhere the route correctly refuses it.
+      const modes = installedBundleIds.has("inpaint-hq")
+        ? (["fast", "hq"] as const)
+        : (["fast"] as const);
+      for (const qualityMode of modes) {
         const { status, body } = await post(
           apiToolPath("erase-object"),
           input,
@@ -273,6 +279,7 @@ const CASES: ToolCase[] = [
           "image/jpeg",
           { format: "png", quality: 95, qualityMode },
           [{ field: "mask", bytes: mask, filename: "mask.png", contentType: "image/png" }],
+          true,
         );
         if (status !== 200 && status !== 202) {
           throw new Error(`erase-object[${qualityMode}] HTTP ${status}: ${body.slice(0, 300)}`);
@@ -280,6 +287,18 @@ const CASES: ToolCase[] = [
         const artifact = await downloadArtifact(JSON.parse(body), status);
         await expectNonDegenerateImage(artifact);
         await expectRegionRewritten(input, artifact, region);
+        artifacts[qualityMode] = artifact;
+      }
+      // A diffusion result that is byte-identical to the LaMa result means the
+      // hq path silently no-opped, which the API would otherwise report as a
+      // clean success.
+      if (artifacts.hq) {
+        const hqDelta = await meanAbsoluteDifference(artifacts.fast, artifacts.hq);
+        if (!(hqDelta > 1)) {
+          throw new Error(
+            `erase-object qualityMode=hq is indistinguishable from fast (mean abs diff ${hqDelta.toFixed(3)}), so the diffusion path did not run`,
+          );
+        }
       }
     },
   },
@@ -478,6 +497,8 @@ async function readTerminal(
 
 /** Shared token for the module-level `post` / `downloadArtifact` helpers. */
 let sessionToken = "";
+/** Bundles the live API reports as installed, for conditional legs. */
+const installedBundleIds = new Set<string>();
 
 export type PostFn = (
   path: string,
@@ -486,9 +507,15 @@ export type PostFn = (
   contentType: string,
   settings: Record<string, unknown>,
   extras?: { bytes: Buffer; contentType: string; field: string; filename: string }[],
+  /**
+   * erase-object's hand-written route reads DISCRETE multipart fields and
+   * ignores a `settings` JSON blob entirely, so a caller following the usual
+   * convention silently gets defaults. Send both when this is set.
+   */
+  discreteFields?: boolean,
 ) => Promise<{ body: string; status: number }>;
 
-const post: PostFn = async (path, file, filename, contentType, settings, extras) => {
+const post: PostFn = async (path, file, filename, contentType, settings, extras, discreteFields) => {
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(file)], { type: contentType }), filename);
   for (const extra of extras ?? []) {
@@ -497,6 +524,9 @@ const post: PostFn = async (path, file, filename, contentType, settings, extras)
       new Blob([new Uint8Array(extra.bytes)], { type: extra.contentType }),
       extra.filename,
     );
+  }
+  if (discreteFields) {
+    for (const [key, value] of Object.entries(settings)) form.append(key, String(value));
   }
   form.append("settings", JSON.stringify(settings));
   const controller = new AbortController();
@@ -636,6 +666,7 @@ async function main(): Promise<void> {
   const installed = new Set(
     inventory.bundles.filter((b) => b.status === "installed").map((b) => b.id),
   );
+  for (const id of installed) installedBundleIds.add(id);
 
   const requested = process.env.QA_BUNDLES
     ? process.env.QA_BUNDLES.split(",").map((s) => s.trim()).filter(Boolean)

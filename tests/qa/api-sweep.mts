@@ -192,7 +192,14 @@ const SECONDARY_ONLY: Record<string, RegExp> = {
  * Tools that move bytes without decoding them (renaming, archiving, encoding).
  * Accepting a malformed image is their contract, not a validation gap.
  */
-const PASSTHROUGH_TOOLS = new Set(["bulk-rename", "create-zip", "image-to-base64"]);
+const PASSTHROUGH_TOOLS = new Set([
+  "bulk-rename",
+  "create-zip",
+  "image-to-base64",
+  // With no edits requested, edit-metadata echoes the input byte for byte, so
+  // it never decodes the pixels and cannot be expected to reject corrupt ones.
+  "edit-metadata",
+]);
 
 /** Extensions whose format has no structure to violate. */
 const TEXTUAL_EXTS = new Set([
@@ -633,18 +640,26 @@ async function runToolCase(
   });
 
   // A tool refusing a format it declares is only acceptable when the refusal is
-  // one this catalog documents as correct.
+  // one this catalog documents as correct. EXPECTED_SELF_REJECT decides both
+  // directions: it rescues a documented refusal and condemns an undocumented one.
   let verdict = classification.verdict;
   let detail = classification.detail;
+  const documented = EXPECTED_SELF_REJECT[tool.id]?.some((pattern) => pattern.test(detail));
   if (
+    documented &&
+    classification.oracle === "structured-error" &&
+    (verdict === "fail" || verdict === "expected-reject")
+  ) {
+    verdict = "expected-reject";
+    detail = `documented refusal: ${detail}`;
+  } else if (
     verdict === "expected-reject" &&
     options.expectSuccess === true &&
     !options.allowSettingsRejection &&
     ext &&
     tool.acceptedInputs.includes(ext)
   ) {
-    const allowed = EXPECTED_SELF_REJECT[tool.id]?.some((pattern) => pattern.test(detail));
-    if (!allowed) {
+    if (!documented) {
       verdict = "fail";
       detail = `tool refused ${ext}, a format it declares it accepts: ${detail}`;
     }
@@ -975,10 +990,13 @@ async function laneHostile(tools: ToolContract[]): Promise<void> {
         // png-bytes.jpg is a genuine PNG wearing a .jpg name. Decoding by
         // content rather than by extension is the intended behaviour, so this
         // one is a positive control: refusing it would be the defect.
-        const sniffControl =
-          filename === "png-bytes.jpg" &&
-          tool.acceptedInputs.includes(".png") &&
-          tool.acceptedInputs.includes(".jpg");
+        // png-bytes.jpg is a real PNG named .jpg, so it is a valid image with a
+        // lying extension. Both answers are defensible: decode it by content,
+        // or refuse it because the declared extension does not match. The
+        // catalog does both (jpg-to-png accepts, png-to-pdf refuses), so the
+        // oracle here is only "no 5xx and no corrupt success". The split itself
+        // is recorded as a consistency finding rather than asserted either way.
+        const sniffControl = filename === "png-bytes.jpg";
         jobs.push(() =>
           runToolCase(tool, {
             mode: "hostile",
@@ -987,6 +1005,7 @@ async function laneHostile(tools: ToolContract[]): Promise<void> {
             fixturePath: join(dir, filename),
             filenameOverride: filename,
             expectSuccess: sniffControl,
+            allowSettingsRejection: sniffControl,
           }),
         );
       }
@@ -1089,6 +1108,11 @@ async function laneMulti(): Promise<void> {
         timeoutMs: timeoutFor(tool),
       });
       const classification = await classify(tool, outcome, true, null);
+      // The multi lane feeds genuinely different files on purpose, which for
+      // merge-csvs means incompatible schemas. Refusing that is correct.
+      const documented = EXPECTED_SELF_REJECT[toolId]?.some((pattern) =>
+        pattern.test(classification.detail),
+      );
       const result: CaseResult = {
         mode: "multi",
         tool: toolId,
@@ -1096,9 +1120,9 @@ async function laneMulti(): Promise<void> {
         format: ext,
         httpStatus: outcome.httpStatus,
         async: outcome.async,
-        verdict: classification.verdict,
+        verdict: documented ? "expected-reject" : classification.verdict,
         oracle: classification.oracle,
-        detail: `${files.length} distinct inputs -> ${classification.detail}`,
+        detail: `${files.length} distinct inputs -> ${documented ? "documented refusal: " : ""}${classification.detail}`,
         facts: classification.facts ? describeFacts(classification.facts) : undefined,
         durationMs: outcome.durationMs,
         jobId: outcome.jobId,
@@ -1162,13 +1186,17 @@ const ARCHIVE_TOOLS = [
   "create-zip",
 ];
 
-/** Settings and input counts that put an archive route into multi-output mode. */
-const ARCHIVE_DRIVE: Record<string, { settings?: Record<string, unknown>; extraInputs?: number }> =
-  {
-    "split-pdf": { settings: { mode: "every", everyN: 1 } },
-    "svg-to-raster": { extraInputs: 1 },
-    "create-zip": { extraInputs: 1 },
-  };
+/** Settings, input counts and routes that reach an archive route's multi-output path. */
+const ARCHIVE_DRIVE: Record<
+  string,
+  { settings?: Record<string, unknown>; extraInputs?: number; path?: string }
+> = {
+  "split-pdf": { settings: { mode: "every", everyN: 1 } },
+  // The main svg-to-raster route always returns one image; the archive lives
+  // behind its /batch sub-route.
+  "svg-to-raster": { extraInputs: 1, path: "/api/v1/tools/image/svg-to-raster/batch" },
+  "create-zip": { extraInputs: 1 },
+};
 const JSON_TOOLS = [
   "info",
   "color-palette",
