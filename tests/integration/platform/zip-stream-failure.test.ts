@@ -72,29 +72,46 @@ afterAll(async () => {
 async function runWithPoisonedOutputs(
   url: string,
   parts: Array<{ name: string; filename?: string; contentType?: string; content: Buffer | string }>,
-): Promise<{ terminated: boolean; deliveredCompleteZip: boolean }> {
+): Promise<{ settledWithin: boolean; deliveredCompleteZip: boolean }> {
   const { body, contentType } = createMultipartPayload(parts);
   storageMock.poison.add("outputs/");
+
+  // Race a real deadline rather than leaning on the test timeout: a hang is
+  // the failure mode being tested, and "the suite timed out" is a much weaker
+  // signal than a named assertion.
+  const HANG_BUDGET_MS = 10_000;
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), HANG_BUDGET_MS);
+  });
+
   try {
-    const res = await testApp.app.inject({
-      method: "POST",
-      url,
-      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
-      body,
-    });
-    let deliveredCompleteZip = false;
+    const request = testApp.app
+      .inject({
+        method: "POST",
+        url,
+        headers: { authorization: `Bearer ${token}`, "content-type": contentType },
+        body,
+      })
+      // A destroyed connection surfaces as a rejected request, which is
+      // exactly the signal the client should get.
+      .then(
+        (res) => res,
+        () => null,
+      );
+
+    const outcome = await Promise.race([request, deadline]);
+    if (outcome === "timeout") return { settledWithin: false, deliveredCompleteZip: false };
+    if (outcome === null) return { settledWithin: true, deliveredCompleteZip: false };
+
     try {
-      new AdmZip(res.rawPayload).getEntries();
-      deliveredCompleteZip = true;
+      new AdmZip(outcome.rawPayload).getEntries();
+      return { settledWithin: true, deliveredCompleteZip: true };
     } catch {
-      deliveredCompleteZip = false;
+      return { settledWithin: true, deliveredCompleteZip: false };
     }
-    return { terminated: true, deliveredCompleteZip };
-  } catch {
-    // A destroyed connection surfaces as a rejected request, which is the
-    // signal we want the client to get.
-    return { terminated: true, deliveredCompleteZip: false };
   } finally {
+    if (timer) clearTimeout(timer);
     storageMock.poison.clear();
   }
 }
@@ -150,7 +167,7 @@ describe("ZIP streaming failure after headers are sent (issue #645)", () => {
       { name: "clientJobId", content: "zipfail-batch" },
     ]);
 
-    expect(result.terminated).toBe(true);
+    expect(result.settledWithin, "request hung instead of terminating").toBe(true);
     expect(result.deliveredCompleteZip).toBe(false);
   }, 60_000);
 
@@ -162,7 +179,7 @@ describe("ZIP streaming failure after headers are sent (issue #645)", () => {
       { name: "clientJobId", content: "zipfail-pdf" },
     ]);
 
-    expect(result.terminated).toBe(true);
+    expect(result.settledWithin, "request hung instead of terminating").toBe(true);
     expect(result.deliveredCompleteZip).toBe(false);
   }, 60_000);
 });

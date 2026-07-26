@@ -1278,7 +1278,7 @@ describe("Settings boundary values", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // MULTI-FORMAT ZERO-BYTE BATCH
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Batch with only zero-byte files", () => {
+describe("Batch where every file is zero-byte", () => {
   it("rejects batch where all files are zero-byte", async () => {
     const res = await postBatch("resize", [
       {

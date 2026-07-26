@@ -8,6 +8,7 @@
  * and the rest. Per-route calls are what drifted, so the gate now lives in
  * one preHandler keyed off the tool id in the URL.
  */
+import { apiToolPath, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -121,6 +122,21 @@ describe("tool access gate (issue #645)", () => {
     expect(res.statusCode, `${url} -> ${res.body.slice(0, 200)}`).not.toBe(403);
   });
 
+  /**
+   * The sampled list above is readable but partial. This walks the whole
+   * catalog so a tool cannot escape the gate by being registered in a shape
+   * nobody thought to sample, for instance inside an encapsulated plugin,
+   * which is the way a global hook would silently stop applying.
+   */
+  it("refuses every tool in the catalog for a role without tools:use", async () => {
+    const reachable: string[] = [];
+    for (const tool of TOOLS) {
+      const res = await post(apiToolPath(tool.id), noToolsToken, IMG);
+      if (res.statusCode !== 403) reachable.push(`${tool.id} -> ${res.statusCode}`);
+    }
+    expect(reachable, `tools not gated: ${reachable.join(", ")}`).toEqual([]);
+  }, 120_000);
+
   it("still lets a tools:use-less role read the popular-tools listing", async () => {
     // A listing under the same prefix is not a tool run. `popular` has one
     // path segment, so it must not be mistaken for a section/toolId pair.
@@ -149,6 +165,12 @@ describe("tool access gate (issue #645)", () => {
    * one answer that must never appear is a 2xx.
    */
   it.each([
+    // Probe hand-written routes specifically. A factory tool like resize
+    // keeps its own requireToolAccess call, so it answers 403 whether or not
+    // the gate resolved the URL, and would hide a gate that failed open.
+    ["percent-encoded hand-written id", "/api/v1/tools/image/%66avicon"],
+    ["percent-encoded ai route", "/api/v1/tools/image/%75pscale"],
+    ["fully percent-encoded hand-written id", "/api/v1/tools/image/%73%70%6c%69%74"],
     ["percent-encoded tool id", "/api/v1/tools/image/%72esize"],
     ["percent-encoded section", "/api/v1/tools/%69mage/resize"],
     ["fully percent-encoded id", "/api/v1/tools/image/%72%65%73%69%7a%65"],
