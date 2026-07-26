@@ -3906,6 +3906,7 @@ export const en = {
     keyboardShortcuts: {
       heading: "Keyboard Shortcuts",
       focusSearchBar: "Focus search bar",
+      typeToSearch: "Start typing to search",
       goToTools: "Go to tools",
       toggleTheme: "Toggle theme",
       goToResize: "Go to Resize",

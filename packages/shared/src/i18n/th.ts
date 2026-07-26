@@ -3910,6 +3910,7 @@ export const th: TranslationKeys = {
     keyboardShortcuts: {
       heading: "ปุ่มลัด",
       focusSearchBar: "โฟกัสแถบค้นหา",
+      typeToSearch: "พิมพ์เพื่อค้นหา",
       goToTools: "ไปที่เครื่องมือ",
       toggleTheme: "สลับธีม",
       goToResize: "ไปที่ปรับขนาด",

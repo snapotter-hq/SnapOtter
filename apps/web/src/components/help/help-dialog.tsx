@@ -4,27 +4,32 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { format } from "@/lib/format.js";
 
 interface HelpDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
+// Labels index into t.help.keyboardShortcuts rather than carrying English text,
+// which is what the rest of the app does. The translations for these already
+// existed in all 21 locales and simply were not being read.
 const SHORTCUTS = [
-  { keys: "mod+k", description: "Focus search bar" },
-  { keys: "mod+/", description: "Go to tools" },
-  { keys: "mod+enter", description: "Process file" },
-  { keys: "mod+s", description: "Download result" },
-  { keys: "mod+shift+d", description: "Toggle theme" },
-  { keys: "mod+alt+1", description: "Go to Resize" },
-  { keys: "mod+alt+2", description: "Go to Crop" },
-  { keys: "mod+alt+3", description: "Go to Compress" },
-  { keys: "mod+alt+4", description: "Go to Convert" },
-  { keys: "mod+alt+5", description: "Go to Remove Background" },
-  { keys: "mod+alt+6", description: "Go to Watermark Text" },
-  { keys: "mod+alt+7", description: "Go to Strip Metadata" },
-  { keys: "mod+alt+8", description: "Go to Image Info" },
-];
+  { keys: "mod+k", labelKey: "focusSearchBar" },
+  { keys: "a-z", labelKey: "typeToSearch" },
+  { keys: "mod+/", labelKey: "goToTools" },
+  { keys: "mod+enter", labelKey: "processFile" },
+  { keys: "mod+s", labelKey: "downloadResult" },
+  { keys: "mod+shift+d", labelKey: "toggleTheme" },
+  { keys: "mod+alt+1", labelKey: "goToResize" },
+  { keys: "mod+alt+2", labelKey: "goToCrop" },
+  { keys: "mod+alt+3", labelKey: "goToCompress" },
+  { keys: "mod+alt+4", labelKey: "goToConvert" },
+  { keys: "mod+alt+5", labelKey: "goToRemoveBackground" },
+  { keys: "mod+alt+6", labelKey: "goToWatermarkText" },
+  { keys: "mod+alt+7", labelKey: "goToStripMetadata" },
+  { keys: "mod+alt+8", labelKey: "goToImageInfo" },
+] as const;
 
 export function HelpDialog({ open, onClose }: HelpDialogProps) {
   const { t } = useTranslation();
@@ -80,9 +85,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
               <h3 className="text-sm font-semibold">{t.help.gettingStarted.heading}</h3>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Select a tool from the sidebar or search for one with <Kbd keys="mod+k" />. Upload a
-              file by dragging it onto the page or clicking the upload area. Adjust settings and
-              download your result.
+              {t.help.gettingStarted.description}
             </p>
           </section>
 
@@ -100,7 +103,9 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                     i !== SHORTCUTS.length - 1 ? "border-b border-border" : ""
                   }`}
                 >
-                  <span className="text-muted-foreground">{s.description}</span>
+                  <span className="text-muted-foreground">
+                    {t.help.keyboardShortcuts[s.labelKey]}
+                  </span>
                   <Kbd keys={s.keys} />
                 </div>
               ))}
@@ -155,7 +160,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
 
           {/* Version */}
           <div className="text-xs text-muted-foreground pt-2 border-t border-border">
-            SnapOtter v{APP_VERSION}
+            {format(t.help.versionLabel, { version: APP_VERSION })}
           </div>
         </div>
       </div>

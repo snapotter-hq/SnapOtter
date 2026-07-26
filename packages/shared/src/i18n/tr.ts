@@ -3973,6 +3973,7 @@ export const tr: TranslationKeys = {
     keyboardShortcuts: {
       heading: "Klavye Kısayolları",
       focusSearchBar: "Arama çubuğuna odaklan",
+      typeToSearch: "Aramak için yazmaya başlayın",
       goToTools: "Araçlara git",
       toggleTheme: "Temayı değiştir",
       goToResize: "Boyutlandırmaya git",

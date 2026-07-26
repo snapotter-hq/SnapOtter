@@ -3692,6 +3692,7 @@ export const zhCN: TranslationKeys = {
     keyboardShortcuts: {
       heading: "键盘快捷键",
       focusSearchBar: "聚焦搜索栏",
+      typeToSearch: "输入即可搜索",
       goToTools: "前往工具",
       toggleTheme: "切换主题",
       goToResize: "前往调整大小",
