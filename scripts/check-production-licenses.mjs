@@ -59,11 +59,17 @@ export function validateInventory(inventory, policy) {
 // still sees every package the current platform installed, so an unacceptable
 // license in a binding is caught wherever it is installed; only the attribution
 // list is normalized, and the upstream project is still credited once.
-// Two shapes in the wild: a suffix on the package name (@img/sharp-darwin-arm64)
+// Three shapes in the wild: a suffix on the package name
+// (@img/sharp-darwin-arm64), the libc glued to the OS (@img/sharp-linuxmusl-arm64),
 // and the whole unscoped name (@esbuild/darwin-arm64), which collapses to the
 // scope alone.
 const PLATFORM_SUFFIX =
-  /[-/](?:darwin|linux|win32|freebsd|openbsd|android|sunos)(?:-(?:x64|arm64|arm|ia32|ppc64|s390x|riscv64|loong64))?(?:-(?:musl|gnu|gnueabihf|msvc))?$/;
+  /[-/](?:darwin|linux(?:musl)?|win32|freebsd|openbsd|android|sunos)(?:-(?:x64|arm64|arm|ia32|ppc64|s390x|riscv64|loong64))?(?:-(?:musl|gnu|gnueabihf|msvc))?$/;
+
+// Packages that only exist on one platform, rather than shipping a build per
+// platform. fsevents is macOS-only by design and simply absent on Linux, so it
+// cannot be normalized into a shared family and has to be named.
+const PLATFORM_ONLY_PACKAGES = new Set(["fsevents"]);
 
 function platformFamily(name) {
   return String(name).replace(PLATFORM_SUFFIX, "");
@@ -84,6 +90,7 @@ export function renderNotices(inventory) {
     lines.push(`## ${expression}`, "");
     const families = new Map();
     for (const entry of inventory[expression]) {
+      if (PLATFORM_ONLY_PACKAGES.has(entry.name)) continue;
       const name = platformFamily(entry.name);
       const family = families.get(name) ?? { name, versions: new Set(), homepage: entry.homepage };
       for (const version of entry.versions) family.versions.add(String(version));

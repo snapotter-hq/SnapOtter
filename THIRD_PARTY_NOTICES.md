@@ -497,7 +497,6 @@ Package authors retain all rights granted by their respective licenses.
 - [forwarded-parse@2.1.2](https://github.com/lpinca/forwarded-parse)
 - [fs-constants@1.0.0](https://github.com/mafintosh/fs-constants)
 - [fs-extra@11.3.1](https://github.com/jprichardson/node-fs-extra)
-- [fsevents@2.3.2,2.3.3](https://github.com/fsevents/fsevents)
 - [get-tsconfig@5.0.0-beta.4](https://github.com/privatenumber/get-tsconfig#readme)
 - [gifwrap@0.9.4](https://github.com/jtlapp/gifwrap#readme)
 - [github-from-package@0.0.0](https://github.com/substack/github-from-package)
