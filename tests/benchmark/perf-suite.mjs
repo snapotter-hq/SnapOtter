@@ -358,6 +358,34 @@ class Sampler {
     return { dbBytes, walBytes, walFiles, jobRows };
   }
 
+  /**
+   * Container lifecycle, read from Docker rather than inferred. A soak that
+   * only samples RSS cannot tell a flat memory curve from a container that
+   * quietly OOM-killed and restarted back to its baseline.
+   */
+  async probeContainerState() {
+    if (!this.cfg.appContainer) return {};
+    const { stdout } = await execFileAsync(
+      "docker",
+      [
+        "inspect",
+        "--type",
+        "container",
+        "--format",
+        "{{.RestartCount}}\t{{.State.OOMKilled}}\t{{.State.Running}}\t{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+        this.cfg.appContainer,
+      ],
+      { timeout: 20_000 },
+    );
+    const [restarts, oomKilled, running, health] = stdout.trim().split("\t");
+    return {
+      restarts: Number(restarts),
+      oomKilled: oomKilled === "true",
+      running: running === "true",
+      health,
+    };
+  }
+
   async probeDisk() {
     if (!this.cfg.appContainer) return {};
     const { stdout } = await execFileAsync(
@@ -376,11 +404,12 @@ class Sampler {
   }
 
   async takeSample(phase) {
-    const [stats, queues, postgres, disk] = await Promise.all([
+    const [stats, queues, postgres, disk, state] = await Promise.all([
       this.probeDockerStats().catch((error) => ({ error: error.message })),
       this.probeQueues().catch((error) => ({ error: error.message })),
       this.probePostgres().catch((error) => ({ error: error.message })),
       this.probeDisk().catch((error) => ({ error: error.message })),
+      this.probeContainerState().catch((error) => ({ error: error.message })),
     ]);
     const sample = {
       kind: "sample",
@@ -391,6 +420,7 @@ class Sampler {
       queues,
       postgres,
       disk,
+      state,
     };
     this.samples.push(sample);
     emit(this.cfg, sample);
@@ -435,6 +465,73 @@ function parseMemUsage(value) {
   return Number((amount * factor).toFixed(2));
 }
 
+/**
+ * Growth shape of one sampled series over a phase.
+ *
+ * A two-point delta cannot separate a leak from churn: a run that allocates,
+ * frees and happens to end high looks identical to one that never gives memory
+ * back. So each series carries a least-squares slope (normalised per hour) and
+ * a split-half comparison. A leak has a positive slope AND a second half that
+ * sits above the first; churn has a slope near zero and halves that match.
+ */
+function seriesGrowth(points) {
+  const usable = points.filter(
+    ([elapsed, value]) => Number.isFinite(elapsed) && Number.isFinite(value),
+  );
+  if (usable.length < 2) return { samples: usable.length };
+  const values = usable.map(([, value]) => value);
+  const half = Math.floor(usable.length / 2);
+  const mean = (list) => list.reduce((sum, value) => sum + value, 0) / list.length;
+  const meanX = mean(usable.map(([elapsed]) => elapsed));
+  const meanY = mean(values);
+  let covariance = 0;
+  let variance = 0;
+  for (const [elapsed, value] of usable) {
+    covariance += (elapsed - meanX) * (value - meanY);
+    variance += (elapsed - meanX) ** 2;
+  }
+  const slopePerSecond = variance === 0 ? 0 : covariance / variance;
+  return {
+    samples: usable.length,
+    first: values[0],
+    last: values.at(-1),
+    min: Math.min(...values),
+    max: Math.max(...values),
+    slopePerHour: Number((slopePerSecond * 3600).toFixed(3)),
+    firstHalfMean: Number(mean(values.slice(0, half)).toFixed(2)),
+    secondHalfMean: Number(mean(values.slice(half)).toFixed(2)),
+  };
+}
+
+/** Per-metric growth curves plus the lifecycle facts a leak verdict needs. */
+export function growthReport(samples) {
+  const appName = Object.keys(samples[0]?.containers ?? {})[0];
+  const series = (pick) => seriesGrowth(samples.map((s) => [s.elapsedS, pick(s)]));
+  const restarts = samples.map((s) => s.state?.restarts).filter(Number.isFinite);
+  const backlog = (sample) =>
+    POOLS.reduce((total, pool) => total + (sample.queues?.[pool]?.waiting ?? 0), 0);
+  return {
+    appMemMiB: series((s) => s.containers?.[appName]?.memMiB),
+    workspaceKiB: series((s) => s.disk?.workspaceKiB),
+    dataKiB: series((s) => s.disk?.dataKiB),
+    dbBytes: series((s) => s.postgres?.dbBytes),
+    walBytes: series((s) => s.postgres?.walBytes),
+    jobRows: series((s) => s.postgres?.jobRows),
+    restartsFirst: restarts[0] ?? null,
+    restartsLast: restarts.at(-1) ?? null,
+    oomKillSamples: samples.filter((s) => s.state?.oomKilled).length,
+    notRunningSamples: samples.filter((s) => s.state?.running === false).length,
+    unhealthySamples: samples.filter(
+      (s) => s.state?.health && s.state.health !== "healthy" && s.state.health !== "none",
+    ).length,
+    queueBacklogLast: samples.length ? backlog(samples.at(-1)) : 0,
+    queueFailedLast: POOLS.reduce(
+      (total, pool) => total + (samples.at(-1)?.queues?.[pool]?.failed ?? 0),
+      0,
+    ),
+  };
+}
+
 function summariseSamples(samples) {
   const appName = Object.keys(samples[0]?.containers ?? {})[0];
   const memory = samples.map((s) => s.containers?.[appName]?.memMiB ?? 0).filter(Boolean);
@@ -456,6 +553,7 @@ function summariseSamples(samples) {
     dataKiBDelta: (last?.disk?.dataKiB ?? 0) - (first?.disk?.dataKiB ?? 0),
     workspaceKiBDelta: (last?.disk?.workspaceKiB ?? 0) - (first?.disk?.workspaceKiB ?? 0),
     workspaceKiBLast: last?.disk?.workspaceKiB ?? 0,
+    growth: growthReport(samples),
   };
 }
 
@@ -652,6 +750,15 @@ async function commandSustained(cfg, args) {
         const result = await runWorkload(cfg, token, fixtures, key);
         results.push(result);
         emit(cfg, { kind: "request", phase: "sustained", ...result });
+        if (index === 0 && cursor % 25 === 0) {
+          const last = sampler.samples.at(-1);
+          const appName = Object.keys(last?.containers ?? {})[0];
+          log(
+            `sustained: ${results.length} requests, ${results.filter((r) => !r.ok).length} errors, ` +
+              `${Math.round((deadline - Date.now()) / 60_000)} min left, ` +
+              `rss=${last?.containers?.[appName]?.memMiB ?? "?"}MiB ws=${last?.disk?.workspaceKiB ?? "?"}KiB`,
+          );
+        }
       }
     }),
   );
@@ -679,6 +786,8 @@ async function commandSoak(cfg, args) {
   const minutes = Number(args.minutes ?? 20);
   const identity = await proveImage(cfg, args["expect-image"]);
   emit(cfg, { kind: "identity", ...identity, baseUrl: cfg.baseUrl });
+  const token = await login(cfg);
+  const fixtures = await loadFixtures();
   const sampler = new Sampler(cfg);
   sampler.start("idle-soak");
   const deadline = Date.now() + minutes * 60_000;
@@ -691,7 +800,15 @@ async function commandSoak(cfg, args) {
       ok: Boolean(response?.ok),
       latencyMs: Number((performance.now() - started).toFixed(1)),
     });
+    if (health.length % 10 === 0) {
+      log(
+        `idle soak: ${health.length} health checks, ${Math.round((deadline - Date.now()) / 60_000)} min left`,
+      );
+    }
   }
+  // An instance that idles without leaking is only half the answer: it also has
+  // to still do work afterwards. One real job, oracle-checked, closes that gap.
+  const afterIdle = await runWorkload(cfg, token, fixtures, "image");
   const samples = await sampler.stop();
   emit(cfg, {
     kind: "soak",
@@ -699,6 +816,7 @@ async function commandSoak(cfg, args) {
     healthChecks: health.length,
     healthFailures: health.filter((h) => !h.ok).length,
     healthLatencyMsMax: Math.max(...health.map((h) => h.latencyMs)),
+    processingProbeAfterIdle: afterIdle,
     resources: summariseSamples(samples),
     hostLoadAfter: hostLoad(),
   });
