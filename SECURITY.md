@@ -113,7 +113,7 @@ SnapOtter is a self-hosted application. Security is a shared responsibility betw
 | Docker image | Publish hardened images with non-root user, minimal attack surface | Pull updates regularly, scan images with your own tooling |
 | Dependencies | Monitor and update npm/pip dependencies | N/A |
 | Authentication | Provide secure auth implementation (scrypt, RBAC, brute-force protection) | Change default credentials before production use, enforce strong passwords |
-| TLS/HTTPS | Support `TRUST_PROXY` for termination at a reverse proxy | Configure and maintain TLS certificates and reverse proxy |
+| TLS/HTTPS | Support `TRUST_PROXY` for termination at a reverse proxy, defaulting to private-network peers only | Configure and maintain TLS certificates and reverse proxy; set `TRUST_PROXY` to match your actual topology |
 | Network security | Bind to `0.0.0.0` for container flexibility | Restrict network exposure with firewalls, do not expose port 1349 directly to the internet |
 | Host OS | N/A | Patch and harden the host operating system |
 | Secrets management | Never bake credentials into image layers | Manage env vars securely (Docker secrets, Vault, etc.), rotate the default admin password |
@@ -138,6 +138,7 @@ The following configurations are recommended for production deployments:
 - [ ] Set `MAX_USERS` to limit account creation
 - [ ] Set `SESSION_DURATION_HOURS` to a value appropriate for your environment (default: `168` / 7 days)
 - [ ] Set `LOGIN_ATTEMPT_LIMIT` to a low value (default: `10`)
+- [ ] Set `TRUST_PROXY` to match your topology (see "Client IP resolution" below)
 - [ ] Use named Docker volumes instead of bind mounts for the `/data` directory
 - [ ] Run with explicit `PUID`/`PGID` matching your host user
 
@@ -151,6 +152,49 @@ The following configurations are recommended for production deployments:
 - [ ] Forward structured logs to a centralized log aggregator (audit events emit at `info` level — do not set `LOG_LEVEL` above `info` or audit stdout output will be suppressed)
 - [ ] Monitor the `/api/v1/health` endpoint with your infrastructure monitoring
 - [ ] Restrict Docker socket access if running alongside other containers
+
+## Client IP resolution (`TRUST_PROXY`)
+
+`request.ip` is the key for every IP-scoped control: the global rate limiter, the login brute-force limiter, the enterprise IP allowlist, and IP attribution in the audit log. `TRUST_PROXY` decides which peers are allowed to set that value with an `X-Forwarded-For` header.
+
+The default is `loopback,linklocal,uniquelocal`, so only a peer on a private network is believed:
+
+| Value | Who may set the client IP | Use it when |
+|-------|---------------------------|-------------|
+| `loopback,linklocal,uniquelocal` (default) | Peers on `127.0.0.0/8`, `169.254.0.0/16`, `10/8`, `172.16/12`, `192.168/16` and the IPv6 equivalents | Anything normal: a direct `docker run`, or a reverse proxy on the same host, a Docker network, or your LAN |
+| `false` | Nobody. `request.ip` is always the socket peer | You want header handling off entirely and accept that a proxied deployment shares one rate-limit bucket |
+| `true` | Anyone who connects | Only when a proxy you control sits in front on a **public** address. Never on a directly exposed instance |
+| `10.0.0.5,192.0.2.7` or a CIDR list | Exactly the peers you name | You want to name your proxies rather than trust a whole range |
+| A number, e.g. `2` | The client is taken that many hops from the right of the chain | A known, fixed depth of proxies |
+
+Setting `true` on an instance that is reachable directly makes `request.ip` attacker-controlled: a caller who rotates the header gets a fresh rate-limit bucket on every request, which removes brute-force protection from the login route and makes the IP allowlist bypassable.
+
+### Docker Desktop caveat
+
+On Docker Desktop (macOS and Windows) a published port is served through a userland proxy that rewrites the source address to the VM gateway, `192.168.65.1`. Every client arrives as that one private address, so:
+
+- the default trust list believes it, and a forged `X-Forwarded-For` still moves `request.ip`
+- setting `TRUST_PROXY=false` does not help either: it just collapses every client into a single bucket keyed on the gateway, so one abusive caller rate-limits everyone
+
+No value of `TRUST_PROXY` recovers the real client address on that platform, because it is discarded before the application sees it. Docker Desktop is a development target. Deploy on Linux, where published ports use NAT and the real source address survives, and put a reverse proxy in front for anything internet-facing.
+
+## Upgrade notes
+
+### Client IP resolution changed (`TRUST_PROXY`)
+
+The shipped default moved from `true` to `loopback,linklocal,uniquelocal`. Most deployments need no action: a reverse proxy on the same host, a Docker network, or a LAN holds a private address and is still believed.
+
+Set `TRUST_PROXY=true` explicitly if your proxy reaches SnapOtter from a **public** address, for example a cloud load balancer on a different network. If you do not, `X-Forwarded-For` from that proxy is ignored and every request is attributed to the proxy's address, which puts all your users in one rate-limit bucket and breaks an IP allowlist keyed on real client addresses.
+
+### `files:own` and `pipelines:own` are now enforced
+
+Both permissions appeared in the roles editor but no route checked them, so unticking either had no effect. They are now enforced on the file-library routes (`/api/v1/files*`) and the saved-pipeline routes (`/api/v1/pipeline/save`, `/list`, `DELETE /:id`).
+
+All three built-in roles (`admin`, `editor`, `user`) include both permissions, so they are unaffected. Only a **custom role that deliberately omitted one** changes behaviour, which is what unticking the box was meant to do in the first place. Holding the broader `files:all` or `pipelines:all` is sufficient on its own, so no role is locked out for lacking the `:own` half.
+
+If a custom role loses access it did not expect to lose, add the missing permission back in Settings, Roles.
+
+Ad-hoc pipeline execution (`/api/v1/pipeline/execute` and `/batch`) is unchanged: it stores nothing and remains governed by `tools:use`.
 
 ## Dependency Management
 

@@ -130,7 +130,7 @@ Common environment variables (set on the `snapotter` service). Use `0` for unlim
 | `PROCESSING_TIMEOUT_S` | `0` | Per-job timeout in seconds. `0` is unlimited. |
 | `RATE_LIMIT_PER_MIN` | `300` | API requests per minute per client. |
 | `SESSION_DURATION_HOURS` | `168` | Login session length in hours. |
-| `TRUST_PROXY` | `true` | Trust `X-Forwarded-*` headers behind a reverse proxy. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP via `X-Forwarded-For`. Private-network peers only by default, so a reverse proxy on a Docker network or a LAN is believed and a public client's forged header is not. Set `true` only if a proxy you control sits in front on a public address. |
 | `ANALYTICS_ENABLED` | asks on first run | Set `false` to disable anonymous product analytics entirely. |
 | `EXTERNAL_URL` | | Public URL of the instance, required for OIDC redirects. |
 | `SQLITE_MIGRATE_PATH` | | Path to a 1.x SQLite database to import on first boot. |
