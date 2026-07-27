@@ -62,9 +62,9 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@biomejs/biome": "^2.5.4",
+    "@biomejs/biome": "^2.5.5",
     "@fast-check/vitest": "^0.4.1",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/exec": "^7.1.0",
@@ -87,7 +87,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
     "semantic-release": "^25.0.8",
-    "turbo": "^2.10.5",
+    "turbo": "^2.10.7",
     "typescript": "^5.7.0",
     "vitest": "^3.2.6",
     "zod-fast-check": "^0.10.1"
