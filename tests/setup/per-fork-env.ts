@@ -27,11 +27,17 @@ process.env.BULLMQ_PREFIX = `snapotter_test_${suffix}`;
 // test forks; 30s keeps tool routes synchronous (200) in tests while production
 // stays at 8s.
 //
-// An explicit SYNC_WAIT_MS is now honored verbatim rather than floored. The
+// An explicit SYNC_WAIT_MS is honored verbatim rather than floored, so the
 // constrained docker test image (macOS Docker VM, where Sharp and FFmpeg run
-// ~2-3x slower) still widens the window, and forcing it *down* (SYNC_WAIT_MS=0)
-// drives every tool through its 202 path, which is the only way to exercise
-// that branch on a machine fast enough to never hit it naturally.
+// ~2-3x slower) can widen the window.
+//
+// Careful with 0: per the repo-wide convention it means unlimited, not
+// instant. BullMQ's waitUntilFinished only arms its timer under `if (ttl)`, so
+// 0 waits forever and every route answers 200. To force the 202 path (the only
+// way to exercise it on a machine fast enough never to hit it naturally), pass
+// a small positive value such as SYNC_WAIT_MS=1. Note that most specs assert a
+// bare 200 and will fail under it; only the ones that call
+// settleAsyncFallback are written to survive.
 const requestedSyncWait = process.env.SYNC_WAIT_MS?.trim();
 const hasExplicitSyncWait =
   Boolean(requestedSyncWait) && Number.isFinite(Number(requestedSyncWait));

@@ -507,6 +507,7 @@ describe("Image-to-PDF cross-format matrix", () => {
 
       expect([200, 202, 400, 422]).toContain(res.statusCode);
 
+      if (await settleAsyncFallback(res)) return;
       if (res.statusCode === 200) {
         const body = JSON.parse(res.body);
         expect(body.downloadUrl).toBeDefined();

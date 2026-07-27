@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { settleAsyncFallback } from "../settle-job.js";
 import { createMultipartPayload } from "../test-server.js";
 import {
   ACCEPTABLE_FALLBACK_CODES,
@@ -327,6 +328,7 @@ describe("SVG through raster tools", () => {
       expect([200, 202, 400, 422]).toContain(res.statusCode);
 
       const body = JSON.parse(res.body);
+      if (await settleAsyncFallback(res)) return;
       if (res.statusCode === 200) {
         if (tool.id === "info") {
           expect(body.width).toBeGreaterThan(0);
