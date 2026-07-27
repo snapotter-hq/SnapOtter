@@ -35,6 +35,21 @@ If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the
 
 ## Cut a release
 
+0. **Confirm the GPU runner is online.** The `ai-bundles` job signs the OCR runtime index only after `verify-ocr-nvidia` passes, and that job needs the self-hosted box. The gated `manifest` job lists `ai-bundles` in its `needs`, so an offline runner means no public image tags at all. A queued self-hosted job waits up to 24 hours rather than failing, so check before you dispatch:
+
+   ```bash
+   gh api repos/snapotter-hq/SnapOtter/actions/runners --jq '
+     [.runners[] | select(.status=="online")
+      | {name, labels: [.labels[].name | ascii_downcase]}
+      | select(.labels | (index("self-hosted") and index("linux")
+                          and index("x64") and index("snapotter-nvidia")))
+      | .name] as $ok
+     | if ($ok|length)>0 then "ready: \($ok|join(", "))"
+       else "NO ONLINE snapotter-nvidia RUNNER, do not dispatch" end'
+   ```
+
+   This has to be run by a maintainer, not by the workflow: listing self-hosted runners requires Administration:read, which is not an available `GITHUB_TOKEN` permission. If it reports no runner, start the service on the GPU box (`systemctl --user start github-runner`) and re-check. The workflow's own `preflight-gpu-runner` job claims the same labels before anything expensive runs, so a missed check shows up as a run parked on the first job instead of a late, unexplained stall.
+
 1. Make sure `main` is green and everything you want in the release is merged.
 2. Optional: to override the auto-generated release notes, add a `.release-notes.md` on `main`. If present, it replaces the GitHub release body and seeds the docs changelog.
 3. Dispatch the workflow:
@@ -76,4 +91,4 @@ To abort, **Reject** the deployment instead. The version tag and the GitHub rele
 
 - The `docker` job uploads layers by digest before the gate. They are untagged, invisible on the registry tag lists, and exist so Trivy can scan the real image before you approve. Registry garbage collection reclaims unreferenced digests over time. If you want nothing at all pushed before approval, move the `environment: publish-images` gate from `manifest` up to the `docker` job, at the cost of approving before the scan runs.
 - To change who can approve, edit **Settings → Environments → publish-images → Required reviewers**.
-- AI feature bundles publish separately (`ai-bundles.yml`). The release's `ai-bundles` job is disabled (`if: false`); bundles are built and pushed to HuggingFace out of band.
+- AI feature bundles are built and published by the release's `ai-bundles` job, which calls the reusable `ai-bundles.yml` to build, verify, sign, and upload them to HuggingFace. The gated `manifest` job lists `ai-bundles` in its `needs`, so a version's public image tags go live only once that version's bundles are published. Publishing is idempotent: if the bundle release already exists it is verified, not re-uploaded.

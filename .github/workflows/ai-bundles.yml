@@ -81,9 +81,55 @@ jobs:
               exit 1
             }
 
+  preflight-gpu-runner:
+    # The NVIDIA verification below is the only job that needs physical hardware,
+    # and it cannot start until build-ocr has produced an image digest. That used
+    # to mean an offline GPU box burned a full multi-arch build and then parked in
+    # "Queued" for 24h at sign-ocr-index, with nothing in the run explaining why.
+    #
+    # This job claims the same labels with no dependencies, so it is the first
+    # thing scheduled. If the box is offline the run visibly sits here at second
+    # zero instead of failing much later and much less legibly. It also proves the
+    # GPU is usable BEFORE the expensive build, rather than after it.
+    #
+    # Note: this cannot be an API check. Listing self-hosted runners needs
+    # Administration:read, which is not an available GITHUB_TOKEN permission, so
+    # an API preflight would 403 on every run and pass vacuously. Claiming the
+    # label is the only signal available to the workflow itself. RELEASE.md
+    # carries the maintainer-side `gh api` check to run before dispatching.
+    name: Preflight GPU runner
+    needs: validate-inputs
+    timeout-minutes: 10
+    runs-on: [self-hosted, linux, x64, snapotter-nvidia]
+    permissions: {}
+    steps:
+      - name: Require a working NVIDIA container runtime
+        run: |
+          command -v nvidia-smi >/dev/null || {
+            echo "::error::nvidia-smi is missing on the snapotter-nvidia runner"
+            exit 1
+          }
+          nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+          docker info --format '{{json .Runtimes}}' | grep -q 'nvidia' || {
+            echo "::error::Docker on the snapotter-nvidia runner has no nvidia runtime"
+            exit 1
+          }
+
+      - name: Require enough free disk for the release image and bundles
+        run: |
+          free_gb="$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
+          echo "free on /: ${free_gb}G"
+          [[ "${free_gb}" -ge 25 ]] || {
+            echo "::error::Need at least 25G free on the runner, found ${free_gb}G"
+            exit 1
+          }
+
   build-ocr:
     name: Build OCR (${{ matrix.target }})
-    needs: validate-inputs
+    # Gated on preflight-gpu-runner: nothing here can be signed or published
+    # without the NVIDIA verification, so spending 90 minutes building before
+    # confirming that box is up only makes the failure slower and less obvious.
+    needs: [validate-inputs, preflight-gpu-runner]
     timeout-minutes: 90
     strategy:
       fail-fast: false
