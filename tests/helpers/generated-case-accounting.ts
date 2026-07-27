@@ -26,9 +26,38 @@ export const GENERATED_SKIP_CATEGORIES = [
   "missing-host-binary",
 ] as const;
 
-/** The API reports an absent processing engine as 503 ENGINE_UNAVAILABLE. */
+/**
+ * True when a response says the host has no processing engine.
+ *
+ * Three shapes, because the gap surfaces at three depths. Input validation
+ * refuses up front with 503 ENGINE_UNAVAILABLE. A tool whose input needs no
+ * probing is admitted and fails inside the sync window, which returns 422 with
+ * the worker's detail. And the engine itself words it two ways: "binary not
+ * found" when nothing is on PATH, or a spawn ENOENT when a configured path does
+ * not exist. Matching only the first is how a local simulation can pass while
+ * CI, which has no ffmpeg at all, still fails.
+ *
+ * Deliberately narrow: a real ffmpeg crash carries an exit code and stderr and
+ * has to stay a failure.
+ */
 export function isEngineUnavailableResponse(statusCode: number, body: string): boolean {
-  return statusCode === 503 && /ENGINE_UNAVAILABLE/.test(body);
+  if (statusCode === 503 && /ENGINE_UNAVAILABLE/.test(body)) return true;
+  return isEngineUnavailableFailure(body);
+}
+
+/**
+ * The same gap seen from the worker instead of the route.
+ *
+ * A tool whose input needs no probing, images-to-video being the obvious one,
+ * is admitted normally and only discovers the missing engine when ffmpeg is
+ * spawned. Match the engine's own "not found" wording, which it raises before
+ * spawning anything. A real crash carries an exit code and stderr and has to
+ * stay a failure.
+ */
+export function isEngineUnavailableFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/\b(ffmpeg|ffprobe)\b[^"]*?\bbinary not found\b/i.test(message)) return true;
+  return /spawn\s+\S*(ffmpeg|ffprobe)\S*\s+ENOENT/i.test(message);
 }
 
 export type GeneratedSkipCategory = (typeof GENERATED_SKIP_CATEGORIES)[number];

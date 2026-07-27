@@ -10,20 +10,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
   type TestApp,
 } from "../test-server.js";
-
-function isAsyncFallback(res: { statusCode: number; body: string }): boolean {
-  if (res.statusCode !== 202) return false;
-  const body = JSON.parse(res.body);
-  expect(body.async).toBe(true);
-  expect(body.jobId).toBeDefined();
-  return true;
-}
 
 describe("New format support", () => {
   let testApp: TestApp;
@@ -72,7 +65,7 @@ describe("New format support", () => {
       });
 
       // Accept 200 (success) or 422 (encoder not available in test env)
-      if (isAsyncFallback(res)) return;
+      if (await settleAsyncFallback(res)) return;
       expect([200, 422]).toContain(res.statusCode);
       if (res.statusCode === 200) {
         const json = JSON.parse(res.body);
@@ -110,7 +103,7 @@ describe("New format support", () => {
       body,
     });
 
-    if (isAsyncFallback(res)) return;
+    if (await settleAsyncFallback(res)) return;
     expect([200, 422]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       const json = JSON.parse(res.body);
@@ -198,7 +191,7 @@ describe("New format support", () => {
             headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
             body,
           });
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           expect([200, 422]).toContain(res.statusCode);
           if (res.statusCode === 200) {
             const json = JSON.parse(res.body);
@@ -240,7 +233,7 @@ describe("New format support", () => {
           headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
           body,
         });
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect([200, 400, 422]).toContain(res.statusCode);
         if (res.statusCode === 200) {
           const json = JSON.parse(res.body);
@@ -273,7 +266,7 @@ describe("New format support", () => {
           headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
           body,
         });
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect([200, 422]).toContain(res.statusCode);
         if (res.statusCode === 200) {
           const ct = res.headers["content-type"] as string;

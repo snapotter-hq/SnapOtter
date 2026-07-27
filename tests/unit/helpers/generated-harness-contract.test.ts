@@ -24,7 +24,7 @@ describe("generated QA harness contract", () => {
   );
 
   it.each([
-    "format-matrix-generated.test.ts",
+    "format-matrix-generated.shared.ts",
     "format-matrix-multimodal.test.ts",
     "format-matrix-ai.test.ts",
   ])("%s makes required-AI mode strict", (filename) => {
@@ -40,7 +40,7 @@ describe("generated QA harness contract", () => {
   });
 
   it.each([
-    "format-matrix-generated.test.ts",
+    "format-matrix-generated.shared.ts",
     "format-matrix-multimodal.test.ts",
     "settings-matrix.test.ts",
   ])("%s resolves every 202 and validates its completed artifact", (filename) => {

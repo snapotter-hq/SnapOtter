@@ -4,6 +4,7 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isEngineUnavailableFailure,
   isEngineUnavailableResponse,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
@@ -1252,8 +1253,15 @@ describe("settings variation matrix", () => {
           if (res.statusCode === 202) {
             const json = JSON.parse(res.body);
             expect(json.jobId).toBeTruthy();
-            await waitForGeneratedJobArtifact(testApp.app, token, toolId, json.jobId as string);
-            accounting.accept();
+            try {
+              await waitForGeneratedJobArtifact(testApp.app, token, toolId, json.jobId as string);
+              accounting.accept();
+            } catch (error) {
+              // Tools whose input needs no probing are admitted normally and
+              // only meet the missing engine when ffmpeg is spawned.
+              if (!isEngineUnavailableFailure(error)) throw error;
+              accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+            }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
         }, 180_000); // Includes terminal async processing and artifact verification.

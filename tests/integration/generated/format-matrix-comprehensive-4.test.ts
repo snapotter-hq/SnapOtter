@@ -7,13 +7,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   assertDownloadResponse,
   CORE_FORMATS,
   callTool,
   type FormatDef,
   getTimeout,
-  isAsyncFallback,
   PRIMARY_FORMATS,
   setupMatrixApp,
 } from "./format-matrix-comprehensive.shared.js";
@@ -36,7 +36,7 @@ describe("Crop across all 16 primary formats", () => {
           async () => {
             const res = await callTool("crop", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -65,7 +65,7 @@ describe("Rotate across all 16 primary formats", () => {
           async () => {
             const res = await callTool("rotate", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -92,7 +92,7 @@ describe("Sharpening across all 16 primary formats", () => {
           async () => {
             const res = await callTool("sharpening", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -119,7 +119,7 @@ describe("Border across all 16 primary formats", () => {
           async () => {
             const res = await callTool("border", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -150,7 +150,7 @@ describe("Extended conversion targets (core formats)", () => {
         it(`${fmt.name} -> ${target.format}`, { timeout: testTimeout }, async () => {
           const res = await callTool("convert", fmt, { format: target.format });
           if (!res) return;
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           expect(res.statusCode).toBe(200);
 
           const body = JSON.parse(res.body);

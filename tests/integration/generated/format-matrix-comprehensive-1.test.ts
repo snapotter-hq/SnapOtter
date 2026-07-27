@@ -35,7 +35,7 @@ describe("Strip-metadata across all 16 primary formats", () => {
       async () => {
         const res = await callTool("strip-metadata", fmt, { stripAll: true });
         if (!res) return;
-        const body = assertDownloadResponse(res, fmt);
+        const body = await assertDownloadResponse(res, fmt);
 
         // For core formats, verify that stripping metadata produces output
         // (it may or may not reduce size depending on whether the fixture
@@ -109,7 +109,7 @@ describe("Image enhancement across all 16 primary formats", () => {
           async () => {
             const res = await callTool("image-enhancement", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt, "image-enhancement"),
         );

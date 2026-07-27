@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isEngineUnavailableFailure,
   isEngineUnavailableResponse,
 } from "../../helpers/generated-case-accounting.js";
 import {
@@ -316,13 +317,18 @@ describe("multi-modality tool x format matrix", () => {
             ).toBeDefined();
             expect(typeof payload.jobId).toBe("string");
 
-            await waitForGeneratedJobArtifact(
-              testApp.app,
-              adminToken,
-              toolId,
-              payload.jobId as string,
-            );
-            accounting.accept();
+            try {
+              await waitForGeneratedJobArtifact(
+                testApp.app,
+                adminToken,
+                toolId,
+                payload.jobId as string,
+              );
+              accounting.accept();
+            } catch (error) {
+              if (!isEngineUnavailableFailure(error)) throw error;
+              accounting.skip("missing-host-binary", `engine unavailable for ${fixture.filename}`);
+            }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
         }, 180_000);

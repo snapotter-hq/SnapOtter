@@ -11,13 +11,13 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { fixtureDir } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   ACCEPTABLE_FALLBACK_CODES,
   adminToken,
   app,
   buildPayload,
   formatSamplesForPart,
-  isAsyncFallback,
   needsFallback,
   setupMatrixApp,
   TOOLS,
@@ -68,7 +68,7 @@ describe("Cross-format matrix", () => {
             // Assert status code
             // ------------------------------------------------------------------
             // A heavy encode may fall back to async (202) under CI load -- accept it.
-            if (isAsyncFallback(res)) return;
+            if (await settleAsyncFallback(res)) return;
 
             if (needsFallback(fmt)) {
               // Formats with optional decoders: accept success or graceful error

@@ -35,6 +35,7 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, expect } from "vitest";
 import { fixtureDir } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -198,22 +199,6 @@ export function needsFallback(fmt: FormatDef): boolean {
   return fmt.needsCliDecoder || fmt.needsHeifDecoder || fmt.mayFailValidation;
 }
 
-/**
- * A CPU-heavy encode can exceed the sync window (SYNC_WAIT_MS, 30s in tests)
- * under parallel CI load and fall back to async: 202 {jobId, async: true}. Per
- * the documented 200-or-202 contract that is a legitimate "accepted & processing"
- * outcome -- the worker runs the same process fn either way -- not a failure.
- * Returns true (validating the async body shape) when the response is that
- * fallback, so callers can treat it as a pass.
- */
-export function isAsyncFallback(res: { statusCode: number; body: string }): boolean {
-  if (res.statusCode !== 202) return false;
-  const body = JSON.parse(res.body);
-  expect(body.async).toBe(true);
-  expect(body.jobId).toBeDefined();
-  return true;
-}
-
 export function getTimeout(fmt: FormatDef, toolId?: string): number | undefined {
   if ((fmt.needsHeifDecoder || fmt.needsCliDecoder) && toolId === "image-enhancement")
     return 300_000;
@@ -280,8 +265,11 @@ export async function callTool(toolId: string, fmt: FormatDef, settings: Record<
  * Assert a standard download response shape (used by most tools).
  * For fallback formats, accepts 200/400/422. For core formats, expects 200.
  */
-export function assertDownloadResponse(res: { statusCode: number; body: string }, fmt: FormatDef) {
-  if (isAsyncFallback(res)) return undefined;
+export async function assertDownloadResponse(
+  res: { statusCode: number; body: string },
+  fmt: FormatDef,
+) {
+  if (await settleAsyncFallback(res)) return undefined;
   if (needsFallback(fmt)) {
     expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
   } else {

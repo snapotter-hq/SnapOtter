@@ -26,7 +26,7 @@
  * holds the fixtures, tool table, and helpers they all share.
  */
 
-import { afterAll, beforeAll, expect } from "vitest";
+import { afterAll, beforeAll } from "vitest";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -437,20 +437,6 @@ export const ACCEPTABLE_FALLBACK_CODES = [200, 202, 400, 422];
 
 export function needsFallback(fmt: FormatSample): boolean {
   return fmt.needsCliDecoder || fmt.needsHeifDecoder || fmt.mayFailValidation;
-}
-
-/**
- * A heavy encode can exceed SYNC_WAIT_MS (30s in tests) under parallel CI load
- * and fall back to 202 {jobId, async: true}. Per the 200-or-202 API contract
- * that is a legitimate "accepted & processing" outcome, not a failure.
- * Returns true (validating the async body shape) so callers can early-return.
- */
-export function isAsyncFallback(res: { statusCode: number; body: string }): boolean {
-  if (res.statusCode !== 202) return false;
-  const body = JSON.parse(res.body);
-  expect(body.async).toBe(true);
-  expect(body.jobId).toBeDefined();
-  return true;
 }
 
 /**

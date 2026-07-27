@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ffmpegAvailable } from "@snapotter/media-engine";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fixtureRoot } from "../../fixtures/index.js";
 
@@ -68,19 +69,24 @@ describe("media validation when the engine is unavailable", () => {
     expect(failure.statusCode).toBeGreaterThanOrEqual(500);
   });
 
-  it("still rejects a genuinely corrupt upload as a client error", async () => {
-    delete process.env.FFPROBE_PATH;
-    const handler = await freshHandler("video");
-    const notMedia = Buffer.from("this is not a video file, it is prose");
+  // Needs a working ffprobe to reach the parse failure at all. CI shards ship
+  // without ffmpeg, where every media input is an engine gap instead.
+  it.skipIf(!ffmpegAvailable())(
+    "still rejects a genuinely corrupt upload as a client error",
+    async () => {
+      delete process.env.FFPROBE_PATH;
+      const handler = await freshHandler("video");
+      const notMedia = Buffer.from("this is not a video file, it is prose");
 
-    const error = await handler.prepare(notMedia, "clip.mp4", scratch()).then(
-      () => null,
-      (caught: unknown) => caught,
-    );
+      const error = await handler.prepare(notMedia, "clip.mp4", scratch()).then(
+        () => null,
+        (caught: unknown) => caught,
+      );
 
-    const failure = error as { name?: string; message: string; statusCode?: number };
-    expect(failure.name).toBe("InputValidationError");
-    expect(failure.statusCode).toBe(400);
-    expect(failure.message).toMatch(/corrupt|unsupported/i);
-  });
+      const failure = error as { name?: string; message: string; statusCode?: number };
+      expect(failure.name).toBe("InputValidationError");
+      expect(failure.statusCode).toBe(400);
+      expect(failure.message).toMatch(/corrupt|unsupported/i);
+    },
+  );
 });

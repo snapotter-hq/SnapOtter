@@ -50,7 +50,7 @@ describe("Color adjustments across all 16 primary formats", () => {
           async () => {
             const res = await callTool("adjust-colors", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -118,7 +118,7 @@ describe("Optimize-for-web across all 16 primary formats", () => {
           async () => {
             const res = await callTool("optimize-for-web", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );

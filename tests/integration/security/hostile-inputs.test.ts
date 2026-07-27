@@ -6,6 +6,7 @@ import { waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
 import { resolveToolPool } from "../../../apps/api/src/lib/pool.js";
 import { TOOL_DISPLAY_MODES } from "../../../apps/web/src/lib/tool-display-modes.js";
 import { fixtureDir } from "../../fixtures/index.js";
+import { isEngineUnavailableResponse } from "../../helpers/generated-case-accounting.js";
 import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
@@ -143,6 +144,11 @@ describe("hostile input matrix", () => {
       for (const fixture of GARBAGE_FIXTURES) {
         const { res, elapsedMs } = await postFile(toolId, fixture);
 
+        // A host with no ffmpeg refuses every media input before it can look at
+        // the bytes, so there is no rejection behaviour to assert here. On a
+        // host that has it, the tool reaches the 4xx path below as normal.
+        if (isEngineUnavailableResponse(res.statusCode, res.body)) continue;
+
         expect(
           SERVER_ERRORS.includes(res.statusCode),
           `${toolId} returned ${res.statusCode} for ${fixture}: ${res.body.slice(0, 300)}`,
@@ -173,6 +179,7 @@ describe("hostile input matrix", () => {
 
       // Lying extension with valid content: anything but a server error is fine
       const { res } = await postFile(toolId, MISMATCH_FIXTURE);
+      if (isEngineUnavailableResponse(res.statusCode, res.body)) return;
       expect(
         SERVER_ERRORS.includes(res.statusCode),
         `${toolId} returned ${res.statusCode} for ${MISMATCH_FIXTURE}: ${res.body.slice(0, 300)}`,
