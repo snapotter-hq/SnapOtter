@@ -55,7 +55,7 @@ Use the production file maintained and tested with each release instead of copyi
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -68,7 +68,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-The canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) includes all four runtime volumes, health checks, resource limits, durable Redis configuration, pinned database/cache images, and the current container hardening. Change the default admin password immediately after first login. For a reproducible deployment, pin the SnapOtter application image to the release tag or digest you verified instead of following `latest`.
+The canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) includes all four runtime volumes, health checks, resource limits, durable Redis configuration, pinned database/cache images, and the current container hardening. Change the default admin password immediately after first login. For a reproducible deployment, pin the SnapOtter application image to the release tag or digest you verified instead of following `latest`.
 
 See [Configuration](/guide/configuration) for all environment variables and [Security & Hardening](/guide/security) for secrets, network policy, and backup guidance.
 

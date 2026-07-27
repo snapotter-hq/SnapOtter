@@ -245,7 +245,7 @@ sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 Завантажте маніфест теми випуску та переконайтеся, що він підтверджений робочим процесом випуску:
 
 ```bash
-gh attestation verify snapotter-v2.1.0-release-subjects.json \
+gh attestation verify snapotter-v2.2.0-release-subjects.json \
   --repo snapotter-hq/SnapOtter \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
@@ -256,13 +256,13 @@ gh attestation verify snapotter-v2.1.0-release-subjects.json \
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
-grype sbom:snapotter-v2.1.0-image-linux-amd64-sbom.cdx.json
+grype sbom:snapotter-v2.2.0-image-linux-amd64-sbom.cdx.json
 
 # Scan with Trivy using the SPDX SBOM
-trivy sbom snapotter-v2.1.0-image-linux-amd64-sbom.spdx.json
+trivy sbom snapotter-v2.2.0-image-linux-amd64-sbom.spdx.json
 
 # Scan the Docker image directly
-trivy image snapotter/snapotter:2.1.0
+trivy image snapotter/snapotter:2.2.0
 ```
 
 ::: info

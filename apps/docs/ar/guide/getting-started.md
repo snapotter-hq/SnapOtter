@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-يتضمن [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) الأساسي جميع وحدات تخزين وقت التشغيل الأربعة، وفحوصات السلامة، وحدود الموارد، وتكوين Redis الدائم، وصور قاعدة البيانات/ذاكرة التخزين المؤقت المثبتة، وتصلب الحاوية الحالية. قم بتغيير كلمة مرور المسؤول الافتراضية مباشرة بعد تسجيل الدخول الأول. للحصول على نشر قابل للتكرار، قم بتثبيت صورة تطبيق SnapOtter على علامة الإصدار أو الملخص الذي قمت بالتحقق منه بدلاً من اتباع `latest`.
+يتضمن [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) الأساسي جميع وحدات تخزين وقت التشغيل الأربعة، وفحوصات السلامة، وحدود الموارد، وتكوين Redis الدائم، وصور قاعدة البيانات/ذاكرة التخزين المؤقت المثبتة، وتصلب الحاوية الحالية. قم بتغيير كلمة مرور المسؤول الافتراضية مباشرة بعد تسجيل الدخول الأول. للحصول على نشر قابل للتكرار، قم بتثبيت صورة تطبيق SnapOtter على علامة الإصدار أو الملخص الذي قمت بالتحقق منه بدلاً من اتباع `latest`.
 
 راجع [التكوين](/ar/guide/configuration) للتعرف على كافة متغيرات البيئة و[الأمان والصلابة](/ar/guide/security) للتعرف على الأسرار وسياسة الشبكة وإرشادات النسخ الاحتياطي.
 

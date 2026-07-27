@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-표준 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml)에는 4개의 런타임 볼륨, 상태 확인, 리소스 제한, 내구성 있는 Redis 구성, 고정된 데이터베이스/캐시 이미지 및 현재 컨테이너 강화가 모두 포함됩니다. 처음 로그인한 후 즉시 기본 관리자 비밀번호를 변경하세요. 재현 가능한 배포를 위해 `latest`를 따르는 대신 SnapOtter 애플리케이션 이미지를 확인한 릴리스 태그 또는 다이제스트에 고정하세요.
+표준 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml)에는 4개의 런타임 볼륨, 상태 확인, 리소스 제한, 내구성 있는 Redis 구성, 고정된 데이터베이스/캐시 이미지 및 현재 컨테이너 강화가 모두 포함됩니다. 처음 로그인한 후 즉시 기본 관리자 비밀번호를 변경하세요. 재현 가능한 배포를 위해 `latest`를 따르는 대신 SnapOtter 애플리케이션 이미지를 확인한 릴리스 태그 또는 다이제스트에 고정하세요.
 
 모든 환경 변수는 [구성](/ko/guide/configuration)을 참조하고 비밀, 네트워크 정책 및 백업 지침은 [보안 및 강화](/ko/guide/security)를 참조하세요.
 

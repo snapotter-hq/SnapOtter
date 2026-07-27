@@ -11,7 +11,7 @@ Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR,
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/hr3s7HPUsr)
 [![GitHub](https://img.shields.io/badge/GitHub-snapotter--hq%2FSnapOtter-181717?logo=github)](https://github.com/snapotter-hq/SnapOtter)
 
-> **SnapOtter 2.1 is out.** The `latest` tag points at `2.1.0`: 200+ tools across image, video, audio, PDF, and files, plus a layer-based editor and local AI. See the [release notes](https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.1.0).
+> **SnapOtter 2.2 is out.** The `latest` tag points at `2.2.0`: 200+ tools across image, video, audio, PDF, and files, plus a layer-based editor and local AI. See the [release notes](https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.2.0).
 
 ## What is SnapOtter?
 
@@ -86,8 +86,8 @@ The first boot seeds an admin account from `DEFAULT_USERNAME` and `DEFAULT_PASSW
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest release |
-| `2.1.0` | Exact version |
-| `2.1` | Latest patch in the 2.1.x line |
+| `2.2.0` | Exact version |
+| `2.2` | Latest patch in the 2.2.x line |
 | `2` | Latest minor in the 2.x line |
 
 | Architecture | GPU support | Notes |

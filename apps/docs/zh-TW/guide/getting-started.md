@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-規範的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) 包括所有四個運行時卷、運行狀況檢查、資源限制、持久性 Redis 配置、固定資料庫/快取映像以及當前容器強化。首次登入後立即變更預設管理員密碼。對於可重現的部署，請將 SnapOtter 應用程式映像固定到您驗證的發布標籤或摘要，而不是遵循 `latest`。
+規範的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) 包括所有四個運行時卷、運行狀況檢查、資源限制、持久性 Redis 配置、固定資料庫/快取映像以及當前容器強化。首次登入後立即變更預設管理員密碼。對於可重現的部署，請將 SnapOtter 應用程式映像固定到您驗證的發布標籤或摘要，而不是遵循 `latest`。
 
 有關所有環境變量，請參閱[配置](/zh-TW/guide/configuration)；有關機密、網路策略和備份指南，請參閱[安全性和強化](/zh-TW/guide/security)。
 

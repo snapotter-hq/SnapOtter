@@ -141,8 +141,8 @@ Voeg voor NVIDIA CUDA-versnelling via Docker Compose de deploy-sectie toe aan de
 | Tag | Beschrijving |
 |-----|------------|
 | `latest` | Nieuwste release |
-| `2.1.0` | Exacte versie |
-| `2.1` | Nieuwste patch in 2.1.x |
+| `2.2.0` | Exacte versie |
+| `2.2` | Nieuwste patch in 2.2.x |
 | `2` | Nieuwste minor in 2.x |
 
 ## Platforms {#platforms}

@@ -59,7 +59,7 @@ Bu sayfadaki kısaltılmış bir Oluşturma örneğini kopyalamak yerine, her s�
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Kurallı [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tümünü, durum denetimlerini, kaynak sınırlarını, dayanıklı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek görüntülerini ve geçerli kapsayıcı güçlendirmeyi içerir. İlk girişten hemen sonra varsayılan yönetici şifresini değiştirin. Tekrarlanabilir bir dağıtım için `latest`'yi takip etmek yerine SnapOtter uygulama görüntüsünü doğruladığınız sürüm etiketine veya özete sabitleyin.
+Kurallı [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tümünü, durum denetimlerini, kaynak sınırlarını, dayanıklı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek görüntülerini ve geçerli kapsayıcı güçlendirmeyi içerir. İlk girişten hemen sonra varsayılan yönetici şifresini değiştirin. Tekrarlanabilir bir dağıtım için `latest`'yi takip etmek yerine SnapOtter uygulama görüntüsünü doğruladığınız sürüm etiketine veya özete sabitleyin.
 
 Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration)'ya ve gizli diziler, ağ politikası ve yedekleme kılavuzu için [Güvenlik ve Güçlendirme](/tr/guide/security)'ye bakın.
 

@@ -76,7 +76,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/ocr \
     "provider": "CPUExecutionProvider",
     "degraded": false,
     "warnings": [],
-    "runtimeVersion": "2.1.0",
+    "runtimeVersion": "2.2.0",
     "modelVersion": "PP-OCRv6-best-v1-medium"
   }
 }

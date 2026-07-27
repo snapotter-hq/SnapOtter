@@ -76,7 +76,7 @@ Anslut till `GET /api/v1/jobs/{jobId}/progress` med det `jobId` som returnerades
     "provider": "CPUExecutionProvider",
     "degraded": false,
     "warnings": [],
-    "runtimeVersion": "2.1.0",
+    "runtimeVersion": "2.2.0",
     "modelVersion": "PP-OCRv6-best-v1-medium"
   }
 }

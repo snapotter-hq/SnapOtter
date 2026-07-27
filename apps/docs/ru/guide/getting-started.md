@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Канонический [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) включает все четыре тома среды выполнения, проверки работоспособности, ограничения ресурсов, устойчивую конфигурацию Redis, закрепленные образы базы данных/кэша и текущее усиление защиты контейнера. Измените пароль администратора по умолчанию сразу после первого входа в систему. Для воспроизводимого развертывания прикрепите образ приложения SnapOtter к проверенному вами тегу выпуска или дайджесту вместо того, чтобы следовать `latest`.
+Канонический [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) включает все четыре тома среды выполнения, проверки работоспособности, ограничения ресурсов, устойчивую конфигурацию Redis, закрепленные образы базы данных/кэша и текущее усиление защиты контейнера. Измените пароль администратора по умолчанию сразу после первого входа в систему. Для воспроизводимого развертывания прикрепите образ приложения SnapOtter к проверенному вами тегу выпуска или дайджесту вместо того, чтобы следовать `latest`.
 
 См. [Конфигурация](/ru/guide/configuration) для всех переменных среды и [Безопасность и усиление](/ru/guide/security) для секретов, сетевой политики и инструкций по резервному копированию.
 

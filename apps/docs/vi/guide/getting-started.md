@@ -59,7 +59,7 @@ Sử dụng tệp sản xuất được duy trì và thử nghiệm với mỗi 
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) chuẩn bao gồm tất cả bốn khối thời gian chạy, kiểm tra tình trạng, giới hạn tài nguyên, cấu hình Redis bền vững, hình ảnh bộ đệm/cơ sở dữ liệu được ghim và tăng cường vùng chứa hiện tại. Thay đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể lặp lại, hãy ghim hình ảnh ứng dụng SnapOtter vào thẻ phát hành hoặc thông báo mà bạn đã xác minh thay vì theo dõi `latest`.
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) chuẩn bao gồm tất cả bốn khối thời gian chạy, kiểm tra tình trạng, giới hạn tài nguyên, cấu hình Redis bền vững, hình ảnh bộ đệm/cơ sở dữ liệu được ghim và tăng cường vùng chứa hiện tại. Thay đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể lặp lại, hãy ghim hình ảnh ứng dụng SnapOtter vào thẻ phát hành hoặc thông báo mà bạn đã xác minh thay vì theo dõi `latest`.
 
 Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến môi trường và [Bảo mật & tăng cường](/vi/guide/security) để biết bí mật, chính sách mạng và hướng dẫn sao lưu.
 

@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-कैनोनिकल [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) में सभी चार रनटाइम वॉल्यूम, स्वास्थ्य जांच, संसाधन सीमाएं, टिकाऊ रेडिस कॉन्फ़िगरेशन, पिन किए गए डेटाबेस/कैश छवियां और वर्तमान कंटेनर हार्डनिंग शामिल हैं। प्रथम लॉगिन के तुरंत बाद डिफ़ॉल्ट एडमिन पासवर्ड बदलें। प्रतिलिपि प्रस्तुत करने योग्य परिनियोजन के लिए, `latest` का अनुसरण करने के बजाय SnapOtter एप्लिकेशन छवि को रिलीज़ टैग पर पिन करें या आपके द्वारा सत्यापित डाइजेस्ट करें।
+कैनोनिकल [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) में सभी चार रनटाइम वॉल्यूम, स्वास्थ्य जांच, संसाधन सीमाएं, टिकाऊ रेडिस कॉन्फ़िगरेशन, पिन किए गए डेटाबेस/कैश छवियां और वर्तमान कंटेनर हार्डनिंग शामिल हैं। प्रथम लॉगिन के तुरंत बाद डिफ़ॉल्ट एडमिन पासवर्ड बदलें। प्रतिलिपि प्रस्तुत करने योग्य परिनियोजन के लिए, `latest` का अनुसरण करने के बजाय SnapOtter एप्लिकेशन छवि को रिलीज़ टैग पर पिन करें या आपके द्वारा सत्यापित डाइजेस्ट करें।
 
 सभी पर्यावरण चर के लिए [कॉन्फ़िगरेशन](/hi/guide/configuration) और रहस्यों, नेटवर्क नीति और बैकअप मार्गदर्शन के लिए [सुरक्षा और हार्डनिंग](/hi/guide/security) देखें।
 

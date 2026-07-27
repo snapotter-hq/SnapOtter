@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-正規の [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) には、4 つのランタイム ボリュームすべて、ヘルス チェック、リソース制限、耐久性のある Redis 構成、固定されたデータベース/キャッシュ イメージ、および現在のコンテナーの強化が含まれています。最初のログイン直後にデフォルトの管理者パスワードを変更します。再現可能な展開を行うには、`latest` をフォローする代わりに、SnapOtter アプリケーション イメージをリリース タグまたは確認したダイジェストに固定します。
+正規の [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) には、4 つのランタイム ボリュームすべて、ヘルス チェック、リソース制限、耐久性のある Redis 構成、固定されたデータベース/キャッシュ イメージ、および現在のコンテナーの強化が含まれています。最初のログイン直後にデフォルトの管理者パスワードを変更します。再現可能な展開を行うには、`latest` をフォローする代わりに、SnapOtter アプリケーション イメージをリリース タグまたは確認したダイジェストに固定します。
 
 すべての環境変数については [構成](/ja/guide/configuration) を、シークレット、ネットワーク ポリシー、およびバックアップ ガイダンスについては [セキュリティと強化](/ja/guide/security) を参照してください。
 

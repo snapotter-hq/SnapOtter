@@ -59,7 +59,7 @@ Gebruik het productiebestand dat bij elke release wordt onderhouden en getest in
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-De canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) omvat alle vier de runtimevolumes, gezondheidscontroles, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerverharding. Wijzig het standaard beheerderswachtwoord onmiddellijk na de eerste keer inloggen. Voor een reproduceerbare implementatie maakt u de SnapOtter-toepassingsimage vast aan de releasetag of -digest die u hebt geverifieerd, in plaats van `latest` te volgen.
+De canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) omvat alle vier de runtimevolumes, gezondheidscontroles, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerverharding. Wijzig het standaard beheerderswachtwoord onmiddellijk na de eerste keer inloggen. Voor een reproduceerbare implementatie maakt u de SnapOtter-toepassingsimage vast aan de releasetag of -digest die u hebt geverifieerd, in plaats van `latest` te volgen.
 
 Zie [Configuratie](/nl/guide/configuration) voor alle omgevingsvariabelen en [Beveiliging en beveiliging](/nl/guide/security) voor geheimen, netwerkbeleid en back-uprichtlijnen.
 

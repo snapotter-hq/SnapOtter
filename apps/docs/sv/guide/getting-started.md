@@ -59,7 +59,7 @@ Använd produktionsfilen som underhålls och testas med varje release istället 
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Den kanoniska [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) inkluderar alla fyra körtidsvolymer, hälsokontroller, resursgränser, hållbar Redis-konfiguration, fästa databas/cache-bilder och den aktuella behållarhärdningen. Ändra standardlösenordet för administratören direkt efter första inloggningen. För en reproducerbar distribution, fäst SnapOtter-applikationsbilden till releasetaggen eller sammanfattningen du verifierade istället för att följa `latest`.
+Den kanoniska [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) inkluderar alla fyra körtidsvolymer, hälsokontroller, resursgränser, hållbar Redis-konfiguration, fästa databas/cache-bilder och den aktuella behållarhärdningen. Ändra standardlösenordet för administratören direkt efter första inloggningen. För en reproducerbar distribution, fäst SnapOtter-applikationsbilden till releasetaggen eller sammanfattningen du verifierade istället för att följa `latest`.
 
 Se [Configuration](/sv/guide/configuration) för alla miljövariabler och [Security & Hardening](/sv/guide/security) för hemligheter, nätverkspolicy och säkerhetskopieringsvägledning.
 

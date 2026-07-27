@@ -141,8 +141,8 @@ volumes:
 | Thẻ | Mô tả |
 |-----|------------|
 | `latest` | Bản phát hành mới nhất |
-| `2.1.0` | Phiên bản chính xác |
-| `2.1` | Bản vá mới nhất trong 2.1.x |
+| `2.2.0` | Phiên bản chính xác |
+| `2.2` | Bản vá mới nhất trong 2.2.x |
 | `2` | Bản minor mới nhất trong 2.x |
 
 ## Nền tảng {#platforms}

@@ -59,7 +59,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) ประกอบด้วยรันไทม์วอลุ่มทั้งสี่ การตรวจสอบสภาพ ขีดจำกัดทรัพยากร การกำหนดค่า Redis ที่คงทน ฐานข้อมูล/อิมเมจแคชที่ปักหมุดไว้ และการทำให้คอนเทนเนอร์ปัจจุบันแข็งตัว เปลี่ยนรหัสผ่านผู้ดูแลระบบเริ่มต้นทันทีหลังจากเข้าสู่ระบบครั้งแรก สำหรับการปรับใช้ที่ทำซ้ำได้ ให้ปักหมุดอิมเมจแอปพลิเคชัน SnapOtter ไว้ที่แท็ก release หรือแยกย่อยที่คุณตรวจสอบแล้ว แทนที่จะติดตาม `latest`
+Canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) ประกอบด้วยรันไทม์วอลุ่มทั้งสี่ การตรวจสอบสภาพ ขีดจำกัดทรัพยากร การกำหนดค่า Redis ที่คงทน ฐานข้อมูล/อิมเมจแคชที่ปักหมุดไว้ และการทำให้คอนเทนเนอร์ปัจจุบันแข็งตัว เปลี่ยนรหัสผ่านผู้ดูแลระบบเริ่มต้นทันทีหลังจากเข้าสู่ระบบครั้งแรก สำหรับการปรับใช้ที่ทำซ้ำได้ ให้ปักหมุดอิมเมจแอปพลิเคชัน SnapOtter ไว้ที่แท็ก release หรือแยกย่อยที่คุณตรวจสอบแล้ว แทนที่จะติดตาม `latest`
 
 ดู [การกำหนดค่า](/th/guide/configuration) สำหรับตัวแปรสภาพแวดล้อมทั้งหมด และ [ความปลอดภัยและการป้องกัน](/th/guide/security) สำหรับความลับ นโยบายเครือข่าย และคำแนะนำในการสำรองข้อมูล
 

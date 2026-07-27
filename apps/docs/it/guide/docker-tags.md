@@ -141,8 +141,8 @@ Per l'accelerazione NVIDIA CUDA tramite Docker Compose, aggiungi la sezione depl
 | Tag | Descrizione |
 |-----|------------|
 | `latest` | Ultima release |
-| `2.1.0` | Versione esatta |
-| `2.1` | Ultima patch di 2.1.x |
+| `2.2.0` | Versione esatta |
+| `2.2` | Ultima patch di 2.2.x |
 | `2` | Ultima minor di 2.x |
 
 ## Piattaforme {#platforms}

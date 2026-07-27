@@ -137,8 +137,8 @@ For NVIDIA CUDA acceleration via Docker Compose, add the deploy section to the S
 | Tag | Description |
 |-----|------------|
 | `latest` | Latest release |
-| `2.1.0` | Exact version |
-| `2.1` | Latest patch in 2.1.x |
+| `2.2.0` | Exact version |
+| `2.2` | Latest patch in 2.2.x |
 | `2` | Latest minor in 2.x |
 
 ## Platforms {#platforms}

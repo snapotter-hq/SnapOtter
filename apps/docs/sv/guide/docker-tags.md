@@ -141,8 +141,8 @@ För NVIDIA CUDA-acceleration via Docker Compose lägger du till deploy-avsnitte
 | Tagg | Beskrivning |
 |-----|------------|
 | `latest` | Senaste utgåvan |
-| `2.1.0` | Exakt version |
-| `2.1` | Senaste patch i 2.1.x |
+| `2.2.0` | Exakt version |
+| `2.2` | Senaste patch i 2.2.x |
 | `2` | Senaste minor i 2.x |
 
 ## Plattformar {#platforms}

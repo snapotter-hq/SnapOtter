@@ -141,8 +141,8 @@ Docker Compose के माध्यम से NVIDIA CUDA acceleration के 
 | Tag | Description |
 |-----|------------|
 | `latest` | नवीनतम release |
-| `2.1.0` | सटीक version |
-| `2.1` | 2.1.x में नवीनतम patch |
+| `2.2.0` | सटीक version |
+| `2.2` | 2.2.x में नवीनतम patch |
 | `2` | 2.x में नवीनतम minor |
 
 ## Platforms {#platforms}

@@ -59,7 +59,7 @@ Gunakan file produksi yang dikelola dan diuji pada setiap rilis alih-alih menyal
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) kanonik mencakup keempat volume runtime, health check, batasan sumber daya, konfigurasi Redis yang tahan lama, gambar database/cache yang disematkan, dan pengerasan kontainer saat ini. Ubah kata sandi admin default segera setelah login pertama. Untuk penerapan yang dapat direproduksi, sematkan gambar aplikasi SnapOtter ke tag rilis atau intisari yang Anda verifikasi, bukan mengikuti `latest`.
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) kanonik mencakup keempat volume runtime, health check, batasan sumber daya, konfigurasi Redis yang tahan lama, gambar database/cache yang disematkan, dan pengerasan kontainer saat ini. Ubah kata sandi admin default segera setelah login pertama. Untuk penerapan yang dapat direproduksi, sematkan gambar aplikasi SnapOtter ke tag rilis atau intisari yang Anda verifikasi, bukan mengikuti `latest`.
 
 Lihat [Konfigurasi](/id/guide/configuration) untuk semua variabel lingkungan dan [Keamanan & Pengerasan](/id/guide/security) untuk rahasia, kebijakan jaringan, dan panduan pencadangan.
 

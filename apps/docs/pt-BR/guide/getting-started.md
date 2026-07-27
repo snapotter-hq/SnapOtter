@@ -59,7 +59,7 @@ Use o arquivo de produção mantido e testado com cada versão em vez de copiar 
 ```bash
 install -d -m 700 snapotter && cd snapotter
 curl --proto '=https' --tlsv1.2 -fsSLo docker-compose.yml \
-  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.1.0/docker/docker-compose.yml
+  https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v2.2.0/docker/docker-compose.yml
 
 # Keep generated service credentials out of shell history and world-readable files.
 umask 077
@@ -72,7 +72,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-O [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.1.0/docker/docker-compose.yml) canônico inclui todos os quatro volumes de tempo de execução, verificações de integridade, limites de recursos, configuração durável do Redis, imagens de banco de dados/cache fixadas e a proteção atual do contêiner. Altere a senha de administrador padrão imediatamente após o primeiro login. Para uma implantação reproduzível, fixe a imagem do aplicativo SnapOtter na tag de lançamento ou resumo que você verificou em vez de seguir `latest`.
+O [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) canônico inclui todos os quatro volumes de tempo de execução, verificações de integridade, limites de recursos, configuração durável do Redis, imagens de banco de dados/cache fixadas e a proteção atual do contêiner. Altere a senha de administrador padrão imediatamente após o primeiro login. Para uma implantação reproduzível, fixe a imagem do aplicativo SnapOtter na tag de lançamento ou resumo que você verificou em vez de seguir `latest`.
 
 Consulte [Configuração](/pt-BR/guide/configuration) para todas as variáveis ​​de ambiente e [Segurança e proteção](/pt-BR/guide/security) para segredos, política de rede e orientação de backup.
 
