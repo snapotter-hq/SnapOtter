@@ -421,3 +421,66 @@ def test_safe_onnx_session_reports_cpu_for_cpu_providers(monkeypatch):
     _fake_onnxruntime(monkeypatch, used={"CUDAExecutionProvider", "CPUExecutionProvider"})
     _, device = gpu.safe_onnx_session("model.onnx", providers=["CPUExecutionProvider"])
     assert device == "cpu"
+
+# --- ONNX CUDA detection via the driver probe ------------------------------
+#
+# CUDAExecutionProvider being listed only means onnxruntime was built with CUDA,
+# not that CUDA can bind. Confirming against the CUDA driver (cuInit) is what
+# lets a GPU exposed with the `compute` capability alone -- a usable driver but
+# no nvidia-smi on PATH -- still be detected (RVA-20260727-001).
+
+def _fake_ort(providers):
+    return types.SimpleNamespace(get_available_providers=lambda: providers)
+
+
+def test_cuda_driver_usable_true_when_cuinit_succeeds(monkeypatch):
+    import ctypes
+    fake = types.SimpleNamespace(cuInit=lambda flags: 0)  # 0 == CUDA_SUCCESS
+    monkeypatch.setattr(ctypes, "CDLL", lambda name: fake)
+    assert gpu._cuda_driver_usable() is True
+
+
+def test_cuda_driver_usable_false_when_cuinit_fails(monkeypatch):
+    import ctypes
+    fake = types.SimpleNamespace(cuInit=lambda flags: 100)  # CUDA_ERROR_NO_DEVICE
+    monkeypatch.setattr(ctypes, "CDLL", lambda name: fake)
+    assert gpu._cuda_driver_usable() is False
+
+
+def test_cuda_driver_usable_false_when_libcuda_absent(monkeypatch):
+    import ctypes
+
+    def raise_oserror(name):
+        raise OSError(f"{name}: cannot open shared object file")
+
+    monkeypatch.setattr(ctypes, "CDLL", raise_oserror)
+    assert gpu._cuda_driver_usable() is False
+
+
+def test_try_onnx_cuda_true_without_nvidia_smi_when_driver_usable(monkeypatch):
+    # The RVA-20260727-001 case: driver initializes, but nvidia-smi is not on
+    # PATH. onnx must still report CUDA rather than silently dropping to CPU.
+    monkeypatch.setitem(
+        sys.modules, "onnxruntime", _fake_ort(["CUDAExecutionProvider", "CPUExecutionProvider"])
+    )
+    monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: True)
+    monkeypatch.setattr(gpu, "_nvidia_smi_gpu_name", lambda: None)
+    assert gpu._try_onnx_cuda() is True
+
+
+def test_try_onnx_cuda_false_when_driver_not_usable(monkeypatch):
+    # CPU-only host carrying the onnxruntime-gpu wheel: the provider is listed
+    # but the driver cannot init, so it must not claim CUDA -- even though (as
+    # the old nvidia-smi gate would have seen) a name could be reported.
+    monkeypatch.setitem(
+        sys.modules, "onnxruntime", _fake_ort(["CUDAExecutionProvider", "CPUExecutionProvider"])
+    )
+    monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: False)
+    monkeypatch.setattr(gpu, "_nvidia_smi_gpu_name", lambda: "NVIDIA GeForce RTX 4070")
+    assert gpu._try_onnx_cuda() is False
+
+
+def test_try_onnx_cuda_false_when_provider_absent(monkeypatch):
+    monkeypatch.setitem(sys.modules, "onnxruntime", _fake_ort(["CPUExecutionProvider"]))
+    monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: True)
+    assert gpu._try_onnx_cuda() is False
