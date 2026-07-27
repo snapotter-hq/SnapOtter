@@ -1,10 +1,12 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
+  cjxlQuality,
   encodeBmp,
   encodeIco,
   encodeJp2,
   encodeQoi,
+  MIN_CJXL_QUALITY,
 } from "../../../apps/api/src/lib/format-encoders.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -177,5 +179,26 @@ describe("encodeJp2", () => {
       if (err instanceof Error && err.message.includes("No ImageMagick")) return;
       throw err;
     }
+  });
+});
+
+describe("cjxlQuality", () => {
+  it("floors the quality at what libjxl 0.7 will honour", () => {
+    // Anything below the floor made cjxl reject the computed distance and crash
+    // the conversion, so it clamps up to the lowest quality that encodes.
+    for (const q of [1, 2, 3, 4]) {
+      expect(cjxlQuality(q)).toBe(MIN_CJXL_QUALITY);
+    }
+  });
+
+  it("passes an in-range quality through unchanged", () => {
+    expect(cjxlQuality(5)).toBe(5);
+    expect(cjxlQuality(50)).toBe(50);
+    expect(cjxlQuality(100)).toBe(100);
+  });
+
+  it("defaults when no quality is given and rounds a fractional one", () => {
+    expect(cjxlQuality(undefined)).toBe(75);
+    expect(cjxlQuality(80.4)).toBe(80);
   });
 });

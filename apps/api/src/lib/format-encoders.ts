@@ -180,6 +180,19 @@ export async function hasMagick(): Promise<boolean> {
   }
 }
 
+// cjxl maps -q to a Butteraugli distance, and libjxl 0.7 (the build shipped in
+// the image and on the CI runners) rejects the distances below q=5 with
+// "Setting frame distance failed", so a request for quality 1 through 4 crashed
+// the whole conversion. Newer cjxl on a dev laptop accepts them, which is why
+// this only ever failed in CI and the container. Clamp to the lowest quality
+// the encoder will actually honour; a caller asking for less just gets the
+// smallest file cjxl can produce rather than a 500.
+export const MIN_CJXL_QUALITY = 5;
+
+export function cjxlQuality(quality?: number): number {
+  return Math.max(MIN_CJXL_QUALITY, Math.round(quality ?? 75));
+}
+
 export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<Buffer> {
   const id = randomUUID();
   const inputPath = join(tmpdir(), `jxl-enc-in-${id}.png`);
@@ -188,7 +201,7 @@ export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<
     const pngBuffer = await sharp(inputBuffer).png().toBuffer();
     await writeFile(inputPath, pngBuffer);
     try {
-      const q = String(quality ?? 75);
+      const q = String(cjxlQuality(quality));
       await execFileAsync("cjxl", [inputPath, outputPath, "-q", q], {
         timeout: 120_000,
       });
