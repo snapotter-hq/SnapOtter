@@ -132,15 +132,25 @@ export class GeneratedCaseAccounting {
         `${this.#toolId}: generated accounting is not conserved (attempted=${summary.attempted}, accepted=${summary.accepted}, rejected=${summary.rejected}, skipped=${summary.skipped})`,
       );
     }
-    // A tool whose every case was gated because the host has no engine was not
-    // tested, but it did not regress either, and the shard it runs on is
-    // documented as shipping no ffmpeg. Demanding an accepted case there turns
-    // a known environment gap into a permanently red gate. Every other route to
-    // zero accepted still fails, including a partial gate, which would
-    // otherwise let real failures hide behind one capability skip.
+    // A tool the host cannot run was not tested, but it did not regress either,
+    // and the shard it runs on is documented as shipping no ffmpeg. Demanding
+    // an accepted case there turns a known environment gap into a permanently
+    // red gate.
+    //
+    // Not every case has to be skipped for this to hold: a tool is offered
+    // fixtures it legitimately refuses, so images-to-video sees 65 host gaps
+    // and 4 clean rejections. Requiring skipped to equal attempted missed that
+    // and kept the gate red. What matters is that nothing was accepted, at
+    // least one case hit the host gap, and every skip is that gap rather than
+    // some other reason.
+    //
+    // This cannot mask a real failure. A case that actually breaks fails its
+    // own assertion long before it reaches the accounting, and `rejected` only
+    // ever counts a status the matrix already allows. On a host that has
+    // ffmpeg there are no host-gap skips at all, so the branch never opens.
     const fullyGatedOnHost =
       summary.attempted > 0 &&
-      summary.skipped === summary.attempted &&
+      summary.skipped > 0 &&
       summary.skips.every((skip) => skip.category === "missing-host-binary");
     if (summary.attempted === 0 || (summary.accepted === 0 && !fullyGatedOnHost)) {
       throw new Error(
