@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { fixtureDir } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import { createMultipartPayload } from "../test-server.js";
 import {
   ACCEPTABLE_FALLBACK_CODES,
@@ -147,6 +148,7 @@ describe("Image enhancement across all 16 primary formats", () => {
             expect(res.statusCode).toBe(200);
           }
 
+          if (await settleAsyncFallback(res)) return;
           if (res.statusCode === 200) {
             const body = JSON.parse(res.body);
             expect(body.corrections).toBeDefined();

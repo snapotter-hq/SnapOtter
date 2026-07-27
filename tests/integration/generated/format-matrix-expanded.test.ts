@@ -35,6 +35,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -414,6 +415,7 @@ describe("Edit-metadata cross-format", () => {
             expect([200, 202, 400, 422]).toContain(res.statusCode);
           }
 
+          if (await settleAsyncFallback(res)) return;
           if (res.statusCode === 200) {
             const body = JSON.parse(res.body);
             expect(body.downloadUrl).toBeDefined();
@@ -465,6 +467,7 @@ describe("Edit-metadata cross-format", () => {
           expect([200, 202, 400, 422]).toContain(res.statusCode);
 
           const body = JSON.parse(res.body);
+          if (await settleAsyncFallback(res)) return;
           if (res.statusCode === 200) {
             // inspect returns metadata fields; at minimum it is an object
             expect(typeof body).toBe("object");
