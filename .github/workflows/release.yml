@@ -21,7 +21,7 @@ jobs:
       release_commit: ${{ steps.check.outputs.release_commit }}
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -184,7 +184,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -289,7 +289,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out the immutable release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -562,7 +562,7 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
 
       - name: Checkout release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -990,7 +990,7 @@ jobs:
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout scan policy
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -1037,7 +1037,7 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v3
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v3
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
@@ -1251,7 +1251,7 @@ jobs:
       platform_digests: ${{ steps.verified_digests.outputs.platform_digests }}
     steps:
       - name: Check out the approved immutable release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -1534,7 +1534,7 @@ jobs:
       packages: read
     steps:
       - name: Check out the immutable release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -1613,7 +1613,7 @@ jobs:
       id-token: write
     steps:
       - name: Check out the immutable release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
@@ -1845,7 +1845,7 @@ jobs:
       packages: write
     steps:
       - name: Check out the approved immutable release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.release_commit }}
           fetch-depth: 0
