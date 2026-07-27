@@ -93,6 +93,11 @@ test.describe("Image Accessibility", () => {
     const logo = page.locator("nav img[src='/logo.png']");
     await expect(logo).toBeVisible();
     await expect(logo).toHaveAttribute("alt", "");
-    await expect(page.locator("nav a").filter({ has: logo })).toHaveAccessibleName(/SnapOtter/);
+    // `has` resolves relative to each candidate, so handing it the absolute
+    // `nav img[...]` locator asked for a <nav> inside the <a> and matched
+    // nothing, which made this assertion vacuous. Scope it to the image.
+    await expect(
+      page.locator("nav a").filter({ has: page.locator("img[src='/logo.png']") }),
+    ).toHaveAccessibleName(/SnapOtter/);
   });
 });

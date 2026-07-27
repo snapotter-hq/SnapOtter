@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { waitForRevealsSettled } from "./helpers.js";
 
 /**
  * Color-contrast smoke for the landing site (issue #557). The landing shares
@@ -30,6 +31,7 @@ for (const path of PAGES) {
   test(`landing ${path} has no color-contrast violations`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
+    await waitForRevealsSettled(page);
     const results = await new AxeBuilder({ page }).withTags(["wcag2aa"]).analyze();
     const contrast = results.violations.filter((v) => v.id === "color-contrast");
     const offenders = contrast.flatMap((v) =>
@@ -50,6 +52,7 @@ for (const path of WCAG_PAGES) {
   test(`landing ${path} has no WCAG A/AA or heading-order violations`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
+    await waitForRevealsSettled(page);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .withRules(["heading-order"])
