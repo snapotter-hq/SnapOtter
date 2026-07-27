@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { APP_VERSION } from "@snapotter/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getOcrRuntimeCapability,
@@ -20,6 +21,11 @@ import {
   resolveAiDataDir,
   selectOcrRuntimeTarget,
 } from "../../../packages/ai/src/runtime-state.js";
+
+// runtime-state rejects any runtime whose compatibility.snapotterVersion is not
+// exactly APP_VERSION, so these fixtures must track the real version. A literal
+// here passes only until the next release bump, then fails every assertion that
+// resolves a runtime. That is what happened on 2.1.0 -> 2.2.0.
 
 const temporaryDirectories: string[] = [];
 const runtimeSigningKey = generateKeyPairSync("ed25519");
@@ -133,7 +139,7 @@ function createRuntimeFixture(): {
     family: "ocr",
     target: "linux-amd64-cpu-py312",
     generation: "generation-test",
-    version: "2.1.0",
+    version: APP_VERSION,
     platform: "linux",
     arch: "amd64",
     archive: {
@@ -152,7 +158,7 @@ function createRuntimeFixture(): {
       "pp-ocrv6-small": createHash("sha256").update("small").digest("hex"),
       "pp-ocrv6-medium": createHash("sha256").update("medium").digest("hex"),
     },
-    compatibility: { protocolVersion: 1, snapotterVersion: "2.1.0" },
+    compatibility: { protocolVersion: 1, snapotterVersion: APP_VERSION },
     capabilities: {
       qualities: ["balanced", "best"],
       providers: ["CPUExecutionProvider"],
@@ -192,7 +198,7 @@ function createRuntimeFixture(): {
     status: "ready",
     activatedAt: "2026-07-13T00:00:00.000Z",
     artifact: {
-      version: "2.1.0",
+      version: APP_VERSION,
       target: "linux-amd64-cpu-py312",
       platform: "linux",
       arch: "amd64",
@@ -242,7 +248,7 @@ function createRuntimeFixture(): {
     },
     compatibility: {
       protocolVersion: 1,
-      snapotterVersion: "2.1.0",
+      snapotterVersion: APP_VERSION,
     },
     capabilities: {
       qualities: ["balanced", "best"],
@@ -393,7 +399,7 @@ describe("readActiveRuntime", () => {
       },
       compatibility: {
         protocolVersion: 1,
-        snapotterVersion: "2.1.0",
+        snapotterVersion: APP_VERSION,
       },
       runtime: {
         root: fixture.runtimeRoot,
