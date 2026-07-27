@@ -11,13 +11,13 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import { createMultipartPayload } from "../test-server.js";
 import {
   adminToken,
   app,
   buildPayload,
   FORMAT_SAMPLES,
-  isAsyncFallback,
   setupMatrixApp,
   TOOLS,
 } from "./format-matrix.shared.js";
@@ -125,7 +125,7 @@ describe("Exotic format error resilience", () => {
         });
 
         // Must not crash (500) — either succeed or return a clean error
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);
 

@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -35,14 +36,6 @@ const HAS_FFMPEG = hasBinary("ffmpeg");
 const HAS_QPDF = hasBinary("qpdf");
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function isAsyncFallback(res: { statusCode: number; body: string }): boolean {
-  if (res.statusCode !== 202) return false;
-  const body = JSON.parse(res.body);
-  expect(body.async).toBe(true);
-  expect(body.jobId).toBeDefined();
-  return true;
-}
 
 async function postTool(
   app: TestApp["app"],
@@ -110,7 +103,7 @@ describe("cross-modality launch smoke", () => {
       flipH: false,
       flipV: false,
     });
-    if (isAsyncFallback(res)) return;
+    if (await settleAsyncFallback(res)) return;
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
@@ -123,7 +116,7 @@ describe("cross-modality launch smoke", () => {
     async () => {
       const file = readFixture(fixtures.video.tiny("mp4"));
       const res = await postTool(app, adminToken, "mute-video", file, "tiny.mp4", "video/mp4", {});
-      if (isAsyncFallback(res)) return;
+      if (await settleAsyncFallback(res)) return;
       expect(res.statusCode).toBe(200);
       const result = JSON.parse(res.body);
       expect(result.downloadUrl).toBeDefined();
@@ -141,7 +134,7 @@ describe("cross-modality launch smoke", () => {
         format: "mp3",
         bitrate: 128,
       });
-      if (isAsyncFallback(res)) return;
+      if (await settleAsyncFallback(res)) return;
       expect(res.statusCode).toBe(200);
       const result = JSON.parse(res.body);
       expect(result.downloadUrl).toBeDefined();
@@ -164,7 +157,7 @@ describe("cross-modality launch smoke", () => {
         "application/pdf",
         { angle: 90, range: "1-z" },
       );
-      if (isAsyncFallback(res)) return;
+      if (await settleAsyncFallback(res)) return;
       expect(res.statusCode).toBe(200);
       const result = JSON.parse(res.body);
       expect(result.downloadUrl).toBeDefined();
@@ -179,7 +172,7 @@ describe("cross-modality launch smoke", () => {
     const res = await postTool(app, adminToken, "csv-json", file, "tiny.csv", "text/csv", {
       direction: "csv-to-json",
     });
-    if (isAsyncFallback(res)) return;
+    if (await settleAsyncFallback(res)) return;
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();

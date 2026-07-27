@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { eq } from "drizzle-orm";
+import { expect } from "vitest";
 import { db, schema } from "../../apps/api/src/db/index.js";
 import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
 import { waitForJob } from "../../apps/api/src/jobs/enqueue.js";
@@ -64,6 +65,64 @@ export async function cancelAcceptedJobAndWait(
     `Job ${jobId} did not settle after cancellation ` +
       `(database=${lastDatabaseStatus}, queue=${lastQueueState})${cancelDetails}`,
   );
+}
+
+const TERMINAL_DATABASE_STATUSES = new Set(["completed", "failed", "canceled"]);
+
+/**
+ * Settle a 202 async-fallback response, and assert the job actually finished.
+ *
+ * A 202 means the sync window expired while the job was still running. Tests
+ * used to `return` here, which asserted nothing beyond the envelope and left
+ * the job running into whatever test came next (the leak
+ * `cancelAcceptedJobAndWait` exists to prevent). Because the window only
+ * expires under load, that made coverage depend on how busy the runner was: on
+ * CI 44 tests took this path and checked nothing, while the same tests on a dev
+ * machine finished inside the window and asserted in full.
+ *
+ * Waits for a terminal state instead and asserts what every caller actually
+ * cares about: the job finished, and if it failed it failed cleanly with a
+ * message rather than crashing. A clean failure is a legitimate outcome here,
+ * since the exotic-format fixtures are expected to be rejected.
+ *
+ * Returns true when the response was a 202 so callers keep their existing
+ * early-return shape; a 202 body carries no result to assert against.
+ */
+export async function settleAsyncFallback(
+  res: { statusCode: number; body: string },
+  timeoutMs = 120_000,
+): Promise<boolean> {
+  if (res.statusCode !== 202) return false;
+
+  const body = JSON.parse(res.body) as { async?: boolean; jobId?: string };
+  expect(body.async).toBe(true);
+  expect(body.jobId).toBeDefined();
+  const jobId = body.jobId as string;
+
+  const deadline = Date.now() + timeoutMs;
+  let row: { status: string; pool: string | null; error: { message: string } | null } | undefined;
+
+  while (Date.now() < deadline) {
+    [row] = await db
+      .select({ status: schema.jobs.status, pool: schema.jobs.pool, error: schema.jobs.error })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, jobId));
+    if (row && TERMINAL_DATABASE_STATUSES.has(row.status)) break;
+    await delay(100);
+  }
+
+  if (!row || !TERMINAL_DATABASE_STATUSES.has(row.status)) {
+    // Never leave it running: a stuck job starves every later test in the fork.
+    await cancelAcceptedJobAndWait(jobId, (row?.pool as Pool | undefined) ?? "image");
+    throw new AcceptedJobTimeoutError(jobId, timeoutMs);
+  }
+
+  if (row.status === "failed") {
+    expect(typeof row.error?.message, `job ${jobId} failed without a message`).toBe("string");
+    expect(row.error?.message.length ?? 0).toBeGreaterThan(0);
+  }
+
+  return true;
 }
 
 /**

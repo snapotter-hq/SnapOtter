@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { settleAsyncFallback } from "../settle-job.js";
 import { createMultipartPayload } from "../test-server.js";
 import {
   ACCEPTABLE_FALLBACK_CODES,
@@ -16,7 +17,6 @@ import {
   CORE_FORMATS,
   callTool,
   getTimeout,
-  isAsyncFallback,
   needsFallback,
   PRIMARY_FORMATS,
   setupMatrixApp,
@@ -41,7 +41,7 @@ describe("Resize across all 16 primary formats", () => {
           async () => {
             const res = await callTool("resize", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -74,7 +74,7 @@ describe("Convert: 16 formats -> 3 output targets", () => {
           async () => {
             const res = await callTool("convert", fmt, { format: target.format });
             if (!res) return;
-            if (isAsyncFallback(res)) return;
+            if (await settleAsyncFallback(res)) return;
 
             if (needsFallback(fmt)) {
               expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
@@ -118,7 +118,7 @@ describe("Compress across all 16 primary formats", () => {
           async () => {
             const res = await callTool("compress", fmt, { ...cfg.settings });
             if (!res) return;
-            assertDownloadResponse(res, fmt);
+            await assertDownloadResponse(res, fmt);
           },
           getTimeout(fmt),
         );
@@ -234,7 +234,7 @@ describe("No-crash matrix: 16 formats x 12 tools", () => {
             );
 
             // A heavy encode may fall back to async (202) under CI load -- accept it.
-            if (isAsyncFallback(res)) return;
+            if (await settleAsyncFallback(res)) return;
 
             // Must be a recognized status code
             if (needsFallback(fmt)) {

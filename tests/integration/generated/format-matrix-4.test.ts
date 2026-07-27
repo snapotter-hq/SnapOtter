@@ -10,13 +10,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
+import { settleAsyncFallback } from "../settle-job.js";
 import { createMultipartPayload } from "../test-server.js";
 import {
   ACCEPTABLE_FALLBACK_CODES,
   adminToken,
   app,
   FORMAT_SAMPLES,
-  isAsyncFallback,
   needsFallback,
   setupMatrixApp,
 } from "./format-matrix.shared.js";
@@ -70,7 +70,7 @@ describe("Cross-format conversion matrix", () => {
           body: payload,
         });
 
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).toBe(200);
 
         const body = JSON.parse(res.body);
@@ -140,7 +140,7 @@ describe("Watermark-image cross-format matrix", () => {
             body: payload,
           });
 
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           if (needsFallback(fmt)) {
             expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
           } else {
@@ -210,7 +210,7 @@ describe("Watermark-image cross-format matrix", () => {
             body: payload,
           });
 
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           if (needsFallback(fmt)) {
             expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
           } else {
@@ -279,7 +279,7 @@ describe("Watermark-image cross-format matrix", () => {
             body: payload,
           });
 
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           expect(res.statusCode).toBe(200);
           const body = JSON.parse(res.body);
           expect(body.downloadUrl).toBeDefined();
@@ -335,7 +335,7 @@ describe("Image-to-PDF cross-format matrix", () => {
             body: payload,
           });
 
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           if (needsFallback(fmt)) {
             expect(ACCEPTABLE_FALLBACK_CODES).toContain(res.statusCode);
           } else {
@@ -407,7 +407,7 @@ describe("Image-to-PDF cross-format matrix", () => {
             body: payload,
           });
 
-          if (isAsyncFallback(res)) return;
+          if (await settleAsyncFallback(res)) return;
           expect(res.statusCode).toBe(200);
           const body = JSON.parse(res.body);
           expect(body.downloadUrl).toBeDefined();
@@ -466,7 +466,7 @@ describe("Image-to-PDF cross-format matrix", () => {
           body: payload,
         });
 
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body);
         expect(body.pages).toBe(2);
@@ -552,8 +552,8 @@ describe("Image-to-PDF cross-format matrix", () => {
         });
 
         // Must not crash with 500
-        if (isAsyncFallback(res)) return;
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);
 
@@ -664,7 +664,7 @@ describe("Watermark-image exotic format error resilience", () => {
           body: payload,
         });
 
-        if (isAsyncFallback(res)) return;
+        if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);
 
