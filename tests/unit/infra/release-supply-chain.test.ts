@@ -67,7 +67,13 @@ describe("release supply-chain closure", () => {
     expect(release).toContain('git checkout --detach "${release_commit}"');
     expect(release).toContain("node scripts/manage-release-notes.mjs materialize");
     expect(release).toContain('"${VERSION}" /tmp/release-notes.md');
-    expect(release).toContain('grep -Fq "(HTTP 404)" /tmp/release.error');
+    // The release is created as a draft (draftRelease: true), and GitHub's
+    // /releases/tags/{tag} endpoint does not return drafts. Recovery therefore
+    // keys off the release id failing to resolve, not off a 404 from a tag
+    // lookup that can never succeed here.
+    expect(release).toContain('gh release view "v${VERSION}"');
+    expect(release).toContain("--json databaseId");
+    expect(release).toContain('if [[ ! "${release_id}" =~ ^[0-9]+$ ]]; then');
     expect(release).toContain('gh release create "v${VERSION}"');
     expect(release).toContain("--draft");
     expect(release).toContain("--verify-tag");
@@ -75,6 +81,20 @@ describe("release supply-chain closure", () => {
     expect(release).toContain("GitHub draft body differs from committed release notes");
     expect(release).not.toContain("- name: Update docs changelog");
     expect(release).not.toContain("HEAD:main");
+  });
+
+  it("never resolves a drafted release through the tag endpoint", () => {
+    // Regression guard. GET /repos/{owner}/{repo}/releases/tags/{tag} returns 404
+    // for a draft, verified against this repo. Every tag lookup in this workflow
+    // ran against the draft semantic-release had just created, so the release job
+    // died immediately after pushing the tag. Resolve the numeric id with
+    // `gh release view` (which reads drafts) and call /releases/{id} instead.
+    const workflow = readRequired(releaseWorkflowPath);
+    const tagLookups = workflow
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("#"))
+      .filter((line) => /gh api\b[^\n]*releases\/tags\//.test(line));
+    expect(tagLookups).toEqual([]);
   });
 
   it("eliminates the arbitrary manual attestation workflow", () => {
