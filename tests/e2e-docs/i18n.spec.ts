@@ -38,14 +38,21 @@ test.describe("docs i18n (English + committed German locale)", () => {
     await expect(target).toBeInViewport();
   });
 
-  test("hreflang alternates are reciprocal and include x-default", async ({ page }) => {
+  test("English pages are indexable and self-canonical", async ({ page }) => {
     await page.goto("/guide/getting-started");
-    const en = await page.locator('link[hreflang="en"]').getAttribute("href");
-    const de = await page.locator('link[hreflang="de"]').getAttribute("href");
-    const xd = await page.locator('link[hreflang="x-default"]').getAttribute("href");
-    expect(en).toContain("/guide/getting-started");
-    expect(de).toContain("/de/guide/getting-started");
-    expect(xd).toBe(en);
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
+    expect(canonical).toBe("https://docs.snapotter.com/guide/getting-started");
+    await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
+  });
+
+  // Only English is indexable, so there is no hreflang cluster left to annotate.
+  // See the transformHead comment in apps/docs/.vitepress/config.mts.
+  test("translated pages are noindex, self-canonical, and carry no hreflang", async ({ page }) => {
+    await page.goto("/de/guide/getting-started");
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
+    expect(canonical).toBe("https://docs.snapotter.com/de/guide/getting-started");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, follow");
+    await expect(page.locator("link[hreflang]")).toHaveCount(0);
   });
 
   test("pagefind returns results within the German locale", async ({ page }) => {

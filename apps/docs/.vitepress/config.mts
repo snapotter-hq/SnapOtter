@@ -9,6 +9,11 @@ import { pageOnlySidebar } from "./llms-sidebar.mjs";
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
 
+// Matches a path whose first segment is one of the translated locales, with or
+// without a leading slash (VitePress hands transformItems a relative page path,
+// but the sitemap stream is happy either way).
+const TRANSLATED_PREFIX = new RegExp(`^/?(${NON_EN.map((l) => l.code).join("|")})(/|$)`);
+
 // Prefix every `link` in a sidebar/nav tree with /<locale>.
 // biome-ignore lint/suspicious/noExplicitAny: VitePress nav/sidebar item trees are recursively typed.
 function prefixLinks(items: any[], locale: string): any[] {
@@ -126,7 +131,14 @@ export default defineConfig({
   // serves the clean URL at 200, so no extra server config is needed.
   cleanUrls: true,
 
-  sitemap: { hostname: "https://docs.snapotter.com" },
+  // Only the English tree is submitted. The translated trees are noindexed in
+  // transformHead below, and submitting pages we ask Google not to index is a
+  // contradiction that shows up in Search Console as sitemap coverage errors.
+  // Drops the submitted count from 3,822 to 182.
+  sitemap: {
+    hostname: HOSTNAME,
+    transformItems: (items) => items.filter((item) => !TRANSLATED_PREFIX.test(item.url)),
+  },
 
   // VitePress defaults to shiki's `github-light`, whose comment (#6a737d, 4.45:1)
   // and string (#22863a, 4.28:1) tokens both miss AA against the code-block
@@ -176,11 +188,28 @@ export default defineConfig({
       code === "en" ? `${HOSTNAME}/${enRel}` : `${HOSTNAME}/${code}/${enRel}`;
 
     head.push(["link", { rel: "canonical", href: urlFor(current) }]);
-    head.push(["link", { rel: "alternate", hreflang: "x-default", href: urlFor("en") }]);
-    head.push(["link", { rel: "alternate", hreflang: "en", href: urlFor("en") }]);
-    for (const l of NON_EN) {
-      head.push(["link", { rel: "alternate", hreflang: l.code, href: urlFor(l.code) }]);
+
+    // The translated trees are machine translations of pages whose unique body is
+    // already small next to the shared chrome (nav, sidebar, 21-language switcher).
+    // At 20 locales x 182 pages Google read the lot as one duplicate cluster and
+    // began electing arbitrary representatives across languages: it picked
+    // /changelog as the canonical for /tools/image/favicon, and
+    // /uk/guide/getting-started for /nl/tools/image/resize. Most were dropped, and
+    // carrying 3,640 pages it refused to index starved the English ones of crawl
+    // budget.
+    //
+    // Self-canonical rather than a cross-canonical to English: pairing noindex with
+    // a canonical pointing elsewhere sends two conflicting instructions. "follow"
+    // keeps the outbound links live. Readers lose nothing, since the language
+    // switcher and every in-page link behave exactly as before.
+    if (isLocale) {
+      head.push(["meta", { name: "robots", content: "noindex, follow" }]);
     }
+
+    // No hreflang. The annotation only means something between pages that can all
+    // be indexed, and English is now the only one; pointing it at noindexed URLs is
+    // ignored at best. Restore this alongside the noindex above if the translated
+    // trees ever become indexable again.
     const ogLocale = current === "en" ? "en_US" : current.replace("-", "_");
     head.push(["meta", { property: "og:locale", content: ogLocale }]);
     head.push(["meta", { property: "og:url", content: urlFor(current) }]);
