@@ -169,30 +169,59 @@ FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae
 ARG TARGETARCH
 FROM libheif-base-${TARGETARCH} AS libheif-builder
 
-ARG LIBHEIF_VERSION=1.21.2
+ARG LIBHEIF_VERSION=1.23.1
+ARG LIBDE265_VERSION=1.1.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake pkg-config gcc g++ make curl ca-certificates \
-    libde265-dev libx265-dev libjpeg-dev libpng-dev \
+    libx265-dev libjpeg-dev libpng-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# libde265 is the HEVC decoder libheif hands every .heic and .heif upload to, so
+# attacker-controlled bitstreams reach it directly through heif-dec (decodeHeic in
+# apps/api/src/lib/heic-converter.ts). Debian 12 ships 1.0.11, which the tracker
+# marks vulnerable to twelve unfixed advisories, mostly heap overflows, and
+# trixie's 1.0.15 is still vulnerable to most of them. Upstream cleared them in
+# the 1.1.x line, so build that from source into the same prefix as libheif and
+# let LD_LIBRARY_PATH shadow the distro copy. Built BEFORE libheif so libheif
+# links this one rather than the distro headers.
+RUN curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 \
+      --output /tmp/libde265.tar.gz \
+      "https://github.com/strukturag/libde265/releases/download/v${LIBDE265_VERSION}/libde265-${LIBDE265_VERSION}.tar.gz" \
+    && printf '%s  %s\n' \
+      "fd48a927e94ed74fc7ce8829d222b9d8599fcbfe8b6448ba66705babc56ab219" \
+      /tmp/libde265.tar.gz | sha256sum --check --strict - \
+    && tar -xzf /tmp/libde265.tar.gz \
+    && cmake -B build-de265 -S "libde265-${LIBDE265_VERSION}" \
+      -DCMAKE_INSTALL_PREFIX=/opt/libheif \
+      -DBUILD_SHARED_LIBS=ON \
+      -DENABLE_SDL=OFF \
+    && cmake --build build-de265 -j$(nproc) \
+    && cmake --install build-de265
 
 RUN curl --fail --location --silent --show-error --retry 3 \
       --proto '=https' --tlsv1.2 \
       --output /tmp/libheif.tar.gz \
       "https://github.com/strukturag/libheif/releases/download/v${LIBHEIF_VERSION}/libheif-${LIBHEIF_VERSION}.tar.gz" \
     && printf '%s  %s\n' \
-      "75f530b7154bc93e7ecf846edfc0416bf5f490612de8c45983c36385aa742b42" \
+      "0de0327f60fcd47de90d5654c6fe152232738d60d84fe084ec3e0f35e03b166a" \
       /tmp/libheif.tar.gz | sha256sum --check --strict - \
     && tar -xzf /tmp/libheif.tar.gz \
-    && cmake -B build -S "libheif-${LIBHEIF_VERSION}" \
+    && PKG_CONFIG_PATH=/opt/libheif/lib/pkgconfig \
+       cmake -B build -S "libheif-${LIBHEIF_VERSION}" \
       -DCMAKE_INSTALL_PREFIX=/opt/libheif \
+      -DCMAKE_PREFIX_PATH=/opt/libheif \
       -DWITH_EXAMPLES=ON \
       -DWITH_GDK_PIXBUF=OFF \
       -DWITH_AOM_DECODER=OFF \
       -DWITH_AOM_ENCODER=OFF \
       -DWITH_DAV1D=OFF \
     && cmake --build build -j$(nproc) \
-    && cmake --install build
+    && cmake --install build \
+    && test -e /opt/libheif/lib/libde265.so \
+    && readelf -d /opt/libheif/lib/libheif.so | grep -q 'NEEDED.*libde265' \
+    && LD_LIBRARY_PATH=/opt/libheif/lib /opt/libheif/bin/heif-dec --version
 
 # ============================================
 # Stage 2c: Build LibRaw (camera RAW decoder)
@@ -546,7 +575,19 @@ RUN pnpm --filter @snapotter/api exec playwright install chromium --with-deps &&
 
 # Remove build-time package managers and native build headers from the runtime
 # image after all dependency/browser installs are complete.
+#
+# xvfb and wget are not build tooling, they are dead weight that carries CVEs.
+# xvfb arrives because `playwright install --with-deps` installs its "tools"
+# group unconditionally, and nothing here ever starts a display server: the one
+# browser launch is headless, LibreOffice always runs --headless, and nothing
+# sets DISPLAY. wget comes from the node base image and has no installed reverse
+# dependency; outbound HTTP is Node's undici and Python's urllib. openssh-client
+# arrives via git, which only Recommends it, so it drops without taking git.
+# Between them that removes 12 packages and their entire CVE contribution.
 RUN apt-get purge -y --auto-remove \
+        xvfb \
+        wget \
+        openssh-client \
         autotools-dev \
         dpkg-dev \
         gcc \

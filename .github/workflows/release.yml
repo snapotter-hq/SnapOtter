@@ -437,13 +437,14 @@ jobs:
           format: json
           output: snapotter-v${{ needs.release.outputs.new_version }}-archive-linux-${{ matrix.arch }}-trivy.json
 
-      - name: Gate unfixed CRITICAL findings
+      - name: Gate unfixed CRITICAL and HIGH findings
         if: always()
         env:
           REPORT: snapotter-v${{ needs.release.outputs.new_version }}-archive-linux-${{ matrix.arch }}-trivy.json
           LABEL: archive linux/${{ matrix.arch }}
         run: |
           node scripts/trivy-unfixed-gate.mjs "${REPORT}" \
+            --severity CRITICAL,HIGH \
             --label "${LABEL}" --summary "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish verified immutable archive assets
@@ -1089,13 +1090,14 @@ jobs:
           format: "json"
           output: "snapotter-v${{ needs.release.outputs.new_version }}-image-${{ matrix.platform }}-trivy.json"
 
-      - name: Gate unfixed CRITICAL findings
+      - name: Gate unfixed CRITICAL and HIGH findings
         if: always()
         env:
           REPORT: "snapotter-v${{ needs.release.outputs.new_version }}-image-${{ matrix.platform }}-trivy.json"
           LABEL: "image ${{ matrix.platform }}"
         run: |
           node scripts/trivy-unfixed-gate.mjs "${REPORT}" \
+            --severity CRITICAL,HIGH \
             --label "${LABEL}" --summary "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload Trivy report to GitHub Release

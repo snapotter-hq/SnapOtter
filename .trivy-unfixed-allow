@@ -1,4 +1,4 @@
-# Unfixed CRITICAL findings we ship knowingly.
+# Unfixed CRITICAL and HIGH findings we ship knowingly.
 #
 # Read with .trivyignore, which does the opposite job. That file hides findings
 # that are absent from the artifact. This one keeps findings that are PRESENT
@@ -8,7 +8,7 @@
 #
 # The release workflow's blocking scan uses ignore-unfixed, which is right for
 # what it gates (a fix exists and we did not take it) and blind to everything
-# here. Without this file the count of unfixed criticals in a shipped image was
+# here. Without this file the count of unfixed findings in a shipped image was
 # structurally zero.
 #
 # Adding an entry means claiming three things and writing down the evidence:
@@ -17,24 +17,125 @@
 # every release. Removing the cause beats adding a line.
 #
 # Every entry below is Debian 12 (arm64). amd64 is on Ubuntu 24.04 and carries
-# none of them, so the amd64 release jobs will report the whole list as absent.
-# That gap is the real fix for most of this: see IMG-20260726-005.
+# NONE of them: a full scan of the 2.2.0 amd64 image reports zero unfixed
+# CRITICAL and zero unfixed HIGH. So the amd64 release jobs report this whole
+# list as absent, and the arm64 base is the single cause of every line here.
+# Moving arm64 to Ubuntu 24.04 deletes this file. See IMG-20260726-005.
+#
+# Verified against the real 2.2.0 arm64 image rather than inferred from the
+# Dockerfile: package presence by dpkg-query, load paths by LD_DEBUG=libs and
+# readelf DT_NEEDED, reverse dependencies by apt-cache rdepends --installed,
+# and fix availability by apt-cache policy plus the Debian security tracker.
+#
+# What was fixed rather than listed, in this pass:
+#   libraw20/libraw-bin  removed with the apt entry in #649; LibRaw 0.22.2 is
+#                        built from source and is the only copy in the image.
+#   libde265             1.1.1 built from source and loaded in place of Debian's
+#                        1.0.11, so the HEVC decoder that actually receives an
+#                        attacker's .heic bitstream is the fixed line.
+#   libheif              pinned build moved 1.21.2 to 1.23.1; the old pin was
+#                        itself listed as affected by CVE-2026-3950.
+#   xvfb, wget,          purged. 12 packages and 14 findings gone, each verified
+#   openssh-client       by dry-run to take nothing else with it.
 
 # ---------------------------------------------------------------------------
 # Reachable from a user upload. These are the ones that matter.
 # ---------------------------------------------------------------------------
 
 # OpenEXR 3.1.5. ImageMagick's exr.so coder links libOpenEXR-3_1.so.30, and an
-# .exr upload reaches it through decodeExr, so a malformed EXR gets to the
-# vulnerable parser. CVE-2023-5841 is fixed in Debian trixie (3.1.13) but has
-# no bookworm backport. The other two are unfixed in every Debian suite
-# including sid (3.4.6) and untriaged by Ubuntu, so the amd64 image is equally
-# exposed and reports zero for them. Fixing this means either rebuilding
-# ImageMagick against a patched OpenEXR or dropping the EXR coder; neither is a
-# release-window change. Re-check when Debian or upstream ships a fix.
+# .exr upload reaches it through decodeExr (apps/api/src/lib/format-decoders.ts),
+# so a malformed EXR gets to the vulnerable parser. Confirmed with LD_DEBUG=libs
+# convert sample.exr. /usr/bin/djxl links OpenEXR too, so every .jxl decode also
+# initialises it, though only the JXL parser touches those bytes.
+#
+# This entry used to list three IDs. The tracker now has sixteen open against
+# bookworm's 3.1.5 and ten are unfixed in sid's 3.4.6 as well, so a base bump
+# does not clear them either. Trixie's 3.1.13 would clear CVE-2023-5841 and
+# CVE-2025-64181 but not the 2026 batch.
+#
+# The library arrives as a dependency of libmagickcore-6.q16-6-extra and of
+# libjxl-tools. Removing it means dropping the EXR coder, which takes .jxl
+# support with it because they share libmagickcore-6.q16-6-extra. That is a
+# product decision about two accepted upload formats, not a hardening one, so
+# it is filed rather than done. Re-check when Debian or upstream ships a fix.
 CVE-2023-5841
+CVE-2025-12495
+CVE-2025-12839
+CVE-2025-12840
+CVE-2025-64181
+CVE-2026-27622
+CVE-2026-34379
+CVE-2026-34543
+CVE-2026-34544
+CVE-2026-34545
+CVE-2026-34588
+CVE-2026-40244
+CVE-2026-40250
+CVE-2026-41142
 CVE-2026-42216
 CVE-2026-42217
+
+# expat 2.5.0. LibreOffice's SAX parser is expat: libexpwraplo.so and
+# libmergedlo.so both carry a direct DT_NEEDED on libexpat.so.1, and every
+# office-format upload is XML that reaches it through convertDocument
+# (packages/doc-engine/src/libreoffice.ts). That covers docx, doc, odt, rtf,
+# xlsx, xls, ods, pptx, ppt and odp across word-to-pdf, excel-to-pdf,
+# powerpoint-to-pdf, the three convert-* tools and the file preview. A direct
+# path from an upload to the vulnerable parser, so it is filed as reachable.
+#
+# SVG is not that path. Sharp's libvips is statically self-contained and vendors
+# its own glib, so sanitizeSvg into Sharp never touches distro expat, and
+# ImageMagick only picks expat up transitively through fontconfig.
+# Bookworm is at its ceiling with no backport.
+CVE-2025-59375
+CVE-2026-25210
+CVE-2026-45186
+CVE-2026-56131
+CVE-2026-56407
+CVE-2026-56408
+
+# libtiff 4.5.0, through LibreOffice. The image pipeline is not the path: Sharp's
+# libvips is self-contained, Pillow vendors its own libtiff, and ghostscript is
+# only ever invoked with -sDEVICE=pdfwrite or pnggray, so its TIFF devices are
+# unreachable. libreoffice-core lists libtiff6 as a Depends, and converting a
+# document carrying an embedded TIFF loads /lib/aarch64-linux-gnu/libtiff.so.6
+# with attacker bytes. Verified with a hand-built docx under LD_DEBUG=libs.
+# Nothing for bookworm and no backport. Trixie's 4.7.0 clears four of the five
+# open advisories; CVE-2026-36849 is ignored there too.
+CVE-2023-52355
+CVE-2026-12912
+CVE-2026-36849
+
+# libjxl 0.7.0, decoder side. .jxl is an accepted input, jxl is in
+# CLI_DECODED_FORMATS, and decodeJxl runs djxl on the user's file before falling
+# back to ImageMagick (apps/api/src/lib/format-decoders.ts), which puts an
+# attacker's bitstream into libjxl.so.0.7. The encoder side is not exposed:
+# encodeJxl always feeds cjxl a Sharp-produced PNG. Bookworm ships 0.7.0 with no
+# backport, and while trixie's 0.11.2 clears this one, the package cannot be
+# dropped without also dropping the EXR coder they share.
+CVE-2025-70103
+
+# harfbuzz 6.0.0, quadratic blowup on a crafted font. Two live paths, both
+# confirmed with LD_DEBUG=libs: a LibreOffice conversion initialises
+# libharfbuzz.so.0, and WeasyPrint's html-to-pdf and markdown-to-pdf reach it
+# through pango. The second supplies the font as well as the document:
+# doc_html_pdf.py blocks remote references but deliberately passes data: URLs to
+# the default fetcher, so a @font-face carrying a base64 payload in user HTML is
+# fetched, parsed and subsetted. Bookworm and bookworm-proposed-updates are both
+# at 6.0.0. Fixed in trixie's 10.2.0.
+CVE-2023-25193
+
+# python3.11, the distro interpreter. /opt/venv is a venv over /usr/bin/python3
+# and /data/ai/venv is a copy of it, so this interpreter runs every AI sidecar
+# script against user uploads. There is no second interpreter in the image. The
+# individual defects sit in stdlib modules the sidecars do not obviously call,
+# but the process is squarely on the upload path, so these are filed here rather
+# than argued away. Bookworm ceiling, no backport.
+CVE-2025-69534
+CVE-2026-11940
+CVE-2026-15308
+CVE-2026-3644
+CVE-2026-7210
 
 # libxml2 2.9.14, use-after-free on crafted XML, denial of service. Linked into
 # convert, tesseract and LibreOffice, all of which run on user-supplied files.
@@ -44,12 +145,37 @@ CVE-2026-42217
 CVE-2026-6653
 
 # ---------------------------------------------------------------------------
+# A fix exists and we are not taking it. Not the same as unfixable.
+# ---------------------------------------------------------------------------
+
+# curl 7.88.1. bookworm-backports carries 8.14.1-2+deb13u2~bpo13+1 and the
+# dry-run install is clean, so "no fix in any channel we can consume" would be a
+# false claim here. We are declining it for this release: a major version jump
+# on a stable base, pulling in four new packages (libnghttp3, libngtcp2 and
+# friends), for a library nothing calls with user input. The only runtime curl
+# invocation is the HEALTHCHECK against http://localhost:1349/api/v1/health.
+# Outbound HTTP is Node undici (apps/api/src/lib/ssrf.ts) and Python urllib,
+# never libcurl.
+#
+# One caveat that keeps this honest: libmergedlo.so links libcurl-gnutls.so.4
+# directly and LibreOffice runs with no network kill switch, so a document
+# carrying a remote linked image is a plausible route into libcurl's response
+# handling. Not empirically confirmed. If it is confirmed, take the backport
+# instead of extending this entry. Re-check next release.
+CVE-2026-12064
+CVE-2026-6276
+CVE-2026-8286
+CVE-2026-8927
+CVE-2026-8932
+
+# ---------------------------------------------------------------------------
 # Present in a process that handles user input, but the vulnerable code is not
 # on any path user input can take.
 # ---------------------------------------------------------------------------
 
-# perl 5.36, all four via libimage-exiftool-perl. exiftool runs on uploads, so
-# perl itself is in the path; these specific defects are not.
+# perl 5.36, all via libimage-exiftool-perl. exiftool runs on uploads through
+# format-decoders.ts, info.ts and edit-metadata.ts, so perl itself is in the
+# path; these specific defects are not.
 #   CVE-2026-8376  heap overflow compiling regexes, 32-bit builds only. Both
 #                  shipped architectures are 64-bit.
 #   CVE-2026-42496 Archive::Tar path traversal. Nothing in the image runs it.
@@ -57,19 +183,83 @@ CVE-2026-6653
 #                  input to deserialize. Nothing deserializes Storable.
 #   CVE-2026-13221 silently incorrect regex results. A correctness bug, not a
 #                  memory-safety one, and NVD's 9.1 does not reflect that.
+#   The 2026-42497, -48962, -57432 and -9538 set is the same shape: defects in
+#   modules exiftool never loads. It is invoked only with -b, -JpgFromRaw,
+#   -PreviewImage and metadata reads, never as a general perl host.
 CVE-2026-8376
 CVE-2026-42496
 CVE-2026-57433
 CVE-2026-13221
+CVE-2026-42497
+CVE-2026-48962
+CVE-2026-57432
+CVE-2026-9538
 
-# glib 2.74, integer underflow in g_dbus_node_info_new_for_xml. Needs
-# attacker-controlled D-Bus introspection XML. The container runs no D-Bus
-# broker and nothing feeds it introspection data.
+# glib 2.74. CVE-2026-58016 is the integer underflow in
+# g_dbus_node_info_new_for_xml and needs attacker-controlled D-Bus introspection
+# XML. The container runs no broker: the dbus package is not installed, there is
+# no dbus-daemon, gdbus or /run/dbus socket, the gio modules directory is empty,
+# and neither gvfs nor dconf-service is present. The 2026-5801x set is the same
+# GDBus and GVariant family and dies on the same fact.
+#
+# Note that libglib2.0-data ships 308 paths under /usr/share and zero shared
+# objects, so half the rows Trivy reports against this source package carry no
+# code at all. GLib's string and GObject code does run, through pango,
+# gdk-pixbuf, ImageMagick, LibreOffice and tesseract, so a future advisory
+# landing outside GDBus needs its own line rather than this one.
 CVE-2026-58016
+CVE-2026-58010
+CVE-2026-58011
+CVE-2026-58012
+CVE-2026-58013
+CVE-2026-58014
+CVE-2026-58015
 
 # sqlite 3.40, integer overflow. Needs attacker-controlled SQL. The app is on
 # Postgres; libsqlite3 is here as a python3 and LibreOffice dependency.
 CVE-2025-7458
+
+# libssh2 1.10.0. In the image only because Debian's libcurl4 and
+# libcurl3-gnutls link it for SCP and SFTP, and those are its only reverse
+# dependencies. Nothing invokes curl with an scp:// or sftp:// URL: the one
+# runtime curl call is the healthcheck against http://localhost, and
+# user-supplied URLs go through Node's undici, never libcurl. The vulnerable
+# transport is never negotiated. No backport.
+CVE-2026-55199
+CVE-2026-55200
+CVE-2026-7598
+
+# libcups2 2.4.2. Present twice over, as a Playwright chromium dependency and as
+# a libreoffice-core and libgs10 one. Both linkers are on the upload path but
+# neither prints: ghostscript is only ever called with -sDEVICE=pdfwrite or
+# pnggray under -dSAFER, never the cups device, and LibreOffice runs
+# --headless --convert-to. Only the client library is installed, with no
+# cups-daemon and no lp, lpstat or ipptool, so nothing ever opens an IPP
+# connection. No backport.
+CVE-2026-34980
+
+# libldap 2.5.13. Consumers are libcurl4, libcurl3-gnutls, libpq5,
+# postgresql-17, libreoffice-core and dirmngr. Reachable only if something dials
+# ldap:// or ldaps://. The database URL is a plain postgres:// with no
+# pg_service LDAP lookup, headless LibreOffice never opens an address book, curl
+# is only called on http://localhost, and no LDAP client tools are installed
+# (ldapsearch and ldapwhoami absent, /etc/ldap/ldap.conf has no active
+# directives). No backport.
+CVE-2023-2953
+
+# Base-system packages that no application code path touches. gzip has no
+# installed reverse dependencies at all and the app decompresses in-process
+# (node:zlib in svg-sanitize.ts, the node tar package in feature-status.ts,
+# Python tarfile in install_feature.py). ncurses serves bash, readline and
+# procps in a container with no TTY that never feeds user data to a terminal
+# library. libacl1 is exercised only by coreutils and tar, on paths the app
+# itself creates under /tmp/workspace and /data. util-linux ships mount, blkid
+# and the smartcols table formatter, none of which is invoked with user input.
+# All at the bookworm candidate with no backport.
+CVE-2026-41992
+CVE-2025-69720
+CVE-2026-54369
+CVE-2026-53615
 
 # ---------------------------------------------------------------------------
 # Not loaded or not present at all. These inflate the count and nothing else.
@@ -80,14 +270,48 @@ CVE-2025-7458
 # why the status is will_not_fix. The vulnerable function is not in the image.
 CVE-2023-45853
 
-# libaom3, heap overflow on frame size change. aom is pulled in only as a
-# dependency of the distro libheif1, which is shadowed at runtime by the
-# libheif 1.21.2 built in this Dockerfile (LD_LIBRARY_PATH=/usr/local/lib) and
-# configured with WITH_AOM_DECODER=OFF. ffmpeg is a self-contained static
-# build. Nothing loads libaom.
-CVE-2023-6879
+# libheif1 1.15.1, shadowed. The Dockerfile builds libheif 1.23.1 into
+# /usr/local/lib and sets LD_LIBRARY_PATH=/usr/local/lib, which the app
+# propagates to every child process (execFile inherits it, and the Python
+# dispatcher passes it explicitly in packages/ai/src/bridge.ts). Verified:
+# LD_DEBUG=libs heif-dec resolves libheif.so.1 to /usr/local/lib and reports
+# 1.23.1, and ImageMagick's heic.so resolves the same way. The distro package
+# stays installed only as a transitive dependency of libmagickcore-6.q16-6 and
+# cannot be purged without removing ImageMagick.
+#
+# `convert -list format` prints HEIC (1.15.1) because that string is baked at
+# ImageMagick build time. It does not reflect the loaded library.
+# bookworm-backports has 1.19.7, which is older than what we build.
+CVE-2025-68431
+CVE-2026-32740
+CVE-2026-32741
+CVE-2026-32882
+CVE-2026-41071
+CVE-2026-47178
 
-# openssh-client, use-after-free during client-side host key re-exchange. It
-# arrives as a dependency of git in the node base image. Nothing in the
-# application shells out to ssh or scp. amd64 does not ship it at all.
-CVE-2026-60002
+# libde265-0 1.0.11, shadowed. This one used to be genuinely reachable: every
+# .heic upload goes decodeHeic to heif-dec to libde265, which put an attacker's
+# HEVC bitstream into Debian's 1.0.11 and its twelve open advisories. The
+# Dockerfile now builds libde265 1.1.1 from source into the same prefix as
+# libheif and asserts at build time that libheif linked it, so the copy that
+# receives those bytes is the fixed line. Verified: ldd on
+# /usr/local/lib/libheif.so resolves libde265.so.0 to /usr/local/lib. The distro
+# package remains installed as a dependency of the distro libheif1 and cannot be
+# purged without removing ImageMagick.
+CVE-2026-33164
+
+# libaom3, heap overflows on frame size change. The only ELF in the image with a
+# DT_NEEDED on libaom.so.3 is the distro libheif.so.1.15.1, itself shadowed. Our
+# libheif is configured WITH_AOM_DECODER=OFF, WITH_AOM_ENCODER=OFF and
+# WITH_DAV1D=OFF, the /usr/local/lib/libheif plugin directory is empty, and
+# ffmpeg is a self-contained static binary. LD_DEBUG=libs across the HEIC, AVIF,
+# JXL, EXR and RAW paths never initialises libaom. AVIF still works because
+# Sharp's libvips decodes it natively, which is the primary path anyway.
+# CVE-2023-6879 and CVE-2023-39616 are fixed in trixie; the 2026-562xx set is
+# vulnerable in bookworm, trixie and sid alike.
+CVE-2023-6879
+CVE-2023-39616
+CVE-2026-56208
+CVE-2026-56209
+CVE-2026-56210
+CVE-2026-56211
