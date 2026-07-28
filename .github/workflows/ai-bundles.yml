@@ -34,6 +34,7 @@ permissions: {}
 jobs:
   validate-inputs:
     name: Validate release inputs
+    timeout-minutes: 10
     if: inputs.release_commit != ''
     runs-on: ubuntu-latest
     permissions: {}
@@ -755,6 +756,7 @@ jobs:
 
   sign-ocr-index:
     name: Sign verified OCR runtime index
+    timeout-minutes: 20
     needs: [build-ocr, verify-ocr, verify-ocr-nvidia]
     runs-on: ubuntu-latest
     permissions:
@@ -1318,6 +1320,10 @@ jobs:
 
   publish:
     name: Publish verified bundles to HuggingFace
+    # Uploads the full v3 set to HuggingFace and then re-downloads and hashes
+    # every published object. Untimed, a stalled transfer burns the 360 minute
+    # default before anyone notices.
+    timeout-minutes: 60
     needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index]
     # Hugging Face exposes one repository-wide branch head. Keep expensive
     # builds parallel across releases, then serialize only the short CAS write

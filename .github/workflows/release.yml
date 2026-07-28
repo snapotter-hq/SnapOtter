@@ -127,21 +127,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.check.outputs.version }}
         run: |
-          release_endpoint="repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}"
-          if ! gh api "${release_endpoint}" > /tmp/release.json 2> /tmp/release.error; then
-            if ! grep -Fq "(HTTP 404)" /tmp/release.error; then
-              cat /tmp/release.error >&2
-              echo "::error::Could not determine whether the GitHub draft exists"
-              exit 1
-            fi
+          # Resolve the release by numeric id, never by tag. GitHub's
+          # /releases/tags/{tag} endpoint returns 404 for a draft, and
+          # draftRelease is on, so a tag lookup here would 404 on the release
+          # semantic-release just created and take the whole job down with it.
+          # gh release view reads drafts, and /releases/{id} then returns the
+          # same REST shape a tag lookup would.
+          resolve_release_id() {
+            gh release view "v${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json databaseId \
+              --jq .databaseId 2>/dev/null
+          }
+
+          release_id="$(resolve_release_id || true)"
+          if [[ ! "${release_id}" =~ ^[0-9]+$ ]]; then
             gh release create "v${VERSION}" \
               --repo "${GITHUB_REPOSITORY}" \
               --draft \
               --verify-tag \
               --title "v${VERSION}" \
               --notes-file /tmp/release-notes.md
-            gh api "${release_endpoint}" > /tmp/release.json
+            release_id="$(resolve_release_id)"
           fi
+          [[ "${release_id}" =~ ^[0-9]+$ ]] || {
+            echo "::error::Could not resolve the GitHub release id for v${VERSION}"
+            exit 1
+          }
+
+          release_endpoint="repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+          gh api "${release_endpoint}" > /tmp/release.json
           jq -e --arg tag "v${VERSION}" \
             '.draft == true and .tag_name == $tag' /tmp/release.json >/dev/null || {
             echo "::error::Expected release is missing, public, or bound to the wrong tag"
@@ -438,8 +453,10 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           REPOSITORY="snapotter-hq/SnapOtter"
+          # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
           release_id="$(
-            gh api "repos/${REPOSITORY}/releases/tags/v${VERSION}" --jq .id
+            gh release view "v${VERSION}" --repo "${REPOSITORY}" \
+              --json databaseId --jq .databaseId
           )"
           [[ "${release_id}" =~ ^[0-9]+$ ]] || {
             echo "::error::GitHub release did not resolve to one immutable ID"
@@ -758,7 +775,17 @@ jobs:
               exit 1
             fi
             asset_name="snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
-            if ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+            # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
+            reuse_release_id="$(
+              gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" \
+                --json databaseId --jq .databaseId 2>/dev/null || true
+            )"
+            if [[ ! "${reuse_release_id}" =~ ^[0-9]+$ ]]; then
+              echo "::warning::Could not resolve the release id; rebuilding ${PLATFORM}"
+              echo "reused=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if ! gh api "repos/${GITHUB_REPOSITORY}/releases/${reuse_release_id}" \
               --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
               > /tmp/existing-platform-asset-ids 2> /tmp/existing-platform-asset.error; then
               echo "::warning::Could not read ${asset_name}; rebuilding ${PLATFORM}"
@@ -915,7 +942,16 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           asset_name="snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
-          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+          # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
+          persist_release_id="$(
+            gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" \
+              --json databaseId --jq .databaseId
+          )"
+          [[ "${persist_release_id}" =~ ^[0-9]+$ ]] || {
+            echo "::error::GitHub release did not resolve to one immutable ID"
+            exit 1
+          }
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${persist_release_id}" \
             --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
             > /tmp/platform-digest-asset-ids
           mapfile -t asset_ids < /tmp/platform-digest-asset-ids
@@ -1070,7 +1106,9 @@ jobs:
         run: |
           repository="snapotter-hq/SnapOtter"
           report="snapotter-v${VERSION}-image-${{ matrix.platform }}-trivy.json"
-          release_id="$(gh api "repos/${repository}/releases/tags/v${VERSION}" --jq .id)"
+          # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
+          release_id="$(gh release view "v${VERSION}" --repo "${repository}" \
+            --json databaseId --jq .databaseId)"
           [[ "${release_id}" =~ ^[0-9]+$ ]] || exit 1
           mapfile -t asset_ids < <(
             gh api "repos/${repository}/releases/${release_id}/assets?per_page=100" \
@@ -1183,7 +1221,9 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           repository="snapotter-hq/SnapOtter"
-          release_id="$(gh api "repos/${repository}/releases/tags/v${VERSION}" --jq .id)"
+          # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
+          release_id="$(gh release view "v${VERSION}" --repo "${repository}" \
+            --json databaseId --jq .databaseId)"
           [[ "${release_id}" =~ ^[0-9]+$ ]] || exit 1
           for sbom in \
             "snapotter-v${VERSION}-image-${{ matrix.platform }}-sbom.cdx.json" \
@@ -1664,8 +1704,10 @@ jobs:
             }
           release_subjects_name="snapotter-v${VERSION}-release-subjects.json"
           echo "release_subjects_name=${release_subjects_name}" >> "$GITHUB_ENV"
+          # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
           release_id="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" --jq .id
+            gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" \
+              --json databaseId --jq .databaseId
           )"
           [[ "${release_id}" =~ ^[0-9]+$ ]] || {
             echo "::error::GitHub release did not resolve to one immutable ID"
@@ -2006,9 +2048,9 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_version }}
         run: |
           draft="$(
-            gh api \
-              "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
-              --jq .draft
+            gh release view "v${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft --jq .isDraft
           )"
           [[ "${draft}" == "true" ]] || {
             echo "::error::Approved release is not a draft before final publication"
@@ -2024,9 +2066,9 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --draft=false
           [[ "$(
-            gh api \
-              "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
-              --jq .draft
+            gh release view "v${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft --jq .isDraft
           )" == "false" ]] || {
             echo "::error::Approved release remained a draft after publication"
             exit 1
