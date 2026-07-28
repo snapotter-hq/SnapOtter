@@ -267,7 +267,7 @@ test("docs Playwright collection includes explicit Axe coverage", () => {
   for (const pageName of ["homepage", "getting started", "configuration", "REST API"]) {
     expect(output).toContain(`${pageName} has no Axe violations`);
   }
-  expect(output).toContain("Total: 99 tests in 7 files");
+  expect(output).toContain("Total: 100 tests in 7 files");
 });
 
 test("Turbo passes surface harness overrides through task boundaries", () => {
