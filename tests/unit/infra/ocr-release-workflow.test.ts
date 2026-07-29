@@ -203,8 +203,14 @@ describe("OCR v3 bundle release workflow", () => {
     expect(verifyJob).toContain("timeout-minutes: 90");
     expect(verifyJob).toContain("docker/verify-ocr-runtime.sh");
     expect(verifyJob).toContain("Verify image has the release trust identity");
-    expect(verifyJob).toContain("Verification image OCR key ID does not match");
-    expect(verifyJob).toContain("Verification image OCR public key does not match");
+    // The identity is verified against the baked trust FILE, which the runtime
+    // reads, not the OCR_RUNTIME_INDEX_* env vars, which the official image leaves
+    // unset by design. Reading the env compared "" and failed a correct image.
+    expect(verifyJob).toContain("cat /app/docker/ocr-runtime-trust.json");
+    expect(verifyJob).toContain(".keys[0].keyId");
+    expect(verifyJob).toContain("Baked OCR trust key ID");
+    expect(verifyJob).toContain("Baked OCR trust public key does not match");
+    expect(verifyJob).not.toContain('printf %s "$OCR_RUNTIME_INDEX_KEY_ID"');
     expect(verifyJob).toContain(
       'actual_official_container="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}"',
     );
