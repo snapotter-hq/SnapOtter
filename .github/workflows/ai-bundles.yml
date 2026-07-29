@@ -358,18 +358,25 @@ jobs:
         run: |
           : "${OCR_RUNTIME_INDEX_KEY_ID:?Set repository variable OCR_RUNTIME_INDEX_KEY_ID}"
           : "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64:?Set repository variable OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}"
-          actual_key_id="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
-            -c 'printf %s "$OCR_RUNTIME_INDEX_KEY_ID"')"
-          actual_public_key="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
-            -c 'printf %s "$OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64"')"
+          # The official image bakes the trust store as a FILE
+          # (/app/docker/ocr-runtime-trust.json, written by write-ocr-runtime-trust.mjs)
+          # and deliberately leaves OCR_RUNTIME_INDEX_* unset in the image env: those
+          # are the operator-override path, and loadOcrRuntimeTrustKeys
+          # (packages/ai/src/runtime-index.ts:52-71) reads env only when set, else the
+          # baked file. So verify the file the runtime actually trusts, not the env.
+          trust_json="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
+            -c 'cat /app/docker/ocr-runtime-trust.json')"
+          actual_key_id="$(printf '%s' "${trust_json}" | jq -r '.keys[0].keyId')"
+          actual_public_key="$(printf '%s' "${trust_json}" | jq -r '.keys[0].publicKey')"
+          expected_public_key="$(printf '%s' "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" | base64 --decode)"
           actual_official_container="$(docker run --rm --entrypoint sh "${SNAPOTTER_BUNDLE_IMAGE}" \
             -c 'printf %s "$SNAPOTTER_OFFICIAL_CONTAINER"')"
           [[ "${actual_key_id}" == "${OCR_RUNTIME_INDEX_KEY_ID}" ]] || {
-            echo "::error::Verification image OCR key ID does not match the release identity"
+            echo "::error::Baked OCR trust key ID (${actual_key_id}) does not match the release identity"
             exit 1
           }
-          [[ "${actual_public_key}" == "${OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64}" ]] || {
-            echo "::error::Verification image OCR public key does not match the release identity"
+          [[ "${actual_public_key}" == "${expected_public_key}" ]] || {
+            echo "::error::Baked OCR trust public key does not match the release identity"
             exit 1
           }
           [[ "${actual_official_container}" == "1" ]] || {
