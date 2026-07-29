@@ -367,8 +367,13 @@ jobs:
           PY
           test -s /tmp/prebuilt-root/snapotter/apps/web/dist/index.html
           test -s /tmp/prebuilt-root/snapotter/apps/api/src/index.ts
-          test -x /tmp/prebuilt-root/snapotter/node_modules/.bin/tsx
-          /tmp/prebuilt-root/snapotter/node_modules/.bin/tsx --version
+          # tsx is a prod dependency of apps/api, so pnpm's workspace layout puts
+          # its bin under apps/api/node_modules/.bin, not the workspace root. This
+          # is exactly where the Docker CMD runs it from (WORKDIR apps/api,
+          # ./node_modules/.bin/tsx). The root path never existed; this assertion
+          # was added in #649 and this is its first real release run.
+          test -x /tmp/prebuilt-root/snapotter/apps/api/node_modules/.bin/tsx
+          ( cd /tmp/prebuilt-root/snapotter/apps/api && ./node_modules/.bin/tsx --version )
           echo "archive_name=${archive_name}" >> "$GITHUB_ENV"
 
       - name: Install pinned Syft 1.42.3 from verified release bytes

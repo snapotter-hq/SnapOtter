@@ -83,8 +83,12 @@ describe("Dockerfile build args", () => {
 
       expect(module).toContain(contract.application);
       expect(module).toContain("golang.org/x/image v0.43.0");
+      // x/text is pinned to the patched line the same way x/image is: 0.38.0
+      // carried CVE-2026-56852 (fixed in 0.39.0) and is linked into both binaries.
+      expect(module).toContain("golang.org/x/text v0.39.0");
       expect(checksums).toContain(`${contract.application} h1:`);
       expect(checksums).toContain("golang.org/x/image v0.43.0 h1:");
+      expect(checksums).toContain("golang.org/x/text v0.39.0 h1:");
       expect(stage).toContain(
         `COPY docker/go-tools/${contract.directory}/go.mod docker/go-tools/${contract.directory}/go.sum ./`,
       );

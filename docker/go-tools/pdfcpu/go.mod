@@ -6,3 +6,5 @@ require (
 	github.com/pdfcpu/pdfcpu v0.13.0
 	golang.org/x/image v0.43.0
 )
+
+require golang.org/x/text v0.39.0 // indirect

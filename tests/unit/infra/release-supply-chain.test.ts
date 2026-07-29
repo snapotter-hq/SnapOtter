@@ -119,7 +119,11 @@ describe("release supply-chain closure", () => {
     expect(archiveSecurity).toContain("Verify immutable release tag binding");
     expect(archiveSecurity).toContain("sha256sum --check --strict");
     expect(archiveSecurity).toContain('filter="data"');
-    expect(archiveSecurity).toContain("node_modules/.bin/tsx --version");
+    // tsx is asserted at apps/api/node_modules/.bin, where pnpm's workspace layout
+    // actually places a workspace-package dependency and where the Docker CMD runs
+    // it. The root path never existed and failed the first real release run.
+    expect(archiveSecurity).toContain("apps/api/node_modules/.bin/tsx");
+    expect(archiveSecurity).not.toContain("snapotter/node_modules/.bin/tsx");
     expect(archiveSecurity).toContain(
       "cyclonedx-json=snapotter-v${VERSION}-archive-linux-${ARCH}-sbom.cdx.json",
     );
