@@ -579,6 +579,12 @@ Fix whatever broke the first start (usually: free the port), then force the app 
 docker compose up -d --force-recreate SnapOtter
 ```
 
+### Windows: reachable from other devices, not from the PC itself {#windows-wsl2-loopback}
+
+With Docker running inside WSL2 (the usual Windows setup), the stack can be reachable from every other machine on your network while `http://localhost:1349` times out on the Windows host itself, even with WSL's mirrored networking mode enabled. The port never shows up in Windows `netstat`, and nothing is wrong with the containers.
+
+Open the app from another device, or from inside the distro using its own address (`hostname -I` in the WSL shell). If localhost forwarding happens to work on your WSL version, treat it as a bonus rather than something to depend on.
+
 ## CI/CD {#ci-cd}
 
 The GitHub repository has three workflows:
