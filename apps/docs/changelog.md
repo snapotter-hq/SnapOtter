@@ -4,7 +4,7 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 # Changelog {#changelog}
 
-## v2.2.0
+## v2.2.0 {#v2-2-0}
 
 Most of 2.2 is hardening. A non-admin holding a delegated `users:manage` role could take over an instance, and every tool endpoint turned out to be missing its permission check. Upgrade if you run more than one user.
 
@@ -13,7 +13,7 @@ The rest is the long tail of self-hosting: downloads that started and never fini
 > [!IMPORTANT]
 > If you granted `users:manage` to a non-admin through a custom role, that role could take over administrator accounts on 2.0.0 through 2.1.0. Details in Security.
 
-### Security
+### Security {#v2-2-0-security}
 
 - **Privilege escalation through a delegated `users:manage` role (GHSA-9xgh-95qh-2x7h).** A non-admin holding `users:manage` through a custom role could reset the password of, or delete, a higher-privileged account, a built-in administrator included, and take over the instance. Password reset and account deletion now verify the caller's authority over the target, so a delegated role cannot reach above its own level. Affected: 2.0.0 through 2.1.0. Reported by 李春来 (Chunlai Li). (#616)
 - **Every tool endpoint is now gated.** Tool access was enforced route by route, so all 45 hand-written routes had to remember the same call and none of them did. A role without `tools:use` could still run image-to-pdf, erase-object, upscale, sign-pdf and the rest. The check now lives in one preHandler keyed off the matched route, so it covers sub-paths and any route added later. (#646)
@@ -24,7 +24,7 @@ The rest is the long tail of self-hosting: downloads that started and never fini
 - **A re-audit of the whole 2.0 tree caught what was still open**: a captured SAML assertion could be replayed, an MFA challenge survived any number of wrong codes, the per-request API-key lookup was a full table scan, `MAX_WORKSPACE_SIZE_GB` was dead config, and the SVG sanitizer let through unquoted `javascript:` hrefs. (#620)
 - **Nine disclosed CVEs patched**: fast-uri, svgo, sharp and tar transitively (#619), plus Pillow 12.3.0 (#517). RAW decoding on arm64 now builds LibRaw 0.22.2 from source instead of linking an unpatched system copy. (#649)
 
-### New Features
+### New Features {#v2-2-0-new-features}
 
 - **Rounded Crop**: rounded-square and iOS-style squircle masks, with a corner-radius control. Built for favicons and app icons. (#602)
 - **Remove GIF Background**: strip the background from an animated GIF, WebP or APNG frame by frame and get a transparent animation back. (#502)
@@ -36,7 +36,7 @@ The rest is the long tail of self-hosting: downloads that started and never fini
 - **Documentation and website in 21 languages**: the docs site, the landing pages and the API reference are all translated now, joining the app interface. A new low-resource deployment guide covers Raspberry Pi and 2 GB machines. (#548)
 - **Clearer tool names**: 18 ambiguous names now self-qualify, so "Compress" became "Compress Image". Tool ids and routes are unchanged, so nothing bookmarked breaks. (#520)
 
-### Improvements
+### Improvements {#v2-2-0-improvements}
 
 - **WCAG AA contrast across the interface**: the palette was retuned so vivid orange stays on fills while text and labels use accessible ink tokens, and all 57 focus indicators now clear the 3:1 non-text bar. (#567, #574)
 - **Upscale and background removal stop looking frozen**: the progress bar advances during inference instead of parking at 30%, and both tools now warn that a CPU-only host is much slower. (#605, #608)
@@ -51,7 +51,7 @@ The rest is the long tail of self-hosting: downloads that started and never fini
 - **A bare `Error: Error` now names its cause.** Sharp encode failures, AI sidecar exits, non-JSON document sidecar output, and background-removal failures all used to arrive with the reason scrubbed off. (#532, #534, #535, #538, #612)
 - **The help dialog is translated.** Its shortcut labels and getting-started text were hardcoded English while finished translations sat unused in all 21 locale files. (#647)
 
-### Bug Fixes
+### Bug Fixes {#v2-2-0-bug-fixes}
 
 - **iPhone HEIC files were rejected** as unreadable before they reached the decoder that handles them. (#631)
 - **Conversion presets failed on a second file**: jpg-to-pdf and its image-to-pdf siblings, plus pdf-to-png, pdf-to-jpg and pdf-to-tiff, all returned `Tool not found` once you uploaded two files. (#633, #643)
@@ -72,7 +72,7 @@ The rest is the long tail of self-hosting: downloads that started and never fini
 - **A Redis endpoint that changed address wedged every consumer** while health checks still answered 200. (#649)
 - **Website and docs fixes**: localized links no longer drop `#` fragments or lowercase `zh-CN`, the docs nav stays inside the viewport on tablets, and neither site calls the GitHub API from your browser any more. (#516, #562, #570, #560)
 
-### Upgrade Notes
+### Upgrade Notes {#v2-2-0-upgrade-notes}
 
 Nothing to migrate, but two shipped defaults changed:
 
@@ -81,7 +81,7 @@ Nothing to migrate, but two shipped defaults changed:
 
 New optional knobs: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (off by default) and `GIF_BG_MAX_FRAMES`.
 
-### Acknowledgements
+### Acknowledgements {#v2-2-0-acknowledgements}
 
 A good part of this release started as someone else's bug report.
 
