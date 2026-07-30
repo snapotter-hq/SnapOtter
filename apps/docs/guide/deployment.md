@@ -561,6 +561,24 @@ cloudflared tunnel --url http://localhost:1349
 
 Note: Cloudflare has a 100 MB upload limit on free plans. Set `MAX_UPLOAD_SIZE_MB=100` to match.
 
+## Troubleshooting {#troubleshooting}
+
+### "Postgres not reachable: EAI_AGAIN" right after a failed first start {#eai-again-after-failed-first-start}
+
+If the very first `docker compose up -d` fails partway (a port already in use is the usual reason), a plain `up -d` retry can start the app container without attaching it to the compose network. The app then crash-loops with:
+
+```
+Postgres not reachable: EAI_AGAIN
+```
+
+while `docker ps` shows postgres healthy. The error is real but points at the wrong container: without the network, DNS for the `postgres` hostname cannot resolve at all, and the restart policy replays the same failure forever.
+
+Fix whatever broke the first start (usually: free the port), then force the app container to be recreated so it reattaches to the network:
+
+```bash
+docker compose up -d --force-recreate SnapOtter
+```
+
 ## CI/CD {#ci-cd}
 
 The GitHub repository has three workflows:
