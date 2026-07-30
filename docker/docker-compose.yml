@@ -75,6 +75,9 @@ services:
       redis:
         condition: service_healthy
     # --- Security hardening ---
+    # erase-object's HQ quality mode (SD1.5 inpainting) needs mem_limit >= 8g
+    # when running on CPU; at 6g the API refuses HQ with a clear error. Fast
+    # mode and every other tool fit in 6g.
     mem_limit: 6g
     memswap_limit: 6g
     cpus: 4

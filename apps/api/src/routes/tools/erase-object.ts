@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { inpaint } from "@snapotter/ai";
+import { inpaint, isGpuAvailable } from "@snapotter/ai";
 import { FEATURE_BUNDLES, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -13,6 +13,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { containerMemoryLimitBytes, hqCpuMemoryRefusal } from "../../lib/hq-memory-gate.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
@@ -156,6 +157,18 @@ export function registerEraseObject(app: FastifyInstance) {
           featureName: hqBundle?.name ?? "High-Quality Inpainting",
           estimatedSize: hqBundle?.estimatedSize ?? "unknown",
         });
+      }
+
+      // Refuse HQ up front on CPU hosts whose cgroup limit cannot fit SD1.5
+      // inference; the alternative is an OOM-killed dispatcher ~40s in and a
+      // "try a smaller image" hint that cannot help (#670).
+      if (qualityMode === "hq") {
+        const refusal = hqCpuMemoryRefusal(isGpuAvailable(), containerMemoryLimitBytes());
+        if (refusal) {
+          return reply
+            .status(422)
+            .send({ error: "Not enough memory for HQ mode", details: refusal });
+        }
       }
 
       if (format === "auto") {
