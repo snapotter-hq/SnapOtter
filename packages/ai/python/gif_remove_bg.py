@@ -204,8 +204,13 @@ def _create_session(model, providers, device):
     _register_hr_matting_session(sessions_class)
     try:
         return new_session(model, providers=providers), device
-    except Exception:
+    except Exception as e:
         if "CUDAExecutionProvider" in providers:
+            print(
+                f"[gif-remove-bg] CUDA session for '{model}' failed ({e}); falling back to CPU",
+                file=sys.stderr,
+                flush=True,
+            )
             return new_session(model, providers=["CPUExecutionProvider"]), "cpu"
         raise
 
@@ -291,11 +296,21 @@ def main():
         emit_progress(5, "Loading model")
         providers, device = onnx_providers()
         session, device = _create_session(model, providers, device)
-        use_alpha = device != "cpu"
+        # Per-frame pymatting runs on the CPU whatever the session device and
+        # costs seconds per frame (it dominated a 30-frame GIF at ~12s/frame
+        # on an otherwise idle GPU host, #668), and its per-frame noise
+        # flickers across an animation. Stills keep matting; animations never
+        # use it.
+        use_alpha = False
+        print(
+            f"[gif-remove-bg] session device={device} model={model}",
+            file=sys.stderr,
+            flush=True,
+        )
 
-        # Probe frame 0 to settle model (OOM -> lighter model for the WHOLE
-        # animation, never per-frame) and matting viability once. Switching model
-        # or matting mid-animation would flicker.
+        # Probe frame 0 to settle the model once (OOM -> lighter model for the
+        # WHOLE animation, never per-frame; switching mid-animation would
+        # flicker).
         try:
             _remove_one(frames[0], session, use_alpha, settings, target, orig_size)
         except Exception as e:
@@ -303,9 +318,6 @@ def main():
                 model = "u2net"
                 emit_progress(5, "Retrying with a lighter model")
                 session, device = _create_session(model, providers, device)
-                use_alpha = device != "cpu"
-            elif use_alpha:
-                use_alpha = False  # matting not viable on this device/model
             else:
                 raise
 
