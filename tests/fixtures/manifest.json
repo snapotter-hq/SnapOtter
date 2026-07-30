@@ -402,11 +402,11 @@
     },
     {
       "path": "video/valid/media-30s.mp4",
-      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, 8s segment at 30s, 480x270",
+      "sourceUrl": "Big Buck Bunny (Blender Foundation, www.bigbuckbunny.org) via archive.org, 8s segment at 30s, 480x270, stream-looped to a true 30.1s (#677)",
       "license": "CC-BY",
       "toolsServed": [],
-      "sha256": "6ad37435eeb01cc694b918f8588255fead60eb01f2a06ca0dc904070064e9136",
-      "bytes": 247284
+      "sha256": "19c3256788660ee49766497dee364c38bf508050f505f949b8ad41714d7db4de",
+      "bytes": 941146
     },
     {
       "path": "video/valid/speech-10s.mp4",
