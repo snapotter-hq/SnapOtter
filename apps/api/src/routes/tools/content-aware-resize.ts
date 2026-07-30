@@ -16,12 +16,14 @@ import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
+// caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
+// value makes the binary exit with a flag parse error.
 const settingsSchema = z.object({
-  width: z.number().positive().optional(),
-  height: z.number().positive().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
   protectFaces: z.boolean().default(false),
-  blurRadius: z.number().min(0).max(20).default(4),
-  sobelThreshold: z.number().min(1).max(20).default(2),
+  blurRadius: z.number().int().min(0).max(20).default(4),
+  sobelThreshold: z.number().int().min(1).max(20).default(2),
   square: z.boolean().default(false),
 });
 

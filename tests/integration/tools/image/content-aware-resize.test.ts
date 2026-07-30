@@ -57,6 +57,27 @@ describe("Content-Aware Resize", () => {
     expect([200, 422]).toContain(res.statusCode);
   }, 60_000);
 
+  it("rejects fractional values for caire's integer-only flags", async () => {
+    for (const settings of [
+      { width: 100.5 },
+      { height: 80.25 },
+      { blurRadius: 2.5 },
+      { sobelThreshold: 10.5 },
+    ]) {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+        { name: "settings", content: JSON.stringify(settings) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode, JSON.stringify(settings)).toBe(400);
+    }
+  }, 60_000);
+
   it("rejects requests without a file", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "settings", content: JSON.stringify({ width: 150 }) },
