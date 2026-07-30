@@ -14,7 +14,30 @@ services:
     # skips binary-gated tools (AI models need on-demand bundles, etc.), so it
     # cannot meet the host-calibrated coverage thresholds; coverage stays
     # enforced on host CI where every tool is present.
-    command: ["pnpm", "vitest", "run", "--reporter=verbose"]
+    #
+    # Repo-audit specs are excluded: they audit the git checkout and dev host,
+    # not the running product. Dockerfile.test.dockerignore prunes *.md and
+    # .git, and /tmp is a noexec tmpfs, so in this image they can only report
+    # the build context's own stripping (missing DOCKERHUB.md / CONTRIBUTING.md
+    # / third-party notices, no `git ls-files`, a non-executable fake binary).
+    # Host CI runs all of them on every PR.
+    command:
+      [
+        "pnpm",
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "--exclude",
+        "**/tests/unit/infra/public-tool-counts.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/lint-coverage.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/docs-dev-ports.test.ts",
+        "--exclude",
+        "**/tests/unit/scripts/check-production-licenses.test.ts",
+        "--exclude",
+        "**/tests/unit/helpers/run-generated-tool.test.ts",
+      ]
     environment:
       - NODE_ENV=test
       - AUTH_ENABLED=true

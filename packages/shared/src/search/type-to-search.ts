@@ -67,6 +67,25 @@ export function isTypeToSearchKey(event: TypeToSearchKeyEvent): boolean {
   return true;
 }
 
+/**
+ * A route announcer parks focus on a heading or main region with tabindex="-1"
+ * to move the screen-reader reading position after a client-side navigation.
+ * That focus is programmatic, unreachable by tabbing, and non-editable, so it
+ * must not disable type-to-search the way a real focused control does.
+ */
+function isProgrammaticReadingFocus(el: unknown): boolean {
+  if (typeof el !== "object" || el === null) return false;
+  const node = el as {
+    getAttribute?: (name: string) => string | null;
+    isContentEditable?: boolean;
+    tagName?: string;
+  };
+  if (typeof node.getAttribute !== "function") return false;
+  if (node.getAttribute("tabindex") !== "-1") return false;
+  if (node.isContentEditable) return false;
+  return !/^(INPUT|TEXTAREA|SELECT|BUTTON|A|AUDIO|VIDEO|IFRAME|SUMMARY)$/.test(node.tagName ?? "");
+}
+
 /** Is this search box actually available to the user right now? */
 export function isSearchBoxTypeable(input: TypeToSearchTarget, doc: TypeToSearchDocument): boolean {
   // jsdom implements neither layout nor elementFromPoint. With no real
@@ -79,7 +98,13 @@ export function isSearchBoxTypeable(input: TypeToSearchTarget, doc: TypeToSearch
   // keyboard navigation intact. Anything the user tabbed to, and any focused
   // input, textarea or contenteditable, is the activeElement, so this one check
   // replaces a separate "is the target editable" test.
-  if (doc.activeElement !== doc.body && doc.activeElement !== null) return false;
+  if (
+    doc.activeElement !== doc.body &&
+    doc.activeElement !== null &&
+    !isProgrammaticReadingFocus(doc.activeElement)
+  ) {
+    return false;
+  }
 
   const rect = input.getBoundingClientRect();
   // A hidden element measures zero, and so does everything in a DOM without

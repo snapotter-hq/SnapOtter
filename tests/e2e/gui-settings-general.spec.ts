@@ -868,12 +868,15 @@ test.describe("GUI Settings - System Settings (extended)", () => {
     await expect(page.getByText("Login Attempt Limit")).toBeVisible();
 
     const persistedValue = await page.locator("input[type='number']").nth(1).inputValue();
-    expect(persistedValue).toBe(testValue);
 
-    // Restore original value
-    await page.locator("input[type='number']").nth(1).fill(originalValue);
-    await page.getByRole("button", { name: /save settings/i }).click();
-    await expect(page.getByText("Settings saved.")).toBeVisible({ timeout: 5_000 });
+    // Restore through the API to the e2e webServer's real limit before
+    // asserting. "Restoring" the input's displayed original writes the
+    // client-side "5" fallback into the DB when no row existed, which overrides
+    // LOGIN_ATTEMPT_LIMIT=100000 and 429s every later fresh admin login,
+    // cascading through the whole serial bucket.
+    const restore = await putSettings(page, { loginAttemptLimit: "100000" });
+    expect(restore.ok).toBeTruthy();
+    expect(persistedValue).toBe(testValue);
   });
 
   test("changed Max File Age persists after dialog re-open", async ({ loggedInPage: page }) => {

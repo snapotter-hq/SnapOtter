@@ -70,12 +70,16 @@ describe("generated QA harness contract", () => {
     expect(text).not.toContain("describe.skip(");
   });
 
-  it("the actual nightly extended lane requires installed AI features", () => {
+  it("the nightly extended lane does not require AI features it never installs", () => {
+    // Strict required-AI mode (absence of a bundle is a failure) is only valid
+    // on a host with bundles installed, which is the release-QA fleet. The
+    // extended-matrix lane has no bundle-install step, so requiring them there
+    // 501s every installed-contract case on a bundle-less runner.
     const workflow = readFileSync(join(process.cwd(), ".github/workflows/nightly.yml"), "utf8");
     const extendedLane = workflow.slice(
       workflow.indexOf("  extended-matrix:"),
       workflow.indexOf("  api-fuzz:"),
     );
-    expect(extendedLane).toContain('REQUIRE_AI_FEATURES: "1"');
+    expect(extendedLane).not.toContain("REQUIRE_AI_FEATURES");
   });
 });

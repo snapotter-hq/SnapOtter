@@ -225,6 +225,45 @@ describe("isSearchBoxTypeable", () => {
     expect(isSearchBoxTypeable(input, d)).toBe(true);
   });
 
+  // A route announcer parks focus on a heading (tabindex="-1") to move the
+  // screen-reader reading position after a client-side navigation. That focus
+  // is programmatic and non-editable, so type-to-search must still work.
+  it("accepts when a route-announcer heading holds the reading position", () => {
+    const input = box();
+    const heading = {
+      tagName: "H1",
+      isContentEditable: false,
+      getAttribute: (name: string) => (name === "tabindex" ? "-1" : null),
+    };
+    const d = doc({ activeElement: heading, elementFromPoint: () => input });
+
+    expect(isSearchBoxTypeable(input, d)).toBe(true);
+  });
+
+  it("still rejects a real focused input even when it has tabindex -1", () => {
+    const focused = {
+      tagName: "INPUT",
+      isContentEditable: false,
+      getAttribute: (name: string) => (name === "tabindex" ? "-1" : null),
+    };
+    const input = box();
+    const d = doc({ activeElement: focused, elementFromPoint: () => input });
+
+    expect(isSearchBoxTypeable(input, d)).toBe(false);
+  });
+
+  it("still rejects a contenteditable region even at tabindex -1", () => {
+    const editable = {
+      tagName: "DIV",
+      isContentEditable: true,
+      getAttribute: (name: string) => (name === "tabindex" ? "-1" : null),
+    };
+    const input = box();
+    const d = doc({ activeElement: editable, elementFromPoint: () => input });
+
+    expect(isSearchBoxTypeable(input, d)).toBe(false);
+  });
+
   it("rejects a zero-width box, which is how a hidden element measures", () => {
     const input = box([], { width: 0 });
     const d = doc({ elementFromPoint: () => input });

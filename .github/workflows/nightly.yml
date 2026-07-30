@@ -12,7 +12,7 @@ env:
   # Keep in sync with ci.yml's install step. tesseract-ocr + language packs are
   # required by the built-in Fast OCR tier: without them the OCR integration
   # tests throw "spawn tesseract ENOENT" and fail the coverage/matrix jobs.
-  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn
+  SYSTEM_DEPS: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools ffmpeg qpdf libreoffice-calc libreoffice-impress libreoffice-writer tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn
   # See ci.yml: ryuk's Docker Hub pull is a recurring flake source; disable the reaper
   # (tests/global-setup.ts stops its containers explicitly; runners are ephemeral).
   TESTCONTAINERS_RYUK_DISABLED: "true"
@@ -366,6 +366,7 @@ jobs:
             sudo sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read" pattern="EPS"/' "$POLICY_FILE"
             sudo sed -i 's/<policy domain="coder" rights="none" pattern="PS"/<policy domain="coder" rights="read" pattern="PS"/' "$POLICY_FILE"
           fi
+      - uses: ./.github/actions/doc-binaries
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
         run: |
@@ -384,7 +385,9 @@ jobs:
           FULL_MATRIX: "1"
           FUZZ: "1"
           FUZZ_RUNS: "50"
-          REQUIRE_AI_FEATURES: "1"
+          # This lane installs no AI bundles, so it must not run the strict
+          # required-AI contract (that 501s every installed-contract case). The
+          # strict contract runs on the release-QA fleet, which has bundles.
           # Full-matrix tests iterate every format x tool; with 4 forks the heavy
           # media conversions starve and hit the 30s default. Fewer forks (more
           # CPU each) plus a generous timeout keeps them from flaking.
@@ -499,6 +502,7 @@ jobs:
             sudo sed -i 's/<policy domain="coder" rights="none" pattern="EPS"/<policy domain="coder" rights="read" pattern="EPS"/' "$POLICY_FILE"
             sudo sed -i 's/<policy domain="coder" rights="none" pattern="PS"/<policy domain="coder" rights="read" pattern="PS"/' "$POLICY_FILE"
           fi
+      - uses: ./.github/actions/doc-binaries
       - uses: ./.github/actions/setup
       - name: Run tests with coverage
         run: pnpm vitest run --coverage tests/unit/ tests/integration/

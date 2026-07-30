@@ -49,15 +49,19 @@ export function isEngineUnavailableResponse(statusCode: number, body: string): b
  * The same gap seen from the worker instead of the route.
  *
  * A tool whose input needs no probing, images-to-video being the obvious one,
- * is admitted normally and only discovers the missing engine when ffmpeg is
- * spawned. Match the engine's own "not found" wording, which it raises before
- * spawning anything. A real crash carries an exit code and stderr and has to
- * stay a failure.
+ * is admitted normally and only discovers the missing engine when it is
+ * spawned. Match each engine's own "not found" wording, which it raises before
+ * spawning anything. The lean docker test image ships without pdfcpu,
+ * LibreOffice (soffice), and pandoc as well as ffmpeg, so all four gate the
+ * same way. A real crash carries an exit code and stderr and has to stay a
+ * failure.
  */
 export function isEngineUnavailableFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  if (/\b(ffmpeg|ffprobe)\b[^"]*?\bbinary not found\b/i.test(message)) return true;
-  return /spawn\s+\S*(ffmpeg|ffprobe)\S*\s+ENOENT/i.test(message);
+  if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\b[^"]*?\bbinary not found\b/i.test(message)) {
+    return true;
+  }
+  return /spawn\s+\S*(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\S*\s+ENOENT/i.test(message);
 }
 
 export type GeneratedSkipCategory = (typeof GENERATED_SKIP_CATEGORIES)[number];

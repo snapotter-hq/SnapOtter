@@ -1,0 +1,21 @@
+name: Install doc-engine binaries
+description: >-
+  Install the curl-fetched doc-engine binaries (pandoc + pdfcpu) that the
+  document tools need. LibreOffice comes from apt separately. Versions match
+  ci.yml and docker/Dockerfile; keep the three in sync.
+runs:
+  using: composite
+  steps:
+    - name: Install Pandoc 3.10 (sandboxed DOCX/EPUB)
+      shell: bash
+      run: |
+        curl -fsSL https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-1-amd64.deb -o /tmp/pandoc.deb
+        sudo apt-get install -y --no-install-recommends /tmp/pandoc.deb
+        pandoc --version
+    - name: Install pdfcpu (doc-engine PDF layout binary; matches docker/Dockerfile v0.13.0)
+      shell: bash
+      run: |
+        curl -fsSL https://github.com/pdfcpu/pdfcpu/releases/download/v0.13.0/pdfcpu_0.13.0_Linux_x86_64.tar.xz -o /tmp/pdfcpu.tar.xz
+        tar -xJf /tmp/pdfcpu.tar.xz -C /tmp
+        sudo install "$(find /tmp -type f -name pdfcpu | head -1)" /usr/local/bin/pdfcpu
+        pdfcpu version

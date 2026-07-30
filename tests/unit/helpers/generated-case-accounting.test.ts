@@ -2,7 +2,34 @@ import { describe, expect, it } from "vitest";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isEngineUnavailableFailure,
 } from "../../helpers/generated-case-accounting.js";
+
+describe("isEngineUnavailableFailure", () => {
+  // The lean docker test image skips binary-gated tools by design, so every
+  // spawn engine gates the same way ffmpeg does: a missing binary is a skip,
+  // not a product failure. A real crash (exit code + stderr) still fails.
+  it.each([
+    "ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)",
+    "pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)",
+    "soffice binary not found (set SOFFICE_PATH or install LibreOffice)",
+  ])("treats a missing-binary message as engine-unavailable: %s", (message) => {
+    expect(isEngineUnavailableFailure(new Error(message))).toBe(true);
+  });
+
+  it.each(["spawn pandoc ENOENT", "spawn /usr/local/bin/pdfcpu ENOENT", "spawn soffice ENOENT"])(
+    "treats a spawn ENOENT for a known engine as engine-unavailable: %s",
+    (message) => {
+      expect(isEngineUnavailableFailure(new Error(message))).toBe(true);
+    },
+  );
+
+  it("keeps a real processing crash a failure", () => {
+    expect(
+      isEngineUnavailableFailure(new Error("pdfcpu exited with code 1: invalid page range")),
+    ).toBe(false);
+  });
+});
 
 describe("GeneratedCaseAccounting", () => {
   it("fails a tool that executes no generated cases", () => {
