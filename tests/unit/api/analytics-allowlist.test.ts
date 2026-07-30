@@ -59,6 +59,7 @@ describe("sanitizeEventProperties", () => {
       os_platform: "linux",
       deploy_mode: "embedded",
       gpu_present: false,
+      app_version: "2.2.0",
       hostname: "leaked-hostname",
     });
     expect(out).toEqual({
@@ -66,6 +67,7 @@ describe("sanitizeEventProperties", () => {
       os_platform: "linux",
       deploy_mode: "embedded",
       gpu_present: false,
+      app_version: "2.2.0",
     });
     expect(out).not.toHaveProperty("hostname");
   });

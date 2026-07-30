@@ -79,6 +79,8 @@ export interface InstanceStartedProperties {
   os_platform: string;
   deploy_mode: "embedded" | "external" | "native";
   gpu_present: boolean;
+  /** APP_VERSION at boot; the only event property that segments the install base by release. */
+  app_version: string;
 }
 
 export interface EditorToolUsedProperties {

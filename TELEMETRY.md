@@ -27,7 +27,7 @@ Emitted from `apps/api` through `trackEvent()`; properties are filtered by `anal
 
 | Event | Fires when | Key properties |
 | --- | --- | --- |
-| `instance_started` | Once per boot | `arch`, `os_platform`, `deploy_mode`, `gpu_present` |
+| `instance_started` | Once per boot | `arch`, `os_platform`, `deploy_mode`, `gpu_present`, `app_version` |
 | `auth_login` | A login succeeds | `method` (`password` or `oidc`) |
 | `auth_login_failed` | A login attempt fails | `method` (`password` or `oidc`) |
 | `tool_used` | A tool job finishes | `tool_id`, `status`, `duration_ms`, `category`, `is_ai_tool`, `is_batch`, `input_format`, `output_format`, `bytes_in`, `bytes_out`, `execution_hint`, `error_code`, `error_kind` |

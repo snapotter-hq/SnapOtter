@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import os from "node:os";
-import type { InstanceStartedProperties } from "@snapotter/shared";
+import { APP_VERSION, type InstanceStartedProperties } from "@snapotter/shared";
 import { deployMode } from "./deploy-mode.js";
 
 // Facts about the running instance, shipped once at boot as the
@@ -19,5 +19,6 @@ export function gatherSystemProperties(): InstanceStartedProperties {
     os_platform: os.platform(),
     deploy_mode: deployMode(),
     gpu_present: existsSync("/dev/nvidia0"),
+    app_version: APP_VERSION,
   };
 }

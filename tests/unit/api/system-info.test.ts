@@ -10,6 +10,7 @@ vi.mock("../../../apps/api/src/lib/deploy-mode.js", () => ({
   deployMode: mockDeployMode,
 }));
 
+import { APP_VERSION } from "@snapotter/shared";
 import { gatherSystemProperties } from "../../../apps/api/src/lib/system-info.js";
 
 describe("gatherSystemProperties", () => {
@@ -45,6 +46,12 @@ describe("gatherSystemProperties", () => {
     mockExistsSync.mockReturnValue(false);
     mockDeployMode.mockReturnValue("external");
     expect(gatherSystemProperties().gpu_present).toBe(false);
+  });
+
+  it("carries the app version so release adoption is measurable", () => {
+    mockDeployMode.mockReturnValue("embedded");
+    mockExistsSync.mockReturnValue(false);
+    expect(gatherSystemProperties().app_version).toBe(APP_VERSION);
   });
 
   it("passes through deploy mode and os platform", () => {
