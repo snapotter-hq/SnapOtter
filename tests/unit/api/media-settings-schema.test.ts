@@ -41,6 +41,14 @@ describe("media time settings schemas", () => {
     expect(parses("trim-video", { startS: 0, endS: Number.MIN_VALUE })).toBe(false);
   });
 
+  it("rejects trim-audio windows shorter than the stream-copy floor", () => {
+    // Stream copy cannot cut below one codec frame (mp3 ~26ms, flac up to
+    // ~93ms), so windows under 0.1s ship a file with zero audio frames.
+    expect(parses("trim-audio", { startS: 0, endS: 0.000001 })).toBe(false);
+    expect(parses("trim-audio", { startS: 5, endS: 5.05 })).toBe(false);
+    expect(parses("trim-audio", { startS: 0, endS: 0.5 })).toBe(true);
+  });
+
   it("requires at least one representable fade duration", () => {
     expect(parses("fade-audio", { fadeInS: Number.MIN_VALUE, fadeOutS: 0 })).toBe(false);
     expect(parses("fade-audio", { fadeInS: 0, fadeOutS: 0.000001 })).toBe(true);
