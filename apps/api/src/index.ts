@@ -33,6 +33,7 @@ import {
   startInterruptedInstallRecovery,
   stopInterruptedInstallRecovery,
 } from "./lib/feature-status.js";
+import { gpuBootLine } from "./lib/gpu-boot-line.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
@@ -771,11 +772,7 @@ try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
 
   const dispatcherResult = await initDispatcher();
-  const gpuLine = dispatcherResult.ready
-    ? dispatcherResult.gpu
-      ? "[INFO] GPU detected -- AI tools will use CUDA acceleration"
-      : "[WARN] No GPU detected -- AI tools will use CPU (slower)"
-    : "[WARN] AI sidecar did not start -- AI tools will use per-request Python (slower)";
+  const gpuLine = gpuBootLine(dispatcherResult, gatherSystemProperties().gpu_present);
   console.log(
     [
       `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
