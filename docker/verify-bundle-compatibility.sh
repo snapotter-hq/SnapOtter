@@ -187,6 +187,49 @@ if [[ $? -ne 0 ]]; then
   fail "Constrained-package consistency check failed -- see violations above" 2
 fi
 
+log "Scanning every package for multi-version disagreement (not just constrained)"
+
+# The tokenizers conflict behind #669 lived outside the constraints list, so
+# the constrained check above sailed past it. This scan reports ANY package
+# left at more than one version after layering. Default is a warning (patch
+# drift like filelock is normal); set COMPAT_STRICT_ANY=1 to make it fatal.
+set +e
+"${VENV}/bin/python3" - "${SITE_PACKAGES}" "${MANIFEST}" <<'PYANYVER'
+import json, os, re, sys
+
+sp, manifest_path = sys.argv[1], sys.argv[2]
+with open(manifest_path) as f:
+    constrained = {re.sub(r"[-_.]+", "_", c.split("==")[0]).lower()
+                   for c in json.load(f).get("constraints", [])}
+
+by_name = {}
+for entry in os.listdir(sp):
+    m = re.match(r"(.+)-([0-9][^-]*)\.dist-info$", entry)
+    if not m:
+        continue
+    key = re.sub(r"[-_.]+", "_", m.group(1)).lower()
+    by_name.setdefault(key, set()).add(m.group(2))
+
+offenders = {k: sorted(v) for k, v in by_name.items()
+             if len(v) > 1 and k not in constrained}
+if not offenders:
+    print("  No unconstrained package is present at more than one version.")
+    sys.exit(0)
+
+print("  WARNING: unconstrained packages at multiple versions after layering:")
+for pkg, vers in sorted(offenders.items()):
+    print(f"    {pkg}: {vers}")
+sys.exit(3)
+PYANYVER
+ANYVER_RC=$?
+set -e
+if [[ ${ANYVER_RC} -ne 0 ]]; then
+  if [[ "${COMPAT_STRICT_ANY:-0}" == "1" ]]; then
+    fail "Unconstrained multi-version packages present and COMPAT_STRICT_ANY=1" 2
+  fi
+  echo "  (warning only; triage each entry by consumer strictness before publishing)"
+fi
+
 log "Checking ONNX Runtime flavor consistency"
 
 "${VENV}/bin/python3" - "${SITE_PACKAGES}" <<'PYFLAVOR' || fail "ONNX Runtime flavor check failed" 2

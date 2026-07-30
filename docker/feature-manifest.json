@@ -29,10 +29,10 @@
       "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/background-removal-amd64-gpu.tar.gz",
-          "sha256": "a1dfbdd5862fd32c7719ca79b0c7e4b76a327330a5991ddad98a2761abca10cb",
-          "compressedSize": 4808242472,
-          "extractedSize": 0
+          "file": "v2.0.0/background-removal-amd64-gpu-r2.tar.gz",
+          "sha256": "61a7036d3c78a410b2237bd158b8f9d6ac51c38a623f3506243b608e62f92d33",
+          "compressedSize": 4826542966,
+          "extractedSize": 7177444273
         },
         "arm64-cpu": {
           "file": "v2.0.0/background-removal-arm64-cpu-r2.tar.gz",
@@ -43,7 +43,7 @@
       },
       "packages": {
         "common": ["rembg==2.0.62"],
-        "amd64": ["onnxruntime-gpu==1.20.1", "mediapipe>=0.10.21"],
+        "amd64": ["onnxruntime-gpu==1.20.2", "mediapipe>=0.10.21"],
         "arm64": ["onnxruntime==1.20.1", "mediapipe>=0.10.18"]
       },
       "pipFlags": {},
@@ -114,10 +114,10 @@
       "estimatedSize": "200-300 MB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/face-detection-amd64-gpu.tar.gz",
-          "sha256": "0ee28b86dac88c60e005604ba0595746f455ec97f08d0c8307ba9b57e131bc7f",
-          "compressedSize": 75358868,
-          "extractedSize": 209838080
+          "file": "v2.0.0/face-detection-amd64-gpu-r2.tar.gz",
+          "sha256": "ff242709bd03befe424fa5096a9d60c6b70f22fcef8af803a1c86838140832be",
+          "compressedSize": 88895081,
+          "extractedSize": 260502197
         },
         "arm64-cpu": {
           "file": "v2.0.0/face-detection-arm64-cpu-r2.tar.gz",
@@ -158,10 +158,10 @@
       "estimatedSize": "1-2 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/object-eraser-colorize-amd64-gpu.tar.gz",
-          "sha256": "a3f6cd2eca9e5dd907497d0d58ca5f6532887bb748e4062de0f4fb9815782c31",
-          "compressedSize": 1545472964,
-          "extractedSize": 2249379840
+          "file": "v2.0.0/object-eraser-colorize-amd64-gpu-r2.tar.gz",
+          "sha256": "0d858f287b9ab57a60e9e3209eae1c14a6a0792687f7105d40b1f4c2a19ef102",
+          "compressedSize": 1532343662,
+          "extractedSize": 2204704276
         },
         "arm64-cpu": {
           "file": "v2.0.0/object-eraser-colorize-arm64-cpu-r3.tar.gz",
@@ -172,7 +172,7 @@
       },
       "packages": {
         "common": ["huggingface-hub[hf_xet]==0.36.2"],
-        "amd64": ["onnxruntime-gpu==1.20.1"],
+        "amd64": ["onnxruntime-gpu==1.20.2"],
         "arm64": ["onnxruntime==1.20.1"]
       },
       "pipFlags": {},
@@ -279,10 +279,10 @@
       "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-          "sha256": "b725a0b18a8295cb87e15f79b31c294f1de98101dedd76389728300a8d377a15",
-          "compressedSize": 5358573124,
-          "extractedSize": 8406943960
+          "file": "v2.0.0/upscale-enhance-amd64-gpu-r2.tar.gz",
+          "sha256": "81f0c688abcdd277fbcdd5501aa22a4fe789e08fe9822811ea326a3de1a8b15d",
+          "compressedSize": 5371590150,
+          "extractedSize": 8454624391
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu-r2.tar.gz",
@@ -403,10 +403,10 @@
       "estimatedSize": "800 MB - 1 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/photo-restoration-amd64-gpu.tar.gz",
-          "sha256": "4747953db35c71b83db19ce12cc6c591730f0cb9f64621f239db17ae3e3563fd",
-          "compressedSize": 4680254837,
-          "extractedSize": 8172949791
+          "file": "v2.0.0/photo-restoration-amd64-gpu-r2.tar.gz",
+          "sha256": "38c82e61acf03980b97f6f2a4754dd7cdbc3d4d64f864bf2776168fc8fb91eea",
+          "compressedSize": 4693244387,
+          "extractedSize": 8220630756
         },
         "arm64-cpu": {
           "file": "v2.0.0/photo-restoration-arm64-cpu-r2.tar.gz",
@@ -418,7 +418,7 @@
       "packages": {
         "common": ["codeformer-pip==0.0.4", "huggingface-hub[hf_xet]==0.36.2", "setuptools<75"],
         "amd64": [
-          "onnxruntime-gpu==1.20.1",
+          "onnxruntime-gpu==1.20.2",
           "mediapipe>=0.10.21",
           "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
@@ -553,10 +553,10 @@
       "estimatedSize": "~600 MB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/transcription-amd64-gpu.tar.gz",
-          "sha256": "3033d480c6183df66855d78c355233dbc86a754d07414e544e1df1038337c9e1",
-          "compressedSize": 559189061,
-          "extractedSize": 845987840
+          "file": "v2.0.0/transcription-amd64-gpu-r2.tar.gz",
+          "sha256": "6229180f698d1ceb0866df4b1c091ed4a89f6324427d373dbbc13a763ae26ce2",
+          "compressedSize": 845757082,
+          "extractedSize": 1647328796
         },
         "arm64-cpu": {
           "file": "v2.0.0/transcription-arm64-cpu-r3.tar.gz",
@@ -567,8 +567,8 @@
       },
       "packages": {
         "common": ["faster-whisper>=1.0.0", "huggingface-hub[hf_xet]==0.36.2"],
-        "amd64": [],
-        "arm64": []
+        "amd64": ["onnxruntime-gpu==1.20.2"],
+        "arm64": ["onnxruntime==1.20.1"]
       },
       "pipFlags": {},
       "postInstall": [],
