@@ -238,6 +238,26 @@ describe("Split", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects a grid whose total tile count would be pathological", async () => {
+    // Each axis is schema-valid (<=100), but 100x100 is 10,000 tiles: ~20s of
+    // work and a 10,000-file ZIP from one request. Bound the product so a
+    // single split cannot spin the worker (fuzz seed 20260724, #695 follow-up).
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ columns: 100, rows: 100 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/split",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/tile/i);
+  });
+
   it("rejects unauthenticated requests", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },

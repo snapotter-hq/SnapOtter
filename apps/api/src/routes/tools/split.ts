@@ -14,6 +14,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -24,6 +25,12 @@ const settingsSchema = z.object({
   outputFormat: z.enum(["original", "png", "jpg", "webp", "avif", "jxl"]).default("original"),
   quality: z.number().int().min(1).max(100).default(90),
 });
+
+// Each axis is capped at 100, but 100x100 is 10,000 tiles: ~20s of Sharp
+// extracts and a 10,000-file ZIP from one request. Bound the product so a
+// single split cannot spin the worker; real grids, filmstrips, and sprite
+// sheets stay well under this.
+const MAX_OUTPUT_TILES = 500;
 
 function resolveOutputFormat(
   outputFormat: string,
@@ -156,6 +163,12 @@ export function registerSplit(app: FastifyInstance) {
       cols = Math.min(cols, 100);
       rows = Math.min(rows, 100);
 
+      if (cols * rows > MAX_OUTPUT_TILES) {
+        return reply.status(400).send({
+          error: `Too many tiles: ${cols}x${rows} exceeds the ${MAX_OUTPUT_TILES}-tile limit. Use a coarser grid.`,
+        });
+      }
+
       const cellW = Math.floor(fullW / cols);
       const cellH = Math.floor(fullH / rows);
       const originalExt = extname(filename) || ".png";
@@ -252,6 +265,12 @@ export function registerSplit(app: FastifyInstance) {
       }
       cols = Math.min(cols, 100);
       rows = Math.min(rows, 100);
+
+      if (cols * rows > MAX_OUTPUT_TILES) {
+        throw new InputValidationError(
+          `Too many tiles: ${cols}x${rows} exceeds the ${MAX_OUTPUT_TILES}-tile limit. Use a coarser grid.`,
+        );
+      }
 
       const cellW = Math.floor(fullW / cols);
       const cellH = Math.floor(fullH / rows);

@@ -74,6 +74,15 @@ describe("generated fuzz budgets", () => {
     );
   });
 
+  it("gives the heavy-canvas border tool a longer per-case budget", () => {
+    // A 2000px border on a mid-size image makes a ~5000px canvas plus a large
+    // gaussian shadow blur, which legitimately exceeds the 8s standard budget
+    // without crashing (fuzz seed 20260724, #695 follow-up).
+    const budget = fuzzBudgetFor({ id: "border", executionHint: "fast" }, 25);
+    expect(budget.costClass).toBe("heavy");
+    expect(budget.caseTimeoutMs).toBeGreaterThanOrEqual(20_000);
+  });
+
   it("only overrides real registered tool IDs", () => {
     const registered = new Set(TOOLS.map(({ id }) => id));
     expect(Object.keys(FUZZ_COST_OVERRIDES).filter((id) => !registered.has(id))).toEqual([]);

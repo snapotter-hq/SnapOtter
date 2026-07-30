@@ -502,8 +502,11 @@ test.describe("GUI Settings - Teams Tab", () => {
       page.on("dialog", (d) => d.accept());
       await page.locator("[role='menu']").getByText("Delete").click();
 
-      // Team should no longer be visible
-      await expect(page.getByText(teamName)).not.toBeVisible({ timeout: 5_000 });
+      // The success toast repeats the team name, so for a moment both the toast
+      // and the row match and a bare not.toBeVisible() hits a strict-mode
+      // violation (2 elements). Wait for every match to clear: the row is
+      // removed and the toast auto-dismisses.
+      await expect(page.getByText(teamName)).toHaveCount(0, { timeout: 10_000 });
     } finally {
       await cleanupTeamsByPrefix(adminToken, "guidelteam-");
     }

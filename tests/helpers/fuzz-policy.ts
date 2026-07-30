@@ -7,7 +7,7 @@ const MAX_FUZZ_SEED = 2_147_483_647;
 const TARGET_STARTUP_BUFFER_MS = 60_000;
 const MAX_DIAGNOSTIC_SETTINGS_LENGTH = 2_048;
 
-export type FuzzCostClass = "standard" | "long" | "slow-codec";
+export type FuzzCostClass = "standard" | "long" | "slow-codec" | "heavy";
 
 export interface FuzzConfig {
   runs: number;
@@ -38,11 +38,15 @@ const CASE_TIMEOUTS_MS: Record<FuzzCostClass, number> = {
   standard: 8_000,
   long: 12_000,
   "slow-codec": 15_000,
+  // A 2000px border makes a ~5000px canvas plus a large gaussian shadow blur;
+  // bounded and correct, but well past the codec budget.
+  heavy: 20_000,
 };
 
 export const FUZZ_COST_OVERRIDES = {
   "webp-to-avif": "slow-codec",
   "webp-to-gif": "slow-codec",
+  border: "heavy",
 } as const satisfies Record<string, FuzzCostClass>;
 
 function parseInteger(
