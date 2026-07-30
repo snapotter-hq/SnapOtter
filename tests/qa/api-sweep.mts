@@ -44,10 +44,15 @@ const PASSWORD = process.env.QA_PASSWORD ?? "";
 const CONCURRENCY = Number(process.env.QA_CONCURRENCY ?? 4);
 const PAIRWISE_CAP = Number(process.env.QA_PAIRWISE_CAP ?? 6);
 const FORMAT_WITNESSES = Number(process.env.QA_FORMAT_WITNESSES ?? 3);
+// QA_OUT_DIR lets several machines sweep in parallel without clobbering each
+// other's lane-<mode>.jsonl (#677).
+const OUT_DIR_OVERRIDE = process.env.QA_OUT_DIR;
 /* biome-ignore-end lint/suspicious/noUndeclaredEnvVars: QA harness runs outside Turbo. */
 
 const REPO = join(import.meta.dirname, "..", "..");
-const OUT_DIR = join(REPO, "docs", "qa", "master-20260724", "evidence", "processing-ai", "final");
+const OUT_DIR =
+  OUT_DIR_OVERRIDE ??
+  join(REPO, "docs", "qa", "master-20260724", "evidence", "processing-ai", "final");
 
 /** Class-aware hard timeouts. Exceeding one is a finding, never a silent skip. */
 const TIMEOUT_MS: Record<string, number> = { fast: 240_000, long: 480_000, ai: 900_000 };

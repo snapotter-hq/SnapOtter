@@ -570,17 +570,6 @@ export function expectJapaneseScript(text: string, minimumChars = 4): void {
   );
 }
 
-/** PDF OCR: a real PDF that now carries a selectable text layer. */
-export function expectSearchablePdf(output: Buffer): void {
-  assertOracle(output.subarray(0, 5).toString("latin1") === "%PDF-", "artifact is not a PDF");
-  assertOracle(output.length > 1000, "PDF artifact is implausibly small");
-  const body = output.toString("latin1");
-  assertOracle(
-    body.includes("/Font") || body.includes("BT\n") || body.includes("Tj"),
-    "PDF carries no text-drawing operators, so no OCR layer was added",
-  );
-}
-
 /** Animated cut-outs must stay animated: a single-frame result is a regression. */
 export async function expectAnimatedFrames(output: Buffer, minimumFrames = 2): Promise<void> {
   const meta = await sharp(output, { pages: -1 }).metadata();

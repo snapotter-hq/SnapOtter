@@ -37,7 +37,6 @@ import {
   expectRedPixelsReduced,
   expectRegionRewritten,
   expectSameSizeButChanged,
-  expectSearchablePdf,
   expectSrtArtifact,
   expectUpscaled,
 } from "../helpers/installed-ai-output-oracles.js";
@@ -102,7 +101,11 @@ const SPEECH_WAV = `${FIXTURES}/audio/valid/speech-10s.wav`;
 const SPEECH_MP4 = `${FIXTURES}/video/valid/speech-10s.mp4`;
 
 /** The English OCR fixture's known answer, checked word by word. */
-const OCR_ENGLISH_TERMS = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"] as const;
+// ocr-clean.png literally reads "The quick brown fox 12345"; the oracle must
+// demand the fixture's words, not the full pangram (#677).
+const OCR_ENGLISH_TERMS = ["the", "quick", "brown", "fox", "12345"] as const;
+// ocr-scanned.pdf is a chat screenshot about Redis scaling.
+const OCR_PDF_TERMS = ["redis", "replicas", "cache", "bottleneck"] as const;
 
 const CASES: ToolCase[] = [
   {
@@ -398,10 +401,10 @@ const CASES: ToolCase[] = [
     fixture: OCR_CLEAN,
     contentType: "image/png",
     settings: { quality: "fast", language: "en", enhance: false },
-    oracle: "recognizes >=6 of the 8 known English fixture words",
+    oracle: "recognizes >=4 of the 5 words printed in the fixture",
     verify: (out) => {
       const text = out.toString("utf8");
-      expectRecognizedTerms(text, OCR_ENGLISH_TERMS, 6);
+      expectRecognizedTerms(text, OCR_ENGLISH_TERMS, 4);
     },
   },
   {
@@ -409,8 +412,13 @@ const CASES: ToolCase[] = [
     fixture: `${FIXTURES}/document/valid/ocr-scanned.pdf`,
     contentType: "application/pdf",
     settings: { quality: "fast", language: "en", enhance: false },
-    oracle: "returns a PDF carrying text-drawing operators",
-    verify: (out) => expectSearchablePdf(out),
+    // The tool's contract is text extraction (it writes <name>_ocr.txt); a
+    // searchable-PDF output would be a feature, not this oracle (#677).
+    oracle: "extracts the known scanned text as plain text",
+    verify: (out) => {
+      const text = out.toString("utf8");
+      expectRecognizedTerms(text, OCR_PDF_TERMS, 3);
+    },
   },
   {
     toolId: "transcribe-audio",

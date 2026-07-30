@@ -3374,7 +3374,7 @@
       },
       {
         "key": "sobelThreshold",
-        "values": [1, 10.5, 20, null]
+        "values": [1, 11, 20, null]
       },
       {
         "key": "square",

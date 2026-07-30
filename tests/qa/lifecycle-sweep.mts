@@ -31,12 +31,15 @@ const BASE = process.env.QA_BASE_URL ?? "http://localhost:13492";
 const USERNAME = process.env.QA_USERNAME ?? "admin";
 const PASSWORD = process.env.QA_PASSWORD ?? "";
 const PROJECT = process.env.QA_COMPOSE_PROJECT ?? "snapotter-qa-f4c2bde9";
+const OUT_DIR_OVERRIDE = process.env.QA_OUT_DIR;
 /* biome-ignore-end lint/suspicious/noUndeclaredEnvVars: QA harness runs outside Turbo. */
 
 const APP = `${PROJECT}-app`;
 const PG = `${PROJECT}-postgres`;
 const REPO = join(import.meta.dirname, "..", "..");
-const OUT_DIR = join(REPO, "docs", "qa", "master-20260724", "evidence", "processing-ai", "final");
+const OUT_DIR =
+  OUT_DIR_OVERRIDE ??
+  join(REPO, "docs", "qa", "master-20260724", "evidence", "processing-ai", "final");
 
 const PNG = resolveFixture(".png", "image") as string;
 const JPG = resolveFixture(".jpg", "image") as string;
