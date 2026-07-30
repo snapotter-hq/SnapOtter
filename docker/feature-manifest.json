@@ -33,10 +33,10 @@
           "extractedSize": 0
         },
         "arm64-cpu": {
-          "file": "v2.0.0/background-removal-arm64-cpu.tar.gz",
-          "sha256": "cbb570b81bfd740dd05e265dd8c93ade53a9f41fdd30cc8b3fbc47a8daa824af",
-          "compressedSize": 4631430295,
-          "extractedSize": 0
+          "file": "v2.0.0/background-removal-arm64-cpu-r2.tar.gz",
+          "sha256": "eb453211098ca6a90b23bae987c3be6873cf7f0f7d67e1855d34f335a2add076",
+          "compressedSize": 4535687017,
+          "extractedSize": 6375426284
         }
       },
       "packages": {
@@ -118,10 +118,10 @@
           "extractedSize": 209838080
         },
         "arm64-cpu": {
-          "file": "v2.0.0/face-detection-arm64-cpu.tar.gz",
-          "sha256": "8ad922514aba1721de154d370f9335f78c5ce5aceade5b19515e0192d4367909",
-          "compressedSize": 222878753,
-          "extractedSize": 704276480
+          "file": "v2.0.0/face-detection-arm64-cpu-r2.tar.gz",
+          "sha256": "c66d494c03beb3988decb2eea528ba4dced95956f337855ee6efee9b95f03720",
+          "compressedSize": 81361023,
+          "extractedSize": 232238876
         }
       },
       "packages": {
@@ -162,10 +162,10 @@
           "extractedSize": 2249379840
         },
         "arm64-cpu": {
-          "file": "v2.0.0/object-eraser-colorize-arm64-cpu.tar.gz",
-          "sha256": "252c0b4fc4ca6f807b2b93038a98469323d906d5c4d75df88e9f47497d30e67c",
-          "compressedSize": 1263259968,
-          "extractedSize": 1464884023
+          "file": "v2.0.0/object-eraser-colorize-arm64-cpu-r2.tar.gz",
+          "sha256": "6f9bd83c9791701dc95f62bc099eb5959be03adb84dd8793d7cae5c9d8f8e177",
+          "compressedSize": 1253858139,
+          "extractedSize": 1437089021
         }
       },
       "packages": {
@@ -283,10 +283,10 @@
           "extractedSize": 8406943960
         },
         "arm64-cpu": {
-          "file": "v2.0.0/upscale-enhance-arm64-cpu.tar.gz",
-          "sha256": "bfb25ff1468d426ba6a125632beabece11e1afebfa6a3adefc64f7b81d7bf469",
-          "compressedSize": 2319501276,
-          "extractedSize": 3661453942
+          "file": "v2.0.0/upscale-enhance-arm64-cpu-r2.tar.gz",
+          "sha256": "d2d9745d2ca1b546c4e5399d5bf8c024bad349135fdb1ad0e4da28b7ac19fc9e",
+          "compressedSize": 2209931629,
+          "extractedSize": 3246159800
         }
       },
       "packages": {
@@ -407,10 +407,10 @@
           "extractedSize": 8172949791
         },
         "arm64-cpu": {
-          "file": "v2.0.0/photo-restoration-arm64-cpu.tar.gz",
-          "sha256": "261a27a176b9f3e76d8cd92576b73a1c014b19e87b4f16e58ed46d17c77697c0",
-          "compressedSize": 1361837793,
-          "extractedSize": 2584214411
+          "file": "v2.0.0/photo-restoration-arm64-cpu-r2.tar.gz",
+          "sha256": "86f1b261314f9f66146c02fddcbeff1880da0b52716e21126c75c7eee00e445d",
+          "compressedSize": 1252233816,
+          "extractedSize": 2238681871
         }
       },
       "packages": {
@@ -557,10 +557,10 @@
           "extractedSize": 845987840
         },
         "arm64-cpu": {
-          "file": "v2.0.0/transcription-arm64-cpu.tar.gz",
-          "sha256": "07088951300dec14b80f4723a3d5bd968574ce2650259be3fd487e7abb47e120",
-          "compressedSize": 528491203,
-          "extractedSize": 741534382
+          "file": "v2.0.0/transcription-arm64-cpu-r2.tar.gz",
+          "sha256": "34a7e6de0d8c5954b2d84838db00b3fc6a1f05923fe4051fba28cd722e9b4379",
+          "compressedSize": 519782354,
+          "extractedSize": 715158338
         }
       },
       "packages": {

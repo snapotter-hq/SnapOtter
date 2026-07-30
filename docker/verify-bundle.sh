@@ -165,7 +165,9 @@ case "${BUNDLE_ID}" in
     check_imports "onnxruntime cv2"
     ;;
   upscale-enhance)
-    check_imports "torch realesrgan onnxruntime"
+    # onnxruntime was only ever a transitive of an older dep tree here; no
+    # upscale-enhance script imports it and gpu.py degrades cleanly without it.
+    check_imports "torch realesrgan"
     ;;
   photo-restoration)
     check_imports "torch onnxruntime mediapipe"
