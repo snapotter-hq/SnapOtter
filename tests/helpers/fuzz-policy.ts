@@ -46,7 +46,16 @@ const CASE_TIMEOUTS_MS: Record<FuzzCostClass, number> = {
 export const FUZZ_COST_OVERRIDES = {
   "webp-to-avif": "slow-codec",
   "webp-to-gif": "slow-codec",
+  // AVIF/HEIC encodes are slow; a heic input cannot be downscaled by the fuzz
+  // (sharp cannot re-encode it), so it runs at full fixture size.
+  "heic-to-avif": "slow-codec",
+  // Animated upscales (percentage up to 500) across frames run several seconds
+  // when the input is a format the fuzz cannot downscale.
+  "gif-tools": "slow-codec",
+  // A 2000px border makes a ~5000px canvas plus a large gaussian shadow blur.
   border: "heavy",
+  // Up to 400 per-tile JXL/AVIF encodes plus a ZIP; bounded and correct.
+  split: "heavy",
 } as const satisfies Record<string, FuzzCostClass>;
 
 function parseInteger(

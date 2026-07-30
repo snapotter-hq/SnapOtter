@@ -1,5 +1,6 @@
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import fc from "fast-check";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { ZodFastCheck } from "zod-fast-check";
@@ -38,6 +39,44 @@ const FUZZ = !!process.env.FUZZ;
 const FUZZ_CONFIG = parseFuzzConfig(FUZZ ? process.env : {});
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const FIXTURE_INDEX = buildGeneratedFixtureIndex(generatedFixtureDirectories());
+
+// This lane checks that valid settings never crash a tool, not how fast a codec
+// is on a big image. Several image tools scale their work with the input
+// (AVIF/JXL encodes, gif upscales, per-tile splits), so a multi-megapixel
+// fixture makes cases legitimately run many seconds and time out without ever
+// crashing. Bound image inputs to a small canvas; the same settings paths run
+// in a fraction of the time. The format matrix still covers full-size inputs on
+// its own path. Formats sharp cannot re-encode (heic, jxl, raw) are left as-is
+// and covered by their per-tool fuzz budgets instead.
+const FUZZ_MAX_IMAGE_DIMENSION = 640;
+
+async function boundFuzzImageInputs(
+  inputs: Awaited<ReturnType<typeof buildGeneratedProcessInputs>>,
+  modality?: string,
+): Promise<typeof inputs> {
+  if (modality !== "image") return inputs;
+  return Promise.all(
+    inputs.map(async (input) => {
+      try {
+        const image = sharp(input.buffer, { animated: true });
+        const meta = await image.metadata();
+        const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
+        if (longest <= FUZZ_MAX_IMAGE_DIMENSION) return input;
+        const buffer = await image
+          .resize({
+            width: FUZZ_MAX_IMAGE_DIMENSION,
+            height: FUZZ_MAX_IMAGE_DIMENSION,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .toBuffer();
+        return { ...input, buffer };
+      } catch {
+        return input;
+      }
+    }),
+  );
+}
 
 describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
   let testApp: TestApp;
@@ -81,7 +120,8 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       if (fixtures.length === 0) {
         return context.skip(`${toolId}: no compatible generated fixture`);
       }
-      const inputs = await buildGeneratedProcessInputs(fixtures, config, tool.modality);
+      const rawInputs = await buildGeneratedProcessInputs(fixtures, config, tool.modality);
+      const inputs = await boundFuzzImageInputs(rawInputs, tool.modality);
       const accounting = new GeneratedCaseAccounting(toolId, {
         expectedAttempts: FUZZ_CONFIG.runs + 1,
       });

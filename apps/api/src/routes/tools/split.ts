@@ -30,7 +30,7 @@ const settingsSchema = z.object({
 // extracts and a 10,000-file ZIP from one request. Bound the product so a
 // single split cannot spin the worker; real grids, filmstrips, and sprite
 // sheets stay well under this.
-const MAX_OUTPUT_TILES = 500;
+const MAX_OUTPUT_TILES = 400;
 
 function resolveOutputFormat(
   outputFormat: string,
