@@ -75,6 +75,53 @@ describe("Feature manifest structure", () => {
   });
 });
 
+describe("Feature manifest: cross-bundle dependency agreement", () => {
+  // #669: the arm64 transcription bundle baked huggingface_hub 1.22.0 (pulled
+  // transitively by unpinned faster-whisper at bundle-build time) while
+  // inpaint-hq's transformers needs hub <1.0. Bundles ship as diffs against
+  // the base venv, so last-writer-wins left 1.22.0 in the shared venv and the
+  // hq install failed verification on arm64.
+  function pinnedVersions(): Map<string, Map<string, string>> {
+    const byPackage = new Map<string, Map<string, string>>();
+    for (const [bundleId, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      const pkgs = bundle.packages as Record<string, string[]>;
+      const specs = [...(pkgs.common ?? []), ...(pkgs.amd64 ?? []), ...(pkgs.arm64 ?? [])];
+      for (const spec of specs) {
+        const m = /^([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?==(\S+)$/.exec(spec);
+        if (!m) continue;
+        const name = m[1].toLowerCase();
+        const perBundle = byPackage.get(name) ?? new Map<string, string>();
+        perBundle.set(bundleId, m[2]);
+        byPackage.set(name, perBundle);
+      }
+    }
+    return byPackage;
+  }
+
+  it("bundles that pin the same package agree on the version", () => {
+    for (const [pkg, byBundle] of pinnedVersions()) {
+      const versions = new Set(byBundle.values());
+      expect(
+        versions.size,
+        `${pkg} is pinned to different versions across bundles: ${JSON.stringify([...byBundle.entries()])}`,
+      ).toBe(1);
+    }
+  });
+
+  it("huggingface-hub is constrained and every bundle pin matches the constraint", () => {
+    const constraints: string[] = manifest.constraints ?? [];
+    const hub = constraints.find((c) => c.toLowerCase().startsWith("huggingface-hub=="));
+    expect(
+      hub,
+      "constraints must pin huggingface-hub so no bundle rebuild can strand hub 1.x in the shared venv",
+    ).toBeDefined();
+    const version = (hub ?? "").split("==")[1];
+    for (const [bundleId, v] of pinnedVersions().get("huggingface-hub") ?? new Map()) {
+      expect(v, `${bundleId} pins huggingface-hub differently from the constraint`).toBe(version);
+    }
+  });
+});
+
 describe("Feature manifest: shared-venv numpy-1.x ABI closure lock", () => {
   // Legacy feature bundles still share one venv. A package that upgrades numpy
   // can strand scipy/scikit-learn/pandas wheels on the wrong ABI and break every

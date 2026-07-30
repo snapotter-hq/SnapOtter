@@ -1,7 +1,10 @@
 {
   "manifestVersion": 2,
   "imageVersion": "2.0.0",
-  "pythonVersion": { "amd64": "3.12", "arm64": "3.11" },
+  "pythonVersion": {
+    "amd64": "3.12",
+    "arm64": "3.11"
+  },
   "basePackages": [
     "numpy==1.26.4",
     "Pillow==12.3.0",
@@ -13,7 +16,8 @@
     "scipy==1.12.0",
     "scikit-learn==1.4.2",
     "scikit-image==0.24.0",
-    "pandas==2.2.2"
+    "pandas==2.2.2",
+    "huggingface-hub==0.36.2"
   ],
   "bundleRepo": "deepsafe/feature-bundles",
   "bundles": {
@@ -560,7 +564,7 @@
         }
       },
       "packages": {
-        "common": ["faster-whisper>=1.0.0"],
+        "common": ["faster-whisper>=1.0.0", "huggingface-hub[hf_xet]==0.36.2"],
         "amd64": [],
         "arm64": ["protobuf>=4.25.3,<5"]
       },
