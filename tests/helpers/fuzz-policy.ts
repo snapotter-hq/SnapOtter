@@ -38,9 +38,13 @@ const CASE_TIMEOUTS_MS: Record<FuzzCostClass, number> = {
   standard: 8_000,
   long: 12_000,
   "slow-codec": 15_000,
-  // A 2000px border makes a ~5000px canvas plus a large gaussian shadow blur;
-  // bounded and correct, but well past the codec budget.
-  heavy: 20_000,
+  // These tools scale with settings the schema permits to a bounded but large
+  // extreme: a 2000px border on a ~5000px canvas, a 400-tile split, or a resize
+  // to the shared 64-megapixel output cap. All are correct and bounded, and all
+  // legitimately run tens of seconds on a loaded runner without crashing, which
+  // is the only thing this lane checks. (Whether the product should allow a
+  // 64MP gif resize at all is a separate, deliberate review.)
+  heavy: 45_000,
 };
 
 export const FUZZ_COST_OVERRIDES = {
@@ -49,9 +53,8 @@ export const FUZZ_COST_OVERRIDES = {
   // AVIF/HEIC encodes are slow; a heic input cannot be downscaled by the fuzz
   // (sharp cannot re-encode it), so it runs at full fixture size.
   "heic-to-avif": "slow-codec",
-  // Animated upscales (percentage up to 500) across frames run several seconds
-  // when the input is a format the fuzz cannot downscale.
-  "gif-tools": "slow-codec",
+  // Resize to the 64-megapixel output cap across frames runs tens of seconds.
+  "gif-tools": "heavy",
   // A 2000px border makes a ~5000px canvas plus a large gaussian shadow blur.
   border: "heavy",
   // Up to 400 per-tile JXL/AVIF encodes plus a ZIP; bounded and correct.
