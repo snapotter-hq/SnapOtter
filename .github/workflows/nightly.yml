@@ -331,6 +331,16 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Free disk space
+        # The from-scratch image is ~15 GB and the build layers add more on top
+        # of three running containers, which crowds a standard runner and has
+        # correlated with the VM being terminated mid-run (exit 137). Reclaim the
+        # preinstalled toolchains this job never uses before building.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker image prune -af || true
+          df -h /
       - name: Run container test suite
         # Attribute the job to test-unit: it runs the full integration suite
         # against the container's real binaries (ffmpeg/qpdf/tesseract/...), which
