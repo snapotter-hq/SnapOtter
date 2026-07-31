@@ -146,6 +146,10 @@ interface SecondarySpec {
 const SECONDARY_INPUTS: Record<string, SecondarySpec[]> = {
   "watermark-image": [{ field: "watermark", ext: ".png", modality: "image" }],
   compose: [{ field: "overlay", ext: ".png", modality: "image" }],
+  // erase-object needs a mask image as a discrete second file; without it the
+  // route refuses with 400. The worker resizes the mask to the image, so any
+  // valid PNG works.
+  "erase-object": [{ field: "mask", ext: ".png", modality: "image" }],
   compare: [{ field: "file", sameAsPrimary: true }],
   "find-duplicates": [{ field: "file", sameAsPrimary: true }],
   collage: [{ field: "file", sameAsPrimary: true }],
@@ -175,6 +179,16 @@ const EXTRA_FIELDS: Record<string, Record<string, string>> = {
 const TOOL_FIXTURES: Record<string, Record<string, string>> = {
   "chart-maker": { ".json": join(REPO, "tests/fixtures/data/valid/chart.json") },
   "extract-subtitles": { ".mkv": join(REPO, "tests/fixtures/video/formats/tiny-subs.mkv") },
+  // remove-gif-background rejects a still GIF by design; it needs an animated one.
+  "remove-gif-background": {
+    ".gif": join(REPO, "tests/fixtures/image/valid/animated-simpsons.gif"),
+  },
+  // Extraction tools emit an empty (but valid) artifact when the input has none
+  // of the thing they extract, which the decodable-output oracle then reads as a
+  // zero-byte failure. Pin fixtures that actually carry text and speech.
+  ocr: { ".png": join(REPO, "tests/fixtures/image/valid/ocr-clean.png") },
+  "transcribe-audio": { ".wav": join(REPO, "tests/fixtures/audio/valid/speech-10s.wav") },
+  "auto-subtitles": { ".mp4": join(REPO, "tests/fixtures/video/valid/speech-10s.mp4") },
 };
 
 /**
@@ -184,6 +198,11 @@ const TOOL_FIXTURES: Record<string, Record<string, string>> = {
  */
 const CANONICAL_EXT: Record<string, string> = {
   "extract-subtitles": ".mkv",
+  // ocr and transcribe-audio declare several formats but only the pinned
+  // content fixture above exercises them, so force its extension over the
+  // earlier-declared .jpg / .mp3 that would resolve to a content-free file.
+  ocr: ".png",
+  "transcribe-audio": ".wav",
 };
 
 /** Formats a multi-input tool only accepts on its SECONDARY field. */
@@ -231,6 +250,9 @@ const EXPECTED_SELF_REJECT: Record<string, RegExp[]> = {
   "remove-pages": [/out of range/i, /only \d+ page/i],
   "extract-pages": [/out of range/i, /only \d+ page/i],
   "split-pdf": [/out of range/i, /only \d+ page/i, /single page/i],
+  // The base passport-photo route is a dispatcher; the real work lives on its
+  // /analyze and /generate sub-routes, so the bare tool path refuses by design.
+  "passport-photo": [/\/analyze or \/generate/i],
 };
 
 /** High-risk axis triples worth explicit three-way coverage. */
