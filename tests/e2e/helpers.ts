@@ -211,6 +211,19 @@ export async function putSettings(
   return { ok: res.ok(), status: res.status() };
 }
 
+/** Upsert the current user's preferences (e.g. reset shared state a spec mutates). */
+export async function putPreferences(
+  page: Page,
+  data: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAuthToken(page);
+  const res = await page.request.put("/api/v1/preferences", {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    data,
+  });
+  return { ok: res.ok(), status: res.status() };
+}
+
 /**
  * changePasswordViaApi() — revert a password change without driving the UI.
  * The current session token survives a password change (the API only revokes

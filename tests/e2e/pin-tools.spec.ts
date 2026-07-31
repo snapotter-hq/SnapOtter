@@ -1,9 +1,15 @@
-import { expect, test } from "./helpers";
+import { expect, putPreferences, test } from "./helpers";
 
 // Mutates the shared per-user `pinnedTools` preference on the server, so it
 // pins and then unpins within the single test to leave state clean.
 test.describe("Pin tools", () => {
   test("pin a tool, persist across reload, then unpin", async ({ loggedInPage: page }) => {
+    // Start from a known-empty pin state. CI retries once, and a prior attempt
+    // that failed after pinning but before unpinning leaves a server-side pin,
+    // which would fail the "not pinned yet" assertion below on the retry.
+    expect((await putPreferences(page, { pinnedTools: [] })).ok).toBeTruthy();
+    await page.reload();
+
     // Resize lives under Image > Essentials on the All tab (default).
     const pinToggle = page.getByTestId("pin-toggle-resize").first();
     await expect(pinToggle).toBeVisible();
