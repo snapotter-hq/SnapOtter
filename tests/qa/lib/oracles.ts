@@ -100,6 +100,14 @@ export function detectSignature(data: Buffer): string | null {
 const IMAGE_SIGNATURES = new Set(["PNG", "JPEG", "GIF", "BMP", "TIFF-LE", "TIFF-BE", "ICO", "PSD"]);
 const MEDIA_SIGNATURES = new Set(["ISOBMFF", "MATROSKA", "OGG", "FLAC", "ID3", "MP3", "RIFF"]);
 
+/**
+ * Plain-text formats a tool may serve as application/octet-stream, so the
+ * content-type check below misses them and they fall through to "binary".
+ * Subtitles are the ones that reach here without a text/* type; decoding them
+ * as text asserts real content instead of passing on a byte-count floor.
+ */
+const TEXT_EXTS = new Set([".srt", ".vtt", ".ass", ".txt"]);
+
 function classify(data: Buffer, filename: string, contentType: string): OutputKind {
   if (data.length === 0) return "empty";
   const ct = contentType.split(";")[0].trim().toLowerCase();
@@ -120,6 +128,7 @@ function classify(data: Buffer, filename: string, contentType: string): OutputKi
   if (signature === "ISOBMFF" || signature === "MATROSKA") return "video";
   if (signature && MEDIA_SIGNATURES.has(signature)) return "audio";
   if (ct.startsWith("text/") || ct.includes("xml") || ct.includes("markdown")) return "text";
+  if (TEXT_EXTS.has(ext)) return "text";
   return "binary";
 }
 
