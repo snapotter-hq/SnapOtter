@@ -326,7 +326,9 @@ jobs:
   docker-e2e:
     name: Docker Container E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # A from-scratch image build (~14 min) plus the full in-container suite runs
+    # ~65 min, so the old 60-minute budget cancelled the job before it finished.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Run container test suite
