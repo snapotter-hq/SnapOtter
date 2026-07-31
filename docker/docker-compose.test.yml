@@ -62,9 +62,17 @@ services:
       - SYNC_WAIT_MS=120000
       - VITEST_TEST_TIMEOUT=180000
       - VITEST_HOOK_TIMEOUT=120000
+      # /tmp is tmpfs (RAM-backed) below, so each fork's scratch files count
+      # against RAM alongside the app plus Postgres and Redis. On a 7GB CI
+      # runner the default fork-per-core parallelism has correlated with the
+      # runner being killed mid-run (exit 137). One fork bounds the peak; the
+      # 90-minute job budget absorbs the slower serial run.
+      - VITEST_MAX_FORKS=1
     tmpfs:
-      - /tmp/test-workspace
-      - /tmp
+      # Cap the RAM-backed scratch mounts so a burst of large temp files (a
+      # multi-megapixel encode, a video transcode) cannot exhaust runner RAM.
+      - /tmp/test-workspace:size=1g
+      - /tmp:size=2g
     depends_on:
       postgres:
         condition: service_healthy
