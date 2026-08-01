@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runQpdf } from "./qpdf.js";
 
 // qpdf page ranges: digits, commas, hyphens, r-prefixed (r1 = last), and z (last page).
@@ -41,14 +45,31 @@ export async function qpdfRotate(
 }
 
 /*
- * Security note: passwords are passed as argv elements to spawn() (no shell).
- * They are visible in /proc/<pid>/cmdline for the ~1s process lifetime. This
- * is acceptable for the single-tenant container threat model. If multi-tenant
- * isolation is ever needed, switch to qpdf's --password-file or @argfile
- * syntax with a 0600 temp file in the scratch dir, deleted in a finally block.
+ * Security note: qpdfEncrypt passes its passwords through a 0600 job-JSON file that
+ * is unlinked in a finally block, so they stay out of argv. qpdfDecrypt still passes
+ * one as an argv element to spawn() (no shell), visible in /proc/<pid>/cmdline for
+ * the ~1s process lifetime, which is acceptable for the single-tenant container
+ * threat model. Its `--password=` form is a single token, so the argument-file
+ * pre-pass described below cannot fire on it.
  */
 
-/** AES-256 encrypt with user + owner passwords (qpdf --encrypt user owner 256 --). */
+/**
+ * AES-256 encrypt with user + owner passwords, via a qpdf job-JSON file.
+ *
+ * The passwords deliberately never appear in argv. qpdf runs an argument-file
+ * pre-pass over every argv element before it parses options, so a bare positional
+ * password beginning with `@` is resolved as a path and that file's lines are
+ * spliced into qpdf's own argv. A single-line file then encrypts the document under
+ * that file's contents at exit 0, handing the user a PDF their own password does not
+ * open, and a multi-line one shifts the arguments enough to surface part of the file
+ * in qpdf's error text.
+ *
+ * The `=`-joined flag form (`--encrypt --user-password=...`) also avoids this, but
+ * only on qpdf 11.7 and newer; the shipped image carries 11.3, which rejects it
+ * outright. Job JSON is accepted by both (verified against 11.3.0 and 12.1.0) and
+ * has the side benefit of keeping the passwords out of /proc/<pid>/cmdline, which
+ * the note above asks for.
+ */
 export async function qpdfEncrypt(
   inputPath: string,
   userPassword: string,
@@ -57,10 +78,23 @@ export async function qpdfEncrypt(
 ): Promise<void> {
   assertPassword(userPassword);
   assertPassword(ownerPassword);
-  await runQpdf(
-    [inputPath, "--encrypt", userPassword, ownerPassword, "256", "--", outPath],
-    60_000,
+
+  const jobPath = join(tmpdir(), `snapotter-qpdf-job-${randomUUID()}.json`);
+  await writeFile(
+    jobPath,
+    JSON.stringify({
+      inputFile: inputPath,
+      outputFile: outPath,
+      encrypt: { userPassword, ownerPassword, "256bit": {} },
+    }),
+    { mode: 0o600 },
   );
+
+  try {
+    await runQpdf([`--job-json-file=${jobPath}`], 60_000);
+  } finally {
+    await rm(jobPath, { force: true });
+  }
 }
 
 /** Decrypt with a known password; qpdf rejects wrong passwords with exit 2. */

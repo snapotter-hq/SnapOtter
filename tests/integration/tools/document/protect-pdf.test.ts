@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { qpdfAvailable } from "@snapotter/doc-engine";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -80,4 +84,49 @@ describe.skipIf(!qpdfAvailable())("protect-pdf (requires qpdf)", () => {
     const res = await runTool({ userPassword: "" });
     expect(res.statusCode).toBe(400);
   }, 60_000);
+
+  // Round-trips a password whose first character is qpdf's argument-file sigil.
+  // Passed as a bare positional, qpdf resolves it as a path and encrypts under
+  // that file's contents instead, so the user's own password no longer opens the
+  // document. Unlocking with the literal string is what proves it stayed literal.
+  it("treats a password starting with the argument-file sigil as a literal", async () => {
+    const canaryPath = join(tmpdir(), `snapotter-qpdf-canary-${randomUUID()}.txt`);
+    await writeFile(canaryPath, "CANARY_FILE_CONTENTS\n");
+
+    try {
+      const literalPassword = `@${canaryPath}`;
+      const res = await runTool({ userPassword: literalPassword });
+      expect(res.statusCode).toBe(200);
+
+      const dl = await testApp.app.inject({
+        method: "GET",
+        url: JSON.parse(res.body).downloadUrl,
+      });
+      expect(dl.statusCode).toBe(200);
+
+      const unlockWith = async (password: string) => {
+        const { body, contentType } = createMultipartPayload([
+          {
+            name: "file",
+            filename: "locked.pdf",
+            contentType: "application/pdf",
+            content: dl.rawPayload,
+          },
+          { name: "settings", content: JSON.stringify({ password }) },
+        ]);
+        return testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/tools/pdf/unlock-pdf",
+          headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+          body,
+        });
+      };
+
+      expect((await unlockWith(literalPassword)).statusCode).toBe(200);
+      // The canary's contents must never have become the encryption key.
+      expect((await unlockWith("CANARY_FILE_CONTENTS")).statusCode).not.toBe(200);
+    } finally {
+      await rm(canaryPath, { force: true });
+    }
+  }, 90_000);
 });

@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { settleClose } from "./helpers/fake-child.js";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
@@ -137,20 +140,54 @@ describe("qpdfRotate", () => {
 });
 
 describe("qpdfEncrypt", () => {
-  it("builds <in> --encrypt <user> <owner> 256 -- <out>", async () => {
+  it("drives qpdf through a job-JSON file rather than argv", async () => {
     h.nextClose({ code: 0 });
     await import("../src/pdf-ops.js").then((m) =>
       m.qpdfEncrypt("/in.pdf", "userpw", "ownerpw", "/out.pdf"),
     );
-    expect(h.lastArgs()).toEqual([
-      "/in.pdf",
-      "--encrypt",
-      "userpw",
-      "ownerpw",
-      "256",
-      "--",
-      "/out.pdf",
-    ]);
+    const args = h.lastArgs();
+    expect(args).toHaveLength(1);
+    expect(args[0]).toMatch(/^--job-json-file=.*\.json$/);
+  });
+
+  // qpdf runs an argument-file pre-pass over every argv element before it parses
+  // options, so a bare positional value starting with `@` is read as a path and that
+  // file's lines are spliced into qpdf's own argv. A one-line file then encrypts the
+  // document under the file's contents, at exit 0, instead of the chosen password.
+  // Keeping passwords out of argv entirely is what closes it.
+  it.each([
+    ["argument-file sigil", "@/etc/hostname"],
+    ["leading dashes", "--allow-insecure"],
+  ])("never puts a password with %s into argv", async (_label, password) => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdf-ops.js").then((m) =>
+      m.qpdfEncrypt("/in.pdf", password, "ownerpw", "/out.pdf"),
+    );
+    expect(JSON.stringify(h.lastArgs())).not.toContain(password);
+  });
+
+  it("writes the literal passwords into the job file and removes it afterwards", async () => {
+    // A child that never settles on its own, so the job file can be read while qpdf
+    // is notionally still running. It is unlinked once the promise resolves.
+    const child = h.nextManual();
+    const { qpdfEncrypt } = await import("../src/pdf-ops.js");
+    const pending = qpdfEncrypt("/in.pdf", "@/etc/hostname", "ownerpw", "/out.pdf");
+
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    const jobPath = h.lastArgs()[0].replace("--job-json-file=", "");
+    const contents = JSON.parse(await readFile(jobPath, "utf8"));
+
+    settleClose(child, { code: 0 });
+    await pending;
+
+    expect(contents.inputFile).toBe("/in.pdf");
+    expect(contents.outputFile).toBe("/out.pdf");
+    expect(contents.encrypt).toMatchObject({
+      userPassword: "@/etc/hostname",
+      ownerPassword: "ownerpw",
+      "256bit": {},
+    });
+    expect(existsSync(jobPath)).toBe(false);
   });
 
   it("rejects an empty user password before spawning", async () => {
