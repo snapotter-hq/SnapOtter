@@ -384,6 +384,44 @@ export async function requireToolAccess(
   return user;
 }
 
+/**
+ * Gate the file routes on the file permissions.
+ *
+ * Either grant is enough: `files:all` is the broader one, so a holder of it is
+ * never locked out for lacking `files:own`. This is the same rule
+ * `requireApiKeyManagement` in routes/api-keys.ts already applies to the
+ * identical apikeys:own / apikeys:all pair, and the roles editor presents Files
+ * and API Keys as the same shape of group.
+ *
+ * Runs before the resource is resolved so a caller without the permission gets
+ * 403 rather than a 404 that would confirm whether an id exists.
+ *
+ * Lives here rather than in routes/user-files.ts because /api/v1/upload needs the
+ * same gate and is registered outside that module.
+ *
+ * See SEC-20260726-C01.
+ */
+export async function requireFileAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<AuthUser | null> {
+  const user = getAuthUser(request);
+  if (!user) {
+    reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    return null;
+  }
+
+  if (
+    !(await hasEffectivePermission(user, "files:own")) &&
+    !(await hasEffectivePermission(user, "files:all"))
+  ) {
+    reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
+    return null;
+  }
+
+  return user;
+}
+
 export async function requireOwnershipOrPermission(
   request: FastifyRequest,
   reply: FastifyReply,

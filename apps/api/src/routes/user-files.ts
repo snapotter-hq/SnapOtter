@@ -33,8 +33,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
-import { hasEffectivePermission } from "../permissions.js";
-import { type AuthUser, requireAuth } from "../plugins/auth.js";
+import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -115,38 +114,6 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
     toolChain: row.toolChain ?? [],
     createdAt: row.createdAt.toISOString(),
   };
-}
-
-/**
- * Gate the file-library routes on the file permissions.
- *
- * Either grant is enough: `files:all` is the broader one, so a holder of it is
- * never locked out for lacking `files:own`. This is the same rule
- * `requireApiKeyManagement` in routes/api-keys.ts already applies to the
- * identical apikeys:own / apikeys:all pair, and the roles editor presents Files
- * and API Keys as the same shape of group.
- *
- * Runs before the resource is resolved so a caller without the permission gets
- * 403 rather than a 404 that would confirm whether an id exists.
- *
- * See SEC-20260726-C01.
- */
-async function requireFileAccess(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<AuthUser | null> {
-  const user = requireAuth(request, reply);
-  if (!user) return null;
-
-  if (
-    !(await hasEffectivePermission(user, "files:own")) &&
-    !(await hasEffectivePermission(user, "files:all"))
-  ) {
-    reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
-    return null;
-  }
-
-  return user;
 }
 
 /**

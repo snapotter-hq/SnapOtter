@@ -10,6 +10,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { getObjectSize, getObjectStream, putObject } from "../lib/object-storage.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { requireFileAccess, requirePermission } from "../permissions.js";
 
 /**
  * Guard against path traversal in URL params.
@@ -85,6 +86,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/upload",
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      // Persists bytes that /api/v1/download then serves without auth, so this
+      // needs the same grant as the rest of the file surface. The tool-access
+      // middleware only covers /api/v1/tools/, and never reached this route.
+      if (!(await requireFileAccess(request, reply))) return;
+
       const jobId = randomUUID();
 
       const uploadedFiles: Array<{
@@ -231,6 +237,10 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
   // ── POST /api/v1/preview ──────────────────────────────────────
   // Returns a WebP preview for formats browsers can't display (HEIC/HEIF).
   app.post("/api/v1/preview", async (request: FastifyRequest, reply: FastifyReply) => {
+    // Decodes attacker-supplied bytes through Sharp, libheif and LibRaw on behalf
+    // of the tool workflow, so it belongs behind the same grant as running a tool.
+    if (!(await requirePermission("tools:use")(request, reply))) return;
+
     const data = await request.file();
     if (!data) {
       return reply.status(400).send({ error: "No file provided" });

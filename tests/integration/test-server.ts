@@ -58,6 +58,7 @@ import { docsRoutes } from "../../apps/api/src/routes/docs.js";
 import { registerEnterpriseRoutes } from "../../apps/api/src/routes/enterprise/index.js";
 import { feedbackRoutes } from "../../apps/api/src/routes/feedback.js";
 import { registerFetchUrlsRoute } from "../../apps/api/src/routes/fetch-urls.js";
+import { filePreviewRoutes } from "../../apps/api/src/routes/file-preview.js";
 import { fileRoutes } from "../../apps/api/src/routes/files.js";
 import { registerJobRoutes } from "../../apps/api/src/routes/jobs.js";
 import { registerMemeTemplates } from "../../apps/api/src/routes/meme-templates.js";
@@ -191,6 +192,9 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // User file library routes (persistent file management with versioning)
   await userFileRoutes(app);
+
+  // Library thumbnails plus the on-demand preview for uploaded media
+  await filePreviewRoutes(app);
 
   // Meme template routes
   await registerMemeTemplates(app);

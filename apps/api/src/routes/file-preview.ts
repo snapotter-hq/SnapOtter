@@ -17,8 +17,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { getStoredFilePath } from "../lib/file-storage.js";
-import { hasEffectivePermission } from "../permissions.js";
-import { getAuthUser, requireAuth } from "../plugins/auth.js";
+import { hasEffectivePermission, requirePermission } from "../permissions.js";
+import { requireAuth } from "../plugins/auth.js";
 
 const PREVIEW_DIR = ".previews";
 let previewDirReady = false;
@@ -243,8 +243,11 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // Optional auth -- the preview is for the user's own uploaded file
-      getAuthUser(request);
+      // Spawns FFmpeg over caller-supplied bytes for the tool workflow, so it takes
+      // the same grant as running a tool. This used to call getAuthUser and discard
+      // the result, leaving it open to any authenticated principal no matter what
+      // the operator had scoped them down to.
+      if (!(await requirePermission("tools:use")(request, reply))) return;
 
       const parts = request.parts();
       let fileBuffer: Buffer | null = null;
