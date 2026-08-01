@@ -14,11 +14,34 @@ import { readStoredFile } from "../lib/file-storage.js";
 import { putObject } from "../lib/object-storage.js";
 
 export async function gdprExportJob(userId: string, jobId: string): Promise<{ outputRef: string }> {
-  // 1. Fetch user profile (exclude passwordHash)
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-  if (!user) throw new Error(`User ${userId} not found`);
-
-  const { passwordHash: _, ...profile } = user;
+  // 1. Fetch user profile.
+  //
+  // The columns are named rather than selected with `*` so that authentication
+  // material never leaves Postgres. passwordHash, totpSecret and recoveryCodesHash
+  // are credentials, not personal data a subject-access request is owed, and this
+  // archive is meant to be handed to the data subject or a regulator. Listing the
+  // allowlist here also means a future column on `users` is excluded by default
+  // instead of silently joining the export.
+  const [profile] = await db
+    .select({
+      id: schema.users.id,
+      username: schema.users.username,
+      role: schema.users.role,
+      team: schema.users.team,
+      email: schema.users.email,
+      authProvider: schema.users.authProvider,
+      externalId: schema.users.externalId,
+      mustChangePassword: schema.users.mustChangePassword,
+      legalHold: schema.users.legalHold,
+      storageUsed: schema.users.storageUsed,
+      storageQuota: schema.users.storageQuota,
+      totpEnabled: schema.users.totpEnabled,
+      createdAt: schema.users.createdAt,
+      updatedAt: schema.users.updatedAt,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId));
+  if (!profile) throw new Error(`User ${userId} not found`);
 
   // 2. Fetch all user's files metadata
   const files = await db.select().from(schema.userFiles).where(eq(schema.userFiles.userId, userId));

@@ -121,11 +121,21 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
 
       // Validate the target user exists
       const [targetUser] = await db
-        .select({ id: schema.users.id })
+        .select({ id: schema.users.id, role: schema.users.role })
         .from(schema.users)
         .where(eq(schema.users.id, targetUserId));
       if (!targetUser) {
         return reply.status(404).send({ error: "User not found" });
+      }
+
+      // Same authority gate the purge routes apply. An export archive carries the
+      // target's whole library and profile, so exporting an account above your own
+      // role is a disclosure path, not a read-only status call.
+      if (!(await canManageTargetRole(user, targetUser.role))) {
+        return reply.status(403).send({
+          error: "Cannot manage a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
       }
 
       // Create a durable job row
@@ -178,9 +188,20 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const { jobId } = request.params;
+      const { id: targetUserId, jobId } = request.params;
 
-      const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      // Scoped to the user named in the path and to the export job type, so this
+      // cannot be used to resolve an arbitrary job id into a download URL.
+      const [job] = await db
+        .select()
+        .from(schema.jobs)
+        .where(
+          and(
+            eq(schema.jobs.id, jobId),
+            eq(schema.jobs.userId, targetUserId),
+            eq(schema.jobs.toolId, "gdpr-export"),
+          ),
+        );
 
       if (!job) {
         return reply.status(404).send({ error: "Export job not found" });

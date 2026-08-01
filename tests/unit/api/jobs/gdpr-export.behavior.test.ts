@@ -5,10 +5,27 @@ const selectMock = vi.hoisted(() => vi.fn());
 const readStoredFileMock = vi.hoisted(() => vi.fn());
 const putObjectMock = vi.hoisted(() => vi.fn());
 
+/**
+ * Stands in for a Drizzle query builder, including its projection behavior: when
+ * `select()` is given a column map, only those keys come back. Without that, a
+ * mock would hand every column to the caller regardless of what was selected, and
+ * assertions like "the export omits passwordHash" would pass even if the query
+ * asked for it.
+ */
 function queryChain<T>(result: T) {
   const chain = {
     from: vi.fn(() => chain),
-    where: vi.fn(() => Promise.resolve(result)),
+    where: vi.fn(() => {
+      const callIndex = selectMock.mock.results.findIndex((r) => r.value === chain);
+      const columns = callIndex >= 0 ? selectMock.mock.calls[callIndex]?.[0] : undefined;
+      if (!columns || !Array.isArray(result)) return Promise.resolve(result);
+      const keys = Object.keys(columns as Record<string, unknown>);
+      return Promise.resolve(
+        (result as Record<string, unknown>[]).map((row) =>
+          Object.fromEntries(keys.map((k) => [k, row[k]])),
+        ),
+      );
+    }),
   };
   return chain;
 }
@@ -28,7 +45,26 @@ async function loadGdprExport() {
       select: selectMock,
     },
     schema: {
-      users: { id: "users.id" },
+      users: {
+        id: "users.id",
+        username: "users.username",
+        role: "users.role",
+        team: "users.team",
+        email: "users.email",
+        authProvider: "users.auth_provider",
+        externalId: "users.external_id",
+        mustChangePassword: "users.must_change_password",
+        legalHold: "users.legal_hold",
+        storageUsed: "users.storage_used",
+        storageQuota: "users.storage_quota",
+        totpEnabled: "users.totp_enabled",
+        createdAt: "users.created_at",
+        updatedAt: "users.updated_at",
+        // Credential material -- present on the table, never exportable.
+        passwordHash: "users.password_hash",
+        totpSecret: "users.totp_secret",
+        recoveryCodesHash: "users.recovery_codes_hash",
+      },
       userFiles: { userId: "userFiles.userId" },
       jobs: { userId: "jobs.userId" },
       auditLog: { actorId: "auditLog.actorId" },
@@ -49,6 +85,33 @@ async function loadGdprExport() {
 describe("GDPR export job behavior", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  // A subject-access export is handed to the data subject, a regulator, or outside
+  // counsel, so it must never carry authentication material. Naming the columns keeps
+  // totpSecret and recoveryCodesHash inside Postgres instead of relying on the caller
+  // to subtract them, which also means a future column addition cannot silently leak.
+  it("selects an explicit profile column list that omits every credential column", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await gdprExportJob("user-1", "export-columns");
+
+    const profileColumns = selectMock.mock.calls[0][0];
+    expect(profileColumns, "profile select must name its columns rather than select *").toBeTypeOf(
+      "object",
+    );
+
+    const selected = Object.keys(profileColumns as Record<string, unknown>);
+    expect(selected).not.toContain("passwordHash");
+    expect(selected).not.toContain("totpSecret");
+    expect(selected).not.toContain("recoveryCodesHash");
+    // Personal data the subject is genuinely owed still ships.
+    expect(selected).toEqual(expect.arrayContaining(["id", "username", "email", "createdAt"]));
   });
 
   it("throws before writing output when the user does not exist", async () => {
