@@ -124,7 +124,7 @@ function errorDigest(err: unknown): string {
   return (h >>> 0).toString(16);
 }
 
-export function buildBeforeSend(isActive: () => boolean) {
+export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
   let windowStart = 0;
   let sentInWindow = 0;
 
@@ -137,6 +137,20 @@ export function buildBeforeSend(isActive: () => boolean) {
       sentInWindow = 0;
     }
     if (++sentInWindow > CEILING_PER_HOUR) return null;
+
+    if (diagnostic) {
+      // A consenting instance: keep the raw message, request, and breadcrumb data.
+      // Still drop identity, and cap message length via redactMessage raw mode.
+      event.user = undefined;
+      const values = asObj(event.exception)?.values;
+      if (Array.isArray(values)) {
+        for (const entry of values) {
+          const ex = asObj(entry);
+          if (ex && typeof ex.value === "string") ex.value = redactMessage(ex.value, { raw: true });
+        }
+      }
+      return event;
+    }
 
     // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;

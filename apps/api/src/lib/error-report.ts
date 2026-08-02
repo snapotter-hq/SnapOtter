@@ -19,7 +19,7 @@ import {
   isSafeMessageError,
   isToolInputError,
 } from "@snapotter/shared";
-import { analyticsEnabled } from "./analytics-gate.js";
+import { analyticsEnabled, sentryDiagnostic } from "./analytics-gate.js";
 
 export type ErrorClass = "expected" | "operational" | "bug";
 
@@ -155,7 +155,7 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
     if (!analyticsEnabled()) return;
     const cls = classifyError(err, ctx.source);
     if (cls === "expected") return;
-    if (!shouldReport(cls, errorSignature(err))) return;
+    if (!sentryDiagnostic() && !shouldReport(cls, errorSignature(err))) return;
 
     const Sentry = await import("@sentry/node");
     const net = connectivityClass(err);

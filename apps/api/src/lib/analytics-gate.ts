@@ -38,6 +38,12 @@ export function telemetryEnvKilled(): boolean {
   return off(process.env.SNAPOTTER_TELEMETRY) || off(process.env.ANALYTICS_ENABLED);
 }
 
+/** Opt-in diagnostic verbosity for a single (usually self-hosted) instance. */
+export function sentryDiagnostic(): boolean {
+  const v = process.env.SNAPOTTER_SENTRY_DIAGNOSTIC;
+  return v === "1" || v === "true" || v === "on";
+}
+
 /** Compile-time bake, with a NON-PRODUCTION-only override so tests can force it on. */
 export function bakedEnabled(): boolean {
   if (telemetryEnvKilled()) return false;

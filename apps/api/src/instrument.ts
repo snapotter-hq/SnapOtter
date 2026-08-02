@@ -1,5 +1,10 @@
 import { ANALYTICS_BAKED } from "@snapotter/shared";
-import { analyticsEnabled, gatePrimed, telemetryEnvKilled } from "./lib/analytics-gate.js";
+import {
+  analyticsEnabled,
+  gatePrimed,
+  sentryDiagnostic,
+  telemetryEnvKilled,
+} from "./lib/analytics-gate.js";
 import { deployMode } from "./lib/deploy-mode.js";
 import { buildBeforeSend } from "./lib/sentry-scrub.js";
 import { buildTracesSampler } from "./lib/sentry-tracing.js";
@@ -9,7 +14,9 @@ import { buildTracesSampler } from "./lib/sentry-tracing.js";
 // so an opted-out instance never reports even a boot-window crash.
 const sentryActive = () => gatePrimed() && analyticsEnabled();
 
-if (ANALYTICS_BAKED.sentryDsn && !telemetryEnvKilled()) {
+const dsn = process.env.SNAPOTTER_SENTRY_DSN_OVERRIDE || ANALYTICS_BAKED.sentryDsn;
+
+if (dsn && !telemetryEnvKilled()) {
   try {
     const Sentry = await import("@sentry/node");
     const { APP_VERSION } = await import("@snapotter/shared");
@@ -31,7 +38,7 @@ if (ANALYTICS_BAKED.sentryDsn && !telemetryEnvKilled()) {
     const tracingEnabled = tracesSampleRate > 0 && tracesSampleRate <= 1;
 
     Sentry.init({
-      dsn: ANALYTICS_BAKED.sentryDsn,
+      dsn,
       release,
       environment: process.env.SNAPOTTER_ENV || "production",
       sendDefaultPii: false,
@@ -56,7 +63,10 @@ if (ANALYTICS_BAKED.sentryDsn && !telemetryEnvKilled()) {
       // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
       // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
       initialScope: { tags: { deploy_mode: deployMode() } },
-      beforeSend: buildBeforeSend(sentryActive) as unknown as SentryOptions["beforeSend"],
+      beforeSend: buildBeforeSend(
+        sentryActive,
+        sentryDiagnostic(),
+      ) as unknown as SentryOptions["beforeSend"],
     });
 
     console.log(

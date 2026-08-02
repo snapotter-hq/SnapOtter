@@ -39,6 +39,7 @@ vi.mock("@sentry/node", () => ({
 
 vi.mock("../../../apps/api/src/lib/analytics-gate.js", () => ({
   analyticsEnabled: () => true,
+  sentryDiagnostic: () => false,
 }));
 
 beforeEach(() => {

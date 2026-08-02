@@ -40,6 +40,18 @@ describe("buildBeforeSend (api)", () => {
   it("returns null when the gate is off", () => {
     expect(buildBeforeSend(() => false)(evt(), {})).toBeNull();
   });
+  it("keeps the raw message and request when diagnostic is on", () => {
+    const diag = buildBeforeSend(() => true, true);
+    const event = {
+      exception: { values: [{ type: "Error", value: "open /data/uploads/a/report.pdf" }] },
+      request: { method: "POST", url: "https://host/api/v1/tools/image/rounded-crop" },
+    };
+    const out = diag(event as never, {
+      originalException: new Error("open /data/uploads/a/report.pdf"),
+    }) as never as { exception: { values: Array<{ value: string }> }; request?: unknown };
+    expect(out.exception.values[0].value).toBe("open /data/uploads/a/report.pdf");
+    expect(out.request).toBeDefined();
+  });
   it("strips high-risk surfaces but keeps full stack paths for debugging", () => {
     const hint = {
       originalException: Object.assign(new Error("x"), { code: "EACCES", syscall: "mkdir" }),
