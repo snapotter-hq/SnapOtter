@@ -260,6 +260,34 @@ describe("importBundleArchive", () => {
     expect(readFileSync(modelPath)).toEqual(fakeModel);
   });
 
+  it("imports a bundle whose file count exceeds the legacy 10k entry cap (#719)", async () => {
+    // OCR-style bundle: thousands of small files. The old 10k manual-import
+    // cap rejected these ("Archive exceeds 10000 entry limit") even though the
+    // installer accepts them, so the same bundle installed via the app but
+    // failed an offline import. Entry count here (~10,052 incl. bundle.json
+    // and the models/ dir) is above the old cap and well under the new one.
+    const count = 10_050;
+    const modelFiles = Array.from({ length: count }, (_, i) => ({
+      path: `f${i}.bin`,
+      content: Buffer.from([i & 0xff]),
+    }));
+    const archivePath = await buildArchive(
+      {
+        bundleId: testBundleId,
+        version: testVersion,
+        models: modelFiles.map((m) => m.path),
+      },
+      modelFiles,
+    );
+
+    const result = await importBundleArchive(createReadStream(archivePath));
+
+    expect(result.bundleId).toBe(testBundleId);
+    expect(result.models).toHaveLength(count);
+    expect(existsSync(join(modelsDir, "f0.bin"))).toBe(true);
+    expect(existsSync(join(modelsDir, `f${count - 1}.bin`))).toBe(true);
+  }, 60_000);
+
   it("rejects archive with path traversal", async () => {
     const traversalPath = await buildTraversalArchive();
     const stream = createReadStream(traversalPath);

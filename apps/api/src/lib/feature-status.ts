@@ -1479,7 +1479,13 @@ interface BundleDescriptor {
 }
 
 const IMPORT_MAX_BYTES = 20 * 1024 * 1024 * 1024; // 20 GB cumulative
-const IMPORT_MAX_ENTRIES = 10_000;
+// Matches the installer's own cap (max_entries in
+// packages/ai/python/install_runtime.py) so any bundle that installs online
+// also imports offline. OCR ships thousands of small files and blew the old
+// 10k cap while staying well under the installer's, so the same bundle
+// installed via the app but failed a manual import (#719). The 20 GB byte cap
+// and the entry-type/traversal guards remain the real DoS backstops.
+const IMPORT_MAX_ENTRIES = 100_000;
 
 export async function importBundleArchive(
   stream: Readable,
