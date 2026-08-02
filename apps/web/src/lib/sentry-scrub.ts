@@ -1,11 +1,12 @@
 /**
- * Sentry beforeSend for the web app. Same allowlist-first stance as the API
- * scrubber (apps/api/src/lib/sentry-scrub.ts), adapted for browsers: native
- * error messages are usually safe and highly diagnostic, so they pass through
- * with url/path redaction; anything else falls back to type-only. Frame paths
- * keep the host-less pathname so debug-id source maps still resolve.
+ * Sentry beforeSend for the web app. Mirrors the API scrubber
+ * (apps/api/src/lib/sentry-scrub.ts): the shared rebuildErrorValue ladder keeps
+ * a redacted message for any non-empty error (the rich default), so there is no
+ * browser-native allowlist here. Breadcrumb text goes through the same shared
+ * redactMessage. Frame paths keep the host-less pathname so debug-id source maps
+ * still resolve.
  */
-import { rebuildErrorValue } from "@snapotter/shared";
+import { rebuildErrorValue, redactMessage } from "@snapotter/shared";
 
 export const IGNORE_ERRORS: (string | RegExp)[] = [
   /^AbortError/,
@@ -30,70 +31,10 @@ export const DENY_URLS: RegExp[] = [
   /^safari-web-extension:\/\//,
 ];
 
-const NATIVE_ERRORS = new Set([
-  "TypeError",
-  "RangeError",
-  "SyntaxError",
-  "ReferenceError",
-  "DOMException",
-  // DOMExceptions report their specific name via err.name, not "DOMException",
-  // so the base entry alone dropped the diagnostic browser message for the
-  // whole family (WEB-3/4/6 arrived as "NotFoundError: NotFoundError"). This is
-  // the full WebIDL DOMException name table: every message is browser-authored
-  // and still passes through scrubText's url/path redaction.
-  "AbortError",
-  "ConstraintError",
-  "DataCloneError",
-  "DataError",
-  "EncodingError",
-  "HierarchyRequestError",
-  "IndexSizeError",
-  "InUseAttributeError",
-  "InvalidAccessError",
-  "InvalidCharacterError",
-  "InvalidModificationError",
-  "InvalidNodeTypeError",
-  "InvalidStateError",
-  "NamespaceError",
-  "NetworkError",
-  "NoModificationAllowedError",
-  "NotAllowedError",
-  "NotFoundError",
-  "NotReadableError",
-  "NotSupportedError",
-  "OperationError",
-  "QuotaExceededError",
-  "ReadOnlyError",
-  "SecurityError",
-  "TimeoutError",
-  "TransactionInactiveError",
-  "UnknownError",
-  "URLMismatchError",
-  "VersionError",
-  "WrongDocumentError",
-]);
-
 // Per-session runaway guard (Sentry de-dupes by fingerprint server-side, so 500
 // distinct events/hour is ample), not a quota lever under the sponsored plan.
 const CEILING_PER_HOUR = 500;
 const HOUR_MS = 3600_000;
-
-// BLOB_RE must be applied before URL_RE: "blob:http://..." would otherwise
-// partially match URL_RE and leave a dangling "blob:" prefix behind.
-const URL_RE = /https?:\/\/[^\s"')]+/g;
-const BLOB_RE = /blob:[^\s"')]+/g;
-const PATH_RE = /(?:\/Users|\/home|[A-Za-z]:\\)[^\s"')]*/g;
-
-/** Redact urls, blob refs, and absolute paths from free text. */
-function scrubText(s: string): string {
-  return s.replace(BLOB_RE, "<blob>").replace(URL_RE, "<url>").replace(PATH_RE, "<path>");
-}
-
-/** Redacted native-error message, or null when the name is not allowlisted. */
-export function scrubBrowserMessage(name: string, message: string): string | null {
-  if (!NATIVE_ERRORS.has(name)) return null;
-  return scrubText(message);
-}
 
 const TAG_ALLOWLIST = new Set(["route", "tool_id", "locale", "error_class"]);
 
@@ -119,7 +60,7 @@ function scrubBreadcrumb(entry: unknown): AnyEvent | null {
   for (const k of ["type", "category", "level", "timestamp"]) {
     if (b[k] !== undefined) out[k] = b[k];
   }
-  if (typeof b.message === "string") out.message = scrubText(b.message);
+  if (typeof b.message === "string") out.message = redactMessage(b.message);
   // For network breadcrumbs keep the non-PII status_code + method (the url is
   // dropped with the rest of `data`): "what request failed before the crash".
   if (b.category === "fetch" || b.category === "xhr") {
@@ -176,16 +117,7 @@ export function buildWebBeforeSend(isActive: () => boolean) {
       }
     }
 
-    const orig = hint?.originalException;
-    let rebuilt = rebuildErrorValue(orig);
-    if (rebuilt === null) {
-      const err = asObj(orig);
-      const name = err?.name;
-      const message = err?.message;
-      if (typeof name === "string" && typeof message === "string") {
-        rebuilt = scrubBrowserMessage(name, message);
-      }
-    }
+    const rebuilt = rebuildErrorValue(hint?.originalException);
 
     const values = asObj(event.exception)?.values;
     if (Array.isArray(values)) {

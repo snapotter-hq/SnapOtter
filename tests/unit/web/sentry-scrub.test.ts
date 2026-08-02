@@ -1,60 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildWebBeforeSend,
-  DENY_URLS,
-  IGNORE_ERRORS,
-  scrubBrowserMessage,
-} from "@/lib/sentry-scrub";
-
-describe("scrubBrowserMessage", () => {
-  it("keeps browser-native messages with urls/paths redacted", () => {
-    expect(scrubBrowserMessage("TypeError", "Failed to fetch https://intra.host/x?q=1")).toBe(
-      "Failed to fetch <url>",
-    );
-    expect(scrubBrowserMessage("TypeError", "cannot read /Users/bob/file.png")).toBe(
-      "cannot read <path>",
-    );
-    expect(scrubBrowserMessage("RangeError", "Invalid array length")).toBe("Invalid array length");
-  });
-
-  it("redacts blob urls and windows paths", () => {
-    expect(scrubBrowserMessage("DOMException", "load blob:http://x/abc failed")).toBe(
-      "load <blob> failed",
-    );
-    expect(scrubBrowserMessage("TypeError", "open C:\\Users\\bob\\tax.pdf")).toBe("open <path>");
-  });
-
-  it("drops messages for non-native error names", () => {
-    expect(scrubBrowserMessage("CustomerDataError", "contains secret.pdf")).toBeNull();
-  });
-
-  // DOMExceptions report their specific name ("NotFoundError"), not
-  // "DOMException", so listing only the base name dropped the diagnostic
-  // browser message for the whole family (WEB-3/4/6 showed as
-  // "NotFoundError: NotFoundError" with no way to tell which DOM call failed).
-  it("keeps messages for specific DOMException names, still redacted", () => {
-    expect(
-      scrubBrowserMessage(
-        "NotFoundError",
-        "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
-      ),
-    ).toBe(
-      "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
-    );
-    expect(scrubBrowserMessage("InvalidStateError", "The object is in an invalid state.")).toBe(
-      "The object is in an invalid state.",
-    );
-    expect(scrubBrowserMessage("NotAllowedError", "Write permission denied.")).toBe(
-      "Write permission denied.",
-    );
-    expect(scrubBrowserMessage("NotReadableError", "error reading /Users/bob/file.png")).toBe(
-      "error reading <path>",
-    );
-    expect(scrubBrowserMessage("DataCloneError", "could not be cloned.")).toBe(
-      "could not be cloned.",
-    );
-  });
-});
+import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } from "@/lib/sentry-scrub";
 
 describe("static filter lists", () => {
   it("deny extension frames and ignore noisy network errors", () => {
@@ -119,11 +64,19 @@ describe("buildWebBeforeSend", () => {
     ]);
   });
 
-  it("falls back to type-only for non-native exceptions without a rebuild", () => {
+  it("keeps a redacted message for a non-native error", () => {
     const send = buildWebBeforeSend(() => true);
     const custom = Object.assign(new Error("user secret"), { name: "WeirdLibError" });
     const out = send(baseEvent(), { originalException: custom })!;
-    expect(out.exception.values[0].value).toBe("TypeError");
+    expect(out.exception.values[0].value).toBe("user secret");
+  });
+
+  it("keeps a redacted message for a non-native app error", () => {
+    const send = buildWebBeforeSend(() => true);
+    const out = send(baseEvent(), {
+      originalException: new Error("upload failed for report.pdf"),
+    })!;
+    expect(out.exception.values[0].value).toBe("upload failed for <file>");
   });
 
   it("enforces the 500-per-hour ceiling", () => {
