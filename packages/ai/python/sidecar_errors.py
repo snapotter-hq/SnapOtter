@@ -15,7 +15,18 @@ _BLOB = re.compile(r"blob:[^\s\"')]+")
 _DATA = re.compile(r"data:[^\s\"')]+")
 _URL = re.compile(r"https?://[^\s\"')]+")
 _PATH = re.compile(r"(?:/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s\"')]*")
+# Relative object-storage keys (uploads/<jobId>/…, outputs/…, previews/…) carry a
+# user-supplied filename tail; mask them like absolute paths. Runs after _PATH,
+# which already swallows the absolute /data/uploads/… form.
+_RELKEY = re.compile(r"\b(?:uploads|outputs|previews)/[^\s\"')]+")
 _IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
+# IPv6: a full 8-group form, or any ::-compressed form (::1, fe80::…, …::). Over-
+# redaction of a stray colon-hex run is acceptable (privacy-safe); a plain decimal
+# version like 2.2.0 has no colons, and a bare HH:MM needs no ::, so both survive.
+_IPV6 = re.compile(
+    r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}"
+    r"|(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?"
+)
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _USER_FILE_EXT = (
     "jpe?g|png|gif|webp|avif|heif?|tiff?|bmp|svg|raw|psd|mp4|mov|avi|mkv|webm|"
@@ -35,7 +46,9 @@ def redact(message):
     s = _DATA.sub("<data>", s)
     s = _URL.sub("<url>", s)
     s = _PATH.sub("<path>", s)
+    s = _RELKEY.sub("<path>", s)
     s = _IP.sub("<ip>", s)
+    s = _IPV6.sub("<ip>", s)
     s = _EMAIL.sub("<email>", s)
     s = _QUOTED.sub(lambda m: m.group(1) + "<value>" + m.group(1), s)
     s = _HEX.sub("<hex>", s)

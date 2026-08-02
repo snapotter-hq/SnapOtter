@@ -11,7 +11,16 @@ const BLOB_RE = /blob:[^\s"')]+/g;
 const DATA_RE = /data:[^\s"')]+/g;
 const URL_RE = /https?:\/\/[^\s"')]+/g;
 const PATH_RE = /(?:\/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s"')]*/g;
+// Relative object-storage keys (uploads/<jobId>/…, outputs/…, previews/…) carry a
+// user-supplied filename tail, so mask them like absolute paths. Runs after
+// PATH_RE, which already swallows the absolute /data/uploads/… form.
+const RELKEY_RE = /\b(?:uploads|outputs|previews)\/[^\s"')]+/g;
 const IP_RE = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
+// IPv6: a full 8-group form, or any ::-compressed form (::1, fe80::…, …::). Over-
+// redaction of a stray colon-hex run is acceptable (privacy-safe); a plain decimal
+// version like 2.2.0 has no colons, and a bare HH:MM needs no ::, so both survive.
+const IPV6_RE =
+  /(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?/g;
 const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 // A user file is a name plus one of the formats SnapOtter processes. Restricting
 // to this set avoids eating version strings ("2.2.0") and code filenames
@@ -32,7 +41,9 @@ export function redactMessage(message: unknown, opts?: { raw?: boolean }): strin
       .replace(DATA_RE, "<data>")
       .replace(URL_RE, "<url>")
       .replace(PATH_RE, "<path>")
+      .replace(RELKEY_RE, "<path>")
       .replace(IP_RE, "<ip>")
+      .replace(IPV6_RE, "<ip>")
       .replace(EMAIL_RE, "<email>")
       .replace(QUOTED_RE, (_m, q) => `${q}<value>${q}`)
       .replace(HEX_RE, "<hex>")

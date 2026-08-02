@@ -63,3 +63,28 @@ describe("redactMessage adversarial", () => {
     ).toContain("<email>");
   });
 });
+
+describe("redactMessage IPv6 and relative keys", () => {
+  it("masks a link-local IPv6 address", () => {
+    expect(redactMessage("connect to fe80::1ff:fe23:4567:890a failed")).toBe(
+      "connect to <ip> failed",
+    );
+  });
+  it("masks a bracketed IPv6 with port", () => {
+    expect(redactMessage("peer [2001:db8::8a2e:370:7334]:443 down")).toBe("peer [<ip>]:443 down");
+  });
+  it("masks the IPv6 loopback", () => {
+    expect(redactMessage("bind ::1 ok")).toBe("bind <ip> ok");
+  });
+  it("masks a full 8-group IPv6", () => {
+    expect(redactMessage("host 2001:db8:0:0:0:0:0:1 up")).toBe("host <ip> up");
+  });
+  it("still masks IPv4 and leaves versions intact", () => {
+    expect(redactMessage("host 10.0.0.1 up")).toBe("host <ip> up");
+    expect(redactMessage("torch 2.2.0 ok")).toBe("torch 2.2.0 ok");
+  });
+  it("masks a relative object-storage key", () => {
+    expect(redactMessage("ENOENT uploads/3f2a/input.bin missing")).toBe("ENOENT <path> missing");
+    expect(redactMessage("wrote outputs/9b7c/result.dat")).toBe("wrote <path>");
+  });
+});
