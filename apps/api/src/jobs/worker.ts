@@ -1119,6 +1119,10 @@ export function startWorkers(): void {
 
     worker.on("failed", (job, err) => {
       if (!job) return;
+      const pf = (err as { pythonFrames?: unknown }).pythonFrames;
+      if (Array.isArray(pf) && pf.length) {
+        logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
+      }
       void reportError(err, {
         source: "worker",
         pool,

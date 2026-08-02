@@ -189,6 +189,10 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
         const vetted = vetSettings(ctx.settings);
         if (vetted) scope.setContext("tool", vetted);
       }
+      const py = err as { pythonType?: string; pythonFrames?: unknown };
+      if (Array.isArray(py.pythonFrames) && py.pythonFrames.length) {
+        scope.setContext("python", { type: py.pythonType, frames: py.pythonFrames });
+      }
       Sentry.captureException(err instanceof Error ? err : new Error(String(err)));
     });
   } catch {

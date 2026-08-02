@@ -165,6 +165,22 @@ export function buildBeforeSend(isActive: () => boolean) {
       }
       if (Object.keys(safe).length) keep.tool = safe;
     }
+    const py = asObj(ctx?.python);
+    if (py) {
+      const type = typeof py.type === "string" ? py.type.slice(0, 64) : undefined;
+      const frames = Array.isArray(py.frames)
+        ? py.frames
+            .map((f) => asObj(f))
+            .filter((f): f is AnyEvent => !!f)
+            .map((f) => ({
+              file: typeof f.file === "string" ? f.file.slice(0, 64) : "?",
+              line: typeof f.line === "number" ? f.line : 0,
+              func: typeof f.func === "string" ? f.func.slice(0, 64) : "?",
+            }))
+            .slice(0, 20)
+        : [];
+      if (frames.length) keep.python = { type, frames };
+    }
     event.contexts = Object.keys(keep).length ? keep : undefined;
 
     const tags = asObj(event.tags);
