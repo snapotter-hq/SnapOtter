@@ -596,16 +596,63 @@ export function registerCollage(app: FastifyInstance) {
                     alpha: 1,
                   };
                 })();
-          cellBuffer = await sharp(files[i].buffer)
-            .resize(Math.round(cellW * zoom), Math.round(cellH * zoom), {
-              fit: "inside",
-              withoutEnlargement: false,
-            })
-            .resize(cellW, cellH, {
-              fit: "contain",
-              background: bgColor,
-            })
-            .toBuffer();
+
+          // The preview renders contain cells as object-contain plus
+          // `translate(panX%, panY%) scale(zoom)` clipped at the cell (#711).
+          // Pan is a fraction of the cell, and neither offset scales with zoom.
+          const panXPx = Math.round((cellSetting.panX / 100) * cellW);
+          const panYPx = Math.round((cellSetting.panY / 100) * cellH);
+
+          if (zoom === 1 && panXPx === 0 && panYPx === 0) {
+            // PNG, not the input format: a JPEG cell buffer cannot carry the
+            // alpha the cornerRadius mask cuts, so corners flatten to black.
+            cellBuffer = await sharp(files[i].buffer)
+              .resize(cellW, cellH, { fit: "contain", background: bgColor })
+              .png()
+              .toBuffer();
+          } else {
+            // Chaining a zoom resize into the contain resize does not work:
+            // Sharp keeps one set of resize options per pipeline, and even as
+            // two pipelines the contain step would scale the zoom right back
+            // out. Scale the contain-fitted image, place it about the cell
+            // centre, clip to the cell and composite over the background.
+            const fitScale = Math.min(cellW / imgW, cellH / imgH);
+            const contentW = Math.max(1, Math.round(imgW * fitScale * zoom));
+            const contentH = Math.max(1, Math.round(imgH * fitScale * zoom));
+            // floor, not round: sharp's own contain places content at
+            // floor((cell - content) / 2), and matching it keeps the two
+            // paths from drifting a pixel apart when the difference is odd.
+            const x0 = Math.floor((cellW - contentW) / 2) + panXPx;
+            const y0 = Math.floor((cellH - contentH) / 2) + panYPx;
+
+            const visLeft = Math.max(0, x0);
+            const visTop = Math.max(0, y0);
+            const visRight = Math.min(cellW, x0 + contentW);
+            const visBottom = Math.min(cellH, y0 + contentH);
+
+            const canvas = sharp({
+              create: { width: cellW, height: cellH, channels: 4, background: bgColor },
+            });
+
+            if (visRight <= visLeft || visBottom <= visTop) {
+              // Panned entirely out of the cell: background only.
+              cellBuffer = await canvas.png().toBuffer();
+            } else {
+              const visible = await sharp(files[i].buffer)
+                .resize(contentW, contentH, { fit: "fill" })
+                .extract({
+                  left: visLeft - x0,
+                  top: visTop - y0,
+                  width: visRight - visLeft,
+                  height: visBottom - visTop,
+                })
+                .toBuffer();
+              cellBuffer = await canvas
+                .composite([{ input: visible, left: visLeft, top: visTop }])
+                .png()
+                .toBuffer();
+            }
+          }
         } else {
           // Cover: resize to fully fill the cell, then crop with pan offset
           const scaleToFit = Math.max(cellW / imgW, cellH / imgH);

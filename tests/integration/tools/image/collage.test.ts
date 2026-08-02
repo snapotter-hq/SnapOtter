@@ -2182,3 +2182,290 @@ describe("Collage", () => {
     expect(meta.width).toBe(meta.height); // 1:1 aspect
   });
 });
+
+/**
+ * Contain-mode zoom and pan (#711).
+ *
+ * The contain branch chained two resizes on one Sharp pipeline; Sharp keeps a
+ * single set of resize options, so the zoom carried by the first call was
+ * silently discarded and every contain cell rendered as if zoom were 1. Even
+ * split into two pipelines the old shape was a no-op, because the second
+ * contain-resize scales the zoomed image straight back down. The preview
+ * defines the intended semantics: object-contain, then
+ * `translate(panX%, panY%) scale(zoom)` clipped at the cell, background
+ * behind.
+ *
+ * The marker image makes the geometry provable: a 200x100 blue field with a
+ * red 10x10 square at the exact centre. In a 1200x1800 cell ("2-h-equal",
+ * gap 0, free aspect = 2400x1800 canvas) contain scales it 6x, so the red
+ * square lands at a known place and a known size for every zoom and pan.
+ */
+describe("Collage contain-mode zoom and pan (#711)", () => {
+  const CELL_W = 1200;
+  const CELL_H = 1800;
+
+  let marker: Buffer;
+
+  beforeAll(async () => {
+    const raw = Buffer.alloc(200 * 100 * 3);
+    for (let i = 0; i < raw.length; i += 3) raw[i + 2] = 255;
+    for (let y = 45; y < 55; y++) {
+      for (let x = 95; x < 105; x++) {
+        const i = (y * 200 + x) * 3;
+        raw[i] = 255;
+        raw[i + 2] = 0;
+      }
+    }
+    marker = await sharp(raw, { raw: { width: 200, height: 100, channels: 3 } })
+      .png()
+      .toBuffer();
+  });
+
+  async function runCollage(cell: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "marker.png", contentType: "image/png", content: marker },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          gap: 0,
+          cells: [{ imageIndex: 0, objectFit: "contain", panX: 0, panY: 0, zoom: 1, ...cell }],
+          ...extra,
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    return dlRes.rawPayload;
+  }
+
+  const isRed = (px: number[]) => px[0] > 200 && px[1] < 60 && px[2] < 60;
+  const isBlue = (px: number[]) => px[2] > 200 && px[0] < 60 && px[1] < 60;
+
+  /** RGBA pixels of the left cell plus a point probe. */
+  async function leftCell(output: Buffer) {
+    const meta = await sharp(output).metadata();
+    expect([meta.width, meta.height]).toEqual([2400, 1800]);
+    const data = await sharp(output)
+      .extract({ left: 0, top: 0, width: CELL_W, height: CELL_H })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    const at = (x: number, y: number) => [
+      data[(y * CELL_W + x) * 4],
+      data[(y * CELL_W + x) * 4 + 1],
+      data[(y * CELL_W + x) * 4 + 2],
+      data[(y * CELL_W + x) * 4 + 3],
+    ];
+    return { data, at };
+  }
+
+  function redStats(data: Buffer, width = CELL_W, height = CELL_H) {
+    let count = 0;
+    let sumX = 0;
+    let sumY = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (isRed([data[i], data[i + 1], data[i + 2]])) {
+          count++;
+          sumX += x;
+          sumY += y;
+        }
+      }
+    }
+    return {
+      count,
+      centroidX: count ? sumX / count : Number.NaN,
+      centroidY: count ? sumY / count : Number.NaN,
+    };
+  }
+
+  it("zoom changes the rendered cell", async () => {
+    const zoom1 = await runCollage({ zoom: 1 });
+    const zoom2 = await runCollage({ zoom: 2 });
+    const [a, b] = await Promise.all([
+      sharp(zoom1).raw().toBuffer(),
+      sharp(zoom2).raw().toBuffer(),
+    ]);
+    expect(a.equals(b)).toBe(false);
+  });
+
+  it("zoom 2 doubles the marker and covers more of the cell", async () => {
+    const { data: z1 } = await leftCell(await runCollage({ zoom: 1 }));
+    const { data: z2, at } = await leftCell(await runCollage({ zoom: 2 }));
+
+    // Red square is 60x60 at zoom 1 and 120x120 at zoom 2 (about 4x the area).
+    const r1 = redStats(z1);
+    const r2 = redStats(z2);
+    expect(r1.count).toBeGreaterThan(2000);
+    expect(r2.count).toBeGreaterThan(r1.count * 2.5);
+
+    // At zoom 1 the content band starts at y=600; at zoom 2 it starts at
+    // y=300, so this point flips from background to image.
+    const z1At = (x: number, y: number) => [
+      z1[(y * CELL_W + x) * 4],
+      z1[(y * CELL_W + x) * 4 + 1],
+      z1[(y * CELL_W + x) * 4 + 2],
+    ];
+    expect(isBlue(z1At(600, 450)) || isRed(z1At(600, 450))).toBe(false);
+    expect(isBlue(at(600, 450))).toBe(true);
+  });
+
+  it("pan shifts the contained image inside the cell", async () => {
+    // panX 25 translates by 25% of the cell width: 300px right.
+    const { data: centred } = await leftCell(await runCollage({ zoom: 1, panX: 0 }));
+    const { data: panned } = await leftCell(await runCollage({ zoom: 1, panX: 25 }));
+
+    const before = redStats(centred);
+    const after = redStats(panned);
+    expect(Math.abs(before.centroidX - 600)).toBeLessThan(15);
+    expect(Math.abs(after.centroidX - 900)).toBeLessThan(15);
+  });
+
+  it("zoomed content over a transparent background keeps real alpha", async () => {
+    const { at } = await leftCell(
+      await runCollage({ zoom: 2 }, { backgroundColor: "transparent", outputFormat: "png" }),
+    );
+
+    // Inside the zoomed content: opaque blue. Above it: still fully clear.
+    const content = at(600, 450);
+    expect(content[3]).toBe(255);
+    expect(isBlue(content)).toBe(true);
+    expect(at(600, 100)[3]).toBe(0);
+  });
+
+  it("pan does not scale with zoom and panY moves vertically", async () => {
+    // The preview contract: translate(panX%, panY%) of the CELL, applied
+    // independently of the zoom. panX 25 is 300px and panY 10 is 180px, so
+    // the zoom-2 marker centre lands at (600+300, 900+180). If pan scaled
+    // with zoom the centroid would land around (1170, 1260) instead.
+    const { data } = await leftCell(await runCollage({ zoom: 2, panX: 25, panY: 10 }));
+
+    const stats = redStats(data);
+    expect(stats.count).toBeGreaterThan(8000);
+    expect(Math.abs(stats.centroidX - 900)).toBeLessThan(15);
+    expect(Math.abs(stats.centroidY - 1080)).toBeLessThan(15);
+  });
+
+  it("pan at the schema limit empties the cell to plain background", async () => {
+    // panX 100 shifts the full-width content exactly one cell to the right,
+    // so nothing remains visible and the branch that skips the extract runs.
+    const { data, at } = await leftCell(await runCollage({ zoom: 1, panX: 100 }));
+
+    expect(redStats(data).count).toBe(0);
+    expect(at(600, 900)).toEqual([255, 255, 255, 255]);
+  });
+
+  it("height-driven cells scale the contained image by the limiting axis", async () => {
+    // In the 2400x900 top cell of 2-v-equal, the 200x100 marker is limited by
+    // height (fitScale 9, not 12), so at zoom 2 the red square renders 180px
+    // tall, about 29000 red pixels. A width-driven fitScale would give 240px
+    // and about 52000; the ceiling separates them with wide margin.
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "marker.png", contentType: "image/png", content: marker },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-v-equal",
+          gap: 0,
+          cells: [{ imageIndex: 0, objectFit: "contain", panX: 0, panY: 0, zoom: 2 }],
+        }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    const topCell = await sharp(dlRes.rawPayload)
+      .extract({ left: 0, top: 0, width: 2400, height: 900 })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    const stats = redStats(topCell, 2400, 900);
+    expect(stats.count).toBeGreaterThan(20000);
+    expect(stats.count).toBeLessThan(40000);
+  });
+
+  it("rounded corners stay clean for JPEG inputs on the default path", async () => {
+    // The fast path used to keep the input format, so a JPEG cell buffer hit
+    // the cornerRadius dest-in mask, JPEG cannot store the masked alpha, and
+    // the corners flattened to black. The general path already emitted PNG,
+    // which made corners snap between black and correct as zoom crossed 1.
+    const markerJpeg = await sharp(marker).jpeg({ quality: 95 }).toBuffer();
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "marker.jpg", contentType: "image/jpeg", content: markerJpeg },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          gap: 0,
+          cornerRadius: 200,
+          cells: [{ imageIndex: 0, objectFit: "contain", panX: 0, panY: 0, zoom: 1 }],
+        }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    // The masked corner must show the white canvas, not a black block.
+    const raw = await sharp(dlRes.rawPayload).removeAlpha().raw().toBuffer();
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    const w = meta.width ?? 0;
+    const corner = [raw[(5 * w + 5) * 3], raw[(5 * w + 5) * 3 + 1], raw[(5 * w + 5) * 3 + 2]];
+    expect(corner[0]).toBeGreaterThan(200);
+    expect(corner[1]).toBeGreaterThan(200);
+    expect(corner[2]).toBeGreaterThan(200);
+  });
+
+  it("zoom 1 with no pan stays byte-identical to a plain contain resize", async () => {
+    const output = await runCollage({ zoom: 1 });
+
+    const cell = await sharp(marker)
+      .resize(CELL_W, CELL_H, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      .toBuffer();
+    const expected = await sharp({
+      create: { width: 2400, height: 1800, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .composite([{ input: cell, left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+
+    const [got, want] = await Promise.all([
+      sharp(output).removeAlpha().raw().toBuffer(),
+      sharp(expected).removeAlpha().raw().toBuffer(),
+    ]);
+    expect(got.equals(want)).toBe(true);
+  });
+});
