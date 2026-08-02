@@ -27,6 +27,8 @@ import io
 import os
 import traceback
 
+from sidecar_errors import build_error_envelope
+
 
 # ── Optional OpenTelemetry tracing (enterprise only) ─────────────
 _tracer = None
@@ -294,10 +296,14 @@ def _run_script_main(script_name, args):
     except SystemExit as e:
         exit_code = e.code if isinstance(e.code, int) else 1
     except Exception as e:
-        # Log full traceback to stderr for diagnostics
+        # Log full traceback to stderr for local diagnostics (unchanged).
         traceback.print_exc(file=sys.stderr)
-        # Write error to the captured stdout
-        sys.stdout.write(json.dumps({"success": False, "error": str(e)}) + "\n")
+        info = build_error_envelope(e)
+        # Keep `error` as the redacted string for back-compatible consumers;
+        # add `errorInfo` (type + our frames) for the structured Sentry path.
+        sys.stdout.write(
+            json.dumps({"success": False, "error": info["message"], "errorInfo": info}) + "\n"
+        )
         sys.stdout.flush()
         exit_code = 1
     finally:
