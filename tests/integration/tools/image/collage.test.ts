@@ -2469,3 +2469,197 @@ describe("Collage contain-mode zoom and pan (#711)", () => {
     expect(got.equals(want)).toBe(true);
   });
 });
+
+/**
+ * Pan range contract and cover-cell encoding (#718).
+ *
+ * The preview clamps drag pan to +/-200 and the settings panel submits the
+ * value untouched, but the schema rejected anything past +/-100, so dragging
+ * a cell more than half its width off-centre made processing fail with a 400.
+ * The schema now matches the preview clamp. In cover mode the extract already
+ * clamps at the image edge, so values past 100 saturate rather than misplace.
+ *
+ * Cover cells also kept the input format for the cell buffer; a JPEG buffer
+ * cannot store the alpha the cornerRadius dest-in mask cuts, so rounded
+ * corners flattened to black. Same defect #717 fixed on the contain fast path.
+ */
+describe("Collage pan range and cover cells (#718)", () => {
+  const CELL_W = 1200;
+  const CELL_H = 1800;
+
+  let marker: Buffer;
+
+  beforeAll(async () => {
+    const raw = Buffer.alloc(200 * 100 * 3);
+    for (let i = 0; i < raw.length; i += 3) raw[i + 2] = 255;
+    for (let y = 45; y < 55; y++) {
+      for (let x = 95; x < 105; x++) {
+        const i = (y * 200 + x) * 3;
+        raw[i] = 255;
+        raw[i + 2] = 0;
+      }
+    }
+    marker = await sharp(raw, { raw: { width: 200, height: 100, channels: 3 } })
+      .png()
+      .toBuffer();
+  });
+
+  async function submitCollage(settings: Record<string, unknown>, content = marker, ext = "png") {
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: `marker.${ext}`, contentType: `image/${ext}`, content },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", gap: 0, ...settings }),
+      },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  async function download(res: { body: string }) {
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    return dlRes.rawPayload;
+  }
+
+  /** RGBA pixels of the left cell. */
+  async function leftCell(output: Buffer) {
+    return sharp(output)
+      .extract({ left: 0, top: 0, width: CELL_W, height: CELL_H })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+  }
+
+  function countRed(data: Buffer) {
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 200 && data[i + 1] < 60 && data[i + 2] < 60) count++;
+    }
+    return count;
+  }
+
+  it("contain accepts panX past 100 in both directions", async () => {
+    // 200x100 marker in a 1200x1800 cell fits to 1200x600; panX +/-150 moves
+    // it 1800px sideways, fully outside the cell, leaving plain background.
+    for (const panX of [150, -150]) {
+      const res = await submitCollage({
+        cells: [{ imageIndex: 0, objectFit: "contain", panX, panY: 0, zoom: 1 }],
+      });
+      expect(res.statusCode).toBe(200);
+
+      const data = await leftCell(await download(res));
+      expect(countRed(data)).toBe(0);
+      const centre = (900 * CELL_W + 600) * 4;
+      expect(data[centre]).toBeGreaterThan(200);
+      expect(data[centre + 1]).toBeGreaterThan(200);
+      expect(data[centre + 2]).toBeGreaterThan(200);
+    }
+  });
+
+  it("contain accepts panY past 100 in both directions", async () => {
+    // Content is 600px tall centred at y=600; panY +/-150 moves it 2700px,
+    // fully outside the 1800px cell.
+    for (const panY of [150, -150]) {
+      const res = await submitCollage({
+        cells: [{ imageIndex: 0, objectFit: "contain", panX: 0, panY, zoom: 1 }],
+      });
+      expect(res.statusCode).toBe(200);
+      expect(countRed(await leftCell(await download(res)))).toBe(0);
+    }
+  });
+
+  it("accepts the exact +/-200 boundary", async () => {
+    const res = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "contain", panX: 200, panY: -200, zoom: 1 }],
+    });
+    expect(res.statusCode).toBe(200);
+    expect(countRed(await leftCell(await download(res)))).toBe(0);
+  });
+
+  it("rejects pan values past the preview clamp of 200", async () => {
+    for (const pan of [{ panX: 250 }, { panX: -250 }, { panY: 250 }, { panY: -250 }]) {
+      const res = await submitCollage({
+        cells: [{ imageIndex: 0, objectFit: "contain", panX: 0, panY: 0, zoom: 1, ...pan }],
+      });
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
+  it("contain keeps panning past 100 under zoom instead of clamping", async () => {
+    // Zoom 2 doubles the fit to 2400x1200, so panX 150 puts the content edge
+    // exactly at the cell edge: an empty cell. A clamp at 100 would leave a
+    // 600px strip of the blue field visible, which zoom 1 cannot detect
+    // because there 100 and 150 both empty the cell.
+    const res = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "contain", panX: 150, panY: 0, zoom: 2 }],
+    });
+    expect(res.statusCode).toBe(200);
+
+    const data = await leftCell(await download(res));
+    let nonWhite = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) nonWhite++;
+    }
+    expect(nonWhite).toBe(0);
+  });
+
+  it("cover pan saturates at the negative edges too", async () => {
+    // Negative saturation rides the other clamp bound (min against
+    // resized - cell), which the widened range makes load-bearing for the
+    // first time. Zoom 2 gives overflow on both axes (7200x3600 resize),
+    // so this exercises the X and Y clamps together.
+    const atNeg150 = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "cover", panX: -150, panY: -150, zoom: 2 }],
+    });
+    const atNeg100 = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "cover", panX: -100, panY: -100, zoom: 2 }],
+    });
+    expect(atNeg150.statusCode).toBe(200);
+    expect(atNeg100.statusCode).toBe(200);
+
+    const [a, b] = await Promise.all([download(atNeg150), download(atNeg100)]);
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it("cover pan past 100 saturates at the image edge", async () => {
+    // The cover extract clamps at the resized image's edge, so panX 150 must
+    // produce exactly the panX 100 output rather than shift further or fail.
+    const at150 = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "cover", panX: 150, panY: 0, zoom: 1 }],
+    });
+    const at100 = await submitCollage({
+      cells: [{ imageIndex: 0, objectFit: "cover", panX: 100, panY: 0, zoom: 1 }],
+    });
+    expect(at150.statusCode).toBe(200);
+    expect(at100.statusCode).toBe(200);
+
+    const [a, b] = await Promise.all([download(at150), download(at100)]);
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it("rounded corners stay clean for JPEG inputs in cover mode", async () => {
+    // No cells at all: the default fit is cover. The cell buffer used to keep
+    // the input format, so the cornerRadius dest-in mask re-encoded to JPEG,
+    // dropped the masked alpha, and the corners flattened to black.
+    const markerJpeg = await sharp(marker).jpeg({ quality: 95 }).toBuffer();
+    const res = await submitCollage({ cornerRadius: 200 }, markerJpeg, "jpeg");
+    expect(res.statusCode).toBe(200);
+
+    const output = await download(res);
+    const raw = await sharp(output).removeAlpha().raw().toBuffer();
+    const meta = await sharp(output).metadata();
+    const w = meta.width ?? 0;
+    const corner = [raw[(5 * w + 5) * 3], raw[(5 * w + 5) * 3 + 1], raw[(5 * w + 5) * 3 + 2]];
+    expect(corner[0]).toBeGreaterThan(200);
+    expect(corner[1]).toBeGreaterThan(200);
+    expect(corner[2]).toBeGreaterThan(200);
+  });
+});

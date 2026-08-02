@@ -11,6 +11,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 
 // ── Template definitions (mirrors the frontend) ─────────────────────
 // We only need the grid proportions and cell definitions here.
@@ -321,8 +322,11 @@ const TEMPLATES: Template[] = [
 
 const cellSchema = z.object({
   imageIndex: z.number().int().min(0),
-  panX: z.number().min(-100).max(100).default(0),
-  panY: z.number().min(-100).max(100).default(0),
+  // +/-200 mirrors the preview's drag clamp (collage-preview.tsx); anything
+  // narrower turns a draggable position into a 400 at submit time (#718). In
+  // cover mode the extract saturates at the image edge for values past 100.
+  panX: z.number().min(-200).max(200).default(0),
+  panY: z.number().min(-200).max(200).default(0),
   zoom: z.number().min(1).max(10).default(1),
   objectFit: z.enum(["cover", "contain"]).default("cover"),
 });
@@ -574,8 +578,15 @@ export function registerCollage(app: FastifyInstance) {
 
         // Get image metadata for proper crop calculation
         const meta = await sharp(files[i].buffer).metadata();
-        const imgW = meta.width ?? cellW;
-        const imgH = meta.height ?? cellH;
+        if (!meta.width || !meta.height) {
+          // Falling back to the cell's own size would fill-stretch the image
+          // to the cell aspect: silent distortion instead of an error (#718).
+          throw new InputValidationError(
+            `Could not read image dimensions for "${files[i].filename}"`,
+          );
+        }
+        const imgW = meta.width;
+        const imgH = meta.height;
 
         const zoom = Math.max(1, cellSetting.zoom);
         const fitMode = cellSetting.objectFit ?? "cover";
@@ -666,6 +677,8 @@ export function registerCollage(app: FastifyInstance) {
           );
           const extractTop = Math.round(overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2));
 
+          // PNG, not the input format: a JPEG cell buffer cannot carry the
+          // alpha the cornerRadius mask cuts, so corners flatten to black.
           cellBuffer = await sharp(files[i].buffer)
             .resize(resizedW, resizedH, { fit: "fill" })
             .extract({
@@ -674,6 +687,7 @@ export function registerCollage(app: FastifyInstance) {
               width: cellW,
               height: cellH,
             })
+            .png()
             .toBuffer();
         }
 
@@ -685,9 +699,14 @@ export function registerCollage(app: FastifyInstance) {
               <rect x="0" y="0" width="${cellW}" height="${cellH}" rx="${r}" ry="${r}" fill="white"/>
             </svg>`,
           );
+          // Explicit PNG so the cut alpha survives no matter what format the
+          // cell branch produced; an implicit re-encode inherits the input
+          // format, which is how JPEG cells got black corners twice
+          // (#717 contain, #718 cover).
           cellBuffer = await sharp(cellBuffer)
             .ensureAlpha()
             .composite([{ input: mask, blend: "dest-in" }])
+            .png()
             .toBuffer();
         }
 
