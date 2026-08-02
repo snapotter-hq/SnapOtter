@@ -739,7 +739,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // keeps the skip and save decisions reading the same live state at one point,
   // so toggling effects after Phase 1 can neither drop nor double the save.
   const fromLibrary = Boolean(currentEntry?.serverFileId);
-  const needsEffectsRequest = Boolean(hasEffectsToApply) || fromLibrary;
+  // WebP/AVIF output is only produced by the Phase 2 effects request; Phase 1
+  // always writes a PNG. Without this, choosing a non-PNG format with a
+  // transparent background and no effects fell through to the plain download
+  // of the Phase 1 PNG, so the chosen format was silently ignored (#720).
+  const wantsNonPngOutput = ((settings.outputFormat as string) ?? "png") !== "png";
+  const needsEffectsRequest = Boolean(hasEffectsToApply) || fromLibrary || wantsNonPngOutput;
 
   // Build CSS preview state from current settings and send to tool-page
   useEffect(() => {
