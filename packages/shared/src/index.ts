@@ -2,6 +2,7 @@ export * from "./analytics/baked.js";
 export * from "./analytics/error-sanitize.js";
 export * from "./analytics/events.js";
 export * from "./analytics/feedback.js";
+export { redactMessage } from "./analytics/redact-message.js";
 export * from "./analytics/types.js";
 export * from "./audit-events.js";
 export * from "./constants.js";
