@@ -15,6 +15,7 @@ _BLOB = re.compile(r"blob:[^\s\"')]+")
 _DATA = re.compile(r"data:[^\s\"')]+")
 _URL = re.compile(r"https?://[^\s\"')]+")
 _PATH = re.compile(r"(?:/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s\"')]*")
+_IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _USER_FILE_EXT = (
     "jpe?g|png|gif|webp|avif|heif?|tiff?|bmp|svg|raw|psd|mp4|mov|avi|mkv|webm|"
@@ -34,6 +35,7 @@ def redact(message):
     s = _DATA.sub("<data>", s)
     s = _URL.sub("<url>", s)
     s = _PATH.sub("<path>", s)
+    s = _IP.sub("<ip>", s)
     s = _EMAIL.sub("<email>", s)
     s = _QUOTED.sub(lambda m: m.group(1) + "<value>" + m.group(1), s)
     s = _HEX.sub("<hex>", s)

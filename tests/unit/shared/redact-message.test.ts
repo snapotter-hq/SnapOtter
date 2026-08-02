@@ -47,3 +47,19 @@ describe("redactMessage (raw)", () => {
     expect(redactMessage("open /data/x/report.pdf", { raw: true })).toBe("open /data/x/report.pdf");
   });
 });
+
+describe("redactMessage adversarial", () => {
+  it("masks an IPv4 address (never-collect: IP)", () => {
+    expect(redactMessage("connect to 192.168.10.5:5432 refused")).toBe(
+      "connect to <ip>:5432 refused",
+    );
+  });
+  it("masks a windows path", () => {
+    expect(redactMessage("open C:\\Users\\jane\\photo.png failed")).toBe("open <path> failed");
+  });
+  it("masks an email inside a long quoted parameter", () => {
+    expect(
+      redactMessage(`Failed query: update where email = 'averylonguseraddress@example.com'`),
+    ).toContain("<email>");
+  });
+});
