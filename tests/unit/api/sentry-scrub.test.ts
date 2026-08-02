@@ -78,9 +78,9 @@ describe("buildBeforeSend (api)", () => {
       { message: "reading <path>", category: "console", level: "info" },
     ]);
   });
-  it("falls back to type-only for unknown errors", () => {
+  it("keeps a redacted message for unknown errors", () => {
     const out = send(evt(), { originalException: new Error("user path /tmp/z") })!;
-    expect(out.exception.values[0].value).toBe("Error");
+    expect(out.exception.values[0].value).toBe("user path <path>");
   });
   it("applies the rebuilt value to the last (original) exception entry only", () => {
     const event = evt({

@@ -3,7 +3,7 @@
  * event ceiling. Kept pure (factory + injected gate) so it is unit-testable
  * without initializing the SDK. See the telemetry overhaul spec for the rules.
  */
-import { rebuildErrorValue } from "@snapotter/shared";
+import { rebuildErrorValue, redactMessage } from "@snapotter/shared";
 
 // Per-process runaway guard, not a quota lever: under the sponsored plan we want
 // real errors, but a single instance stuck in an error loop must not spam. Sentry
@@ -27,17 +27,6 @@ const TAG_ALLOWLIST = new Set([
   "instance_id",
 ]);
 
-const URL_RE = /https?:\/\/[^\s"')]+/g;
-const BLOB_RE = /blob:[^\s"')]+/g;
-// Absolute paths under roots that can hold user files (uploads live in /data,
-// /tmp) or dev machines (/Users, /home). Over-redaction of a benign path is fine.
-const PATH_RE = /(?:\/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-z]:\\)[^\s"')]*/g;
-
-/** Redact urls, blob refs, and absolute paths from free text (breadcrumb messages). */
-function scrubText(s: string): string {
-  return s.replace(BLOB_RE, "<blob>").replace(URL_RE, "<url>").replace(PATH_RE, "<path>");
-}
-
 // Sentry event/hint are typed loosely on purpose: this module must not import
 // @sentry/node (instrument.ts loads the SDK lazily and passes events through).
 type AnyEvent = Record<string, unknown>;
@@ -60,7 +49,7 @@ function scrubBreadcrumb(entry: unknown): AnyEvent | null {
   for (const k of ["type", "category", "level", "timestamp"]) {
     if (b[k] !== undefined) out[k] = b[k];
   }
-  if (typeof b.message === "string") out.message = scrubText(b.message);
+  if (typeof b.message === "string") out.message = redactMessage(b.message);
   // For http breadcrumbs keep the non-PII status_code + method (the url is the
   // sensitive part, dropped with the rest of `data`): they answer "what request
   // failed right before the error".
