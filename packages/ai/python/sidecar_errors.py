@@ -20,12 +20,14 @@ _PATH = re.compile(r"(?:/(?:Users|home|root|data|tmp|var|app|opt|mnt|srv)|[A-Za-
 # which already swallows the absolute /data/uploads/… form.
 _RELKEY = re.compile(r"\b(?:uploads|outputs|previews)/[^\s\"')]+")
 _IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
-# IPv6: a full 8-group form, or any ::-compressed form (::1, fe80::…, …::). Over-
-# redaction of a stray colon-hex run is acceptable (privacy-safe); a plain decimal
-# version like 2.2.0 has no colons, and a bare HH:MM needs no ::, so both survive.
+# IPv6: a full 8-group form, or any ::-compressed form (::1, fe80::…, …::). The
+# negative lookbehind/lookahead ((?<![\w:]) … (?![\w:])) require the address to
+# stand alone, so C++/Rust scope resolution (std::bad_alloc, core::result) is left
+# intact. A plain decimal version like 2.2.0 has no colons, and a bare HH:MM needs
+# no ::, so both survive too.
 _IPV6 = re.compile(
-    r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}"
-    r"|(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?"
+    r"(?<![\w:])(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|"
+    r"(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?)(?![\w:])"
 )
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _USER_FILE_EXT = (

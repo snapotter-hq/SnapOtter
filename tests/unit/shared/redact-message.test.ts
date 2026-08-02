@@ -87,4 +87,10 @@ describe("redactMessage IPv6 and relative keys", () => {
     expect(redactMessage("ENOENT uploads/3f2a/input.bin missing")).toBe("ENOENT <path> missing");
     expect(redactMessage("wrote outputs/9b7c/result.dat")).toBe("wrote <path>");
   });
+  it("does not mangle C++/Rust scope resolution", () => {
+    expect(redactMessage("terminate called: std::bad_alloc")).toBe(
+      "terminate called: std::bad_alloc",
+    );
+    expect(redactMessage("panic in core::result::unwrap")).toBe("panic in core::result::unwrap");
+  });
 });
