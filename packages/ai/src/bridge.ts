@@ -108,7 +108,12 @@ const OOM_EXIT_TEXT =
  * memory-aware callers still retry on a lighter model. Any other non-zero exit
  * is a bug, with the extracted reason (or an OOM reported in-band) preserved.
  */
-function pythonExitError(code: number | null, signal: string | null, extracted: string): SafeError {
+function pythonExitError(
+  code: number | null,
+  signal: string | null,
+  extracted: string,
+  info?: PythonErrorInfo | null,
+): SafeError {
   if (signal === "SIGSEGV" || code === 139) {
     return new SafeError("Process crashed (segmentation fault)", {
       kind: "operational",
@@ -122,10 +127,14 @@ function pythonExitError(code: number | null, signal: string | null, extracted: 
     });
   }
   const message = extracted || `Python script exited with code ${code}`;
-  return new SafeError(message, {
+  const err = new SafeError(message, {
     kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
     code: `exit-${code ?? "unknown"}`,
   });
+  if (info) {
+    Object.assign(err, { pythonType: info.type, pythonFrames: info.frames });
+  }
+  return err;
 }
 
 /**
@@ -184,6 +193,41 @@ function extractPythonError(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+export interface PythonErrorInfo {
+  type?: string;
+  frames: Array<{ file: string; line: number; func: string }>;
+}
+
+/** Read the structured {type, frames} envelope from a sidecar failure, or null. */
+export function extractPythonErrorInfo(error: unknown): PythonErrorInfo | null {
+  if (!error || typeof error !== "object") return null;
+  const pErr = error as { stdout?: string; stderr?: string };
+  for (const output of [pErr.stdout, pErr.stderr]) {
+    if (!output) continue;
+    try {
+      const parsed = JSON.parse(output.trim()) as { errorInfo?: unknown };
+      const info = parsed.errorInfo as PythonErrorInfo | undefined;
+      if (info && Array.isArray(info.frames)) {
+        return {
+          type: typeof info.type === "string" ? info.type : undefined,
+          frames: info.frames
+            .filter(
+              (f): f is { file: string; line: number; func: string } =>
+                !!f &&
+                typeof (f as { file?: unknown }).file === "string" &&
+                typeof (f as { line?: unknown }).line === "number" &&
+                typeof (f as { func?: unknown }).func === "string",
+            )
+            .slice(0, 20),
+        };
+      }
+    } catch {
+      // not JSON; nothing structured to read
+    }
+  }
+  return null;
 }
 
 export type ProgressCallback = (percent: number, stage: string) => void;
@@ -420,11 +464,11 @@ export class PythonDispatcher {
             if (req) {
               this.pending.delete(reqId);
               if (response.exitCode !== 0) {
-                const extracted = extractPythonError({
-                  stdout: response.stdout,
-                  stderr: req.stderrLines.join("\n"),
-                });
-                req.reject(pythonExitError(response.exitCode, null, extracted));
+                const raw = { stdout: response.stdout, stderr: req.stderrLines.join("\n") };
+                const extracted = extractPythonError(raw);
+                req.reject(
+                  pythonExitError(response.exitCode, null, extracted, extractPythonErrorInfo(raw)),
+                );
               } else {
                 req.resolve({
                   stdout: response.stdout || "",
@@ -737,8 +781,9 @@ export class PythonDispatcher {
           const stderr = stderrLines.join("\n");
 
           if (code !== 0) {
+            const raw = { stdout: stdout.trim(), stderr };
             rejectOnce(
-              pythonExitError(code, signal, extractPythonError({ stdout: stdout.trim(), stderr })),
+              pythonExitError(code, signal, extractPythonError(raw), extractPythonErrorInfo(raw)),
             );
             return;
           }
