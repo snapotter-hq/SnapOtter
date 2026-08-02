@@ -113,6 +113,17 @@ describe("classifyError", () => {
   });
 });
 
+describe("classifyError redis", () => {
+  it("classifies a Redis OOM ReplyError as operational", () => {
+    const err = Object.assign(new Error("OOM command not allowed"), { name: "ReplyError" });
+    expect(classifyError(err, "worker")).toBe("operational");
+  });
+  it("classifies a Redis READONLY ReplyError as operational", () => {
+    const err = Object.assign(new Error("READONLY You can't write"), { name: "ReplyError" });
+    expect(classifyError(err, "worker")).toBe("operational");
+  });
+});
+
 describe("throttle", () => {
   beforeEach(() => resetThrottleForTests());
   it("operational: 1 per signature per hour; bug: 10", () => {

@@ -74,6 +74,13 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
   if (e?.code && OPERATIONAL_CODES.has(e.code)) return "operational";
+  if (
+    e?.name === "ReplyError" &&
+    typeof e.message === "string" &&
+    /^(OOM|READONLY|MISCONF|NOREPLICAS)\b/.test(e.message)
+  ) {
+    return "operational";
+  }
   return "bug";
 }
 
