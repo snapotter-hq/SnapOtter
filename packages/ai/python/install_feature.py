@@ -141,8 +141,8 @@ def get_site_packages_dir(venv_path: str) -> str:
 
 # -- SHA256 verification --
 
-def verify_sha256(filepath: str, expected: str) -> bool:
-    """Stream-hash a file and compare to expected hex digest."""
+def file_sha256(filepath: str) -> str:
+    """Stream-hash a file and return the hex digest."""
     h = hashlib.sha256()
     with open(filepath, "rb") as f:
         while True:
@@ -150,7 +150,16 @@ def verify_sha256(filepath: str, expected: str) -> bool:
             if not chunk:
                 break
             h.update(chunk)
-    return h.hexdigest() == expected
+    return h.hexdigest()
+
+
+def _unlink_quietly(path: str) -> None:
+    """Best-effort delete for cleanup on error paths; a failed unlink must
+    never mask the error being reported."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 # -- Download with resume --
@@ -225,7 +234,6 @@ def download_with_hf_hub(
     expected_size: int,
     progress_start: int,
     progress_end: int,
-    force_download: bool = False,
 ) -> bool:
     """Download through huggingface_hub when available.
 
@@ -264,7 +272,6 @@ def download_with_hf_hub(
             filename=archive_file,
             repo_type="model",
             local_dir=local_dir,
-            force_download=force_download,
         )
     except Exception as e:
         emit_progress(
@@ -468,6 +475,89 @@ def _retry_or_raise(err, attempt, max_retries, bytes_downloaded, meta_path,
     else:
         cleanup()
         raise RuntimeError(f"Failed to download after {max_retries} attempts: {err}")
+
+
+def download_and_verify(
+    bundle_repo: str,
+    archive_file: str,
+    tar_path: str,
+    expected_sha256: str,
+    compressed_size: int,
+) -> None:
+    """Download the bundle archive to tar_path and verify its SHA256.
+
+    The first attempt prefers the accelerated Hugging Face client, which
+    assembles the file with parallel offset writes. On some storage backends
+    (network mounts, FUSE bind mounts) that write pattern can corrupt the
+    assembled file even though every transfer step reports success, and
+    re-running the same client just reproduces the corruption (issue #714).
+    So a checksum mismatch is retried over the plain sequential downloader:
+    single-stream append-only writes are the most widely compatible pattern.
+    (When the accelerated client was unavailable, the first attempt was
+    already sequential and the retry is simply a fresh download.)
+    """
+    url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
+    manual_hint = (
+        f"You can download the bundle manually from:\n"
+        f"  {url}\n"
+        f"Then upload it via Settings > AI Features > Offline Import."
+    )
+
+    def read_back_sha256() -> str:
+        # An IO error while hashing a multi-GB file is a live possibility on
+        # the flaky mounts this retry exists for; it must surface as a JSON
+        # error frame the Node bridge can parse, not a raw traceback.
+        try:
+            return file_sha256(tar_path)
+        except OSError as e:
+            fail(
+                f"Could not read back the downloaded archive to verify it "
+                f"({e}). This points at the storage backing the data "
+                f"volume.\n\n{manual_hint}"
+            )
+
+    try:
+        if not download_with_hf_hub(
+            bundle_repo, archive_file, tar_path, compressed_size, 2, 85
+        ):
+            download_with_resume(url, tar_path, compressed_size, 2, 85)
+    except RuntimeError as e:
+        fail(f"{e}\n\n{manual_hint}")
+
+    emit_progress(86, "Verifying integrity...")
+    actual = read_back_sha256()
+    if actual == expected_sha256:
+        return
+
+    # A mismatch is positive evidence of corruption, so discard every byte of
+    # the first attempt: the assembled file AND the .partial/.meta resume
+    # sidecars a previously killed run may have left, which the sequential
+    # downloader would otherwise weld stale bytes from. Cleanup is best-effort
+    # (the downloader renames over tar_path anyway); the retry matters more.
+    for stale in (tar_path, tar_path + ".partial", tar_path + ".meta"):
+        _unlink_quietly(stale)
+    emit_progress(86, "Checksum mismatch, retrying with the sequential downloader...")
+    try:
+        download_with_resume(url, tar_path, compressed_size, 2, 85)
+    except RuntimeError as e:
+        fail(
+            f"Checksum mismatch on the first download (expected "
+            f"{expected_sha256}, got {actual}), and the sequential "
+            f"re-download then failed: {e}\n\n{manual_hint}"
+        )
+
+    actual = read_back_sha256()
+    if actual != expected_sha256:
+        _unlink_quietly(tar_path)
+        fail(
+            f"SHA256 checksum mismatch after re-download.\n"
+            f"Expected: {expected_sha256}\n"
+            f"Actual:   {actual}\n"
+            f"The re-download used the plain sequential downloader, so a repeat "
+            f"mismatch usually points at the storage backing the data volume "
+            f"(network mounts and FUSE filesystems can alter large files) or a "
+            f"proxy rewriting the transfer.\n\n{manual_hint}"
+        )
 
 
 # -- Safe tar extraction --
@@ -1050,16 +1140,17 @@ def _install() -> None:
 
         # Verify checksum
         emit_progress(10, "Verifying checksum...")
-        if not verify_sha256(tar_path, expected_sha256):
+        actual_sha256 = file_sha256(tar_path)
+        if actual_sha256 != expected_sha256:
             fail(
                 f"SHA256 checksum mismatch for local file.\n"
                 f"Expected: {expected_sha256}\n"
+                f"Actual:   {actual_sha256}\n"
                 f"This usually means the manifest and archive are out of sync."
             )
     else:
         # Remote mode: download from HuggingFace
         bundle_repo = manifest.get("bundleRepo", "deepsafe/feature-bundles")
-        url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
 
         # Disk space check (early sanity bail before a multi-GB download).
         # estimate_extracted covers the extractedSize:0 case so the budget can't
@@ -1080,51 +1171,9 @@ def _install() -> None:
         # drifted/upgraded venv doesn't silently fall back to slow urllib.
         ensure_hf_hub(venv_path)
 
-        try:
-            if not download_with_hf_hub(
-                bundle_repo,
-                archive_file,
-                tar_path,
-                compressed_size,
-                2,
-                85,
-            ):
-                download_with_resume(url, tar_path, compressed_size, 2, 85)
-        except RuntimeError as e:
-            fail(
-                f"{e}\n\n"
-                f"You can download the bundle manually from:\n"
-                f"  {url}\n"
-                f"Then upload it via Settings > AI Features > Offline Import."
-            )
-
-        # Verify checksum
-        emit_progress(86, "Verifying integrity...")
-        if not verify_sha256(tar_path, expected_sha256):
-            # Delete and retry once from scratch
-            os.unlink(tar_path)
-            emit_progress(86, "Checksum mismatch, retrying download...")
-            try:
-                if not download_with_hf_hub(
-                    bundle_repo,
-                    archive_file,
-                    tar_path,
-                    compressed_size,
-                    2,
-                    85,
-                    force_download=True,
-                ):
-                    download_with_resume(url, tar_path, compressed_size, 2, 85)
-            except RuntimeError as e:
-                fail(str(e))
-
-            if not verify_sha256(tar_path, expected_sha256):
-                os.unlink(tar_path)
-                fail(
-                    f"SHA256 checksum mismatch after re-download.\n"
-                    f"Expected: {expected_sha256}\n"
-                    f"The archive may be corrupted. Try again later."
-                )
+        download_and_verify(
+            bundle_repo, archive_file, tar_path, expected_sha256, compressed_size
+        )
 
     # -- Extract to staging --
     staging_dir = os.path.join(ai_dir, f"staging-{bundle_id}")

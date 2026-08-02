@@ -1,7 +1,11 @@
+import hashlib
 import importlib.util
+import json
 import os
 import sys
 import types
+
+import pytest
 
 
 def load_installer():
@@ -169,3 +173,330 @@ def test_ensure_hf_hub_self_heals_missing_client(monkeypatch, tmp_path):
     spec = next(part for part in cmd if part.startswith("huggingface-hub["))
     assert "hf_xet" in spec
     assert "hf_transfer" in spec
+
+
+# -- download_and_verify: checksum-mismatch retry contract (issue #714) --
+
+GOOD_BYTES = b"good archive bytes"
+BAD_BYTES = b"corrupt archive bytes"
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _last_error(capsys) -> str:
+    """Parse the JSON error line fail() writes to stderr."""
+    err_lines = [line for line in capsys.readouterr().err.strip().splitlines() if line]
+    payload = json.loads(err_lines[-1])
+    return payload["error"]
+
+
+def test_download_and_verify_accepts_good_first_download(monkeypatch, tmp_path):
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+    calls = {"hf": 0, "resume": 0}
+
+    def fake_hf(*args, **kwargs):
+        calls["hf"] += 1
+        with open(args[2], "wb") as f:
+            f.write(GOOD_BYTES)
+        return True
+
+    def fake_resume(url, tar_path, *rest):
+        calls["resume"] += 1
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    installer.download_and_verify(
+        "deepsafe/feature-bundles",
+        "v2.0.0/background-removal-amd64-gpu.tar.gz",
+        str(dest),
+        _sha256(GOOD_BYTES),
+        len(GOOD_BYTES),
+    )
+
+    assert calls == {"hf": 1, "resume": 0}
+    assert dest.read_bytes() == GOOD_BYTES
+
+
+def test_checksum_mismatch_retries_with_sequential_downloader(monkeypatch, tmp_path):
+    """A corrupt accelerated download must be retried over the plain sequential
+    downloader, not by re-running the transport that just produced bad bytes
+    (issue #714: hf_xet parallel writes corrupt on some bind mounts, so a
+    force_download re-run fails the same way forever)."""
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+    calls = {"hf": 0, "resume": 0}
+
+    def fake_hf(*args, **kwargs):
+        calls["hf"] += 1
+        with open(args[2], "wb") as f:
+            f.write(BAD_BYTES)
+        return True
+
+    def fake_resume(url, tar_path, *rest):
+        calls["resume"] += 1
+        assert not os.path.exists(tar_path), "corrupt file must be gone before retry"
+        with open(tar_path, "wb") as f:
+            f.write(GOOD_BYTES)
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    installer.download_and_verify(
+        "deepsafe/feature-bundles",
+        "v2.0.0/background-removal-amd64-gpu.tar.gz",
+        str(dest),
+        _sha256(GOOD_BYTES),
+        len(GOOD_BYTES),
+    )
+
+    assert calls["hf"] == 1, "accelerated client must not be re-run after a mismatch"
+    assert calls["resume"] == 1
+    assert dest.read_bytes() == GOOD_BYTES
+
+
+def test_mismatch_retry_discards_stale_resume_sidecars(monkeypatch, tmp_path):
+    """A mismatch is positive evidence of corruption, so the retry must not
+    resume from .partial/.meta sidecars a previously killed run left behind
+    (welding stale bytes onto the fresh download would fail the checksum again
+    and misdiagnose the cause as the user's storage)."""
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+    (tmp_path / "background-removal-amd64-gpu.tar.gz.partial").write_bytes(b"stale")
+    (tmp_path / "background-removal-amd64-gpu.tar.gz.meta").write_text(
+        '{"bytesDownloaded": 5}'
+    )
+
+    def fake_hf(*args, **kwargs):
+        with open(args[2], "wb") as f:
+            f.write(BAD_BYTES)
+        return True
+
+    def fake_resume(url, tar_path, *rest):
+        assert not os.path.exists(tar_path + ".partial"), "stale .partial must be wiped"
+        assert not os.path.exists(tar_path + ".meta"), "stale .meta must be wiped"
+        with open(tar_path, "wb") as f:
+            f.write(GOOD_BYTES)
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    installer.download_and_verify(
+        "deepsafe/feature-bundles",
+        "v2.0.0/background-removal-amd64-gpu.tar.gz",
+        str(dest),
+        _sha256(GOOD_BYTES),
+        len(GOOD_BYTES),
+    )
+
+    assert dest.read_bytes() == GOOD_BYTES
+
+
+def test_hf_unavailable_falls_back_to_sequential_download(monkeypatch, tmp_path):
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+    seen = {}
+
+    def fake_resume(url, tar_path, *rest):
+        seen["url"] = url
+        with open(tar_path, "wb") as f:
+            f.write(GOOD_BYTES)
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", lambda *a, **k: False)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    installer.download_and_verify(
+        "deepsafe/feature-bundles",
+        "v2.0.0/background-removal-amd64-gpu.tar.gz",
+        str(dest),
+        _sha256(GOOD_BYTES),
+        len(GOOD_BYTES),
+    )
+
+    assert seen["url"] == (
+        "https://huggingface.co/deepsafe/feature-bundles"
+        "/resolve/main/v2.0.0/background-removal-amd64-gpu.tar.gz"
+    )
+    assert dest.read_bytes() == GOOD_BYTES
+
+
+def test_first_download_failure_reports_manual_hint(monkeypatch, tmp_path, capsys):
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+
+    def fake_resume(url, tar_path, *rest):
+        raise RuntimeError("Failed to download after 5 attempts: boom")
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", lambda *a, **k: False)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    with pytest.raises(SystemExit):
+        installer.download_and_verify(
+            "deepsafe/feature-bundles",
+            "v2.0.0/background-removal-amd64-gpu.tar.gz",
+            str(dest),
+            _sha256(GOOD_BYTES),
+            len(GOOD_BYTES),
+        )
+
+    error = _last_error(capsys)
+    assert "Failed to download after 5 attempts: boom" in error
+    assert "resolve/main/v2.0.0/background-removal-amd64-gpu.tar.gz" in error
+    assert "Offline Import" in error
+
+
+def test_retry_download_failure_keeps_mismatch_context(monkeypatch, tmp_path, capsys):
+    """When the sequential re-download after a mismatch itself fails, the error
+    must still say a checksum mismatch started it (with the digests), so a
+    #714-class corruption is distinguishable from a plain flaky download."""
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+
+    def fake_hf(*args, **kwargs):
+        with open(args[2], "wb") as f:
+            f.write(BAD_BYTES)
+        return True
+
+    def fake_resume(url, tar_path, *rest):
+        raise RuntimeError("Failed to download after 5 attempts: boom")
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    with pytest.raises(SystemExit):
+        installer.download_and_verify(
+            "deepsafe/feature-bundles",
+            "v2.0.0/background-removal-amd64-gpu.tar.gz",
+            str(dest),
+            _sha256(GOOD_BYTES),
+            len(GOOD_BYTES),
+        )
+
+    error = _last_error(capsys)
+    assert "Checksum mismatch" in error
+    assert _sha256(GOOD_BYTES) in error
+    assert _sha256(BAD_BYTES) in error
+    assert "Failed to download after 5 attempts: boom" in error
+    assert "Offline Import" in error
+
+
+def test_verify_read_error_fails_with_json_error(monkeypatch, tmp_path, capsys):
+    """EIO while hashing the multi-GB archive (a live possibility on the flaky
+    mounts this retry exists for) must surface as a JSON error frame the Node
+    bridge can parse, not a raw traceback."""
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+
+    def fake_hf(*args, **kwargs):
+        with open(args[2], "wb") as f:
+            f.write(GOOD_BYTES)
+        return True
+
+    def broken_hash(path):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", lambda *a: None)
+    monkeypatch.setattr(installer, "file_sha256", broken_hash)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    with pytest.raises(SystemExit):
+        installer.download_and_verify(
+            "deepsafe/feature-bundles",
+            "v2.0.0/background-removal-amd64-gpu.tar.gz",
+            str(dest),
+            _sha256(GOOD_BYTES),
+            len(GOOD_BYTES),
+        )
+
+    error = _last_error(capsys)
+    assert "Input/output error" in error
+    assert "Offline Import" in error
+
+
+def test_checksum_mismatch_failure_reports_both_hashes(monkeypatch, tmp_path, capsys):
+    """When both transports produce wrong bytes, the error must state the
+    expected AND actual digests and point at the offline-import workaround."""
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+
+    def fake_hf(*args, **kwargs):
+        with open(args[2], "wb") as f:
+            f.write(BAD_BYTES)
+        return True
+
+    def fake_resume(url, tar_path, *rest):
+        with open(tar_path, "wb") as f:
+            f.write(BAD_BYTES)
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", fake_resume)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    with pytest.raises(SystemExit):
+        installer.download_and_verify(
+            "deepsafe/feature-bundles",
+            "v2.0.0/background-removal-amd64-gpu.tar.gz",
+            str(dest),
+            _sha256(GOOD_BYTES),
+            len(GOOD_BYTES),
+        )
+
+    error = _last_error(capsys)
+    assert _sha256(GOOD_BYTES) in error
+    assert _sha256(BAD_BYTES) in error
+    assert "Offline Import" in error
+    assert not dest.exists()
+
+
+def test_local_bundle_checksum_error_reports_actual_hash(monkeypatch, tmp_path, capsys):
+    installer = load_installer()
+    archive_entry = {
+        "file": "v2.0.0/background-removal.tar.gz",
+        "sha256": _sha256(GOOD_BYTES),
+        "compressedSize": len(GOOD_BYTES),
+        "extractedSize": 0,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "bundles": {
+                    "background-removal": {
+                        "archives": {
+                            "amd64-gpu": archive_entry,
+                            "arm64-cpu": archive_entry,
+                        }
+                    }
+                }
+            }
+        )
+    )
+    models_dir = tmp_path / "ai" / "models"
+    models_dir.mkdir(parents=True)
+    local = tmp_path / "local.tar.gz"
+    local.write_bytes(BAD_BYTES)
+
+    monkeypatch.setenv("SNAPOTTER_BUNDLE_LOCAL_PATH", str(local))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["install_feature.py", "background-removal", str(manifest_path), str(models_dir)],
+    )
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    with pytest.raises(SystemExit):
+        installer._install()
+
+    error = _last_error(capsys)
+    assert _sha256(GOOD_BYTES) in error
+    assert _sha256(BAD_BYTES) in error
