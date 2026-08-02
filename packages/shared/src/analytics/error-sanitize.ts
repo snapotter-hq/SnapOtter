@@ -5,6 +5,7 @@
  * author). Returning null means "no safe rebuild known, use type-only".
  */
 import { isSafeMessageError } from "../tool-errors.js";
+import { redactMessage } from "./redact-message.js";
 
 interface ErrLike {
   name?: unknown;
@@ -56,13 +57,39 @@ function looksLikePg(links: ErrLike[]): boolean {
   );
 }
 
+/** "at file.ts:NN" from the first in-app stack frame, mirroring errorSignature. */
+function frameHint(err: unknown): string | null {
+  const stack = (err as { stack?: unknown } | null)?.stack;
+  if (typeof stack !== "string") return null;
+  const line = stack.split("\n").find((l) => l.includes("/apps/") || l.includes("/packages/"));
+  const m = line?.match(/([^/\\]+\.[cm]?[jt]sx?):(\d+)/);
+  return m ? `at ${m[1]}:${m[2]}` : null;
+}
+
 /** Safe replacement for exception.value, or null for type-only fallback. */
 export function rebuildErrorValue(err: unknown): string | null {
   try {
-    if (isSafeMessageError(err)) return err.message;
     const links = chain(err);
-    if (links.length === 0) return null;
 
+    // 1. SafeError: our authored (or toSidecarError-wrapped) message, redacted,
+    //    plus the redacted immediate cause so a wrapper title never hides detail.
+    if (isSafeMessageError(err)) {
+      let out = redactMessage(err.message);
+      for (let i = 1; i < links.length; i++) {
+        const m = links[i].message;
+        if (typeof m === "string" && m.trim()) {
+          const detail = redactMessage(m);
+          if (detail && !out.includes(detail)) out = `${out}: ${detail}`;
+          break;
+        }
+      }
+      return out;
+    }
+
+    if (links.length === 0) return null;
+    const top = links[0];
+
+    // 2. Structured rebuilds: pg SQLSTATE, node E-code, reply, zod, http status.
     for (const l of links) {
       if (typeof l.code === "string" && SQLSTATE.test(l.code) && !NODE_CODE.test(l.code)) {
         return typeof l.routine === "string" && PG_ROUTINE.test(l.routine)
@@ -72,11 +99,9 @@ export function rebuildErrorValue(err: unknown): string | null {
     }
     for (const l of links) {
       if (typeof l.code === "string" && NODE_CODE.test(l.code)) {
-        // syscall is libuv vocabulary or "spawn <server-binary>", never user args.
         return typeof l.syscall === "string" ? `${l.code} ${l.syscall}` : l.code;
       }
     }
-    const top = links[0];
     if (top.name === "ReplyError" && typeof top.message === "string") {
       const token = top.message.split(" ")[0];
       return REPLY_TOKEN.test(token) ? `reply ${token}` : "reply";
@@ -96,6 +121,17 @@ export function rebuildErrorValue(err: unknown): string | null {
         typeof top.name === "string" && SAFE_NAME.test(top.name) ? top.name : "HttpError";
       return `${name} ${top.status}`;
     }
+
+    // 3. Non-empty message: keep it, redacted (the rich default).
+    if (typeof top.message === "string" && top.message.trim().length > 0) {
+      return redactMessage(top.message);
+    }
+
+    // 4. Empty message with a stack: derive a title from the first in-app frame.
+    const hint = frameHint(err);
+    if (hint) return hint;
+
+    // 5. Nothing safe to surface: type-only.
     return null;
   } catch {
     return null;

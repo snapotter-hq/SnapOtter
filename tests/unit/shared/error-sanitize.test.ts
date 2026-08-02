@@ -66,8 +66,11 @@ describe("rebuildErrorValue", () => {
     });
     expect(rebuildErrorValue(err)).toBe("zod invalid_type at files.~.0");
   });
-  it("returns null for unknown errors (caller falls back to type-only)", () => {
-    expect(rebuildErrorValue(new Error("user file /tmp/x.pdf broke"))).toBeNull();
+  it("keeps a redacted message for an unknown Error, null only for non-objects", () => {
+    // Was type-only before the fallback ladder; now the message survives, redacted.
+    expect(rebuildErrorValue(new Error("user file /tmp/x.pdf broke"))).toBe(
+      "user file <path> broke",
+    );
     expect(rebuildErrorValue("string")).toBeNull();
     expect(rebuildErrorValue(null)).toBeNull();
   });
@@ -78,10 +81,51 @@ describe("rebuildErrorValue", () => {
     });
     expect(rebuildErrorValue(err)).toBe("HttpError 502");
   });
-  it("returns null for a circular cause chain without hanging", () => {
+  it("keeps the redacted message for a circular cause chain without hanging", () => {
     const err = new Error("loop") as Error & { cause?: unknown };
     err.cause = err;
-    expect(rebuildErrorValue(err)).toBeNull();
+    // chain()'s max cap breaks the cycle; the top message still surfaces.
+    expect(rebuildErrorValue(err)).toBe("loop");
+  });
+});
+
+describe("rebuildErrorValue ladder", () => {
+  it("keeps a redacted message for an unknown error (was type-only)", () => {
+    expect(rebuildErrorValue(new Error("Background removal failed"))).toBe(
+      "Background removal failed",
+    );
+    expect(rebuildErrorValue(new Error("open /data/uploads/9f/in.bin"))).toBe("open <path>");
+  });
+
+  it("redacts a SafeError message (NODE-4W path leak)", () => {
+    const e = new SafeError("[Errno 13] Permission denied: '/root/.u2net/x.onnx'", { kind: "bug" });
+    expect(rebuildErrorValue(e)).toBe("[Errno 13] Permission denied: '<path>'");
+  });
+
+  it("appends the redacted cause to a SafeError title (NODE-3D)", () => {
+    const cause = new Error("unsupported image format for /data/x.heic");
+    const e = new SafeError("Image conversion failed", { kind: "bug", cause });
+    expect(rebuildErrorValue(e)).toBe(
+      "Image conversion failed: unsupported image format for <path>",
+    );
+  });
+
+  it("derives a frame title for an empty-message error (NODE-3C)", () => {
+    const e = new Error("");
+    e.stack = "Error\n    at Object.process (/app/apps/api/src/routes/tools/rounded-crop.ts:96:10)";
+    expect(rebuildErrorValue(e)).toBe("at rounded-crop.ts:96");
+  });
+
+  it("still prefers a pg SQLSTATE rebuild over the raw message", () => {
+    const e = Object.assign(new Error(`password authentication failed for user "x"`), {
+      code: "28P01",
+      routine: "auth_failed",
+    });
+    expect(rebuildErrorValue(e)).toBe("pg 28P01 auth_failed");
+  });
+
+  it("returns null only when there is no message and no stack", () => {
+    expect(rebuildErrorValue({ name: "Weird" })).toBeNull();
   });
 });
 
