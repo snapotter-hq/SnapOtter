@@ -174,7 +174,9 @@ export function registerEraseObject(app: FastifyInstance) {
       if (format === "auto") {
         const detected = await resolveOutputFormat(imageBuffer, filename);
         format = detected.format === "jpeg" ? "jpg" : detected.format;
-        quality = detected.quality;
+        // detected.quality is undefined for PNG, whose encode path below never
+        // reads it anyway; keep the stored setting a plain number.
+        quality = detected.quality ?? quality;
       }
 
       try {

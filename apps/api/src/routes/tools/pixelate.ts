@@ -109,11 +109,11 @@ export function registerPixelate(app: FastifyInstance) {
       }
 
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      // Sharp reads `quality` on PNG as "quantise down to a palette", which
-      // dithers the flat blocks this tool exists to produce and inflates the
-      // file. Every other encoder wants the hint.
-      const encodeOptions = outputFormat.format === "png" ? {} : { quality: outputFormat.quality };
-      const buffer = await pixelated.toFormat(outputFormat.format, encodeOptions).toBuffer();
+      // resolveOutputFormat leaves quality undefined for PNG, which keeps the
+      // flat blocks free of palette dithering (#710).
+      const buffer = await pixelated
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
       const base = filename.replace(/\.[^.]+$/, "");
       const ext = outputFormat.extension;
       return {

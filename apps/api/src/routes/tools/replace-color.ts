@@ -77,9 +77,11 @@ export function registerReplaceColor(app: FastifyInstance) {
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
       const needsAlpha = settings.makeTransparent;
+      // No quality on the forced PNG: even 100 turns on Sharp's palette
+      // quantisation, which is lossy past 256 distinct colours (#710).
       const useFormat =
         needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
-          ? { format: "png" as const, quality: 100, contentType: "image/png" }
+          ? { format: "png" as const, quality: undefined, contentType: "image/png" }
           : outputFormat;
 
       const buffer = await sharp(pixels, {

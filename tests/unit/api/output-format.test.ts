@@ -15,12 +15,15 @@ describe("resolveOutputFormat", () => {
     expect(result.quality).toBe(95);
   });
 
-  it("detects PNG input and returns png config", async () => {
+  it("detects PNG input and returns png config with no quality", async () => {
     const result = await resolveOutputFormat(PNG, "image.png");
     expect(result.format).toBe("png");
     expect(result.extension).toBe("png");
     expect(result.contentType).toBe("image/png");
-    expect(result.quality).toBe(95);
+    // Sharp reads `quality` on PNG as "quantise to a palette", so a default
+    // quality silently dithered every PNG that passed through (issue #710).
+    // Only an explicit override may request that.
+    expect(result.quality).toBeUndefined();
   });
 
   it("detects WebP input and returns webp config", async () => {
@@ -37,6 +40,8 @@ describe("resolveOutputFormat", () => {
     expect(result.format).toBe("png");
     expect(result.extension).toBe("png");
     expect(result.contentType).toBe("image/png");
+    // The fallback produces PNG too, so it gets the same lossless treatment.
+    expect(result.quality).toBeUndefined();
   });
 
   it("respects quality override for lossy formats", async () => {

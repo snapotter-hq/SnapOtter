@@ -5,7 +5,14 @@ export interface OutputFormat {
   format: SharpFormat;
   extension: string;
   contentType: string;
-  quality: number;
+  /**
+   * Undefined for PNG unless explicitly overridden: Sharp reads `quality` on
+   * PNG as "quantise down to a palette", which dithers the image and often
+   * inflates the file (issue #710). `toFormat(format, { quality: undefined })`
+   * behaves exactly like passing no quality at all, so routes can spread this
+   * without caring about the format.
+   */
+  quality?: number;
 }
 
 const FORMAT_MAP: Record<string, { format: SharpFormat; extension: string; contentType: string }> =
@@ -51,7 +58,9 @@ export async function resolveOutputFormat(
 
   const mapped = detected ? FORMAT_MAP[detected] : undefined;
   const config = mapped ?? PNG_FALLBACK;
-  const quality = qualityOverride ?? DEFAULT_QUALITY;
+  // PNG stays lossless unless the caller explicitly asked for a quality;
+  // every other encoder wants the default hint.
+  const quality = qualityOverride ?? (config.format === "png" ? undefined : DEFAULT_QUALITY);
 
   return { ...config, quality };
 }

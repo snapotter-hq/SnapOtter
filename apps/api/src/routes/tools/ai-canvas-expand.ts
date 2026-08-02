@@ -47,7 +47,9 @@ registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
   if (format === "auto") {
     const detected = await resolveOutputFormat(input, data.filename);
     format = detected.format === "jpeg" ? "jpg" : detected.format;
-    quality = detected.quality;
+    // detected.quality is undefined for PNG, whose encode path below never
+    // reads it anyway; keep the local a plain number.
+    quality = detected.quality ?? quality;
   }
 
   const resultBuffer = await outpaint(

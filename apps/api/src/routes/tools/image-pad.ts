@@ -110,14 +110,16 @@ export function registerImagePad(app: FastifyInstance) {
           .toBuffer();
       }
 
-      // Transparent forces PNG to preserve alpha; otherwise detect from input
+      // Transparent forces PNG to preserve alpha; otherwise detect from input.
+      // No quality for the forced PNG: Sharp reads it as palette quantisation,
+      // which dithers the padded image (#710).
       const forcePng = settings.background === "transparent";
       const outputFormat = forcePng
         ? {
             format: "png" as const,
             extension: "png",
             contentType: "image/png",
-            quality: 95,
+            quality: undefined,
           }
         : await resolveOutputFormat(inputBuffer, filename);
 
