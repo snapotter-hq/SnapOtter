@@ -222,6 +222,36 @@ def test_download_and_verify_accepts_good_first_download(monkeypatch, tmp_path):
     assert dest.read_bytes() == GOOD_BYTES
 
 
+def test_download_and_verify_emits_liveness_frames_while_hashing(monkeypatch, tmp_path):
+    # The verify stage hashes a multi-GB file; the stall watchdog only counts
+    # progress frames, so verification must emit from inside the read loop.
+    installer = load_installer()
+    dest = tmp_path / "background-removal-amd64-gpu.tar.gz"
+    progress = []
+
+    def fake_hf(*args, **kwargs):
+        with open(args[2], "wb") as f:
+            f.write(GOOD_BYTES)
+        return True
+
+    monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
+    monkeypatch.setattr(installer, "download_with_resume", lambda *a: None)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: progress.append((p, s)))
+
+    installer.download_and_verify(
+        "deepsafe/feature-bundles",
+        "v2.0.0/background-removal-amd64-gpu.tar.gz",
+        str(dest),
+        _sha256(GOOD_BYTES),
+        len(GOOD_BYTES),
+    )
+
+    verify_frames = [
+        (p, s) for p, s in progress if p == 86 and "GB processed" in s
+    ]
+    assert verify_frames, "hashing must emit at least one in-loop liveness frame"
+
+
 def test_checksum_mismatch_retries_with_sequential_downloader(monkeypatch, tmp_path):
     """A corrupt accelerated download must be retried over the plain sequential
     downloader, not by re-running the transport that just produced bad bytes
@@ -401,7 +431,7 @@ def test_verify_read_error_fails_with_json_error(monkeypatch, tmp_path, capsys):
             f.write(GOOD_BYTES)
         return True
 
-    def broken_hash(path):
+    def broken_hash(path, progress_cb=None):
         raise OSError(5, "Input/output error")
 
     monkeypatch.setattr(installer, "download_with_hf_hub", fake_hf)
@@ -500,3 +530,71 @@ def test_local_bundle_checksum_error_reports_actual_hash(monkeypatch, tmp_path, 
     error = _last_error(capsys)
     assert _sha256(GOOD_BYTES) in error
     assert _sha256(BAD_BYTES) in error
+
+
+def _local_bundle_setup(monkeypatch, tmp_path, payload):
+    archive_entry = {
+        "file": "v2.0.0/background-removal.tar.gz",
+        "sha256": _sha256(GOOD_BYTES),
+        "compressedSize": len(GOOD_BYTES),
+        "extractedSize": 0,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "bundles": {
+                    "background-removal": {
+                        "archives": {
+                            "amd64-gpu": archive_entry,
+                            "arm64-cpu": archive_entry,
+                        }
+                    }
+                }
+            }
+        )
+    )
+    models_dir = tmp_path / "ai" / "models"
+    models_dir.mkdir(parents=True)
+    local = tmp_path / "local.tar.gz"
+    local.write_bytes(payload)
+    monkeypatch.setenv("SNAPOTTER_BUNDLE_LOCAL_PATH", str(local))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["install_feature.py", "background-removal", str(manifest_path), str(models_dir)],
+    )
+
+
+def test_local_bundle_verify_emits_liveness_frames(monkeypatch, tmp_path):
+    # The local/offline path hashes the same multi-GB archives as the remote
+    # path and must feed the stall watchdog the same way.
+    installer = load_installer()
+    _local_bundle_setup(monkeypatch, tmp_path, BAD_BYTES)
+    progress = []
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: progress.append((p, s)))
+
+    with pytest.raises(SystemExit):
+        installer._install()
+
+    assert any("GB processed" in s for _, s in progress), (
+        "local verify must emit in-loop liveness frames"
+    )
+
+
+def test_local_bundle_verify_read_error_fails_with_json_error(monkeypatch, tmp_path, capsys):
+    installer = load_installer()
+    _local_bundle_setup(monkeypatch, tmp_path, GOOD_BYTES)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    def broken_hash(path, progress_cb=None):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(installer, "file_sha256", broken_hash)
+
+    with pytest.raises(SystemExit):
+        installer._install()
+
+    error = _last_error(capsys)
+    assert "Input/output error" in error
+    assert "SNAPOTTER_BUNDLE_LOCAL_PATH" in error

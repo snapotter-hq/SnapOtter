@@ -36,10 +36,25 @@ DOWNLOAD_META_BYTES = 64 * 1024 * 1024
 
 # -- Helpers --
 
+_progress_pipe_broken = [False]
+
+
 def emit_progress(percent: int, stage: str) -> None:
-    """Emit a progress update via stderr JSON line."""
-    sys.stderr.write(json.dumps({"progress": percent, "stage": stage}) + "\n")
-    sys.stderr.flush()
+    """Emit a progress update via stderr JSON line.
+
+    Progress frames are advisory liveness. If the parent died and stderr is a
+    broken pipe, the write raises BrokenPipeError (an OSError); letting that
+    escape from inside file_sha256/move_tree/safe_extract would be
+    misdiagnosed as a storage failure and could abort a working shared-venv
+    merge. Nobody is listening on a broken pipe, so swallow the error and
+    stop emitting instead."""
+    if _progress_pipe_broken[0]:
+        return
+    try:
+        sys.stderr.write(json.dumps({"progress": percent, "stage": stage}) + "\n")
+        sys.stderr.flush()
+    except OSError:
+        _progress_pipe_broken[0] = True
 
 
 def fail(message: str) -> None:
@@ -141,16 +156,75 @@ def get_site_packages_dir(venv_path: str) -> str:
 
 # -- SHA256 verification --
 
-def file_sha256(filepath: str) -> str:
-    """Stream-hash a file and return the hex digest."""
+def file_sha256(filepath: str, progress_cb=None) -> str:
+    """Stream-hash a file and return the hex digest.
+
+    progress_cb, when given, receives the cumulative bytes hashed so far. The
+    install watchdog treats stderr progress frames as the only liveness
+    signal, so callers hashing multi-GB archives report from inside the read
+    loop (real work, not a timer)."""
     h = hashlib.sha256()
+    done = 0
     with open(filepath, "rb") as f:
         while True:
             chunk = f.read(8192)
             if not chunk:
                 break
             h.update(chunk)
+            if progress_cb is not None:
+                done += len(chunk)
+                progress_cb(done)
     return h.hexdigest()
+
+
+def make_activity_reporter(percent: int, stage: str, min_delta_bytes: int = 512 * 1024 * 1024):
+    """Return a cumulative-bytes callback that emits a progress frame at most
+    every min_delta_bytes of new activity.
+
+    The percent stays fixed (the stage boundaries own the numbers); the frame
+    itself is what keeps the stall watchdog fed, and the stage text carries a
+    processed-bytes counter so a multi-GB stage visibly moves."""
+    last_emitted = [None]
+
+    def report(done_bytes: int) -> None:
+        if last_emitted[0] is not None and done_bytes - last_emitted[0] < min_delta_bytes:
+            return
+        last_emitted[0] = done_bytes
+        gb = done_bytes / (1024**3)
+        emit_progress(percent, f"{stage} ({gb:.1f} GB processed)")
+
+    return report
+
+
+def make_move_reporter(percent: int, stage: str, every: int = 500):
+    """Return a no-arg callback for move_tree that emits a progress frame
+    every `every` entries moved. Same watchdog-feeding role as
+    make_activity_reporter, keyed on entry count since moves have no byte
+    stream to measure."""
+    moved = [0]
+
+    def report() -> None:
+        moved[0] += 1
+        if moved[0] % every == 0:
+            emit_progress(percent, f"{stage} ({moved[0]} entries)")
+
+    return report
+
+
+def make_copy_activity_reporter(percent: int, stage: str):
+    """Return a byte-DELTA callback for move_tree's cross-filesystem copies.
+
+    Entry-count reporting goes silent for the whole duration of one huge
+    file; this accumulates chunk deltas into the cumulative total
+    make_activity_reporter expects, so a multi-GB copy emits every 512MB."""
+    reporter = make_activity_reporter(percent, stage)
+    total = [0]
+
+    def report(delta_bytes: int) -> None:
+        total[0] += delta_bytes
+        reporter(total[0])
+
+    return report
 
 
 def _unlink_quietly(path: str) -> None:
@@ -508,7 +582,10 @@ def download_and_verify(
         # the flaky mounts this retry exists for; it must surface as a JSON
         # error frame the Node bridge can parse, not a raw traceback.
         try:
-            return file_sha256(tar_path)
+            return file_sha256(
+                tar_path,
+                progress_cb=make_activity_reporter(86, "Verifying integrity..."),
+            )
         except OSError as e:
             fail(
                 f"Could not read back the downloaded archive to verify it "
@@ -562,28 +639,81 @@ def download_and_verify(
 
 # -- Safe tar extraction --
 
-def safe_extract(tar_path: str, staging_dir: str) -> None:
-    """Extract a tar.gz with security guards."""
+class _CountingReader:
+    """File wrapper that reports cumulative bytes read to a callback.
+
+    Extraction reads the compressed archive through this wrapper, so every
+    callback corresponds to real decompression work: the liveness signal the
+    install watchdog needs cannot outlive a genuinely wedged extract. The
+    count is cumulative across seeks (tarfile re-reads the gzip stream), so
+    reported values are always monotonic."""
+
+    def __init__(self, raw, progress_cb):
+        self._raw = raw
+        self._progress_cb = progress_cb
+        self._count = 0
+
+    def read(self, n=-1):
+        data = self._raw.read(n)
+        if data:
+            self._count += len(data)
+            self._progress_cb(self._count)
+        return data
+
+    def seek(self, *args):
+        return self._raw.seek(*args)
+
+    def tell(self):
+        return self._raw.tell()
+
+    def close(self):
+        return self._raw.close()
+
+
+def safe_extract(tar_path: str, staging_dir: str, progress_cb=None) -> None:
+    """Extract a tar.gz with security guards.
+
+    progress_cb, when given, receives cumulative compressed bytes read."""
     os.makedirs(staging_dir, exist_ok=True)
-    with tarfile.open(tar_path, "r:gz") as tf:
-        for member in tf.getmembers():
-            # Block symlinks, hardlinks, devices
-            if not member.isfile() and not member.isdir():
-                raise RuntimeError(f"Blocked unsafe tar entry type: {member.name}")
-            # Block absolute paths and traversal
-            if member.name.startswith("/") or ".." in member.name.split("/"):
-                raise RuntimeError(f"Blocked unsafe tar path: {member.name}")
-        # The filter= kwarg was added in Python 3.12; the manual guards above
-        # already block unsafe entries on older interpreters (e.g. 3.11).
-        if sys.version_info >= (3, 12):
-            tf.extractall(staging_dir, filter="data")
-        else:
-            tf.extractall(staging_dir)
+    with open(tar_path, "rb") as raw:
+        fileobj = _CountingReader(raw, progress_cb) if progress_cb is not None else raw
+        with tarfile.open(fileobj=fileobj, mode="r:gz") as tf:
+            for member in tf.getmembers():
+                # Block symlinks, hardlinks, devices
+                if not member.isfile() and not member.isdir():
+                    raise RuntimeError(f"Blocked unsafe tar entry type: {member.name}")
+                # Block absolute paths and traversal
+                if member.name.startswith("/") or ".." in member.name.split("/"):
+                    raise RuntimeError(f"Blocked unsafe tar path: {member.name}")
+            # The filter= kwarg was added in Python 3.12; the manual guards above
+            # already block unsafe entries on older interpreters (e.g. 3.11).
+            if sys.version_info >= (3, 12):
+                tf.extractall(staging_dir, filter="data")
+            else:
+                tf.extractall(staging_dir)
 
 
 # -- File move --
 
-def move_tree(src: str, dst: str) -> None:
+COPY_CHUNK_BYTES = 8 * 1024 * 1024
+
+
+def _copy_file_with_activity(src: str, dst: str, copy_activity_cb) -> None:
+    """shutil.copy2 equivalent (data + metadata) that reports byte deltas per
+    chunk, so a cross-filesystem copy of one multi-GB file still feeds the
+    stall watchdog."""
+    with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+        while True:
+            chunk = fsrc.read(COPY_CHUNK_BYTES)
+            if not chunk:
+                break
+            fdst.write(chunk)
+            if copy_activity_cb is not None:
+                copy_activity_cb(len(chunk))
+    shutil.copystat(src, dst)
+
+
+def move_tree(src: str, dst: str, progress_cb=None, copy_activity_cb=None) -> None:
     """Merge src into dst, replacing entries crash-atomically where possible.
 
     This writes into the SHARED /data/ai/venv site-packages, so a crash mid-move
@@ -592,7 +722,12 @@ def move_tree(src: str, dst: str) -> None:
     place with NO delete-then-write window, so an interruption leaves either the
     old or the new file intact, never a missing one. Cross-filesystem copies go
     through a temp sibling then an atomic rename for the same reason. Renames
-    (vs copytree) also avoid transiently doubling the payload on disk."""
+    (vs copytree) also avoid transiently doubling the payload on disk.
+
+    progress_cb, when given, is called once per entry moved; copy_activity_cb
+    receives byte deltas during cross-filesystem copies. Together they keep
+    liveness frames flowing whether the payload is many small entries or a
+    few huge ones."""
     if not os.path.isdir(src):
         return
     os.makedirs(dst, exist_ok=True)
@@ -601,7 +736,7 @@ def move_tree(src: str, dst: str) -> None:
         d = os.path.join(dst, name)
         if os.path.isdir(s) and os.path.isdir(d):
             # Both dirs exist: merge recursively rather than replace.
-            move_tree(s, d)
+            move_tree(s, d, progress_cb, copy_activity_cb)
             continue
         try:
             # A type mismatch (dir<->file) can't be atomically swapped by rename,
@@ -613,6 +748,8 @@ def move_tree(src: str, dst: str) -> None:
                 else:
                     os.remove(d)
             os.replace(s, d)
+            if progress_cb is not None:
+                progress_cb()
             continue
         except OSError as e:
             if getattr(e, "errno", None) != errno.EXDEV:
@@ -623,11 +760,17 @@ def move_tree(src: str, dst: str) -> None:
         if os.path.isdir(s):
             if os.path.exists(d):
                 shutil.rmtree(d)
-            shutil.copytree(s, d)
+            shutil.copytree(
+                s,
+                d,
+                copy_function=lambda cs, cd: _copy_file_with_activity(cs, cd, copy_activity_cb),
+            )
         else:
             tmp = d + ".part"
-            shutil.copy2(s, tmp)
+            _copy_file_with_activity(s, tmp, copy_activity_cb)
             os.replace(tmp, d)
+        if progress_cb is not None:
+            progress_cb()
     # Remove whatever remains of src (emptied by renames, or copied originals).
     shutil.rmtree(src, ignore_errors=True)
 
@@ -1138,9 +1281,19 @@ def _install() -> None:
         if not os.path.exists(tar_path):
             fail(f"Local bundle file not found: {tar_path}")
 
-        # Verify checksum
+        # Verify checksum, with the same liveness frames and readable read
+        # errors as the remote download path: the archive is just as large.
         emit_progress(10, "Verifying checksum...")
-        actual_sha256 = file_sha256(tar_path)
+        try:
+            actual_sha256 = file_sha256(
+                tar_path,
+                progress_cb=make_activity_reporter(10, "Verifying checksum..."),
+            )
+        except OSError as e:
+            fail(
+                f"Could not read the local bundle archive to verify it ({e}). "
+                f"Check the storage behind SNAPOTTER_BUNDLE_LOCAL_PATH."
+            )
         if actual_sha256 != expected_sha256:
             fail(
                 f"SHA256 checksum mismatch for local file.\n"
@@ -1182,7 +1335,11 @@ def _install() -> None:
     try:
         if os.path.exists(staging_dir):
             shutil.rmtree(staging_dir)
-        safe_extract(tar_path, staging_dir)
+        safe_extract(
+            tar_path,
+            staging_dir,
+            progress_cb=make_activity_reporter(88, "Extracting packages and models..."),
+        )
     except Exception as e:
         if os.path.exists(staging_dir):
             shutil.rmtree(staging_dir, ignore_errors=True)
@@ -1257,7 +1414,12 @@ def _install() -> None:
             reconcile_onnxruntime(staging_sp, site_packages_dir)
             reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
-            move_tree(staging_sp, site_packages_dir)
+            move_tree(
+                staging_sp,
+                site_packages_dir,
+                progress_cb=make_move_reporter(92, "Installing packages..."),
+                copy_activity_cb=make_copy_activity_reporter(92, "Installing packages..."),
+            )
             clear_venv_writing(venv_writing_marker)
 
         # -- Move models --
@@ -1265,7 +1427,14 @@ def _install() -> None:
         staging_models = os.path.join(staging_dir, "models")
         if os.path.isdir(staging_models):
             os.makedirs(models_dir, exist_ok=True)
-            move_tree(staging_models, models_dir)
+            # Model bundles are a handful of multi-GB files, so report every
+            # entry; the byte reporter covers the inside of each copy.
+            move_tree(
+                staging_models,
+                models_dir,
+                progress_cb=make_move_reporter(95, "Installing models...", every=1),
+                copy_activity_cb=make_copy_activity_reporter(95, "Installing models..."),
+            )
     except OSError as e:
         shutil.rmtree(staging_dir, ignore_errors=True)
         abandon_merge(
