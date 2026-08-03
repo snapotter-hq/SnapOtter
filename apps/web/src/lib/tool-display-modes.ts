@@ -253,3 +253,12 @@ for (const preset of CONVERSION_PRESETS) {
   }
 }
 export const MULTI_FILE_TOOLS: ReadonlySet<string> = multiFileTools;
+
+/**
+ * Live-preview tools whose imageWrapperStyle/children are an input control
+ * (pixelate's selection box), not a CSS simulation of the result. After
+ * processing, the viewer switches to the server result for these and keeps
+ * the overlay usable for the next round; simulation tools (vignette, duotone,
+ * beautify, ...) keep showing the styled original, which IS the result (#713).
+ */
+export const LIVE_PREVIEW_INPUT_OVERLAY_TOOLS: ReadonlySet<string> = new Set(["pixelate"]);

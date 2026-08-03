@@ -49,7 +49,7 @@ import { formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
-import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
+import { LIVE_PREVIEW_INPUT_OVERLAY_TOOLS, MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
 import { getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
@@ -946,13 +946,17 @@ export function ToolPage() {
     }
 
     // For live-preview tools: keep showing the CSS-styled original so WYSIWYG.
-    // The server-rendered result is available via download.
+    // The server-rendered result is available via download. Tools whose
+    // overlay is an input control (pixelate's selection box) get the opposite
+    // treatment: the style simulates nothing, so show the server result and
+    // keep the overlay on top for the next region (#713).
     if (hasProcessed && originalBlobUrl && displayMode === "live-preview" && imageWrapperStyle) {
+      const overlayIsInput = toolId ? LIVE_PREVIEW_INPUT_OVERLAY_TOOLS.has(toolId) : false;
       return (
         <ImageViewer
-          src={originalBlobUrl}
-          filename={selectedFileName ?? files[0].name}
-          fileSize={selectedFileSize ?? files[0].size}
+          src={overlayIsInput ? displayUrl : originalBlobUrl}
+          filename={overlayIsInput ? processedFileName : (selectedFileName ?? files[0].name)}
+          fileSize={overlayIsInput ? (processedSize ?? 0) : (selectedFileSize ?? files[0].size)}
           imageWrapperStyle={imageWrapperStyle}
           imageWrapperChildren={imageWrapperChildren}
         />
