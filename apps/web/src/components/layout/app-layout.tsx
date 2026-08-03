@@ -67,7 +67,16 @@ export function AppLayout({ children, breadcrumb, navVariant }: AppLayoutProps) 
       <main
         id="main-content"
         tabIndex={-1}
-        className={cn("flex-1 overflow-y-auto", isMobile && "pb-20")}
+        className="flex-1 overflow-y-auto"
+        // The fixed bottom nav grows by the home-indicator inset on iOS
+        // (its own paddingBottom is max(0.5rem, safe-area-inset-bottom)), so
+        // a fixed 5rem reservation leaves the last row underneath it on
+        // notched devices (#736).
+        style={
+          isMobile
+            ? { paddingBottom: "calc(4.5rem + max(0.5rem, env(safe-area-inset-bottom)))" }
+            : undefined
+        }
       >
         {children}
       </main>

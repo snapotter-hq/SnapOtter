@@ -2,6 +2,7 @@
 import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
 import { Monitor } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
 import {
   AutosaveRecoveryBanner,
@@ -157,6 +158,15 @@ export function EditorPage() {
         <Monitor size={48} className="text-muted-foreground mb-4" />
         <h2 className="text-lg font-semibold text-foreground mb-2">{t.editor.mobile.heading}</h2>
         <p className="text-sm text-muted-foreground max-w-sm">{t.editor.mobile.description}</p>
+        {/* A home-screen web app has no browser chrome, so this screen needs
+            its own way back or it is a dead end (#735). */}
+        <Link
+          to="/"
+          data-testid="editor-mobile-back"
+          className="mt-6 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium"
+        >
+          {t.toolPage.backToTools}
+        </Link>
       </main>
     );
   }

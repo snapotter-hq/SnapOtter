@@ -294,3 +294,50 @@ test.describe("@mobile RTL responsive", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// iOS navigation dead ends (#735, #736)
+// ---------------------------------------------------------------------------
+test.describe("@mobile iOS navigation", () => {
+  test("editor desktop-only warning offers a way back (#735)", async ({ loggedInPage: page }) => {
+    // A home-screen web app runs with no browser chrome, so without an
+    // in-page control the editor's desktop-only warning is a dead end.
+    await page.goto("/editor");
+    await expect(page.getByText("Desktop Recommended")).toBeVisible({ timeout: 10_000 });
+
+    const back = page.getByTestId("editor-mobile-back");
+    await expect(back).toBeVisible();
+    await back.click();
+    await page.waitForURL(/\/$/, { timeout: 10_000 });
+  });
+
+  test("last tool clears the fixed bottom nav (#736)", async ({ loggedInPage: page }) => {
+    await page.goto("/");
+    const main = page.locator("#main-content");
+    await expect(main).toBeVisible();
+
+    // The scroller must reserve the nav height plus the home-indicator
+    // inset. Device emulation reports a zero inset, so the inset's
+    // participation is pinned on the style; the geometry check below runs
+    // at inset zero.
+    expect(await main.evaluate((el) => (el as HTMLElement).style.paddingBottom)).toContain(
+      "safe-area-inset-bottom",
+    );
+
+    await main.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    // The pin toggle is a sibling of the card link inside a relative
+    // wrapper, so the wrapper (its parent) is the card's true bounding box.
+    const lastCard = page
+      .getByTestId(/^pin-toggle-/)
+      .last()
+      .locator("xpath=..");
+    const nav = page.locator("nav.fixed");
+    const [cardBox, navBox] = await Promise.all([lastCard.boundingBox(), nav.boundingBox()]);
+    expect(cardBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    if (!cardBox || !navBox) return;
+    expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(navBox.y + 1);
+  });
+});
