@@ -148,6 +148,15 @@ test.describe("Home Page - Before Upload", () => {
     await expect(page.getByText("Essentials").first()).toBeVisible();
   });
 
+  test("desktop scroller carries no mobile nav reservation", async ({ loggedInPage: page }) => {
+    // The mobile-only bottom padding (#736) must not leak to desktop; an
+    // unconditional reservation would leave 80px of dead space at the end
+    // of every page's scroll.
+    expect(
+      await page.locator("#main-content").evaluate((el) => (el as HTMLElement).style.paddingBottom),
+    ).toBe("");
+  });
+
   test("each tool category header is visible in tool panel", async ({ loggedInPage: page }) => {
     const toolPanel = page.locator("aside, [class*='tool-panel'], section").filter({
       hasText: "Essentials",

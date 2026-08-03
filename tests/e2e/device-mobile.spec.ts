@@ -308,7 +308,7 @@ test.describe("@mobile iOS navigation", () => {
     const back = page.getByTestId("editor-mobile-back");
     await expect(back).toBeVisible();
     await back.click();
-    await page.waitForURL(/\/$/, { timeout: 10_000 });
+    await expect(page).toHaveURL("/", { timeout: 10_000 });
   });
 
   test("last tool clears the fixed bottom nav (#736)", async ({ loggedInPage: page }) => {
