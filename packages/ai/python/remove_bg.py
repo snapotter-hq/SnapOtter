@@ -184,6 +184,9 @@ def main():
     output_path = sys.argv[2]
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 
+    from model_paths import ensure_rembg_model_home
+    ensure_rembg_model_home()
+
     model = settings.get("model", "birefnet-general-lite")
     if model not in ALLOWED_MODELS:
         model = "birefnet-general-lite"

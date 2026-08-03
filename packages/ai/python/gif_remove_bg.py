@@ -269,7 +269,10 @@ def main():
         from PIL import Image
 
         from gpu import onnx_providers
+        from model_paths import ensure_rembg_model_home
         from remove_bg import ALLOWED_MODELS
+
+        ensure_rembg_model_home()
 
         model = settings.get("model", "u2net")
         if model not in ALLOWED_MODELS:
