@@ -904,24 +904,26 @@ export function ToolPage() {
       }
     }
 
+    const conversionCompleteCard = (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center p-8 max-w-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
+            <CheckCircle2 className="h-8 w-8 text-success-ink" />
+          </div>
+          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
+          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
+          {processedSize != null && (
+            <p className="text-xs text-muted-foreground">
+              {processedFileType} &middot; {formatFileSize(processedSize)}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
     // Non-previewable format with no fallback at all - show success card
     if (hasProcessed && !isProcessedPreviewable && !processedPreviewUrl && !originalBlobUrl) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center p-8 max-w-xs">
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-8 w-8 text-success-ink" />
-            </div>
-            <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
-            <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
-            {processedSize != null && (
-              <p className="text-xs text-muted-foreground">
-                {processedFileType} &middot; {formatFileSize(processedSize)}
-              </p>
-            )}
-          </div>
-        </div>
-      );
+      return conversionCompleteCard;
     }
 
     if (
@@ -952,11 +954,30 @@ export function ToolPage() {
     // keep the overlay on top for the next region (#713).
     if (hasProcessed && originalBlobUrl && displayMode === "live-preview" && imageWrapperStyle) {
       const overlayIsInput = toolId ? LIVE_PREVIEW_INPUT_OVERLAY_TOOLS.has(toolId) : false;
+      if (overlayIsInput) {
+        // Never substitute the original for the result here: pixelate
+        // redacts, and a missing result preview rendered as the untouched
+        // original would show unredacted content under the processed
+        // filename. Without a renderable result, show the success card.
+        const resultSrc = processedPreviewUrl ?? (isProcessedPreviewable ? processedUrl : null);
+        if (!resultSrc) {
+          return conversionCompleteCard;
+        }
+        return (
+          <ImageViewer
+            src={resultSrc}
+            filename={processedFileName}
+            fileSize={processedSize ?? 0}
+            imageWrapperStyle={imageWrapperStyle}
+            imageWrapperChildren={imageWrapperChildren}
+          />
+        );
+      }
       return (
         <ImageViewer
-          src={overlayIsInput ? displayUrl : originalBlobUrl}
-          filename={overlayIsInput ? processedFileName : (selectedFileName ?? files[0].name)}
-          fileSize={overlayIsInput ? (processedSize ?? 0) : (selectedFileSize ?? files[0].size)}
+          src={originalBlobUrl}
+          filename={selectedFileName ?? files[0].name}
+          fileSize={selectedFileSize ?? files[0].size}
           imageWrapperStyle={imageWrapperStyle}
           imageWrapperChildren={imageWrapperChildren}
         />
