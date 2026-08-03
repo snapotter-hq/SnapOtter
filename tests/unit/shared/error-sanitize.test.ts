@@ -127,6 +127,16 @@ describe("rebuildErrorValue ladder", () => {
   it("returns null only when there is no message and no stack", () => {
     expect(rebuildErrorValue({ name: "Weird" })).toBeNull();
   });
+
+  it("handles a pathological stack without catastrophic backtracking", () => {
+    const e = new Error("");
+    e.stack = `Error\n    at x (/apps/${".".repeat(100000)})`;
+    const start = performance.now();
+    const out = rebuildErrorValue(e);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(500);
+    expect(out).toBeNull();
+  });
 });
 
 describe("extractErrorCode", () => {

@@ -62,7 +62,7 @@ function frameHint(err: unknown): string | null {
   const stack = (err as { stack?: unknown } | null)?.stack;
   if (typeof stack !== "string") return null;
   const line = stack.split("\n").find((l) => l.includes("/apps/") || l.includes("/packages/"));
-  const m = line?.match(/([^/\\]+\.[cm]?[jt]sx?):(\d+)/);
+  const m = line?.slice(0, 300).match(/([^/\\\s():]+):(\d+)/);
   return m ? `at ${m[1]}:${m[2]}` : null;
 }
 

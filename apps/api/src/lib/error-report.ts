@@ -112,7 +112,7 @@ export function errorSignature(err: unknown): string {
   let frame = "-";
   if (typeof e?.stack === "string") {
     const line = e.stack.split("\n").find((l) => l.includes("/apps/") || l.includes("/packages/"));
-    const m = line?.match(/([^/\\]+\.[cm]?[jt]sx?):(\d+)/);
+    const m = line?.slice(0, 300).match(/([^/\\\s():]+):(\d+)/);
     if (m) frame = `${m[1]}:${m[2]}`;
   }
   return `${name}:${code}:${frame}`;
