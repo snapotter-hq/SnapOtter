@@ -16,6 +16,7 @@ export interface UpscaleOptions {
   denoise?: number;
   format?: string;
   quality?: number;
+  signal?: AbortSignal;
 }
 
 export interface UpscaleResult {
@@ -32,6 +33,7 @@ export async function upscale(
   options: UpscaleOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<UpscaleResult> {
+  const { signal, ...pythonOptions } = options;
   const inputPath = join(outputDir, "input_upscale.png");
   const outputPath = join(outputDir, "output_upscale.png");
 
@@ -40,7 +42,7 @@ export async function upscale(
 
   const meta = await sharp(pngBuffer).metadata();
   const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
-  const scale = options.scale ?? 2;
+  const scale = pythonOptions.scale ?? 2;
   const effectiveMp = megapixels * scale ** 2;
   // CPU inference is ~50-100x slower than GPU; be generous for self-hosted NAS hardware
   const rateMs = isGpuAvailable() ? 30_000 : 180_000;
@@ -48,8 +50,8 @@ export async function upscale(
 
   const { stdout } = await runPythonWithProgress(
     "upscale.py",
-    [inputPath, outputPath, JSON.stringify(options)],
-    { onProgress, timeout },
+    [inputPath, outputPath, JSON.stringify(pythonOptions)],
+    { onProgress, timeout, signal },
   );
 
   const result = parseStdoutJson(stdout);

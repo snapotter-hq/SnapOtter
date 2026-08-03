@@ -1667,15 +1667,15 @@ describe("OCR dynamic timeout", () => {
 // ── removeBackground dynamic timeout ────────────────────────────────
 
 describe("removeBackground dynamic timeout", () => {
-  it("uses megapixel-based timeout for large images", async () => {
+  it("uses the CPU floor for small images when no GPU is available", async () => {
     vi.mocked(parseStdoutJson).mockReturnValue({ success: true });
 
     await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
 
-    // sharp metadata returns 800x600 = 0.48MP
-    // baseTimeout = 300000, timeout = max(300000, 0.48 * 30 * 1000) = 300000
+    // sharp metadata returns 800x600 = 0.48MP; isGpuAvailable is mocked false
+    // baseTimeout = 600000 (CPU), timeout = max(600000, 0.48 * 180 * 1000)
     const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-    expect(options.timeout).toBe(300000);
+    expect(options.timeout).toBe(600000);
   });
 });
 

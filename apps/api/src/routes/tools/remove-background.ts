@@ -56,6 +56,7 @@ registerAiJobHandler("remove-background", async (input, data, ctx) => {
       model: settings.model,
       edgeRefine: settings.edgeRefine,
       decontaminate: settings.decontaminate,
+      signal: ctx.signal,
     },
     (percent, stage) => ctx.report(percent, stage),
   );
@@ -397,6 +398,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           model: s.model,
           edgeRefine: s.edgeRefine,
           decontaminate: s.decontaminate,
+          signal: ctx?.signal,
         });
 
         const fmt = (s.outputFormat ?? "png") as BgOutputFormat;

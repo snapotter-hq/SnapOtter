@@ -54,7 +54,15 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
   const result = await upscale(
     input,
     ctx.scratchDir,
-    { scale, model, faceEnhance, denoise, format: pythonFormat, quality: outputQuality },
+    {
+      scale,
+      model,
+      faceEnhance,
+      denoise,
+      format: pythonFormat,
+      quality: outputQuality,
+      signal: ctx.signal,
+    },
     (percent, stage) => ctx.report(percent, stage),
   );
 
@@ -255,7 +263,7 @@ export function registerUpscale(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await upscale(orientedBuffer, scratchDir, { scale });
+        const result = await upscale(orientedBuffer, scratchDir, { scale, signal: ctx?.signal });
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         let outputBuffer = result.buffer;
         if (outputFormat.format !== "png") {

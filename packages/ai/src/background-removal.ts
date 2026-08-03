@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
+  isGpuAvailable,
   type ProgressCallback,
   parseStdoutJson,
   runPythonWithProgress,
@@ -69,8 +70,13 @@ export async function removeBackground(
 
   try {
     const megapixels = (origW * origH) / 1_000_000;
-    const baseTimeout = sidecarOptions.model?.startsWith("birefnet") ? 600000 : 300000;
-    const timeout = Math.max(baseTimeout, megapixels * 30 * 1000);
+    const gpu = isGpuAvailable();
+    // CPU inference is ~50-100x slower than GPU; mirror the upscaler's CPU
+    // rate, and give CPU runs a 10-minute floor since model load alone can
+    // exceed 5 minutes on NAS-class hardware.
+    const baseTimeout = sidecarOptions.model?.startsWith("birefnet") || !gpu ? 600_000 : 300_000;
+    const rateMs = gpu ? 30_000 : 180_000;
+    const timeout = Math.max(baseTimeout, megapixels * rateMs);
 
     const rawMask = await runAndParse(
       inputPath,
@@ -122,7 +128,7 @@ async function runAndParse(
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-      { onProgress, timeout: 300000, signal },
+      { onProgress, timeout, signal },
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {

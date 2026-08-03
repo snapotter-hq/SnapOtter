@@ -125,6 +125,16 @@ describe("upscale", () => {
       expect(JSON.parse(args[2])).toEqual(allOptions);
     });
 
+    it("forwards AbortSignal to the bridge without serializing it into the args JSON", async () => {
+      const controller = new AbortController();
+
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2, signal: controller.signal });
+
+      const [, args, bridgeOptions] = vi.mocked(runPythonWithProgress).mock.calls[0];
+      expect(JSON.parse(args[2])).toEqual({ scale: 2 });
+      expect(bridgeOptions).toEqual(expect.objectContaining({ signal: controller.signal }));
+    });
+
     it("converts input to PNG before writing", async () => {
       await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR);
 

@@ -21,11 +21,16 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
+  isGpuAvailable: vi.fn(() => false),
 }));
 
 import sharp from "sharp";
 import { removeBackground } from "../../../packages/ai/src/background-removal.js";
-import { parseStdoutJson, runPythonWithProgress } from "../../../packages/ai/src/bridge.js";
+import {
+  isGpuAvailable,
+  parseStdoutJson,
+  runPythonWithProgress,
+} from "../../../packages/ai/src/bridge.js";
 
 const FAKE_INPUT = Buffer.from("fake-image-data");
 const FAKE_OUTPUT_DIR = "/tmp/test-output";
@@ -40,6 +45,7 @@ beforeEach(() => {
     stderr: "",
   });
   vi.mocked(parseStdoutJson).mockReturnValue({ success: true });
+  vi.mocked(isGpuAvailable).mockReturnValue(false);
   vi.mocked(sharp).mockImplementation(
     () =>
       ({
@@ -245,28 +251,7 @@ describe("removeBackground", () => {
   });
 
   describe("timeout calculation", () => {
-    it("uses 300000ms base timeout for non-birefnet models", async () => {
-      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
-
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBe(300000);
-    });
-
-    it("uses 600000ms base timeout for birefnet models", async () => {
-      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
-
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBeGreaterThanOrEqual(600000);
-    });
-
-    it("uses 600000ms base timeout for birefnet-massive model", async () => {
-      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-massive" });
-
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBeGreaterThanOrEqual(600000);
-    });
-
-    it("scales timeout with megapixels for large images", async () => {
+    const mock24MpImage = () => {
       vi.mocked(sharp).mockImplementation(
         () =>
           ({
@@ -276,19 +261,83 @@ describe("removeBackground", () => {
             metadata: vi.fn().mockResolvedValue({ width: 6000, height: 4000 }),
           }) as unknown as ReturnType<typeof sharp>,
       );
+    };
 
-      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    describe("with a GPU", () => {
+      beforeEach(() => {
+        vi.mocked(isGpuAvailable).mockReturnValue(true);
+      });
 
-      // 24 MP * 30 * 1000 = 720000 > 300000
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBe(720000);
+      it("uses 300000ms base timeout for non-birefnet models", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(300000);
+      });
+
+      it("uses 600000ms base timeout for birefnet models", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBeGreaterThanOrEqual(600000);
+      });
+
+      it("uses 600000ms base timeout for birefnet-massive model", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-massive" });
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBeGreaterThanOrEqual(600000);
+      });
+
+      it("scales timeout at 30s per megapixel for large images", async () => {
+        mock24MpImage();
+
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+        // 24 MP * 30 * 1000 = 720000 > 300000
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(720000);
+      });
+
+      it("uses default 300000ms base when model is not specified", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(300000);
+      });
     });
 
-    it("uses default 300000ms base when model is not specified", async () => {
-      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    describe("CPU-only", () => {
+      it("raises the base timeout to 600000ms: model load alone can exceed 5 minutes", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
 
-      const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
-      expect(options.timeout).toBe(300000);
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(600000);
+      });
+
+      it("keeps the 600000ms base for birefnet models", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(600000);
+      });
+
+      it("scales timeout at 180s per megapixel, matching the upscaler's CPU rate", async () => {
+        mock24MpImage();
+
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+        // 24 MP * 180 * 1000 = 4320000 > 600000
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(4320000);
+      });
+
+      it("uses the 600000ms base when model is not specified", async () => {
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR);
+
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(600000);
+      });
     });
   });
 
@@ -492,15 +541,29 @@ describe("removeBackground", () => {
       expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
     });
 
-    it("uses 300000ms timeout for the u2net fallback attempt", async () => {
+    it("gives the u2net fallback attempt the same adaptive timeout as the primary attempt", async () => {
+      // CPU-only large image: the fallback still runs on the same slow
+      // hardware, so a fixed 300s budget would kill it where the primary
+      // attempt was allowed 180s/MP.
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 6000, height: 4000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
       vi.mocked(runPythonWithProgress)
         .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
         .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
 
       await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
 
+      const primaryOptions = vi.mocked(runPythonWithProgress).mock.calls[0][2];
       const fallbackOptions = vi.mocked(runPythonWithProgress).mock.calls[1][2];
-      expect(fallbackOptions.timeout).toBe(300000);
+      expect(fallbackOptions.timeout).toBe(primaryOptions.timeout);
+      expect(fallbackOptions.timeout).toBe(4320000);
     });
 
     it("propagates error if fallback also fails", async () => {

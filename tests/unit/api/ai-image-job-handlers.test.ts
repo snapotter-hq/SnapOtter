@@ -8,6 +8,7 @@ import {
   removeBackground,
   removeRedEye,
   restorePhoto,
+  upscale,
 } from "@snapotter/ai";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,8 +20,10 @@ import { registerColorize } from "../../../apps/api/src/routes/tools/colorize.js
 import { registerEnhanceFaces } from "../../../apps/api/src/routes/tools/enhance-faces.js";
 import { registerNoiseRemoval } from "../../../apps/api/src/routes/tools/noise-removal.js";
 import { registerRedEyeRemoval } from "../../../apps/api/src/routes/tools/red-eye-removal.js";
+import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
 import { registerRestorePhoto } from "../../../apps/api/src/routes/tools/restore-photo.js";
 import { registerTransparencyFixer } from "../../../apps/api/src/routes/tools/transparency-fixer.js";
+import { registerUpscale } from "../../../apps/api/src/routes/tools/upscale.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const aiMocks = vi.hoisted(() => ({
@@ -31,6 +34,7 @@ const aiMocks = vi.hoisted(() => ({
   removeBackground: vi.fn(),
   removeRedEye: vi.fn(),
   restorePhoto: vi.fn(),
+  upscale: vi.fn(),
 }));
 
 vi.mock("@snapotter/ai", () => ({
@@ -41,6 +45,7 @@ vi.mock("@snapotter/ai", () => ({
   removeBackground: aiMocks.removeBackground,
   removeRedEye: aiMocks.removeRedEye,
   restorePhoto: aiMocks.restorePhoto,
+  upscale: aiMocks.upscale,
 }));
 
 const PNG = readFixture(fixtures.image.base.png200);
@@ -102,6 +107,13 @@ function resetAiMocks() {
     eyesCorrected: 2,
   });
   vi.mocked(removeBackground).mockResolvedValue(PNG);
+  vi.mocked(upscale).mockResolvedValue({
+    buffer: PNG,
+    width: 400,
+    height: 300,
+    method: "realesrgan",
+    format: "png",
+  });
   vi.mocked(isMemoryAllocError).mockReturnValue(false);
 }
 
@@ -295,6 +307,64 @@ describe("AI image job handlers", () => {
       contentType: "image/png",
       resultPayload: { filename: "photo.png" },
     });
+  });
+});
+
+describe("worker abort signal pass-through", () => {
+  // A worker timeout or user cancel aborts ctx.signal; without forwarding it,
+  // the Python inference keeps burning CPU after the job is already dead.
+  it("remove-background forwards ctx.signal to the sidecar call", async () => {
+    registerRemoveBackground(fakeApp);
+
+    await runAiToolJob(job("remove-background", { model: "u2net" }), PNG, ctx);
+
+    expect(removeBackground).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ model: "u2net", signal: ctx.signal }),
+      expect.any(Function),
+    );
+  });
+
+  it("upscale forwards ctx.signal to the sidecar call", async () => {
+    registerUpscale(fakeApp);
+
+    await runAiToolJob(job("upscale", { scale: 2, format: "png" }), PNG, ctx);
+
+    expect(upscale).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ scale: 2, signal: ctx.signal }),
+      expect.any(Function),
+    );
+  });
+
+  it("remove-background pipeline processor forwards ctx.signal", async () => {
+    registerRemoveBackground(fakeApp);
+
+    const config = getToolConfig("remove-background");
+    expect(config).toBeDefined();
+    await config?.process(PNG, { model: "u2net" }, "photo.png", ctx);
+
+    expect(removeBackground).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      SCRATCH_DIR,
+      expect.objectContaining({ model: "u2net", signal: ctx.signal }),
+    );
+  });
+
+  it("upscale pipeline processor forwards ctx.signal", async () => {
+    registerUpscale(fakeApp);
+
+    const config = getToolConfig("upscale");
+    expect(config).toBeDefined();
+    await config?.process(PNG, { scale: 2 }, "photo.png", ctx);
+
+    expect(upscale).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      SCRATCH_DIR,
+      expect.objectContaining({ scale: 2, signal: ctx.signal }),
+    );
   });
 });
 
