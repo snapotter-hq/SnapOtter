@@ -137,24 +137,21 @@ describe("buildBeforeSend (api)", () => {
     const out = send(evt({ contexts: { device: { hostname: "leak" } } }), {})!;
     expect(out.contexts).toBeUndefined();
   });
-  it("keeps a vetted python context and drops overlong fields", () => {
+  it("keeps a vetted python context of frame strings and drops overlong ones", () => {
     const event = {
       ...evt(),
       contexts: {
         python: {
           type: "RuntimeError",
-          frames: [
-            { file: "remove_bg.py", line: 88, func: "run" },
-            { file: "x".repeat(200), line: 1, func: "y".repeat(200) },
-          ],
+          frames: ["remove_bg.py:88 run", "x".repeat(500)],
         },
       },
     };
     const out = send(event, { originalException: new Error("x") })!;
     expect(out.contexts.python.type).toBe("RuntimeError");
     expect(out.contexts.python.frames).toHaveLength(2);
-    expect(out.contexts.python.frames[1].file.length).toBeLessThanOrEqual(64);
-    expect(out.contexts.python.frames[1].func.length).toBeLessThanOrEqual(64);
+    expect(out.contexts.python.frames[0]).toBe("remove_bg.py:88 run");
+    expect(out.contexts.python.frames[1].length).toBeLessThanOrEqual(200);
   });
   it("enforces the 500-events-per-hour ceiling", () => {
     for (let i = 0; i < 500; i++) expect(send(evt(), {})).not.toBeNull();

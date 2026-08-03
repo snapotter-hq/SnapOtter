@@ -198,7 +198,17 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
       }
       const py = err as { pythonType?: string; pythonFrames?: unknown };
       if (Array.isArray(py.pythonFrames) && py.pythonFrames.length) {
-        scope.setContext("python", { type: py.pythonType, frames: py.pythonFrames });
+        // Flatten each frame to a short string. An array of frame OBJECTS sits
+        // deeper than Sentry's default normalizeDepth (3), so the SDK truncates
+        // each to "[Object]" before beforeSend runs and the context is lost.
+        // Strings are primitives and survive normalization at any depth.
+        const frames = py.pythonFrames
+          .map((f) => {
+            const o = (f ?? {}) as { file?: unknown; line?: unknown; func?: unknown };
+            return `${String(o.file)}:${String(o.line)} ${String(o.func)}`;
+          })
+          .slice(0, 20);
+        scope.setContext("python", { type: py.pythonType, frames });
       }
       Sentry.captureException(err instanceof Error ? err : new Error(String(err)));
     });
