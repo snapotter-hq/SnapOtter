@@ -38,10 +38,10 @@ const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-e
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 // After degrading a dead POST to the async path (#722), how long to wait for
-// any SSE frame proving the job reached the server. The factory publishes its
-// first progress frame within milliseconds of the request ending, and the SSE
-// replay covers jobs that finished while disconnected, so a silent 30s means
-// the request tail never arrived and no job exists.
+// any SSE frame proving the job reached the server. Only armed when no frame
+// arrived before the degrade; the progress route replays live queued and
+// processing rows on connect, so a silent 30s on a fresh SSE means the
+// request tail never arrived and no job exists.
 const JOB_EVIDENCE_TIMEOUT_MS = 30_000;
 
 /** Extension to MIME type for batch ZIP blob construction. Falls back to undefined (generic). */
@@ -103,6 +103,10 @@ export function useToolProcessor(toolId: string) {
   // serverFileId to the saved result, so "new" keeps deriving from the
   // original library file on re-runs.
   const saveModeRef = useRef<"new" | "overwrite">("new");
+  const jobEvidenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether any single-type SSE frame arrived for the current run: proof the
+  // job reached the server, consulted when a dead POST degrades (#722).
+  const sawJobEvidenceRef = useRef(false);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
   const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
@@ -112,19 +116,6 @@ export function useToolProcessor(toolId: string) {
     activeEntryIndexRef.current = null;
     setActiveJob(null, null);
   }, [setActiveJob]);
-
-  const cancelCurrentJob = useCallback(async () => {
-    const jobId = activeJobIdRef.current;
-    if (!jobId) return;
-    try {
-      await fetch(`/api/v1/jobs/${jobId}/cancel`, {
-        method: "POST",
-        headers: formatHeaders(),
-      });
-    } catch {
-      // Cancel request failed; SSE handler will clean up
-    }
-  }, []);
 
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) {
@@ -141,8 +132,6 @@ export function useToolProcessor(toolId: string) {
       reconnectSSERef.current(true);
     }, SSE_STALL_TIMEOUT_MS);
   }, [clearStallTimer]);
-
-  const jobEvidenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearJobEvidenceTimer = useCallback(() => {
     if (jobEvidenceTimerRef.current) {
@@ -166,10 +155,42 @@ export function useToolProcessor(toolId: string) {
         eventSourceRef.current = null;
       }
       clearActiveJob();
-      setError("Processing was interrupted. Retry when reconnected.");
+      setError(
+        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+      );
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
     }, JOB_EVIDENCE_TIMEOUT_MS);
+  }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
+
+  const cancelCurrentJob = useCallback(async () => {
+    const jobId = activeJobIdRef.current;
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
+        method: "POST",
+        headers: formatHeaders(),
+      });
+      // 404 means no job exists server-side (possible in the degraded #722
+      // state when the request tail never arrived). Nothing will ever emit a
+      // frame, so settle locally as canceled instead of blaming the network
+      // 30 seconds later.
+      if (res.status === 404 && activeJobIdRef.current === jobId) {
+        clearJobEvidenceTimer();
+        clearStallTimer();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        clearActiveJob();
+        setError("Canceled");
+        setProcessing(false);
+        setProgress(IDLE_PROGRESS);
+      }
+    } catch {
+      // Cancel request failed; SSE handler will clean up
+    }
   }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
 
   const reconnectSSE = useCallback(
@@ -205,6 +226,7 @@ export function useToolProcessor(toolId: string) {
             if (data.type !== "single") return;
 
             // Any single frame proves the job reached the server (#722).
+            sawJobEvidenceRef.current = true;
             clearJobEvidenceTimer();
             if (asyncModeRef.current) resetStallTimer();
 
@@ -213,6 +235,10 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
+              // The SSE settles the run; a still-open sync POST (half-dead
+              // proxy, no RST) must not fire a late onerror/ontimeout over
+              // this result. abort() only emits onabort, which stays silent.
+              xhrRef.current?.abort();
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
               const result = data.result as ProcessResult;
@@ -243,6 +269,9 @@ export function useToolProcessor(toolId: string) {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
+              // Settle the still-open POST so its late onerror/ontimeout
+              // cannot replace this specific error with a generic one.
+              xhrRef.current?.abort();
               clearActiveJob();
               setError(data.error || "Processing failed");
               setProcessing(false);
@@ -345,8 +374,9 @@ export function useToolProcessor(toolId: string) {
       setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
       // A stale evidence timer from a previous degraded run must not fire
-      // into this run (#722).
+      // into this run, and evidence never carries across runs (#722).
       clearJobEvidenceTimer();
+      sawJobEvidenceRef.current = false;
 
       const startTime = Date.now();
       elapsedRef.current = setInterval(() => {
@@ -428,13 +458,19 @@ export function useToolProcessor(toolId: string) {
         if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
         asyncModeRef.current = true;
         setActiveJob(clientJobId, cancelCurrentJob);
-        // If the drop also took the SSE, reopen it; the terminal replay
-        // cache covers a job that finished in between.
-        reconnectSSE();
+        // Force a fresh SSE: the event that got us here says the network
+        // path just died, and a half-open source keeps readyState OPEN while
+        // delivering nothing. The server replays terminal state and live
+        // queued/processing rows on connect, so the swap loses nothing.
+        reconnectSSE(true);
         resetStallTimer();
-        // Heartbeats alone must not hold "processing" forever if the
-        // request tail never reached the server.
-        startJobEvidenceTimer();
+        // Heartbeats alone must not hold "processing" forever if the request
+        // tail never reached the server. A frame seen before the degrade
+        // already proves the job exists; queued jobs can then stay silent
+        // far longer than any timeout we could pick here.
+        if (!sawJobEvidenceRef.current) {
+          startJobEvidenceTimer();
+        }
         return true;
       };
 
@@ -496,6 +532,10 @@ export function useToolProcessor(toolId: string) {
       };
 
       xhr.onerror = () => {
+        // This run already settled (SSE delivered its terminal frame) or a
+        // newer run took over: a late socket event must neither error a
+        // finished result nor tear down the successor's state.
+        if (activeJobIdRef.current !== clientJobId) return;
         if (degradeToAsync()) return;
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -510,6 +550,7 @@ export function useToolProcessor(toolId: string) {
       };
 
       xhr.ontimeout = () => {
+        if (activeJobIdRef.current !== clientJobId) return;
         if (degradeToAsync()) return;
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -586,8 +627,9 @@ export function useToolProcessor(toolId: string) {
       setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
       // A stale evidence timer from a previous degraded run must not fire
-      // into this run (#722).
+      // into this run, and evidence never carries across runs (#722).
       clearJobEvidenceTimer();
+      sawJobEvidenceRef.current = false;
 
       const startTime = Date.now();
       elapsedRef.current = setInterval(() => {

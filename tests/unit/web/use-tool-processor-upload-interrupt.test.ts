@@ -193,7 +193,7 @@ describe("useToolProcessor upload interruption (#722)", () => {
     });
 
     expect(useFileStore.getState().error).toBe(
-      "Processing was interrupted. Retry when reconnected.",
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
     );
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().activeJobId).toBeNull();
@@ -247,6 +247,177 @@ describe("useToolProcessor upload interruption (#722)", () => {
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(true);
     expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+
+    unmount();
+  });
+
+  it("skips the evidence timer when a frame already proved the job exists", () => {
+    const { unmount } = startRun();
+
+    // The factory's early progress frame arrives while the POST is still in
+    // flight; a queued job may then stay silent far longer than 30s.
+    act(() => {
+      sendSingleFrame({ phase: "processing", percent: 5, stage: "Validating..." });
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("force-reopens the SSE on degrade even when the old one looks open", () => {
+    const { unmount } = startRun();
+
+    // A half-open connection keeps readyState OPEN while delivering nothing;
+    // the event that triggered the degrade says the network path just died.
+    expect(MockEventSource.instances).toHaveLength(1);
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("recovers when the drop killed the SSE along with the POST", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      // Sync-mode SSE error closes the source and nulls the ref.
+      MockEventSource.instances[0].onerror?.();
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    expect(MockEventSource.instances.length).toBeGreaterThan(1);
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: "server-job",
+          downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("a degraded run's leftovers cannot touch the next run", () => {
+    const { result, unmount } = startRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Second run: the previous run's evidence timer must not fire into it.
+    const file = new File([new ArrayBuffer(64)], "clip2.mp4", { type: "video/mp4" });
+    act(() => {
+      useFileStore.getState().setFiles([file]);
+      result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("keeps a failed frame's error over the evidence timeout", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "Canceled" });
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+
+    unmount();
+  });
+
+  it("a late client timeout cannot overwrite a result the SSE already delivered", () => {
+    const { unmount } = startRun();
+
+    // Sync flow, no degrade: the SSE settles the run first (half-dead proxy
+    // holds the POST open without an RST), then the XHR's own timer fires.
+    act(() => {
+      xhrs[0].upload.onload?.();
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: "server-job",
+          downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+    act(() => {
+      xhrs[0].ontimeout?.();
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+    unmount();
+  });
+
+  it("cancel during degraded mode with an unknown job cleans up as canceled", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    expect(cancel).not.toBeNull();
+    await act(async () => {
+      await cancel?.();
+    });
+
+    // A 404 means no job exists server-side: nothing will ever emit a frame,
+    // so waiting (or blaming the network) misleads a user who clicked cancel.
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
 
     unmount();
   });

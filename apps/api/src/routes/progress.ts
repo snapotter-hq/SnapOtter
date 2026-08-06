@@ -494,6 +494,32 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       try {
         const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
         if (ended) return;
+        // A live (queued/processing) single-file row replays a nonterminal
+        // frame: a reconnecting client must be able to tell "the job exists
+        // and is working" apart from "no such job", and heartbeats carry no
+        // evidence. Queued jobs publish nothing until the worker picks them
+        // up, so without this replay a busy pool looks identical to a job
+        // that never existed, and a client that degraded a dead upload
+        // socket to the async path gives up on it (#722).
+        if (
+          row &&
+          row.type !== "batch" &&
+          (row.status === "queued" || row.status === "processing")
+        ) {
+          const progress: Record<string, unknown> = isRecord(row.progress) ? row.progress : {};
+          const storedPercent = progress.percent;
+          const synthetic: SingleFileProgress = {
+            jobId,
+            type: "single",
+            phase: "processing",
+            percent:
+              typeof storedPercent === "number" && Number.isFinite(storedPercent)
+                ? storedPercent
+                : 0,
+            ...(typeof progress.stage === "string" ? { stage: progress.stage } : {}),
+          };
+          sendFrame(JSON.stringify(synthetic));
+        }
         if (
           row &&
           (row.status === "completed" || row.status === "failed" || row.status === "canceled")
