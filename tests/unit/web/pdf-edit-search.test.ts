@@ -16,8 +16,8 @@ const PDF_EDIT_TOOLS = new Set(TOOLS.filter((t) => t.category === "pdf-edit").ma
 describe("PDF editing discoverability (#733)", () => {
   it("'edit pdf' surfaces the PDF editing suite", () => {
     const results = search("edit pdf");
-    // Reported symptom: this returned nothing, so the user concluded the
-    // feature did not exist.
+    // Reported symptom: this returned no useful results (only converters that
+    // end in "-pdf"), so the user concluded the feature did not exist.
     expect(results.length).toBeGreaterThanOrEqual(3);
     // The top few hits are all genuine PDF editing tools, not converters that
     // merely end in "-pdf".

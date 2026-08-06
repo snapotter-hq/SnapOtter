@@ -1,23 +1,10 @@
 import { normalizeSearchQuery, TOOLS } from "@snapotter/shared";
 import Fuse from "fuse.js";
 import { describe, expect, it } from "vitest";
-
-const OPTS = {
-  keys: [
-    { name: "name", weight: 0.35 },
-    { name: "description", weight: 0.25 },
-    { name: "keywords", weight: 0.3 },
-    { name: "modality", weight: 0.15 },
-    { name: "id", weight: 0.15 },
-    { name: "category", weight: 0.1 },
-  ],
-  threshold: 0.45,
-  ignoreLocation: true,
-  minMatchCharLength: 2,
-};
+import { FUSE_OPTIONS } from "@/hooks/use-fuse-search";
 
 function search(q: string) {
-  const fuse = new Fuse(TOOLS, OPTS as never);
+  const fuse = new Fuse(TOOLS, FUSE_OPTIONS);
   return fuse.search(normalizeSearchQuery(q)).map((r) => r.item.id);
 }
 
