@@ -1395,6 +1395,7 @@ const BASE_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
+    keywords: ["edit pdf", "modify pdf"],
   },
   {
     id: "convert-document",
@@ -1596,6 +1597,7 @@ const BASE_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
+    keywords: ["edit pdf", "modify pdf"],
   },
   {
     id: "pdf-page-numbers",
@@ -1607,6 +1609,7 @@ const BASE_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
+    keywords: ["edit pdf", "modify pdf"],
   },
   {
     id: "flatten-pdf",
@@ -1629,6 +1632,7 @@ const BASE_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
+    keywords: ["edit pdf", "modify pdf"],
   },
   {
     id: "sign-pdf",
@@ -1640,7 +1644,20 @@ const BASE_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
-    keywords: ["sign", "signature", "e-sign", "esign", "fill and sign", "autograph"],
+    keywords: [
+      "sign",
+      "signature",
+      "e-sign",
+      "esign",
+      "fill and sign",
+      "autograph",
+      "annotate",
+      "annotate pdf",
+      "markup",
+      "pdf editor",
+      "edit pdf",
+      "modify pdf",
+    ],
   },
   {
     id: "pdf-to-text",

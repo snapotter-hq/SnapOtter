@@ -4,7 +4,9 @@ import type { IFuseOptions } from "fuse.js";
 import Fuse from "fuse.js";
 import { useMemo } from "react";
 
-const FUSE_OPTIONS: IFuseOptions<Tool> = {
+// Exported so tests exercise the real ranking config instead of a copy that
+// can drift out of sync with production (which would give false green).
+export const FUSE_OPTIONS: IFuseOptions<Tool> = {
   keys: [
     { name: "name", weight: 0.35 },
     { name: "keywords", weight: 0.3 },
