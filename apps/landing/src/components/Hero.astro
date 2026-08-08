@@ -5,6 +5,7 @@ import { t } from "@/i18n";
 import CategoryCards from "./CategoryCards.astro";
 import HeroQuickstart from "./HeroQuickstart.astro";
 import HeroSearch from "./HeroSearch.astro";
+import HeroTestimonialStrip from "./HeroTestimonialStrip.astro";
 import TrustSignals from "./TrustSignals.astro";
 
 interface Props {
@@ -67,5 +68,8 @@ const trustBadges = [
 
     <!-- Stats strip -->
     <TrustSignals locale={locale} />
+
+    <!-- Social-proof strip: a one-row teaser for the full Testimonials section -->
+    <HeroTestimonialStrip locale={locale} />
   </div>
 </section>

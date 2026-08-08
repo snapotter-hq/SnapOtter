@@ -1,0 +1,84 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+import { HERO_TESTIMONIALS } from "@/data/testimonials";
+import { t } from "@/i18n";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+const items = HERO_TESTIMONIALS;
+// Duration scales with item count so the strip keeps a constant visual speed
+// if the curated set grows or shrinks.
+const duration = `${items.length * 7}s`;
+---
+
+<div class="reveal relative mt-14">
+  <!-- Label doubles as a jump link to the full testimonials section below. -->
+  <a
+    href="#testimonials"
+    class="mx-auto mb-4 flex w-fit items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted transition-colors hover:text-primary-ink"
+    aria-label={t(locale, "home.hero.socialProof.aria")}
+  >
+    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+    {t(locale, "home.hero.socialProof.label")}
+    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+  </a>
+
+  <!--
+    Pinned to LTR in every locale. Quotes are user-submitted and never
+    translated, so they are always Latin script; under dir="rtl" the flex track
+    lays out from the right and drifts off-screen. Mirrors Testimonials.astro.
+    Cards match that section's styling: this strip sits on the cream page
+    background (the hero gradient masks out above the fold), not the warm band.
+  -->
+  <div class="marquee -mx-6" dir="ltr">
+    <div class="marquee-viewport">
+      <ul class="marquee-track" style={`--marquee-duration: ${duration}`}>
+        {
+          [false, true].map((isClone) =>
+            items.map((item) => (
+              <li class="marquee-item" aria-hidden={isClone ? "true" : undefined}>
+                <figure class="flex h-full w-full flex-col gap-2.5 rounded-2xl border border-border bg-surface p-5 text-start shadow-[0_1px_2px_rgba(26,24,20,0.04)]">
+                  <div class="flex gap-0.5 text-primary" aria-hidden="true">
+                    {Array.from({ length: 5 }).map(() => (
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 1.5l2.47 5.16 5.68.78-4.12 3.95 1.02 5.61L10 14.35l-5.05 2.65 1.02-5.61L1.85 7.44l5.68-.78L10 1.5z" />
+                      </svg>
+                    ))}
+                  </div>
+
+                  <blockquote
+                    class="line-clamp-3 grow text-sm leading-relaxed text-foreground"
+                    lang={item.lang}
+                  >
+                    {item.quote}
+                  </blockquote>
+
+                  <figcaption class="flex items-baseline justify-between gap-3 text-xs">
+                    <span class="font-semibold text-foreground">{item.author}</span>
+                    {item.url ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        class="shrink-0 font-medium text-primary-ink underline-offset-2 hover:text-primary-ink-strong hover:underline"
+                        tabindex={isClone ? -1 : undefined}
+                      >
+                        {item.context}
+                      </a>
+                    ) : (
+                      <span class="shrink-0 text-muted">{item.context}</span>
+                    )}
+                  </figcaption>
+                </figure>
+              </li>
+            )),
+          )
+        }
+      </ul>
+    </div>
+  </div>
+</div>

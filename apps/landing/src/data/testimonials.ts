@@ -29,6 +29,8 @@ export interface Testimonial {
   url?: string;
   /** BCP-47 tag when the quote is not in English, for correct screen-reader pronunciation. */
   lang?: string;
+  /** Surfaced in the single-row hero strip (a teaser for the full section). */
+  hero?: boolean;
 }
 
 export const TESTIMONIALS: Testimonial[] = [
@@ -38,12 +40,14 @@ export const TESTIMONIALS: Testimonial[] = [
     author: "Dhruv Bhutani",
     context: "XDA Developers",
     url: "https://www.xda-developers.com/i-ditched-lightroom-subscription-for-a-self-hosted-tool/",
+    hero: true,
   },
   {
     quote:
       "Fantastic software! I managed to replace [my old converter] and even got more features with SnapOtter.",
     author: "Self-hosted admin",
     context: "Shared via in-app feedback",
+    hero: true,
   },
   {
     quote:
@@ -51,12 +55,14 @@ export const TESTIMONIALS: Testimonial[] = [
     author: "Yadullah Abidi",
     context: "MakeUseOf",
     url: "https://www.makeuseof.com/stopped-using-cloud-image-editors-found-self-hosted-alternative/",
+    hero: true,
   },
   {
     quote: "I have a 24/7 server that I run SnapOtter on (which is working perfectly!)",
     author: "@amn-96",
     context: "GitHub",
     url: "https://github.com/snapotter-hq/SnapOtter/issues/189",
+    hero: true,
   },
   {
     quote: "Holy shit this is great!",
@@ -75,12 +81,14 @@ export const TESTIMONIALS: Testimonial[] = [
     context: "YouTube",
     url: "https://www.youtube.com/watch?v=UonUAfkSoqM",
     lang: "de",
+    hero: true,
   },
   {
     quote: "Your software is incredible ... thanks for all hard work",
     author: "@arturbacilla",
     context: "GitHub",
     url: "https://github.com/snapotter-hq/SnapOtter/issues/189#issuecomment-4771081169",
+    hero: true,
   },
   {
     quote: "Thank you for your hard work. This is an excellent endeavor.",
@@ -116,18 +124,21 @@ export const TESTIMONIALS: Testimonial[] = [
     quote: "Love the work you guys have put into this! Great job!",
     author: "Docker user",
     context: "Shared via in-app feedback",
+    hero: true,
   },
   {
     quote: "SnapOtter has excellent Smart Crop (subject/face/trim) and Split Image tools",
     author: "@MrCoala",
     context: "GitHub",
     url: "https://github.com/snapotter-hq/SnapOtter/discussions/609",
+    hero: true,
   },
   {
     quote: "Thanks for creating this! Very helpful on linux systems especially",
     author: "u/sidcode",
     context: "r/selfhosted",
     url: "https://www.reddit.com/comments/ojh9ym4",
+    hero: true,
   },
   {
     quote: "Hi, awesome tool.",
@@ -166,6 +177,7 @@ export const TESTIMONIALS: Testimonial[] = [
     author: "Akash Jain",
     context: "YouTube",
     url: "https://www.youtube.com/watch?v=HWC3jX8-tiw",
+    hero: true,
   },
 ];
 
@@ -178,3 +190,11 @@ export const TESTIMONIAL_ROWS: Testimonial[][] = [
   TESTIMONIALS.filter((_, i) => i % 2 === 0),
   TESTIMONIALS.filter((_, i) => i % 2 === 1),
 ];
+
+/**
+ * Curated single-row subset for the hero social-proof strip, weighted toward
+ * quotes with a public, clickable source. In-app quotes stay unattributed per
+ * the rules at the top of this file. This is a teaser; the full Testimonials
+ * section renders every entry in TESTIMONIALS.
+ */
+export const HERO_TESTIMONIALS: Testimonial[] = TESTIMONIALS.filter((t) => t.hero);

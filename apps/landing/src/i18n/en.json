@@ -335,6 +335,8 @@
   "home.hero.subtitle": "Convert, compress, OCR, transcribe, strip metadata, and run local AI across image, video, audio, PDF, and documents. Through a UI, REST API, and pipelines, on infrastructure you own.",
   "home.hero.searchPlaceholder": "Search tools",
   "home.hero.searchEmpty": "No tools match. Try \"resize\", \"convert\", or \"compress\".",
+  "home.hero.socialProof.label": "Loved by self-hosters",
+  "home.hero.socialProof.aria": "Read more from the people running SnapOtter",
   "home.categoryCards.toolCount": "{count} tools",
   "home.categoryCards.image.label": "Image Tools",
   "home.categoryCards.image.blurb": "Edit, resize, and enhance",
