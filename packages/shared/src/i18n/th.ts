@@ -3842,6 +3842,7 @@ export const th: TranslationKeys = {
     filesSelected: "เลือกแล้ว {count} ไฟล์",
     dropToAdd: "วางเพื่อเพิ่มไฟล์",
     dropToReplace: "วางเพื่อแทนที่ไฟล์",
+    reorderHint: "ลากภาพขนาดย่อเพื่อจัดเรียงใหม่ หรือกลับลำดับ ก่อนเรียกใช้",
   },
   reviewPanel: {
     processedResultAlt: "ผลลัพธ์ที่ประมวลผลแล้ว",

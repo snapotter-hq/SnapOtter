@@ -3896,6 +3896,7 @@ export const es: TranslationKeys = {
     filesSelected: "{count} archivos seleccionados",
     dropToAdd: "Suelta para agregar archivos",
     dropToReplace: "Suelta para reemplazar archivo",
+    reorderHint: "Arrastra las miniaturas para reordenar, o invierte el orden, antes de ejecutar.",
   },
   reviewPanel: {
     processedResultAlt: "Resultado procesado",

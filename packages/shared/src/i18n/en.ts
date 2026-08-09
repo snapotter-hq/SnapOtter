@@ -3837,6 +3837,7 @@ export const en = {
     filesSelected: "{count} files selected",
     dropToAdd: "Drop to add files",
     dropToReplace: "Drop to replace file",
+    reorderHint: "Drag the thumbnails to reorder, or reverse the order, before running.",
   },
   reviewPanel: {
     processedResultAlt: "Processed result",

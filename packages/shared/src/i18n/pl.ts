@@ -3908,6 +3908,8 @@ export const pl: TranslationKeys = {
     filesSelected: "Wybrano plików: {count}",
     dropToAdd: "Upuść, aby dodać pliki",
     dropToReplace: "Upuść, aby zastąpić plik",
+    reorderHint:
+      "Przeciągnij miniatury, aby zmienić kolejność, lub odwróć kolejność przed uruchomieniem.",
   },
   reviewPanel: {
     processedResultAlt: "Wynik przetwarzania",

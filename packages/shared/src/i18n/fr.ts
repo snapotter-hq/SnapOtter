@@ -3922,6 +3922,8 @@ export const fr: TranslationKeys = {
     filesSelected: "{count} fichiers sélectionnés",
     dropToAdd: "Déposer pour ajouter des fichiers",
     dropToReplace: "Déposer pour remplacer le fichier",
+    reorderHint:
+      "Faites glisser les miniatures pour les réorganiser, ou inversez l'ordre, avant de lancer.",
   },
   reviewPanel: {
     processedResultAlt: "Résultat traité",

@@ -3903,6 +3903,8 @@ export const tr: TranslationKeys = {
     filesSelected: "{count} dosya seçildi",
     dropToAdd: "Dosya eklemek için bırakın",
     dropToReplace: "Dosyayı değiştirmek için bırakın",
+    reorderHint:
+      "Çalıştırmadan önce sıralamak için küçük resimleri sürükleyin veya sırayı tersine çevirin.",
   },
   reviewPanel: {
     processedResultAlt: "İşlenmiş sonuç",

@@ -3895,6 +3895,8 @@ export const id: TranslationKeys = {
     filesSelected: "{count} file dipilih",
     dropToAdd: "Lepas untuk menambahkan file",
     dropToReplace: "Lepas untuk mengganti file",
+    reorderHint:
+      "Seret gambar mini untuk mengurutkan ulang, atau balik urutannya, sebelum menjalankan.",
   },
   reviewPanel: {
     processedResultAlt: "Hasil yang diproses",

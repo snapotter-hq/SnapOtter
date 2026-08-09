@@ -3864,6 +3864,7 @@ export const ar: TranslationKeys = {
     filesSelected: "تم اختيار {count} ملف",
     dropToAdd: "أفلت لإضافة ملفات",
     dropToReplace: "أفلت لاستبدال الملف",
+    reorderHint: "اسحب الصور المصغّرة لإعادة الترتيب، أو اعكس الترتيب، قبل التشغيل.",
   },
   reviewPanel: {
     processedResultAlt: "النتيجة المعالجة",

@@ -3626,6 +3626,7 @@ export const zhTW: TranslationKeys = {
     filesSelected: "已選取{count}個檔案",
     dropToAdd: "放下以新增檔案",
     dropToReplace: "放下以取代檔案",
+    reorderHint: "執行前可拖曳縮圖重新排序，或反轉順序。",
   },
   reviewPanel: {
     processedResultAlt: "處理結果",

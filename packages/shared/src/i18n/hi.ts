@@ -3693,6 +3693,7 @@ export const hi: TranslationKeys = {
     filesSelected: "{count} फाइलें चुनी गईं",
     dropToAdd: "फाइलें जोड़ने के लिए छोड़ें",
     dropToReplace: "फाइल बदलने के लिए छोड़ें",
+    reorderHint: "चलाने से पहले क्रम बदलने के लिए थंबनेल खींचें, या क्रम उलटें।",
   },
   reviewPanel: {
     processedResultAlt: "प्रोसेस्ड परिणाम",

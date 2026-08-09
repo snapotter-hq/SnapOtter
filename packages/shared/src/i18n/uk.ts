@@ -3898,6 +3898,8 @@ export const uk: TranslationKeys = {
     filesSelected: "Обрано файлів: {count}",
     dropToAdd: "Відпустіть, щоб додати файли",
     dropToReplace: "Відпустіть, щоб замінити файл",
+    reorderHint:
+      "Перетягніть мініатюри, щоб змінити порядок, або змініть його на зворотний, перед запуском.",
   },
   reviewPanel: {
     processedResultAlt: "Результат обробки",

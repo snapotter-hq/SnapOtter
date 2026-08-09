@@ -3903,6 +3903,7 @@ export const ptBR: TranslationKeys = {
     filesSelected: "{count} arquivos selecionados",
     dropToAdd: "Solte para adicionar arquivos",
     dropToReplace: "Solte para substituir arquivo",
+    reorderHint: "Arraste as miniaturas para reordenar, ou inverta a ordem, antes de executar.",
   },
   reviewPanel: {
     processedResultAlt: "Resultado processado",

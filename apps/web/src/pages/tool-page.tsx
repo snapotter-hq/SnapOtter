@@ -1155,6 +1155,9 @@ export function ToolPage() {
 
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-muted-foreground">{t.common.settings}</h3>
+          {canReorder && hasMultiple && (
+            <p className="text-xs text-muted-foreground">{t.dropzone.reorderHint}</p>
+          )}
           <Suspense fallback={<div className="text-xs text-muted-foreground">Loading...</div>}>
             <ToolSettings {...settingsProps} />
           </Suspense>

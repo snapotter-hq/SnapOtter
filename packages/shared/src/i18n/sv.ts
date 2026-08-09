@@ -3892,6 +3892,7 @@ export const sv: TranslationKeys = {
     filesSelected: "{count} filer valda",
     dropToAdd: "Släpp för att lägga till filer",
     dropToReplace: "Släpp för att ersätta fil",
+    reorderHint: "Dra miniatyrerna för att ändra ordning, eller vänd ordningen, innan du kör.",
   },
   reviewPanel: {
     processedResultAlt: "Bearbetat resultat",
