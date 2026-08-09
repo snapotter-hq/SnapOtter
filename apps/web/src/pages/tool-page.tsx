@@ -49,7 +49,11 @@ import { formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
-import { LIVE_PREVIEW_INPUT_OVERLAY_TOOLS, MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
+import {
+  LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
+  MULTI_FILE_TOOLS,
+  REORDERABLE_TOOLS,
+} from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
 import { getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
@@ -301,6 +305,8 @@ export function ToolPage() {
     batchZipFilename,
     selectedIndex,
     setSelectedIndex,
+    reorderFiles,
+    reverseFiles,
     navigateNext,
     navigatePrev,
     currentEntry,
@@ -381,6 +387,7 @@ export function ToolPage() {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragCounter = useRef(0);
   const isMultiFileTool = toolId ? MULTI_FILE_TOOLS.has(toolId) : false;
+  const canReorder = toolId ? REORDERABLE_TOOLS.has(toolId) : false;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
   useEffect(() => {
@@ -1283,6 +1290,8 @@ export function ToolPage() {
                 entries={entries}
                 selectedIndex={selectedIndex}
                 onSelect={setSelectedIndex}
+                onReorder={canReorder ? reorderFiles : undefined}
+                onReverse={canReorder ? reverseFiles : undefined}
               />
             )}
           </section>
@@ -1415,6 +1424,8 @@ export function ToolPage() {
               entries={entries}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
+              onReorder={canReorder ? reorderFiles : undefined}
+              onReverse={canReorder ? reverseFiles : undefined}
             />
           )}
         </section>

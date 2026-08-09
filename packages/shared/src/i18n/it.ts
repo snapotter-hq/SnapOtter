@@ -4060,6 +4060,7 @@ export const it: TranslationKeys = {
     imageControls: "Controlli immagine",
     zoomControls: "Controlli zoom",
     dragToReorder: "Trascina per riordinare",
+    reverseOrder: "Inverti ordine",
     whiteBackground: "Sfondo bianco",
     blackBackground: "Sfondo nero",
     expandPanel: "Espandi pannello",

@@ -4052,6 +4052,7 @@ export const nl: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Zoombediening",
     dragToReorder: "Sleep om te herordenen",
+    reverseOrder: "Volgorde omkeren",
     whiteBackground: "Witte achtergrond",
     blackBackground: "Zwarte achtergrond",
     expandPanel: "Paneel uitvouwen",

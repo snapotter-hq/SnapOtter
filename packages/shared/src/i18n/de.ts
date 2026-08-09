@@ -4067,6 +4067,7 @@ export const de: TranslationKeys = {
     imageControls: "Vorschausteuerung",
     zoomControls: "Zoom-Steuerung",
     dragToReorder: "Ziehen zum Neuordnen",
+    reverseOrder: "Reihenfolge umkehren",
     whiteBackground: "Weißer Hintergrund",
     blackBackground: "Schwarzer Hintergrund",
     expandPanel: "Bereich erweitern",

@@ -4070,6 +4070,7 @@ export const fr: TranslationKeys = {
     imageControls: "Contrôles d'aperçu",
     zoomControls: "Contrôles de zoom",
     dragToReorder: "Glisser pour réorganiser",
+    reverseOrder: "Inverser l'ordre",
     whiteBackground: "Arrière-plan blanc",
     blackBackground: "Arrière-plan noir",
     expandPanel: "Développer le panneau",

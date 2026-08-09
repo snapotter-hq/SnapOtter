@@ -3772,6 +3772,7 @@ export const zhTW: TranslationKeys = {
     imageControls: "預覽控制項",
     zoomControls: "縮放控制",
     dragToReorder: "拖曳以重新排序",
+    reverseOrder: "反轉順序",
     whiteBackground: "白色背景",
     blackBackground: "黑色背景",
     expandPanel: "展開面板",

@@ -3969,6 +3969,7 @@ export const ko: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "확대/축소 컨트롤",
     dragToReorder: "드래그하여 순서 변경",
+    reverseOrder: "순서 뒤집기",
     whiteBackground: "흰색 배경",
     blackBackground: "검은색 배경",
     expandPanel: "패널 펼치기",

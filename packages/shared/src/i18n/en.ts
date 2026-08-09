@@ -3983,6 +3983,7 @@ export const en = {
     imageControls: "Preview controls",
     zoomControls: "Zoom controls",
     dragToReorder: "Drag to reorder",
+    reverseOrder: "Reverse order",
     whiteBackground: "White background",
     blackBackground: "Black background",
     expandPanel: "Expand panel",

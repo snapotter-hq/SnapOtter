@@ -4045,6 +4045,7 @@ export const es: TranslationKeys = {
     imageControls: "Controles de vista previa",
     zoomControls: "Controles de zoom",
     dragToReorder: "Arrastrar para reordenar",
+    reverseOrder: "Invertir orden",
     whiteBackground: "Fondo blanco",
     blackBackground: "Fondo negro",
     expandPanel: "Expandir panel",

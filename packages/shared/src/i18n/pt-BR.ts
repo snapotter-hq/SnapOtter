@@ -4051,6 +4051,7 @@ export const ptBR: TranslationKeys = {
     imageControls: "Controles de visualização",
     zoomControls: "Controles de zoom",
     dragToReorder: "Arraste para reordenar",
+    reverseOrder: "Inverter ordem",
     whiteBackground: "Fundo branco",
     blackBackground: "Fundo preto",
     expandPanel: "Expandir painel",

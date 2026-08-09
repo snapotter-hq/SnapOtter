@@ -3991,6 +3991,7 @@ export const ja: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "ズームコントロール",
     dragToReorder: "ドラッグして並べ替え",
+    reverseOrder: "順序を逆にする",
     whiteBackground: "白背景",
     blackBackground: "黒背景",
     expandPanel: "パネルを展開",

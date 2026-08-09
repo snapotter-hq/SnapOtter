@@ -4010,6 +4010,7 @@ export const ar: TranslationKeys = {
     imageControls: "عناصر تحكم المعاينة",
     zoomControls: "أدوات التكبير",
     dragToReorder: "اسحب لإعادة الترتيب",
+    reverseOrder: "عكس الترتيب",
     whiteBackground: "خلفية بيضاء",
     blackBackground: "خلفية سوداء",
     expandPanel: "توسيع اللوحة",

@@ -3839,6 +3839,7 @@ export const hi: TranslationKeys = {
     imageControls: "पूर्वावलोकन नियंत्रण",
     zoomControls: "ज़ूम नियंत्रण",
     dragToReorder: "क्रम बदलने के लिए खींचें",
+    reverseOrder: "क्रम उलटें",
     whiteBackground: "सफ़ेद बैकग्राउंड",
     blackBackground: "काला बैकग्राउंड",
     expandPanel: "पैनल विस्तारित करें",

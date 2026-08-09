@@ -3770,6 +3770,7 @@ export const zhCN: TranslationKeys = {
     imageControls: "预览控件",
     zoomControls: "缩放控件",
     dragToReorder: "拖动以重新排序",
+    reverseOrder: "反转顺序",
     whiteBackground: "白色背景",
     blackBackground: "黑色背景",
     expandPanel: "展开面板",

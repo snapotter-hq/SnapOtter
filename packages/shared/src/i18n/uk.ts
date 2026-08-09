@@ -4046,6 +4046,7 @@ export const uk: TranslationKeys = {
     imageControls: "Елементи керування переглядом",
     zoomControls: "Керування масштабом",
     dragToReorder: "Перетягніть для зміни порядку",
+    reverseOrder: "Змінити порядок на зворотний",
     whiteBackground: "Біле тло",
     blackBackground: "Чорне тло",
     expandPanel: "Розгорнути панель",

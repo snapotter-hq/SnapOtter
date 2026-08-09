@@ -4039,6 +4039,7 @@ export const sv: TranslationKeys = {
     imageControls: "Förhandsvisningskontroller",
     zoomControls: "Zoomkontroller",
     dragToReorder: "Dra för att ändra ordning",
+    reverseOrder: "Omvänd ordning",
     whiteBackground: "Vit bakgrund",
     blackBackground: "Svart bakgrund",
     expandPanel: "Expandera panel",

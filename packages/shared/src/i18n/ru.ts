@@ -4048,6 +4048,7 @@ export const ru: TranslationKeys = {
     imageControls: "Управление предпросмотром",
     zoomControls: "Управление масштабом",
     dragToReorder: "Перетащите для изменения порядка",
+    reverseOrder: "Обратить порядок",
     whiteBackground: "Белый фон",
     blackBackground: "Чёрный фон",
     expandPanel: "Развернуть панель",

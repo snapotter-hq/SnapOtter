@@ -4035,6 +4035,7 @@ export const vi: TranslationKeys = {
     imageControls: "Điều khiển xem trước",
     zoomControls: "Điều khiển thu phóng",
     dragToReorder: "Kéo để sắp xếp lại",
+    reverseOrder: "Đảo ngược thứ tự",
     whiteBackground: "Nền trắng",
     blackBackground: "Nền đen",
     expandPanel: "Mở rộng bảng",

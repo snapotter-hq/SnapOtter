@@ -4051,6 +4051,7 @@ export const tr: TranslationKeys = {
     imageControls: "Önizleme kontrolleri",
     zoomControls: "Yakınlaştırma kontrolleri",
     dragToReorder: "Sıralamak için sürükleyin",
+    reverseOrder: "Sırayı tersine çevir",
     whiteBackground: "Beyaz arka plan",
     blackBackground: "Siyah arka plan",
     expandPanel: "Paneli genişlet",

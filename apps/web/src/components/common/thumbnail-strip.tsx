@@ -1,13 +1,32 @@
 import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  ArrowLeftRight,
   CheckCircle2,
   File as FileIcon,
   FileText,
   Film,
+  GripVertical,
   Loader2,
   Music,
   XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
 
 const BROWSER_IMG_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"]);
@@ -176,14 +195,134 @@ function Thumb({ entry }: { entry: FileEntry }) {
   );
 }
 
+/** The selectable tile: thumbnail plus completed/failed status badge. */
+function ThumbTile({
+  entry,
+  index,
+  isSelected,
+  buttonRef,
+  onSelect,
+}: {
+  entry: FileEntry;
+  index: number;
+  isSelected: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+  onSelect: (index: number) => void;
+}) {
+  const isCompleted = entry.status === "completed";
+  const isFailed = entry.status === "failed";
+  return (
+    <button
+      type="button"
+      ref={buttonRef}
+      onClick={() => onSelect(index)}
+      className={`relative shrink-0 rounded overflow-hidden transition-all ${
+        isSelected
+          ? "outline outline-2 outline-primary outline-offset-1"
+          : "hover:outline hover:outline-1 hover:outline-border"
+      }`}
+      style={{ width: 52, height: 38 }}
+      title={entry.file.name}
+    >
+      {entry.previewLoading ? (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+        </div>
+      ) : (
+        <Thumb entry={entry} />
+      )}
+      {isCompleted && (
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
+          <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
+      {isFailed && (
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
+          <XCircle className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
+    </button>
+  );
+}
+
+/** A ThumbTile wrapped in a dnd-kit sortable, with a keyboard-reachable drag
+ *  handle. Tapping the tile still selects; the handle is the drag activator. */
+function SortableThumbTile({
+  entry,
+  index,
+  isSelected,
+  buttonRef,
+  onSelect,
+  dragLabel,
+}: {
+  entry: FileEntry;
+  index: number;
+  isSelected: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+  onSelect: (index: number) => void;
+  dragLabel: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: entry.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  // dnd-kit sets role="button" on the handle; the native <button> already has
+  // that role, so drop it to avoid a redundant-role attribute.
+  const { role: _dragRole, ...dragAttributes } = attributes;
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative shrink-0 ${isDragging ? "z-10 opacity-50" : ""}`}
+    >
+      <ThumbTile
+        entry={entry}
+        index={index}
+        isSelected={isSelected}
+        buttonRef={buttonRef}
+        onSelect={onSelect}
+      />
+      <button
+        type="button"
+        {...dragAttributes}
+        {...listeners}
+        aria-label={dragLabel}
+        title={dragLabel}
+        className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground cursor-grab active:cursor-grabbing hover:bg-background hover:text-foreground focus:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 interface ThumbnailStripProps {
   entries: FileEntry[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  /** When provided, tiles become drag-sortable; called with the moved indexes. */
+  onReorder?: (from: number, to: number) => void;
+  /** When provided, a reverse-order control is shown. */
+  onReverse?: () => void;
 }
 
-export function ThumbnailStrip({ entries, selectedIndex, onSelect }: ThumbnailStripProps) {
+export function ThumbnailStrip({
+  entries,
+  selectedIndex,
+  onSelect,
+  onReorder,
+  onReverse,
+}: ThumbnailStripProps) {
+  const { t } = useTranslation();
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
     selectedRef.current?.scrollIntoView({
@@ -195,49 +334,77 @@ export function ThumbnailStrip({ entries, selectedIndex, onSelect }: ThumbnailSt
 
   if (entries.length <= 1) return null;
 
-  return (
+  function handleDragEnd(event: DragEndEvent) {
+    if (!onReorder) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = entries.findIndex((e) => e.id === active.id);
+    const to = entries.findIndex((e) => e.id === over.id);
+    if (from !== -1 && to !== -1) onReorder(from, to);
+  }
+
+  const tiles = entries.map((entry, i) => {
+    const isSelected = i === selectedIndex;
+    const buttonRef = isSelected ? selectedRef : undefined;
+    if (!onReorder) {
+      return (
+        <ThumbTile
+          key={entry.id}
+          entry={entry}
+          index={i}
+          isSelected={isSelected}
+          buttonRef={buttonRef}
+          onSelect={onSelect}
+        />
+      );
+    }
+    return (
+      <SortableThumbTile
+        key={entry.id}
+        entry={entry}
+        index={i}
+        isSelected={isSelected}
+        buttonRef={buttonRef}
+        onSelect={onSelect}
+        dragLabel={t.a11y.dragToReorder}
+      />
+    );
+  });
+
+  const scroller = (
     <div
-      className="flex gap-1.5 px-3 py-2 overflow-x-auto border-t border-border bg-muted/30"
+      className="flex gap-1.5 px-3 py-2 overflow-x-auto grow"
       style={{ scrollBehavior: "smooth" }}
     >
-      {entries.map((entry, i) => {
-        const isSelected = i === selectedIndex;
-        const isCompleted = entry.status === "completed";
-        const isFailed = entry.status === "failed";
-        return (
-          <button
-            key={entry.file.name}
-            type="button"
-            ref={isSelected ? selectedRef : undefined}
-            onClick={() => onSelect(i)}
-            className={`relative shrink-0 rounded overflow-hidden transition-all ${
-              isSelected
-                ? "outline outline-2 outline-primary outline-offset-1"
-                : "hover:outline hover:outline-1 hover:outline-border"
-            }`}
-            style={{ width: 52, height: 38 }}
-            title={entry.file.name}
+      {onReorder ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={entries.map((e) => e.id)}
+            strategy={horizontalListSortingStrategy}
           >
-            {entry.previewLoading ? (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
-              </div>
-            ) : (
-              <Thumb entry={entry} />
-            )}
-            {isCompleted && (
-              <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-              </div>
-            )}
-            {isFailed && (
-              <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
-                <XCircle className="h-2.5 w-2.5 text-white" />
-              </div>
-            )}
-          </button>
-        );
-      })}
+            {tiles}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        tiles
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex items-stretch border-t border-border bg-muted/30">
+      {onReverse && (
+        <button
+          type="button"
+          onClick={onReverse}
+          title={t.a11y.reverseOrder}
+          aria-label={t.a11y.reverseOrder}
+          className="shrink-0 px-2 flex items-center border-e border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        >
+          <ArrowLeftRight className="h-4 w-4" />
+        </button>
+      )}
+      {scroller}
     </div>
   );
 }

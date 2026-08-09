@@ -25,6 +25,8 @@ export function previewKindFor(modality: Modality): PreviewKind {
 }
 
 export interface FileEntry {
+  /** Stable identity for this entry, unchanged across reordering. */
+  id: string;
   file: File;
   blobUrl: string;
   previewLoading: boolean;
@@ -46,9 +48,12 @@ export interface FileEntry {
 // Helpers
 // ---------------------------------------------------------------------------
 
+let nextEntryId = 0;
+
 function createEntry(file: File): FileEntry {
   const modality = detectModalityFromMime(file.type);
   return {
+    id: `entry-${++nextEntryId}`,
     file,
     blobUrl: URL.createObjectURL(file),
     previewLoading: needsServerPreview(file),
@@ -143,6 +148,8 @@ interface FileState {
   setFiles: (files: File[]) => void;
   addFiles: (files: File[]) => void;
   removeFile: (index: number) => void;
+  reorderFiles: (from: number, to: number) => void;
+  reverseFiles: () => void;
   setSelectedIndex: (index: number) => void;
   navigateNext: () => void;
   navigatePrev: () => void;
@@ -276,6 +283,43 @@ export const useFileStore = create<FileState>((set, get) => ({
     } else if (newEntries.length === 0) {
       newIndex = 0;
     }
+    set({
+      entries: newEntries,
+      selectedIndex: newIndex,
+      files: deriveFiles(newEntries),
+      ...deriveSelected(newEntries, newIndex),
+    });
+  },
+
+  reorderFiles: (from, to) => {
+    const { entries, selectedIndex } = get();
+    if (from === to) return;
+    if (from < 0 || from >= entries.length || to < 0 || to >= entries.length) return;
+
+    const selectedId = entries[selectedIndex]?.id;
+    const newEntries = [...entries];
+    const [moved] = newEntries.splice(from, 1);
+    newEntries.splice(to, 0, moved);
+
+    const followed = selectedId ? newEntries.findIndex((e) => e.id === selectedId) : -1;
+    const newIndex = followed === -1 ? selectedIndex : followed;
+    set({
+      entries: newEntries,
+      selectedIndex: newIndex,
+      files: deriveFiles(newEntries),
+      ...deriveSelected(newEntries, newIndex),
+    });
+  },
+
+  reverseFiles: () => {
+    const { entries, selectedIndex } = get();
+    if (entries.length < 2) return;
+
+    const selectedId = entries[selectedIndex]?.id;
+    const newEntries = [...entries].reverse();
+
+    const followed = selectedId ? newEntries.findIndex((e) => e.id === selectedId) : -1;
+    const newIndex = followed === -1 ? selectedIndex : followed;
     set({
       entries: newEntries,
       selectedIndex: newIndex,

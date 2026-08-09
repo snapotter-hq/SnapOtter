@@ -3988,6 +3988,7 @@ export const th: TranslationKeys = {
     imageControls: "การควบคุมการแสดงตัวอย่าง",
     zoomControls: "ตัวควบคุมการซูม",
     dragToReorder: "ลากเพื่อจัดเรียงใหม่",
+    reverseOrder: "กลับลำดับ",
     whiteBackground: "พื้นหลังสีขาว",
     blackBackground: "พื้นหลังสีดำ",
     expandPanel: "ขยายแผง",

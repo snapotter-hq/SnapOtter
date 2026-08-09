@@ -4056,6 +4056,7 @@ export const pl: TranslationKeys = {
     imageControls: "Sterowanie podglądem",
     zoomControls: "Kontrolki powiększenia",
     dragToReorder: "Przeciągnij, aby zmienić kolejność",
+    reverseOrder: "Odwróć kolejność",
     whiteBackground: "Białe tło",
     blackBackground: "Czarne tło",
     expandPanel: "Rozwiń panel",

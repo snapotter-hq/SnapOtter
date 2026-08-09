@@ -255,6 +255,32 @@ for (const preset of CONVERSION_PRESETS) {
 export const MULTI_FILE_TOOLS: ReadonlySet<string> = multiFileTools;
 
 /**
+ * Multi-input tools where the ORDER of the files changes the result, so the
+ * user can drag to reorder them (and reverse the order) before running. This
+ * is the order-sensitive subset of multi-file tools: it adds the image tools
+ * that self-submit their files (stitch, collage) and drops the mixed-modality
+ * pairs (video+subtitle, video+audio) whose inputs are keyed by kind, not
+ * position, so reordering them would be meaningless.
+ */
+const reorderableTools = new Set<string>([
+  "merge-pdf",
+  "merge-audio",
+  "merge-videos",
+  "merge-csvs",
+  "images-to-video",
+  "sprite-sheet",
+  "stitch",
+  "collage",
+  "create-zip",
+]);
+for (const preset of CONVERSION_PRESETS) {
+  if (BASE_CONFIG[preset.base].group === "image-to-pdf") {
+    reorderableTools.add(preset.id);
+  }
+}
+export const REORDERABLE_TOOLS: ReadonlySet<string> = reorderableTools;
+
+/**
  * Live-preview tools whose imageWrapperStyle/children are an input control
  * (pixelate's selection box), not a CSS simulation of the result. After
  * processing, the viewer switches to the server result for these and keeps

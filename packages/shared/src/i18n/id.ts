@@ -4043,6 +4043,7 @@ export const id: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Kontrol zoom",
     dragToReorder: "Seret untuk mengurutkan ulang",
+    reverseOrder: "Balik urutan",
     whiteBackground: "Latar belakang putih",
     blackBackground: "Latar belakang hitam",
     expandPanel: "Perluas panel",
