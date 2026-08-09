@@ -69,16 +69,20 @@ NOISE_GATE_SIGMA = 5.0
 
 
 def estimate_noise_sigma(img_bgr):
-    """Fast Gaussian-noise estimate (Immerkaer). Robust to real image content
-    because the Laplacian-like kernel cancels smooth gradients and edges,
-    leaving the noise floor. Returns the estimated standard deviation."""
+    """Fast Gaussian-noise estimate (Immerkaer 1996). The kernel cancels any
+    intensity variation up to second order (flat and smoothly shaded regions),
+    so what survives is dominated by the pixel-scale noise; a sharp photo can
+    read a little high because hard edges also respond. Returns the estimated
+    standard deviation."""
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).astype(np.float64)
     h, w = gray.shape
     if h < 3 or w < 3:
         return 0.0
     kernel = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], dtype=np.float64)
     conv = np.abs(cv2.filter2D(gray, -1, kernel))
-    return float(np.sqrt(np.pi / 2) * conv.sum() / (6.0 * (w - 2) * (h - 2)))
+    # Sum the interior only: the border pixels are filter2D extrapolation
+    # artefacts, and the (w-2)(h-2) normaliser is the interior count.
+    return float(np.sqrt(np.pi / 2) * conv[1:-1, 1:-1].sum() / (6.0 * (w - 2) * (h - 2)))
 
 
 # ── Scratch detection ─────────────────────────────────────────────────
