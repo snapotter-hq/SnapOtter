@@ -50,6 +50,36 @@ DDCOLOR_MODEL_PATH = os.environ.get(
 LAMA_MODEL_SIZE = 512
 CODEFORMER_SIZE = 512
 
+# Content-adaptive gating (#723). Restoration used to run every step on every
+# image, so a clean photo lost half its fine detail: denoise softened a
+# noise-free image, and the scratch detector's Otsu threshold always selected
+# the top ~12% of edges (hair, features) as "scratches" and inpainted them.
+#
+# SCRATCH_RESPONSE_FLOOR: only inpaint pixels whose morphological line response
+# clears this absolute level. A clean portrait's response peaks around 187
+# (p99.9) so it produces an empty mask here, while genuine high-contrast
+# creases (response to ~238) still register. This trades faint-scratch recall
+# for not wrecking undamaged photos, until the learned scratch model lands.
+#
+# NOISE_GATE_SIGMA: skip denoising below this estimated noise level. A clean
+# scan measures ~2, a grainy one ~12, so 5 skips the images that have nothing
+# to denoise.
+SCRATCH_RESPONSE_FLOOR = 200
+NOISE_GATE_SIGMA = 5.0
+
+
+def estimate_noise_sigma(img_bgr):
+    """Fast Gaussian-noise estimate (Immerkaer). Robust to real image content
+    because the Laplacian-like kernel cancels smooth gradients and edges,
+    leaving the noise floor. Returns the estimated standard deviation."""
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).astype(np.float64)
+    h, w = gray.shape
+    if h < 3 or w < 3:
+        return 0.0
+    kernel = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], dtype=np.float64)
+    conv = np.abs(cv2.filter2D(gray, -1, kernel))
+    return float(np.sqrt(np.pi / 2) * conv.sum() / (6.0 * (w - 2) * (h - 2)))
+
 
 # ── Scratch detection ─────────────────────────────────────────────────
 
@@ -96,9 +126,13 @@ def detect_scratches(img_bgr, _sensitivity=None):
     if otsu_thresh < 40:
         return np.zeros_like(gray)
 
-    # When Otsu is borderline, use a high fixed threshold to only catch strong scratches
-    if otsu_thresh < 60:
-        _, mask = cv2.threshold(response_u8, 100, 255, cv2.THRESH_BINARY)
+    # Require a strong ABSOLUTE response, not just Otsu's relative split. On a
+    # clean photo Otsu still selects the top ~12% of edges (hair, features) as
+    # "scratches"; the floor keeps only genuine high-contrast damage, so an
+    # undamaged image yields an empty mask instead of losing detail to
+    # false-positive inpainting (#723).
+    effective_thresh = max(float(otsu_thresh), float(SCRATCH_RESPONSE_FLOOR))
+    _, mask = cv2.threshold(response_u8, effective_thresh, 255, cv2.THRESH_BINARY)
 
     # Connected component filtering
     mask = _filter_components(mask, h * w)
@@ -118,7 +152,7 @@ def detect_scratches(img_bgr, _sensitivity=None):
         if len(nonzero) > 0:
             target_count = int(h * w * 0.15)
             cutoff = np.percentile(nonzero, max(0, 100 * (1 - target_count / len(nonzero))))
-            _, mask = cv2.threshold(response_u8, max(cutoff, otsu_thresh), 255, cv2.THRESH_BINARY)
+            _, mask = cv2.threshold(response_u8, max(cutoff, effective_thresh), 255, cv2.THRESH_BINARY)
             mask = _filter_components(mask, h * w)
 
     # Dilate for cleaner inpainting boundaries
@@ -699,10 +733,18 @@ def main():
             emit_progress(65, "Face enhancement disabled")
 
         if do_denoise and denoise_strength > 0:
-            emit_progress(70, "Reducing noise")
-            result = denoise_image(result, denoise_strength)
-            steps_applied.append("denoise")
-            emit_progress(80, "Noise reduced")
+            # Only denoise images that actually have noise: NLMeans softens fine
+            # detail, so running it on a clean photo removes texture it should
+            # keep (#723). The estimate is measured on the working image after
+            # any inpainting, so repaired regions do not skew it.
+            measured_sigma = estimate_noise_sigma(result)
+            if measured_sigma < NOISE_GATE_SIGMA:
+                emit_progress(80, f"Denoising skipped: already clean (noise {measured_sigma:.1f})")
+            else:
+                emit_progress(70, "Reducing noise")
+                result = denoise_image(result, denoise_strength)
+                steps_applied.append("denoise")
+                emit_progress(80, "Noise reduced")
         else:
             emit_progress(80, "Denoising disabled")
 
