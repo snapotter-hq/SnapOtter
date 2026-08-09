@@ -65,7 +65,12 @@ def _our_frames(exc):
         # Keep only our sidecar-script frames; drop stdlib and venv/site-packages.
         if os.path.dirname(os.path.abspath(fr.filename)) != _SIDECAR_DIR:
             continue
-        frames.append({"file": os.path.basename(fr.filename), "line": fr.lineno, "func": fr.name})
+        base = os.path.basename(fr.filename)
+        # Drop the dispatcher's own exec() plumbing frame so the traceback starts
+        # at the failing script, not the infrastructure that ran it.
+        if base == "dispatcher.py":
+            continue
+        frames.append({"file": base, "line": fr.lineno, "func": fr.name})
     return frames[-20:]
 
 
