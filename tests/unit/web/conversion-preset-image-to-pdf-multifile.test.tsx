@@ -131,9 +131,14 @@ describe("ConversionPresetSettings multi-file dispatch (issue #627)", () => {
     render(<ConversionPresetSettings />);
     fireEvent.click(screen.getByTestId("preset-submit"));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/tools/image/jpg-to-png/batch");
-    expect(xhrInstances).toHaveLength(0);
+    // The batch path rides XHR since #750 (it needs upload.onload to know a
+    // degrade is safe), so the /batch URL is the discriminator now.
+    expect(xhrInstances).toHaveLength(1);
+    expect(xhrInstances[0].open).toHaveBeenCalledWith(
+      "POST",
+      "/api/v1/tools/image/jpg-to-png/batch",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uses the single-file request for jpg-to-pdf when only 1 file is selected", () => {
