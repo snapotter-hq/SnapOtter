@@ -1,13 +1,19 @@
 /**
- * Pipeline batch ZIP streaming failure path.
+ * Pipeline batch ZIP failure paths.
  *
- * The batch route writes the 200 header before it streams ZIP entries from
- * object storage. If a read fails mid-stream the route must abort the archive
- * and end the response instead of hanging the connection. That branch cannot
- * be reached through public inputs (the manifest only lists outputs the worker
- * just wrote), so this file swaps getObjectStream for a passthrough that fails
- * ONLY for the per-file output keys of one designated batch parent id. Workers
- * read inputs from uploads/ keys and the pipeline finalize copy uses
+ * Since #750 the batch-finalize worker packages the ZIP into durable storage
+ * before the route responds, so an entry read failure surfaces as a clean
+ * error status (nothing was committed to the wire yet) instead of a destroyed
+ * mid-stream response. The mid-stream failure surface still exists, but only
+ * for the stored ZIP itself: the route commits the 200 header and then
+ * streams outputs/<parentId>/<zip>; if that read dies the route must destroy
+ * the connection rather than end it cleanly (a clean end of a short body
+ * would be indistinguishable from success).
+ *
+ * Neither branch is reachable through public inputs (the finalize only lists
+ * outputs the workers just wrote), so this file swaps getObjectStream for a
+ * passthrough that fails ONLY for the designated parent's keys. Workers read
+ * inputs from uploads/ keys and the pipeline finalize copy uses
  * getObjectBuffer, so normal processing is untouched.
  */
 
@@ -21,8 +27,12 @@ import {
 } from "../test-server.js";
 
 const mocks = vi.hoisted(() => ({
-  // When set, getObjectStream throws for keys matching outputs/<id>-f<N>/...
-  failZipStreamsForParentId: null as string | null,
+  // When set, getObjectStream throws for the per-file output keys
+  // (outputs/<id>-f<N>/...) read by the batch-finalize ZIP packaging.
+  failEntryStreamsForParentId: null as string | null,
+  // When set, getObjectStream throws for the stored batch ZIP itself
+  // (outputs/<id>/...), the key the route streams after the finalize.
+  failZipObjectForParentId: null as string | null,
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
@@ -31,8 +41,12 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   return {
     ...actual,
     getObjectStream: async (key: string, range?: { start: number; end?: number }) => {
-      const parentId = mocks.failZipStreamsForParentId;
-      if (parentId && new RegExp(`^outputs/${parentId}-f\\d+/`).test(key)) {
+      const entryParent = mocks.failEntryStreamsForParentId;
+      if (entryParent && new RegExp(`^outputs/${entryParent}-f\\d+/`).test(key)) {
+        throw new Error("simulated object storage outage");
+      }
+      const zipParent = mocks.failZipObjectForParentId;
+      if (zipParent && key.startsWith(`outputs/${zipParent}/`)) {
         throw new Error("simulated object storage outage");
       }
       return actual.getObjectStream(key, range);
@@ -60,7 +74,8 @@ afterAll(async () => {
 }, 10_000);
 
 afterEach(() => {
-  mocks.failZipStreamsForParentId = null;
+  mocks.failEntryStreamsForParentId = null;
+  mocks.failZipObjectForParentId = null;
 });
 
 function postBatch(clientJobId: string) {
@@ -80,7 +95,7 @@ function postBatch(clientJobId: string) {
   });
 }
 
-describe("Pipeline batch ZIP streaming", () => {
+describe("Pipeline batch ZIP delivery", () => {
   it("streams a complete ZIP when object storage is healthy", async () => {
     const res = await postBatch("zip-stream-healthy-parent");
 
@@ -91,19 +106,59 @@ describe("Pipeline batch ZIP streaming", () => {
     expect(res.rawPayload.includes(ZIP_EOCD)).toBe(true);
   }, 30_000);
 
-  it("aborts the archive and ends the response when an entry read fails", async () => {
-    const parentId = "zip-stream-failure-parent";
-    mocks.failZipStreamsForParentId = parentId;
+  it("fails with a clean error status when an entry read dies during ZIP packaging", async () => {
+    const parentId = "zip-entry-failure-parent";
+    mocks.failEntryStreamsForParentId = parentId;
 
     const res = await postBatch(parentId);
 
-    // Headers were already committed before streaming began.
-    expect(res.statusCode).toBe(200);
-    expect(res.headers["content-type"]).toBe("application/zip");
-    expect(res.headers["x-job-id"]).toBe(parentId);
-    // The stream failed before finalize(), so the body must terminate without
-    // a complete archive (no end-of-central-directory record), and the
-    // request must resolve rather than hang.
+    // The finalize failed before the route committed anything to the wire,
+    // so the client gets a real error status and JSON body, not a destroyed
+    // 200 stream (#750 moved packaging ahead of the response).
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(res.headers["content-type"]).toContain("application/json");
     expect(res.rawPayload.includes(ZIP_EOCD)).toBe(false);
+
+    // The failure is durable: the parent row replays a terminal failed frame,
+    // which is what settles a client that degraded to the SSE path.
+    const sse = await app.inject({
+      method: "GET",
+      url: `/api/v1/jobs/${parentId}/progress`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payloadAsStream: true,
+    });
+    let terminal: Record<string, unknown> | null = null;
+    for await (const chunk of sse.stream()) {
+      const text = Buffer.from(chunk).toString();
+      for (const line of text.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const data = JSON.parse(line.slice(6));
+        if (data.type === "batch" && data.status !== "processing") terminal = data;
+      }
+      if (terminal) break;
+    }
+    expect(terminal?.status).toBe("failed");
+  }, 30_000);
+
+  it("destroys the connection when the stored ZIP read dies mid-stream", async () => {
+    const parentId = "zip-object-failure-parent";
+    mocks.failZipObjectForParentId = parentId;
+
+    // The 200 header goes out before the stored ZIP is opened; the poisoned
+    // read must then surface as a transport failure (destroyed socket), never
+    // as a cleanly-ended short body. app.inject reports that either as a
+    // rejected request or as a truncated payload, depending on timing.
+    let sawTransportFailure = false;
+    let payload: Buffer | null = null;
+    try {
+      const res = await postBatch(parentId);
+      payload = res.rawPayload;
+    } catch {
+      sawTransportFailure = true;
+    }
+
+    if (!sawTransportFailure) {
+      expect(payload?.includes(ZIP_EOCD)).toBe(false);
+    }
   }, 30_000);
 });

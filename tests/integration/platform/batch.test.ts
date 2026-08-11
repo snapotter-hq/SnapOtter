@@ -704,6 +704,52 @@ describe("Legacy batch SSE wire parity", () => {
     expect(parsed.failedFiles).toBe(1);
     expect(parsed.status).toBe("completed");
     expect(parsed.type).toBe("batch");
+
+    // #750: the terminal frame carries the durable result so a client that
+    // lost the HTTP response can settle from SSE alone. fileResults maps
+    // ORIGINAL upload indices (the invalid slot 1 is absent, not shifted).
+    expect(parsed.result).toBeDefined();
+    expect(typeof parsed.result.downloadUrl).toBe("string");
+    expect(parsed.result.fileResults["0"]).toContain("good1");
+    expect(parsed.result.fileResults["1"]).toBeUndefined();
+    expect(parsed.result.fileResults["2"]).toContain("good2");
+    expect(parsed.result.fileResults).toEqual(
+      JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string)),
+    );
+
+    // The durable ZIP is byte-identical to the one the HTTP response streamed.
+    const download = await app.inject({
+      method: "GET",
+      url: parsed.result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(download.statusCode).toBe(200);
+    expect(download.rawPayload.equals(res.rawPayload)).toBe(true);
+
+    // The parent row replays the same terminal result after the Redis
+    // terminal key expires (simulated by deleting it).
+    await sharedRedis().del(terminalKeyName);
+    const sse = await app.inject({
+      method: "GET",
+      url: `/api/v1/jobs/${clientJobId}/progress`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payloadAsStream: true,
+    });
+    let replayed: Record<string, unknown> | null = null;
+    for await (const chunk of sse.stream()) {
+      const text = Buffer.from(chunk).toString();
+      for (const line of text.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const data = JSON.parse(line.slice(6));
+        if (data.type === "batch") replayed = data;
+      }
+      if (replayed) break;
+    }
+    expect(replayed).not.toBeNull();
+    expect(replayed?.status).toBe("completed");
+    expect((replayed?.result as Record<string, unknown>)?.downloadUrl).toBe(
+      parsed.result.downloadUrl,
+    );
   });
 });
 

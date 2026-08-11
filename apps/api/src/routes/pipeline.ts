@@ -10,7 +10,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { FEATURE_BUNDLES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
-import archiver from "archiver";
 import type { FlowJob } from "bullmq";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -1099,6 +1098,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Validate, decode, and upload each file; build per-file pipeline chains
           const perFileChildren: FlowJob[] = [];
           const preFailures: Array<{ originalIndex: number; filename: string; error: string }> = [];
+          // Flow index -> original upload index, consumed by batch-finalize so
+          // fileResults keeps index alignment across pre-failures.
+          const fileIndexMap: number[] = [];
           let flowChildIndex = 0;
 
           // The first step's modality drives input validation for every file, so
@@ -1272,6 +1274,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             });
 
             perFileChildren.push(perFileTree);
+            fileIndexMap.push(fi);
             flowChildIndex++;
           }
 
@@ -1281,7 +1284,17 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
 
           if (perFileChildren.length === 0) {
-            // All files failed validation
+            // All files failed validation. There is no flow to run, so no
+            // finalize will ever publish a terminal frame; publish it here so
+            // a client that lost this response settles from SSE (#750).
+            updateJobProgress({
+              jobId: parentId,
+              status: "failed",
+              totalFiles: files.length,
+              completedFiles: files.length,
+              failedFiles: files.length,
+              errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+            });
             return reply.status(422).send({
               error: "All files failed processing",
               errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
@@ -1301,7 +1314,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               totalFiles: files.length,
               inputRefs: [],
               filename: "",
-              settings: { flowChildCount: perFileChildren.length },
+              settings: { flowChildCount: perFileChildren.length, fileIndexMap },
               analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
             } satisfies ToolJobData,
             opts: { jobId: parentId, attempts: 1 },
@@ -1311,7 +1324,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Update the parent row with the final flow child count
           await db
             .update(schema.jobs)
-            .set({ settings: { flowChildCount: perFileChildren.length } })
+            .set({ settings: { flowChildCount: perFileChildren.length, fileIndexMap } })
             .where(eq(schema.jobs.id, parentId));
 
           // Inject OTel trace context into every node of the batch flow tree
@@ -1320,132 +1333,74 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           await getFlowProducer().add(batchTree);
           uncommittedOcrKeys.clear();
 
-          // Wait for batch completion
+          // ── Wait for completion and stream the stored ZIP ────────────────
           const batchResult = await waitForJob("system", parentId, 30 * 60_000);
 
           if (!batchResult) {
-            return reply.status(422).send({ error: "Pipeline batch processing timed out" });
+            // The flow is still running; answer with the async contract and
+            // let the client ride the SSE to the terminal frame, which
+            // carries the durable download URL (#750).
+            return reply.status(202).send({ jobId: parentId, async: true });
           }
 
-          const manifest = (batchResult.resultPayload?.manifest ?? []) as Array<{
-            index: number;
-            filename: string;
-            outputRef?: string;
-            error?: string;
-          }>;
-
-          // Combine manifest with pre-failures
-          const allResults: Array<{
-            originalIndex: number;
-            filename: string;
-            outputRef?: string;
-            error?: string;
-          }> = [];
-
-          // Map flow indices back to original file indices
-          let fci = 0;
-          for (let fi = 0; fi < files.length; fi++) {
-            const pf = preFailures.find((p) => p.originalIndex === fi);
-            if (pf) {
-              allResults.push({
-                originalIndex: fi,
-                filename: pf.filename,
-                error: pf.error,
-              });
-            } else {
-              const entry = manifest.find((m) => m.index === fci);
-              if (entry) {
-                allResults.push({
-                  originalIndex: fi,
-                  filename: entry.filename,
-                  outputRef: entry.outputRef,
-                  error: entry.error,
-                });
+          const payload = batchResult.resultPayload as
+            | {
+                manifest?: Array<{
+                  index: number;
+                  filename: string;
+                  outputRef?: string;
+                  error?: string;
+                }>;
+                zip?: {
+                  key: string;
+                  filename: string;
+                  size: number;
+                  fileResults: Record<string, string>;
+                };
               }
-              fci++;
-            }
-          }
+            | undefined;
 
-          // Deduplicate output filenames
-          const usedNames = new Set<string>();
-          function getUniqueName(name: string): string {
-            if (!usedNames.has(name)) {
-              usedNames.add(name);
-              return name;
-            }
-            const dotIdx = name.lastIndexOf(".");
-            const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-            const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-            let counter = 1;
-            let candidate = `${base}_${counter}${ext}`;
-            while (usedNames.has(candidate)) {
-              counter++;
-              candidate = `${base}_${counter}${ext}`;
-            }
-            usedNames.add(candidate);
-            return candidate;
-          }
-
-          const successEntries = allResults.filter((r) => r.outputRef);
-          const failedEntries = allResults.filter((r) => !r.outputRef);
-
-          if (successEntries.length === 0) {
+          const zip = payload?.zip;
+          if (!zip) {
+            // Every file failed; the finalize already published the terminal
+            // failed frame. Mirror it on the HTTP contract.
+            const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             return reply.status(422).send({
               error: "All files failed processing",
-              errors: failedEntries.map((f) => ({
-                filename: f.filename,
-                error: f.error ?? "Failed",
-              })),
+              errors: [
+                ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+                ...manifestFailures.map((f) => ({
+                  filename: f.filename,
+                  error: f.error ?? "Failed",
+                })),
+              ],
             });
           }
 
-          const fileResultsMap: Record<string, string> = {};
-          for (const entry of successEntries) {
-            const uniqueName = getUniqueName(entry.filename);
-            entry.filename = uniqueName;
-            fileResultsMap[String(entry.originalIndex)] = uniqueName;
-          }
-
-          // ── Stream ZIP response ──────────────────────────────────────────
+          // ── Stream the ZIP the finalize persisted ────────────────────────
           reply.hijack();
           reply.raw.writeHead(200, {
             "Content-Type": "application/zip",
-            "Content-Disposition": `attachment; filename="pipeline-batch-${parentId.slice(0, 8)}.zip"`,
-            "Transfer-Encoding": "chunked",
+            "Content-Disposition": `attachment; filename="${zip.filename}"`,
+            "Content-Length": String(zip.size),
             "X-Job-Id": parentId,
-            "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
+            "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
             ...getSecurityHeaders(),
           });
 
-          const archive = archiver("zip", { zlib: { level: 5 } });
-
-          archive.on("error", (err) => {
-            request.log.error({ err }, "Archiver error during pipeline batch processing");
-            if (!reply.raw.writableEnded) {
-              reply.raw.end();
-            }
-          });
-
-          archive.pipe(reply.raw);
-
-          // Append results from object storage in original upload order
+          // The 200 headers are already out, so nothing here can change the
+          // status. Destroy the socket rather than end() it: a clean end
+          // would hand the client a short body it may mistake for success.
           try {
-            for (const entry of successEntries) {
-              if (!entry.outputRef) continue;
-              const stream = await getObjectStream(entry.outputRef);
-              archive.append(stream, { name: entry.filename });
-            }
-
-            await archive.finalize();
+            const stream = await getObjectStream(zip.key);
+            stream.on("error", (err: Error) => {
+              request.log.error({ err, jobId: parentId }, "Pipeline batch ZIP stream error");
+              reply.raw.destroy(err);
+            });
+            stream.pipe(reply.raw);
           } catch (err) {
-            request.log.error(
-              { err },
-              "Failed to stream ZIP entries during pipeline batch processing",
-            );
-            archive.abort();
-            if (!reply.raw.writableEnded) {
-              reply.raw.end();
-            }
+            request.log.error({ err, jobId: parentId }, "Failed to open stored pipeline batch ZIP");
+            reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
           }
         } finally {
           request.raw.removeListener("aborted", abortIngress);
