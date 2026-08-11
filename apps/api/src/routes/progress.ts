@@ -30,6 +30,20 @@ export interface JobProgress {
   errors: Array<{ filename: string; error: string }>;
   /** Current file being processed (if any). */
   currentFile?: string;
+  /**
+   * Terminal frames only: the durable batch result (downloadUrl, fileResults,
+   * ...) so a client that lost its HTTP response can settle from SSE alone
+   * (#750). Absent on nonterminal frames.
+   */
+  result?: Record<string, unknown>;
+}
+
+export interface PersistedJobProgress {
+  percent: number;
+  totalFiles: number;
+  completedFiles: number;
+  failedFiles: number;
+  result?: Record<string, unknown>;
 }
 
 export interface SingleFileProgress {
@@ -54,6 +68,8 @@ interface SingleFileReplayRow {
   progress: unknown;
   error: unknown;
 }
+
+type BatchReplayRow = SingleFileReplayRow;
 
 const MISSING_DURABLE_RESULT_ERROR = "Completed result is no longer available. Run the job again.";
 
@@ -115,6 +131,79 @@ export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFile
   };
 }
 
+function asCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+/** Compute the durable jsonb for a batch parent row. Counts (not just a
+ * percent) persist so a reconnecting client can be shown real batch progress,
+ * and terminal frames keep their result for replay after the Redis terminal
+ * key expires (#750). */
+export function buildPersistedJobProgress(progress: JobProgress): PersistedJobProgress {
+  return {
+    percent:
+      progress.totalFiles > 0
+        ? Math.round((progress.completedFiles / progress.totalFiles) * 100)
+        : 0,
+    totalFiles: progress.totalFiles,
+    completedFiles: progress.completedFiles,
+    failedFiles: progress.failedFiles,
+    ...(progress.result ? { result: progress.result } : {}),
+  };
+}
+
+function storedBatchErrors(error: unknown): Array<{ filename: string; error: string }> {
+  if (!isRecord(error) || !Array.isArray(error.details)) return [];
+  const out: Array<{ filename: string; error: string }> = [];
+  for (const entry of error.details) {
+    if (isRecord(entry) && typeof entry.filename === "string" && typeof entry.error === "string") {
+      out.push({ filename: entry.filename, error: entry.error });
+    }
+  }
+  return out;
+}
+
+/** Reconstruct a batch frame from the parent jobs row: nonterminal for live
+ * rows (proof the batch exists, mirroring the single-file replay of #722),
+ * terminal with the durable result otherwise. */
+export function buildBatchReplayEvent(row: BatchReplayRow): JobProgress & { type: "batch" } {
+  const progress = isRecord(row.progress) ? row.progress : {};
+  const counts = {
+    totalFiles: asCount(progress.totalFiles),
+    completedFiles: asCount(progress.completedFiles),
+    failedFiles: asCount(progress.failedFiles),
+  };
+  const base = { jobId: row.jobId, type: "batch" as const, ...counts };
+
+  if (row.status === "queued" || row.status === "processing") {
+    return { ...base, status: "processing", errors: [] };
+  }
+
+  if (row.status === "completed") {
+    const result = isRecord(progress.result) ? progress.result : undefined;
+    if (!result) {
+      return {
+        ...base,
+        status: "failed",
+        errors: [{ filename: "", error: MISSING_DURABLE_RESULT_ERROR }],
+      };
+    }
+    return { ...base, status: "completed", errors: storedBatchErrors(row.error), result };
+  }
+
+  const errors = storedBatchErrors(row.error);
+  if (errors.length === 0) {
+    const message =
+      isRecord(row.error) && typeof row.error.message === "string"
+        ? row.error.message
+        : row.status === "canceled"
+          ? "Canceled"
+          : "Processing failed";
+    errors.push({ filename: "", error: message });
+  }
+  return { ...base, status: "failed", errors };
+}
+
 // ── Redis channels / keys ──────────────────────────────────────
 
 const progressChannel = () => `${bullPrefix()}:progress`;
@@ -144,10 +233,8 @@ function enqueuePersist(jobId: string, fn: () => Promise<void>): Promise<void> {
 
 async function persistJobProgress(progress: JobProgress): Promise<void> {
   try {
-    const percent =
-      progress.totalFiles > 0
-        ? Math.round((progress.completedFiles / progress.totalFiles) * 100)
-        : 0;
+    const progressJsonb = buildPersistedJobProgress(progress);
+    const isTerminalFrame = progress.status === "completed" || progress.status === "failed";
     const [existing] = await db
       .select({ id: schema.jobs.id })
       .from(schema.jobs)
@@ -158,21 +245,30 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
         .update(schema.jobs)
         .set({
           status: progress.status,
-          progress: { percent },
+          progress: progressJsonb,
           error:
             progress.errors.length > 0
               ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
               : null,
-          completedAt:
-            progress.status === "completed" || progress.status === "failed" ? new Date() : null,
+          completedAt: isTerminalFrame ? new Date() : null,
         })
-        .where(eq(schema.jobs.id, progress.jobId));
+        // Same resurrect guard as the single-file persist: child outcomes are
+        // published fire and forget, so a late nonterminal frame must not
+        // overwrite the terminal state the finalize already committed.
+        .where(
+          isTerminalFrame
+            ? eq(schema.jobs.id, progress.jobId)
+            : and(
+                eq(schema.jobs.id, progress.jobId),
+                notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+              ),
+        );
     } else {
       await db.insert(schema.jobs).values({
         id: progress.jobId,
         type: "batch",
         status: progress.status,
-        progress: { percent },
+        progress: progressJsonb,
         inputRefs: [],
         error:
           progress.errors.length > 0
@@ -319,6 +415,102 @@ export async function updateSingleFileProgressAtomically(
     }),
   );
   announce(event);
+}
+
+export interface CompleteBatchJobArgs {
+  jobId: string;
+  totalFiles: number;
+  completedFiles: number;
+  failedFiles: number;
+  errors: Array<{ filename: string; error: string }>;
+  outputRefs: string[];
+  bytesOut: number;
+  result: Record<string, unknown>;
+}
+
+/**
+ * Commit the authoritative batch completion (row status, outputRefs, durable
+ * progress with the result) and only then announce the terminal frame, so a
+ * replay can never observe the frame without the durable state behind it.
+ * Runs through the per-job persist queue: earlier fire-and-forget child
+ * frames land first and cannot overwrite this write afterwards.
+ */
+export async function completeBatchJob(args: CompleteBatchJobArgs): Promise<void> {
+  const frame: JobProgress & { type: "batch" } = {
+    jobId: args.jobId,
+    type: "batch",
+    status: "completed",
+    totalFiles: args.totalFiles,
+    completedFiles: args.completedFiles,
+    failedFiles: args.failedFiles,
+    errors: args.errors,
+    result: args.result,
+  };
+  await enqueuePersist(args.jobId, async () => {
+    await db
+      .update(schema.jobs)
+      .set({
+        status: "completed",
+        completedAt: new Date(),
+        outputRefs: args.outputRefs,
+        bytesOut: args.bytesOut,
+        progress: buildPersistedJobProgress(frame),
+        error:
+          args.errors.length > 0
+            ? { message: `${args.errors.length} file(s) failed`, details: args.errors }
+            : null,
+      })
+      .where(eq(schema.jobs.id, args.jobId));
+  });
+  announce(frame);
+}
+
+export interface FailBatchJobArgs {
+  jobId: string;
+  totalFiles: number;
+  completedFiles: number;
+  failedFiles: number;
+  errors: Array<{ filename: string; error: string }>;
+  message: string;
+}
+
+/**
+ * Terminal batch failure. Guarded so a late safety-net call (the worker's
+ * failed handler) can never downgrade an already-committed completion; the
+ * frame is only announced when this call actually owned the transition.
+ */
+export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
+  const frame: JobProgress & { type: "batch" } = {
+    jobId: args.jobId,
+    type: "batch",
+    status: "failed",
+    totalFiles: args.totalFiles,
+    completedFiles: args.completedFiles,
+    failedFiles: args.failedFiles,
+    errors: args.errors,
+  };
+  let applied = false;
+  await enqueuePersist(args.jobId, async () => {
+    const res = await db
+      .update(schema.jobs)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        progress: buildPersistedJobProgress(frame),
+        error: {
+          message: args.message,
+          ...(args.errors.length > 0 ? { details: args.errors } : {}),
+        },
+      })
+      .where(
+        and(
+          eq(schema.jobs.id, args.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
+  });
+  if (applied) announce(frame);
 }
 
 /**
@@ -520,32 +712,46 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
           };
           sendFrame(JSON.stringify(synthetic));
         }
+        // Live batch parents replay a nonterminal frame for the same reason
+        // the single path does (#722): a client that degraded a dead batch
+        // POST needs proof the batch exists, and heartbeats carry none. The
+        // finalize can also take a while after the last child (ZIP packaging),
+        // where this replay is the only evidence available (#750).
         if (
           row &&
-          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
+          row.type === "batch" &&
+          (row.status === "queued" || row.status === "processing")
         ) {
-          let syntheticJson: string;
-          if (row.type !== "batch") {
-            syntheticJson = JSON.stringify(
-              buildSingleFileReplayEvent({
+          sendFrame(
+            JSON.stringify(
+              buildBatchReplayEvent({
                 jobId,
                 status: row.status,
                 progress: row.progress,
                 error: row.error,
               }),
-            );
-          } else {
-            syntheticJson = JSON.stringify({
-              jobId,
-              type: "batch",
-              status: row.status === "canceled" ? "failed" : row.status,
-              totalFiles: 0,
-              completedFiles: 0,
-              failedFiles: 0,
-              errors: [],
-            });
-          }
-          callback(syntheticJson);
+            ),
+          );
+        }
+        if (
+          row &&
+          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
+        ) {
+          const replayEvent =
+            row.type !== "batch"
+              ? buildSingleFileReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                })
+              : buildBatchReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                });
+          callback(JSON.stringify(replayEvent));
         }
       } catch {
         // DB unavailable; the listener continues with live updates.
