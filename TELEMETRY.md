@@ -70,6 +70,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `sponsor_clicked` | The sponsor link is clicked | none |
 | `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
 | `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |
+| `tool_run_degraded` | A run's sync HTTP response died after the upload finished and the client fell back to the async SSE path instead of failing the job (#750). High volume on one instance means a reverse proxy is killing sync waits; the fallback hides that from users, so this event is the only operator-visible signal | `tool_id`, `is_batch`, `trigger` (`socket`, `timeout`, `http-502`, or `http-504`), `had_evidence` |
 
 ### SDK-generated events
 

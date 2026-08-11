@@ -146,6 +146,23 @@ describe("analytics lib (baked model)", () => {
       expect(mockCapture).toHaveBeenCalledWith("tool_opened", {});
     });
 
+    it("forwards the tool_run_degraded dimensions (#750)", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mod.track("tool_run_degraded", {
+        tool_id: "trim-video",
+        is_batch: false,
+        trigger: "socket",
+        had_evidence: true,
+        message: "leak",
+      });
+      expect(mockCapture).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "trim-video",
+        is_batch: false,
+        trigger: "socket",
+        had_evidence: true,
+      });
+    });
+
     it("drops all properties for an unknown event", async () => {
       await mod.initAnalytics(enabledConfig);
       mod.track("not_allow_listed", { tool_id: "resize" });

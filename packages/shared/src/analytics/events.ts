@@ -32,6 +32,12 @@ export const ANALYTICS_EVENTS = {
   // and skip rates become measurable instead of counting only submissions.
   FEEDBACK_PROMPT_SHOWN: "feedback_prompt_shown",
   FEEDBACK_PROMPT_DISMISSED: "feedback_prompt_dismissed",
+  // A sync tool run lost its HTTP response after the upload fully left the
+  // browser and fell back to the async SSE path instead of erroring (#750).
+  // The fallback deliberately masks proxy problems from the user, so this
+  // event is the only way an operator learns their reverse proxy is killing
+  // every sync wait.
+  TOOL_RUN_DEGRADED: "tool_run_degraded",
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
@@ -102,4 +108,15 @@ export interface PipelineSavedProperties {
 
 export interface PipelineTemplateSelectedProperties {
   template_id: string;
+}
+
+export interface ToolRunDegradedProperties {
+  tool_id: string;
+  is_batch: boolean;
+  /** What killed the sync response: a socket error, a client-side timeout, or
+   * an intermediary's 502/504 with an unparseable body. */
+  trigger: "socket" | "timeout" | "http-502" | "http-504";
+  /** Whether an SSE frame had already proven the job reached the server when
+   * the degrade happened. */
+  had_evidence: boolean;
 }
