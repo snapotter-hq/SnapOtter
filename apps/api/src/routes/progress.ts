@@ -356,13 +356,20 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
 
   // Terminal events write the replay cache BEFORE publishing, so a client
   // connecting right after the live event always finds the terminal key.
+  // A dropped TERMINAL announcement is the one failure a waiting client may
+  // never recover from on its own, so it must at least reach the logs;
+  // nonterminal drops stay quiet (they would spam every frame of an outage).
   const publishPromise = isTerminal
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
-        .catch(() => {})
+        .catch((err) => {
+          console.error("terminal replay key write failed", payload.jobId, err);
+        })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
-  void Promise.resolve(publishPromise).catch(() => {});
+  void Promise.resolve(publishPromise).catch((err) => {
+    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+  });
 }
 
 function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): Promise<void> {
@@ -531,10 +538,14 @@ export function publishEphemeral(
   const announce = isTerminal
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
-        .catch(() => {})
+        .catch((err) => {
+          console.error("terminal replay key write failed", payload.jobId, err);
+        })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
-  void Promise.resolve(announce).catch(() => {});
+  void Promise.resolve(announce).catch((err) => {
+    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+  });
 }
 
 // ── SSE subscriber (module-level, shared across all connections) ─

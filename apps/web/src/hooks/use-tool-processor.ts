@@ -284,7 +284,20 @@ export function useToolProcessor(toolId: string) {
               es.close();
               eventSourceRef.current = null;
               xhrRef.current?.abort();
-              batchRunRef.current?.onTerminal(frame);
+              const run = batchRunRef.current;
+              if (run) {
+                run.onTerminal(frame);
+              } else {
+                // Unreachable by construction (async mode implies a batch run
+                // installed the handler); if the invariant ever breaks, fail
+                // visibly instead of leaving the run in silent limbo.
+                clearJobEvidenceTimer();
+                if (elapsedRef.current) clearInterval(elapsedRef.current);
+                clearActiveJob();
+                setError("Processing was interrupted. Retry when reconnected.");
+                setProcessing(false);
+                setProgress(IDLE_PROGRESS);
+              }
               return;
             }
             if (data.type !== "single") return;
@@ -789,6 +802,18 @@ export function useToolProcessor(toolId: string) {
           if (activeJobIdRef.current !== clientJobId) return;
           try {
             const res = await fetch(url, { headers: formatHeaders() });
+            // A 4xx is deterministic: the result is gone or this session may
+            // not read it. Retrying cannot help, and the message must not
+            // blame the network.
+            if (res.status >= 400 && res.status < 500) {
+              if (activeJobIdRef.current !== clientJobId) return;
+              failRun(
+                res.status === 404
+                  ? "Completed result is no longer available. Run the job again."
+                  : "The finished batch could not be downloaded. Refresh and try again.",
+              );
+              return;
+            }
             if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
             const blob = await res.blob();
             if (activeJobIdRef.current !== clientJobId) return;
@@ -892,8 +917,11 @@ export function useToolProcessor(toolId: string) {
 
         if (xhr.status === 202) {
           // The server's sync wait expired while the batch keeps running;
-          // ride the SSE to the terminal frame like any degraded run.
+          // ride the SSE to the terminal frame like any degraded run. Force
+          // a fresh source: a sync-mode SSE error during the long wait nulls
+          // the ref, and the replay-on-connect recovers anything missed.
           asyncModeRef.current = true;
+          reconnectSSE(true);
           resetStallTimer();
           return;
         }
@@ -921,9 +949,14 @@ export function useToolProcessor(toolId: string) {
         }
 
         void (async () => {
-          const text = await (xhr.response instanceof Blob
-            ? xhr.response.text()
-            : Promise.resolve(String(xhr.response ?? "")));
+          let text = "";
+          try {
+            text = await (xhr.response instanceof Blob
+              ? xhr.response.text()
+              : Promise.resolve(String(xhr.response ?? "")));
+          } catch {
+            // Unreadable body; fall through to the status-based handling.
+          }
           if (activeJobIdRef.current !== clientJobId) return;
           let errorMsg: string;
           try {

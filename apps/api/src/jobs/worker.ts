@@ -1015,6 +1015,11 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
  * failures into the PassThrough; destroying it makes putObjectStream reject
  * (and clean up its partial object).
  */
+// A source stream that neither errors nor ends (half-open S3 read) would
+// otherwise hold the concurrency-1 system pool forever: BullMQ keeps
+// renewing the lock of an "active" job, so stall detection never fires.
+const BATCH_ZIP_TIMEOUT_MS = 15 * 60_000;
+
 async function buildBatchZip(
   zipKey: string,
   entries: Array<{ filename: string; outputRef: string }>,
@@ -1035,13 +1040,25 @@ async function buildBatchZip(
     // up its partial object); abort() alone leaves it waiting for an end
     // that never comes.
     passthrough.destroy(err);
+    // The aborted archive never reads its queued entries, so already-opened
+    // sources would idle with buffered data and hold their descriptors.
+    for (const stream of opened) {
+      (stream as unknown as { destroy?: (e?: Error) => void }).destroy?.();
+    }
   };
   archive.on("error", fail);
   archive.pipe(passthrough);
   const upload = putObjectStream(zipKey, passthrough);
   const feed = (async () => {
     for (const entry of entries) {
+      if (failed) break;
       const source = await getObjectStream(entry.outputRef);
+      if (failed) {
+        // fail() ran while this open was in flight; its cleanup loop cannot
+        // have seen this stream.
+        (source as unknown as { destroy?: () => void }).destroy?.();
+        break;
+      }
       opened.push(source);
       // Never hand archiver a stream that can emit 'error': it re-emits the
       // error on an internal listener-less stream, which is process-fatal.
@@ -1063,14 +1080,20 @@ async function buildBatchZip(
   // it. finalize() after an abort is not guaranteed to settle, so the feed
   // is observed but never awaited unguarded.
   feed.catch((err: unknown) => fail(err instanceof Error ? err : new Error(String(err))));
+  const watchdog = setTimeout(
+    () => fail(new Error("Batch ZIP packaging timed out")),
+    BATCH_ZIP_TIMEOUT_MS,
+  );
   try {
     return await upload;
   } catch (err) {
-    // Abandoned entry streams would otherwise hold their descriptors open.
-    for (const stream of opened) {
-      (stream as unknown as { destroy?: (e?: Error) => void }).destroy?.();
-    }
-    throw err instanceof Error ? err : new Error(String(err));
+    const error = err instanceof Error ? err : new Error(String(err));
+    // The upload can reject without fail() having run (the local capacity
+    // check rejects before consuming); fail() owns all teardown.
+    fail(error);
+    throw error;
+  } finally {
+    clearTimeout(watchdog);
   }
 }
 
@@ -1173,6 +1196,8 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
     const packagingError = "Failed to package batch results";
+    // The terminal write must not displace the packaging root cause: the
+    // rethrow below is what reaches the job record and Sentry.
     await failBatchJob({
       jobId: data.jobId,
       totalFiles,
@@ -1180,6 +1205,11 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       failedFiles,
       errors: [...counters.errors, { filename: "", error: packagingError }],
       message: packagingError,
+    }).catch((persistErr) => {
+      logger.error(
+        { err: persistErr, jobId: data.jobId },
+        "failed to record batch packaging failure",
+      );
     });
     throw err instanceof Error ? err : new Error(String(err));
   }
@@ -1259,9 +1289,17 @@ export function startWorkers(): void {
             totalFiles: data.totalFiles ?? 0,
             completedFiles: data.totalFiles ?? 0,
             failedFiles: data.totalFiles ?? 0,
-            errors: [],
+            // The blank-name entry is the synthetic-error contract the client
+            // displays; without it the frame reads as "all files failed" for
+            // a batch whose files all succeeded.
+            errors: [{ filename: "", error: "Failed to package batch results" }],
             message: "Failed to package batch results",
-          }).catch(() => {});
+          }).catch((netErr) => {
+            // The net itself failing means a degraded client may hang on a
+            // row that never goes terminal; that must reach the operator.
+            logger.error({ err: netErr, jobId: data.jobId }, "batch-finalize safety net failed");
+            void reportError(netErr, { source: "worker", pool, jobId: data.jobId });
+          });
         }
         void reportError(err, {
           source: "worker",

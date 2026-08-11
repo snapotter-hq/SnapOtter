@@ -887,6 +887,9 @@ describe("batch children and finalize", () => {
       const frame = await terminalFrame(parentId);
       expect(frame.type).toBe("batch");
       expect(frame.status).toBe("failed");
+      // The blank-name synthetic entry is what the client displays; without
+      // it this frame would read as "all files failed".
+      expect(frame.errors).toEqual([{ filename: "", error: "Failed to package batch results" }]);
 
       const row = await waitFor(async () => {
         const candidate = await jobRow(parentId);

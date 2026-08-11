@@ -423,6 +423,33 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  it("fails fast with the right message when the durable ZIP is already gone", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      sendBatchFrame(completedTerminalFrame());
+    });
+
+    // A 404 is deterministic: no retries, no network blame.
+    await settled(() => {
+      expect(useFileStore.getState().error).toBe(
+        "Completed result is no longer available. Run the job again.",
+      );
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("gives up after download retries are exhausted", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(() => Promise.reject(new Error("network down")));

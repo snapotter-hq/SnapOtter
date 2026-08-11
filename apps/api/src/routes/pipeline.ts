@@ -49,7 +49,7 @@ import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
-import { updateJobProgress, updateSingleFileProgress } from "./progress.js";
+import { failBatchJob, updateJobProgress, updateSingleFileProgress } from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
 
 /**
@@ -1285,15 +1285,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           if (perFileChildren.length === 0) {
             // All files failed validation. There is no flow to run, so no
-            // finalize will ever publish a terminal frame; publish it here so
-            // a client that lost this response settles from SSE (#750).
-            updateJobProgress({
+            // finalize will ever publish a terminal frame; publish it here
+            // (awaited and guarded, like the finalize's own writes) so a
+            // client that lost this response settles from SSE (#750).
+            await failBatchJob({
               jobId: parentId,
-              status: "failed",
               totalFiles: files.length,
               completedFiles: files.length,
               failedFiles: files.length,
               errors: preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              message: "All files failed processing",
+            }).catch((err) => {
+              request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
             });
             return reply.status(422).send({
               error: "All files failed processing",
@@ -1399,6 +1402,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             stream.on("error", (err: Error) => {
               request.log.error({ err, jobId: parentId }, "Pipeline batch ZIP stream error");
               reply.raw.destroy(err);
+            });
+            // pipe() only unpipes when the destination dies; the source stays
+            // open and leaks its descriptor on every mid-download disconnect.
+            reply.raw.on("close", () => {
+              stream.destroy();
             });
             stream.pipe(reply.raw);
           } catch (err) {
