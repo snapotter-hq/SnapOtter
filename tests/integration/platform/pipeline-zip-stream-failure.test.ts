@@ -140,6 +140,41 @@ describe("Pipeline batch ZIP delivery", () => {
     expect(terminal?.status).toBe("failed");
   }, 30_000);
 
+  it("keeps original-index alignment in fileResults across a pre-failed upload", async () => {
+    const parentId = "zip-index-alignment-parent";
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good1.png", content: PNG_200x150, contentType: "image/png" },
+      {
+        name: "file",
+        filename: "bad.png",
+        content: Buffer.from("not an image"),
+        contentType: "image/png",
+      },
+      { name: "file", filename: "good2.png", content: PNG_200x150, contentType: "image/png" },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+      { name: "clientJobId", content: parentId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    // The invalid slot 1 must stay a hole, not shift good2 into it: the
+    // finalize maps flow indices back through fileIndexMap (#750).
+    const fileResults = JSON.parse(
+      decodeURIComponent(res.headers["x-file-results"] as string),
+    ) as Record<string, string>;
+    expect(Object.keys(fileResults).sort()).toEqual(["0", "2"]);
+    expect(fileResults["0"]).toContain("good1");
+    expect(fileResults["2"]).toContain("good2");
+  }, 30_000);
+
   it("destroys the connection when the stored ZIP read dies mid-stream", async () => {
     const parentId = "zip-object-failure-parent";
     mocks.failZipObjectForParentId = parentId;

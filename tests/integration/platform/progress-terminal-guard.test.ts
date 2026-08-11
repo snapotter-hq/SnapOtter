@@ -25,7 +25,13 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { updateSingleFileProgress } from "../../../apps/api/src/routes/progress.js";
+import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
+import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import {
+  failBatchJob,
+  updateJobProgress,
+  updateSingleFileProgress,
+} from "../../../apps/api/src/routes/progress.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -104,5 +110,102 @@ describe("late progress frames against a terminal job row", () => {
     const row = await readJob(id);
     expect(row.status).toBe("completed");
     expect(row.completedAt).not.toBeNull();
+  });
+});
+
+/**
+ * The batch twin (#750): child outcomes are fire-and-forget nonterminal
+ * frames, and the finalize's terminal write can race them. A late child frame
+ * must not resurrect a completed parent (it would wipe the durable result the
+ * SSE replay depends on), and the crashed-finalize safety net (failBatchJob)
+ * must never downgrade a committed completion nor announce a failed frame
+ * over one.
+ */
+describe("late batch frames and the failBatchJob guard", () => {
+  const BATCH_RESULT = {
+    downloadUrl: "/api/v1/download/x/batch-resize-x.zip",
+    fileResults: { "0": "a.png" },
+  };
+
+  async function seedBatchJob(status: "completed" | "processing"): Promise<string> {
+    const id = randomUUID();
+    await db.insert(schema.jobs).values({
+      id,
+      type: "batch",
+      status,
+      inputRefs: [],
+      completedAt: status === "processing" ? null : new Date(),
+      progress:
+        status === "completed"
+          ? { percent: 100, totalFiles: 1, completedFiles: 1, failedFiles: 0, result: BATCH_RESULT }
+          : { percent: 0, totalFiles: 1, completedFiles: 0, failedFiles: 0 },
+    });
+    return id;
+  }
+
+  it("a late nonterminal child frame cannot resurrect a completed batch row", async () => {
+    const id = await seedBatchJob("completed");
+
+    updateJobProgress({
+      jobId: id,
+      status: "processing",
+      totalFiles: 1,
+      completedFiles: 0,
+      failedFiles: 0,
+      errors: [],
+    });
+    // updateJobProgress persists fire and forget; give its queue time to
+    // drain before asserting nothing changed.
+    await new Promise((r) => setTimeout(r, 500));
+
+    const row = await readJob(id);
+    expect(row.status, "completed batch row was resurrected").toBe("completed");
+    expect(row.completedAt).not.toBeNull();
+    expect((row.progress as { result?: unknown } | null)?.result, "durable result wiped").toEqual(
+      BATCH_RESULT,
+    );
+  });
+
+  it("failBatchJob refuses to downgrade a completed batch and announces nothing", async () => {
+    const id = await seedBatchJob("completed");
+
+    await failBatchJob({
+      jobId: id,
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [],
+      message: "Failed to package batch results",
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("completed");
+    expect((row.progress as { result?: unknown } | null)?.result).toEqual(BATCH_RESULT);
+    // No terminal failed frame may be announced over the completion: a
+    // reconnecting client would settle on whichever it reads.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)).toBeNull();
+  });
+
+  it("failBatchJob owns the transition on a live batch and announces it", async () => {
+    const id = await seedBatchJob("processing");
+
+    await failBatchJob({
+      jobId: id,
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "a.png", error: "boom" }],
+      message: "Failed to package batch results",
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("failed");
+    expect(row.completedAt).not.toBeNull();
+
+    const raw = await sharedRedis().get(`${bullPrefix()}:terminal:${id}`);
+    expect(raw).not.toBeNull();
+    const frame = JSON.parse(raw as string) as Record<string, unknown>;
+    expect(frame.type).toBe("batch");
+    expect(frame.status).toBe("failed");
   });
 });

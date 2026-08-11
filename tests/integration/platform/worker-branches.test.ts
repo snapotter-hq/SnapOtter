@@ -24,6 +24,26 @@ import { setTimeout as delay } from "node:timers/promises";
 import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY, TOOLS } from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Makes the finalize die before its own failure handling (readBatchCounters
+// runs outside the packaging try/catch), so the worker failed-handler safety
+// net is the only thing standing between a crash and a hung degraded client.
+const batchProgressMock = vi.hoisted(() => ({ failCountersForParentId: null as string | null }));
+
+vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/jobs/batch-progress.js")>();
+  return {
+    ...actual,
+    readBatchCounters: async (parentId: string) => {
+      if (batchProgressMock.failCountersForParentId === parentId) {
+        throw new Error("injected counters outage");
+      }
+      return actual.readBatchCounters(parentId);
+    },
+  };
+});
+
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 
@@ -822,6 +842,60 @@ describe("batch children and finalize", () => {
     const entries = new AdmZip(zipBytes).getEntries();
     expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
     expect(entries[0].getData().toString("utf8")).toBe("aaa");
+  }, 30_000);
+
+  it("the failed-handler safety net publishes a terminal failed frame when the finalize crashes", async () => {
+    const parentId = `bnet-${randomUUID()}`;
+    // The parent row a real batch route inserts before enqueueing the flow.
+    await db.insert(schema.jobs).values({
+      id: parentId,
+      type: "batch",
+      status: "processing",
+      pool: "system",
+      inputRefs: [],
+      progress: { percent: 50, totalFiles: 1, completedFiles: 1, failedFiles: 0 },
+    });
+    await putObject("outputs/seed-net/ok.png", Buffer.from("net-bytes"));
+    await db.insert(schema.jobs).values({
+      id: `${parentId}-f0`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: ["uploads/seed-net/in0.png"],
+      outputRefs: ["outputs/seed-net/ok.png"],
+    });
+
+    batchProgressMock.failCountersForParentId = parentId;
+    try {
+      await getQueue("system").add(
+        "batch-finalize",
+        toolJob({
+          jobId: parentId,
+          toolId: "wt-echo",
+          kind: "batch-finalize",
+          pool: "system",
+          totalFiles: 1,
+          settings: { flowChildCount: 1 },
+          filename: "",
+        }),
+        { jobId: parentId, attempts: 1 },
+      );
+
+      // Without the net nobody publishes a terminal frame: the crash happens
+      // before the finalize's own failure handling.
+      const frame = await terminalFrame(parentId);
+      expect(frame.type).toBe("batch");
+      expect(frame.status).toBe("failed");
+
+      const row = await waitFor(async () => {
+        const candidate = await jobRow(parentId);
+        return candidate?.status === "failed" ? candidate : undefined;
+      });
+      expect(row.error?.message).toBe("Failed to package batch results");
+    } finally {
+      batchProgressMock.failCountersForParentId = null;
+    }
   }, 30_000);
 
   it("assembles the ordered manifest across completed, failed, and missing children", async () => {

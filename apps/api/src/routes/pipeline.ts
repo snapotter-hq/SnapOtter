@@ -1337,10 +1337,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const batchResult = await waitForJob("system", parentId, 30 * 60_000);
 
           if (!batchResult) {
-            // The flow is still running; answer with the async contract and
-            // let the client ride the SSE to the terminal frame, which
-            // carries the durable download URL (#750).
-            return reply.status(202).send({ jobId: parentId, async: true });
+            // The flow keeps running and the finalize will persist the ZIP
+            // and publish the terminal frame, but the pipeline client cannot
+            // ride the async contract yet (it settles only from this
+            // response), so a 202 here would hand it JSON it tries to unzip.
+            // Keep the timeout error until the pipeline hook learns the #750
+            // degrade path.
+            return reply.status(422).send({ error: "Pipeline batch processing timed out" });
           }
 
           const payload = batchResult.resultPayload as

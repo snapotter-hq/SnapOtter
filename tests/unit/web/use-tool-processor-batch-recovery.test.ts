@@ -451,6 +451,79 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  it("degrades a batch 502 whose blob body is not JSON", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 502;
+      xhrs[0].response = new Blob(["<html><body>502 Bad Gateway</body></html>"], {
+        type: "text/html",
+      });
+      xhrs[0].onload?.();
+    });
+
+    // The 5xx body read is async (Blob.text), so the degrade lands a tick
+    // later; what must never happen is an error.
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "resize",
+        is_batch: true,
+        trigger: "http-502",
+        had_evidence: false,
+      });
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("recovers through the stall timer when the terminal frame was missed", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      // Evidence first, so the 30s evidence timer never arms and the 300s
+      // stall timer is the recovery path under test.
+      sendBatchFrame({
+        status: "processing",
+        totalFiles: 2,
+        completedFiles: 1,
+        failedFiles: 0,
+        errors: [],
+      });
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    const sourcesAfterDegrade = MockEventSource.instances.length;
+
+    // The terminal frame never arrives on this source (half-open SSE). The
+    // stall timer must force a fresh source, whose server-side replay then
+    // delivers the terminal frame.
+    act(() => {
+      vi.advanceTimersByTime(300_001);
+    });
+    expect(MockEventSource.instances.length).toBeGreaterThan(sourcesAfterDegrade);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      sendBatchFrame(completedTerminalFrame());
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("emits tool_run_degraded with batch dimensions on degrade", async () => {
     const { unmount } = startBatchRun();
 
