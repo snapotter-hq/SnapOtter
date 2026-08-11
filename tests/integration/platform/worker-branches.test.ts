@@ -22,6 +22,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY, TOOLS } from "@snapotter/shared";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
@@ -579,13 +580,28 @@ describe("pipeline finalize", () => {
     expect(row.status).toBe("failed");
     expect(row.error?.message).toBe("Step 2: kaboom");
 
-    // Child outcome recorded against the pipeline-batch parent.
+    // Child outcome recorded against the pipeline-batch parent. Outcomes are
+    // nonterminal since #750 (only batch-finalize publishes the terminal
+    // frame, after the durable ZIP exists), so the record shows up in the
+    // Redis counters and the parent row's persisted counts.
     expect(await sharedRedis().get(`${bullPrefix()}:batch:${batchParent}:failed`)).toBe("1");
-    const parentFrame = await terminalFrame(batchParent);
-    expect(parentFrame.status).toBe("failed");
-    expect(parentFrame.failedFiles).toBe(1);
-    const errors = (parentFrame.errors ?? []) as Array<{ filename: string; error: string }>;
-    expect(errors).toEqual([{ filename: "b.png", error: "Step 2: kaboom" }]);
+    const errorsRaw = await sharedRedis().lrange(
+      `${bullPrefix()}:batch:${batchParent}:errors`,
+      0,
+      -1,
+    );
+    expect(errorsRaw.map((e) => JSON.parse(e))).toEqual([
+      { filename: "b.png", error: "Step 2: kaboom" },
+    ]);
+    const parentRow = await waitFor(async () => {
+      const candidate = await jobRow(batchParent);
+      return candidate?.status === "processing" ? candidate : undefined;
+    });
+    expect(parentRow.progress).toMatchObject({
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+    });
 
     const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
     const props = events[0];
@@ -657,10 +673,18 @@ describe("pipeline finalize", () => {
       { step: 2, toolId: "compress", size: 5 },
     ]);
 
-    // Success recorded against the pipeline-batch parent.
+    // Success recorded against the pipeline-batch parent; the record stays
+    // nonterminal since #750 (the batch-finalize owns the terminal frame).
     expect(await sharedRedis().get(`${bullPrefix()}:batch:${batchParent}:done`)).toBe("1");
-    const parentFrame = await terminalFrame(batchParent);
-    expect(parentFrame.status).toBe("completed");
+    const parentRow = await waitFor(async () => {
+      const candidate = await jobRow(batchParent);
+      return candidate?.status === "processing" ? candidate : undefined;
+    });
+    expect(parentRow.progress).toMatchObject({
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 0,
+    });
 
     const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
     const props = events[0];
@@ -704,10 +728,10 @@ describe("pipeline finalize", () => {
 });
 
 describe("batch children and finalize", () => {
-  it("records one success and one failure, then emits the terminal batch frame", async () => {
+  it("records one success and one failure, then the finalize emits the terminal batch frame", async () => {
     const parentId = `bparent-${randomUUID()}`;
-    const okId = randomUUID();
-    const boomId = randomUUID();
+    const okId = `${parentId}-f0`;
+    const boomId = `${parentId}-f1`;
     const okRef = await seedInput(okId, "a.png", Buffer.from("aaa"));
     const boomRef = await seedInput(boomId, "b.png", Buffer.from("bbb"));
 
@@ -734,18 +758,6 @@ describe("batch children and finalize", () => {
       }),
     );
 
-    // The terminal batch frame appears once both children have recorded.
-    const parentFrame = await terminalFrame(parentId);
-    expect(parentFrame.status).toBe("completed"); // one success => batch completed
-    expect(parentFrame.totalFiles).toBe(2);
-    expect(parentFrame.completedFiles).toBe(2);
-    expect(parentFrame.failedFiles).toBe(1);
-    const errors = (parentFrame.errors ?? []) as Array<{ filename: string; error: string }>;
-    expect(errors).toEqual([{ filename: "b.png", error: "boom" }]);
-
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:done`)).toBe("1");
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:failed`)).toBe("1");
-
     // The successful child completed normally with its own output.
     const okRow = await terminalRow(okId);
     expect(okRow.status).toBe("completed");
@@ -763,16 +775,60 @@ describe("batch children and finalize", () => {
     });
     expect(boomResult.resultPayload).toEqual({ failed: true, error: "boom" });
 
-    // The durable batch parent row carries the failure summary.
+    // Child outcomes alone stay nonterminal since #750; only the finalize
+    // publishes the terminal frame, once the durable ZIP exists.
+    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:done`)).toBe("1");
+    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:failed`)).toBe("1");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${parentId}`)).toBeNull();
+
+    // The parent row already exists (the nonterminal persist created it), so
+    // enqueue the finalize the way the flow producer does: queue-only.
+    await getQueue("system").add(
+      "batch-finalize",
+      toolJob({
+        jobId: parentId,
+        toolId: "wt-echo",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 2,
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+        filename: "",
+      }),
+      { jobId: parentId, attempts: 1 },
+    );
+
+    const parentFrame = await terminalFrame(parentId);
+    expect(parentFrame.status).toBe("completed"); // one success => batch completed
+    expect(parentFrame.totalFiles).toBe(2);
+    expect(parentFrame.completedFiles).toBe(2);
+    expect(parentFrame.failedFiles).toBe(1);
+    const errors = (parentFrame.errors ?? []) as Array<{ filename: string; error: string }>;
+    expect(errors).toEqual([{ filename: "b.png", error: "boom" }]);
+
+    // The terminal frame carries the durable result a degraded client needs.
+    const frameResult = (parentFrame.result ?? {}) as Record<string, unknown>;
+    expect(String(frameResult.downloadUrl)).toContain(`/api/v1/download/${parentId}/`);
+    expect(frameResult.fileResults).toEqual({ "0": "a_wt-echo.png" });
+
+    // The durable batch parent row carries the failure summary and the ZIP.
     const parentRow = await waitFor(async () => {
       const row = await jobRow(parentId);
       return row?.status === "completed" ? row : undefined;
     });
     expect(parentRow.error?.message).toBe("1 file(s) failed");
+    const zipKey = (parentRow.outputRefs ?? [])[0];
+    expect(zipKey).toContain(`outputs/${parentId}/`);
+    const zipBytes = await getObjectBuffer(zipKey);
+    const entries = new AdmZip(zipBytes).getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
+    expect(entries[0].getData().toString("utf8")).toBe("aaa");
   }, 30_000);
 
   it("assembles the ordered manifest across completed, failed, and missing children", async () => {
     const jobId = `bf-${randomUUID()}`;
+    // The finalize streams every successful output into the durable ZIP
+    // (#750), so the fabricated ref must exist as a real object.
+    await putObject("outputs/seed/ok.png", Buffer.from("ok-bytes"));
     await db.insert(schema.jobs).values({
       id: `${jobId}-f0`,
       type: "batch-child",
