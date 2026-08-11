@@ -56,14 +56,41 @@ export async function recordChildOutcome(
   const errors: Array<{ filename: string; error: string }> = (
     await r.lrange(`${base}:errors`, 0, 99)
   ).map((e) => JSON.parse(e));
-  const finished = completedFiles >= totalFiles;
+  // Child outcomes are always nonterminal (#750): the terminal frame belongs
+  // to batch-finalize, which publishes it only after the durable ZIP and its
+  // download URL exist. Emitting "completed" here would close client SSE
+  // streams before the result they need to settle a degraded run is ready.
   updateJobProgress({
     jobId: parentId,
-    status: finished ? (doneCount > 0 ? "completed" : "failed") : "processing",
+    status: "processing",
     totalFiles,
     completedFiles,
     failedFiles,
     errors,
     currentFile: filename,
   });
+}
+
+export interface BatchCounters {
+  done: number;
+  failed: number;
+  errors: Array<{ filename: string; error: string }>;
+}
+
+/** Read the accumulated child outcomes for a batch parent (errors capped at
+ * 100, same bound the SSE frames use). Used by batch-finalize to build the
+ * terminal frame. */
+export async function readBatchCounters(parentId: string): Promise<BatchCounters> {
+  const r = sharedRedis();
+  const base = `${bullPrefix()}:batch:${parentId}`;
+  const [done, failed, rawErrors] = await Promise.all([
+    r.get(`${base}:done`),
+    r.get(`${base}:failed`),
+    r.lrange(`${base}:errors`, 0, 99),
+  ]);
+  return {
+    done: Number(done ?? 0),
+    failed: Number(failed ?? 0),
+    errors: rawErrors.map((e) => JSON.parse(e)),
+  };
 }

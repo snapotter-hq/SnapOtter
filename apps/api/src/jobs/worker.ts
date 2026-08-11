@@ -24,6 +24,7 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   ANALYTICS_EVENTS,
@@ -35,6 +36,7 @@ import {
   type PipelineExecutedProperties,
   TOOLS,
 } from "@snapotter/shared";
+import archiver from "archiver";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
@@ -44,13 +46,16 @@ import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
+import { createUniqueNamer } from "../lib/filename.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import {
   copyObjectToFile,
   getObjectBuffer,
   getObjectSize,
+  getObjectStream,
   putObject,
+  putObjectStream,
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
@@ -58,6 +63,8 @@ import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
+  completeBatchJob,
+  failBatchJob,
   publishEphemeral,
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
@@ -74,7 +81,7 @@ import {
   runAiPathToolJob,
   runAiToolJob,
 } from "./ai-handlers.js";
-import { recordChildOutcome } from "./batch-progress.js";
+import { readBatchCounters, recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
@@ -1002,17 +1009,97 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
 // ── Batch finalize handler ────────────────────────────────────
 
 /**
+ * Stream every successful child output through one archiver pass into a
+ * durable ZIP object. A source stream that fails after opening never rejects
+ * an await on its own, so both the archive and every entry stream funnel
+ * failures into the PassThrough; destroying it makes putObjectStream reject
+ * (and clean up its partial object).
+ */
+async function buildBatchZip(
+  zipKey: string,
+  entries: Array<{ filename: string; outputRef: string }>,
+): Promise<number> {
+  const archive = archiver("zip", { zlib: { level: 5 } });
+  const passthrough = new PassThrough();
+  // fail() can destroy the passthrough before putObjectStream's pipeline has
+  // attached its consumer; an 'error' event in that window has no listener
+  // and would be process-fatal. The upload's rejection is the real signal.
+  passthrough.on("error", () => {});
+  const opened: NodeJS.ReadableStream[] = [];
+  let failed = false;
+  const fail = (err: Error) => {
+    if (failed) return;
+    failed = true;
+    archive.abort();
+    // Destroying the passthrough is what makes the upload reject (and clean
+    // up its partial object); abort() alone leaves it waiting for an end
+    // that never comes.
+    passthrough.destroy(err);
+  };
+  archive.on("error", fail);
+  archive.pipe(passthrough);
+  const upload = putObjectStream(zipKey, passthrough);
+  const feed = (async () => {
+    for (const entry of entries) {
+      const source = await getObjectStream(entry.outputRef);
+      opened.push(source);
+      // Never hand archiver a stream that can emit 'error': it re-emits the
+      // error on an internal listener-less stream, which is process-fatal.
+      // The wrapper ends quietly instead; fail() has already destroyed the
+      // passthrough by then, so the truncated entry can never be mistaken
+      // for a complete archive.
+      const entryStream = new PassThrough();
+      source.on("error", (err: Error) => {
+        fail(err);
+        entryStream.end();
+      });
+      source.pipe(entryStream);
+      archive.append(entryStream, { name: entry.filename });
+    }
+    await archive.finalize();
+  })();
+  // The upload is the one promise that settles in every outcome: it resolves
+  // when the archive ends the passthrough and rejects when fail() destroys
+  // it. finalize() after an abort is not guaranteed to settle, so the feed
+  // is observed but never awaited unguarded.
+  feed.catch((err: unknown) => fail(err instanceof Error ? err : new Error(String(err))));
+  try {
+    return await upload;
+  } catch (err) {
+    // Abandoned entry streams would otherwise hold their descriptors open.
+    for (const stream of opened) {
+      (stream as unknown as { destroy?: (e?: Error) => void }).destroy?.();
+    }
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+/**
  * Assembles the ordered manifest from child DB rows after all batch
- * children have completed. Runs on the system pool (concurrency 1)
- * and does only lightweight DB reads -- no heavy processing.
+ * children have completed, packages the successful outputs into a durable
+ * ZIP under outputs/<parentId>/, commits the terminal parent-row state, and
+ * publishes the terminal batch SSE frame carrying the download URL (#750).
+ * Runs on the system pool (concurrency 1); the HTTP route streams the
+ * stored ZIP instead of re-archiving.
  *
- * The manifest `[{index, filename, outputRef?, error?}]` is returned
- * as the job result so the HTTP route can stream the ZIP.
+ * The manifest `[{index, filename, outputRef?, error?}]` is returned in the
+ * job result alongside the zip descriptor so the HTTP route can build its
+ * response without recomputing either.
  */
 async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
-  const flowChildCount =
-    (data.settings as { flowChildCount?: number } | null)?.flowChildCount ?? data.totalFiles ?? 0;
+  const settings = (data.settings ?? {}) as {
+    flowChildCount?: number;
+    fileIndexMap?: number[];
+  };
+  const flowChildCount = settings.flowChildCount ?? data.totalFiles ?? 0;
+  // Flow index -> original upload index. Pre-failed uploads never became flow
+  // children, so without this map every index after a pre-failure would pair
+  // a result with the wrong file (#645's alignment contract). Absent on jobs
+  // enqueued before this field existed; identity is correct for those unless
+  // a pre-failure occurred, matching the old route behavior.
+  const fileIndexMap = Array.isArray(settings.fileIndexMap) ? settings.fileIndexMap : null;
+  const totalFiles = data.totalFiles ?? flowChildCount;
 
   const manifest: Array<{
     index: number;
@@ -1040,19 +1127,92 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     }
   }
 
-  // Update parent row
-  await db
-    .update(schema.jobs)
-    .set({ status: "completed", completedAt: new Date() })
-    .where(eq(schema.jobs.id, data.jobId));
+  // Deduplicate output names once, here, so the ZIP entries, the terminal
+  // frame's fileResults, and the route's X-File-Results header cannot drift.
+  const getUniqueName = createUniqueNamer();
+  const fileResults: Record<string, string> = {};
+  const successEntries: Array<{ filename: string; outputRef: string }> = [];
+  for (const entry of manifest) {
+    if (!entry.outputRef) continue;
+    const uniqueName = getUniqueName(entry.filename);
+    entry.filename = uniqueName;
+    fileResults[String(fileIndexMap?.[entry.index] ?? entry.index)] = uniqueName;
+    successEntries.push({ filename: uniqueName, outputRef: entry.outputRef });
+  }
+
+  const counters = await readBatchCounters(data.jobId);
+  const failedFiles = Math.max(0, totalFiles - successEntries.length);
+
+  if (successEntries.length === 0) {
+    await failBatchJob({
+      jobId: data.jobId,
+      totalFiles,
+      completedFiles: totalFiles,
+      failedFiles,
+      errors: counters.errors,
+      message: "All files failed processing",
+    });
+    return {
+      outputRefs: [],
+      filename: "",
+      contentType: "application/json",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: { manifest, allFailed: true },
+    };
+  }
+
+  const zipFilename =
+    data.toolId === "pipeline-batch"
+      ? `pipeline-batch-${data.jobId.slice(0, 8)}.zip`
+      : `batch-${data.toolId}-${data.jobId.slice(0, 8)}.zip`;
+  const zipKey = `outputs/${data.jobId}/${zipFilename}`;
+
+  let zipSize: number;
+  try {
+    zipSize = await buildBatchZip(zipKey, successEntries);
+  } catch (err) {
+    const packagingError = "Failed to package batch results";
+    await failBatchJob({
+      jobId: data.jobId,
+      totalFiles,
+      completedFiles: totalFiles,
+      failedFiles,
+      errors: [...counters.errors, { filename: "", error: packagingError }],
+      message: packagingError,
+    });
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+
+  const result: Record<string, unknown> = {
+    jobId: data.jobId,
+    downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
+    zipFilename,
+    fileResults,
+    processedSize: zipSize,
+  };
+
+  await completeBatchJob({
+    jobId: data.jobId,
+    totalFiles,
+    completedFiles: totalFiles,
+    failedFiles,
+    errors: counters.errors,
+    outputRefs: [zipKey],
+    bytesOut: zipSize,
+    result,
+  });
 
   return {
-    outputRefs: [],
-    filename: "",
-    contentType: "application/json",
+    outputRefs: [zipKey],
+    filename: zipFilename,
+    contentType: "application/zip",
     originalSize: 0,
-    processedSize: 0,
-    resultPayload: { manifest },
+    processedSize: zipSize,
+    resultPayload: {
+      manifest,
+      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults },
+    },
   };
 }
 
@@ -1087,10 +1247,26 @@ export function startWorkers(): void {
 
       worker.on("failed", (job, err) => {
         if (!job) return;
+        const data = job.data as ToolJobData | undefined;
+        // Safety net for a finalize that died without reaching its own
+        // terminal write (crash, stall eviction): a degraded client is
+        // waiting on the terminal batch frame and nothing else will send
+        // one. failBatchJob is guarded, so a finalize that already
+        // committed terminal state is left untouched.
+        if (data?.kind === "batch-finalize") {
+          void failBatchJob({
+            jobId: data.jobId,
+            totalFiles: data.totalFiles ?? 0,
+            completedFiles: data.totalFiles ?? 0,
+            failedFiles: data.totalFiles ?? 0,
+            errors: [],
+            message: "Failed to package batch results",
+          }).catch(() => {});
+        }
         void reportError(err, {
           source: "worker",
           pool,
-          toolId: (job.data as ToolJobData | undefined)?.toolId,
+          toolId: data?.toolId,
           jobId: job.id,
         });
       });
