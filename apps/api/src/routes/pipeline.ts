@@ -185,7 +185,12 @@ function buildPipelineFlowTree(opts: {
 
   // Build bottom-up: step 0 is the deepest leaf
   // Steps swallow failures via return markers, so a retry would never
-  // run; attempts: 1 makes that explicit.
+  // run; attempts: 1 makes that explicit. A step can still hard-fail
+  // outside its own handler (stall eviction after an OOM kill); without
+  // ignoreDependencyOnFailure that wedges its parent in waiting-children
+  // forever and no terminal frame ever reaches the client. With it, the
+  // parent step runs, sees the predecessor has no output, and propagates a
+  // clean failure up to the finalize (#766).
   let currentNode: FlowJob = {
     name: parsedSteps[0].resolvedToolId,
     queueName: queueName(parsedSteps[0].pool),
@@ -204,7 +209,7 @@ function buildPipelineFlowTree(opts: {
       settings: parsedSteps[0].parsedSettings,
       analyticsDistinctId,
     } satisfies ToolJobData,
-    opts: { jobId: stepJobIds[0], attempts: 1 },
+    opts: { jobId: stepJobIds[0], attempts: 1, ignoreDependencyOnFailure: true },
   };
 
   for (let i = 1; i < totalSteps; i++) {
@@ -226,7 +231,7 @@ function buildPipelineFlowTree(opts: {
         settings: parsedSteps[i].parsedSettings,
         analyticsDistinctId,
       } satisfies ToolJobData,
-      opts: { jobId: stepJobIds[i], attempts: 1 },
+      opts: { jobId: stepJobIds[i], attempts: 1, ignoreDependencyOnFailure: true },
       children: [currentNode],
     };
   }
@@ -252,7 +257,9 @@ function buildPipelineFlowTree(opts: {
       settings: {},
       analyticsDistinctId,
     } satisfies ToolJobData,
-    opts: { jobId, attempts: 1 },
+    // In a batch, this finalize is itself a child of batch-finalize and must
+    // not wedge the batch if it hard-fails.
+    opts: { jobId, attempts: 1, ...(parentId ? { ignoreDependencyOnFailure: true } : {}) },
     children: [currentNode],
   };
 
@@ -669,9 +676,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
 
             if (!result) {
-              return reply.status(422).send({
-                error: "Pipeline processing timed out",
-              });
+              // The flow keeps running and the finalize's terminal single
+              // frame carries the full result; the client rides the SSE to
+              // it instead of being told the run failed (#766).
+              return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
             }
 
             // Check for step failure reported by the finalize handler
@@ -1340,13 +1348,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const batchResult = await waitForJob("system", parentId, 30 * 60_000);
 
           if (!batchResult) {
-            // The flow keeps running and the finalize will persist the ZIP
-            // and publish the terminal frame, but the pipeline client cannot
-            // ride the async contract yet (it settles only from this
-            // response), so a 202 here would hand it JSON it tries to unzip.
-            // Keep the timeout error until the pipeline hook learns the #750
-            // degrade path.
-            return reply.status(422).send({ error: "Pipeline batch processing timed out" });
+            // The flow keeps running; the finalize persists the ZIP and
+            // publishes the terminal frame carrying its download URL, and
+            // the pipeline hook speaks the async contract since #766.
+            return reply.status(202).send({ jobId: parentId, async: true });
           }
 
           const payload = batchResult.resultPayload as
