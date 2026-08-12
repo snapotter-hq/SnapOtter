@@ -360,7 +360,12 @@ export function usePipelineProcessor() {
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
 
-      xhr.timeout = 600_000;
+      // The server holds this response for up to its 10-minute sync wait and
+      // then answers 202; a client wall-clock cap would always fire first,
+      // turning every legitimately long pipeline into a spurious degrade.
+      // Liveness is owned by the SSE settle plus the evidence and stall
+      // timers.
+      xhr.timeout = 0;
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

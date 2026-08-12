@@ -520,6 +520,47 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
   if (applied) announce(frame);
 }
 
+export interface FailSingleJobArgs {
+  jobId: string;
+  message: string;
+}
+
+/**
+ * Terminal single-run failure with failBatchJob's guarantees (#766): the
+ * guarded write never downgrades a committed completion, and the frame is
+ * announced only when this call owned the transition. Used by the worker's
+ * pipeline-finalize safety net, where the SSE channel id (clientJobId) and
+ * the authoritative flow row can differ; call it per row id.
+ */
+export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<void> {
+  const frame: SingleFileProgress = {
+    jobId: args.jobId,
+    type: "single",
+    phase: "failed",
+    percent: 0,
+    error: args.message,
+  };
+  let applied = false;
+  await enqueuePersist(args.jobId, async () => {
+    const res = await db
+      .update(schema.jobs)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        progress: { percent: 0 },
+        error: { message: args.message },
+      })
+      .where(
+        and(
+          eq(schema.jobs.id, args.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
+  });
+  if (applied) announce(frame);
+}
+
 /**
  * Publish a progress event to Redis pub/sub and set the terminal replay
  * key, but do NOT persist to the durable DB row. Used by the worker's

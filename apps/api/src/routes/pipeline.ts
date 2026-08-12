@@ -609,9 +609,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             await putObject(uploadKey, processBuffer);
           }
 
-          // Report initial progress
+          // Report initial progress. Awaited: this insert creates the
+          // client-facing row the SSE replays, which is the evidence a
+          // degraded client's fresh connection relies on (#766). Dropped
+          // fire-and-forget, a failed insert would fabricate "the server
+          // never confirmed the job" for a flow that is queued and fine.
           if (clientJobId) {
-            void updateSingleFileProgress({
+            await updateSingleFileProgress({
               jobId: clientJobId,
               phase: "processing",
               percent: 0,

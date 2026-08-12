@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
+import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -148,8 +149,52 @@ describe("pipeline sync-wait expiry (#766)", () => {
       });
       expect(download.statusCode).toBe(200);
       expect(new AdmZip(download.rawPayload).getEntries()).toHaveLength(2);
+
+      // Drift pin for ignoreDependencyOnFailure: its behavior (a stall-
+      // evicted node not wedging its parent) needs an evicted lock-holder,
+      // which an in-process test cannot produce, so pin the wiring instead.
+      // Steps and per-file finalize roots carry the flag; the batch parent
+      // does not (it has no parent to unwedge).
+      const step = await getQueue("image").getJob(`${clientJobId}-f0-s0`);
+      expect(step?.opts.ignoreDependencyOnFailure).toBe(true);
+      const perFileFinalize = await getQueue("image").getJob(`${clientJobId}-f0`);
+      expect(perFileFinalize?.opts.ignoreDependencyOnFailure).toBe(true);
+      const batchParent = await getQueue("system").getJob(clientJobId);
+      expect(batchParent?.opts.ignoreDependencyOnFailure ?? false).toBe(false);
     } finally {
       enqueueMock.timeoutPools.delete("system");
+    }
+  }, 60_000);
+
+  it("execute without a clientJobId answers 202 under the id its frames publish on", async () => {
+    enqueueMock.timeoutPools.add("image");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+        },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/execute",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(202);
+      const parsed = JSON.parse(res.body) as { jobId: string; async: boolean };
+      expect(parsed.async).toBe(true);
+      expect(parsed.jobId.length).toBeGreaterThan(0);
+
+      // The two `clientJobId ?? jobId` sites (frame channel and 202 body)
+      // must never drift apart: an API consumer subscribes to the body's id.
+      const frame = await waitForTerminalFrame(parsed.jobId);
+      expect(frame.type).toBe("single");
+      expect(frame.phase).toBe("complete");
+    } finally {
+      enqueueMock.timeoutPools.delete("image");
     }
   }, 60_000);
 });

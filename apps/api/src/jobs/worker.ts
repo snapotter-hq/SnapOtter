@@ -65,6 +65,7 @@ import { InputValidationError } from "../modality/contract.js";
 import {
   completeBatchJob,
   failBatchJob,
+  failSingleJobGuarded,
   publishEphemeral,
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
@@ -1333,6 +1334,25 @@ export function startWorkers(): void {
 
     worker.on("failed", (job, err) => {
       if (!job) return;
+      const data = job.data as ToolJobData | undefined;
+      // Safety net, the pipeline twin of the batch-finalize net (#766): a
+      // finalize that died without reaching its own terminal write (hard
+      // throw in the output copy or preview, stall eviction) leaves a
+      // degraded or 202 client riding the SSE with nothing ever coming. The
+      // SSE channel (clientJobId) and the authoritative flow row can differ,
+      // so both get the guarded write; a committed completion is never
+      // downgraded, and the frame is announced only for a transition this
+      // call owned.
+      if (data?.kind === "pipeline-finalize") {
+        const netFail = (jobId: string) =>
+          failSingleJobGuarded({ jobId, message: "Pipeline processing failed" }).catch((netErr) => {
+            logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
+            void reportError(netErr, { source: "worker", pool, jobId });
+          });
+        const frameId = data.clientJobId ?? data.jobId;
+        void netFail(frameId);
+        if (frameId !== data.jobId) void netFail(data.jobId);
+      }
       const pf = (err as { pythonFrames?: unknown }).pythonFrames;
       if (Array.isArray(pf) && pf.length) {
         logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
@@ -1340,10 +1360,10 @@ export function startWorkers(): void {
       void reportError(err, {
         source: "worker",
         pool,
-        toolId: (job.data as ToolJobData | undefined)?.toolId,
+        toolId: data?.toolId,
         jobId: job.id,
-        inputFormat: safeFormatTag((job.data as ToolJobData | undefined)?.filename),
-        settings: (job.data as ToolJobData | undefined)?.settings,
+        inputFormat: safeFormatTag(data?.filename),
+        settings: data?.settings,
       });
     });
 

@@ -716,6 +716,7 @@ describe("pipeline finalize", () => {
 
   it("hard-fails the finalize job when the last step has no output ref", async () => {
     const jobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
     await db.insert(schema.jobs).values({
       id: `${jobId}-s0`,
       type: "pipeline-step",
@@ -725,6 +726,15 @@ describe("pipeline finalize", () => {
       inputRefs: [],
       outputRefs: [],
     });
+    // The client-facing row the SSE replays, as the route's first progress
+    // publish would have created it.
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      type: "single",
+      status: "processing",
+      inputRefs: [],
+      progress: { percent: 0, stage: "Preparing pipeline..." },
+    });
 
     await enqueueToolJob(
       toolJob({
@@ -733,6 +743,7 @@ describe("pipeline finalize", () => {
         kind: "pipeline-finalize",
         totalSteps: 1,
         filename: "chain.png",
+        clientJobId,
       }),
     );
 
@@ -744,6 +755,22 @@ describe("pipeline finalize", () => {
       return (await job.getState()) === "failed" ? job : undefined;
     }, 25_000);
     expect(failedJob.failedReason).toContain("Last step has no output");
+
+    // A degraded or 202 client is riding the SSE under clientJobId; without
+    // a terminal frame it spins forever (#766 safety net, the pipeline twin
+    // of the batch-finalize net from #750).
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.type).toBe("single");
+    expect(frame.phase).toBe("failed");
+    expect(String(frame.error).length).toBeGreaterThan(0);
+
+    // The client row goes terminal too, so replay after the Redis key
+    // expires stays failed instead of resurrecting a processing spinner.
+    const clientRow = await waitFor(async () => {
+      const row = await jobRow(clientJobId);
+      return row?.status === "failed" ? row : undefined;
+    });
+    expect(clientRow.completedAt).not.toBeNull();
   }, 30_000);
 });
 

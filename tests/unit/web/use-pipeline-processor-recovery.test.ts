@@ -327,6 +327,92 @@ describe("usePipelineProcessor single-run recovery (#766)", () => {
     unmount();
   });
 
+  it("recovers through the stall timer when the terminal frame was missed", () => {
+    vi.useFakeTimers();
+    const { unmount } = startSingleRun();
+
+    act(() => {
+      // Evidence first, so the 30s evidence timer never arms and the 300s
+      // stall timer is the recovery path under test.
+      sendSingleFrame({ phase: "processing", percent: 40, stage: "Step 1/1" });
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    const sourcesAfterDegrade = MockEventSource.instances.length;
+
+    // The terminal frame never arrives on this source (half-open SSE). The
+    // stall timer must force a fresh source, whose server-side replay then
+    // delivers the terminal frame.
+    act(() => {
+      vi.advanceTimersByTime(300_001);
+    });
+    expect(MockEventSource.instances.length).toBeGreaterThan(sourcesAfterDegrade);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("recovers via the visibility handler when the tab comes back with a dead SSE", () => {
+    vi.useFakeTimers();
+    const { unmount } = startSingleRun();
+
+    act(() => {
+      sendSingleFrame({ phase: "processing", percent: 40, stage: "Step 1/1" });
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    // The phone comes back from background with a source that died while
+    // suspended: not OPEN, so the handler must open a fresh one able to
+    // settle the run (the old handler could only render progress).
+    act(() => {
+      latestSse().readyState = 2;
+      document.dispatchEvent(new Event("visibilitychange"));
+      vi.advanceTimersByTime(501);
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("keeps a degraded run's leftovers away from the next run", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = startSingleRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Second run: the previous run's evidence timer must not fire into it.
+    const file = new File([new ArrayBuffer(64)], "photo2.png", { type: "image/png" });
+    act(() => {
+      useFileStore.getState().setFiles([file]);
+      result.current.processSingle(file, STEPS);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
   it("settles a failed frame with its step error", () => {
     const { unmount } = startSingleRun();
 
@@ -539,6 +625,81 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     unmount();
+  });
+
+  it("degrades a batch 502 whose blob body is not JSON", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 502;
+      xhrs[0].response = new Blob(["<html><body>502 Bad Gateway</body></html>"], {
+        type: "text/html",
+      });
+      xhrs[0].onload?.();
+    });
+
+    // The 5xx body read is async (Blob.text), so the degrade lands a tick
+    // later; what must never happen is an error.
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "pipeline",
+        is_batch: true,
+        trigger: "http-502",
+        had_evidence: false,
+      });
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("keeps original-index alignment when fileResults has a hole", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const files = [
+      new File([new ArrayBuffer(16)], "good1.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "bad.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "good2.jpg", { type: "image/jpeg" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void hook.result.current.processAll(files, STEPS);
+    });
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      // Slot 1 pre-failed server-side: it is a hole in fileResults, and the
+      // outputs for slots 0 and 2 must not shift into it.
+      sendBatchFrame({
+        status: "completed",
+        totalFiles: 3,
+        completedFiles: 3,
+        failedFiles: 1,
+        errors: [{ filename: "bad.png", error: "Invalid image" }],
+        result: {
+          ...BATCH_RESULT,
+          fileResults: { "0": "first_resize.png", "2": "second_resize.jpg" },
+        },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[2].status).toBe("completed");
+    });
+    expect(useFileStore.getState().entries[0].processedFilename).toBe("first_resize.png");
+    expect(useFileStore.getState().entries[1].status).toBe("failed");
+    expect(useFileStore.getState().entries[2].processedFilename).toBe("second_resize.jpg");
+
+    hook.unmount();
   });
 
   it("skips the evidence timer when a batch frame already proved the flow exists", () => {
