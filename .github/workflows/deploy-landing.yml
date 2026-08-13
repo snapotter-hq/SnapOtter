@@ -32,6 +32,13 @@ jobs:
           # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
           # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Turn on the landing $pageview beacon and route it through the
+          # first-party proxy (e.snapotter.com) so ad blockers don't drop it.
+          # Reuses the same phc_ project key the app image bakes. In forks and
+          # PRs the secret is empty, so Analytics.astro's `key &&` gate keeps the
+          # beacon off and nothing is emitted.
+          PUBLIC_POSTHOG_KEY: ${{ secrets.SNAPOTTER_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: https://e.snapotter.com
 
       # Astro's getRelativeLocaleUrl lowercases locale segments by default, so a
       # regression could re-emit /zh-cn/ etc. in hrefs and hreflang. Those 404 on
