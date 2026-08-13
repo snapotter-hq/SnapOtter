@@ -2,11 +2,13 @@
  * Cooperative job cancellation via Redis pub/sub.
  *
  * - Workers call registerCancelable(jobId) on start and unregister on finish.
- * - requestCancel(jobId) handles three states:
- *   1. Waiting/delayed: remove from queue, mark DB row canceled.
- *   2. Active (in a worker): publish the jobId on the cancel channel;
+ * - requestCancel(jobId) handles four states:
+ *   1. Batch parent: flag the batch canceled and publish every flow child
+ *      id on the cancel channel; batch-finalize commits terminal state (#767).
+ *   2. Waiting/delayed: remove from queue, mark DB row canceled.
+ *   3. Active (in a worker): publish the jobId on the cancel channel;
  *      the worker's AbortSignal fires and it cleans up.
- *   3. Terminal or absent: no-op, returns false.
+ *   4. Terminal or absent: no-op, returns false.
  * - startCancelListener() subscribes to the cancel channel and fires
  *   registered AbortControllers.
  */
@@ -14,6 +16,7 @@
 import { eq } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
+import { markBatchCanceled } from "./batch-progress.js";
 import { createRedisSubscriberConnection, sharedRedis } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { bullPrefix, POOLS } from "./types.js";
@@ -71,6 +74,39 @@ export async function stopCancelListener(): Promise<void> {
  * terminal or not found in any queue.
  */
 export async function requestCancel(jobId: string): Promise<boolean> {
+  // Batch parents never match the single-job states below: they sit in
+  // waiting-children while their <parentId>-fN children run, so a cancel
+  // against the parent id used to cancel nothing (#767). Cancel them
+  // cooperatively instead: flag the batch (children consult the flag before
+  // doing any work), abort active children over the cancel channel, and let
+  // batch-finalize commit the canceled terminal state. Keyed off the DB row,
+  // not the queue job, so a cancel landing between the parent row insert and
+  // the flow enqueue still takes effect.
+  const [row] = await db
+    .select({
+      type: schema.jobs.type,
+      toolId: schema.jobs.toolId,
+      status: schema.jobs.status,
+      settings: schema.jobs.settings,
+    })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, jobId));
+  if (row?.type === "batch") {
+    // Pipeline-batch children are pipeline flows without a cooperative
+    // check; a flag would report canceled while every step keeps running.
+    if (row.toolId === "pipeline-batch") return false;
+    if (row.status === "completed" || row.status === "failed" || row.status === "canceled") {
+      return false;
+    }
+    await markBatchCanceled(jobId);
+    const flowChildCount =
+      (row.settings as { flowChildCount?: number } | null)?.flowChildCount ?? 0;
+    for (let i = 0; i < flowChildCount; i++) {
+      await sharedRedis().publish(CANCEL_CHANNEL(), `${jobId}-f${i}`);
+    }
+    return true;
+  }
+
   for (const pool of POOLS) {
     const queue = getQueue(pool);
     const job = await queue.getJob(jobId);
