@@ -28,6 +28,8 @@ import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import {
+  cancelBatchJob,
+  completeBatchJob,
   failBatchJob,
   updateJobProgress,
   updateSingleFileProgress,
@@ -127,7 +129,7 @@ describe("late batch frames and the failBatchJob guard", () => {
     fileResults: { "0": "a.png" },
   };
 
-  async function seedBatchJob(status: "completed" | "processing"): Promise<string> {
+  async function seedBatchJob(status: "completed" | "processing" | "canceled"): Promise<string> {
     const id = randomUUID();
     await db.insert(schema.jobs).values({
       id,
@@ -183,6 +185,89 @@ describe("late batch frames and the failBatchJob guard", () => {
     expect((row.progress as { result?: unknown } | null)?.result).toEqual(BATCH_RESULT);
     // No terminal failed frame may be announced over the completion: a
     // reconnecting client would settle on whichever it reads.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)).toBeNull();
+  });
+
+  it("completeBatchJob refuses to overwrite a canceled batch row (#767)", async () => {
+    const id = await seedBatchJob("canceled");
+
+    await completeBatchJob({
+      jobId: id,
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 0,
+      errors: [],
+      outputRefs: ["outputs/x/batch.zip"],
+      bytesOut: 10,
+      result: BATCH_RESULT,
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("canceled");
+    // The loser must not announce a completed frame contradicting the
+    // committed cancellation.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)).toBeNull();
+  });
+
+  it("cancelBatchJob with a result announces completed-with-result and cancels the row", async () => {
+    const id = await seedBatchJob("processing");
+
+    await cancelBatchJob({
+      jobId: id,
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      errors: [{ filename: "b.png", error: "Canceled" }],
+      outputRefs: ["outputs/x/batch.zip"],
+      bytesOut: 10,
+      result: BATCH_RESULT,
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("canceled");
+    expect(row.outputRefs).toEqual(["outputs/x/batch.zip"]);
+    expect((row.progress as { result?: unknown } | null)?.result).toEqual(BATCH_RESULT);
+
+    const frame = JSON.parse(
+      (await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)) as string,
+    ) as Record<string, unknown>;
+    expect(frame.status).toBe("completed");
+    expect(frame.result).toEqual(BATCH_RESULT);
+  });
+
+  it("cancelBatchJob without a result announces failed with the Canceled synthetic", async () => {
+    const id = await seedBatchJob("processing");
+
+    await cancelBatchJob({
+      jobId: id,
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Canceled" }],
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("canceled");
+    const frame = JSON.parse(
+      (await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)) as string,
+    ) as { status: string; errors: Array<{ filename: string; error: string }> };
+    expect(frame.status).toBe("failed");
+    expect(frame.errors[0]).toEqual({ filename: "", error: "Canceled" });
+  });
+
+  it("cancelBatchJob refuses to downgrade a completed batch", async () => {
+    const id = await seedBatchJob("completed");
+
+    await cancelBatchJob({
+      jobId: id,
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Canceled" }],
+    });
+
+    const row = await readJob(id);
+    expect(row.status).toBe("completed");
     expect(await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)).toBeNull();
   });
 

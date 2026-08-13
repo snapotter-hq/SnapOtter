@@ -179,16 +179,21 @@ export function buildBatchReplayEvent(row: BatchReplayRow): JobProgress & { type
     return { ...base, status: "processing", errors: [] };
   }
 
-  if (row.status === "completed") {
-    const result = isRecord(progress.result) ? progress.result : undefined;
-    if (!result) {
-      return {
-        ...base,
-        status: "failed",
-        errors: [{ filename: "", error: MISSING_DURABLE_RESULT_ERROR }],
-      };
-    }
+  const result = isRecord(progress.result) ? progress.result : undefined;
+  // A canceled batch that packaged its finished files before stopping replays
+  // as completed-with-result so the partial ZIP stays reachable after the
+  // Redis terminal key expires (#767). Only a resultless completed row is a
+  // lost result; a resultless canceled row is a full cancellation and takes
+  // the failed shape below.
+  if (result && (row.status === "completed" || row.status === "canceled")) {
     return { ...base, status: "completed", errors: storedBatchErrors(row.error), result };
+  }
+  if (row.status === "completed") {
+    return {
+      ...base,
+      status: "failed",
+      errors: [{ filename: "", error: MISSING_DURABLE_RESULT_ERROR }],
+    };
   }
 
   const errors = storedBatchErrors(row.error);
@@ -441,6 +446,12 @@ export interface CompleteBatchJobArgs {
  * replay can never observe the frame without the durable state behind it.
  * Runs through the per-job persist queue: earlier fire-and-forget child
  * frames land first and cannot overwrite this write afterwards.
+ *
+ * Guarded since #767: with real batch cancel, cancelBatchJob commits
+ * "canceled" from the same finalize, so nothing may overwrite an existing
+ * terminal state (the remaining writer conflict is a stall-evicted zombie
+ * finalize double-writing). A call that lost the transition announces
+ * nothing, so a duplicate frame can never contradict the committed outcome.
  */
 export async function completeBatchJob(args: CompleteBatchJobArgs): Promise<void> {
   const frame: JobProgress & { type: "batch" } = {
@@ -453,8 +464,9 @@ export async function completeBatchJob(args: CompleteBatchJobArgs): Promise<void
     errors: args.errors,
     result: args.result,
   };
+  let applied = false;
   await enqueuePersist(args.jobId, async () => {
-    await db
+    const res = await db
       .update(schema.jobs)
       .set({
         status: "completed",
@@ -467,9 +479,70 @@ export async function completeBatchJob(args: CompleteBatchJobArgs): Promise<void
             ? { message: `${args.errors.length} file(s) failed`, details: args.errors }
             : null,
       })
-      .where(eq(schema.jobs.id, args.jobId));
+      .where(
+        and(
+          eq(schema.jobs.id, args.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
   });
-  announce(frame);
+  if (applied) announce(frame);
+}
+
+export interface CancelBatchJobArgs {
+  jobId: string;
+  totalFiles: number;
+  completedFiles: number;
+  failedFiles: number;
+  errors: Array<{ filename: string; error: string }>;
+  outputRefs?: string[];
+  bytesOut?: number;
+  result?: Record<string, unknown>;
+}
+
+/**
+ * Terminal batch cancellation (#767). The authoritative row becomes
+ * "canceled" either way; the announced frame reuses the existing wire
+ * vocabulary so clients need no new terminal type: completed-with-result
+ * when finished files were packaged (the client settles on the partial ZIP),
+ * failed with a leading blank-name "Canceled" entry when nothing survived.
+ * Guarded like failBatchJob: never downgrades a committed terminal state and
+ * announces only a transition it owned.
+ */
+export async function cancelBatchJob(args: CancelBatchJobArgs): Promise<void> {
+  const base = {
+    jobId: args.jobId,
+    type: "batch" as const,
+    totalFiles: args.totalFiles,
+    completedFiles: args.completedFiles,
+    failedFiles: args.failedFiles,
+    errors: args.errors,
+  };
+  const frame: JobProgress & { type: "batch" } = args.result
+    ? { ...base, status: "completed", result: args.result }
+    : { ...base, status: "failed" };
+  let applied = false;
+  await enqueuePersist(args.jobId, async () => {
+    const res = await db
+      .update(schema.jobs)
+      .set({
+        status: "canceled",
+        completedAt: new Date(),
+        ...(args.outputRefs ? { outputRefs: args.outputRefs } : {}),
+        ...(args.bytesOut !== undefined ? { bytesOut: args.bytesOut } : {}),
+        progress: buildPersistedJobProgress(frame),
+        error: { message: "Canceled", details: args.errors },
+      })
+      .where(
+        and(
+          eq(schema.jobs.id, args.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
+  });
+  if (applied) announce(frame);
 }
 
 export interface FailBatchJobArgs {
