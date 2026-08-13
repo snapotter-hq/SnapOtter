@@ -209,17 +209,21 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
     </div>
   );
 
+  // HintIcon is a button now, so it sits beside the label, not inside it
+  // (labels must not contain other interactive elements).
   const enlargementCheckbox = (
-    <label className="flex items-center gap-1.5 text-xs text-foreground">
-      <input
-        type="checkbox"
-        checked={withoutEnlargement}
-        onChange={(e) => setWithoutEnlargement(e.target.checked)}
-        className="rounded"
-      />
-      <span>{t.toolSettings.resize.limitToOriginalSize}</span>
+    <div className="flex items-center gap-1.5">
+      <label className="flex items-center gap-1.5 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={withoutEnlargement}
+          onChange={(e) => setWithoutEnlargement(e.target.checked)}
+          className="rounded"
+        />
+        <span>{t.toolSettings.resize.limitToOriginalSize}</span>
+      </label>
       <HintIcon text={t.toolSettings.resize.limitToOriginalSizeHint} />
-    </label>
+    </div>
   );
 
   return (

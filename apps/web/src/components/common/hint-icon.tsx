@@ -43,7 +43,9 @@ export function HintIcon({ text }: { text: string }) {
           setOpen((v) => !v);
         }}
         onBlur={() => setOpen(false)}
-        className="inline-flex items-center"
+        // Padding with negative margin: a 28px tap target (WCAG 2.5.8) with
+        // zero layout shift in the dense settings rows this sits in.
+        className="inline-flex items-center p-2 -m-2"
       >
         <Info className="h-3 w-3 text-muted-foreground" />
       </button>

@@ -100,17 +100,20 @@ export function ContentAwareResizeControls({
         Resize to square
       </label>
 
-      {/* Face protection */}
-      <label className="flex items-center gap-2 text-xs text-foreground">
-        <input
-          type="checkbox"
-          checked={protectFaces}
-          onChange={(e) => setProtectFaces(e.target.checked)}
-          className="rounded"
-        />
-        <span>Protect faces</span>
+      {/* Face protection. HintIcon is a button, so it sits beside the label,
+          not inside it (labels must not contain other interactive elements). */}
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-foreground">
+          <input
+            type="checkbox"
+            checked={protectFaces}
+            onChange={(e) => setProtectFaces(e.target.checked)}
+            className="rounded"
+          />
+          <span>Protect faces</span>
+        </label>
         <HintIcon text="Detect and protect face regions from seam removal using face detection" />
-      </label>
+      </div>
 
       {/* Blur radius */}
       <div>
