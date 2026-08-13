@@ -143,3 +143,16 @@ Aktivera flera användare med rollbaserad åtkomstkontroll:
 Skapa team under **Settings → Teams** för att gruppera användare.
 
 Ange `AUTH_ENABLED=true` (eller `false` för enanvändare/eget bruk utan inloggning).
+
+## Använd från mobilen {#use-it-from-your-phone}
+
+SnapOtter fungerar i mobila webbläsare och går att installera som en app. Öppna din instans på mobilen och gör sedan så här:
+
+- **iPhone / iPad (Safari):** tryck på Dela och sedan på **Lägg till på hemskärmen**.
+- **Android (Chrome):** öppna webbläsarmenyn och tryck på **Installera appen**.
+
+Den installerade appen öppnas i ett eget fönster, direkt till din instans.
+
+En hake: webbläsare erbjuder bara installation över HTTPS. En vanlig HTTP-adress på ditt lokala nätverk fungerar fortfarande utmärkt i en webbläsarflik; för en riktig installation lägger du instansen bakom en omvänd proxy med certifikat (se [distributionsguiden](/sv/guide/deployment)).
+
+På mobiler och surfplattor visar bildverktygen knappen **Ta ett foto** bredvid uppladdningsknappen. Fota ett kvitto eller en whiteboard så hamnar bilden direkt i verktyget.

@@ -143,3 +143,16 @@ Włącz wielu użytkowników z kontrolą dostępu opartą na rolach:
 Twórz zespoły w **Ustawienia → Zespoły**, aby grupować użytkowników.
 
 Ustaw `AUTH_ENABLED=true` (lub `false` dla pojedynczego użytkownika/użytku własnego bez logowania).
+
+## Używanie na telefonie {#use-it-from-your-phone}
+
+SnapOtter działa w przeglądarkach mobilnych i można go zainstalować jako aplikację. Otwórz swoją instancję na telefonie, a następnie:
+
+- **iPhone / iPad (Safari):** stuknij w Udostępnij, a potem w **Do ekranu początkowego**.
+- **Android (Chrome):** otwórz menu przeglądarki i stuknij w **Zainstaluj aplikację**.
+
+Zainstalowana aplikacja otwiera się we własnym oknie, od razu z Twoją instancją.
+
+Jest jeden haczyk: przeglądarki proponują instalację tylko przez HTTPS. Zwykły adres HTTP w sieci lokalnej nadal działa w karcie przeglądarki; żeby naprawdę zainstalować aplikację, umieść instancję za reverse proxy z certyfikatem (zobacz [przewodnik wdrażania](/pl/guide/deployment)).
+
+Na telefonach i tabletach narzędzia do obrazów pokazują przycisk **Zrób zdjęcie** obok przycisku przesyłania. Sfotografuj paragon albo tablicę, a zdjęcie trafi prosto do narzędzia.

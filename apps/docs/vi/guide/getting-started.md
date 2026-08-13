@@ -143,3 +143,16 @@ Bật nhiều người dùng với kiểm soát truy cập dựa trên vai trò:
 Tạo các nhóm trong mục **Settings → Teams** để nhóm người dùng lại.
 
 Đặt `AUTH_ENABLED=true` (hoặc `false` cho trường hợp một người dùng/tự sử dụng mà không cần đăng nhập).
+
+## Dùng trên điện thoại {#use-it-from-your-phone}
+
+SnapOtter chạy tốt trên trình duyệt di động, và bạn có thể cài nó như một ứng dụng. Mở instance của bạn trên điện thoại, sau đó:
+
+- **iPhone / iPad (Safari):** nhấn Chia sẻ, rồi chọn **Thêm vào MH chính**.
+- **Android (Chrome):** mở menu trình duyệt rồi nhấn **Cài đặt ứng dụng**.
+
+Ứng dụng sau khi cài sẽ mở trong cửa sổ riêng, vào thẳng instance của bạn.
+
+Có một lưu ý: trình duyệt chỉ đưa ra lời mời cài đặt qua HTTPS. Địa chỉ HTTP thường trong mạng LAN vẫn dùng tốt trong một thẻ trình duyệt; còn muốn cài đặt thật sự, hãy đặt instance sau một reverse proxy có chứng chỉ (xem [hướng dẫn triển khai](/vi/guide/deployment)).
+
+Trên điện thoại và máy tính bảng, các công cụ hình ảnh hiển thị nút **Chụp ảnh** bên cạnh nút tải lên. Chụp một tờ hóa đơn hay tấm bảng trắng, ảnh sẽ vào thẳng công cụ.

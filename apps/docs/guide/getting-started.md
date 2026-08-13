@@ -139,3 +139,16 @@ Enable multiple users with role-based access control:
 Create teams under **Settings → Teams** to group users.
 
 Set `AUTH_ENABLED=true` (or `false` for single-user/self-use without login).
+
+## Use It From Your Phone {#use-it-from-your-phone}
+
+SnapOtter works in mobile browsers, and you can install it as an app. Open your instance on the phone, then:
+
+- **iPhone / iPad (Safari):** tap Share, then **Add to Home Screen**.
+- **Android (Chrome):** open the browser menu and tap **Install app**.
+
+The installed app opens in its own window, straight to your instance.
+
+One catch: browsers only offer the install prompt over HTTPS. A plain HTTP address on your LAN still works fine in a browser tab; for the real install, put the instance behind a reverse proxy with a certificate (see the [deployment guide](/guide/deployment)).
+
+On phones and tablets, image tools show a **Take photo** button next to the upload button. Shoot a receipt or a whiteboard and it lands straight in the tool.

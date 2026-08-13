@@ -143,3 +143,16 @@ Aktifkan beberapa pengguna dengan kontrol akses berbasis peran:
 Buat tim di bawah **Settings → Teams** untuk mengelompokkan pengguna.
 
 Atur `AUTH_ENABLED=true` (atau `false` untuk penggunaan tunggal/pribadi tanpa login).
+
+## Gunakan dari Ponsel Anda {#use-it-from-your-phone}
+
+SnapOtter berjalan di browser seluler, dan Anda dapat memasangnya sebagai aplikasi. Buka instance Anda di ponsel, lalu:
+
+- **iPhone / iPad (Safari)**: ketuk Bagikan, lalu **Tambah ke Layar Utama**.
+- **Android (Chrome)**: buka menu browser dan ketuk **Instal aplikasi**.
+
+Aplikasi yang terpasang terbuka di jendelanya sendiri, langsung ke instance Anda.
+
+Satu catatan: browser hanya menawarkan opsi instal melalui HTTPS. Alamat HTTP biasa di LAN Anda tetap berfungsi baik di tab browser; untuk instalasi yang sebenarnya, tempatkan instance di belakang reverse proxy dengan sertifikat (lihat [panduan deployment](/id/guide/deployment)).
+
+Di ponsel dan tablet, perkakas gambar menampilkan tombol **Ambil foto** di samping tombol unggah. Potret struk atau papan tulis, dan hasilnya langsung masuk ke perkakas.

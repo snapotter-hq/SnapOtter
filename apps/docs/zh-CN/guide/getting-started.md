@@ -143,3 +143,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 在 **Settings → Teams** 下创建团队以对用户分组。
 
 设置 `AUTH_ENABLED=true`（或对单用户/自用无需登录的场景设置 `false`）。
+
+## 在手机上使用 {#use-it-from-your-phone}
+
+SnapOtter 可以在手机浏览器中使用，也可以安装成应用。在手机上打开你的实例，然后：
+
+- **iPhone / iPad（Safari）**：轻点“共享”，再轻点**添加到主屏幕**。
+- **Android（Chrome）**：打开浏览器菜单，点按**安装应用**。
+
+安装后的应用会在独立窗口中打开，直接进入你的实例。
+
+有一点要注意：浏览器只在 HTTPS 下才会提供安装入口。局域网里的普通 HTTP 地址照样能在浏览器标签页中正常使用；想要真正安装，请把实例放到带证书的反向代理后面（参见[部署指南](/zh-CN/guide/deployment)）。
+
+在手机和平板上，图像工具会在上传按钮旁边显示**拍照**按钮。拍一张收据或白板，照片会直接进入工具。

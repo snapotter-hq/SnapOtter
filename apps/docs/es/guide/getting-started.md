@@ -143,3 +143,16 @@ Habilita varios usuarios con control de acceso basado en roles:
 Crea equipos en **Ajustes → Equipos** para agrupar usuarios.
 
 Establece `AUTH_ENABLED=true` (o `false` para un solo usuario/uso propio sin inicio de sesión).
+
+## Úsalo desde el teléfono {#use-it-from-your-phone}
+
+SnapOtter funciona en navegadores móviles y puedes instalarlo como aplicación. Abre tu instancia en el teléfono y luego:
+
+- **iPhone / iPad (Safari)**: toca Compartir y luego **Añadir a pantalla de inicio**.
+- **Android (Chrome)**: abre el menú del navegador y toca **Instalar aplicación**.
+
+La aplicación instalada se abre en su propia ventana, directamente en tu instancia.
+
+Un detalle: los navegadores solo ofrecen la instalación a través de HTTPS. Una dirección HTTP normal en tu red local sigue funcionando bien en una pestaña del navegador; para la instalación real, pon la instancia detrás de un proxy inverso con certificado (consulta la [guía de despliegue](/es/guide/deployment)).
+
+En teléfonos y tabletas, las herramientas de imagen muestran un botón **Tomar foto** junto al botón de subida. Fotografía un recibo o una pizarra y llegará directamente a la herramienta.

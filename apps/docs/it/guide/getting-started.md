@@ -143,3 +143,16 @@ Abilita più utenti con controllo degli accessi basato sui ruoli:
 Crea team in **Impostazioni → Team** per raggruppare gli utenti.
 
 Imposta `AUTH_ENABLED=true` (o `false` per utente singolo/uso personale senza login).
+
+## Usalo dal telefono {#use-it-from-your-phone}
+
+SnapOtter funziona nei browser mobili e puoi installarlo come app. Apri la tua istanza sul telefono, poi:
+
+- **iPhone / iPad (Safari)**: tocca Condividi, poi **Aggiungi alla schermata Home**.
+- **Android (Chrome)**: apri il menu del browser e tocca **Installa app**.
+
+L'app installata si apre in una finestra dedicata, direttamente sulla tua istanza.
+
+Un'avvertenza: i browser propongono l'installazione solo via HTTPS. Un semplice indirizzo HTTP sulla tua LAN continua a funzionare bene in una scheda del browser; per la vera installazione, metti l'istanza dietro un reverse proxy con certificato (vedi la [guida alla distribuzione](/it/guide/deployment)).
+
+Su telefoni e tablet, gli strumenti immagine mostrano un pulsante **Scatta una foto** accanto al pulsante di caricamento. Fotografa uno scontrino o una lavagna e l'immagine finisce dritta nello strumento.

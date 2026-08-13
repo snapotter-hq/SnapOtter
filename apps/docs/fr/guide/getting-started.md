@@ -143,3 +143,16 @@ Activez plusieurs utilisateurs avec un contrôle d'accès basé sur les rôles :
 Créez des équipes sous **Settings → Teams** pour regrouper les utilisateurs.
 
 Réglez `AUTH_ENABLED=true` (ou `false` pour un usage mono-utilisateur/personnel sans connexion).
+
+## Utiliser SnapOtter depuis votre téléphone {#use-it-from-your-phone}
+
+SnapOtter fonctionne dans les navigateurs mobiles, et vous pouvez l'installer comme une application. Ouvrez votre instance sur le téléphone, puis :
+
+- **iPhone / iPad (Safari)** : touchez Partager, puis **Sur l'écran d'accueil**.
+- **Android (Chrome)** : ouvrez le menu du navigateur et touchez **Installer l'application**.
+
+L'application installée s'ouvre dans sa propre fenêtre, directement sur votre instance.
+
+Un détail : les navigateurs ne proposent l'installation qu'en HTTPS. Une simple adresse HTTP sur votre réseau local fonctionne très bien dans un onglet du navigateur ; pour une vraie installation, placez l'instance derrière un reverse proxy avec un certificat (voir le [guide de déploiement](/fr/guide/deployment)).
+
+Sur téléphone et tablette, les outils d'image affichent un bouton **Prendre une photo** à côté du bouton d'import. Photographiez un reçu ou un tableau blanc, et l'image arrive directement dans l'outil.

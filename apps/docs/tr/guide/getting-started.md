@@ -143,3 +143,16 @@ Rol tabanlı erişim kontrolü ile birden fazla kullanıcıyı etkinleştirin:
 Kullanıcıları gruplamak için **Settings → Teams** altında ekipler oluşturun.
 
 `AUTH_ENABLED=true` ayarlayın (veya oturum açma olmadan tek kullanıcı/kendi kullanımı için `false`).
+
+## Telefonunuzdan Kullanın {#use-it-from-your-phone}
+
+SnapOtter mobil tarayıcılarda çalışır ve uygulama olarak yüklenebilir. Örneğinizi telefonda açın, ardından:
+
+- **iPhone / iPad (Safari):** Paylaş'a, ardından **Ana Ekrana Ekle**'ye dokunun.
+- **Android (Chrome):** tarayıcı menüsünü açın ve **Uygulamayı yükle**'ye dokunun.
+
+Yüklenen uygulama kendi penceresinde, doğrudan örneğinizde açılır.
+
+Tek bir pürüz var: tarayıcılar yükleme seçeneğini yalnızca HTTPS üzerinden sunar. Yerel ağınızdaki düz bir HTTP adresi tarayıcı sekmesinde sorunsuz çalışmaya devam eder; gerçek yükleme için örneği sertifikalı bir ters proxy arkasına alın (bkz. [dağıtım kılavuzu](/tr/guide/deployment)).
+
+Telefon ve tabletlerde görüntü araçları, yükleme düğmesinin yanında bir **Fotoğraf çek** düğmesi gösterir. Bir fişin veya beyaz tahtanın fotoğrafını çekin, görüntü doğrudan araca gelir.

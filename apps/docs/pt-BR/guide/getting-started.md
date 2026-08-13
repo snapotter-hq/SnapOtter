@@ -143,3 +143,16 @@ Habilite múltiplos usuários com controle de acesso baseado em papéis:
 Crie equipes em **Configurações → Equipes** para agrupar usuários.
 
 Defina `AUTH_ENABLED=true` (ou `false` para usuário único/uso próprio sem login).
+
+## Use no celular {#use-it-from-your-phone}
+
+O SnapOtter funciona em navegadores móveis e pode ser instalado como aplicativo. Abra sua instância no celular e depois:
+
+- **iPhone / iPad (Safari):** toque em Compartilhar e depois em **Adicionar à Tela de Início**.
+- **Android (Chrome):** abra o menu do navegador e toque em **Instalar app**.
+
+O aplicativo instalado abre em uma janela própria, direto na sua instância.
+
+Um detalhe: os navegadores só oferecem a instalação via HTTPS. Um endereço HTTP simples na sua rede local continua funcionando normalmente em uma aba do navegador; para a instalação de verdade, coloque a instância atrás de um proxy reverso com certificado (veja o [guia de implantação](/pt-BR/guide/deployment)).
+
+Em celulares e tablets, as ferramentas de imagem mostram um botão **Tirar foto** ao lado do botão de envio. Fotografe um recibo ou um quadro branco e a imagem cai direto na ferramenta.

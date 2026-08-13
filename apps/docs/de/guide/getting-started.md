@@ -143,3 +143,16 @@ Aktiviere mehrere Benutzer mit rollenbasierter Zugriffskontrolle:
 Erstelle Teams unter **Einstellungen → Teams**, um Benutzer zu gruppieren.
 
 Setze `AUTH_ENABLED=true` (oder `false` für Einzelbenutzer/Eigennutzung ohne Login).
+
+## Vom Smartphone aus nutzen {#use-it-from-your-phone}
+
+SnapOtter läuft in mobilen Browsern, und du kannst es als App installieren. Öffne deine Instanz auf dem Smartphone, dann:
+
+- **iPhone / iPad (Safari)**: Tippe auf Teilen, dann auf **Zum Home-Bildschirm**.
+- **Android (Chrome)**: Öffne das Browsermenü und tippe auf **App installieren**.
+
+Die installierte App öffnet sich in einem eigenen Fenster, direkt in deiner Instanz.
+
+Ein Haken: Browser bieten die Installation nur über HTTPS an. Eine einfache HTTP-Adresse im LAN funktioniert im Browser-Tab weiterhin problemlos; für die echte Installation stellst du die Instanz hinter einen Reverse-Proxy mit Zertifikat (siehe [Deployment-Leitfaden](/de/guide/deployment)).
+
+Auf Smartphones und Tablets zeigen die Bild-Tools neben dem Upload-Button einen Button **Foto aufnehmen**. Fotografiere einen Kassenbon oder ein Whiteboard, und das Bild landet direkt im Tool.

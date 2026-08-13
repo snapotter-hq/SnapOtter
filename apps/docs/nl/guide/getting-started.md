@@ -143,3 +143,16 @@ Schakel meerdere gebruikers in met op rollen gebaseerde toegangscontrole:
 Maak teams aan onder **Instellingen → Teams** om gebruikers te groeperen.
 
 Stel `AUTH_ENABLED=true` in (of `false` voor gebruik met één gebruiker/eigen gebruik zonder login).
+
+## Gebruik het vanaf je telefoon {#use-it-from-your-phone}
+
+SnapOtter werkt in mobiele browsers, en je kunt het als app installeren. Open je instance op je telefoon en doe dan het volgende:
+
+- **iPhone / iPad (Safari)**: tik op Deel en dan op **Zet op beginscherm**.
+- **Android (Chrome)**: open het browsermenu en tik op **App installeren**.
+
+De geïnstalleerde app opent in een eigen venster, direct in je instance.
+
+Eén ding om te weten: browsers bieden de installatie alleen aan via HTTPS. Een gewoon HTTP-adres op je LAN werkt prima in een browsertabblad; voor de echte installatie zet je de instance achter een reverse proxy met een certificaat (zie de [implementatiegids](/nl/guide/deployment)).
+
+Op telefoons en tablets tonen de afbeeldingstools een knop **Foto maken** naast de uploadknop. Fotografeer een bonnetje of een whiteboard en het staat meteen in de tool.
