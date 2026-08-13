@@ -1,4 +1,4 @@
-import type { AnalyticsConfig } from "@snapotter/shared";
+import { type AnalyticsConfig, resolvePostHogClientHosts } from "@snapotter/shared";
 import { flushEarlyErrors } from "./early-errors";
 
 type PostHogInstance = import("posthog-js").PostHog;
@@ -53,9 +53,21 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
   } else {
     try {
       const posthogJs = (await import("posthog-js")).default;
+      // In proxy mode api_host is this instance's own /ingest (first-party, so
+      // ad blockers don't drop events) and ui_host points at real PostHog;
+      // otherwise both fall back to talking to PostHog directly.
+      // Guard window for the node test env; proxy mode only runs in the browser,
+      // where window.location.origin always exists.
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const { apiHost, uiHost } = resolvePostHogClientHosts({
+        posthogHost: config.posthogHost,
+        posthogProxyPath: config.posthogProxyPath,
+        origin,
+      });
       posthog =
         posthogJs.init(config.posthogApiKey, {
-          api_host: config.posthogHost,
+          api_host: apiHost,
+          ...(uiHost ? { ui_host: uiHost } : {}),
           autocapture: false,
           // Fire $pageview on SPA history changes, not just the initial hard
           // load, so react-router route changes (tool pages, editor, automate,

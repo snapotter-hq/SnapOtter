@@ -22,6 +22,7 @@ interface AnalyticsConfig {
   enabled: boolean;
   posthogApiKey: string;
   posthogHost: string;
+  posthogProxyPath: string;
   sentryDsn: string;
   sentryDsnWeb: string;
   posthogSampleRate: number;
@@ -87,6 +88,7 @@ test.describe("Analytics opt-out toggle", () => {
       enabled: false,
       posthogApiKey: "",
       posthogHost: "",
+      posthogProxyPath: "",
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 0,

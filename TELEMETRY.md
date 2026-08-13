@@ -19,7 +19,8 @@ The code is authoritative; this doc is the map. A drift test (`tests/unit/shared
 - We never send file names, paths, contents, OCR text, EXIF, extracted document text, IP address, or account identity. The single exception is feedback contact details (email, name, company), and only when the user ticks the contact-consent box.
 - `instance_id` rides events as a property, not an `identify()` call. Events stay anonymous and person-less while still rolling up per instance.
 - Autocapture and session replay are off. Exceptions go to Sentry, not PostHog.
-- One opt-out gate stops all egress: `analyticsEnabled()` on the server, the live `enabled` flag on the client, and a build-time bake (`SNAPOTTER_ANALYTICS=off`) that can strip it entirely.
+- One opt-out gate stops all egress: `analyticsEnabled()` on the server, the live `enabled` flag on the client, and a build-time bake (`SNAPOTTER_ANALYTICS=off`) that can strip it entirely. The reverse proxy honors it too: with analytics off, `/ingest` returns 204 and forwards nothing.
+- Client analytics is first-party. The browser sends PostHog events to this instance's own origin (`/ingest`), which forwards them server-side to PostHog; ad blockers key on third-party hosts, so this keeps product analytics from being silently dropped. The proxy strips `cookie` and `authorization` before forwarding (no session leak to PostHog) and does not pass the browser IP on, so client events geolocate to the instance's egress IP, never an end user's. `SNAPOTTER_POSTHOG_PROXY=off` reverts to sending straight from the browser. Server events (`posthog-node`) always go direct: a server never meets an ad blocker.
 
 ## Server events
 

@@ -37,6 +37,7 @@ import { gpuBootLine } from "./lib/gpu-boot-line.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
+import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
@@ -54,6 +55,7 @@ import {
 } from "./plugins/auth.js";
 import { registerMfa } from "./plugins/mfa.js";
 import { oidcRoutes } from "./plugins/oidc.js";
+import { registerPostHogProxy } from "./plugins/posthog-proxy.js";
 import { registerSaml } from "./plugins/saml.js";
 import { registerStatic } from "./plugins/static.js";
 import { toolAccessMiddleware } from "./plugins/tool-access.js";
@@ -519,6 +521,13 @@ await settingsRoutes(app);
 
 // Analytics config and consent routes
 await analyticsRoutes(app);
+
+// First-party PostHog reverse proxy: routes the browser's posthog-js traffic
+// through this origin so ad blockers don't drop it. On by default; the
+// break-glass env (SNAPOTTER_POSTHOG_PROXY=off) keeps the client on the direct host.
+if (posthogProxyEnabled()) {
+  await registerPostHogProxy(app);
+}
 
 // Explicit customer feedback capture (respects the analytics gate)
 await feedbackRoutes(app);

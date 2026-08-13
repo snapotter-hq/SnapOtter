@@ -34,6 +34,7 @@ import { startCancelListener, stopCancelListener } from "../../apps/api/src/jobs
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
+import { posthogProxyEnabled } from "../../apps/api/src/lib/posthog-proxy.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import {
   authMiddleware,
@@ -46,6 +47,7 @@ import { registerIpAllowlist } from "../../apps/api/src/plugins/ip-allowlist.js"
 import { registerMfa } from "../../apps/api/src/plugins/mfa.js";
 import { oidcRoutes } from "../../apps/api/src/plugins/oidc.js";
 import { registerPerUserRateLimit } from "../../apps/api/src/plugins/per-user-rate-limit.js";
+import { registerPostHogProxy } from "../../apps/api/src/plugins/posthog-proxy.js";
 import { registerSaml } from "../../apps/api/src/plugins/saml.js";
 import { toolAccessMiddleware } from "../../apps/api/src/plugins/tool-access.js";
 import { registerUpload } from "../../apps/api/src/plugins/upload.js";
@@ -244,6 +246,12 @@ export async function buildTestApp(): Promise<TestApp> {
 
   // Analytics routes
   await analyticsRoutes(app);
+
+  // First-party PostHog reverse proxy (mirrors index.ts so integration tests
+  // exercise the real registration, not a divergent copy).
+  if (posthogProxyEnabled()) {
+    await registerPostHogProxy(app);
+  }
 
   // Explicit customer feedback capture
   await feedbackRoutes(app);

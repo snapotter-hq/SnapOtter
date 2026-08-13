@@ -7,6 +7,7 @@ describe("AnalyticsConfig type", () => {
       enabled: true,
       posthogApiKey: "phc_test123",
       posthogHost: "https://us.i.posthog.com",
+      posthogProxyPath: "/ingest",
       sentryDsn: "https://abc@sentry.io/123",
       sentryDsnWeb: "https://abc@sentry.io/456",
       posthogSampleRate: 1.0,
@@ -15,6 +16,7 @@ describe("AnalyticsConfig type", () => {
     expect(config.enabled).toBe(true);
     expect(config.posthogApiKey).toBe("phc_test123");
     expect(config.posthogHost).toBe("https://us.i.posthog.com");
+    expect(config.posthogProxyPath).toBe("/ingest");
     expect(config.sentryDsn).toBe("https://abc@sentry.io/123");
     expect(config.sentryDsnWeb).toBe("https://abc@sentry.io/456");
     expect(config.posthogSampleRate).toBe(1.0);
@@ -26,6 +28,7 @@ describe("AnalyticsConfig type", () => {
       enabled: false,
       posthogApiKey: "",
       posthogHost: "",
+      posthogProxyPath: "",
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 0,
@@ -40,6 +43,7 @@ describe("AnalyticsConfig type", () => {
       enabled: true,
       posthogApiKey: "key",
       posthogHost: "https://host.com",
+      posthogProxyPath: "/ingest",
       sentryDsn: "https://dsn",
       sentryDsnWeb: "https://dsn-web",
       posthogSampleRate: 0.5,
@@ -53,6 +57,7 @@ describe("AnalyticsConfig type", () => {
       enabled: true,
       posthogApiKey: "key",
       posthogHost: "host",
+      posthogProxyPath: "/ingest",
       sentryDsn: "dsn",
       sentryDsnWeb: "dsn-web",
       posthogSampleRate: 1,
@@ -65,6 +70,7 @@ describe("AnalyticsConfig type", () => {
         "instanceId",
         "posthogApiKey",
         "posthogHost",
+        "posthogProxyPath",
         "posthogSampleRate",
         "sentryDsn",
         "sentryDsnWeb",

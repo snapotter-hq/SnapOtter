@@ -926,6 +926,7 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
       enabled: false,
       posthogApiKey: "",
       posthogHost: "",
+      posthogProxyPath: "",
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 0,
