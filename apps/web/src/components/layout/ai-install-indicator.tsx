@@ -21,7 +21,7 @@ export function AiInstallIndicator() {
   const totalBundles = bundles.length;
 
   return (
-    <div className="fixed bottom-16 right-4 z-40 bg-background border border-border rounded-xl shadow-lg px-4 py-3 min-w-[260px] max-w-[320px]">
+    <div className="fixed bottom-[calc(4.5rem+max(0.5rem,env(safe-area-inset-bottom))+0.5rem)] md:bottom-16 end-4 z-40 bg-background border border-border rounded-xl shadow-lg px-4 py-3 min-w-[260px] max-w-[320px]">
       <div className="flex items-center gap-2 mb-2">
         <Download className="h-4 w-4 text-primary shrink-0" />
         <p className="text-sm font-medium text-foreground truncate">

@@ -180,7 +180,7 @@ export function ImageToBase64Results() {
 
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4 w-72">
+        <div className="flex flex-col items-center gap-4 w-72 max-w-full">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           {progress ? (
             <>

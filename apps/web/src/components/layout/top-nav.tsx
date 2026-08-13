@@ -81,7 +81,8 @@ export function TopNav({
               to="/"
               aria-label={t.common.goHome}
               className={cn(
-                "shrink-0",
+                // Negative margin keeps the 40px touch target from shifting layout.
+                "shrink-0 p-2.5 -m-2.5",
                 isDark
                   ? "text-[#aaa] hover:text-[#e0e0e0]"
                   : "text-muted-foreground hover:text-foreground",
@@ -106,7 +107,7 @@ export function TopNav({
             </span>
           </div>
         ) : (
-          <Link to="/" className="shrink-0" aria-label={t.a11y.homeLink}>
+          <Link to="/" className="shrink-0 p-1.5 -m-1.5" aria-label={t.a11y.homeLink}>
             <OtterLogo className="h-7 w-7" />
           </Link>
         )}
@@ -118,14 +119,14 @@ export function TopNav({
             type="button"
             onClick={onFeedbackClick}
             className={cn(
-              "p-1.5 rounded-md transition-colors",
+              "p-2.5 rounded-md transition-colors",
               isDark
                 ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
             aria-label={t.feedback.navLabel}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-5 w-5" />
           </button>
         )}
 
@@ -135,14 +136,14 @@ export function TopNav({
           type="button"
           onClick={onHelpClick}
           className={cn(
-            "p-1.5 rounded-md transition-colors",
+            "p-2.5 rounded-md transition-colors",
             isDark
               ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
               : "text-muted-foreground hover:text-foreground hover:bg-muted",
           )}
           aria-label={t.sidebar.help}
         >
-          <HelpCircle className="h-4 w-4" />
+          <HelpCircle className="h-5 w-5" />
         </button>
       </header>
     );
@@ -258,7 +259,8 @@ export function TopNav({
             type="button"
             onClick={onFeedbackClick}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
+              // pointer-coarse: tablets render this desktop branch but tap it.
+              "flex items-center gap-1.5 px-2.5 py-1.5 pointer-coarse:py-3 rounded-md text-sm font-medium transition-colors",
               isDark
                 ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -274,7 +276,7 @@ export function TopNav({
           type="button"
           onClick={onHelpClick}
           className={cn(
-            "p-1.5 rounded-md transition-colors",
+            "p-1.5 pointer-coarse:p-3 rounded-md transition-colors",
             isDark
               ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
               : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -313,11 +315,11 @@ function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?:
         aria-label={t.a11y.sponsorLink}
         title={t.a11y.sponsorLink}
         className={cn(
-          "p-1.5 rounded-md transition-colors",
+          "p-2.5 rounded-md transition-colors",
           isDark ? "text-pink-300 hover:bg-[#333]" : "text-pink-700 hover:bg-pink-50",
         )}
       >
-        <Heart className="h-4 w-4 fill-current" />
+        <Heart className="h-5 w-5 fill-current" />
       </a>
     );
   }
@@ -329,7 +331,7 @@ function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?:
       rel="noopener noreferrer"
       onClick={handleClick}
       className={cn(
-        "ms-1 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-700 dark:focus-visible:ring-pink-300 focus-visible:ring-offset-1",
+        "ms-1 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 pointer-coarse:py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-700 dark:focus-visible:ring-pink-300 focus-visible:ring-offset-1",
         isDark
           ? "border-pink-800 bg-pink-950/30 text-pink-300 hover:bg-pink-950/50"
           : "border-pink-200 bg-pink-50 text-pink-700 hover:bg-pink-100",
@@ -371,8 +373,8 @@ function LanguageSelector({ isDark }: { isDark: boolean }) {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (open) document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [open]);
 
   const current = supportedLocales.find((l) => l.code === locale);
