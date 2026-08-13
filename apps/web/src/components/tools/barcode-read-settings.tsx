@@ -356,7 +356,7 @@ export function BarcodeReadSettings() {
                       <button
                         type="button"
                         onClick={() => handleCopyOne(barcode.text, idx)}
-                        className="shrink-0 p-1 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="shrink-0 p-1 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity"
                         title="Copy value"
                       >
                         {copiedIndex === idx ? (

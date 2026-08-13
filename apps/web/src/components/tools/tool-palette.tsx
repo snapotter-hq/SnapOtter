@@ -139,7 +139,7 @@ function ToolItem({ tool, onAdd }: ToolItemProps) {
           {getToolDescription(t, tool.id, tool.description)}
         </div>
       </div>
-      <Plus className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      <Plus className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0" />
     </button>
   );
 }

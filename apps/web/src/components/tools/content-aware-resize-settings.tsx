@@ -1,21 +1,11 @@
-import { Download, Info } from "lucide-react";
+import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
-
-function HintIcon({ text }: { text: string }) {
-  return (
-    <span className="relative group">
-      <Info className="h-3 w-3 text-muted-foreground" />
-      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-48 rounded bg-foreground px-2 py-1.5 text-[11px] leading-tight text-background opacity-0 transition-opacity group-hover:opacity-100 z-10">
-        {text}
-      </span>
-    </span>
-  );
-}
 
 export interface ContentAwareResizeControlsProps {
   settings?: Record<string, unknown>;

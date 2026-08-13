@@ -134,9 +134,9 @@ export function PdfToImagePreview() {
                 <a
                   href={result.downloadUrl}
                   download={`page-${result.page}.${store.format}`}
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors"
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 pointer-coarse:bg-black/30 transition-colors"
                 >
-                  <Download className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Download className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity" />
                 </a>
               </div>
             );

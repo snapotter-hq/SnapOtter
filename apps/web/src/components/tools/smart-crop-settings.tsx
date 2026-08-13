@@ -1,6 +1,7 @@
 import { SMART_CROP_FACE_PRESETS, SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
-import { ArrowLeftRight, Info } from "lucide-react";
+import { ArrowLeftRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -19,17 +20,6 @@ const ASPECT_PRESETS = [
   { label: "4:5", w: 1080, h: 1350 },
   { label: "9:16", w: 1080, h: 1920 },
 ];
-
-function HintIcon({ text }: { text: string }) {
-  return (
-    <span className="relative group">
-      <Info className="h-3 w-3 text-muted-foreground" />
-      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-48 rounded bg-foreground px-2 py-1.5 text-[11px] leading-tight text-background opacity-0 transition-opacity group-hover:opacity-100 z-10">
-        {text}
-      </span>
-    </span>
-  );
-}
 
 export interface SmartCropControlsProps {
   settings?: Record<string, unknown>;

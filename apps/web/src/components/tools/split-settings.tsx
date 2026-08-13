@@ -436,9 +436,9 @@ export function SplitSettings() {
                     className="w-full h-full object-cover"
                   />
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 pointer-coarse:bg-black/30 transition-colors flex items-center justify-center">
                   <Download
-                    className={`h-3.5 w-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity ${
+                    className={`h-3.5 w-3.5 text-white opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity ${
                       downloadingIndex === i ? "animate-bounce" : ""
                     }`}
                   />
