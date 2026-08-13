@@ -3,6 +3,7 @@ import { FileImage, FolderOpen } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
+import { toolAcceptsCameraPhotos } from "@/lib/camera-capture";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
@@ -70,6 +71,7 @@ export function ToolDropzone({
         multiple={resolvedMultiple}
         fileFilter={fileFilter}
         acceptDescription={formatsDisplay ?? undefined}
+        cameraCapture={toolAcceptsCameraPhotos(tool.acceptedInputs)}
       />
 
       {/* Import from library */}

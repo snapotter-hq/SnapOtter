@@ -3885,6 +3885,7 @@ export const es: TranslationKeys = {
     urlFetchFailed: "No se pudo obtener la imagen desde la URL",
     ariaLabel: "Zona de carga de archivos",
     dropPrompt: "Arrastra tus imágenes aquí",
+    takePhoto: "Tomar foto",
     browseOrPaste: "usa el botón de subida o pega desde el portapapeles",
     uploadButton: "Subir",
     defaultFormats: "Imágenes, video, audio, PDF, archivos y más de 150 formatos",

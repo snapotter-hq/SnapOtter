@@ -3893,6 +3893,7 @@ export const nl: TranslationKeys = {
     urlFetchFailed: "Afbeelding kon niet worden opgehaald van URL",
     ariaLabel: "Bestand-dropzone",
     dropPrompt: "Sleep je afbeeldingen hierheen",
+    takePhoto: "Foto maken",
     browseOrPaste: "gebruik de uploadknop of plak vanuit het klembord",
     uploadButton: "Uploaden",
     defaultFormats: "Afbeeldingen, Video's, Audio, PDF, Bestanden en 150+ formaten",

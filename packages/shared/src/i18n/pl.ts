@@ -3897,6 +3897,7 @@ export const pl: TranslationKeys = {
     urlFetchFailed: "Nie udało się pobrać obrazu z URL",
     ariaLabel: "Strefa upuszczania plików",
     dropPrompt: "Przeciągnij tutaj swoje obrazy",
+    takePhoto: "Zrób zdjęcie",
     browseOrPaste: "użyj przycisku przesyłania lub wklej ze schowka",
     uploadButton: "Prześlij",
     defaultFormats: "Obrazy, Wideo, Audio, PDF, Pliki i ponad 150 formatów",

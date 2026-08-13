@@ -3884,6 +3884,7 @@ export const id: TranslationKeys = {
     urlFetchFailed: "Tidak dapat mengambil gambar dari URL",
     ariaLabel: "Area seret file",
     dropPrompt: "Seret gambar Anda ke sini",
+    takePhoto: "Ambil foto",
     browseOrPaste: "gunakan tombol unggah, atau tempel dari clipboard",
     uploadButton: "Unggah",
     defaultFormats: "Gambar, Video, Audio, PDF, File, dan 150+ format",

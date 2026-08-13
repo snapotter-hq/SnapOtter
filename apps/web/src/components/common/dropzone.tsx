@@ -1,6 +1,7 @@
-import { AlertCircle, FileImage, FileUp, Upload } from "lucide-react";
+import { AlertCircle, Camera, FileImage, FileUp, Upload } from "lucide-react";
 import { type DragEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTouchDevice } from "@/hooks/use-mobile";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { cn } from "@/lib/utils";
 import { UrlImportModal } from "./url-import-modal";
@@ -93,6 +94,8 @@ interface DropzoneProps {
   fileFilter?: (file: File) => boolean;
   /** Override the format hint text (e.g. "SVG files only"). */
   acceptDescription?: string;
+  /** Offer a "Take photo" button on touch devices (image-accepting tools). */
+  cameraCapture?: boolean;
 }
 
 // Browsers may not map certain formats (HEIC, JXL, RAW, etc.) to image/* in file pickers.
@@ -111,6 +114,7 @@ export function Dropzone({
   compact = false,
   fileFilter,
   acceptDescription,
+  cameraCapture = false,
 }: DropzoneProps) {
   const { t } = useTranslation();
   // When no explicit filter is given, accept any file: the file picker still
@@ -118,6 +122,7 @@ export function Dropzone({
   // pass an explicit fileFilter, so they are unaffected.
   const checkFile = fileFilter ?? (() => true);
   const resolvedAccept = expandAccept(accept);
+  const isTouchDevice = useTouchDevice();
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
@@ -195,6 +200,25 @@ export function Dropzone({
     input.click();
   }, [multiple, resolvedAccept, checkFile, onFiles, acceptDescription, accept]);
 
+  const handleCameraClick = useCallback(() => {
+    setError(null);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    // Attribute, not property: jsdom and some engines do not reflect .capture.
+    input.setAttribute("capture", "environment");
+    input.onchange = (e) => {
+      const picked = Array.from((e.target as HTMLInputElement).files || []);
+      const validFiles = picked.filter(checkFile);
+      if (validFiles.length > 0) {
+        onFiles?.(validFiles);
+      } else if (picked.length > 0) {
+        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
+      }
+    };
+    input.click();
+  }, [checkFile, onFiles, acceptDescription, accept]);
+
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const clip = e.clipboardData;
@@ -263,21 +287,36 @@ export function Dropzone({
           </p>
           <p className="text-sm text-muted-foreground">{t.dropzone.browseOrPaste}</p>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleClick();
-          }}
-          className={cn(
-            "flex items-center gap-2 rounded-lg bg-primary text-primary-foreground transition-all duration-200 text-sm font-medium shadow-sm",
-            compact ? "px-5 py-2" : "px-8 py-3",
-            "hover:bg-primary/90 hover:shadow-md active:scale-[0.98]",
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick();
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-lg bg-primary text-primary-foreground transition-all duration-200 text-sm font-medium shadow-sm",
+              compact ? "px-5 py-2" : "px-8 py-3",
+              "hover:bg-primary/90 hover:shadow-md active:scale-[0.98]",
+            )}
+          >
+            <Upload className="h-4 w-4" />
+            {t.common.upload}
+          </button>
+          {cameraCapture && isTouchDevice && !compact && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCameraClick();
+              }}
+              className="flex items-center gap-2 rounded-lg border border-border bg-background text-foreground transition-all duration-200 text-sm font-medium shadow-sm px-8 py-3 hover:bg-muted/40 active:scale-[0.98]"
+            >
+              <Camera className="h-4 w-4" />
+              {t.dropzone.takePhoto}
+            </button>
           )}
-        >
-          <Upload className="h-4 w-4" />
-          {t.common.upload}
-        </button>
+        </div>
         <p className="text-xs text-muted-foreground">
           {acceptDescription ?? t.dropzone.defaultFormats}
         </p>

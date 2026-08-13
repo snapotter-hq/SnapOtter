@@ -3,10 +3,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dropzone, isImageFile } from "@/components/common/dropzone";
+import { toolAcceptsCameraPhotos } from "@/lib/camera-capture";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function makeFile(name: string, type = "image/png", size = 1024): File {
@@ -63,6 +65,26 @@ function spyFileInput() {
     if (this.type === "file") captured = this;
   });
   return () => captured;
+}
+
+/**
+ * jsdom has no matchMedia; the app's useMediaQuery treats that as "no match".
+ * Stub it to simulate a touch (coarse-pointer) or mouse (fine-pointer) device.
+ */
+function stubPointer(coarse: boolean) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn().mockImplementation((query: string) => ({
+      matches: coarse && query === "(pointer: coarse)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +156,23 @@ describe("isImageFile", () => {
   it("rejects files with no extension and no image MIME", () => {
     expect(isImageFile(makeFile("noext", ""))).toBe(false);
     expect(isImageFile(makeFile("noext", "application/octet-stream"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toolAcceptsCameraPhotos
+// ---------------------------------------------------------------------------
+describe("toolAcceptsCameraPhotos", () => {
+  it("accepts tools that take jpg or jpeg", () => {
+    expect(toolAcceptsCameraPhotos([".jpg", ".png"])).toBe(true);
+    expect(toolAcceptsCameraPhotos([".jpeg"])).toBe(true);
+  });
+
+  it("rejects tools that cannot use a camera photo", () => {
+    expect(toolAcceptsCameraPhotos([".pdf"])).toBe(false);
+    expect(toolAcceptsCameraPhotos([".svg"])).toBe(false);
+    expect(toolAcceptsCameraPhotos([])).toBe(false);
+    expect(toolAcceptsCameraPhotos(undefined)).toBe(false);
   });
 });
 
@@ -677,6 +716,64 @@ describe("Dropzone", () => {
       expect(() => {
         fireEvent.click(screen.getByLabelText("File drop zone"));
       }).not.toThrow();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Camera capture (issue #172)
+  // ---------------------------------------------------------------------------
+  describe("camera capture", () => {
+    it("shows Take photo on touch devices when cameraCapture is set", () => {
+      stubPointer(true);
+      render(<Dropzone cameraCapture />);
+      expect(screen.getByRole("button", { name: "Take photo" })).toBeDefined();
+    });
+
+    it("hides Take photo on fine-pointer devices", () => {
+      stubPointer(false);
+      render(<Dropzone cameraCapture />);
+      expect(screen.queryByRole("button", { name: "Take photo" })).toBeNull();
+    });
+
+    it("hides Take photo when cameraCapture is not set, even on touch", () => {
+      stubPointer(true);
+      render(<Dropzone />);
+      expect(screen.queryByRole("button", { name: "Take photo" })).toBeNull();
+    });
+
+    it("hides Take photo in compact mode", () => {
+      stubPointer(true);
+      render(<Dropzone cameraCapture compact />);
+      expect(screen.queryByRole("button", { name: "Take photo" })).toBeNull();
+    });
+
+    it("opens a single-file camera input with capture=environment", () => {
+      stubPointer(true);
+      const getInput = spyFileInput();
+      render(<Dropzone cameraCapture />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
+      const input = getInput();
+      expect(input).not.toBeNull();
+      expect(input?.getAttribute("capture")).toBe("environment");
+      expect(input?.accept).toBe("image/*");
+      expect(input?.multiple).toBe(false);
+    });
+
+    it("routes the captured photo through the normal file flow", () => {
+      stubPointer(true);
+      const onFiles = vi.fn();
+      const getInput = spyFileInput();
+      render(<Dropzone cameraCapture onFiles={onFiles} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
+      const input = getInput()!;
+
+      const photo = makeFile("capture.jpg", "image/jpeg");
+      Object.defineProperty(input, "files", { value: [photo], configurable: true });
+      input.onchange?.({ target: input } as unknown as Event);
+
+      expect(onFiles).toHaveBeenCalledWith([photo]);
     });
   });
 });

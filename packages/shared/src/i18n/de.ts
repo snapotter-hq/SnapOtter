@@ -3906,6 +3906,7 @@ export const de: TranslationKeys = {
     urlFetchFailed: "Bild konnte nicht von URL abgerufen werden",
     ariaLabel: "Datei-Ablagezone",
     dropPrompt: "Bilder hierher ziehen",
+    takePhoto: "Foto aufnehmen",
     browseOrPaste:
       "Verwenden Sie die Upload-Schaltfläche oder fügen Sie aus der Zwischenablage ein",
     uploadButton: "Hochladen",

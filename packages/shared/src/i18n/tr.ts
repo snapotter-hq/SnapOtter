@@ -3892,6 +3892,7 @@ export const tr: TranslationKeys = {
     urlFetchFailed: "URL'den görüntü alınamadı",
     ariaLabel: "Dosya bırakma alanı",
     dropPrompt: "Görüntülerinizi buraya bırakın",
+    takePhoto: "Fotoğraf çek",
     browseOrPaste: "yükleme düğmesini kullanın veya panodan yapıştırın",
     uploadButton: "Yükle",
     defaultFormats: "Görseller, Videolar, Ses, PDF, Dosyalar ve 150+ biçim",

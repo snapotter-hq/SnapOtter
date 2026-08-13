@@ -3887,6 +3887,7 @@ export const uk: TranslationKeys = {
     urlFetchFailed: "Не вдалося завантажити зображення за URL",
     ariaLabel: "Зона перетягування файлів",
     dropPrompt: "Перетягніть зображення сюди",
+    takePhoto: "Зробити фото",
     browseOrPaste: "скористайтеся кнопкою завантаження або вставте з буфера обміну",
     uploadButton: "Завантажити",
     defaultFormats: "Зображення, Відео, Аудіо, PDF, Файли та 150+ форматів",

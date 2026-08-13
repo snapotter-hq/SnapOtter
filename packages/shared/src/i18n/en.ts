@@ -3826,6 +3826,7 @@ export const en = {
     urlFetchFailed: "Could not fetch file from URL",
     ariaLabel: "File drop zone",
     dropPrompt: "Drop your files here",
+    takePhoto: "Take photo",
     browseOrPaste: "use the upload button, or paste from clipboard",
     uploadButton: "Upload",
     defaultFormats: "Images, Videos, Audio, PDF, Files, and 150+ formats",

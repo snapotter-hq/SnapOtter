@@ -3853,6 +3853,7 @@ export const ar: TranslationKeys = {
     urlFetchFailed: "تعذر جلب الصورة من الرابط",
     ariaLabel: "منطقة إسقاط الملفات",
     dropPrompt: "اسحب صورك هنا",
+    takePhoto: "التقاط صورة",
     browseOrPaste: "استخدم زر التحميل، أو الصق من الحافظة",
     uploadButton: "رفع",
     defaultFormats: "صور، فيديوهات، صوت، PDF، ملفات، وأكثر من 150 صيغة",

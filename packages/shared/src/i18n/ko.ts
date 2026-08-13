@@ -3810,6 +3810,7 @@ export const ko: TranslationKeys = {
     urlFetchFailed: "URL에서 이미지를 가져올 수 없습니다",
     ariaLabel: "파일 드롭 영역",
     dropPrompt: "여기에 이미지를 드롭하세요",
+    takePhoto: "사진 촬영",
     browseOrPaste: "업로드 버튼을 사용하거나 클립보드에서 붙여넣기",
     uploadButton: "업로드",
     defaultFormats: "이미지, 동영상, 오디오, PDF, 파일 및 150가지 이상의 포맷",

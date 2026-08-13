@@ -3614,6 +3614,7 @@ export const zhCN: TranslationKeys = {
     urlFetchFailed: "无法从 URL 获取图片",
     ariaLabel: "文件拖放区域",
     dropPrompt: "将图片拖放到此处",
+    takePhoto: "拍照",
     browseOrPaste: "使用上传按钮，或从剪贴板粘贴",
     uploadButton: "上传",
     defaultFormats: "图片、视频、音频、PDF、文件及 150+ 种格式",

@@ -3889,6 +3889,7 @@ export const ru: TranslationKeys = {
     urlFetchFailed: "Не удалось загрузить изображение по URL",
     ariaLabel: "Зона перетаскивания файлов",
     dropPrompt: "Перетащите изображения сюда",
+    takePhoto: "Сделать фото",
     browseOrPaste: "используйте кнопку загрузки или вставьте из буфера обмена",
     uploadButton: "Загрузить",
     defaultFormats: "Изображения, Видео, Аудио, PDF, Файлы и 150+ форматов",

@@ -3831,6 +3831,7 @@ export const th: TranslationKeys = {
     urlFetchFailed: "ไม่สามารถดึงภาพจาก URL",
     ariaLabel: "พื้นที่วางไฟล์",
     dropPrompt: "ลากภาพมาวางที่นี่",
+    takePhoto: "ถ่ายภาพ",
     browseOrPaste: "ใช้ปุ่มอัปโหลดหรือวางจากคลิปบอร์ด",
     uploadButton: "อัปโหลด",
     defaultFormats: "รูปภาพ วิดีโอ เสียง PDF ไฟล์ และรูปแบบอื่นกว่า 150 รูปแบบ",

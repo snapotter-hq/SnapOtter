@@ -3911,6 +3911,7 @@ export const fr: TranslationKeys = {
     urlFetchFailed: "Impossible de récupérer l'image depuis l'URL",
     ariaLabel: "Zone de dépôt de fichiers",
     dropPrompt: "Déposez vos images ici",
+    takePhoto: "Prendre une photo",
     browseOrPaste: "utilisez le bouton d'import, ou collez depuis le presse-papiers",
     uploadButton: "Importer",
     defaultFormats: "Images, vidéos, audio, PDF, fichiers et plus de 150 formats",
