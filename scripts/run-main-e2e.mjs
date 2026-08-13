@@ -14,24 +14,43 @@ const RELEASE_PROJECTS = [
   "tablet-webkit",
 ];
 
-function hasVisualBaselines(platform) {
+// The legacy broad matrix (visual-regression.spec.ts) keeps darwin-only
+// baselines on purpose: the update-visual-baselines workflow regenerates only
+// the maintained visual projects. Each visual lane is therefore gated on its
+// OWN baselines, so a platform never runs comparisons that cannot have a
+// snapshot (a missing snapshot is a test failure, not a skip).
+const LEGACY_SNAPSHOT_DIR = "visual-regression.spec.ts";
+
+function visualBaselineState(platform) {
   const screenshotRoot = path.resolve(process.cwd(), "tests/e2e/__screenshots__");
-  if (!existsSync(screenshotRoot)) return false;
-  return readdirSync(screenshotRoot, { recursive: true }).some((entry) =>
-    String(entry).endsWith(`-${platform}.png`),
-  );
+  const state = { maintained: false, legacy: false };
+  if (!existsSync(screenshotRoot)) return state;
+  for (const entry of readdirSync(screenshotRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const hasPlatform = readdirSync(path.join(screenshotRoot, entry.name)).some((file) =>
+      file.endsWith(`-${platform}.png`),
+    );
+    if (!hasPlatform) continue;
+    if (entry.name === LEGACY_SNAPSHOT_DIR) state.legacy = true;
+    else state.maintained = true;
+  }
+  return state;
 }
 
 export function buildMainE2ePlan(platform = process.platform, coreOnly = false) {
   const projects = coreOnly ? ["chromium"] : RELEASE_PROJECTS;
   const standard = ["test", ...projects.map((project) => `--project=${project}`)];
-  const visualBaselinesAvailable = hasVisualBaselines(platform);
-  if (!visualBaselinesAvailable) standard.push("--grep-invert=@visual");
+  const baselines = visualBaselineState(platform);
+  // Device @visual tests run inside the standard command's device projects
+  // and share the maintained baseline set.
+  if (!baselines.maintained) standard.push("--grep-invert=@visual");
 
   const plan = [standard, ["test", "--project=chromium-serial", "--workers=1"]];
-  if (visualBaselinesAvailable) {
-    plan.push(["test", "--project=chromium-visual", "--project=chromium-legacy-visual"]);
-  }
+  const visualLane = [
+    ...(baselines.maintained ? ["--project=chromium-visual"] : []),
+    ...(baselines.legacy ? ["--project=chromium-legacy-visual"] : []),
+  ];
+  if (visualLane.length > 0) plan.push(["test", ...visualLane]);
   return plan;
 }
 

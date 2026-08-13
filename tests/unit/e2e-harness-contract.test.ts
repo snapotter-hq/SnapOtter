@@ -667,10 +667,31 @@ test("the canonical E2E command exactly covers every release browser and device 
   );
   expect(new Set(selectedProjects)).toEqual(new Set(configuredProjects));
   expect(selectedProjects).toHaveLength(configuredProjects?.length ?? 0);
-  expect(linuxPlan.flat()).not.toContain("--project=chromium-visual");
+
+  // Visual lanes are filesystem-derived PER PROJECT. The maintained visual
+  // baselines (gui-visual-*, device-visual) exist for darwin and, since the
+  // #172 branch, linux. The legacy matrix (visual-regression.spec.ts) is
+  // darwin-only on purpose: the update-visual-baselines workflow does not
+  // regenerate it, so a platform with maintained baselines but no legacy
+  // ones must run chromium-visual and skip chromium-legacy-visual instead
+  // of failing every legacy comparison on a missing snapshot.
+  expect(darwinPlan.flat()).toContain("--project=chromium-visual");
   expect(darwinPlan.flat()).toContain("--project=chromium-legacy-visual");
-  expect(linuxPlan[0]).toContain("--grep-invert=@visual");
+  expect(darwinPlan[0]).not.toContain("--grep-invert=@visual");
+  expect(linuxPlan.flat()).toContain("--project=chromium-visual");
+  expect(linuxPlan.flat()).not.toContain("--project=chromium-legacy-visual");
+  expect(linuxPlan[0]).not.toContain("--grep-invert=@visual");
   expect(linuxPlan[1]).toEqual(["test", "--project=chromium-serial", "--workers=1"]);
+
+  // A platform with no baselines at all (win32 today) skips every visual
+  // comparison: @visual grep-inverted in the standard run, no visual lane.
+  const win32Plan = JSON.parse(
+    execFileSync(process.execPath, [e2eRunnerPath, "--plan", "win32"], { encoding: "utf8" }),
+  ) as string[][];
+  expect(win32Plan[0]).toContain("--grep-invert=@visual");
+  expect(win32Plan.flat()).not.toContain("--project=chromium-visual");
+  expect(win32Plan.flat()).not.toContain("--project=chromium-legacy-visual");
+  expect(win32Plan).toHaveLength(2);
 });
 
 test("Vitest excludes every Playwright spec directory", () => {
