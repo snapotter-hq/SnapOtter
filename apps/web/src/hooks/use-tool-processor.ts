@@ -120,8 +120,14 @@ export function useToolProcessor(toolId: string) {
   // (#722, #750).
   const sawJobEvidenceRef = useRef(false);
   // Installed by processAllFiles so the SSE handler can settle a degraded
-  // batch run from its terminal frame (#750). Null outside batch runs.
-  const batchRunRef = useRef<{ onTerminal: (frame: BatchProgressFrame) => void } | null>(null);
+  // batch run from its terminal frame (#750) and the cancel path can record
+  // intent or settle a run the server never saw (#767). Null outside batch
+  // runs.
+  const batchRunRef = useRef<{
+    onTerminal: (frame: BatchProgressFrame) => void;
+    markCanceled: () => void;
+    cancelLocally: () => void;
+  } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
   const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
@@ -196,6 +202,9 @@ export function useToolProcessor(toolId: string) {
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
+    // Record intent before the request: outcome labeling must not depend on
+    // the response racing the terminal frame (#767).
+    batchRunRef.current?.markCanceled();
     try {
       const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
         method: "POST",
@@ -206,6 +215,13 @@ export function useToolProcessor(toolId: string) {
       // frame, so settle locally as canceled instead of blaming the network
       // 30 seconds later.
       if (res.status === 404 && activeJobIdRef.current === jobId) {
+        // A batch upload may still be in flight; its settle path also has to
+        // abort the XHR and tear down the run's own state (#767).
+        const batchRun = batchRunRef.current;
+        if (batchRun) {
+          batchRun.cancelLocally();
+          return;
+        }
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -704,7 +720,7 @@ export function useToolProcessor(toolId: string) {
 
       // batch_processed fires once for the batch as a unit (distinct from the N
       // per-file tool_used events), so batch usage is separable from single runs.
-      const trackBatch = (status: "completed" | "failed") =>
+      const trackBatch = (status: "completed" | "failed" | "canceled") =>
         void import("@/lib/analytics").then(({ track }) =>
           track(ANALYTICS_EVENTS.BATCH_PROCESSED, {
             tool_id: toolId,
@@ -712,6 +728,11 @@ export function useToolProcessor(toolId: string) {
             status,
           }),
         );
+
+      // Set on the user's cancel click; drives outcome labeling and the
+      // batch_processed status. The server keeps its own truth in the row
+      // status; this flag only shapes what this client shows (#767).
+      let canceledByUser = false;
 
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
@@ -735,6 +756,12 @@ export function useToolProcessor(toolId: string) {
       activeJobIdRef.current = clientJobId;
       activeEntryIndexRef.current = null;
       asyncModeRef.current = false;
+      // The cancel button lives behind the store's activeJob handle. Batch
+      // runs arm it for the whole run, sync wait included: since #750 the
+      // HTTP response is only an observer, so without this the only exit
+      // from a long unwanted batch was closing the tab, which stopped
+      // nothing server-side (#767).
+      setActiveJob(clientJobId, cancelCurrentJob);
 
       // Tear down the run without touching the outcome state; callers set
       // the result or error first.
@@ -755,7 +782,7 @@ export function useToolProcessor(toolId: string) {
       const failRun = (message: string) => {
         setError(message);
         finishRun();
-        trackBatch("failed");
+        trackBatch(canceledByUser ? "canceled" : "failed");
       };
 
       const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
@@ -784,12 +811,17 @@ export function useToolProcessor(toolId: string) {
               error: null,
             });
           } else {
-            updateEntry(i, { status: "failed", error: "File not found in batch results" });
+            // After a user cancel, a missing result is the cancel doing its
+            // job, not a lookup failure.
+            updateEntry(i, {
+              status: "failed",
+              error: canceledByUser ? "Canceled" : "File not found in batch results",
+            });
           }
         }
 
         finishRun();
-        trackBatch("completed");
+        trackBatch(canceledByUser ? "canceled" : "completed");
       };
 
       // A degraded run settles here: download the durable ZIP the terminal
@@ -830,6 +862,17 @@ export function useToolProcessor(toolId: string) {
       };
 
       batchRunRef.current = {
+        markCanceled: () => {
+          canceledByUser = true;
+        },
+        cancelLocally: () => {
+          if (activeJobIdRef.current !== clientJobId) return;
+          canceledByUser = true;
+          // The upload may still be in flight; aborting it is what actually
+          // stops ingress when no job row exists server-side yet.
+          xhrRef.current?.abort();
+          failRun("Canceled");
+        },
         onTerminal: (frame) => {
           if (activeJobIdRef.current !== clientJobId) return;
           if (
@@ -978,7 +1021,10 @@ export function useToolProcessor(toolId: string) {
             }
             errorMsg = `Batch processing failed: ${xhr.status}`;
           }
-          failRun(errorMsg);
+          // After a user cancel, the route's 422 ("Batch canceled" when
+          // nothing finished) settles as the cancellation it is, through the
+          // same message the i18n layer already maps.
+          failRun(canceledByUser ? "Canceled" : errorMsg);
         })();
       };
 
@@ -1007,6 +1053,8 @@ export function useToolProcessor(toolId: string) {
       processFiles,
       setProcessing,
       setError,
+      setActiveJob,
+      cancelCurrentJob,
       clearActiveJob,
       clearJobEvidenceTimer,
       clearStallTimer,
