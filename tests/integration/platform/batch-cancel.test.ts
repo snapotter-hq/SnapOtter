@@ -114,8 +114,13 @@ async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
 
 /** Insert the parent and child rows and enqueue the flow exactly the way
  * routes/batch.ts does (batch-finalize parent on the system queue, one
- * batch-child per file with attempts 1 + ignoreDependencyOnFailure). */
-async function enqueueBatchFlow(files: string[]): Promise<{ parentId: string }> {
+ * batch-child per file with attempts 1 + ignoreDependencyOnFailure).
+ * beforeEnqueue runs between the row inserts and the FlowProducer add, the
+ * window a pre-enqueue cancel lands in. */
+async function enqueueBatchFlow(
+  files: string[],
+  opts: { beforeEnqueue?: (parentId: string) => Promise<void> } = {},
+): Promise<{ parentId: string }> {
   const parentId = randomUUID();
   const fileIndexMap = files.map((_, i) => i);
 
@@ -180,8 +185,18 @@ async function enqueueBatchFlow(files: string[]): Promise<{ parentId: string }> 
     children,
   };
 
+  await opts.beforeEnqueue?.(parentId);
   await getFlowProducer().add(tree);
   return { parentId };
+}
+
+/** The finalize's BullMQ return value, what routes/batch.ts branches on. */
+async function finalizeReturnValue(parentId: string): Promise<Record<string, unknown>> {
+  const job = await waitFor(async () => {
+    const j = await getQueue("system").getJob(parentId);
+    return j?.returnvalue ? j : undefined;
+  });
+  return job.returnvalue as Record<string, unknown>;
 }
 
 beforeAll(async () => {
@@ -317,10 +332,14 @@ describe("cooperative child skip and canceled finalize", () => {
     const { parentId } = await enqueueBatchFlow(["fast.png", "slow-1.png", "slow-2.png"]);
 
     // The fast child must be done before the cancel so the batch has real
-    // finished work to keep.
+    // finished work to keep, and a slow child must be actively running so
+    // the abort-over-the-channel path is exercised deterministically (a
+    // queued slow child would take the flag-skip path, which has its own
+    // test above).
     await waitFor(async () => {
-      const row = await jobRow(`${parentId}-f0`);
-      return row?.status === "completed" ? row : undefined;
+      const fast = await jobRow(`${parentId}-f0`);
+      const slow = await jobRow(`${parentId}-f1`);
+      return fast?.status === "completed" && slow?.status === "processing" ? true : undefined;
     });
 
     expect(await requestCancel(parentId)).toBe(true);
@@ -345,6 +364,10 @@ describe("cooperative child skip and canceled finalize", () => {
       const row = await terminalRow(slow);
       expect(row.status).toBe("canceled");
     }
+
+    // routes/batch.ts branches its sync response on this payload.
+    const returned = await finalizeReturnValue(parentId);
+    expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
   });
 
   it("a cancel that lands after every child finished completes normally", async () => {
@@ -366,71 +389,11 @@ describe("cooperative child skip and canceled finalize", () => {
   });
 
   it("a full cancel before any child ran fails with the Canceled synthetic", async () => {
-    const parentId = randomUUID();
-    // Flag first so both children skip regardless of worker timing. The flow
-    // is enqueued afterwards with a fresh id, so reuse enqueueBatchFlow's
-    // internals inline with the pre-set flag.
-    const files = ["slow-x.png", "slow-y.png"];
-    const fileIndexMap = files.map((_, i) => i);
-    await db.insert(schema.jobs).values({
-      id: parentId,
-      type: "batch",
-      toolId: "wt-batch-cancel",
-      pool: "system",
-      status: "queued",
-      inputRefs: [],
-      settings: { flowChildCount: files.length, fileIndexMap },
-    });
-    await markBatchCanceled(parentId);
-
-    const children: FlowJob[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const childId = `${parentId}-f${i}`;
-      const key = `uploads/${childId}/${files[i]}`;
-      await putObject(key, Buffer.from(`payload-${i}`));
-      await db.insert(schema.jobs).values({
-        id: childId,
-        type: "batch-child",
-        toolId: "wt-batch-cancel",
-        pool: "image",
-        status: "queued",
-        inputRefs: [key],
-      });
-      children.push({
-        name: "wt-batch-cancel",
-        queueName: queueName("image"),
-        data: {
-          kind: "batch-child",
-          jobId: childId,
-          toolId: "wt-batch-cancel",
-          userId: null,
-          pool: "image",
-          parentId,
-          totalFiles: files.length,
-          fileIndex: i,
-          inputRefs: [key],
-          filename: files[i],
-          settings: {},
-        } satisfies ToolJobData,
-        opts: { jobId: childId, attempts: 1, ignoreDependencyOnFailure: true },
-      });
-    }
-    await getFlowProducer().add({
-      name: "batch-finalize",
-      queueName: queueName("system"),
-      data: {
-        kind: "batch-finalize",
-        jobId: parentId,
-        toolId: "wt-batch-cancel",
-        userId: null,
-        pool: "system",
-        totalFiles: files.length,
-        inputRefs: [],
-        filename: "",
-        settings: { flowChildCount: files.length, fileIndexMap },
-      } satisfies ToolJobData,
-      opts: { jobId: parentId, attempts: 1 },
-      children,
+    // Flag inside the insert-to-enqueue window so both children skip
+    // regardless of worker timing: the pre-enqueue cancel race the DB-row
+    // branch of requestCancel exists for.
+    const { parentId } = await enqueueBatchFlow(["slow-x.png", "slow-y.png"], {
+      beforeEnqueue: (id) => markBatchCanceled(id),
     });
 
     const parent = await terminalRow(parentId);
@@ -446,5 +409,11 @@ describe("cooperative child skip and canceled finalize", () => {
       const row = await jobRow(childId);
       expect(row?.status).toBe("canceled");
     }
+
+    // routes/batch.ts turns this payload into the "Batch canceled" 422.
+    const returned = await finalizeReturnValue(parentId);
+    const resultPayload = returned.resultPayload as { canceled?: boolean; allFailed?: boolean };
+    expect(resultPayload.canceled).toBe(true);
+    expect(resultPayload.allFailed).toBe(true);
   });
 });

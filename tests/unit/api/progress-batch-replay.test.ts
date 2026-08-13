@@ -295,6 +295,34 @@ describe("buildBatchReplayEvent", () => {
     });
   });
 
+  it("replays a resultless canceled row as failed with its stored details (#767)", () => {
+    expect(
+      buildBatchReplayEvent({
+        jobId: "batch-canceled-full",
+        status: "canceled",
+        progress: { percent: 100, totalFiles: 2, completedFiles: 2, failedFiles: 2 },
+        error: {
+          message: "Canceled",
+          details: [
+            { filename: "", error: "Canceled" },
+            { filename: "a.png", error: "Canceled" },
+          ],
+        },
+      }),
+    ).toEqual({
+      jobId: "batch-canceled-full",
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "", error: "Canceled" },
+        { filename: "a.png", error: "Canceled" },
+      ],
+    });
+  });
+
   it("tolerates legacy rows whose progress has only a percent", () => {
     expect(
       buildBatchReplayEvent({

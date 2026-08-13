@@ -75,6 +75,16 @@ const partialZipBlob = () =>
   new Blob([PARTIAL_ZIP_BYTES.slice().buffer], { type: "application/zip" });
 const encodedPartialResults = () => encodeURIComponent(JSON.stringify(PARTIAL_NAMES));
 
+// Every file finished: the cancel lost the race.
+const FULL_NAMES = { "0": "first_resize.png", "1": "second_resize.jpg" } as const;
+const FULL_ZIP_BYTES = (() => {
+  const zip = new AdmZip();
+  zip.addFile("first_resize.png", Buffer.from([1, 2, 3, 4]));
+  zip.addFile("second_resize.jpg", Buffer.from([5, 6]));
+  return new Uint8Array(zip.toBuffer());
+})();
+const fullZipBlob = () => new Blob([FULL_ZIP_BYTES.slice().buffer], { type: "application/zip" });
+
 function latestSse(): MockEventSource {
   return MockEventSource.instances[MockEventSource.instances.length - 1];
 }
@@ -344,6 +354,62 @@ describe("useToolProcessor batch cancel (#767)", () => {
 
     // trackBatch lands through a dynamic analytics import, one tick after
     // the run settles; assert with a wait so the event is not raced.
+    await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
+    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+
+    hook.unmount();
+  });
+
+  it("a cancel that lost the race settles the full result without Canceled labels", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith("/cancel")) {
+        // Too late: the server found the batch already terminal.
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ canceled: false }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        blob: () => Promise.resolve(fullZipBlob()),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    await act(async () => {
+      await hook.result.current.cancelCurrentJob();
+    });
+
+    act(() => {
+      sendBatchFrame({
+        status: "completed",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 0,
+        errors: [],
+        result: { ...PARTIAL_RESULT, fileResults: FULL_NAMES },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().entries[1].error).toBeNull();
+    expect(useFileStore.getState().error).toBeNull();
+
+    // Intent-based: the click is what batch_processed's "canceled" measures;
+    // failedFiles on the frame carries the outcome.
     await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
     expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
 
