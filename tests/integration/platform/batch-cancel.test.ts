@@ -8,7 +8,14 @@
  * drain them against this fork's Postgres + Redis.
  */
 import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+import AdmZip from "adm-zip";
+import type { FlowJob } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
@@ -16,19 +23,180 @@ const { runMigrations } = await import("../../../apps/api/src/db/migrate.js");
 const { isBatchCanceled, markBatchCanceled } = await import(
   "../../../apps/api/src/jobs/batch-progress.js"
 );
-const { requestCancel } = await import("../../../apps/api/src/jobs/cancel.js");
+const { requestCancel, startCancelListener, stopCancelListener } = await import(
+  "../../../apps/api/src/jobs/cancel.js"
+);
 const { createRedisSubscriberConnection, sharedRedis } = await import(
   "../../../apps/api/src/jobs/connection.js"
 );
-const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
+const { getFlowProducer } = await import("../../../apps/api/src/jobs/enqueue.js");
+const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+const { bullPrefix, queueName } = await import("../../../apps/api/src/jobs/types.js");
+const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
+const { getObjectBuffer, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
+const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
+
+const passthroughSchema = { parse: (v: unknown) => v } as never;
+
+// Behavior keyed on filename: fast*.png returns instantly, slow*.png waits on
+// the worker's abort signal, so a cancel mid-batch has a real running target.
+registerToolProcessFn({
+  toolId: "wt-batch-cancel",
+  settingsSchema: passthroughSchema,
+  process: async (
+    inputBuffer: Buffer,
+    _settings: unknown,
+    filename: string,
+    ctx?: ToolProcessCtx,
+  ) => {
+    if (filename.startsWith("slow")) {
+      await new Promise<void>((resolve, reject) => {
+        const signal = ctx?.signal;
+        if (!signal) {
+          reject(new Error("wt-batch-cancel requires an abort signal"));
+          return;
+        }
+        if (signal.aborted) {
+          reject(new Error("aborted before start"));
+          return;
+        }
+        const timer = setTimeout(resolve, 20_000);
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new Error("aborted by signal"));
+          },
+          { once: true },
+        );
+      });
+    }
+    return { buffer: inputBuffer, filename, contentType: "image/png" };
+  },
+});
+
+mkdirSync(process.env.WORKSPACE_PATH ?? "", { recursive: true });
+await runMigrations();
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+type JobRow = typeof schema.jobs.$inferSelect;
+
+async function waitFor<T>(probe: () => Promise<T | undefined>, timeoutMs = 20_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await probe();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline) throw new Error(`condition not met within ${timeoutMs}ms`);
+    await delay(150);
+  }
+}
+
+async function jobRow(jobId: string): Promise<JobRow | undefined> {
+  const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+  return row;
+}
+
+async function terminalRow(jobId: string, timeoutMs = 25_000): Promise<JobRow> {
+  return waitFor(async () => {
+    const row = await jobRow(jobId);
+    return row && row.status !== "queued" && row.status !== "processing" ? row : undefined;
+  }, timeoutMs);
+}
+
+async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
+  const raw = await waitFor(async () => {
+    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+    return value ?? undefined;
+  }, 25_000);
+  return JSON.parse(raw) as Record<string, unknown>;
+}
+
+/** Insert the parent and child rows and enqueue the flow exactly the way
+ * routes/batch.ts does (batch-finalize parent on the system queue, one
+ * batch-child per file with attempts 1 + ignoreDependencyOnFailure). */
+async function enqueueBatchFlow(files: string[]): Promise<{ parentId: string }> {
+  const parentId = randomUUID();
+  const fileIndexMap = files.map((_, i) => i);
+
+  await db.insert(schema.jobs).values({
+    id: parentId,
+    type: "batch",
+    toolId: "wt-batch-cancel",
+    pool: "system",
+    status: "queued",
+    inputRefs: [],
+    settings: { flowChildCount: files.length, fileIndexMap },
+  });
+
+  const children: FlowJob[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const childId = `${parentId}-f${i}`;
+    const key = `uploads/${childId}/${files[i]}`;
+    await putObject(key, Buffer.from(`payload-${i}`));
+    await db.insert(schema.jobs).values({
+      id: childId,
+      type: "batch-child",
+      toolId: "wt-batch-cancel",
+      pool: "image",
+      status: "queued",
+      inputRefs: [key],
+    });
+    children.push({
+      name: "wt-batch-cancel",
+      queueName: queueName("image"),
+      data: {
+        kind: "batch-child",
+        jobId: childId,
+        toolId: "wt-batch-cancel",
+        userId: null,
+        pool: "image",
+        parentId,
+        totalFiles: files.length,
+        fileIndex: i,
+        inputRefs: [key],
+        filename: files[i],
+        settings: {},
+      } satisfies ToolJobData,
+      opts: { jobId: childId, attempts: 1, ignoreDependencyOnFailure: true },
+    });
+  }
+
+  const tree: FlowJob = {
+    name: "batch-finalize",
+    queueName: queueName("system"),
+    data: {
+      kind: "batch-finalize",
+      jobId: parentId,
+      toolId: "wt-batch-cancel",
+      userId: null,
+      pool: "system",
+      totalFiles: files.length,
+      inputRefs: [],
+      filename: "",
+      settings: { flowChildCount: files.length, fileIndexMap },
+    } satisfies ToolJobData,
+    opts: { jobId: parentId, attempts: 1 },
+    children,
+  };
+
+  await getFlowProducer().add(tree);
+  return { parentId };
+}
 
 beforeAll(async () => {
-  await runMigrations();
+  await startCancelListener();
+  startWorkers();
 }, 30_000);
 
 afterAll(async () => {
+  await closeWorkers();
+  await stopCancelListener();
+  await closeQueues();
   await sharedRedis().quit();
-});
+}, 20_000);
+
+// ── Tests ───────────────────────────────────────────────────────
 
 describe("batch cancel flag", () => {
   it("marks and reads the canceled flag with a TTL", async () => {
@@ -95,5 +263,188 @@ describe("requestCancel on a batch parent", () => {
     const id = await seedParent({ toolId: "pipeline-batch" });
     expect(await requestCancel(id)).toBe(false);
     expect(await isBatchCanceled(id)).toBe(false);
+  });
+});
+
+describe("cooperative child skip and canceled finalize", () => {
+  it("skips a pending child when the batch is canceled", async () => {
+    const parentId = randomUUID();
+    const childId = `${parentId}-f0`;
+    const key = `uploads/${childId}/skipme.png`;
+    await putObject(key, Buffer.from("payload"));
+    await db.insert(schema.jobs).values({
+      id: childId,
+      type: "batch-child",
+      toolId: "wt-batch-cancel",
+      pool: "image",
+      status: "queued",
+      inputRefs: [key],
+    });
+    await markBatchCanceled(parentId);
+
+    await getQueue("image").add(
+      "wt-batch-cancel",
+      {
+        kind: "batch-child",
+        jobId: childId,
+        toolId: "wt-batch-cancel",
+        userId: null,
+        pool: "image",
+        parentId,
+        totalFiles: 1,
+        fileIndex: 0,
+        inputRefs: [key],
+        filename: "skipme.png",
+        settings: {},
+      } satisfies ToolJobData,
+      { jobId: childId, attempts: 1 },
+    );
+
+    const row = await terminalRow(childId);
+    expect(row.status).toBe("canceled");
+    expect((row.error as { message?: string } | null)?.message).toBe("Canceled");
+
+    const base = `${bullPrefix()}:batch:${parentId}`;
+    expect(await sharedRedis().get(`${base}:done`)).toBeNull();
+    expect(await sharedRedis().get(`${base}:failed`)).toBe("1");
+    const errors = (await sharedRedis().lrange(`${base}:errors`, 0, -1)).map(
+      (e) => JSON.parse(e) as { filename: string; error: string },
+    );
+    expect(errors).toEqual([{ filename: "skipme.png", error: "Canceled" }]);
+  });
+
+  it("cancel mid-batch commits a canceled row with a partial ZIP", async () => {
+    const { parentId } = await enqueueBatchFlow(["fast.png", "slow-1.png", "slow-2.png"]);
+
+    // The fast child must be done before the cancel so the batch has real
+    // finished work to keep.
+    await waitFor(async () => {
+      const row = await jobRow(`${parentId}-f0`);
+      return row?.status === "completed" ? row : undefined;
+    });
+
+    expect(await requestCancel(parentId)).toBe(true);
+
+    const parent = await terminalRow(parentId);
+    expect(parent.status).toBe("canceled");
+    expect(parent.outputRefs?.length).toBe(1);
+    const zipKey = parent.outputRefs?.[0] as string;
+
+    const frame = await terminalFrame(parentId);
+    expect(frame.status).toBe("completed");
+    const result = frame.result as { downloadUrl?: string; fileResults?: Record<string, string> };
+    expect(result.downloadUrl).toContain(`/api/v1/download/${parentId}/`);
+    expect(Object.keys(result.fileResults ?? {})).toEqual(["0"]);
+
+    const zip = new AdmZip(await getObjectBuffer(zipKey));
+    const names = zip.getEntries().map((e) => e.entryName);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^fast/);
+
+    for (const slow of [`${parentId}-f1`, `${parentId}-f2`]) {
+      const row = await terminalRow(slow);
+      expect(row.status).toBe("canceled");
+    }
+  });
+
+  it("a cancel that lands after every child finished completes normally", async () => {
+    const { parentId } = await enqueueBatchFlow(["fast-a.png", "fast-b.png"]);
+
+    await waitFor(async () => {
+      const a = await jobRow(`${parentId}-f0`);
+      const b = await jobRow(`${parentId}-f1`);
+      return a?.status === "completed" && b?.status === "completed" ? true : undefined;
+    });
+    await markBatchCanceled(parentId);
+
+    const parent = await terminalRow(parentId);
+    expect(parent.status).toBe("completed");
+    const frame = await terminalFrame(parentId);
+    expect(frame.status).toBe("completed");
+    const result = frame.result as { fileResults?: Record<string, string> };
+    expect(Object.keys(result.fileResults ?? {})).toEqual(["0", "1"]);
+  });
+
+  it("a full cancel before any child ran fails with the Canceled synthetic", async () => {
+    const parentId = randomUUID();
+    // Flag first so both children skip regardless of worker timing. The flow
+    // is enqueued afterwards with a fresh id, so reuse enqueueBatchFlow's
+    // internals inline with the pre-set flag.
+    const files = ["slow-x.png", "slow-y.png"];
+    const fileIndexMap = files.map((_, i) => i);
+    await db.insert(schema.jobs).values({
+      id: parentId,
+      type: "batch",
+      toolId: "wt-batch-cancel",
+      pool: "system",
+      status: "queued",
+      inputRefs: [],
+      settings: { flowChildCount: files.length, fileIndexMap },
+    });
+    await markBatchCanceled(parentId);
+
+    const children: FlowJob[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const childId = `${parentId}-f${i}`;
+      const key = `uploads/${childId}/${files[i]}`;
+      await putObject(key, Buffer.from(`payload-${i}`));
+      await db.insert(schema.jobs).values({
+        id: childId,
+        type: "batch-child",
+        toolId: "wt-batch-cancel",
+        pool: "image",
+        status: "queued",
+        inputRefs: [key],
+      });
+      children.push({
+        name: "wt-batch-cancel",
+        queueName: queueName("image"),
+        data: {
+          kind: "batch-child",
+          jobId: childId,
+          toolId: "wt-batch-cancel",
+          userId: null,
+          pool: "image",
+          parentId,
+          totalFiles: files.length,
+          fileIndex: i,
+          inputRefs: [key],
+          filename: files[i],
+          settings: {},
+        } satisfies ToolJobData,
+        opts: { jobId: childId, attempts: 1, ignoreDependencyOnFailure: true },
+      });
+    }
+    await getFlowProducer().add({
+      name: "batch-finalize",
+      queueName: queueName("system"),
+      data: {
+        kind: "batch-finalize",
+        jobId: parentId,
+        toolId: "wt-batch-cancel",
+        userId: null,
+        pool: "system",
+        totalFiles: files.length,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: files.length, fileIndexMap },
+      } satisfies ToolJobData,
+      opts: { jobId: parentId, attempts: 1 },
+      children,
+    });
+
+    const parent = await terminalRow(parentId);
+    expect(parent.status).toBe("canceled");
+    expect(parent.outputRefs ?? []).toEqual([]);
+
+    const frame = await terminalFrame(parentId);
+    expect(frame.status).toBe("failed");
+    const errors = frame.errors as Array<{ filename: string; error: string }>;
+    expect(errors[0]).toEqual({ filename: "", error: "Canceled" });
+
+    for (const childId of [`${parentId}-f0`, `${parentId}-f1`]) {
+      const row = await jobRow(childId);
+      expect(row?.status).toBe("canceled");
+    }
   });
 });

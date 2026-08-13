@@ -38,7 +38,7 @@ import {
 } from "@snapotter/shared";
 import archiver from "archiver";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
@@ -63,6 +63,7 @@ import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
+  cancelBatchJob,
   completeBatchJob,
   failBatchJob,
   failSingleJobGuarded,
@@ -82,7 +83,7 @@ import {
   runAiPathToolJob,
   runAiToolJob,
 } from "./ai-handlers.js";
-import { readBatchCounters, recordChildOutcome } from "./batch-progress.js";
+import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
@@ -988,6 +989,31 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const parentId = job.data.parentId ?? "";
   const totalFiles = job.data.totalFiles ?? 0;
+  // Cooperative batch cancel (#767): children queued behind the cancel do no
+  // work at all. Active children are aborted through the cancel channel and
+  // land in the catch below via processToolJob's own cancel handling. The
+  // guarded write cannot clobber a row another path already settled.
+  if (parentId && (await isBatchCanceled(parentId))) {
+    await db
+      .update(schema.jobs)
+      .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
+      .where(
+        and(
+          eq(schema.jobs.id, job.data.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    jobsTotal.inc({ pool: job.data.pool, status: "canceled" });
+    await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
+    return {
+      outputRefs: [],
+      filename: job.data.filename,
+      contentType: "",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: { failed: true, canceled: true, error: "Canceled" },
+    };
+  }
   try {
     const result = await processToolJob(job);
     await recordChildOutcome(parentId, totalFiles, job.data.filename);
@@ -1132,6 +1158,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     error?: string;
   }> = [];
 
+  let canceledChildren = 0;
   for (let i = 0; i < flowChildCount; i++) {
     const childId = `${data.jobId}-f${i}`;
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
@@ -1145,6 +1172,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       const outFilename = row.outputRefs[0].split("/").pop() ?? "output";
       manifest.push({ index: i, filename: outFilename, outputRef: row.outputRefs[0] });
     } else {
+      if (row.status === "canceled") canceledChildren++;
       const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
       const inputFilename = row.inputRefs?.[0]?.split("/").pop() ?? `file-${i}`;
       manifest.push({ index: i, filename: inputFilename, error: friendlyError(errorMsg) });
@@ -1166,6 +1194,30 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   const counters = await readBatchCounters(data.jobId);
   const failedFiles = Math.max(0, totalFiles - successEntries.length);
+
+  // Cancel requires both halves: the flag proves a cancel was requested, a
+  // canceled child proves it landed before the work finished. A flag with
+  // zero canceled children means every file completed first; that batch
+  // completes normally, matching a too-late cancel on a single run.
+  const canceled = canceledChildren > 0 && (await isBatchCanceled(data.jobId));
+
+  if (canceled && successEntries.length === 0) {
+    await cancelBatchJob({
+      jobId: data.jobId,
+      totalFiles,
+      completedFiles: totalFiles,
+      failedFiles,
+      errors: [{ filename: "", error: "Canceled" }, ...counters.errors],
+    });
+    return {
+      outputRefs: [],
+      filename: "",
+      contentType: "application/json",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: { manifest, canceled: true, allFailed: true },
+    };
+  }
 
   if (successEntries.length === 0) {
     await failBatchJob({
@@ -1223,16 +1275,29 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     processedSize: zipSize,
   };
 
-  await completeBatchJob({
-    jobId: data.jobId,
-    totalFiles,
-    completedFiles: totalFiles,
-    failedFiles,
-    errors: counters.errors,
-    outputRefs: [zipKey],
-    bytesOut: zipSize,
-    result,
-  });
+  if (canceled) {
+    await cancelBatchJob({
+      jobId: data.jobId,
+      totalFiles,
+      completedFiles: totalFiles,
+      failedFiles,
+      errors: counters.errors,
+      outputRefs: [zipKey],
+      bytesOut: zipSize,
+      result,
+    });
+  } else {
+    await completeBatchJob({
+      jobId: data.jobId,
+      totalFiles,
+      completedFiles: totalFiles,
+      failedFiles,
+      errors: counters.errors,
+      outputRefs: [zipKey],
+      bytesOut: zipSize,
+      result,
+    });
+  }
 
   return {
     outputRefs: [zipKey],
@@ -1242,6 +1307,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     processedSize: zipSize,
     resultPayload: {
       manifest,
+      ...(canceled ? { canceled: true } : {}),
       zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults },
     },
   };
