@@ -341,3 +341,42 @@ test.describe("@mobile iOS navigation", () => {
     expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(navBox.y + 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Camera capture (#172)
+// ---------------------------------------------------------------------------
+test.describe("@mobile Camera capture", () => {
+  test("image tools offer Take photo on touch devices", async ({ loggedInPage: page }) => {
+    await page.goto("/image/resize");
+    await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible();
+  });
+
+  test("tools that cannot use a photo do not offer the camera", async ({ loggedInPage: page }) => {
+    await page.goto("/pdf/merge-pdf");
+    await expect(page.getByRole("button", { name: "Upload from computer" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Take photo" })).toHaveCount(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch target sizes (#172): icon controls in the mobile header
+// ---------------------------------------------------------------------------
+test.describe("@mobile Touch target sizes", () => {
+  test("mobile header controls are at least 40px", async ({ loggedInPage: page }) => {
+    await page.goto("/image/resize");
+    await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible();
+
+    // Buttons plus aria-labelled icon links (back chevron, sponsor); plain
+    // breadcrumb text links are exempt (WCAG inline exception).
+    const controls = page.locator("header button, header a[aria-label]");
+    const count = await controls.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const box = await controls.nth(i).boundingBox();
+      expect(box, `header control ${i} has no box`).not.toBeNull();
+      if (!box) continue;
+      expect(box.width, `control ${i} width`).toBeGreaterThanOrEqual(39);
+      expect(box.height, `control ${i} height`).toBeGreaterThanOrEqual(39);
+    }
+  });
+});

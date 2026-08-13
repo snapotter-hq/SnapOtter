@@ -119,14 +119,16 @@ export async function uploadTestImage(page: Page): Promise<void> {
   const testImagePath = getTestImagePath();
 
   const fileChooserPromise = page.waitForEvent("filechooser");
-  // Prefer the explicit upload button; on some tool pages the first
-  // border-dashed element is a settings section, not the dropzone.
-  const uploadButton = page.getByRole("button", { name: /upload from computer/i }).first();
-  if (await uploadButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await uploadButton.click();
-  } else {
-    await page.locator("[class*='border-dashed']").first().click();
-  }
+  // click() auto-waits for the button. The old isVisible({ timeout }) check
+  // never waited (Playwright ignores that option and returns immediately), so
+  // calls made right after goto raced the first React render and fell into a
+  // border-dashed fallback that clicked the drag-only dropzone section, where
+  // no file chooser can ever open. Every upload flow renders this button, so
+  // waiting for it is always correct and the fallback is gone.
+  await page
+    .getByRole("button", { name: /upload from computer/i })
+    .first()
+    .click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(testImagePath);
 
