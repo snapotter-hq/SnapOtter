@@ -18,9 +18,16 @@ vi.mock("@/lib/api", () => ({
   parseApiError: (body: unknown) => (body as { error?: string } | null)?.error ?? "error",
 }));
 
+// Deterministic run ids. Tests that start a second run must queue a distinct
+// id, or run-identity guards degenerate into always-true comparisons.
+const generateIdMock = vi.hoisted(() => ({ queue: [] as string[] }));
+
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, generateId: () => "44444444-4444-4444-8444-444444444444" };
+  return {
+    ...actual,
+    generateId: () => generateIdMock.queue.shift() ?? "44444444-4444-4444-8444-444444444444",
+  };
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -412,6 +419,56 @@ describe("useToolProcessor batch cancel (#767)", () => {
     // failedFiles on the frame carries the outcome.
     await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
     expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+
+    hook.unmount();
+  });
+
+  it("a batch closure orphaned by the evidence timer cannot swallow a later single-run cancel", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: "Job not found" }),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Batch run degrades with no evidence and the 30s timer settles it.
+    const hook = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    vi.useRealTimers();
+
+    // A later single run degrades the same way; its cancel must settle
+    // immediately instead of being handed to the dead batch closure. The id
+    // must differ from the batch run's or the closure's identity guard
+    // cannot tell the runs apart.
+    generateIdMock.queue.push("55555555-5555-4555-8555-555555555555");
+    const file = new File([new ArrayBuffer(16)], "third.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    await act(async () => {
+      await hook.result.current.cancelCurrentJob();
+    });
+
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
 
     hook.unmount();
   });

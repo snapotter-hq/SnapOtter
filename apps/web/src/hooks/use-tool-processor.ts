@@ -122,11 +122,13 @@ export function useToolProcessor(toolId: string) {
   // Installed by processAllFiles so the SSE handler can settle a degraded
   // batch run from its terminal frame (#750) and the cancel path can record
   // intent or settle a run the server never saw (#767). Null outside batch
-  // runs.
+  // runs. cancelLocally reports whether it acted: a stale closure from an
+  // already-settled run refuses, and the caller must fall through to the
+  // single-run settle instead of treating the cancel as handled.
   const batchRunRef = useRef<{
     onTerminal: (frame: BatchProgressFrame) => void;
     markCanceled: () => void;
-    cancelLocally: () => void;
+    cancelLocally: () => boolean;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -190,6 +192,9 @@ export function useToolProcessor(toolId: string) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      // This teardown ends whatever run armed it; a batch closure left
+      // behind would swallow a later run's cancel-404 settle (#767).
+      batchRunRef.current = null;
       clearActiveJob();
       setError(
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
@@ -216,12 +221,10 @@ export function useToolProcessor(toolId: string) {
       // 30 seconds later.
       if (res.status === 404 && activeJobIdRef.current === jobId) {
         // A batch upload may still be in flight; its settle path also has to
-        // abort the XHR and tear down the run's own state (#767).
-        const batchRun = batchRunRef.current;
-        if (batchRun) {
-          batchRun.cancelLocally();
-          return;
-        }
+        // abort the XHR and tear down the run's own state (#767). A refusal
+        // means the closure belongs to an earlier run: fall through and
+        // settle the live run the single-run way.
+        if (batchRunRef.current?.cancelLocally()) return;
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -866,12 +869,13 @@ export function useToolProcessor(toolId: string) {
           canceledByUser = true;
         },
         cancelLocally: () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (activeJobIdRef.current !== clientJobId) return false;
           canceledByUser = true;
           // The upload may still be in flight; aborting it is what actually
           // stops ingress when no job row exists server-side yet.
           xhrRef.current?.abort();
           failRun("Canceled");
+          return true;
         },
         onTerminal: (frame) => {
           if (activeJobIdRef.current !== clientJobId) return;
