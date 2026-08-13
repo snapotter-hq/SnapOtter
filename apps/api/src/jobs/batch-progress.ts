@@ -71,6 +71,25 @@ export async function recordChildOutcome(
   });
 }
 
+const canceledKey = (parentId: string) => `${bullPrefix()}:batch:${parentId}:canceled`;
+
+/** Flag a batch as canceled (#767). Children consult the flag before doing
+ * any work; the TTL matches the outcome counters above. */
+export async function markBatchCanceled(parentId: string): Promise<void> {
+  await sharedRedis().setex(canceledKey(parentId), 3600, "1");
+}
+
+/** Whether a cooperative batch cancel was requested. A Redis read fault
+ * reports false: keep-working is the safe direction, and a Redis outage has
+ * already stopped the queues themselves. */
+export async function isBatchCanceled(parentId: string): Promise<boolean> {
+  try {
+    return (await sharedRedis().exists(canceledKey(parentId))) === 1;
+  } catch {
+    return false;
+  }
+}
+
 export interface BatchCounters {
   done: number;
   failed: number;
