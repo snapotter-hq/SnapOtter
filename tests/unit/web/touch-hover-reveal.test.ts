@@ -40,12 +40,16 @@ function isHoverOnlyReveal(line: string): boolean {
 describe("hover-revealed controls stay reachable on touch", () => {
   it("every group-hover reveal has a coarse-pointer or focus escape", () => {
     const offenders: string[] = [];
+    let scanned = 0;
     for (const file of walk(ROOT)) {
+      scanned++;
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {
         if (isHoverOnlyReveal(line)) offenders.push(`${file.slice(ROOT.length + 1)}:${i + 1}`);
       });
     }
+    // A relocated source tree must fail loudly, not pass on an empty walk.
+    expect(scanned).toBeGreaterThan(200);
     expect(
       offenders,
       `hover-only reveals without a touch escape:\n${offenders.join("\n")}`,

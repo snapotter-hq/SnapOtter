@@ -290,11 +290,11 @@ test.describe("GUI Watermark & Overlay Tools", () => {
   // ========================================================================
   // COMPOSE (Image Composition)
   //
-  // The compose page has two dashed-border elements: the overlay upload
-  // button in the settings sidebar and the main dropzone. The generic
-  // uploadTestImage helper picks the first border-dashed element (overlay
-  // button), so compose tests use the dropzone's aria-label and set
-  // overlay files directly on the hidden input.
+  // The compose page has two upload surfaces: the overlay upload button in
+  // the settings sidebar and the main dropzone. These tests target each one
+  // explicitly (dropzone via aria-label, overlay via its hidden input)
+  // instead of the generic uploadTestImage helper, which clicks the single
+  // "Upload from computer" button and would be ambiguous here.
   // ========================================================================
   test.describe("Compose", () => {
     async function uploadBaseImage(page: Page) {

@@ -37,4 +37,28 @@ describe("HintIcon", () => {
     fireEvent.blur(trigger);
     expect(isOpen(screen.getByText("hint", { selector: "span" }))).toBe(false);
   });
+
+  // iOS Safari never focuses (or blurs) buttons on tap, so outside-tap and
+  // Escape are the dismissal paths that actually exist on touch devices.
+  it("closes on pointerdown outside", () => {
+    render(<HintIcon text="hint" />);
+    fireEvent.click(screen.getByRole("button", { name: "hint" }));
+    fireEvent.pointerDown(document.body);
+    expect(isOpen(screen.getByText("hint", { selector: "span" }))).toBe(false);
+  });
+
+  it("stays open on pointerdown on the trigger itself", () => {
+    render(<HintIcon text="hint" />);
+    const trigger = screen.getByRole("button", { name: "hint" });
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(trigger);
+    expect(isOpen(screen.getByText("hint", { selector: "span" }))).toBe(true);
+  });
+
+  it("closes on Escape", () => {
+    render(<HintIcon text="hint" />);
+    fireEvent.click(screen.getByRole("button", { name: "hint" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(isOpen(screen.getByText("hint", { selector: "span" }))).toBe(false);
+  });
 });

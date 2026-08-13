@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,8 +10,29 @@ import { cn } from "@/lib/utils";
  */
 export function HintIcon({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  // Tap-to-open needs tap-elsewhere-to-close: the same iOS Safari behavior
+  // that motivates the toggle (no focus on tap) also means onBlur alone never
+  // fires there, stranding the tooltip open. Escape covers WCAG 1.4.13.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
-    <span className="relative group inline-flex">
+    <span ref={rootRef} className="relative group inline-flex">
       <button
         type="button"
         aria-label={text}

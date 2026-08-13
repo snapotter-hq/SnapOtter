@@ -123,6 +123,8 @@ export function Dropzone({
   const checkFile = fileFilter ?? (() => true);
   const resolvedAccept = expandAccept(accept);
   const isTouchDevice = useTouchDevice();
+  const unsupportedMessage =
+    acceptDescription || `This tool accepts ${accept || "the supported file types"}`;
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
@@ -176,10 +178,10 @@ export function Dropzone({
       if (validFiles.length > 0) {
         onFiles?.(validFiles);
       } else if (droppedFiles.length > 0) {
-        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
+        setError(unsupportedMessage);
       }
     },
-    [onFiles, checkFile, acceptDescription, accept],
+    [onFiles, checkFile, unsupportedMessage],
   );
 
   const handleClick = useCallback(() => {
@@ -194,11 +196,11 @@ export function Dropzone({
       if (validFiles.length > 0) {
         onFiles?.(validFiles);
       } else if (picked.length > 0) {
-        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
+        setError(unsupportedMessage);
       }
     };
     input.click();
-  }, [multiple, resolvedAccept, checkFile, onFiles, acceptDescription, accept]);
+  }, [multiple, resolvedAccept, checkFile, onFiles, unsupportedMessage]);
 
   const handleCameraClick = useCallback(() => {
     setError(null);
@@ -213,11 +215,11 @@ export function Dropzone({
       if (validFiles.length > 0) {
         onFiles?.(validFiles);
       } else if (picked.length > 0) {
-        setError(acceptDescription || `This tool accepts ${accept || "the supported file types"}`);
+        setError(unsupportedMessage);
       }
     };
     input.click();
-  }, [checkFile, onFiles, acceptDescription, accept]);
+  }, [checkFile, onFiles, unsupportedMessage]);
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
