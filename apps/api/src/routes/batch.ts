@@ -545,6 +545,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   outputRef?: string;
                   error?: string;
                 }>;
+                canceled?: boolean;
                 zip?: {
                   key: string;
                   filename: string;
@@ -556,11 +557,13 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           const zip = payload?.zip;
           if (!zip) {
-            // Every file failed; the finalize already published the terminal
-            // failed frame. Mirror it on the HTTP contract.
+            // No file produced output; the finalize already published the
+            // terminal frame. Mirror it on the HTTP contract. A fully
+            // canceled batch is not a processing failure; keep the message
+            // honest for API consumers that never see the SSE (#767).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             return reply.status(422).send({
-              error: "All files failed processing",
+              error: payload?.canceled ? "Batch canceled" : "All files failed processing",
               errors: [
                 ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
                 ...manifestFailures.map((f) => ({
