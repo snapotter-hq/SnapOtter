@@ -17,6 +17,29 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 
+// Injects a fault into the skip path's outcome recording so the fall-through
+// contract (a failing skip must not wedge the child) is testable.
+const cancelSkipFault = vi.hoisted(() => ({ parentId: null as string | null }));
+
+vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/jobs/batch-progress.js")>();
+  return {
+    ...actual,
+    recordChildOutcome: async (
+      parentId: string,
+      totalFiles: number,
+      filename: string,
+      error?: string,
+    ) => {
+      if (parentId === cancelSkipFault.parentId && error === "Canceled") {
+        throw new Error("injected outcome-recording outage");
+      }
+      return actual.recordChildOutcome(parentId, totalFiles, filename, error);
+    },
+  };
+});
+
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { runMigrations } = await import("../../../apps/api/src/db/migrate.js");
@@ -279,6 +302,15 @@ describe("requestCancel on a batch parent", () => {
     expect(await requestCancel(id)).toBe(false);
     expect(await isBatchCanceled(id)).toBe(false);
   });
+
+  it("returns false for an implicit batch row with no cooperative machinery", async () => {
+    // Custom batch sub-routes (pdf-to-image, svg-to-raster) get their rows
+    // from the progress persist layer: type batch, no settings, nothing
+    // reading the flag. Claiming canceled: true for them would be a lie.
+    const id = await seedParent({ toolId: null, settings: null });
+    expect(await requestCancel(id)).toBe(false);
+    expect(await isBatchCanceled(id)).toBe(false);
+  });
 });
 
 describe("cooperative child skip and canceled finalize", () => {
@@ -326,6 +358,54 @@ describe("cooperative child skip and canceled finalize", () => {
       (e) => JSON.parse(e) as { filename: string; error: string },
     );
     expect(errors).toEqual([{ filename: "skipme.png", error: "Canceled" }]);
+  });
+
+  it("a failing skip falls through to normal processing instead of wedging the child", async () => {
+    const parentId = randomUUID();
+    const childId = `${parentId}-f0`;
+    const key = `uploads/${childId}/fallthrough.png`;
+    await putObject(key, Buffer.from("payload"));
+    await db.insert(schema.jobs).values({
+      id: childId,
+      type: "batch-child",
+      toolId: "wt-batch-cancel",
+      pool: "image",
+      status: "queued",
+      inputRefs: [key],
+    });
+    await markBatchCanceled(parentId);
+    cancelSkipFault.parentId = parentId;
+
+    try {
+      await getQueue("image").add(
+        "wt-batch-cancel",
+        {
+          kind: "batch-child",
+          jobId: childId,
+          toolId: "wt-batch-cancel",
+          userId: null,
+          pool: "image",
+          parentId,
+          totalFiles: 1,
+          fileIndex: 0,
+          inputRefs: [key],
+          filename: "fallthrough.png",
+          settings: {},
+        } satisfies ToolJobData,
+        { jobId: childId, attempts: 1 },
+      );
+
+      // The injected fault hits the skip's outcome recording; the child must
+      // end terminal through normal processing (a too-late cancel), never
+      // stuck queued with a hard-failed job behind it.
+      const row = await terminalRow(childId);
+      expect(row.status).toBe("completed");
+      const base = `${bullPrefix()}:batch:${parentId}`;
+      expect(await sharedRedis().get(`${base}:done`)).toBe("1");
+      expect(await sharedRedis().get(`${base}:failed`)).toBeNull();
+    } finally {
+      cancelSkipFault.parentId = null;
+    }
   });
 
   it("cancel mid-batch commits a canceled row with a partial ZIP", async () => {

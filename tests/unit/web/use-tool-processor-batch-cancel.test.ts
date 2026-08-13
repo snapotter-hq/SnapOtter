@@ -367,7 +367,7 @@ describe("useToolProcessor batch cancel (#767)", () => {
     hook.unmount();
   });
 
-  it("a cancel that lost the race settles the full result without Canceled labels", async () => {
+  it("a cancel the server refused settles the full result as a plain completion", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.endsWith("/cancel")) {
         // Too late: the server found the batch already terminal.
@@ -415,10 +415,10 @@ describe("useToolProcessor batch cancel (#767)", () => {
     expect(useFileStore.getState().entries[1].error).toBeNull();
     expect(useFileStore.getState().error).toBeNull();
 
-    // Intent-based: the click is what batch_processed's "canceled" measures;
-    // failedFiles on the frame carries the outcome.
+    // The server said canceled: false, so nothing was canceled: the event
+    // reports the outcome, not the declined click.
     await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
-    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "completed" });
 
     hook.unmount();
   });
@@ -498,6 +498,7 @@ describe("useToolProcessor batch cancel (#767)", () => {
         [
           JSON.stringify({
             error: "Batch canceled",
+            canceled: true,
             errors: [
               { filename: "first.png", error: "Canceled" },
               { filename: "second.jpg", error: "Canceled" },
@@ -513,6 +514,52 @@ describe("useToolProcessor batch cancel (#767)", () => {
       expect(useFileStore.getState().processing).toBe(false);
     });
     expect(useFileStore.getState().error).toBe("Canceled");
+
+    hook.unmount();
+  });
+
+  it("keeps a genuine failure message when the cancel lost to a real all-failed outcome", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canceled: true }),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    await act(async () => {
+      await hook.result.current.cancelCurrentJob();
+    });
+
+    // Every file had already failed for real reasons before the cancel
+    // registered; the route reports the failure, not a cancellation.
+    act(() => {
+      xhrs[0].status = 422;
+      xhrs[0].response = new Blob(
+        [
+          JSON.stringify({
+            error: "All files failed processing",
+            errors: [
+              { filename: "first.png", error: "Invalid image" },
+              { filename: "second.jpg", error: "Invalid image" },
+            ],
+          }),
+        ],
+        { type: "application/json" },
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(useFileStore.getState().error).toBe("All files failed processing");
 
     hook.unmount();
   });

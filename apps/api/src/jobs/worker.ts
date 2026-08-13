@@ -993,26 +993,39 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
   // work at all. Active children are aborted through the cancel channel and
   // land in the catch below via processToolJob's own cancel handling. The
   // guarded write cannot clobber a row another path already settled.
-  if (parentId && (await isBatchCanceled(parentId))) {
-    await db
-      .update(schema.jobs)
-      .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
-      .where(
-        and(
-          eq(schema.jobs.id, job.data.jobId),
-          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
-        ),
+  if (parentId) {
+    try {
+      if (await isBatchCanceled(parentId)) {
+        await db
+          .update(schema.jobs)
+          .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
+          .where(
+            and(
+              eq(schema.jobs.id, job.data.jobId),
+              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+            ),
+          );
+        jobsTotal.inc({ pool: job.data.pool, status: "canceled" });
+        await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
+        return {
+          outputRefs: [],
+          filename: job.data.filename,
+          contentType: "",
+          originalSize: 0,
+          processedSize: 0,
+          resultPayload: { failed: true, canceled: true, error: "Canceled" },
+        };
+      }
+    } catch (err) {
+      // The skip must stay inside this function's no-throw contract: a hard
+      // failure here would leave the child row non-terminal forever
+      // (attempts: 1, and nothing else revisits it). Fall through and
+      // process normally instead; the file becomes a too-late cancel.
+      logger.warn(
+        { err, jobId: job.data.jobId, parentId },
+        "batch cancel skip failed; processing the child normally",
       );
-    jobsTotal.inc({ pool: job.data.pool, status: "canceled" });
-    await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
-    return {
-      outputRefs: [],
-      filename: job.data.filename,
-      contentType: "",
-      originalSize: 0,
-      processedSize: 0,
-      resultPayload: { failed: true, canceled: true, error: "Canceled" },
-    };
+    }
   }
   try {
     const result = await processToolJob(job);

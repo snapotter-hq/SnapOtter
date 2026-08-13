@@ -81,11 +81,14 @@ export async function markBatchCanceled(parentId: string): Promise<void> {
 
 /** Whether a cooperative batch cancel was requested. A Redis read fault
  * reports false: keep-working is the safe direction, and a Redis outage has
- * already stopped the queues themselves. */
+ * already stopped the queues themselves. The swallowed error is still
+ * logged, because at the finalize this read labels the terminal outcome and
+ * a silent false can commit "completed" for a canceled batch. */
 export async function isBatchCanceled(parentId: string): Promise<boolean> {
   try {
     return (await sharedRedis().exists(canceledKey(parentId))) === 1;
-  } catch {
+  } catch (err) {
+    console.error("batch cancel flag read failed", parentId, err);
     return false;
   }
 }

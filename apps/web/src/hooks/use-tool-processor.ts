@@ -207,14 +207,21 @@ export function useToolProcessor(toolId: string) {
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
-    // Record intent before the request: outcome labeling must not depend on
-    // the response racing the terminal frame (#767).
-    batchRunRef.current?.markCanceled();
     try {
       const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
         method: "POST",
         headers: formatHeaders(),
       });
+      // Record intent only once the server acknowledged the cancel: a failed
+      // or refused POST must not repaint the run's real outcome as canceled
+      // (#767). The ack always precedes the terminal frame (the finalize
+      // still has children to drain), so labeling cannot race it.
+      if (res.ok) {
+        const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
+        if (body?.canceled === true && activeJobIdRef.current === jobId) {
+          batchRunRef.current?.markCanceled();
+        }
+      }
       // 404 means no job exists server-side (possible in the degraded #722
       // state when the request tail never arrived). Nothing will ever emit a
       // frame, so settle locally as canceled instead of blaming the network
@@ -1006,8 +1013,14 @@ export function useToolProcessor(toolId: string) {
           }
           if (activeJobIdRef.current !== clientJobId) return;
           let errorMsg: string;
+          let serverCanceled = false;
           try {
             const body = JSON.parse(text);
+            // The route marks a fully canceled batch structurally; only that
+            // settles as a cancellation. A real failure after a cancel click
+            // (the cancel lost the race, a 500) keeps its own message
+            // instead of being repainted as "Canceled".
+            serverCanceled = (body as { canceled?: boolean } | null)?.canceled === true;
             const parsed = parseApiError(body, xhr.status);
             if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
               errorMsg = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
@@ -1025,10 +1038,9 @@ export function useToolProcessor(toolId: string) {
             }
             errorMsg = `Batch processing failed: ${xhr.status}`;
           }
-          // After a user cancel, the route's 422 ("Batch canceled" when
-          // nothing finished) settles as the cancellation it is, through the
-          // same message the i18n layer already maps.
-          failRun(canceledByUser ? "Canceled" : errorMsg);
+          // "Canceled" (not the route's message) so the existing i18n
+          // mapping renders it localized.
+          failRun(serverCanceled ? "Canceled" : errorMsg);
         })();
       };
 

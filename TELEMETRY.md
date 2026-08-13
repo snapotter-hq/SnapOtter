@@ -54,7 +54,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `tool_opened` | A tool page opens | `tool_id`, `category`, `modality` |
 | `file_added` | Files are added | `file_count` |
 | `tool_started` | Processing starts | `tool_id`, `is_batch`, `file_count` |
-| `batch_processed` | A batch run finishes | `tool_id`, `file_count`, `status` (`completed`, `failed`, or `canceled`; canceled is intent-based: the user clicked cancel, even if the batch finished first) |
+| `batch_processed` | A batch run finishes | `tool_id`, `file_count`, `status` (`completed`, `failed`, or `canceled`; canceled means the server acknowledged a cancel request during the run, even if every file had already finished) |
 | `result_downloaded` | A result is downloaded | `tool_id` |
 | `result_saved` | A result is saved to the library | `tool_id` |
 | `search` | A tool search runs | `results_count`, `clicked_tool_id` |

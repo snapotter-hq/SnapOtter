@@ -95,6 +95,12 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     // Pipeline-batch children are pipeline flows without a cooperative
     // check; a flag would report canceled while every step keeps running.
     if (row.toolId === "pipeline-batch") return false;
+    // Custom batch sub-routes (pdf-to-image, svg-to-raster) process inline
+    // and only publish progress frames; their rows are implicit inserts with
+    // no settings and nothing reads the flag. Claiming canceled: true for
+    // them would be a lie. Real batch parents write settings (with
+    // flowChildCount) at insert time, before the enqueue window.
+    if (!row.settings) return false;
     if (row.status === "completed" || row.status === "failed" || row.status === "canceled") {
       return false;
     }
@@ -102,7 +108,14 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     const flowChildCount =
       (row.settings as { flowChildCount?: number } | null)?.flowChildCount ?? 0;
     for (let i = 0; i < flowChildCount; i++) {
-      await sharedRedis().publish(CANCEL_CHANNEL(), `${jobId}-f${i}`);
+      // Best-effort accelerant for active children; the flag above is the
+      // durable mechanism, so one failed publish must not 500 a cancel that
+      // already committed.
+      await sharedRedis()
+        .publish(CANCEL_CHANNEL(), `${jobId}-f${i}`)
+        .catch((err) => {
+          console.error("batch child cancel publish failed", `${jobId}-f${i}`, err);
+        });
     }
     return true;
   }

@@ -564,6 +564,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             return reply.status(422).send({
               error: payload?.canceled ? "Batch canceled" : "All files failed processing",
+              // Structured so clients key on the outcome instead of matching
+              // the message string.
+              ...(payload?.canceled ? { canceled: true } : {}),
               errors: [
                 ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
                 ...manifestFailures.map((f) => ({
