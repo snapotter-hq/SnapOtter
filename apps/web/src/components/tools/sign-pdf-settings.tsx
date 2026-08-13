@@ -271,7 +271,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
                   deleteSignature(s.id);
                   refresh();
                 }}
-                className="absolute -end-1 -top-1 hidden h-4 w-4 rounded-full bg-destructive text-[10px] text-white group-hover:block"
+                className="absolute -end-1 -top-1 hidden h-4 w-4 rounded-full bg-destructive text-[10px] text-white group-hover:block pointer-coarse:block"
               >
                 ✕
               </button>

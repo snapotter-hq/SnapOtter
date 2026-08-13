@@ -21,16 +21,29 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
+// The reveal idiom comes in two shapes: opacity (`opacity-0` +
+// `group-hover:opacity-100`) and display (`hidden`/`invisible` +
+// `group-hover:block|flex|...`). Both need an escape.
+const DISPLAY_VALUES = "(?:block|flex|inline-flex|inline-grid|inline|grid|table|visible)";
+const HIDDEN_TOKEN = /(?:^|[\s"'`{])(?:hidden|invisible)(?:[\s"'`}]|$)/;
+const HOVER_DISPLAY = new RegExp(`group-hover:${DISPLAY_VALUES}`);
+const ESCAPES = new RegExp(
+  `(?:pointer-coarse|group-focus-within):(?:opacity-100|${DISPLAY_VALUES})`,
+);
+
+function isHoverOnlyReveal(line: string): boolean {
+  const opacityReveal = line.includes("opacity-0") && line.includes("group-hover:opacity-100");
+  const displayReveal = HIDDEN_TOKEN.test(line) && HOVER_DISPLAY.test(line);
+  return (opacityReveal || displayReveal) && !ESCAPES.test(line);
+}
+
 describe("hover-revealed controls stay reachable on touch", () => {
-  it("every opacity-0 group-hover reveal has a coarse-pointer or focus escape", () => {
+  it("every group-hover reveal has a coarse-pointer or focus escape", () => {
     const offenders: string[] = [];
     for (const file of walk(ROOT)) {
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {
-        if (!line.includes("opacity-0") || !line.includes("group-hover:opacity-100")) return;
-        if (line.includes("pointer-coarse:opacity-100")) return;
-        if (line.includes("group-focus-within:opacity-100")) return;
-        offenders.push(`${file.slice(ROOT.length + 1)}:${i + 1}`);
+        if (isHoverOnlyReveal(line)) offenders.push(`${file.slice(ROOT.length + 1)}:${i + 1}`);
       });
     }
     expect(
