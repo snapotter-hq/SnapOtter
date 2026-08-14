@@ -41,6 +41,22 @@ export const authAttempts = new Counter({
   registers: [registry],
 });
 
+// One increment per /ingest forward that failed to reach PostHog (issue #788).
+// `kind` is the closed set from classifyPostHogUpstreamError, so cardinality
+// stays bounded. A nonzero rate here means browser analytics is being dropped
+// between this instance and PostHog (egress firewalled, DNS broken, PostHog down).
+// Scope caveats: failures after the upstream started responding (mid-body death,
+// undici body timeout) surface on the response stream, not reply-from's onError,
+// and a connect failure racing a still-streaming request body can be settled by
+// the request-stream error path first, which skips onError. Both undercount
+// slightly; treat this as a floor, not an exact ledger.
+export const posthogProxyUpstreamErrors = new Counter({
+  name: "snapotter_posthog_proxy_upstream_errors_total",
+  help: "PostHog /ingest proxy forwards that failed to reach the upstream, by failure kind",
+  labelNames: ["kind"] as const,
+  registers: [registry],
+});
+
 export async function metricsText(): Promise<string> {
   const counts = await perPoolCounts();
   const lines: string[] = [
