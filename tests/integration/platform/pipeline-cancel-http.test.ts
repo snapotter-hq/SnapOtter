@@ -127,6 +127,27 @@ describe("route-stamped cancel metadata (#771)", () => {
     expect(flowSettings.clientJobId).toBe(clientJobId);
   });
 
+  it("re-stamps the alias pointer at the newest flow when a clientJobId is reused", async () => {
+    const clientJobId = randomUUID();
+    await runPipeline(clientJobId);
+    const first = await jobRow(clientJobId);
+    const firstFlow = ((first?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
+    expect(typeof firstFlow).toBe("string");
+
+    // Clear run 1's terminal frame so runPipeline waits on run 2's own.
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+    await runPipeline(clientJobId);
+
+    // The reused id must not 500, and its pointer must follow the newest
+    // flow so a cancel resolves the live run, not the finished one.
+    const reused = await jobRow(clientJobId);
+    const secondFlow = ((reused?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
+    expect(typeof secondFlow).toBe("string");
+    expect(secondFlow).not.toBe(firstFlow);
+    const flow = await jobRow(secondFlow as string);
+    expect(flow?.type).toBe("pipeline");
+  });
+
   it("stamps stepCount on the pipeline-batch parent", async () => {
     const clientJobId = randomUUID();
     const { body, contentType } = createMultipartPayload([

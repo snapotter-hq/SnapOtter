@@ -301,6 +301,100 @@ describe("usePipelineProcessor cancel (#771)", () => {
     hook.unmount();
   });
 
+  it("settles a canceled sync 422 structurally, not by matching the error string", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canceled: true }),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const hook = startSingleRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    // The canceled marker is the contract; the error text may drift.
+    act(() => {
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({
+        error: "Pipeline run was canceled",
+        completedSteps: [],
+        canceled: true,
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+
+    hook.unmount();
+  });
+
+  it("keeps the lookup-failure label when the cancel was refused", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith("/cancel")) {
+        // Too late: the server found the run already terminal.
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ canceled: false }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        blob: () => Promise.resolve(partialZipBlob()),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    // The refused click must not repaint a genuine lookup failure.
+    act(() => {
+      sendBatchFrame({
+        status: "completed",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 1,
+        errors: [{ filename: "second.jpg", error: "Processing failed" }],
+        result: {
+          jobId: JOB_ID,
+          downloadUrl: `/api/v1/download/${JOB_ID}/pipeline-batch-66666666.zip`,
+          zipFilename: "pipeline-batch-66666666.zip",
+          fileResults: PARTIAL_NAMES,
+          processedSize: PARTIAL_ZIP_BYTES.length,
+        },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("failed");
+    });
+    expect(useFileStore.getState().entries[1].error).toBe("File not found in batch results");
+
+    hook.unmount();
+  });
+
   it("labels files the cancel skipped when settling the partial ZIP from SSE", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.endsWith("/cancel")) {

@@ -627,8 +627,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // resolve the alias to the flow and the cancel route unable to
             // authorize the run's own starter. Insert-first also closes the
             // window where a cancel lands before the flow rows exist: the
-            // pointer is durable from the first moment the id is known. A
-            // reused id keeps the old lazy-create semantics.
+            // pointer is durable from the first moment the id is known. On a
+            // reused id the pointer and owner follow the newest flow, so a
+            // cancel resolves the live run instead of the finished one
+            // (frames were always latest-run-wins on a shared channel).
             await db
               .insert(schema.jobs)
               .values({
@@ -640,7 +642,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 inputRefs: [],
                 settings: { pipelineFlowId: jobId },
               })
-              .onConflictDoNothing();
+              .onConflictDoUpdate({
+                target: schema.jobs.id,
+                set: { userId, settings: { pipelineFlowId: jobId } },
+              });
 
             // Report initial progress. Awaited: this write settles the
             // client-facing row the SSE replays, which is the evidence a

@@ -58,6 +58,7 @@ const { eq } = await import("drizzle-orm");
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { runMigrations } = await import("../../../apps/api/src/db/migrate.js");
+const { markBatchCanceled } = await import("../../../apps/api/src/jobs/batch-progress.js");
 const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
@@ -556,6 +557,45 @@ describe("pipeline finalize", () => {
     expect(props.status).toBe("failed");
     expect(props.step_count).toBe(1);
     expect(props.tool_ids).toEqual([]);
+    expect(props.is_batch).toBe(false);
+    expect(props.file_count).toBe(1);
+  });
+
+  it("commits a canceled run and emits canceled analytics when a flagged step was canceled", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "canceled",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "Canceled" },
+    });
+    // Both halves of #770's too-late rule: the flag plus the canceled step.
+    await markBatchCanceled(jobId);
+
+    await enqueueToolJob(
+      toolJob({
+        jobId,
+        toolId: "pipeline",
+        kind: "pipeline-finalize",
+        totalSteps: 1,
+        filename: "chain.png",
+      }),
+    );
+
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.error?.message).toBe("Canceled");
+
+    const frame = await terminalFrame(jobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+
+    const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+    const props = events[0];
+    expect(props.status).toBe("canceled");
     expect(props.is_batch).toBe(false);
     expect(props.file_count).toBe(1);
   });

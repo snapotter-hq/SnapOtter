@@ -276,6 +276,40 @@ describe("durable single-file terminal progress", () => {
       error: "Completed result is no longer available. Run the job again.",
     });
   });
+
+  it("replays a canceled durable row as the failed Canceled terminal (#771)", () => {
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-canceled",
+        status: "canceled",
+        progress: { percent: 0 },
+        error: { message: "Canceled" },
+      }),
+    ).toEqual({
+      jobId: "single-canceled",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+    });
+  });
+
+  it("falls back to Canceled for a canceled row without a stored message", () => {
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-canceled-bare",
+        status: "canceled",
+        progress: {},
+        error: null,
+      }),
+    ).toEqual({
+      jobId: "single-canceled-bare",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+    });
+  });
 });
 
 describe("JobProgress type shape", () => {

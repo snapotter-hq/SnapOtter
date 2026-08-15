@@ -524,13 +524,20 @@ export function usePipelineProcessor() {
         } else {
           try {
             const body = JSON.parse(xhr.responseText);
-            const parsed = parseApiError(body, xhr.status);
-            if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              setError(
-                `The "${parsed.featureName}" feature is not installed. Enable it in Settings → AI Features.`,
-              );
+            // The route marks a canceled run structurally (#771); keying on
+            // the marker instead of the error text keeps the single and
+            // batch paths agreeing on what a cancel looks like.
+            if ((body as { canceled?: boolean } | null)?.canceled === true) {
+              setError("Canceled");
             } else {
-              setError(parsed as string);
+              const parsed = parseApiError(body, xhr.status);
+              if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
+                setError(
+                  `The "${parsed.featureName}" feature is not installed. Enable it in Settings → AI Features.`,
+                );
+              } else {
+                setError(parsed as string);
+              }
             }
           } catch {
             setError(`Processing failed: ${xhr.status}`);

@@ -890,7 +890,10 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   // cancel was requested, a canceled step proves it landed before the work
   // finished. A flag with zero canceled steps means every step completed
   // first; that pipeline completes normally, matching a too-late cancel on
-  // a single run. Intermediate step outputs are internal artifacts (a
+  // a single run. The flag's 1h TTL means a cancel on a pipeline that runs
+  // longer than that settles as a failure whose message still reads
+  // "Canceled": the same accepted tradeoff batch finalize inherited from
+  // #770. Intermediate step outputs are internal artifacts (a
   // half-processed frame is not a deliverable), so a canceled pipeline
   // returns nothing.
   const cancelScope = data.parentId ?? data.clientJobId ?? data.jobId;
@@ -1515,7 +1518,9 @@ export function startWorkers(): void {
       // SSE channel (clientJobId) and the authoritative flow row can differ,
       // so both get the guarded write; a committed completion is never
       // downgraded, and the frame is announced only for a transition this
-      // call owned.
+      // call owned. A finalize that dies inside its own cancel dual-write
+      // (#771) lands here too and gets labeled a failure; once that write
+      // threw, the net cannot know the run was canceled.
       if (data?.kind === "pipeline-finalize") {
         const netFail = (jobId: string) =>
           failSingleJobGuarded({ jobId, message: "Pipeline processing failed" }).catch((netErr) => {
