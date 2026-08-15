@@ -297,10 +297,29 @@ describe("requestCancel on a batch parent", () => {
     expect(await isBatchCanceled(id)).toBe(false);
   });
 
-  it("returns false for a pipeline-batch parent", async () => {
-    const id = await seedParent({ toolId: "pipeline-batch" });
-    expect(await requestCancel(id)).toBe(false);
-    expect(await isBatchCanceled(id)).toBe(false);
+  it("cancels a pipeline-batch parent cooperatively, publishing per-file step ids", async () => {
+    // #770 refused these (a flag would have claimed canceled while every
+    // step kept running); #771 gave steps the cooperative check, so the
+    // refusal flipped. The abortable jobs are the per-file pipeline steps,
+    // not the per-file finalizes.
+    const id = await seedParent({
+      toolId: "pipeline-batch",
+      settings: { flowChildCount: 2, stepCount: 2 },
+    });
+    const received: string[] = [];
+    const sub = createRedisSubscriberConnection();
+    await sub.subscribe(`${bullPrefix()}:cancel`);
+    sub.on("message", (_ch: string, msg: string) => received.push(msg));
+
+    try {
+      expect(await requestCancel(id)).toBe(true);
+      expect(await isBatchCanceled(id)).toBe(true);
+      await vi.waitFor(() => {
+        expect(received).toEqual([`${id}-f0-s0`, `${id}-f0-s1`, `${id}-f1-s0`, `${id}-f1-s1`]);
+      });
+    } finally {
+      await sub.quit();
+    }
   });
 
   it("returns false for an implicit batch row with no cooperative machinery", async () => {
