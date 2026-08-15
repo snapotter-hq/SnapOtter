@@ -106,6 +106,7 @@ function signedIndex(
     archiveSize?: number;
     target?: string;
     minimumMemoryBytes?: number | null;
+    licenseNotice?: string;
   } = {},
 ) {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
@@ -139,6 +140,7 @@ function signedIndex(
       qualities: ["balanced", "best"],
       providers: ["CPUExecutionProvider"],
     },
+    ...(options.licenseNotice ? { license: options.licenseNotice } : {}),
     ...(options.minimumMemoryBytes === null
       ? {}
       : { resources: { minimumMemoryBytes: options.minimumMemoryBytes ?? 4 * 1024 ** 3 } }),
@@ -158,6 +160,30 @@ function signedIndex(
   };
   return { artifact, index, raw: Buffer.from(canonicalRuntimeJson(index)), trustKey };
 }
+
+describe("canonicalRuntimeJson (#667)", () => {
+  it("escapes non-ASCII to match Python's json.dumps(ensure_ascii=True) signer form", () => {
+    // The signer (docker/build-ocr-runtime.sh) canonicalizes with
+    // json.dumps(ensure_ascii=True); the JS form must be byte-identical or the
+    // raw.equals and Ed25519 checks fail at install time on any non-ASCII char.
+    // Python: json.dumps({"x":"© 😀"}, sort_keys=True, separators=(",",":"))
+    //   -> {"x":"© 😀"}
+    expect(canonicalRuntimeJson({ x: "© 😀" })).toBe('{"x":"\\u00a9 \\ud83d\\ude00"}\n');
+  });
+
+  it("escapes U+007F (DEL), which ensure_ascii does but plain JSON.stringify leaves raw", () => {
+    expect(canonicalRuntimeJson({ k: String.fromCharCode(0x7f) })).toBe('{"k":"\\u007f"}\n');
+  });
+
+  it("leaves all-ASCII metadata byte-identical, so today's index still verifies", () => {
+    expect(canonicalRuntimeJson({ b: 2, a: "ok" })).toBe('{"a":"ok","b":2}\n');
+  });
+
+  it("emits pure-ASCII bytes so the verifier's ASCII gate accepts a signed non-ASCII index", () => {
+    const bytes = Buffer.from(canonicalRuntimeJson({ note: "café" }));
+    expect(bytes.some((byte) => byte > 0x7f)).toBe(false);
+  });
+});
 
 describe("remainingInstallerTimeoutMs", () => {
   it("floors a fractional remaining budget to the safe integer the installer requires", () => {
@@ -211,6 +237,17 @@ describe("verifyRuntimeIndex", () => {
       "22553579e29b27b75c9b6375d816f02483bd2e6f76f9ffcc9ae5311422410917",
     );
     expect(verified.minimumMemoryBytes).toBe(4 * 1024 ** 3);
+  });
+
+  it("verifies a signed index whose metadata contains non-ASCII, end to end (#667)", () => {
+    const fixture = signedIndex({ licenseNotice: "© 2026 Example Ø" });
+    // The signed bytes stay pure ASCII (the verifier's raw.some(byte > 0x7f) gate
+    // in runtime-index.ts) even though the license carries non-ASCII, because the
+    // canonical form escapes it. Before the fix the JS re-serialization diverged
+    // and this threw.
+    expect(fixture.raw.some((byte) => byte > 0x7f)).toBe(false);
+    const verified = verifyRuntimeIndex(fixture.raw, TARGET, [fixture.trustKey], "2.1.0");
+    expect((verified.artifact as { license?: string }).license).toBe("© 2026 Example Ø");
   });
 
   it("requires a signed positive safe minimum-memory policy", () => {

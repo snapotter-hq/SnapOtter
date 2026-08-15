@@ -43,7 +43,23 @@ function sortJson(value: unknown): unknown {
 
 /** Canonical representation shared with install_runtime.py and release signing. */
 export function canonicalRuntimeJson(value: unknown): string {
-  return `${JSON.stringify(sortJson(value))}\n`;
+  // Match Python's json.dumps(..., ensure_ascii=True), the form the signer and
+  // verifier use (docker/build-ocr-runtime.sh, docker/verify-ocr-runtime.sh):
+  // escape every UTF-16 code unit at or above 0x7f to \uXXXX (ensure_ascii
+  // escapes DEL too, which plain JSON.stringify leaves raw) so this re-serialization
+  // is byte-identical to the signed, ASCII-only index. Without it, one non-ASCII
+  // char (a model name, license, or source string) makes the raw.equals check
+  // and the Ed25519 verification fail at real install time even though the
+  // release workflow passes on today's all-ASCII metadata (#667). Escaping each
+  // UTF-16 code unit renders astral chars as surrogate pairs, exactly as
+  // ensure_ascii does. Structural JSON is ASCII, so only string contents change.
+  const json = JSON.stringify(sortJson(value));
+  let ascii = "";
+  for (let i = 0; i < json.length; i++) {
+    const code = json.charCodeAt(i);
+    ascii += code >= 0x7f ? `\\u${code.toString(16).padStart(4, "0")}` : json[i];
+  }
+  return `${ascii}\n`;
 }
 
 /** Resolve either the image-pinned release key or an operator-supplied trust store. */
