@@ -223,6 +223,45 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  it("does not let a second user take over an alias row by reusing its id", async () => {
+    const clientJobId = randomUUID();
+    await runPipeline(clientJobId);
+    const before = await jobRow(clientJobId);
+    const ownerBefore = before?.userId;
+    const pointerBefore = ((before?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
+    expect(ownerBefore).not.toBeNull();
+
+    // A second user submits their own pipeline under the first user's id.
+    // The run may proceed (colliding channels were always latest-run-wins),
+    // but the alias row's owner and pointer must survive: transferring them
+    // would hand the second user the row and strip the first user's own
+    // cancel authorization.
+    const attacker = await createUserAndLogin(app, `alias-reuse-${Date.now()}`);
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { "content-type": contentType, authorization: `Bearer ${attacker.token}` },
+      body,
+    });
+    expect([200, 202]).toContain(res.statusCode);
+    await waitForTerminalFrame(clientJobId);
+
+    const after = await jobRow(clientJobId);
+    expect(after?.userId).toBe(ownerBefore);
+    expect(((after?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId).toBe(
+      pointerBefore,
+    );
+  });
 });
 
 describe("sync responses for canceled runs", () => {

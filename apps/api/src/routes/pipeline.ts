@@ -628,9 +628,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // authorize the run's own starter. Insert-first also closes the
             // window where a cancel lands before the flow rows exist: the
             // pointer is durable from the first moment the id is known. On a
-            // reused id the pointer and owner follow the newest flow, so a
-            // cancel resolves the live run instead of the finished one
-            // (frames were always latest-run-wins on a shared channel).
+            // reused id the pointer follows the newest flow, so a cancel
+            // resolves the live run instead of the finished one, but ONLY
+            // for the row's own user (setWhere): re-pointing a row someone
+            // else owns would transfer it and strip their cancel
+            // authorization. A foreign or pre-#771 ownerless row is left
+            // alone, the old lazy-create semantics, with no 409 so the
+            // response cannot become an id-existence oracle.
             await db
               .insert(schema.jobs)
               .values({
@@ -644,7 +648,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               })
               .onConflictDoUpdate({
                 target: schema.jobs.id,
-                set: { userId, settings: { pipelineFlowId: jobId } },
+                set: { settings: { pipelineFlowId: jobId } },
+                setWhere: eq(schema.jobs.userId, userId),
               });
 
             // Report initial progress. Awaited: this write settles the
