@@ -191,6 +191,9 @@ function buildPipelineFlowTree(opts: {
   // forever and no terminal frame ever reaches the client. With it, the
   // parent step runs, sees the predecessor has no output, and propagates a
   // clean failure up to the finalize (#766).
+  // Steps carry parentId (#771): pipeline-batch steps key their cooperative
+  // cancel check on the batch parent; single-run steps key it on
+  // clientJobId instead.
   let currentNode: FlowJob = {
     name: parsedSteps[0].resolvedToolId,
     queueName: queueName(parsedSteps[0].pool),
@@ -204,6 +207,7 @@ function buildPipelineFlowTree(opts: {
       totalSteps,
       prevJobId: undefined,
       clientJobId,
+      parentId,
       inputRefs: [uploadKey],
       filename,
       settings: parsedSteps[0].parsedSettings,
@@ -226,6 +230,7 @@ function buildPipelineFlowTree(opts: {
         totalSteps,
         prevJobId: stepJobIds[i - 1],
         clientJobId,
+        parentId,
         inputRefs: [],
         filename,
         settings: parsedSteps[i].parsedSettings,
@@ -609,12 +614,39 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             await putObject(uploadKey, processBuffer);
           }
 
-          // Report initial progress. Awaited: this insert creates the
-          // client-facing row the SSE replays, which is the evidence a
-          // degraded client's fresh connection relies on (#766). Dropped
-          // fire-and-forget, a failed insert would fabricate "the server
-          // never confirmed the job" for a flow that is queued and fine.
+          // Derive the pipeline's pool from the first step's modality so the
+          // finalize job and parent row land on the correct queue.
+          const firstModality =
+            TOOLS.find((t) => t.id === parsedSteps[0].resolvedToolId)?.modality ?? "image";
+          const pipelinePool: Pool = MODALITY_POOL[firstModality];
+
           if (clientJobId) {
+            // Pre-insert the client-facing alias row with the flow pointer
+            // and owner (#771). The progress persist layer would otherwise
+            // create it lazily with neither, leaving requestCancel unable to
+            // resolve the alias to the flow and the cancel route unable to
+            // authorize the run's own starter. Insert-first also closes the
+            // window where a cancel lands before the flow rows exist: the
+            // pointer is durable from the first moment the id is known. A
+            // reused id keeps the old lazy-create semantics.
+            await db
+              .insert(schema.jobs)
+              .values({
+                id: clientJobId,
+                userId,
+                pool: pipelinePool,
+                type: "single",
+                status: "queued",
+                inputRefs: [],
+                settings: { pipelineFlowId: jobId },
+              })
+              .onConflictDoNothing();
+
+            // Report initial progress. Awaited: this write settles the
+            // client-facing row the SSE replays, which is the evidence a
+            // degraded client's fresh connection relies on (#766). Dropped
+            // fire-and-forget, a failed write would fabricate "the server
+            // never confirmed the job" for a flow that is queued and fine.
             await updateSingleFileProgress({
               jobId: clientJobId,
               phase: "processing",
@@ -622,12 +654,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               stage: "Preparing pipeline...",
             });
           }
-
-          // Derive the pipeline's pool from the first step's modality so the
-          // finalize job and parent row land on the correct queue.
-          const firstModality =
-            TOOLS.find((t) => t.id === parsedSteps[0].resolvedToolId)?.modality ?? "image";
-          const pipelinePool: Pool = MODALITY_POOL[firstModality];
 
           // Build the nested FlowJob tree
           const { tree, stepJobIds } = buildPipelineFlowTree({
@@ -665,7 +691,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             type: "pipeline",
             status: "queued",
             inputRefs: [],
-            settings: {},
+            // Cancel metadata (#771): requestCancel keys the cooperative
+            // flag by clientJobId (the id the steps carry) and publishes
+            // stepCount step ids for the active abort.
+            settings: { stepCount: parsedSteps.length, clientJobId: clientJobId ?? jobId },
           });
 
           // Inject OTel trace context into every node of the flow tree
@@ -686,11 +715,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
             }
 
-            // Check for step failure reported by the finalize handler
+            // Check for step failure reported by the finalize handler. A
+            // canceled run keeps the same 422 shape plus the structural
+            // marker the web client settles on (#771), mirroring batch.ts.
             if (result.resultPayload?.error) {
               return reply.status(422).send({
                 error: result.resultPayload.error as string,
                 completedSteps: result.resultPayload.steps,
+                ...(result.resultPayload.canceled === true ? { canceled: true } : {}),
               });
             }
 
@@ -1094,7 +1126,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             type: "batch",
             status: "queued",
             inputRefs: [],
-            settings: { flowChildCount: 0 },
+            // stepCount from the first write (#771): a cancel landing while
+            // files are still validating resolves through this row.
+            settings: { flowChildCount: 0, stepCount: parsedSteps.length },
           });
 
           // Emit initial batch progress
@@ -1339,7 +1373,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Update the parent row with the final flow child count
           await db
             .update(schema.jobs)
-            .set({ settings: { flowChildCount: perFileChildren.length, fileIndexMap } })
+            .set({
+              settings: {
+                flowChildCount: perFileChildren.length,
+                fileIndexMap,
+                stepCount: parsedSteps.length,
+              },
+            })
             .where(eq(schema.jobs.id, parentId));
 
           // Inject OTel trace context into every node of the batch flow tree
@@ -1366,6 +1406,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   outputRef?: string;
                   error?: string;
                 }>;
+                canceled?: boolean;
                 zip?: {
                   key: string;
                   filename: string;
@@ -1377,11 +1418,15 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           const zip = payload?.zip;
           if (!zip) {
-            // Every file failed; the finalize already published the terminal
-            // failed frame. Mirror it on the HTTP contract.
+            // Every file failed (or a full cancel kept anything from
+            // finishing); the finalize already published the terminal frame.
+            // Mirror it on the HTTP contract: a canceled batch is not a
+            // processing failure, and the structural marker is what the web
+            // client settles on instead of string-matching (#771, mirroring
+            // batch.ts).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             return reply.status(422).send({
-              error: "All files failed processing",
+              error: payload?.canceled ? "Batch canceled" : "All files failed processing",
               errors: [
                 ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
                 ...manifestFailures.map((f) => ({
@@ -1389,6 +1434,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   error: f.error ?? "Failed",
                 })),
               ],
+              ...(payload?.canceled ? { canceled: true } : {}),
             });
           }
 
