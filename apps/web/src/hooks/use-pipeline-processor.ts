@@ -54,8 +54,16 @@ const JOB_EVIDENCE_TIMEOUT_MS = 30_000;
  * result; the batch frame carries the durable ZIP's download URL).
  */
 export function usePipelineProcessor() {
-  const { processing, error, processedUrl, originalSize, processedSize, setProcessing, setError } =
-    useFileStore();
+  const {
+    processing,
+    error,
+    processedUrl,
+    originalSize,
+    processedSize,
+    setProcessing,
+    setError,
+    setActiveJob,
+  } = useFileStore();
 
   const [progress, setProgress] = useState<PipelineProgress>(IDLE_PROGRESS);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,6 +75,10 @@ export function usePipelineProcessor() {
   const activeEntryIndexRef = useRef<number | null>(null);
   const asyncModeRef = useRef(false);
   const sawJobEvidenceRef = useRef(false);
+  // Set on the user's cancel click once the server acknowledged it (#771).
+  // Drives batch labeling: files missing from a partial result read
+  // "Canceled" instead of a lookup failure. Reset at every run start.
+  const canceledByUserRef = useRef(false);
   // Installed by processAll so the SSE handler can settle a degraded batch
   // run from its terminal frame. Null outside batch runs.
   const batchRunRef = useRef<{ onTerminal: (frame: BatchProgressFrame) => void } | null>(null);
@@ -86,6 +98,12 @@ export function usePipelineProcessor() {
     },
     [],
   );
+
+  const clearActiveJob = useCallback(() => {
+    activeJobIdRef.current = null;
+    activeEntryIndexRef.current = null;
+    setActiveJob(null, null);
+  }, [setActiveJob]);
 
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) {
@@ -121,7 +139,7 @@ export function usePipelineProcessor() {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      activeJobIdRef.current = null;
+      clearActiveJob();
       batchRunRef.current = null;
       setError(
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
@@ -129,7 +147,50 @@ export function usePipelineProcessor() {
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
     }, JOB_EVIDENCE_TIMEOUT_MS);
-  }, [clearJobEvidenceTimer, clearStallTimer, setError, setProcessing]);
+  }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
+
+  // The pipeline twin of use-tool-processor's cancelCurrentJob (#771): POST
+  // the cancel under the run's client-facing id, record intent only once the
+  // server acknowledged it, and settle locally when the server never saw the
+  // job at all (the degraded #722 state: nothing will ever emit a frame).
+  const cancelCurrentJob = useCallback(async () => {
+    const jobId = activeJobIdRef.current;
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
+        method: "POST",
+        headers: formatHeaders(),
+      });
+      // Record intent only on an acknowledged cancel: a failed or refused
+      // POST must not repaint the run's real outcome as canceled (#767).
+      if (res.ok) {
+        const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
+        if (body?.canceled === true && activeJobIdRef.current === jobId) {
+          canceledByUserRef.current = true;
+        }
+      }
+      // 404 means no job exists server-side. Nothing will ever emit a
+      // frame, so settle locally as canceled instead of blaming the network
+      // 30 seconds later.
+      if (res.status === 404 && activeJobIdRef.current === jobId) {
+        xhrRef.current?.abort();
+        clearJobEvidenceTimer();
+        clearStallTimer();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        batchRunRef.current = null;
+        clearActiveJob();
+        setError("Canceled");
+        setProcessing(false);
+        setProgress(IDLE_PROGRESS);
+      }
+    } catch {
+      // Cancel request failed; the SSE handler owns cleanup
+    }
+  }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -199,7 +260,7 @@ export function usePipelineProcessor() {
                 // leaving the run in silent limbo.
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
-                activeJobIdRef.current = null;
+                clearActiveJob();
                 setError("Processing was interrupted. Retry when reconnected.");
                 setProcessing(false);
                 setProgress(IDLE_PROGRESS);
@@ -233,8 +294,7 @@ export function usePipelineProcessor() {
                 processedSize: result.processedSize,
                 ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
               });
-              activeJobIdRef.current = null;
-              activeEntryIndexRef.current = null;
+              clearActiveJob();
               batchRunRef.current = null;
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -247,8 +307,7 @@ export function usePipelineProcessor() {
               es.close();
               eventSourceRef.current = null;
               xhrRef.current?.abort();
-              activeJobIdRef.current = null;
-              activeEntryIndexRef.current = null;
+              clearActiveJob();
               batchRunRef.current = null;
               setError(data.error || "Processing failed");
               setProcessing(false);
@@ -282,7 +341,14 @@ export function usePipelineProcessor() {
         // EventSource creation failed
       }
     },
-    [clearStallTimer, clearJobEvidenceTimer, resetStallTimer, setError, setProcessing],
+    [
+      clearStallTimer,
+      clearJobEvidenceTimer,
+      clearActiveJob,
+      resetStallTimer,
+      setError,
+      setProcessing,
+    ],
   );
 
   useEffect(() => {
@@ -331,6 +397,7 @@ export function usePipelineProcessor() {
       clearJobEvidenceTimer();
       sawJobEvidenceRef.current = false;
       asyncModeRef.current = false;
+      canceledByUserRef.current = false;
       batchRunRef.current = null;
 
       const startTime = Date.now();
@@ -344,6 +411,9 @@ export function usePipelineProcessor() {
       const clientJobId = generateId();
       activeJobIdRef.current = clientJobId;
       activeEntryIndexRef.current = capturedIndex;
+      // Arm the ProgressCard cancel button for the whole run (#771); every
+      // settle path disarms it through clearActiveJob.
+      setActiveJob(clientJobId, cancelCurrentJob);
 
       // Open SSE for real-time progress from the server
       reconnectSSE(true);
@@ -469,8 +539,7 @@ export function usePipelineProcessor() {
 
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
-        activeEntryIndexRef.current = null;
+        clearActiveJob();
       };
 
       xhr.onerror = () => {
@@ -487,8 +556,7 @@ export function usePipelineProcessor() {
         setError("Processing was interrupted. Retry when reconnected.");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
-        activeEntryIndexRef.current = null;
+        clearActiveJob();
       };
 
       xhr.ontimeout = () => {
@@ -503,8 +571,7 @@ export function usePipelineProcessor() {
         setError("Request timed out - the server may be overloaded. Try again.");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
-        activeJobIdRef.current = null;
-        activeEntryIndexRef.current = null;
+        clearActiveJob();
       };
 
       xhr.open("POST", "/api/v1/pipeline/execute");
@@ -516,6 +583,9 @@ export function usePipelineProcessor() {
     [
       setProcessing,
       setError,
+      setActiveJob,
+      cancelCurrentJob,
+      clearActiveJob,
       clearJobEvidenceTimer,
       clearStallTimer,
       reconnectSSE,
@@ -544,6 +614,7 @@ export function usePipelineProcessor() {
       clearJobEvidenceTimer();
       sawJobEvidenceRef.current = false;
       asyncModeRef.current = false;
+      canceledByUserRef.current = false;
 
       const startTime = Date.now();
       elapsedRef.current = setInterval(() => {
@@ -553,6 +624,8 @@ export function usePipelineProcessor() {
       const clientJobId = generateId();
       activeJobIdRef.current = clientJobId;
       activeEntryIndexRef.current = null;
+      // Arm the ProgressCard cancel button for the whole run (#771).
+      setActiveJob(clientJobId, cancelCurrentJob);
 
       // Tear down the run without touching the outcome state; callers set
       // the result or error first.
@@ -565,7 +638,7 @@ export function usePipelineProcessor() {
           eventSourceRef.current = null;
         }
         batchRunRef.current = null;
-        activeJobIdRef.current = null;
+        clearActiveJob();
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
       };
@@ -596,7 +669,12 @@ export function usePipelineProcessor() {
               error: null,
             });
           } else {
-            updateEntry(i, { status: "failed", error: "File not found in batch results" });
+            // After a user cancel, a missing result is the cancel doing its
+            // job, not a lookup failure (#771).
+            updateEntry(i, {
+              status: "failed",
+              error: canceledByUserRef.current ? "Canceled" : "File not found in batch results",
+            });
           }
         }
 
@@ -766,6 +844,12 @@ export function usePipelineProcessor() {
           let errorMsg: string;
           try {
             const body = JSON.parse(text);
+            // The route marks a canceled batch structurally (#771); the
+            // per-file error list would otherwise read as a failure report.
+            if ((body as { canceled?: boolean } | null)?.canceled === true) {
+              failRun("Canceled");
+              return;
+            }
             if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
               // Show the first file's step-level error (all files typically fail at the same step)
               const first = body.errors[0];
@@ -818,6 +902,9 @@ export function usePipelineProcessor() {
       processSingle,
       setProcessing,
       setError,
+      setActiveJob,
+      cancelCurrentJob,
+      clearActiveJob,
       clearJobEvidenceTimer,
       clearStallTimer,
       reconnectSSE,
@@ -830,6 +917,7 @@ export function usePipelineProcessor() {
   return {
     processSingle,
     processAll,
+    cancelCurrentJob,
     processing,
     error,
     downloadUrl: processedUrl,
