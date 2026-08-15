@@ -64,6 +64,7 @@ import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
   cancelBatchJob,
+  cancelSingleJobGuarded,
   completeBatchJob,
   failBatchJob,
   failSingleJobGuarded,
@@ -658,6 +659,45 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
 
+  // Cooperative pipeline cancel (#771): steps queued behind the cancel do
+  // no work at all. The scope key is the batch parent for pipeline-batch
+  // steps and the client-facing id for single runs (data.clientJobId is
+  // clientJobId ?? flowId, the same key requestCancel flags). Active steps
+  // are aborted over the cancel channel instead and land in the catch below
+  // via processToolJob's own cancel handling. A fault here must fall through
+  // to normal processing, not wedge the row (attempts: 1, and nothing else
+  // revisits it); the run then finishes as a too-late cancel.
+  const cancelScope = data.parentId ?? data.clientJobId;
+  if (cancelScope) {
+    try {
+      if (await isBatchCanceled(cancelScope)) {
+        await db
+          .update(schema.jobs)
+          .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
+          .where(
+            and(
+              eq(schema.jobs.id, data.jobId),
+              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+            ),
+          );
+        jobsTotal.inc({ pool: data.pool, status: "canceled" });
+        return {
+          outputRefs: [],
+          filename: data.filename,
+          contentType: "",
+          originalSize: 0,
+          processedSize: 0,
+          resultPayload: { failed: true, canceled: true, error: "Canceled" },
+        };
+      }
+    } catch (err) {
+      logger.warn(
+        { err, jobId: data.jobId, cancelScope },
+        "pipeline cancel skip failed; processing the step normally",
+      );
+    }
+  }
+
   // Resolve inputRefs at run time: step 0 already has them from the
   // route; later steps read the previous step's output from the DB.
   if (data.stepIndex !== undefined && data.stepIndex > 0 && data.prevJobId) {
@@ -784,7 +824,7 @@ export function pipelineExecutedProps(
   totalSteps: number,
   toolIds: string[],
   durationMs: number,
-  status: "completed" | "failed",
+  status: "completed" | "failed" | "canceled",
 ) {
   // `satisfies` (not a return-type annotation) validates the shape against
   // PipelineExecutedProperties while keeping the inferred anonymous type, which
@@ -810,6 +850,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   let lastOutputRef = "";
   let lastBytesOut = 0;
   let failedAtStep: number | null = null;
+  let failedStepCanceled = false;
   let failError = "";
 
   for (let i = 0; i < totalSteps; i++) {
@@ -824,6 +865,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
     if (row.status !== "completed") {
       failedAtStep = i;
+      failedStepCanceled = row.status === "canceled";
       failError = (row.error as { message?: string } | null)?.message ?? `Step ${i + 1} failed`;
       break;
     }
@@ -842,6 +884,58 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   }
 
   const progressJobId = data.clientJobId ?? data.jobId;
+
+  // ── Cancel path (#771) ──────────────────────────────────────
+  // Cancel requires both halves (#770's too-late rule): the flag proves a
+  // cancel was requested, a canceled step proves it landed before the work
+  // finished. A flag with zero canceled steps means every step completed
+  // first; that pipeline completes normally, matching a too-late cancel on
+  // a single run. Intermediate step outputs are internal artifacts (a
+  // half-processed frame is not a deliverable), so a canceled pipeline
+  // returns nothing.
+  const cancelScope = data.parentId ?? data.clientJobId ?? data.jobId;
+  const canceled =
+    failedAtStep !== null && failedStepCanceled && (await isBatchCanceled(cancelScope));
+
+  if (canceled) {
+    // Guarded dual write (#766): the SSE channel (clientJobId) and the
+    // authoritative flow row can differ; both must settle canceled or a
+    // reconnecting client replays a live row forever.
+    await cancelSingleJobGuarded({ jobId: data.jobId });
+    if (progressJobId !== data.jobId) {
+      await cancelSingleJobGuarded({ jobId: progressJobId });
+    }
+
+    // Batch progress (pipeline-batch only): the canceled file counts like a
+    // failed one; batch-finalize turns the canceled rows into #767's
+    // partial-ZIP semantics.
+    if (data.parentId && data.totalFiles !== undefined) {
+      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, "Canceled");
+    }
+
+    if (analyticsEnabled()) {
+      void trackEvent(
+        ANALYTICS_EVENTS.PIPELINE_EXECUTED,
+        pipelineExecutedProps(
+          data,
+          totalSteps,
+          steps.map((s) => s.toolId),
+          Date.now() - startTime,
+          "canceled",
+        ),
+        data.analyticsDistinctId,
+      );
+    }
+
+    return {
+      outputRefs: [],
+      filename: data.filename,
+      contentType: "",
+      originalSize: firstBytesIn,
+      processedSize: 0,
+      resultPayload: { error: "Canceled", canceled: true, stepsCompleted: steps.length, steps },
+    };
+  }
 
   // ── Failure path ────────────────────────────────────────────
   if (failedAtStep !== null) {

@@ -634,6 +634,47 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
   if (applied) announce(frame);
 }
 
+export interface CancelSingleJobArgs {
+  jobId: string;
+}
+
+/**
+ * Terminal single-run cancellation (#771), failSingleJobGuarded's sibling.
+ * The authoritative row becomes "canceled"; the announced frame reuses the
+ * failed-with-"Canceled" wire vocabulary the worker's single-run cancel path
+ * already speaks, so clients need no new terminal type. Used by the pipeline
+ * finalize, where the SSE channel id (clientJobId) and the authoritative
+ * flow row can differ; call it per row id.
+ */
+export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise<void> {
+  const frame: SingleFileProgress = {
+    jobId: args.jobId,
+    type: "single",
+    phase: "failed",
+    percent: 0,
+    error: "Canceled",
+  };
+  let applied = false;
+  await enqueuePersist(args.jobId, async () => {
+    const res = await db
+      .update(schema.jobs)
+      .set({
+        status: "canceled",
+        completedAt: new Date(),
+        progress: { percent: 0 },
+        error: { message: "Canceled" },
+      })
+      .where(
+        and(
+          eq(schema.jobs.id, args.jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+        ),
+      );
+    applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
+  });
+  if (applied) announce(frame);
+}
+
 /**
  * Publish a progress event to Redis pub/sub and set the terminal replay
  * key, but do NOT persist to the durable DB row. Used by the worker's

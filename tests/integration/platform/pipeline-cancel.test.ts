@@ -19,9 +19,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 
-// Injects a fault into the step skip's flag read so the fall-through
-// contract (a failing skip must not wedge the step) is testable.
-const flagReadFault = vi.hoisted(() => ({ scope: null as string | null }));
+// Injects a bounded fault into the step skip's flag read so the fall-through
+// contract (a failing skip must not wedge the step) is testable. Bounded by
+// `remaining` so the finalize's own flag read behind the same scope runs
+// against the real implementation.
+const flagReadFault = vi.hoisted(() => ({ scope: null as string | null, remaining: 0 }));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
   const actual =
@@ -29,7 +31,8 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
   return {
     ...actual,
     isBatchCanceled: async (parentId: string) => {
-      if (parentId === flagReadFault.scope) {
+      if (parentId === flagReadFault.scope && flagReadFault.remaining > 0) {
+        flagReadFault.remaining--;
         throw new Error("injected flag-read outage");
       }
       return actual.isBatchCanceled(parentId);
@@ -183,18 +186,23 @@ interface PipelineFlowOpts {
 async function enqueuePipelineFlow(
   opts: PipelineFlowOpts,
 ): Promise<{ flowId: string; stepIds: string[] }> {
-  const flowId = opts.parentId ? `${opts.parentId}-f0` : randomUUID();
-  return enqueuePipelineFlowAt(flowId, opts);
+  const flowId = randomUUID();
+  const built = await buildPipelineFlow(flowId, opts);
+  await opts.beforeEnqueue?.(flowId);
+  if (!opts.skipEnqueue) await getFlowProducer().add(built.tree);
+  return { flowId, stepIds: built.stepIds };
 }
 
-async function enqueuePipelineFlowAt(
+async function buildPipelineFlow(
   flowId: string,
   opts: PipelineFlowOpts,
-): Promise<{ flowId: string; stepIds: string[] }> {
+): Promise<{ tree: FlowJob; stepIds: string[] }> {
   const filename = opts.filename ?? "input.png";
   const totalSteps = opts.steps.length;
   const stepIds = opts.steps.map((_, i) => `${flowId}-s${i}`);
-  const progressId = opts.clientJobId ?? flowId;
+  // Batch per-file trees carry no clientJobId (the batch channel is the
+  // parent id); single runs always carry the client-facing id.
+  const progressId = opts.parentId ? undefined : (opts.clientJobId ?? flowId);
   const uploadKey = `uploads/${flowId}-s0/${filename}`;
   await putObject(uploadKey, Buffer.from("payload"));
 
@@ -227,7 +235,9 @@ async function enqueuePipelineFlowAt(
     pool: "image",
     status: "queued",
     inputRefs: [],
-    settings: { stepCount: totalSteps, clientJobId: progressId },
+    // Cancel metadata is stamped on single-run flow rows only; per-file
+    // rows of a batch resolve through the parent instead.
+    settings: opts.parentId ? {} : { stepCount: totalSteps, clientJobId: progressId },
   });
 
   let node: FlowJob = {
@@ -299,9 +309,68 @@ async function enqueuePipelineFlowAt(
     children: [node],
   };
 
-  await opts.beforeEnqueue?.(flowId);
-  if (!opts.skipEnqueue) await getFlowProducer().add(tree);
-  return { flowId, stepIds };
+  return { tree, stepIds };
+}
+
+/**
+ * Insert the parent row and per-file pipeline chains and enqueue the batch
+ * flow exactly the way routes/pipeline.ts builds it: per-file trees as
+ * children of one batch-finalize parent on the system queue, the parent row
+ * carrying {flowChildCount, fileIndexMap, stepCount}.
+ */
+async function enqueuePipelineBatch(opts: {
+  files: Array<{ steps: StepSettings[]; filename: string }>;
+  beforeEnqueue?: (parentId: string) => Promise<void>;
+}): Promise<{ parentId: string; fileFlowIds: string[] }> {
+  const parentId = randomUUID();
+  const stepCount = opts.files[0]?.steps.length ?? 0;
+  const fileIndexMap = opts.files.map((_, i) => i);
+
+  await db.insert(schema.jobs).values({
+    id: parentId,
+    type: "batch",
+    toolId: "pipeline-batch",
+    pool: "system",
+    status: "queued",
+    inputRefs: [],
+    settings: { flowChildCount: opts.files.length, fileIndexMap, stepCount },
+  });
+
+  const children: FlowJob[] = [];
+  const fileFlowIds: string[] = [];
+  for (let i = 0; i < opts.files.length; i++) {
+    const flowId = `${parentId}-f${i}`;
+    const built = await buildPipelineFlow(flowId, {
+      steps: opts.files[i].steps,
+      parentId,
+      totalFiles: opts.files.length,
+      filename: opts.files[i].filename,
+    });
+    children.push(built.tree);
+    fileFlowIds.push(flowId);
+  }
+
+  const batchTree: FlowJob = {
+    name: "batch-finalize",
+    queueName: queueName("system"),
+    data: {
+      kind: "batch-finalize",
+      jobId: parentId,
+      toolId: "pipeline-batch",
+      userId: null,
+      pool: "system",
+      totalFiles: opts.files.length,
+      inputRefs: [],
+      filename: "",
+      settings: { flowChildCount: opts.files.length, fileIndexMap, stepCount },
+    } satisfies ToolJobData,
+    opts: { jobId: parentId, attempts: 1 },
+    children,
+  };
+
+  await opts.beforeEnqueue?.(parentId);
+  await getFlowProducer().add(batchTree);
+  return { parentId, fileFlowIds };
 }
 
 /** The finalize's BullMQ return value, what routes/pipeline.ts branches on. */
@@ -494,5 +563,237 @@ describe("requestCancel on a pipeline-batch parent", () => {
     const id = await seedParent({ status: "completed" });
     expect(await requestCancel(id)).toBe(false);
     expect(await isBatchCanceled(id)).toBe(false);
+  });
+});
+
+// ── Cooperative step skip and canceled finalize ─────────────────
+
+describe("cooperative step skip and canceled finalize", () => {
+  it("cancel mid-run aborts the active step, skips the queued step, and settles every surface", async () => {
+    const clientJobId = randomUUID();
+    const tag = `mid-${clientJobId.slice(0, 8)}`;
+    const { flowId, stepIds } = await enqueuePipelineFlow({
+      steps: [
+        { mode: "slow", tag: `${tag}-s0` },
+        { mode: "fast", tag: `${tag}-s1` },
+      ],
+      clientJobId,
+    });
+
+    // The slow step must be actively running so the abort-over-the-channel
+    // path is exercised deterministically (a queued step would take the
+    // flag-skip path, which has its own test below).
+    await waitFor(async () => {
+      const row = await jobRow(stepIds[0]);
+      return row?.status === "processing" ? true : undefined;
+    });
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+
+    // Active step aborted, queued step skipped without ever running.
+    const s0 = await terminalRow(stepIds[0]);
+    expect(s0.status).toBe("canceled");
+    const s1 = await terminalRow(stepIds[1]);
+    expect(s1.status).toBe("canceled");
+    expect(invoked).not.toContain(`${tag}-s1`);
+
+    // Both the authoritative flow row and the client-facing alias settle
+    // canceled (#766's dual-write lesson).
+    const flow = await terminalRow(flowId);
+    expect(flow.status).toBe("canceled");
+    const alias = await terminalRow(clientJobId);
+    expect(alias.status).toBe("canceled");
+    expect((alias.error as { message?: string } | null)?.message).toBe("Canceled");
+
+    // Live SSE clients settle from the terminal frame on the alias channel;
+    // a reconnecting client replays the same canceled outcome.
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.type).toBe("single");
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+
+    // routes/pipeline.ts branches its sync 422 on this payload.
+    const returned = await finalizeReturnValue(flowId);
+    const payload = returned.resultPayload as { canceled?: boolean; error?: string };
+    expect(payload.canceled).toBe(true);
+    expect(payload.error).toBe("Canceled");
+  });
+
+  it("a cancel that lands after every step finished completes normally", async () => {
+    const clientJobId = randomUUID();
+    const tag = `late-${clientJobId.slice(0, 8)}`;
+    const { flowId, stepIds } = await enqueuePipelineFlow({
+      steps: [
+        { mode: "fast", tag: `${tag}-s0` },
+        { mode: "fast", tag: `${tag}-s1` },
+      ],
+      clientJobId,
+    });
+
+    await waitFor(async () => {
+      const s0 = await jobRow(stepIds[0]);
+      const s1 = await jobRow(stepIds[1]);
+      return s0?.status === "completed" && s1?.status === "completed" ? true : undefined;
+    });
+    await markBatchCanceled(clientJobId);
+
+    const flow = await terminalRow(flowId);
+    expect(flow.status).toBe("completed");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("complete");
+    expect((frame.result as Record<string, unknown>).downloadUrl).toContain(
+      `/api/v1/download/${flowId}/`,
+    );
+  });
+
+  it("a cancel flagged before enqueue skips every step", async () => {
+    const clientJobId = randomUUID();
+    const tag = `pre-${clientJobId.slice(0, 8)}`;
+    const { flowId, stepIds } = await enqueuePipelineFlow({
+      steps: [
+        { mode: "slow", tag: `${tag}-s0` },
+        { mode: "slow", tag: `${tag}-s1` },
+      ],
+      clientJobId,
+      beforeEnqueue: async () => {
+        await markBatchCanceled(clientJobId);
+      },
+    });
+
+    const flow = await terminalRow(flowId);
+    expect(flow.status).toBe("canceled");
+    for (const stepId of stepIds) {
+      const row = await jobRow(stepId);
+      expect(row?.status).toBe("canceled");
+    }
+    expect(invoked).not.toContain(`${tag}-s0`);
+    expect(invoked).not.toContain(`${tag}-s1`);
+
+    const alias = await terminalRow(clientJobId);
+    expect(alias.status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+  });
+
+  it("a failing flag read falls through to normal processing instead of wedging the step", async () => {
+    const clientJobId = randomUUID();
+    const tag = `fault-${clientJobId.slice(0, 8)}`;
+    flagReadFault.scope = clientJobId;
+    flagReadFault.remaining = 2;
+
+    try {
+      const { flowId, stepIds } = await enqueuePipelineFlow({
+        steps: [
+          { mode: "fast", tag: `${tag}-s0` },
+          { mode: "fast", tag: `${tag}-s1` },
+        ],
+        clientJobId,
+        beforeEnqueue: async () => {
+          await markBatchCanceled(clientJobId);
+        },
+      });
+
+      // Both step-level flag reads hit the injected outage and must fall
+      // through to normal processing (a too-late cancel), never leave the
+      // step row wedged behind a hard-failed job. The finalize's own flag
+      // read then runs for real, sees no canceled step, and completes.
+      const flow = await terminalRow(flowId);
+      expect(flow.status).toBe("completed");
+      expect(invoked).toContain(`${tag}-s0`);
+      expect(invoked).toContain(`${tag}-s1`);
+      for (const stepId of stepIds) {
+        const row = await jobRow(stepId);
+        expect(row?.status).toBe("completed");
+      }
+    } finally {
+      flagReadFault.scope = null;
+      flagReadFault.remaining = 0;
+    }
+  });
+});
+
+// ── Pipeline-batch composition ──────────────────────────────────
+
+describe("pipeline-batch cancel", () => {
+  it("cancel mid-batch keeps finished files in a partial ZIP and cancels the rest", async () => {
+    const { parentId, fileFlowIds } = await enqueuePipelineBatch({
+      files: [
+        { steps: [{ mode: "fast", tag: "pb-fast" }], filename: "fast.png" },
+        { steps: [{ mode: "slow", tag: "pb-slow" }], filename: "slow.png" },
+      ],
+    });
+
+    // The fast file's step must be done before the cancel so the batch has
+    // real finished work to keep, and the slow file's step must be actively
+    // running so the abort path is exercised. Only jobs scheduled ahead of
+    // the slow step gate the condition (the pools run at concurrency 1).
+    await waitFor(async () => {
+      const fast = await jobRow(`${fileFlowIds[0]}-s0`);
+      const slow = await jobRow(`${fileFlowIds[1]}-s0`);
+      return fast?.status === "completed" && slow?.status === "processing" ? true : undefined;
+    });
+
+    expect(await requestCancel(parentId)).toBe(true);
+
+    const parent = await terminalRow(parentId);
+    expect(parent.status).toBe("canceled");
+    expect(parent.outputRefs?.length).toBe(1);
+    const zipKey = parent.outputRefs?.[0] as string;
+
+    // The finished file's whole pipeline completed, so it lands in the ZIP
+    // (#767's file-level partial semantics); the canceled file reads
+    // "Canceled".
+    const frame = await terminalFrame(parentId);
+    expect(frame.status).toBe("completed");
+    const result = frame.result as { downloadUrl?: string; fileResults?: Record<string, string> };
+    expect(result.downloadUrl).toContain(`/api/v1/download/${parentId}/`);
+    expect(Object.keys(result.fileResults ?? {})).toEqual(["0"]);
+
+    const zip = new AdmZip(await getObjectBuffer(zipKey));
+    const names = zip.getEntries().map((e) => e.entryName);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^fast/);
+
+    const finishedFile = await terminalRow(fileFlowIds[0]);
+    expect(finishedFile.status).toBe("completed");
+    const canceledFile = await terminalRow(fileFlowIds[1]);
+    expect(canceledFile.status).toBe("canceled");
+    const canceledStep = await terminalRow(`${fileFlowIds[1]}-s0`);
+    expect(canceledStep.status).toBe("canceled");
+
+    const returned = await waitFor(async () => {
+      const j = await getQueue("system").getJob(parentId);
+      return j?.returnvalue ? (j.returnvalue as Record<string, unknown>) : undefined;
+    });
+    expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+  });
+
+  it("a full cancel before any step ran settles the batch with the Canceled synthetic", async () => {
+    const { parentId, fileFlowIds } = await enqueuePipelineBatch({
+      files: [
+        { steps: [{ mode: "slow", tag: "pbx-a" }], filename: "a.png" },
+        { steps: [{ mode: "slow", tag: "pbx-b" }], filename: "b.png" },
+      ],
+      beforeEnqueue: (id) => markBatchCanceled(id),
+    });
+
+    const parent = await terminalRow(parentId);
+    expect(parent.status).toBe("canceled");
+    expect(parent.outputRefs ?? []).toEqual([]);
+
+    const frame = await terminalFrame(parentId);
+    expect(frame.status).toBe("failed");
+    const errors = frame.errors as Array<{ filename: string; error: string }>;
+    expect(errors[0]).toEqual({ filename: "", error: "Canceled" });
+
+    for (const flowId of fileFlowIds) {
+      const row = await jobRow(flowId);
+      expect(row?.status).toBe("canceled");
+      const step = await jobRow(`${flowId}-s0`);
+      expect(step?.status).toBe("canceled");
+    }
+    expect(invoked).not.toContain("pbx-a");
+    expect(invoked).not.toContain("pbx-b");
   });
 });

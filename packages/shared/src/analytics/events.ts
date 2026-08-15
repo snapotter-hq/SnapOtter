@@ -71,7 +71,7 @@ export interface PipelineExecutedProperties {
   is_batch: boolean;
   file_count?: number;
   duration_ms: number;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "canceled";
 }
 
 export interface AiBundleActionProperties {
