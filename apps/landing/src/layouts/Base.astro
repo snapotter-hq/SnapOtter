@@ -5,6 +5,7 @@ import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import Analytics from "@/components/Analytics.astro";
 import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
+import StickyMobileCta from "@/components/StickyMobileCta.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
 import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
 
@@ -17,6 +18,7 @@ interface Props {
   noindex?: boolean;
   locale?: string;
   path?: string; // un-prefixed page path for hreflang, e.g. "/faq" or "/"
+  mobileCta?: boolean; // phone-only bottom CTA bar; off for pages that end in their own CTA
 }
 
 const toolCount = TOOLS.length;
@@ -32,6 +34,7 @@ const {
   noindex = false,
   locale = "en",
   path = "/",
+  mobileCta = true,
 } = Astro.props;
 
 const alternates = altLinks(path);
@@ -131,6 +134,7 @@ const htmlDir = dirFor(locale);
     <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
     <MachineTranslationBanner locale={locale} />
     <slot />
+    {mobileCta && <StickyMobileCta locale={locale} />}
 
     <!-- Scroll-triggered reveal observer -->
     <script is:inline>

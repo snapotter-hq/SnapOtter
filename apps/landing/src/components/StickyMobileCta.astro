@@ -1,0 +1,50 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes frontmatter imports.
+// Persistent bottom CTA for phones. The navbar's CTAs live in its md:flex
+// desktop cluster and are hidden below md, so without this a phone visitor has
+// no call to action until they open the hamburger. Hidden again at md+, where
+// the navbar CTAs reappear. CSS-only, no client JS: it is always-visible while
+// mounted, so the responsive breakpoint alone decides when it shows.
+//
+// Actions mirror what the hero and navbar already offer, reusing their i18n
+// keys so no new strings are needed: "Try the live demo" (lowest friction) and
+// "Get Started Free" (the primary docs quickstart). "Book a Demo" stays in the
+// nav; it is the enterprise path, not the self-serve one this bar is for.
+import { t } from "@/i18n";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+---
+
+<div class="md:hidden">
+  {/* In-flow spacer so the fixed bar never covers the last row of the footer.
+      Generous by a hair on purpose; a small gap beats clipping content. */}
+  <div style="height: calc(4.5rem + env(safe-area-inset-bottom));" aria-hidden="true"></div>
+
+  <div
+    id="mobile-cta"
+    class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-xl"
+    style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));"
+  >
+    <a
+      href="https://demo.snapotter.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="flex-1 rounded-lg border border-border px-4 py-2.5 text-center text-sm font-medium transition-colors hover:bg-background-alt"
+    >
+      {t(locale, "home.quickstart.tryDemo")}
+    </a>
+    <a
+      href="https://docs.snapotter.com/guide/getting-started.html"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn-primary flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-semibold"
+    >
+      {t(locale, "nav.getStartedFree")}
+    </a>
+  </div>
+</div>
