@@ -670,3 +670,54 @@ describe("useToolProcessor proxy 5xx degrade (#750)", () => {
     unmount();
   });
 });
+
+describe("useToolProcessor batch stale-state reset (#746)", () => {
+  it("clears each entry's stale processed state and revokes its blob before uploading", () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "first.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "second.jpg", { type: "image/jpeg" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    // A previous run left a result on the first entry.
+    useFileStore.getState().updateEntry(0, {
+      processedUrl: "blob:old-result",
+      processedPreviewUrl: "/api/v1/download/old/preview.webp",
+      processedFilename: "first_old.png",
+      processedSize: 4321,
+      status: "completed",
+    });
+
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+
+    const entry = useFileStore.getState().entries[0];
+    expect(entry.processedUrl).toBeNull();
+    expect(entry.processedPreviewUrl).toBeNull();
+    expect(entry.processedFilename).toBeNull();
+    expect(entry.processedSize).toBeNull();
+    expect(entry.status).toBe("processing");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:old-result");
+
+    hook.unmount();
+  });
+
+  it("settles entries as failed, not stuck at processing, when a whole-run failure never reaches the ZIP", () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      // Socket dies mid-upload (no upload.onload): the run fails via failRun
+      // without a terminal ZIP. Entries must not stay pulsing at "processing".
+      xhrs[0].onerror?.();
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].status).toBe("failed");
+    expect(entries[1].status).toBe("failed");
+    expect(entries[0].processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+});

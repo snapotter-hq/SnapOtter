@@ -750,6 +750,23 @@ export function useToolProcessor(toolId: string) {
       // Batch runs never auto-save to the library (no fileId is sent), so a
       // previous single run's saved indicator must not survive into this one.
       useFileStore.getState().setLastSavedLibraryFileId(null);
+      // Mirror the single-file reset: clear every entry's stale processed state
+      // before this run uploads, so a failed or absent result can't render a
+      // previous run's output under the new run's filename and size (#746).
+      // Revoke stale result blob URLs so they don't leak.
+      const priorEntries = useFileStore.getState().entries;
+      for (let i = 0; i < priorEntries.length; i++) {
+        const staleUrl = priorEntries[i]?.processedUrl;
+        if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
+        updateEntry(i, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "processing",
+          error: null,
+        });
+      }
       setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
       // A stale evidence timer from a previous degraded run must not fire
@@ -790,6 +807,16 @@ export function useToolProcessor(toolId: string) {
       };
 
       const failRun = (message: string) => {
+        // Entries were set to "processing" at kickoff (the reset loop above). A
+        // whole-run failure that never reached settleFromZip must settle them,
+        // or the result pane keeps pulsing on the stale original because the
+        // entry never leaves "processing" (#746).
+        const runEntries = useFileStore.getState().entries;
+        for (let i = 0; i < runEntries.length; i++) {
+          if (runEntries[i]?.status === "processing") {
+            updateEntry(i, { status: "failed", error: message });
+          }
+        }
         setError(message);
         finishRun();
         trackBatch(canceledByUser ? "canceled" : "failed");
@@ -817,6 +844,10 @@ export function useToolProcessor(toolId: string) {
               processedUrl: URL.createObjectURL(blob),
               processedFilename: processedName,
               processedSize: blob.size,
+              // Batch results come from the ZIP, not a server preview; clear any
+              // stale processedPreviewUrl so an earlier single run's preview
+              // can't win over this result (displayUrl prefers it) (#746).
+              processedPreviewUrl: null,
               status: "completed",
               error: null,
             });
@@ -824,6 +855,11 @@ export function useToolProcessor(toolId: string) {
             // After a user cancel, a missing result is the cancel doing its
             // job, not a lookup failure.
             updateEntry(i, {
+              // Clear the result so hasProcessed goes false and the failure
+              // screen (guarded by !hasProcessed) renders instead of a stale
+              // previous result (#746).
+              processedUrl: null,
+              processedPreviewUrl: null,
               status: "failed",
               error: canceledByUser ? "Canceled" : "File not found in batch results",
             });

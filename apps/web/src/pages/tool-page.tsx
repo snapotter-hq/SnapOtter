@@ -49,6 +49,7 @@ import { formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
+import { shouldShowConversionCard } from "@/lib/result-display";
 import {
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
   MULTI_FILE_TOOLS,
@@ -928,8 +929,21 @@ export function ToolPage() {
       </div>
     );
 
-    // Non-previewable format with no fallback at all - show success card
-    if (hasProcessed && !isProcessedPreviewable && !processedPreviewUrl && !originalBlobUrl) {
+    // A processed result with no renderable preview must not fall back to the
+    // original: the branches below render displayUrl as the result, so they
+    // would otherwise show the untouched original under the processed filename
+    // and size (#746). The live-preview + imageWrapperStyle branch is excluded
+    // (WYSIWYG CSS simulation, or #713 input-overlay handling).
+    if (
+      shouldShowConversionCard({
+        hasProcessed,
+        isProcessedPreviewable,
+        processedPreviewUrl,
+        originalBlobUrl,
+        displayMode,
+        hasImageWrapperStyle: imageWrapperStyle != null,
+      })
+    ) {
       return conversionCompleteCard;
     }
 

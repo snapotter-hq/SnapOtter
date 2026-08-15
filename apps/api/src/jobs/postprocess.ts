@@ -15,6 +15,7 @@ import type { LibrarySaveMode } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 
@@ -120,7 +121,6 @@ export async function generatePreview(
   buffer: Buffer,
   contentType: string,
   jobId: string,
-  fallbackInput?: Buffer,
 ): Promise<string | undefined> {
   // Per-modality dispatch (before the image logic)
   if (contentType.startsWith("video/")) {
@@ -154,18 +154,16 @@ export async function generatePreview(
     const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
     await putObject(key, previewBuffer);
     return key;
-  } catch {
-    // Retry with the original input buffer (pre-processing) which was
-    // already validated and decoded during the intake phase.
-    if (fallbackInput) {
-      try {
-        const fallbackBuffer = await sharp(fallbackInput).webp({ quality: 80 }).toBuffer();
-        await putObject(key, fallbackBuffer);
-        return key;
-      } catch {
-        // Both attempts failed; frontend will use the upload preview
-      }
-    }
+  } catch (err) {
+    // The result itself can't be decoded for a preview. Do NOT fall back to the
+    // pre-processing input: the client renders this preview under the processed
+    // filename, so an input-derived preview would show the untouched original as
+    // if it were the result (#746). No honest preview exists, so the frontend
+    // shows a success card instead.
+    logger.warn(
+      { err, jobId, contentType },
+      "preview generation failed; result has no renderable preview",
+    );
   }
   return undefined;
 }
