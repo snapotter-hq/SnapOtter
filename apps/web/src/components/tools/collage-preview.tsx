@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { COLLAGE_PAN_LIMIT } from "@snapotter/shared";
 import { useDrag, usePinch } from "@use-gesture/react";
 import {
   Download,
@@ -361,8 +362,14 @@ function CollageCell({
       if (first) memo = { panX: transform.panX, panY: transform.panY };
       const rect = cellRef.current?.getBoundingClientRect();
       if (!rect || !memo) return memo;
-      const panX = Math.max(-200, Math.min(200, memo.panX + (mx / rect.width) * 100));
-      const panY = Math.max(-200, Math.min(200, memo.panY + (my / rect.height) * 100));
+      const panX = Math.max(
+        -COLLAGE_PAN_LIMIT,
+        Math.min(COLLAGE_PAN_LIMIT, memo.panX + (mx / rect.width) * 100),
+      );
+      const panY = Math.max(
+        -COLLAGE_PAN_LIMIT,
+        Math.min(COLLAGE_PAN_LIMIT, memo.panY + (my / rect.height) * 100),
+      );
       store.setCellTransform(cellIndex, { panX, panY });
       return memo;
     },

@@ -682,6 +682,35 @@ describe("Collage", () => {
     expect(result.processedSize).toBeGreaterThan(0);
   });
 
+  it("rejects a cell pan beyond the shared limit (COLLAGE_PAN_LIMIT + 1)", async () => {
+    // Pan past +/-200 is clamped in the preview and rejected by the route
+    // schema; both derive from the shared COLLAGE_PAN_LIMIT so they can't drift
+    // (#740). 201 is COLLAGE_PAN_LIMIT + 1.
+    const { body, contentType } = createMultipartPayload([
+      { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          cells: [{ imageIndex: 0, panX: 201, panY: 0, zoom: 1, objectFit: "cover" }],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it("uses 16:9 aspect ratio", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
@@ -1857,7 +1886,7 @@ describe("Collage", () => {
 
   // ── JXL output format ─────────────────────────────────────────────
 
-  it("accepts jxl output format (succeeds if Sharp supports JXL)", async () => {
+  it("accepts jxl output format (succeeds if the cjxl/ImageMagick encoder is present)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
       { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
@@ -1881,8 +1910,10 @@ describe("Collage", () => {
       body,
     });
 
-    // JXL support depends on the Sharp build; either succeeds or fails gracefully
-    expect([200, 422]).toContain(res.statusCode);
+    // JXL support depends on cjxl / ImageMagick being present. Either it encodes
+    // (200), or the binary is missing and that infra failure now surfaces as a
+    // real 500 with telemetry, not a 422 masked as bad input (#740).
+    expect([200, 500]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       const result = JSON.parse(res.body);
       expect(result.processedSize).toBeGreaterThan(0);

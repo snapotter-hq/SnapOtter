@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { COLLAGE_PAN_LIMIT } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
@@ -322,11 +323,12 @@ const TEMPLATES: Template[] = [
 
 const cellSchema = z.object({
   imageIndex: z.number().int().min(0),
-  // +/-200 mirrors the preview's drag clamp (collage-preview.tsx); anything
-  // narrower turns a draggable position into a 400 at submit time (#718). In
-  // cover mode the extract saturates at the image edge for values past 100.
-  panX: z.number().min(-200).max(200).default(0),
-  panY: z.number().min(-200).max(200).default(0),
+  // COLLAGE_PAN_LIMIT mirrors the preview's drag clamp (collage-preview.tsx),
+  // shared so the two can't drift; anything narrower turns a draggable position
+  // into a 400 at submit time (#718). In cover mode the extract saturates at the
+  // image edge for values past 100.
+  panX: z.number().min(-COLLAGE_PAN_LIMIT).max(COLLAGE_PAN_LIMIT).default(0),
+  panY: z.number().min(-COLLAGE_PAN_LIMIT).max(COLLAGE_PAN_LIMIT).default(0),
   zoom: z.number().min(1).max(10).default(1),
   objectFit: z.enum(["cover", "contain"]).default("cover"),
 });
@@ -768,10 +770,20 @@ export function registerCollage(app: FastifyInstance) {
         processedSize: finalBuffer.length,
       });
     } catch (err) {
-      return reply.status(422).send({
-        error: "Collage creation failed",
-        details: err instanceof Error ? err.message : "Unknown error",
-      });
+      if (err instanceof InputValidationError) {
+        // Genuine bad input (e.g. an image whose dimensions won't decode). The
+        // 422 here is the documented worker-error convention, not the factory's
+        // 400 (see #718); keep it.
+        return reply.status(422).send({
+          error: "Collage creation failed",
+          details: err.message,
+        });
+      }
+      // Everything else is infrastructure, not the user's images: a storage
+      // outage (putObject), a missing cjxl/ImageMagick binary (encodeJxl), a
+      // sharp crash. Rethrow so the global handler logs it and reports to Sentry
+      // instead of masking it as an input error the user retries forever (#740).
+      throw err;
     }
   });
 }

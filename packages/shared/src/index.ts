@@ -6,6 +6,7 @@ export * from "./analytics/proxy.js";
 export { redactMessage } from "./analytics/redact-message.js";
 export * from "./analytics/types.js";
 export * from "./audit-events.js";
+export * from "./collage.js";
 export * from "./constants.js";
 export * from "./conversion-presets.js";
 export * from "./features.js";
