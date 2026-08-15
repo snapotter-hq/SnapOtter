@@ -103,6 +103,10 @@ function techArticle(
     "@type": "TechArticle",
     headline: title,
     ...(description ? { description } : {}),
+    // image and author are Google-recommended Article fields. Every docs page
+    // shares the site OG image and is authored by the project.
+    image: `${hostname}/og-image.png`,
+    author: { "@type": "Organization", name: "SnapOtter", url: "https://snapotter.com" },
     url: `${hostname}/${enRel}`,
     inLanguage: "en",
     isPartOf: { "@type": "WebSite", name: "SnapOtter Docs", url: hostname },

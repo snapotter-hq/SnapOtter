@@ -50,6 +50,20 @@ describe("buildJsonLd", () => {
     expect(article?.inLanguage).toBe("en");
   });
 
+  test("TechArticle carries a representative image", () => {
+    const out = buildJsonLd({ ...base, enRel: "guide/architecture", title: "Architecture" });
+    expect(byType(out, "TechArticle")?.image).toBe(`${HOSTNAME}/og-image.png`);
+  });
+
+  test("TechArticle names SnapOtter as the Organization author", () => {
+    const out = buildJsonLd({ ...base, enRel: "guide/architecture", title: "Architecture" });
+    expect(byType(out, "TechArticle")?.author).toEqual({
+      "@type": "Organization",
+      name: "SnapOtter",
+      url: "https://snapotter.com",
+    });
+  });
+
   test("breadcrumb trail is Docs > Section > Page with real URLs", () => {
     const out = buildJsonLd({ ...base, enRel: "guide/architecture", title: "Architecture" });
     const items = crumbs(out);
