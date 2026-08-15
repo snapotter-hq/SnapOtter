@@ -4,6 +4,7 @@ import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
+import { buildJsonLd } from "./jsonld.mts";
 import { pageOnlySidebar } from "./llms-sidebar.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
@@ -176,7 +177,10 @@ export default defineConfig({
   ],
 
   transformHead({ pageData }) {
-    const head: Array<[string, Record<string, string>]> = [];
+    // Widened past the 2-tuple form so the JSON-LD <script> tags below, which
+    // carry inner text as a third element, typecheck.
+    const head: Array<[string, Record<string, string>] | [string, Record<string, string>, string]> =
+      [];
     const rel = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "");
     const codes = NON_EN.map((l) => l.code);
     const firstSeg = rel.split("/")[0];
@@ -219,6 +223,18 @@ export default defineConfig({
       head.push(["meta", { name: "twitter:description", content: pageData.description }]);
     }
     head.push(["meta", { name: "twitter:title", content: pageData.title }]);
+
+    // Structured data. buildJsonLd returns nothing for the noindexed locale
+    // trees, so this only fires on the indexable English pages.
+    for (const schema of buildJsonLd({
+      hostname: HOSTNAME,
+      enRel,
+      isLocale,
+      title: pageData.title,
+      description: pageData.description,
+    })) {
+      head.push(["script", { type: "application/ld+json" }, JSON.stringify(schema)]);
+    }
     return head;
   },
 

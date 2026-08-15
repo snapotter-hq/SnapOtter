@@ -5,7 +5,7 @@
   "scripts": {
     "docs:dev": "vitepress dev .",
     "docs:build": "vitepress build .",
-    "lint": "biome check .vitepress/config.mts .vitepress/i18n .vitepress/llms-sidebar.mjs .vitepress/theme",
+    "lint": "biome check .vitepress/config.mts .vitepress/jsonld.mts .vitepress/i18n .vitepress/llms-sidebar.mjs .vitepress/theme",
     "docs:preview": "vitepress preview ."
   },
   "devDependencies": {
