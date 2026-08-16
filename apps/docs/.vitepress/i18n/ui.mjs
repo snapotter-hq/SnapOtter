@@ -82,6 +82,7 @@ const EN = {
   "sidebar.guide.upgrading": "Upgrading from 1.x",
   "sidebar.guide.deployment": "Deployment",
   "sidebar.guide.securityHardening": "Security & Hardening",
+  "sidebar.guide.accountRecovery": "Account Recovery",
   "sidebar.guide.telemetry": "What SnapOtter collects",
   "sidebar.guide.supportedFormats": "Supported Formats",
   "sidebar.guide.hardware": "Hardware requirements",
