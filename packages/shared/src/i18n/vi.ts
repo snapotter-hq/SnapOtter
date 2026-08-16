@@ -3706,6 +3706,7 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
     methodSaml: "SAML",

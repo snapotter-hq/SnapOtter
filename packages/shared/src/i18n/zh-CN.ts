@@ -3446,6 +3446,7 @@ export const zhCN: TranslationKeys = {
     verify: "验证",
     verifying: "验证中...",
     mfaInvalidCode: "验证码无效，请重试。",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "您的组织要求启用多因素认证。请在账户设置中设置 MFA。",
     methodSaml: "SAML",
     passwordManagedByProvider: "密码修改由您的身份提供商管理。",

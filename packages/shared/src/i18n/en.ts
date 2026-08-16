@@ -3655,6 +3655,7 @@ export const en = {
     verify: "Verify",
     verifying: "Verifying...",
     mfaInvalidCode: "Invalid code. Please try again.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",
     methodSaml: "SAML",

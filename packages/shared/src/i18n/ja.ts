@@ -3661,6 +3661,7 @@ export const ja: TranslationKeys = {
     verify: "確認",
     verifying: "確認中...",
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     methodSaml: "SAML",
     passwordManagedByProvider: "パスワードはIDプロバイダーで管理されています。",

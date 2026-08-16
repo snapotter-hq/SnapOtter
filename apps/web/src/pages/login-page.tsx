@@ -1,10 +1,47 @@
 import { KeyRound } from "lucide-react";
+import QRCodeStyling from "qr-code-styling";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { setToken } from "@/lib/api";
 import { format } from "@/lib/format";
+import { copyToClipboard } from "@/lib/utils";
+
+function parseManualSecret(uri: string): string {
+  try {
+    return new URL(uri).searchParams.get("secret") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function QrCode({ uri }: { uri: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const qr = new QRCodeStyling({
+      width: 200,
+      height: 200,
+      data: uri,
+      margin: 8,
+      dotsOptions: { type: "square", color: "#000000" },
+      backgroundOptions: { color: "#ffffff" },
+    } as never);
+    const el = containerRef.current;
+    if (el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+      qr.append(el);
+    }
+  }, [uri]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex items-center justify-center rounded-xl border border-border p-4 bg-white w-fit"
+    />
+  );
+}
 
 function RotatingPhrase() {
   const { t } = useTranslation();
@@ -139,6 +176,13 @@ export function LoginPage() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
   const mfaInputRef = useRef<HTMLInputElement>(null);
+  const [showMfaEnrollment, setShowMfaEnrollment] = useState(false);
+  const [enrollmentToken, setEnrollmentToken] = useState("");
+  const [enrollmentUri, setEnrollmentUri] = useState("");
+  const [enrollmentRecoveryCodes, setEnrollmentRecoveryCodes] = useState<string[]>([]);
+  const [enrollmentCode, setEnrollmentCode] = useState("");
+  const [enrollmentLoading, setEnrollmentLoading] = useState(false);
+  const [enrollmentCodesCopied, setEnrollmentCodesCopied] = useState(false);
 
   useEffect(() => {
     // A successful OIDC/SAML login for an already-enrolled user redirects
@@ -196,6 +240,19 @@ export function LoginPage() {
         return;
       }
       const data = await res.json();
+      if (data.requiresMfaEnrollment) {
+        // A licensed instance with a required MFA policy walks an unenrolled
+        // user through TOTP setup at login instead of blocking them. The
+        // secret is fresh per response, so once the panel is up we keep the
+        // token and URI in state and never re-submit the form underneath the
+        // user (that would rotate the secret out from under a scanned QR).
+        setEnrollmentToken(data.enrollmentToken);
+        setEnrollmentUri(data.uri);
+        setEnrollmentRecoveryCodes(data.recoveryCodes ?? []);
+        setShowMfaEnrollment(true);
+        setTimeout(() => mfaInputRef.current?.focus(), 100);
+        return;
+      }
       if (data.requiresMfa) {
         setMfaToken(data.mfaToken);
         setShowMfaPrompt(true);
@@ -245,6 +302,44 @@ export function LoginPage() {
     }
   };
 
+  const handleEnrollComplete = async () => {
+    setEnrollmentLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/mfa/enroll-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enrollmentToken, code: enrollmentCode }),
+      });
+      if (!res.ok) {
+        setError(t.auth.mfaInvalidCode);
+        setEnrollmentCode("");
+        return;
+      }
+      const data = await res.json();
+      setToken(data.token);
+      localStorage.setItem("snapotter-username", data.user?.username || username);
+      if (data.user?.mustChangePassword) {
+        window.location.href = "/change-password";
+      } else {
+        window.location.href = "/";
+      }
+    } catch {
+      setError(t.auth.connectionError);
+    } finally {
+      setEnrollmentLoading(false);
+    }
+  };
+
+  const handleCopyRecoveryCodes = async () => {
+    if (enrollmentRecoveryCodes.length === 0) return;
+    const ok = await copyToClipboard(enrollmentRecoveryCodes.join("\n"));
+    if (ok) {
+      setEnrollmentCodesCopied(true);
+      setTimeout(() => setEnrollmentCodesCopied(false), 2000);
+    }
+  };
+
   return (
     <main id="main-content" tabIndex={-1} className="flex h-dvh bg-background">
       <div className="flex-1 flex items-center justify-center p-8">
@@ -285,7 +380,101 @@ export function LoginPage() {
               </p>
             </div>
           )}
-          {showMfaPrompt ? (
+          {showMfaEnrollment ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-primary"
+                    role="img"
+                    aria-hidden="true"
+                  >
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t.auth.mfaEnrollmentHeading}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-foreground">{t.settings.security.twoFactorScanQr}</p>
+              {enrollmentUri && <QrCode uri={enrollmentUri} />}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t.settings.security.twoFactorManualEntry}
+                </p>
+                <code className="block text-xs bg-muted rounded-md px-3 py-2 break-all">
+                  {parseManualSecret(enrollmentUri)}
+                </code>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t.settings.security.twoFactorRecoveryCodesHeading}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  {t.settings.security.twoFactorRecoveryCodesDescription}
+                </p>
+                <div className="grid grid-cols-2 gap-1 rounded-md border border-border p-3 font-mono text-xs">
+                  {enrollmentRecoveryCodes.map((rc) => (
+                    <span key={rc}>{rc}</span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyRecoveryCodes}
+                  className="mt-2 text-xs text-primary-ink hover:underline"
+                >
+                  {enrollmentCodesCopied
+                    ? t.settings.security.twoFactorCodesCopied
+                    : t.settings.security.twoFactorCopyRecoveryCodes}
+                </button>
+              </div>
+              <div>
+                <label
+                  htmlFor="enrollment-code"
+                  className="block text-sm font-medium mb-1 text-foreground"
+                >
+                  {t.settings.security.twoFactorEnterCode}
+                </label>
+                <input
+                  id="enrollment-code"
+                  ref={mfaInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  placeholder={t.settings.security.twoFactorCodePlaceholder}
+                  value={enrollmentCode}
+                  onChange={(e) => setEnrollmentCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && enrollmentCode.length >= 6) handleEnrollComplete();
+                  }}
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <button
+                type="button"
+                onClick={handleEnrollComplete}
+                disabled={enrollmentLoading || enrollmentCode.length < 6}
+                className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {enrollmentLoading ? t.auth.verifying : t.settings.security.twoFactorConfirmButton}
+              </button>
+            </div>
+          ) : showMfaPrompt ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">

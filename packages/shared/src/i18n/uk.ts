@@ -3715,6 +3715,7 @@ export const uk: TranslationKeys = {
     verify: "Перевірити",
     verifying: "Перевірка...",
     mfaInvalidCode: "Невірний код. Спробуйте ще раз.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Ваша організація вимагає багатофакторну автентифікацію. Налаштуйте MFA в параметрах облікового запису.",
     methodSaml: "SAML",

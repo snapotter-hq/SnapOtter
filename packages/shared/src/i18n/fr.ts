@@ -3738,6 +3738,7 @@ export const fr: TranslationKeys = {
     verify: "Vérifier",
     verifying: "Vérification...",
     mfaInvalidCode: "Code invalide. Veuillez réessayer.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",
     methodSaml: "SAML",

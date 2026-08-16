@@ -3447,6 +3447,7 @@ export const zhTW: TranslationKeys = {
     verify: "驗證",
     verifying: "驗證中...",
     mfaInvalidCode: "驗證碼無效，請再試一次。",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "您的組織要求啟用多因素驗證。請在帳戶設定中設定 MFA。",
     methodSaml: "SAML",
     passwordManagedByProvider: "密碼由您的身分提供者管理。",

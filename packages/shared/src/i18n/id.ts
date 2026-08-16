@@ -3712,6 +3712,7 @@ export const id: TranslationKeys = {
     verify: "Verifikasi",
     verifying: "Memverifikasi...",
     mfaInvalidCode: "Kode tidak valid. Silakan coba lagi.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
     methodSaml: "SAML",

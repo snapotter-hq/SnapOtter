@@ -3710,6 +3710,7 @@ export const sv: TranslationKeys = {
     verify: "Verifiera",
     verifying: "Verifierar...",
     mfaInvalidCode: "Ogiltig kod. Försök igen.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
     methodSaml: "SAML",

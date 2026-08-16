@@ -3719,6 +3719,7 @@ export const tr: TranslationKeys = {
     verify: "Doğrula",
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",
     methodSaml: "SAML",

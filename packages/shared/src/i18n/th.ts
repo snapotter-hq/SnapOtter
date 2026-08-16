@@ -3662,6 +3662,7 @@ export const th: TranslationKeys = {
     verify: "ยืนยัน",
     verifying: "กำลังยืนยัน...",
     mfaInvalidCode: "รหัสไม่ถูกต้อง กรุณาลองอีกครั้ง",
+    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "องค์กรของคุณกำหนดให้ใช้การยืนยันตัวตนหลายปัจจัย กรุณาตั้งค่า MFA ในการตั้งค่าบัญชี",
     methodSaml: "SAML",
     passwordManagedByProvider: "การเปลี่ยนรหัสผ่านจัดการโดยผู้ให้บริการยืนยันตัวตนของคุณ",
