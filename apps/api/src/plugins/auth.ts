@@ -327,16 +327,19 @@ async function getLoginAttemptLimit(): Promise<number> {
  * Resolve the throttle thresholds: DB setting override first, env default
  * otherwise. Unlike loginAttemptLimit, a stored 0 is a meaningful override
  * here (repo convention: 0 disables), so it wins over the env default.
+ *
+ * Both sides arrive validated: the env schema enforces int min 0 / min 1 at
+ * boot, and the settings policy (loginThrottleMaxFailures integerSetting(0),
+ * loginThrottleWindowSeconds integerSetting(1)) enforces the same bounds on
+ * every DB write, so no re-sanitizing here.
  */
 async function getLoginThrottleConfig(): Promise<LoginThrottleConfig> {
-  const maxFailures = await getSettingNumber(
-    "loginThrottleMaxFailures",
-    env.LOGIN_THROTTLE_MAX_FAILURES,
-  );
-  const windowS = await getSettingNumber("loginThrottleWindowSeconds", env.LOGIN_THROTTLE_WINDOW_S);
   return {
-    maxFailures: maxFailures >= 0 ? Math.floor(maxFailures) : env.LOGIN_THROTTLE_MAX_FAILURES,
-    windowS: windowS >= 1 ? Math.floor(windowS) : env.LOGIN_THROTTLE_WINDOW_S,
+    maxFailures: await getSettingNumber(
+      "loginThrottleMaxFailures",
+      env.LOGIN_THROTTLE_MAX_FAILURES,
+    ),
+    windowS: await getSettingNumber("loginThrottleWindowSeconds", env.LOGIN_THROTTLE_WINDOW_S),
   };
 }
 
@@ -431,6 +434,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: sanitizeAuditInput(body.username),
           reason: "disabled_user",
         });
+        // A disabled-account probe still counts as a failed attempt against
+        // the username, so hammering a disabled account throttles too.
+        await recordThrottleFailure();
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
       }
 
@@ -462,7 +468,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // A correct password ends the failed-guess episode, whatever the MFA
       // branches below decide about the session.
-      await clearLoginFailures(redis, body.username);
+      await clearLoginFailures(redis, body.username, throttleConfig);
 
       let mfaRequiredByPolicy = false;
       try {

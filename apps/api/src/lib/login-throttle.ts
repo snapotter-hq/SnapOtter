@@ -45,6 +45,27 @@ export function loginThrottleKey(username: string): string {
 }
 
 /**
+ * Unwrap a multi.exec() result, throwing on a null result (transaction
+ * aborted) or any per-command error tuple. ioredis resolves exec() with
+ * [err, result] pairs and reports command-level failures (WRONGTYPE, OOM,
+ * LOADING) inside them instead of rejecting; coalescing those into defaults
+ * would silently fail the throttle open. Throwing here propagates to the
+ * login handler and 500s, which is this module's documented fail-closed
+ * behavior.
+ */
+function unwrapExec(results: [error: Error | null, result: unknown][] | null): unknown[] {
+  if (results === null) {
+    throw new Error("login throttle: redis MULTI transaction aborted");
+  }
+  for (const [err] of results) {
+    if (err) {
+      throw new Error(`login throttle: redis command failed: ${err.message}`, { cause: err });
+    }
+  }
+  return results.map(([, result]) => result);
+}
+
+/**
  * Read the current window without recording anything. Runs at the top of the
  * login handler, before user lookup, so real and nonexistent usernames share
  * the exact same throttled response.
@@ -62,11 +83,11 @@ export async function checkLoginThrottle(
   const multi = redis.multi();
   multi.zremrangebyscore(key, 0, now - windowMs);
   multi.zrange(key, 0, -1, "WITHSCORES");
-  const results = await multi.exec();
+  const results = unwrapExec(await multi.exec());
 
-  // multi.exec() returns [[err, result], ...]; WITHSCORES alternates
-  // member, score, member, score, ... in ascending score order.
-  const entries = (results?.[1]?.[1] as string[] | undefined) ?? [];
+  // WITHSCORES alternates member, score, member, score, ... in ascending
+  // score order.
+  const entries = results[1] as string[];
   const scores: number[] = [];
   for (let i = 1; i < entries.length; i += 2) {
     scores.push(Number(entries[i]));
@@ -96,17 +117,30 @@ export async function recordLoginFailure(
   multi.zadd(key, now, `${now}:${Math.random()}`);
   multi.zcard(key);
   multi.expire(key, config.windowS + 1);
-  const results = await multi.exec();
+  const results = unwrapExec(await multi.exec());
 
-  const failures = (results?.[2]?.[1] as number) ?? 0;
+  const failures = results[2] as number;
   // Exactly-at-threshold detection keeps the LOGIN_THROTTLED audit event to
   // one per episode: later attempts are rejected before verification and
   // never recorded, so the count cannot re-hit the threshold until the
-  // window slides and the throttle genuinely trips again.
+  // window slides and the throttle genuinely trips again. Known corner: if
+  // an admin lowers the threshold below an already-accumulated count
+  // mid-window, the throttle arms via the check path without a
+  // LOGIN_THROTTLED audit row for that episode; accepted for the same
+  // reason, throttled attempts are never recorded.
   return { failures, crossedThreshold: failures === config.maxFailures };
 }
 
-/** Forget the username's failures. Called after a successful password check. */
-export async function clearLoginFailures(redis: Redis, username: string): Promise<void> {
+/**
+ * Forget the username's failures. Called after a successful password check.
+ * Short-circuits when the throttle is disabled, like the other two functions,
+ * so opted-out instances never touch Redis on the login happy path.
+ */
+export async function clearLoginFailures(
+  redis: Redis,
+  username: string,
+  config: LoginThrottleConfig,
+): Promise<void> {
+  if (config.maxFailures <= 0) return;
   await redis.del(loginThrottleKey(username));
 }

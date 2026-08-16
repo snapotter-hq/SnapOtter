@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type Redis from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createRedisConnection } from "../../../apps/api/src/jobs/connection.js";
 import {
   checkLoginThrottle,
@@ -152,7 +152,7 @@ describe("reset on success", () => {
     }
     expect((await checkLoginThrottle(redis, username, CONFIG)).throttled).toBe(true);
 
-    await clearLoginFailures(redis, username);
+    await clearLoginFailures(redis, username, CONFIG);
 
     expect((await checkLoginThrottle(redis, username, CONFIG)).throttled).toBe(false);
     // The next failure starts a fresh window rather than re-arming instantly.
@@ -166,7 +166,7 @@ describe("reset on success", () => {
       await recordLoginFailure(redis, username.toUpperCase(), CONFIG);
     }
 
-    await clearLoginFailures(redis, username.toLowerCase());
+    await clearLoginFailures(redis, username.toLowerCase(), CONFIG);
 
     expect((await checkLoginThrottle(redis, username, CONFIG)).throttled).toBe(false);
   });
@@ -195,5 +195,60 @@ describe("maxFailures 0 disables", () => {
 
     const state = await checkLoginThrottle(redis, username, disabled);
     expect(state).toEqual({ throttled: false, retryAfterS: 0 });
+  });
+
+  it("clearLoginFailures never touches redis when disabled", async () => {
+    const del = vi.fn();
+    const stub = { del } as unknown as Redis;
+
+    await clearLoginFailures(stub, uid(), disabled);
+
+    expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe("redis command failures fail closed", () => {
+  /**
+   * Stub whose multi().exec() resolves the way ioredis reports command-level
+   * failures (WRONGTYPE, OOM, LOADING): a fulfilled promise of [err, result]
+   * tuples, or null when the transaction aborts. The throttle must reject in
+   * both cases; coalescing them into "not throttled" / "0 failures" would
+   * fail the brake open.
+   */
+  const stubRedis = (execResult: [Error | null, unknown][] | null): Redis => {
+    const multi = {
+      zremrangebyscore: () => multi,
+      zrange: () => multi,
+      zadd: () => multi,
+      zcard: () => multi,
+      expire: () => multi,
+      exec: async () => execResult,
+    };
+    return { multi: () => multi } as unknown as Redis;
+  };
+
+  const wrongType = new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+
+  it("checkLoginThrottle rejects when a command in the transaction errors", async () => {
+    const stub = stubRedis([
+      [null, 0],
+      [wrongType, null],
+    ]);
+    await expect(checkLoginThrottle(stub, uid(), CONFIG)).rejects.toThrow(/WRONGTYPE/);
+  });
+
+  it("recordLoginFailure rejects when a command in the transaction errors", async () => {
+    const stub = stubRedis([
+      [null, 0],
+      [wrongType, null],
+      [null, 1],
+      [null, 1],
+    ]);
+    await expect(recordLoginFailure(stub, uid(), CONFIG)).rejects.toThrow(/WRONGTYPE/);
+  });
+
+  it("both reject when exec() resolves null (transaction aborted)", async () => {
+    await expect(checkLoginThrottle(stubRedis(null), uid(), CONFIG)).rejects.toThrow(/aborted/);
+    await expect(recordLoginFailure(stubRedis(null), uid(), CONFIG)).rejects.toThrow(/aborted/);
   });
 });

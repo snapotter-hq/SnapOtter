@@ -81,9 +81,12 @@ const envSchema = z
     // username accumulates LOGIN_THROTTLE_MAX_FAILURES failures within
     // LOGIN_THROTTLE_WINDOW_S seconds, further attempts get 429 until the
     // oldest failures age out. 0 disables. DB-overridable via the
-    // loginThrottleMaxFailures / loginThrottleWindowSeconds settings.
-    LOGIN_THROTTLE_MAX_FAILURES: z.coerce.number().default(10),
-    LOGIN_THROTTLE_WINDOW_S: z.coerce.number().default(900),
+    // loginThrottleMaxFailures / loginThrottleWindowSeconds settings. Bounds
+    // are enforced here so a bad value fails loudly at boot instead of
+    // silently neutering the throttle (a window of 0 would wipe the window on
+    // every recorded failure while the feature looks armed).
+    LOGIN_THROTTLE_MAX_FAILURES: z.coerce.number().int().min(0).default(10),
+    LOGIN_THROTTLE_WINDOW_S: z.coerce.number().int().min(1).default(900),
     // One default everywhere. A source build that never goes through the
     // Docker layer resolves to the same trust list the image bakes, so `pnpm
     // dev` and a bare `node` deployment cannot end up on a different
