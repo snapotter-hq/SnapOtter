@@ -1116,6 +1116,21 @@ export function isStaticAssetRequest(method: string, url: string): boolean {
   );
 }
 
+/**
+ * Throttle audit writes for failed API-key auth: one row per key prefix + IP
+ * per 5 minutes, so unauthenticated scanners cannot flood the audit table.
+ * Returns true when this failure should be written.
+ */
+async function shouldAuditApiKeyAuthFailure(prefix: string, ip: string): Promise<boolean> {
+  try {
+    const result = await sharedRedis().set(`apikey:authfail:${prefix}:${ip}`, "1", "EX", 300, "NX");
+    return result === "OK";
+  } catch {
+    // Redis unavailable: keep the security event visible rather than dropping it.
+    return true;
+  }
+}
+
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip the session DB lookup for bundle assets: they are served on every
@@ -1166,12 +1181,15 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
           const allKeys = await db.select().from(schema.apiKeys);
           keysToCheck = allKeys.filter((k) => !k.keyPrefix).slice(0, 100);
         }
+        let matchedExpiredKey = false;
         for (const key of keysToCheck) {
           const matches = await verifyPassword(token, key.keyHash);
           if (matches) {
             // Check expiration
             if (key.expiresAt && key.expiresAt < new Date()) {
-              // Key expired - skip it
+              // Key expired: skip it, but remember the match so the audit
+              // event can distinguish an expired key from a wrong one.
+              matchedExpiredKey = true;
               continue;
             }
             // Backfill prefix for legacy keys
@@ -1205,6 +1223,12 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
           }
         }
         authAttempts.inc({ method: "apikey", result: "failure" });
+        if (await shouldAuditApiKeyAuthFailure(prefix, request.ip)) {
+          await auditFromRequest(request)("API_KEY_AUTH_FAILED", {
+            keyPrefix: prefix,
+            reason: matchedExpiredKey ? "expired" : "unknown",
+          });
+        }
       }
 
       // Public routes can proceed without a valid session
