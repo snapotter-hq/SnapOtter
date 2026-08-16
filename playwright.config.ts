@@ -285,6 +285,9 @@ export default defineConfig({
         // it well above any single run to avoid 429s that cascade into
         // create-user 401s and login timeouts.
         LOGIN_ATTEMPT_LIMIT: "100000",
+        // Several specs deliberately fail a login as "admin"; keep the
+        // per-username failed-login throttle out of reach the same way.
+        LOGIN_THROTTLE_MAX_FAILURES: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
         // The api-keys management routes cap at 30/min per IP in production. The

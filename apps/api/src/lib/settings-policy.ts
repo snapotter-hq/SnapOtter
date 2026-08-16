@@ -136,6 +136,8 @@ const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
   "sqlite_import.dismissedAt": general(timestampSetting),
 
   loginAttemptLimit: security(integerSetting(1)),
+  loginThrottleMaxFailures: security(integerSetting(0)),
+  loginThrottleWindowSeconds: security(integerSetting(1)),
   sessionIdleTimeoutMinutes: security(integerSetting(0)),
   maxSessionsPerUser: security(integerSetting(0)),
   mfaPolicy: security(z.enum(["optional", "admins_only", "required"])),

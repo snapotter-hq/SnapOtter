@@ -31,6 +31,12 @@ describe("Security: env defaults", () => {
     expect(env.LOGIN_ATTEMPT_LIMIT).toBe(10);
   });
 
+  it("per-username login throttle defaults to 10 failures per 15 minutes", () => {
+    const env = loadEnv();
+    expect(env.LOGIN_THROTTLE_MAX_FAILURES).toBe(10);
+    expect(env.LOGIN_THROTTLE_WINDOW_S).toBe(900);
+  });
+
   it("RATE_LIMIT_PER_MIN is parsed correctly (test env overrides to 10000)", () => {
     // vitest.config.ts sets RATE_LIMIT_PER_MIN=10000 for tests
     const env = loadEnv();

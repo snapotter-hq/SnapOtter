@@ -64,6 +64,7 @@ export default defineConfig({
         DEFAULT_PASSWORD: "admin",
         RATE_LIMIT_PER_MIN: "50000",
         LOGIN_ATTEMPT_LIMIT: "100000",
+        LOGIN_THROTTLE_MAX_FAILURES: "100000",
         SKIP_MUST_CHANGE_PASSWORD: "true",
         ANALYTICS_ENABLED: "false",
         DATABASE_URL: backingState.databaseUrl,

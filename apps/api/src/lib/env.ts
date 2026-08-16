@@ -77,6 +77,13 @@ const envSchema = z
     LIBREOFFICE_TIMEOUT_S: z.coerce.number().default(120),
     SESSION_DURATION_HOURS: z.coerce.number().default(168),
     LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(10),
+    // Per-username sliding-window throttle on failed password logins: once a
+    // username accumulates LOGIN_THROTTLE_MAX_FAILURES failures within
+    // LOGIN_THROTTLE_WINDOW_S seconds, further attempts get 429 until the
+    // oldest failures age out. 0 disables. DB-overridable via the
+    // loginThrottleMaxFailures / loginThrottleWindowSeconds settings.
+    LOGIN_THROTTLE_MAX_FAILURES: z.coerce.number().default(10),
+    LOGIN_THROTTLE_WINDOW_S: z.coerce.number().default(900),
     // One default everywhere. A source build that never goes through the
     // Docker layer resolves to the same trust list the image bakes, so `pnpm
     // dev` and a bare `node` deployment cannot end up on a different

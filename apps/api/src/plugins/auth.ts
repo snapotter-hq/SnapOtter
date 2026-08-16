@@ -9,6 +9,12 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
+import {
+  checkLoginThrottle,
+  clearLoginFailures,
+  type LoginThrottleConfig,
+  recordLoginFailure,
+} from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
 import {
@@ -315,6 +321,25 @@ async function getLoginAttemptLimit(): Promise<number> {
   return env.LOGIN_ATTEMPT_LIMIT;
 }
 
+// ── Per-username failed-login throttle (issue #820) ──────────────
+
+/**
+ * Resolve the throttle thresholds: DB setting override first, env default
+ * otherwise. Unlike loginAttemptLimit, a stored 0 is a meaningful override
+ * here (repo convention: 0 disables), so it wins over the env default.
+ */
+async function getLoginThrottleConfig(): Promise<LoginThrottleConfig> {
+  const maxFailures = await getSettingNumber(
+    "loginThrottleMaxFailures",
+    env.LOGIN_THROTTLE_MAX_FAILURES,
+  );
+  const windowS = await getSettingNumber("loginThrottleWindowSeconds", env.LOGIN_THROTTLE_WINDOW_S);
+  return {
+    maxFailures: maxFailures >= 0 ? Math.floor(maxFailures) : env.LOGIN_THROTTLE_MAX_FAILURES,
+    windowS: windowS >= 1 ? Math.floor(windowS) : env.LOGIN_THROTTLE_WINDOW_S,
+  };
+}
+
 // ── Auth routes ────────────────────────────────────────────────────
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -362,12 +387,43 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
+      const audit = auditFromRequest(request);
+      const redis = sharedRedis();
+
+      // Per-username throttle check, before user lookup: real and nonexistent
+      // usernames share the same window state and the same 429, so the
+      // response is not an enumeration oracle. Below the threshold nothing
+      // changes and the dummy-scrypt timing equalization further down still
+      // covers the unknown-user path.
+      const throttleConfig = await getLoginThrottleConfig();
+      const throttle = await checkLoginThrottle(redis, body.username, throttleConfig);
+      if (throttle.throttled) {
+        reply.header("Retry-After", String(throttle.retryAfterS));
+        return reply.status(429).send({
+          error: "Too many failed login attempts. Try again later.",
+          code: "LOGIN_THROTTLED",
+          retryAfter: throttle.retryAfterS,
+        });
+      }
+
+      // Shared by the failed-verification paths below. The LOGIN_THROTTLED
+      // audit event fires once per episode, on the failure that arms the
+      // throttle; the rejected attempts after it are never recorded.
+      const recordThrottleFailure = async (): Promise<void> => {
+        const record = await recordLoginFailure(redis, body.username, throttleConfig);
+        if (record.crossedThreshold) {
+          await audit("LOGIN_THROTTLED", {
+            username: sanitizeAuditInput(body.username),
+            failures: record.failures,
+            windowSeconds: throttleConfig.windowS,
+          });
+        }
+      };
+
       const [user] = await db
         .select()
         .from(schema.users)
         .where(eq(schema.users.username, body.username));
-
-      const audit = auditFromRequest(request);
 
       if (user && isDisabledRole(user.role)) {
         authAttempts.inc({ method: "password", result: "failure" });
@@ -388,6 +444,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: sanitizeAuditInput(body.username),
           reason: "unknown_user",
         });
+        await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
@@ -399,8 +456,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: sanitizeAuditInput(body.username),
           reason: "bad_password",
         });
+        await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
       }
+
+      // A correct password ends the failed-guess episode, whatever the MFA
+      // branches below decide about the session.
+      await clearLoginFailures(redis, body.username);
 
       let mfaRequiredByPolicy = false;
       try {
@@ -414,7 +476,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // ── MFA challenge ──────────────────────────────────────────
       if (user.totpEnabled) {
         const mfaToken = randomUUID();
-        const redis = sharedRedis();
         await redis.setex(`mfa:${mfaToken}`, 300, user.id);
 
         await audit("MFA_CHALLENGE_ISSUED", { userId: user.id, username: user.username });

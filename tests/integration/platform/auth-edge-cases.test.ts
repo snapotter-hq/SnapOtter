@@ -28,10 +28,17 @@ async function clearSetting(key: string): Promise<void> {
 
 beforeAll(async () => {
   testApp = await buildTestApp();
+  // The timing-oracle test below fires 10 wrong-password attempts at "admin";
+  // keep the per-username failed-login throttle (default 10 per 15 min, issue
+  // #820) out of reach so those attempts stay on the sub-threshold path the
+  // timing equalization test is about. The throttle has its own spec in
+  // login-throttle.test.ts.
+  await setSetting("loginThrottleMaxFailures", "100000");
   adminToken = await loginAsAdmin(testApp.app);
 }, 30_000);
 
 afterAll(async () => {
+  await clearSetting("loginThrottleMaxFailures");
   await testApp.cleanup();
 }, 10_000);
 

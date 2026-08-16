@@ -12,6 +12,9 @@ describe("settings policy registry", () => {
     { key: "tempFileMaxAgeHours", input: "1.5", expected: "1.5" },
     { key: "startupCleanup", input: true, expected: "true" },
     { key: "jobsRetentionDays", input: 30, expected: "30" },
+    // 0 is a valid override here: it disables the login throttle.
+    { key: "loginThrottleMaxFailures", input: 0, expected: "0" },
+    { key: "loginThrottleWindowSeconds", input: "900", expected: "900" },
     {
       key: "disabledTools",
       input: ["compress-image", "resize-image"],
@@ -28,6 +31,8 @@ describe("settings policy registry", () => {
     { key: "defaultTheme", input: "midnight" },
     { key: "defaultLocale", input: "xx-invalid" },
     { key: "loginAttemptLimit", input: "0" },
+    { key: "loginThrottleMaxFailures", input: "-1" },
+    { key: "loginThrottleWindowSeconds", input: "0" },
     { key: "passwordMinLength", input: "7" },
     { key: "disabledTools", input: "not-json" },
     { key: "ssoBreakGlassUsername", input: "invalid username" },
@@ -77,6 +82,8 @@ describe("settings policy registry", () => {
   it("separates general, security, compliance, and full-admin authority", () => {
     expect(getSettingPolicy("defaultTheme")?.write).toBe("settings:write");
     expect(getSettingPolicy("loginAttemptLimit")?.write).toBe("security:manage");
+    expect(getSettingPolicy("loginThrottleMaxFailures")?.write).toBe("security:manage");
+    expect(getSettingPolicy("loginThrottleWindowSeconds")?.write).toBe("security:manage");
     expect(getSettingPolicy("auditRetentionDays")?.write).toBe("compliance:manage");
     expect(getSettingPolicy("oidc_client_secret")?.write).toBe("full-admin");
   });
