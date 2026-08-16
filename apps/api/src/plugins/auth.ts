@@ -428,6 +428,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (mfaRequiredByPolicy) {
+        // Licensed instances walk the user through enrollment right here instead
+        // of hard-blocking, so a required policy cannot strand a not-yet-enrolled
+        // user (snapotter-hq/SnapOtter#811). Unlicensed instances (a policy stored
+        // before the v2.2.0 license gate) cannot enroll, so keep the 403; the
+        // offline recovery CLI is the escape there.
+        const { beginForcedEnrollment } = await import("./mfa.js");
+        const enrollment = await beginForcedEnrollment(user);
+        if (enrollment) {
+          await audit("MFA_ENROLLMENT_STARTED", { userId: user.id, username: user.username });
+          return reply.status(200).send({ requiresMfaEnrollment: true, ...enrollment });
+        }
         authAttempts.inc({ method: "password", result: "failure" });
         await audit("LOGIN_FAILED", {
           userId: user.id,

@@ -779,18 +779,21 @@ async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Pro
     .onConflictDoUpdate({ target: schema.settings.key, set: { value } });
 }
 
-// This is the actual fix for #515/#529: exercises the real /api/auth/login
-// route end to end, not a mocked response. Everything else in this repo that
-// covers this bug (the license gate on saving the setting, the frontend's
-// handling of a stubbed 403) would still pass if this exact backend branch
-// were reverted or its response code were renamed.
+// Exercises the real /api/auth/login MFA-policy branch end to end, not a mocked
+// response. Originally the fix for #515/#529 (an unenrolled user under a
+// required policy was hard-blocked with 403). Since #811, a LICENSED instance
+// (this file mocks mfa as licensed) no longer hard-blocks: it starts a forced
+// enrollment at login and returns 200 requiresMfaEnrollment. The hard 403 now
+// only survives on an unlicensed instance, covered by
+// mfa-forced-enrollment-unlicensed.test.ts. This block would still catch a
+// revert or a renamed response code on the licensed branch.
 describe("POST /api/auth/login with mfaPolicy enforcement", () => {
   afterEach(async () => {
     await setMfaPolicy("optional");
     await clearMfaState("admin");
   });
 
-  it("blocks an unenrolled admin with 403 MFA_ENROLLMENT_REQUIRED when policy is required", async () => {
+  it("starts a forced enrollment (200 requiresMfaEnrollment) for an unenrolled admin when policy is required", async () => {
     await setMfaPolicy("required");
 
     const res = await testApp.app.inject({
@@ -799,13 +802,15 @@ describe("POST /api/auth/login with mfaPolicy enforcement", () => {
       payload: { username: "admin", password: "Adminpass1" },
     });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
-    expect(body.code).toBe("MFA_ENROLLMENT_REQUIRED");
+    expect(body.requiresMfaEnrollment).toBe(true);
+    expect(body.enrollmentToken).toBeDefined();
+    // No session is handed out until enroll-complete confirms a TOTP code.
     expect(body.token).toBeUndefined();
   });
 
-  it("blocks an unenrolled admin under an admins_only policy", async () => {
+  it("starts a forced enrollment for an unenrolled admin under an admins_only policy", async () => {
     await setMfaPolicy("admins_only");
 
     const res = await testApp.app.inject({
@@ -814,8 +819,8 @@ describe("POST /api/auth/login with mfaPolicy enforcement", () => {
       payload: { username: "admin", password: "Adminpass1" },
     });
 
-    expect(res.statusCode).toBe(403);
-    expect(JSON.parse(res.body).code).toBe("MFA_ENROLLMENT_REQUIRED");
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).requiresMfaEnrollment).toBe(true);
   });
 
   it("does not block a non-admin user under an admins_only policy", async () => {
