@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
-import { upsertSetting } from "../lib/settings-helpers.js";
+import { getSettingString, upsertSetting } from "../lib/settings-helpers.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 
 // auditLog's first parameter is a FastifyBaseLogger, but a CLI has no request.
@@ -42,4 +42,14 @@ export async function disableUserMfa(username: string): Promise<DisableMfaResult
     via: "cli",
   });
   return "cleared";
+}
+
+/** Read-only snapshot for diagnosing which login gate is blocking someone. */
+export async function mfaStatus(): Promise<{ policy: string; enrolled: string[] }> {
+  const policy = await getSettingString("mfaPolicy", "optional");
+  const rows = await db
+    .select({ username: schema.users.username })
+    .from(schema.users)
+    .where(eq(schema.users.totpEnabled, true));
+  return { policy, enrolled: rows.map((r) => r.username) };
 }

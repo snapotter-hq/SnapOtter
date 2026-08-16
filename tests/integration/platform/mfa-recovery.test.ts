@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { disableUserMfa, resetMfaPolicy } from "../../../apps/api/src/scripts/mfa-recover.js";
+import {
+  disableUserMfa,
+  mfaStatus,
+  resetMfaPolicy,
+} from "../../../apps/api/src/scripts/mfa-recover.js";
 
 async function readPolicy(): Promise<string | undefined> {
   const [row] = await db
@@ -104,5 +108,20 @@ describe("disableUserMfa", () => {
       .from(schema.auditLog)
       .where(and(eq(schema.auditLog.action, "MFA_RESET"), eq(schema.auditLog.targetId, id)));
     expect(row).toBeDefined();
+  });
+});
+
+describe("mfaStatus", () => {
+  it("reports the current policy and enrolled usernames", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "admins_only" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "admins_only" } });
+    const { username } = await insertUser({ totpEnabled: true, totpSecret: "s" });
+
+    const status = await mfaStatus();
+
+    expect(status.policy).toBe("admins_only");
+    expect(status.enrolled).toContain(username);
   });
 });
