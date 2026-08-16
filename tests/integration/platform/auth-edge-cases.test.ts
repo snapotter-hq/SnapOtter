@@ -6,6 +6,7 @@
 import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -530,20 +531,10 @@ describe("Forced password change gate", () => {
 // A user whose role is prefixed "disabled:" is treated as deactivated.
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Disabled user paths", () => {
-  it("login is rejected with 403 USER_DISABLED before any password check", async () => {
-    const { username, password, id } = await createUser();
-    await db.update(schema.users).set({ role: `disabled:user` }).where(eq(schema.users.id, id));
-
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/login",
-      payload: { username, password },
-    });
-
-    expect(res.statusCode).toBe(403);
-    expect(JSON.parse(res.body).code).toBe("USER_DISABLED");
-
-    // The failed attempt is audited with the disabled_user reason.
+  // Fetch the LOGIN_FAILED audit entry for a (unique) username, if any.
+  async function findLoginFailedAudit(
+    username: string,
+  ): Promise<{ username?: string; reason?: string } | undefined> {
     const audit = await testApp.app.inject({
       method: "GET",
       url: "/api/v1/audit-log?action=LOGIN_FAILED&limit=100",
@@ -553,10 +544,116 @@ describe("Disabled user paths", () => {
       action: string;
       details?: { username?: string; reason?: string };
     }>;
-    const match = entries.find(
-      (e) => e.details?.username === username && e.details?.reason === "disabled_user",
+    return entries.find((e) => e.details?.username === username)?.details;
+  }
+
+  // Current failure count of the password-method authAttempts counter.
+  async function passwordFailureCount(): Promise<number> {
+    const metric = await authAttempts.get();
+    const row = metric.values.find(
+      (v) => v.labels.method === "password" && v.labels.result === "failure",
     );
-    expect(match).toBeDefined();
+    return row?.value ?? 0;
+  }
+
+  it("login with the CORRECT password on a disabled account returns 403 USER_DISABLED", async () => {
+    const { username, password, id } = await createUser();
+    await db.update(schema.users).set({ role: `disabled:user` }).where(eq(schema.users.id, id));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+
+    // The caller proved password knowledge, so revealing the disabled state
+    // leaks nothing an attacker could use for enumeration.
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe("USER_DISABLED");
+
+    // The failed attempt is audited with the disabled_user reason.
+    const details = await findLoginFailedAudit(username);
+    expect(details?.reason).toBe("disabled_user");
+  });
+
+  it("login failures are byte-identical for unknown, wrong-password, and disabled accounts", async () => {
+    // Issue #818: a pre-password disabled check let an unauthenticated caller
+    // confirm a disabled username exists. Without password knowledge, all
+    // three cases must be indistinguishable.
+    const active = await createUser();
+    const disabled = await createUser();
+    await db
+      .update(schema.users)
+      .set({ role: `disabled:user` })
+      .where(eq(schema.users.id, disabled.id));
+
+    const payloads = [
+      { username: `nonexistent_${uid()}`, password: "WrongPass1" },
+      { username: active.username, password: "WrongPass1" },
+      { username: disabled.username, password: "WrongPass1" },
+    ];
+    const responses = [];
+    for (const payload of payloads) {
+      responses.push(await testApp.app.inject({ method: "POST", url: "/api/auth/login", payload }));
+    }
+
+    for (const res of responses) {
+      expect(res.statusCode).toBe(401);
+      expect(res.body).toBe(JSON.stringify({ error: "Invalid credentials" }));
+    }
+  });
+
+  it("wrong-password login on a disabled account still audits reason disabled_user", async () => {
+    const { username, id } = await createUser();
+    await db.update(schema.users).set({ role: `disabled:user` }).where(eq(schema.users.id, id));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "WrongPass1" },
+    });
+    expect(res.statusCode).toBe(401);
+
+    // Admins still see that the attempt targeted a disabled account.
+    const details = await findLoginFailedAudit(username);
+    expect(details?.reason).toBe("disabled_user");
+  });
+
+  it("a disabled passwordless (SSO-provisioned) account gets the generic 401, audited as disabled_user", async () => {
+    const { username, id } = await createUser();
+    await db
+      .update(schema.users)
+      .set({ role: `disabled:user`, passwordHash: null })
+      .where(eq(schema.users.id, id));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "Whatever1" },
+    });
+
+    // No password on file means no way to prove ownership: the response must
+    // stay generic, but the audit trail keeps the more precise reason.
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toBe(JSON.stringify({ error: "Invalid credentials" }));
+    const details = await findLoginFailedAudit(username);
+    expect(details?.reason).toBe("disabled_user");
+  });
+
+  it("each failed login increments authAttempts exactly once", async () => {
+    const { username, password, id } = await createUser();
+    await db.update(schema.users).set({ role: `disabled:user` }).where(eq(schema.users.id, id));
+
+    const payloads = [
+      { username, password }, // correct password, disabled -> 403
+      { username, password: "WrongPass1" }, // wrong password, disabled -> 401
+      { username: `nonexistent_${uid()}`, password: "Whatever1" }, // unknown -> 401
+    ];
+    for (const payload of payloads) {
+      const before = await passwordFailureCount();
+      await testApp.app.inject({ method: "POST", url: "/api/auth/login", payload });
+      expect((await passwordFailureCount()) - before).toBe(1);
+    }
   });
 
   it("session endpoint denies and purges the session once the user is disabled", async () => {

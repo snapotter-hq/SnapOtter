@@ -369,15 +369,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      if (user && isDisabledRole(user.role)) {
-        authAttempts.inc({ method: "password", result: "failure" });
-        await audit("LOGIN_FAILED", {
-          username: sanitizeAuditInput(body.username),
-          reason: "disabled_user",
-        });
-        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
-      }
-
       if (!user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
@@ -386,7 +377,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
-          reason: "unknown_user",
+          // An SSO-provisioned account that was later disabled has no local
+          // hash and lands here too; keep the precise audit reason while the
+          // response stays the generic 401.
+          reason: user && isDisabledRole(user.role) ? "disabled_user" : "unknown_user",
         });
         return reply.status(401).send({ error: "Invalid credentials" });
       }
@@ -397,9 +391,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
-          reason: "bad_password",
+          reason: isDisabledRole(user.role) ? "disabled_user" : "bad_password",
         });
         return reply.status(401).send({ error: "Invalid credentials" });
+      }
+
+      // Only reveal the disabled state to a caller who proved password
+      // knowledge; without it, disabled accounts must be indistinguishable
+      // from unknown ones (issue #818).
+      if (isDisabledRole(user.role)) {
+        authAttempts.inc({ method: "password", result: "failure" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "disabled_user",
+        });
+        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
       }
 
       let mfaRequiredByPolicy = false;
