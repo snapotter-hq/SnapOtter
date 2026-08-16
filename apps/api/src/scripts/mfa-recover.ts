@@ -113,15 +113,17 @@ export async function runRecoveryCli(argv: string[]): Promise<number> {
 }
 
 // Run only when executed directly (tsx/node), not when imported by tests.
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Set process.exitCode and let the process end naturally after the pool drains,
+// rather than process.exit(), so a piped confirmation line is never truncated.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runRecoveryCli(process.argv.slice(2))
     .then(async (code) => {
       await closeDb();
-      process.exit(code);
+      process.exitCode = code;
     })
     .catch(async (err) => {
       console.error(err instanceof Error ? err.message : err);
       await closeDb();
-      process.exit(1);
+      process.exitCode = 1;
     });
 }
