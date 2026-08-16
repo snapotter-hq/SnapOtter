@@ -1,0 +1,4 @@
+#!/bin/sh
+# Offline MFA recovery CLI for locked-out operators.
+# Docs: https://docs.snapotter.com/guide/account-recovery
+cd /app/apps/api && exec ./node_modules/.bin/tsx src/scripts/mfa-recover.ts "$@"
