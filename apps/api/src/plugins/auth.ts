@@ -10,6 +10,7 @@ import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { authAttempts } from "../lib/metrics.js";
+import { isSecureRequest } from "../lib/secure-cookie.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
 import {
   canAssignRole,
@@ -481,7 +482,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           path: "/",
           httpOnly: true,
           sameSite: "strict",
-          secure: env.EXTERNAL_URL.startsWith("https"),
+          secure: isSecureRequest(request),
           maxAge: SESSION_DURATION_MS / 1000,
         });
       }

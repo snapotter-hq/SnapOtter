@@ -35,6 +35,7 @@ import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
 import { posthogProxyEnabled } from "../../apps/api/src/lib/posthog-proxy.js";
+import { parseTrustProxy } from "../../apps/api/src/lib/trust-proxy.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
 import {
   authMiddleware,
@@ -138,6 +139,10 @@ export async function buildTestApp(): Promise<TestApp> {
   const app = Fastify({
     logger: false, // quiet during tests
     bodyLimit: env.MAX_UPLOAD_SIZE_MB * 1024 * 1024,
+    // Mirrors index.ts so forwarded-header behaviour (request.ip,
+    // request.protocol) matches production. inject() peers on 127.0.0.1 are
+    // trusted by the default policy; see tests/unit/security/trust-proxy-policy.test.ts.
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
   });
 
   // Plugins

@@ -11,6 +11,7 @@ import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { resolveExternalUser, sanitizeUsername } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
+import { isSecureRequest } from "../lib/secure-cookie.js";
 import { createSessionToken } from "./auth.js";
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -47,7 +48,9 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
     env.OIDC_CLIENT_SECRET,
     undefined,
     {
-      execute: isSecure() ? undefined : [oidc.allowInsecureRequests],
+      // No request in scope here; this gates plain-http issuer URLs for dev
+      // setups, so only the declared origin matters.
+      execute: env.EXTERNAL_URL.startsWith("https") ? undefined : [oidc.allowInsecureRequests],
     },
   );
 
@@ -100,10 +103,6 @@ function deriveUsername(claims: Record<string, unknown>): string {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function isSecure(): boolean {
-  return env.EXTERNAL_URL.startsWith("https");
-}
-
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
 function redirectToLogin(reply: FastifyReply, errorCode: string): void {
@@ -152,7 +151,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       reply.setCookie("oidc-state", cookieValue, {
         httpOnly: true,
         sameSite: "lax",
-        secure: isSecure(),
+        secure: isSecureRequest(request),
         path: "/api/auth/oidc",
         maxAge: 600, // 10 minutes
         signed: false, // already signed manually
@@ -188,7 +187,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         path: "/api/auth/oidc",
         httpOnly: true,
         sameSite: "lax",
-        secure: isSecure(),
+        secure: isSecureRequest(request),
       });
 
       const unsigned = request.unsignCookie(rawCookie);
@@ -377,7 +376,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       reply.setCookie("snapotter-session", token, {
         httpOnly: true,
         sameSite: "strict",
-        secure: isSecure(),
+        secure: isSecureRequest(request),
         path: "/",
         maxAge: env.SESSION_DURATION_HOURS * 3600,
       });
