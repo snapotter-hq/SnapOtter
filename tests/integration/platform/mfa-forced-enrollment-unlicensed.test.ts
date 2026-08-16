@@ -12,7 +12,7 @@
  * lives apart from the licensed suite because the enterprise mock is per-file
  * all-or-nothing. The required policy is written straight to the DB, since the
  * PUT /settings gate would (correctly) reject saving it on an unlicensed
- * instance -- which is exactly why this legacy pre-gate state has to be seeded
+ * instance, which is exactly why this legacy pre-gate state has to be seeded
  * directly.
  */
 import { eq } from "drizzle-orm";

@@ -90,7 +90,7 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     expect(body.uri).toContain("otpauth://totp/");
     expect(Array.isArray(body.recoveryCodes)).toBe(true);
     expect(body.recoveryCodes.length).toBeGreaterThan(0);
-    // No session was handed out yet -- that only happens after enroll-complete.
+    // No session was handed out yet; that only happens after enroll-complete.
     expect(body.token).toBeUndefined();
 
     // A real pending secret now sits on the row, still inactive.
