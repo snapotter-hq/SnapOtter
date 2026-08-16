@@ -9,6 +9,7 @@ import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { getSettingString } from "../lib/settings-helpers.js";
+import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
   getPermissions,
@@ -430,16 +431,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Clear MFA data
-      await db
-        .update(schema.users)
-        .set({
-          totpSecret: null,
-          totpEnabled: false,
-          recoveryCodesHash: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.users.id, user.id));
+      await clearUserMfa(user.id);
 
       const audit = auditFromRequest(request);
       await audit("MFA_DISABLED", { userId: user.id, username: user.username });
@@ -476,16 +468,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Clear MFA data
-      await db
-        .update(schema.users)
-        .set({
-          totpSecret: null,
-          totpEnabled: false,
-          recoveryCodesHash: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.users.id, id));
+      await clearUserMfa(id);
 
       const audit = auditFromRequest(request);
       await audit("MFA_RESET", {
