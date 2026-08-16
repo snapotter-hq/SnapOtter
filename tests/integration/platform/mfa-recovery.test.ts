@@ -6,6 +6,7 @@ import {
   disableUserMfa,
   mfaStatus,
   resetMfaPolicy,
+  runRecoveryCli,
 } from "../../../apps/api/src/scripts/mfa-recover.js";
 
 async function readPolicy(): Promise<string | undefined> {
@@ -123,5 +124,37 @@ describe("mfaStatus", () => {
 
     expect(status.policy).toBe("admins_only");
     expect(status.enrolled).toContain(username);
+  });
+});
+
+describe("runRecoveryCli", () => {
+  it("returns 0 for reset-mfa-policy and relaxes the policy", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+    const code = await runRecoveryCli(["reset-mfa-policy"]);
+    expect(code).toBe(0);
+    expect(await readPolicy()).toBe("optional");
+  });
+
+  it("returns 0 for status", async () => {
+    expect(await runRecoveryCli(["status"])).toBe(0);
+  });
+
+  it("returns 1 for disable-mfa with no username", async () => {
+    expect(await runRecoveryCli(["disable-mfa"])).toBe(1);
+  });
+
+  it("returns 1 for an unknown command", async () => {
+    expect(await runRecoveryCli(["frobnicate"])).toBe(1);
+  });
+
+  it("returns 1 for no command", async () => {
+    expect(await runRecoveryCli([])).toBe(1);
+  });
+
+  it("returns 0 for help", async () => {
+    expect(await runRecoveryCli(["help"])).toBe(0);
   });
 });

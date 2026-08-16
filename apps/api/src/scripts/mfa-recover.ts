@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
-import { db, schema } from "../db/index.js";
+import { closeDb, db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
 import { getSettingString, upsertSetting } from "../lib/settings-helpers.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
@@ -52,4 +52,75 @@ export async function mfaStatus(): Promise<{ policy: string; enrolled: string[] 
     .from(schema.users)
     .where(eq(schema.users.totpEnabled, true));
   return { policy, enrolled: rows.map((r) => r.username) };
+}
+
+const USAGE = `snapotter-admin — offline MFA recovery
+
+Usage:
+  snapotter-admin status                  Show the MFA policy and enrolled users
+  snapotter-admin reset-mfa-policy        Set the MFA policy back to "optional"
+  snapotter-admin disable-mfa <username>  Clear a user's TOTP enrollment
+`;
+
+export async function runRecoveryCli(argv: string[]): Promise<number> {
+  const [command, ...rest] = argv;
+  switch (command) {
+    case "status": {
+      const { policy, enrolled } = await mfaStatus();
+      console.log(`MFA policy: ${policy}`);
+      console.log(
+        enrolled.length
+          ? `Enrolled users (${enrolled.length}): ${enrolled.join(", ")}`
+          : "Enrolled users: none",
+      );
+      return 0;
+    }
+    case "reset-mfa-policy": {
+      await resetMfaPolicy();
+      console.log(
+        'MFA policy reset to "optional". It applies on the next login; no restart needed.',
+      );
+      return 0;
+    }
+    case "disable-mfa": {
+      const username = rest[0];
+      if (!username) {
+        console.error("Usage: snapotter-admin disable-mfa <username>");
+        return 1;
+      }
+      const result = await disableUserMfa(username);
+      if (result === "not-found") {
+        console.error(`No user found with username "${username}".`);
+        return 1;
+      }
+      if (result === "already-clear") {
+        console.log(`MFA is already disabled for "${username}". Nothing to do.`);
+        return 0;
+      }
+      console.log(`Cleared MFA enrollment for "${username}".`);
+      return 0;
+    }
+    case "help":
+    case "--help":
+    case "-h":
+      console.log(USAGE);
+      return 0;
+    default:
+      console.error(USAGE);
+      return 1;
+  }
+}
+
+// Run only when executed directly (tsx/node), not when imported by tests.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runRecoveryCli(process.argv.slice(2))
+    .then(async (code) => {
+      await closeDb();
+      process.exit(code);
+    })
+    .catch(async (err) => {
+      console.error(err instanceof Error ? err.message : err);
+      await closeDb();
+      process.exit(1);
+    });
 }
