@@ -153,8 +153,10 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
         url: "/api/auth/mfa/enroll-complete",
         payload: { enrollmentToken, code: "000000" },
       });
+      const badBody = JSON.parse(bad.body);
       expect(bad.statusCode).toBe(401);
-      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
+      expect(badBody.code).toBe("INVALID_CODE");
+      expect(badBody.token).toBeUndefined();
     }
 
     // The 6th attempt finds a burned token: it now reads as expired.
