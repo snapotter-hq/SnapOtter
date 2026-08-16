@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { closeDb, db, schema } from "../db/index.js";
@@ -54,7 +55,7 @@ export async function mfaStatus(): Promise<{ policy: string; enrolled: string[] 
   return { policy, enrolled: rows.map((r) => r.username) };
 }
 
-const USAGE = `snapotter-admin — offline MFA recovery
+const USAGE = `snapotter-admin: offline MFA recovery
 
 Usage:
   snapotter-admin status                  Show the MFA policy and enrolled users
@@ -112,7 +113,7 @@ export async function runRecoveryCli(argv: string[]): Promise<number> {
 }
 
 // Run only when executed directly (tsx/node), not when imported by tests.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   runRecoveryCli(process.argv.slice(2))
     .then(async (code) => {
       await closeDb();
