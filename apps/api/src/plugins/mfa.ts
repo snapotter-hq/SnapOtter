@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as OTPAuth from "otpauth";
@@ -34,6 +34,11 @@ const verifyCodeSchema = z.object({
 
 const completeSchema = z.object({
   mfaToken: z.string().uuid("Invalid MFA token"),
+  code: z.string().min(1, "Code is required").max(20, "Code too long"),
+});
+
+const enrollCompleteSchema = z.object({
+  enrollmentToken: z.string().uuid("Invalid enrollment token"),
   code: z.string().min(1, "Code is required").max(20, "Code too long"),
 });
 
@@ -129,6 +134,45 @@ export function resolveExternalLoginMfaOutcome(
   if (totpEnabled) return "challenge";
   if (isMfaRequiredForUser(policy, userRole)) return "enrollment_required";
   return "proceed";
+}
+
+/**
+ * Start a forced TOTP enrollment for a user who just passed password auth but
+ * is blocked by a required MFA policy without an enrollment. Mirrors the enroll
+ * route's pending-secret storage, but keyed by a short-lived redis token so it
+ * can complete without a session. Returns null when MFA is not licensed (the
+ * caller keeps the hard 403 in that case).
+ */
+export async function beginForcedEnrollment(user: {
+  id: string;
+  username: string;
+}): Promise<{ enrollmentToken: string; uri: string; recoveryCodes: string[] } | null> {
+  let mfaLicensed = false;
+  try {
+    const { isFeatureEnabled } = await import("@snapotter/enterprise");
+    mfaLicensed = isFeatureEnabled("mfa");
+  } catch {
+    // Enterprise package not available.
+  }
+  if (!mfaLicensed) return null;
+
+  const totp = createTotp(user.username);
+  const recoveryCodes = generateRecoveryCodes();
+  const encryptedSecret = await encryptSecret(totp.secret.base32);
+
+  await db
+    .update(schema.users)
+    .set({
+      totpSecret: encryptedSecret,
+      totpEnabled: false,
+      recoveryCodesHash: hashRecoveryCodes(recoveryCodes),
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.users.id, user.id));
+
+  const enrollmentToken = randomUUID();
+  await sharedRedis().setex(`mfa:enroll:${enrollmentToken}`, MFA_CHALLENGE_TTL_SECONDS, user.id);
+  return { enrollmentToken, uri: totp.toString(), recoveryCodes };
 }
 
 // ── MFA plugin registration ───────────────────────────────────────
@@ -366,6 +410,116 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         userId: dbUser.id,
         username: dbUser.username,
       });
+
+      const [teamRow] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, dbUser.team));
+
+      return reply.send({
+        token,
+        user: {
+          id: dbUser.id,
+          username: dbUser.username,
+          role: dbUser.role,
+          mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : dbUser.mustChangePassword,
+          permissions: await getPermissions(dbUser.role),
+          teamName: teamRow?.name ?? dbUser.team,
+        },
+        expiresAt: expiresAt.toISOString(),
+      });
+    },
+  );
+
+  // POST /api/auth/mfa/enroll-complete confirms a forced enrollment started at
+  // login (snapotter-hq/SnapOtter#811) and mints a session. Not session-gated:
+  // the whole point is that the user has no session yet. Keyed on a short-lived
+  // redis enroll token instead. Only a TOTP code is accepted for the initial
+  // confirmation (never a recovery code), same as the self-service verify route.
+  app.post(
+    "/api/auth/mfa/enroll-complete",
+    {
+      config: { rateLimit: { max: 15, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parsed = enrollCompleteSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: "Enrollment token and code are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const { enrollmentToken, code } = parsed.data;
+
+      const redis = sharedRedis();
+      const userId = await redis.get(`mfa:enroll:${enrollmentToken}`);
+      if (!userId) {
+        return reply.status(401).send({
+          error: "Enrollment challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
+
+      const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+      if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
+        return reply.status(401).send({
+          error: "User not found or MFA not configured",
+          code: "MFA_NOT_CONFIGURED",
+        });
+      }
+      if (dbUser.totpEnabled) {
+        // Defensive: the pending secret should be inactive at this point.
+        return reply.status(409).send({
+          error: "MFA is already verified and active",
+          code: "MFA_ALREADY_ENABLED",
+        });
+      }
+
+      const secretBase32 = await decryptSecret(dbUser.totpSecret);
+      if (!secretBase32) {
+        return reply.status(500).send({
+          error: "Failed to decrypt TOTP secret",
+          code: "DECRYPTION_FAILED",
+        });
+      }
+
+      const audit = auditFromRequest(request);
+
+      if (!verifyTotpCode(secretBase32, code)) {
+        // Burn the enrollment after a few wrong codes so an attacker who already
+        // holds valid credentials cannot grind TOTP guesses within the window.
+        // The counter shares the enrollment token's lifetime.
+        const attemptsKey = `mfa:enroll:attempts:${enrollmentToken}`;
+        const attempts = await redis.incr(attemptsKey);
+        if (attempts === 1) await redis.expire(attemptsKey, MFA_CHALLENGE_TTL_SECONDS);
+        if (attempts >= MFA_MAX_FAILED_ATTEMPTS) {
+          await redis.del(`mfa:enroll:${enrollmentToken}`, attemptsKey);
+        }
+        await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
+        return reply.status(401).send({
+          error: "Invalid TOTP code",
+          code: "INVALID_CODE",
+        });
+      }
+
+      // Activate MFA and clear the enrollment token + any failed-attempt counter.
+      await db
+        .update(schema.users)
+        .set({ totpEnabled: true, updatedAt: new Date() })
+        .where(eq(schema.users.id, userId));
+      await redis.del(`mfa:enroll:${enrollmentToken}`, `mfa:enroll:attempts:${enrollmentToken}`);
+
+      // Create a session, same as the complete route's login completion.
+      const token = createSessionToken();
+      const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+      await db.insert(schema.sessions).values({
+        id: token,
+        userId: dbUser.id,
+        expiresAt,
+      });
+
+      await audit("MFA_ENROLLED", { userId: dbUser.id, username: dbUser.username });
+      await audit("LOGIN_SUCCESS", { userId: dbUser.id, username: dbUser.username });
 
       const [teamRow] = await db
         .select()
