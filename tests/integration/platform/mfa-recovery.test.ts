@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { resetMfaPolicy } from "../../../apps/api/src/scripts/mfa-recover.js";
+import { disableUserMfa, resetMfaPolicy } from "../../../apps/api/src/scripts/mfa-recover.js";
 
 async function readPolicy(): Promise<string | undefined> {
   const [row] = await db
@@ -33,5 +33,76 @@ describe("resetMfaPolicy", () => {
     const before = await countAudit("SETTINGS_UPDATED");
     await resetMfaPolicy();
     expect(await countAudit("SETTINGS_UPDATED")).toBe(before + 1);
+  });
+});
+
+async function insertUser(
+  opts: {
+    totpEnabled?: boolean;
+    totpSecret?: string | null;
+    recoveryCodesHash?: string | null;
+  } = {},
+) {
+  const id = randomUUID();
+  const username = `recover_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await db.insert(schema.users).values({
+    id,
+    username,
+    totpEnabled: opts.totpEnabled ?? false,
+    totpSecret: opts.totpSecret ?? null,
+    recoveryCodesHash: opts.recoveryCodesHash ?? null,
+  });
+  return { id, username };
+}
+
+describe("disableUserMfa", () => {
+  it("clears an enrolled user's MFA columns and returns 'cleared'", async () => {
+    const { id, username } = await insertUser({
+      totpEnabled: true,
+      totpSecret: "secret",
+      recoveryCodesHash: "a,b",
+    });
+    const other = await insertUser({ totpEnabled: true, totpSecret: "other" });
+
+    const result = await disableUserMfa(username);
+
+    expect(result).toBe("cleared");
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(row.totpEnabled).toBe(false);
+    expect(row.totpSecret).toBeNull();
+    expect(row.recoveryCodesHash).toBeNull();
+
+    const [otherRow] = await db.select().from(schema.users).where(eq(schema.users.id, other.id));
+    expect(otherRow.totpSecret).toBe("other");
+  });
+
+  it("clears a dangling pending enrollment (secret set, totpEnabled false)", async () => {
+    const { id, username } = await insertUser({ totpEnabled: false, totpSecret: "pending" });
+    const result = await disableUserMfa(username);
+    expect(result).toBe("cleared");
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(row.totpSecret).toBeNull();
+  });
+
+  it("returns 'already-clear' and writes no audit row when nothing is set", async () => {
+    const { username } = await insertUser();
+    const before = await countAudit("MFA_RESET");
+    const result = await disableUserMfa(username);
+    expect(result).toBe("already-clear");
+    expect(await countAudit("MFA_RESET")).toBe(before);
+  });
+
+  it("returns 'not-found' for an unknown username", async () => {
+    expect(await disableUserMfa("no-such-user-xyz")).toBe("not-found");
+  });
+
+  it("writes an MFA_RESET audit row targeting the user when cleared", async () => {
+    const { id, username } = await insertUser({ totpEnabled: true, totpSecret: "s" });
+    await disableUserMfa(username);
+    const [row] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "MFA_RESET"), eq(schema.auditLog.targetId, id)));
+    expect(row).toBeDefined();
   });
 });

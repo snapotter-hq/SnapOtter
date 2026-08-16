@@ -1,6 +1,9 @@
+import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
+import { db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
+import { clearUserMfa } from "../lib/user-mfa.js";
 
 // auditLog's first parameter is a FastifyBaseLogger, but a CLI has no request.
 // It only calls .info(obj, msg) and .warn(obj, msg), so a console-backed shim
@@ -20,4 +23,23 @@ export async function resetMfaPolicy(): Promise<void> {
     value: "optional",
     via: "cli-recovery",
   });
+}
+
+export type DisableMfaResult = "cleared" | "already-clear" | "not-found";
+
+/** Clear a single user's TOTP enrollment by username. Idempotent: an already
+ * un-enrolled user (including a dangling pending secret) is handled cleanly. */
+export async function disableUserMfa(username: string): Promise<DisableMfaResult> {
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+  if (!user) return "not-found";
+  if (!user.totpEnabled && !user.totpSecret && !user.recoveryCodesHash) {
+    return "already-clear";
+  }
+  await clearUserMfa(user.id);
+  await auditLog(cliLogger, "MFA_RESET", {
+    targetUserId: user.id,
+    targetUsername: username,
+    via: "cli",
+  });
+  return "cleared";
 }
