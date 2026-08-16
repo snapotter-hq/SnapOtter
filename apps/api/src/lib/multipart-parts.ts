@@ -20,6 +20,15 @@ export interface MultipartFieldPart {
 
 export type MultipartPart = MultipartFilePart | MultipartFieldPart;
 
+/**
+ * Caps on multipart text fields, shared with the plugin registration in
+ * plugins/upload.ts so the two limit sets cannot drift. fieldSize restates
+ * busboy's implicit 1 MB per-field default; fields bounds the per-request
+ * field count, which busboy otherwise leaves unlimited (issue #821).
+ */
+export const MULTIPART_FIELD_SIZE_BYTES = 1024 * 1024;
+export const MULTIPART_MAX_FIELDS = 100;
+
 const DONE = Symbol("multipart-done");
 
 /**
@@ -50,6 +59,8 @@ export async function* multipartParts(
         limits.fileSize ??
         (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined),
       files: limits.files ?? (env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined),
+      fieldSize: MULTIPART_FIELD_SIZE_BYTES,
+      fields: MULTIPART_MAX_FIELDS,
     },
   });
 
@@ -88,8 +99,17 @@ export async function* multipartParts(
       file: stream,
     });
   });
-  bb.on("field", (fieldname, value) => push({ type: "field", fieldname, value }));
+  bb.on("field", (fieldname, value, _fieldnameTruncated, valueTruncated) => {
+    // Busboy clips a field value at fieldSize and keeps going; a clipped
+    // settings payload must fail loudly here, not parse as garbage downstream.
+    if (valueTruncated) {
+      push(new Error(`field value too large: ${fieldname}`));
+      return;
+    }
+    push({ type: "field", fieldname, value });
+  });
   bb.on("filesLimit", () => push(new Error("reached files limit")));
+  bb.on("fieldsLimit", () => push(new Error("reached fields limit")));
   bb.on("partsLimit", () => push(new Error("reached parts limit")));
   bb.on("error", (err: unknown) => push(err instanceof Error ? err : new Error(String(err))));
   bb.on("finish", () => push(DONE));

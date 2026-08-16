@@ -486,10 +486,15 @@ Two things to know before you go measuring client IPs. Docker Desktop on macOS a
 
 Two things matter for every proxy below: allow large request bodies (uploads), and do not buffer responses. A response-buffering proxy breaks SSE progress and, more visibly, makes a large file download "start but never finish", because the proxy holds the whole file before passing it on. SnapOtter sends `X-Accel-Buffering: no` on downloads so nginx streams them even if buffering is left on elsewhere, but proxies other than nginx need response buffering disabled explicitly (shown in each config below). If a download stalls partway, a buffering proxy in front is the first thing to check.
 
+A note on HSTS: the API sends `Strict-Transport-Security` on every response itself, so a proxy that passes response headers through (all of the configs below do) needs no HSTS setup of its own. Only if your proxy is configured to strip or override upstream response headers do you need to preserve the header or re-add it at the edge.
+
 ### Nginx {#nginx}
 
 ```nginx
 server {
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -522,6 +527,8 @@ server {
 4. Enable WebSocket support
 5. Under Advanced, add: `client_max_body_size 500M;` and `proxy_buffering off;`
 
+The API's `Strict-Transport-Security` header passes through NPM as-is; the HSTS toggle on the SSL tab is optional on top of it.
+
 ### Traefik {#traefik}
 
 ```yaml
@@ -537,6 +544,8 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
+Traefik forwards upstream response headers unchanged, so the API's `Strict-Transport-Security` header reaches browsers without a `headers` middleware. If you already run one that rewrites response headers, make sure it leaves that header intact.
+
 ### Caddy {#caddy}
 
 ```txt
@@ -551,7 +560,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs) and for large file downloads to stream through instead of stalling. The extended timeouts allow large file uploads to complete without Caddy closing the connection early.
+`flush_interval -1` disables response buffering, which is required for SSE progress events (batch processing, AI tools, feature installs) and for large file downloads to stream through instead of stalling. The extended timeouts allow large file uploads to complete without Caddy closing the connection early. Caddy also passes the API's `Strict-Transport-Security` header through untouched, so no `header` directive is needed for HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -560,6 +569,8 @@ cloudflared tunnel --url http://localhost:1349
 ```
 
 Note: Cloudflare has a 100 MB upload limit on free plans. Set `MAX_UPLOAD_SIZE_MB=100` to match.
+
+The tunnel forwards the API's response headers, `Strict-Transport-Security` included, so no dashboard HSTS configuration is required (Cloudflare's own edge HSTS setting is optional on top).
 
 ## Troubleshooting {#troubleshooting}
 

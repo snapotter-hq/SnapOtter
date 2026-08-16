@@ -1,13 +1,19 @@
 import multipart from "@fastify/multipart";
 import type { FastifyInstance } from "fastify";
 import { env } from "../config.js";
-import { multipartParts } from "../lib/multipart-parts.js";
+import {
+  MULTIPART_FIELD_SIZE_BYTES,
+  MULTIPART_MAX_FIELDS,
+  multipartParts,
+} from "../lib/multipart-parts.js";
 
 export async function registerUpload(app: FastifyInstance): Promise<void> {
   await app.register(multipart, {
     limits: {
       fileSize: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
       files: env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined,
+      fieldSize: MULTIPART_FIELD_SIZE_BYTES,
+      fields: MULTIPART_MAX_FIELDS,
     },
   });
 
