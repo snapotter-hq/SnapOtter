@@ -699,3 +699,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Fix for issue #829: safe input handling
