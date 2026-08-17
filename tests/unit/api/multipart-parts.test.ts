@@ -129,6 +129,30 @@ describe("multipartParts", () => {
     await generator.return(undefined);
   });
 
+  it("rejects a request with more than 100 text fields", async () => {
+    const body = multipartBody(
+      Array.from({ length: 101 }, (_, i) => ({ name: `field${i}`, content: "x" })),
+    );
+
+    await expect(async () => {
+      for await (const part of multipartParts(fakeRequest(body))) {
+        if (part.type === "file") await drain(part.file);
+      }
+    }).rejects.toThrow("fields limit");
+  });
+
+  it("rejects a text field over the 1 MB cap instead of silently truncating it", async () => {
+    const body = multipartBody([
+      { name: "settings", content: Buffer.alloc(1024 * 1024 + 1, 0x61) },
+    ]);
+
+    await expect(async () => {
+      for await (const part of multipartParts(fakeRequest(body))) {
+        if (part.type === "file") await drain(part.file);
+      }
+    }).rejects.toThrow("field value too large");
+  });
+
   it("honors a route-specific two-file limit", async () => {
     const body = multipartBody([
       { name: "index", filename: "ocr-runtime-index.json", content: "index" },

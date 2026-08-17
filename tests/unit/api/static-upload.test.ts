@@ -14,7 +14,8 @@ const mockMultipartPlugin = vi.fn();
 vi.mock("@fastify/multipart", () => ({ default: mockMultipartPlugin }));
 
 const multipartPartsMock = vi.hoisted(() => vi.fn());
-vi.mock("../../../apps/api/src/lib/multipart-parts.js", () => ({
+vi.mock("../../../apps/api/src/lib/multipart-parts.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/multipart-parts.js")>()),
   multipartParts: multipartPartsMock,
 }));
 
@@ -130,6 +131,8 @@ describe("registerUpload", () => {
       limits: {
         fileSize: 10 * 1024 * 1024,
         files: 5,
+        fieldSize: 1024 * 1024,
+        fields: 100,
       },
     });
   });
@@ -144,6 +147,8 @@ describe("registerUpload", () => {
       limits: {
         fileSize: undefined,
         files: 5,
+        fieldSize: 1024 * 1024,
+        fields: 100,
       },
     });
   });
@@ -158,6 +163,8 @@ describe("registerUpload", () => {
       limits: {
         fileSize: 10 * 1024 * 1024,
         files: undefined,
+        fieldSize: 1024 * 1024,
+        fields: 100,
       },
     });
   });
@@ -172,6 +179,8 @@ describe("registerUpload", () => {
       limits: {
         fileSize: undefined,
         files: undefined,
+        fieldSize: 1024 * 1024,
+        fields: 100,
       },
     });
   });

@@ -16,6 +16,7 @@ import {
   recordLoginFailure,
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
+import { isSecureRequest } from "../lib/secure-cookie.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
 import {
   canAssignRole,
@@ -428,18 +429,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .from(schema.users)
         .where(eq(schema.users.username, body.username));
 
-      if (user && isDisabledRole(user.role)) {
-        authAttempts.inc({ method: "password", result: "failure" });
-        await audit("LOGIN_FAILED", {
-          username: sanitizeAuditInput(body.username),
-          reason: "disabled_user",
-        });
-        // A disabled-account probe still counts as a failed attempt against
-        // the username, so hammering a disabled account throttles too.
-        await recordThrottleFailure();
-        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
-      }
-
       if (!user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
@@ -448,7 +437,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
-          reason: "unknown_user",
+          // An SSO-provisioned account that was later disabled has no local
+          // hash and lands here too; keep the precise audit reason while the
+          // response stays the generic 401.
+          reason: user && isDisabledRole(user.role) ? "disabled_user" : "unknown_user",
         });
         await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
@@ -460,15 +452,29 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
-          reason: "bad_password",
+          reason: isDisabledRole(user.role) ? "disabled_user" : "bad_password",
         });
         await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
-      // A correct password ends the failed-guess episode, whatever the MFA
-      // branches below decide about the session.
+      // A correct password ends the failed-guess episode, whatever the
+      // branches below decide about the session: the caller proved the
+      // password, so the disabled 403 and the MFA paths all clear the window.
       await clearLoginFailures(redis, body.username, throttleConfig);
+
+      // Only reveal the disabled state to a caller who proved password
+      // knowledge; without it, disabled accounts must be indistinguishable
+      // from unknown ones (issue #818). Wrong-password probes against a
+      // disabled account record throttle failures via the 401 path above.
+      if (isDisabledRole(user.role)) {
+        authAttempts.inc({ method: "password", result: "failure" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "disabled_user",
+        });
+        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
 
       let mfaRequiredByPolicy = false;
       try {
@@ -548,7 +554,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           path: "/",
           httpOnly: true,
           sameSite: "strict",
-          secure: env.EXTERNAL_URL.startsWith("https"),
+          secure: isSecureRequest(request),
           maxAge: SESSION_DURATION_MS / 1000,
         });
       }
@@ -1183,6 +1189,21 @@ export function isStaticAssetRequest(method: string, url: string): boolean {
   );
 }
 
+/**
+ * Throttle audit writes for failed API-key auth: one row per key prefix + IP
+ * per 5 minutes, so unauthenticated scanners cannot flood the audit table.
+ * Returns true when this failure should be written.
+ */
+async function shouldAuditApiKeyAuthFailure(prefix: string, ip: string): Promise<boolean> {
+  try {
+    const result = await sharedRedis().set(`apikey:authfail:${prefix}:${ip}`, "1", "EX", 300, "NX");
+    return result === "OK";
+  } catch {
+    // Redis unavailable: keep the security event visible rather than dropping it.
+    return true;
+  }
+}
+
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip the session DB lookup for bundle assets: they are served on every
@@ -1233,12 +1254,15 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
           const allKeys = await db.select().from(schema.apiKeys);
           keysToCheck = allKeys.filter((k) => !k.keyPrefix).slice(0, 100);
         }
+        let matchedExpiredKey = false;
         for (const key of keysToCheck) {
           const matches = await verifyPassword(token, key.keyHash);
           if (matches) {
             // Check expiration
             if (key.expiresAt && key.expiresAt < new Date()) {
-              // Key expired - skip it
+              // Key expired: skip it, but remember the match so the audit
+              // event can distinguish an expired key from a wrong one.
+              matchedExpiredKey = true;
               continue;
             }
             // Backfill prefix for legacy keys
@@ -1272,6 +1296,12 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
           }
         }
         authAttempts.inc({ method: "apikey", result: "failure" });
+        if (await shouldAuditApiKeyAuthFailure(prefix, request.ip)) {
+          await auditFromRequest(request)("API_KEY_AUTH_FAILED", {
+            keyPrefix: prefix,
+            reason: matchedExpiredKey ? "expired" : "unknown",
+          });
+        }
       }
 
       // Public routes can proceed without a valid session

@@ -72,8 +72,8 @@ The following headers are set on all responses:
 | `X-XSS-Protection` | `0` (modern best practice) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (production only) |
-| `Content-Security-Policy` | Restrictive policy with `default-src 'self'` (production only) |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (sent in all environments; browsers ignore it over plain HTTP) |
+| `Content-Security-Policy` | Restrictive policy with `default-src 'self'` |
 
 ### Rate Limiting
 

@@ -15,6 +15,7 @@ import {
 } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
 import { makeRedisSamlCacheProvider } from "../lib/saml-cache.js";
+import { isSecureRequest } from "../lib/secure-cookie.js";
 import { createSessionToken } from "./auth.js";
 
 // -- SAML instance factory ----------------------------------------------------
@@ -42,10 +43,6 @@ function getSamlInstance(): SAML {
 }
 
 // -- Helpers ------------------------------------------------------------------
-
-function isSecure(): boolean {
-  return env.EXTERNAL_URL.startsWith("https");
-}
 
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
@@ -257,7 +254,7 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
       reply.setCookie("snapotter-session", token, {
         httpOnly: true,
         sameSite: "strict",
-        secure: isSecure(),
+        secure: isSecureRequest(request),
         path: "/",
         maxAge: env.SESSION_DURATION_HOURS * 3600,
       });
