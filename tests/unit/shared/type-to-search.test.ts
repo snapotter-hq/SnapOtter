@@ -93,6 +93,15 @@ describe("isTypeToSearchKey", () => {
     expect(isTypeToSearchKey(ev({ key: " " }))).toBe(false);
   });
 
+  it("rejects a synthetic event whose key is undefined instead of throwing", () => {
+    // Password-manager and autofill extensions dispatch synthetic keydowns on
+    // document with no key at all (Sentry WEB-N). The type says `key: string`;
+    // the runtime disagrees.
+    const synthetic = { ...ev({ key: "x" }), key: undefined } as unknown as TypeToSearchKeyEvent;
+
+    expect(isTypeToSearchKey(synthetic)).toBe(false);
+  });
+
   it.each(["Enter", "Tab", "Escape", "ArrowDown", "Backspace", "F1", "Dead", "Shift"])(
     "rejects the non-printable key %s",
     (key) => {

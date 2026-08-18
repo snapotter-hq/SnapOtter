@@ -44,6 +44,10 @@ export function isTypeToSearchKey(event: TypeToSearchKeyEvent): boolean {
   if (event.defaultPrevented) return false;
   if (event.isComposing) return false;
 
+  // Synthetic events (password-manager autofill, WebView bridges) can arrive
+  // with no key at all, whatever the type says. Nobody typed those.
+  if (typeof event.key !== "string") return false;
+
   // Every non-printable key reports a multi-character name: Enter, Tab, Escape,
   // ArrowDown, F1, Dead. A single character means a real character.
   if (event.key.length !== 1) return false;
