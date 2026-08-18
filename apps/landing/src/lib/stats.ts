@@ -9,10 +9,10 @@
 // github.com/orgs/snapotter-hq/packages. So this is read off by hand and cannot
 // be fetched at build time like the Docker Hub figure below.
 //
-// OBSERVED 2026-07-25: 77,000. The previous value sat at 36,000 long enough to
+// OBSERVED 2026-08-18: 122,000. A previous value sat at 36,000 long enough to
 // understate the real number by more than half, so re-read the package page
 // whenever you touch this file and update the date with it.
-const GHCR_ESTIMATE = 77_000;
+const GHCR_ESTIMATE = 122_000;
 
 // Fallbacks for when an upstream fetch fails. These are a safety net, not a
 // source of truth: a successful build overwrites them with live values, and the
@@ -20,12 +20,13 @@ const GHCR_ESTIMATE = 77_000;
 // "+", a stale constant understates rather than overstates, so a degraded build
 // is never a false claim, just a quieter one.
 //
-// REFRESHED 2026-07-25 against the live APIs. They had drifted badly before
-// that (104K against a real 232K, understating pulls by ~55%), because a failed
-// fetch degraded silently and nothing ever surfaced the gap. `warnStale` below
-// now puts it in the build log. Re-check these whenever you touch this file.
-const STAR_FALLBACK = 2_080; // live 2026-07-25: 2,086
-const DOCKER_FALLBACK = 232_000; // live 2026-07-25: 232,478
+// REFRESHED 2026-08-18 against the live APIs. They had drifted badly once
+// before (104K against a real 232K, understating pulls by ~55%), because a
+// failed fetch degraded silently and nothing ever surfaced the gap. `warnStale`
+// below now puts it in the build log. Re-check these whenever you touch this
+// file.
+const STAR_FALLBACK = 2_210; // live 2026-08-18: 2,217
+const DOCKER_FALLBACK = 353_000; // live 2026-08-18: 353,906
 
 const GITHUB_REPO = "snapotter-hq/SnapOtter";
 const DOCKERHUB_REPO = "snapotter/snapotter";
