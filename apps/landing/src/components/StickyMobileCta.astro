@@ -25,9 +25,12 @@ const { locale = "en" } = Astro.props;
       Generous by a hair on purpose; a small gap beats clipping content. */}
   <div style="height: calc(4.5rem + env(safe-area-inset-bottom));" aria-hidden="true"></div>
 
+  {/* Opaque on purpose, no backdrop-filter: blur on a bottom-fixed bar
+      flickers and stutters on phones while the browser repositions it
+      during the URL-bar collapse animation (guarded by e2e). */}
   <div
     id="mobile-cta"
-    class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-xl"
+    class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-surface px-4 py-3"
     style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));"
   >
     <a

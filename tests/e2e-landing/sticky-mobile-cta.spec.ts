@@ -24,6 +24,30 @@ test.describe("Sticky mobile CTA", () => {
     );
   });
 
+  test("stays cheap to composite: no backdrop blur, opaque background", async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto("/");
+
+    // Regression guard: backdrop-filter on a bottom-fixed bar flickers and lags
+    // on phones while the browser repositions it during URL-bar collapse. The
+    // bar must stay a plain opaque layer so the compositor can keep it glued
+    // to the bottom edge.
+    const bar = page.locator("#mobile-cta");
+    const { backdropFilter, alpha } = await bar.evaluate((el) => {
+      const style = getComputedStyle(el);
+      const bg = style.backgroundColor;
+      const slash = bg.match(/\/\s*([\d.]+)\s*\)$/);
+      const rgba = bg.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)$/);
+      const parsed = slash ?? rgba;
+      return {
+        backdropFilter: style.backdropFilter,
+        alpha: parsed ? Number.parseFloat(parsed[1]) : 1,
+      };
+    });
+    expect(backdropFilter).toBe("none");
+    expect(alpha).toBe(1);
+  });
+
   test("is hidden on desktop where the navbar CTAs are already visible", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto("/");
