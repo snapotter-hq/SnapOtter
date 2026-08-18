@@ -116,6 +116,23 @@ describe("assertLocalCapacity capacity guard", () => {
     });
   });
 
+  it("classifies the cap error as an operational SafeError, not a bug", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-cap-class-"));
+    await mkdir(join(root, "outputs", "job1"), { recursive: true });
+    await writeFile(join(root, "outputs", "job1", "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    // "Disk full" is the canonical operational condition in error-report.ts.
+    // As a plain Error it lands in Sentry as a bug-class event (NODE-5Y).
+    await expect(assertLocalCapacity()).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+    });
+  });
+
   it("reuses the cached workspace total within the cache window", async () => {
     root = await mkdtemp(join(tmpdir(), "snapotter-cap-cache-"));
     await mkdir(join(root, "outputs", "job1"), { recursive: true });

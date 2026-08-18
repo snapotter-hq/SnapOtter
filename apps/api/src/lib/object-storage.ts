@@ -53,6 +53,7 @@ function isS3Enabled(): boolean {
 }
 
 import type { S3StorageModule } from "@snapotter/enterprise";
+import { SafeError } from "@snapotter/shared";
 
 let s3Mod: S3StorageModule | null = null;
 // Concurrent first calls may double-configure; configureS3 is idempotent.
@@ -146,9 +147,13 @@ async function assertWorkspaceSizeCap(root: string): Promise<void> {
     workspaceSizeCache = { bytes: used, at: now };
   }
   if (isOverWorkspaceCap(used, maxGb)) {
-    const error = new Error("Workspace storage limit reached; try again shortly");
-    (error as Error & { statusCode: number }).statusCode = 503;
-    throw error;
+    // "Disk full" is the canonical operational condition (error-report.ts);
+    // as a plain Error this reported to Sentry as a bug (NODE-5Y).
+    throw new SafeError("Workspace storage limit reached; try again shortly", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
   }
 }
 
@@ -170,9 +175,11 @@ export async function assertLocalCapacity(): Promise<void> {
   }
   const freeBytes = fsStats.bavail * fsStats.bsize;
   if (isBelowCapacity(freeBytes)) {
-    const error = new Error("Insufficient disk space for processing");
-    (error as Error & { statusCode: number }).statusCode = 503;
-    throw error;
+    throw new SafeError("Insufficient disk space for processing", {
+      kind: "operational",
+      code: "disk-free-floor",
+      statusCode: 503,
+    });
   }
 }
 

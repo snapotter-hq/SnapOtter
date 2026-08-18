@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, stat, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   type RunTesseractOptions,
@@ -87,15 +88,22 @@ function validatePositiveInteger(value: number, label: string, maximum?: number)
   return value;
 }
 
-/** Parse a strict 1-based page list such as `all`, `1-3,5`, or `2,4-6`. */
+/**
+ * Parse a strict 1-based page list such as `all`, `1-3,5`, or `2,4-6`.
+ *
+ * Rejections are ToolInputError: the spec is user-typed and only checkable
+ * against the real page count here in the worker, long after Zod. As plain
+ * Errors these were reported to Sentry as bug-class events and reached the
+ * user as opaque failures (NODE-55).
+ */
 export function parsePdfPageSpec(spec: string, totalPages: number): number[] {
   validatePositiveInteger(totalPages, "PDF page count");
   const normalized = spec.trim();
-  if (!normalized) throw new Error("No pages specified");
+  if (!normalized) throw new ToolInputError("No pages specified");
 
   if (normalized.toLowerCase() === "all") {
     if (totalPages > MAX_PDF_OCR_PAGES) {
-      throw new Error(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
+      throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
     }
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
@@ -103,32 +111,36 @@ export function parsePdfPageSpec(spec: string, totalPages: number): number[] {
   const selected = new Set<number>();
   for (const rawPart of normalized.split(",")) {
     const part = rawPart.trim();
-    if (!part) throw new Error(`Invalid page selection: "${spec}"`);
+    if (!part) throw new ToolInputError(`Invalid page selection: "${spec}"`);
 
     const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
-    if (!match) throw new Error(`Invalid page selection: "${part}"`);
+    if (!match) throw new ToolInputError(`Invalid page selection: "${part}"`);
 
     const start = Number(match[1]);
     const end = match[2] === undefined ? start : Number(match[2]);
     if (start < 1 || end < 1) {
-      throw new Error(`Invalid page selection: "${part}" (pages start at 1)`);
+      throw new ToolInputError(`Invalid page selection: "${part}" (pages start at 1)`);
     }
     if (start > end) {
-      throw new Error(`Invalid page selection: "${part}" (range start is after range end)`);
+      throw new ToolInputError(
+        `Invalid page selection: "${part}" (range start is after range end)`,
+      );
     }
     if (end > totalPages) {
-      throw new Error(`Invalid page selection: "${part}" (document has ${totalPages} pages)`);
+      throw new ToolInputError(
+        `Invalid page selection: "${part}" (document has ${totalPages} pages)`,
+      );
     }
 
     for (let page = start; page <= end; page += 1) {
       selected.add(page);
       if (selected.size > MAX_PDF_OCR_PAGES) {
-        throw new Error(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
+        throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
       }
     }
   }
 
-  if (selected.size === 0) throw new Error("No pages specified");
+  if (selected.size === 0) throw new ToolInputError("No pages specified");
   return [...selected].sort((left, right) => left - right);
 }
 

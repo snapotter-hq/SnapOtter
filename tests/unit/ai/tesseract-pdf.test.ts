@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { PassThrough } from "node:stream";
+import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -127,6 +128,22 @@ describe("parsePdfPageSpec", () => {
     expect(() => parsePdfPageSpec("1-51", 100)).toThrow("Too many pages for OCR (max 50)");
     expect(() => parsePdfPageSpec("all", 51)).toThrow("Too many pages for OCR (max 50)");
   });
+
+  // The spec is user-typed and only checkable against the real page count, deep
+  // in the worker. As plain Errors these landed in Sentry as bug-class events
+  // and reached the user as opaque failures (NODE-55). ToolInputError is the
+  // repo's class for exactly this: user input, never reported, message shown.
+  it.each(["", "0", "3-1", "1-a", "1,11", "1-51"])(
+    "throws a ToolInputError for user-facing rejection %j",
+    (spec) => {
+      try {
+        parsePdfPageSpec(spec, 10);
+        expect.unreachable("spec should have been rejected");
+      } catch (err) {
+        expect(isToolInputError(err)).toBe(true);
+      }
+    },
+  );
 });
 
 describe("runTesseractPdf", () => {
