@@ -10,6 +10,63 @@ describe("static filter lists", () => {
   });
 });
 
+describe("noise filters for non-app code", () => {
+  const matchesIgnore = (message: string) =>
+    IGNORE_ERRORS.some((p) => (typeof p === "string" ? message.includes(p) : p.test(message)));
+
+  // Sentry WEB-J: crypto-wallet extensions poke window.ethereum into every page.
+  it("ignores wallet-extension injections", () => {
+    expect(
+      matchesIgnore("undefined is not an object (evaluating 'window.ethereum.selectedAddress')"),
+    ).toBe(true);
+  });
+
+  // Sentry WEB-M: injected code referencing globals that do not exist here.
+  it("ignores the EmptyRanges injected-global error", () => {
+    expect(matchesIgnore("Can't find variable: EmptyRanges")).toBe(true);
+  });
+
+  // Sentry WEB-V/W/Y/Z: a fork running `vite dev` with our baked DSN reports
+  // stacks through /node_modules/.vite/deps/, which no production build of
+  // ours ever produces. Their errors are not ours to triage.
+  it("drops events whose frames come from a vite dev server", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "TypeError",
+            value: "useMaterialStore.getState(...).setToken is not a function",
+            stacktrace: {
+              frames: [
+                { filename: "http://localhost:5173/node_modules/.vite/deps/react-dom_client.js" },
+                { filename: "/src/pages/home-page.tsx" },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    expect(send(event, { originalException: new TypeError("x") })).toBeNull();
+  });
+
+  it("keeps events whose frames come from our built bundle", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "TypeError",
+            value: "real bug",
+            stacktrace: { frames: [{ filename: "http://192.168.0.4:1349/assets/app.js" }] },
+          },
+        ],
+      },
+    };
+    expect(send(event, { originalException: new TypeError("x") })).not.toBeNull();
+  });
+});
+
 describe("buildWebBeforeSend", () => {
   const baseEvent = (over: Record<string, any> = {}): Record<string, any> => ({
     request: { url: "http://192.168.0.4:1349/image/resize" },

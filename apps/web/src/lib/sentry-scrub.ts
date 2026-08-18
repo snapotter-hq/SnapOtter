@@ -23,7 +23,35 @@ export const IGNORE_ERRORS: (string | RegExp)[] = [
   /getUrlAutofillTargetingRules/i,
   /onLongParse/i,
   /Java exception was raised during method invocation/i,
+  // Crypto-wallet extensions inject window.ethereum on every page (WEB-J);
+  // other injections reference globals that exist only in their bundle (WEB-M).
+  /window\.ethereum/i,
+  /EmptyRanges/,
 ];
+
+/**
+ * No production build of ours serves anything under /node_modules/.vite/deps/;
+ * only `vite dev` does. Events with such frames come from a fork or modified
+ * build running a dev server against our baked DSN (WEB-V/W/Y/Z), and they
+ * pollute release health under our own release tag. Not ours to triage.
+ */
+const DEV_SERVER_FRAME = "/node_modules/.vite/";
+
+function hasDevServerFrames(event: AnyEvent): boolean {
+  const values = asObj(event.exception)?.values;
+  if (!Array.isArray(values)) return false;
+  for (const entry of values) {
+    const frames = asObj(asObj(entry)?.stacktrace)?.frames;
+    if (!Array.isArray(frames)) continue;
+    for (const f of frames) {
+      const frame = asObj(f);
+      if (typeof frame?.filename === "string" && frame.filename.includes(DEV_SERVER_FRAME)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 export const DENY_URLS: RegExp[] = [
   /^chrome-extension:\/\//,
@@ -96,6 +124,8 @@ export function buildWebBeforeSend(isActive: () => boolean) {
       sentInWindow = 0;
     }
     if (++sentInWindow > CEILING_PER_HOUR) return null;
+
+    if (hasDevServerFrames(event)) return null;
 
     // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;
