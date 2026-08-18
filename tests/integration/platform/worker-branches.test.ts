@@ -18,7 +18,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY, TOOLS } from "@snapotter/shared";
@@ -71,8 +71,11 @@ const { trackEvent } = await import("../../../apps/api/src/lib/analytics.js");
 const { __resetGateForTests, __setReaderForTests, refreshAnalyticsGate } = await import(
   "../../../apps/api/src/lib/analytics-gate.js"
 );
-const { getObjectBuffer, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
+const { getObjectBuffer, getObjectSize, putObject } = await import(
+  "../../../apps/api/src/lib/object-storage.js"
+);
 const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
+const { MAX_BUFFERED_OUTPUT_BYTES } = await import("../../../apps/api/src/jobs/output-resolve.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
 
 const trackEventMock = vi.mocked(trackEvent);
@@ -117,6 +120,26 @@ registerToolProcessFn({
         { name: "extra.pdf", buffer: PDF_JUNK, contentType: "application/pdf" },
         { name: "notes.txt", scratchPath: notesPath, contentType: "text/plain" },
       ],
+    };
+  },
+});
+
+// Emits a sparse scratch file just over the 1.5 GiB buffering cap. stat()
+// reports the full size without the test writing real bytes, which drives the
+// worker's streamed-output branch: putObjectStream instead of readFile, no
+// poster preview, byte counts from the stream (issue #841, Sentry NODE-2Z).
+registerToolProcessFn({
+  toolId: "wt-huge",
+  settingsSchema: passthroughSchema,
+  process: unusedLegacyProcess,
+  processV2: async (ctx) => {
+    const hugePath = join(ctx.scratchDir, "huge.bin");
+    await writeFile(hugePath, "");
+    await truncate(hugePath, MAX_BUFFERED_OUTPUT_BYTES + 1);
+    return {
+      scratchPath: hugePath,
+      filename: "huge.bin",
+      contentType: "application/octet-stream",
     };
   },
 });
@@ -377,6 +400,33 @@ describe("tool job success path", () => {
       return setting ?? undefined;
     }, 10_000);
   }, 30_000);
+});
+
+describe("streamed over-cap output", () => {
+  it("streams an output past the buffering cap to storage with correct sizes and no preview", async () => {
+    const size = MAX_BUFFERED_OUTPUT_BYTES + 1;
+    const jobId = randomUUID();
+    const inputRef = await seedInput(jobId, "in.bin", Buffer.from("x"));
+
+    await enqueueToolJob(
+      toolJob({ jobId, toolId: "wt-huge", inputRefs: [inputRef], filename: "in.bin" }),
+    );
+
+    // Streaming 1.5 GiB of sparse zeros through putObjectStream takes real
+    // wall-clock; the fast-pool timeout (120s default) has ample headroom.
+    const row = await terminalRow(jobId, 110_000);
+    expect(row.status).toBe("completed");
+    expect(row.outputRefs).toEqual([`outputs/${jobId}/huge.bin`]);
+    // Byte accounting comes from the stream, not a buffer that never existed.
+    expect(row.bytesOut).toBe(size);
+    expect(await getObjectSize(`outputs/${jobId}/huge.bin`)).toBe(size);
+
+    const result = (row.progress?.result ?? {}) as Record<string, unknown>;
+    expect(result.processedSize).toBe(size);
+    expect(result.downloadUrl).toBe(`/api/v1/download/${jobId}/huge.bin`);
+    // Poster previews need the bytes in memory; a streamed result ships without.
+    expect(result).not.toHaveProperty("previewUrl");
+  }, 120_000);
 });
 
 describe("tool job failure paths", () => {
