@@ -46,16 +46,32 @@ const SOCKET_TIMEOUT_MS = 30_000;
 const SUBSCRIBER_PING_INTERVAL_MS = 10_000;
 
 /**
+ * ioredis emits "error" on every failed connect attempt. An EventEmitter
+ * "error" with no listener is escalated by Node to an uncaught exception,
+ * so without this handler a Redis restart kills the whole API process
+ * (Sentry NODE-30). Reconnecting is ioredis's job via its retryStrategy;
+ * the listener only has to exist and say what happened.
+ */
+function swallowConnectionErrors(connection: Redis): Redis {
+  connection.on("error", (err: Error) => {
+    console.error("[redis] connection error:", err.message);
+  });
+  return connection;
+}
+
+/**
  * Create a new ioredis connection from REDIS_URL.
  * Each caller gets an independent connection (BullMQ requires separate
  * connections for Queue, Worker, and QueueEvents).
  */
 export function createRedisConnection(): Redis {
-  return new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: true,
-    socketTimeout: SOCKET_TIMEOUT_MS,
-  });
+  return swallowConnectionErrors(
+    new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+      socketTimeout: SOCKET_TIMEOUT_MS,
+    }),
+  );
 }
 
 /**
@@ -64,11 +80,13 @@ export function createRedisConnection(): Redis {
  * ioredis ready checks that issue INFO during reconnects.
  */
 export function createRedisSubscriberConnection(): Redis {
-  const connection = new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    socketTimeout: SOCKET_TIMEOUT_MS,
-  });
+  const connection = swallowConnectionErrors(
+    new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      socketTimeout: SOCKET_TIMEOUT_MS,
+    }),
+  );
   keepSubscriberSocketProbed(connection);
   return connection;
 }

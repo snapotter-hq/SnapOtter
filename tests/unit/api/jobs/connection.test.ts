@@ -5,14 +5,18 @@ type RedisStub = {
   quit: ReturnType<typeof vi.fn>;
   info: ReturnType<typeof vi.fn>;
   once: ReturnType<typeof vi.fn>;
-  /** Fires the handler registered for an event, as ioredis would. */
+  on: ReturnType<typeof vi.fn>;
+  /** Fires the handler registered via once(), as ioredis would. */
   emitOnce: (event: string) => void;
+  /** Fires every handler registered via on(). Throws if none exist, like an EventEmitter "error" would. */
+  emitOn: (event: string, ...args: unknown[]) => void;
 };
 
 const { RedisMock, stubs } = vi.hoisted(() => {
   const created: RedisStub[] = [];
   const mock = vi.fn(function RedisMock() {
     const handlers = new Map<string, () => void>();
+    const onHandlers = new Map<string, ((...args: unknown[]) => void)[]>();
     const stub: RedisStub = {
       ping: vi.fn().mockResolvedValue("PONG"),
       quit: vi.fn().mockResolvedValue("OK"),
@@ -21,7 +25,20 @@ const { RedisMock, stubs } = vi.hoisted(() => {
         handlers.set(event, handler);
         return stub;
       }),
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        onHandlers.set(event, [...(onHandlers.get(event) ?? []), handler]);
+        return stub;
+      }),
       emitOnce: (event: string) => handlers.get(event)?.(),
+      emitOn: (event: string, ...args: unknown[]) => {
+        const listeners = onHandlers.get(event);
+        if (!listeners || listeners.length === 0) {
+          // Mirror Node's EventEmitter contract for "error": no listener
+          // means the process goes down. That is the bug under test.
+          throw args[0] instanceof Error ? args[0] : new Error(`unhandled ${event}`);
+        }
+        for (const listener of listeners) listener(...args);
+      },
     };
     created.push(stub);
     return stub;
@@ -165,6 +182,40 @@ describe("Redis connection factory", () => {
       process.off("unhandledRejection", unhandled);
       vi.useRealTimers();
     }
+  });
+
+  it("attaches an error listener to command connections so a Redis blip cannot crash the process", async () => {
+    const { createRedisConnection } = await freshModule();
+
+    const conn = createRedisConnection() as unknown as RedisStub;
+
+    // ioredis emits "error" on every failed connect attempt. With no listener,
+    // Node escalates it to an uncaught exception and kills the API (Sentry
+    // NODE-30: fatal ECONNREFUSED from installs whose Redis restarted).
+    expect(conn.on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("attaches an error listener to subscriber connections", async () => {
+    const { createRedisSubscriberConnection } = await freshModule();
+
+    const conn = createRedisSubscriberConnection() as unknown as RedisStub;
+
+    expect(conn.on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("logs and swallows connection errors, leaving reconnection to ioredis", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { createRedisConnection } = await freshModule();
+
+    const conn = createRedisConnection() as unknown as RedisStub;
+
+    expect(() =>
+      conn.emitOn("error", new Error("connect ECONNREFUSED 127.0.0.1:6379")),
+    ).not.toThrow();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("[redis]"),
+      expect.stringContaining("ECONNREFUSED"),
+    );
   });
 
   it("sharedRedis memoizes a single connection across calls", async () => {
