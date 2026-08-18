@@ -18,6 +18,16 @@ def main():
         print(json.dumps({"error": "pdf2docx not installed"}))
         sys.exit(1)
     try:
+        # PyMuPDF's message system writes to sys.stdout by default, and MuPDF
+        # errors ("error: No common ancestor in structure tree") are routed
+        # through it. This stdout is a one-JSON-line protocol; keep library
+        # diagnostics on stderr (issue #843, Sentry NODE-5M).
+        import pymupdf
+
+        pymupdf.set_messages(stream=sys.stderr)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         install_pdf2docx_layout_fixes()
         cv = Converter(path)
         try:

@@ -7,7 +7,11 @@ vi.mock("@snapotter/ai", () => ({
 }));
 
 import { isSafeMessageError } from "@snapotter/shared";
-import { pdfPageCountPy, pdfRedactPy } from "../../../packages/doc-engine/src/python-docs.js";
+import {
+  pdfPageCountPy,
+  pdfRedactPy,
+  pdfToWordPy,
+} from "../../../packages/doc-engine/src/python-docs.js";
 
 /** Flatten an error's message, code, and cause-chain messages into one string. */
 function errorText(err: unknown): string {
@@ -25,6 +29,29 @@ function errorText(err: unknown): string {
 describe("python-docs sidecar JSON parsing", () => {
   beforeEach(() => {
     runDocsScript.mockReset();
+  });
+
+  // MuPDF's C-level printer writes "error: ..." lines to stdout ahead of the
+  // script's one JSON line (pdf2docx drives PyMuPDF). Sentry NODE-5M: those
+  // lines broke the whole parse and a successful conversion reported as
+  // "Document tool returned non-JSON output".
+  it("finds the JSON line under library noise on stdout", async () => {
+    runDocsScript.mockResolvedValue(
+      "error: No common ancestor in structure tree\n" +
+        "error: No common ancestor in structure tree\n" +
+        JSON.stringify({ ok: true }),
+    );
+    await expect(pdfToWordPy("/in.pdf", "/out.docx")).resolves.toBeUndefined();
+  });
+
+  it("surfaces the script's real error line under library noise", async () => {
+    runDocsScript.mockResolvedValue(
+      "error: No common ancestor in structure tree\n" +
+        JSON.stringify({ error: "conversion failed on page 3" }),
+    );
+    await expect(pdfToWordPy("/in.pdf", "/out.docx")).rejects.toThrow(
+      "conversion failed on page 3",
+    );
   });
 
   it("parses valid JSON output normally", async () => {

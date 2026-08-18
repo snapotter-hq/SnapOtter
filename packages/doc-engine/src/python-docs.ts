@@ -14,6 +14,21 @@ function parseDocsJson<T>(script: string, stdout: string): T {
   try {
     return JSON.parse(trimmed) as T;
   } catch {
+    // MuPDF's C-level printer writes "error: ..." lines to the same stdout the
+    // JSON contract uses (pdf2docx and the PyMuPDF scripts both drive MuPDF),
+    // ahead of the script's single JSON line. Walk the lines from the end and
+    // take the last one that parses, so library noise cannot turn a completed
+    // conversion into a failure (Sentry NODE-5M).
+    const lines = trimmed.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line.startsWith("{")) continue;
+      try {
+        return JSON.parse(line) as T;
+      } catch {
+        // fall through to the earlier lines
+      }
+    }
     throw new SafeError("Document tool returned non-JSON output", {
       kind: "bug",
       code: script,
