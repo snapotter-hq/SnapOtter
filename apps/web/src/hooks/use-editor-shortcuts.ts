@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
+import { copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
@@ -477,13 +478,9 @@ export function useEditorShortcuts(callbacks?: {
       });
       fetch(dataUrl)
         .then((res) => res.blob())
-        .then(async (blob) => {
-          try {
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          } catch {
-            // Clipboard API not available
-          }
-        })
+        // copyImageToClipboard resolves false (never throws) when the
+        // Clipboard API is unavailable, e.g. on plain-http installs.
+        .then((blob) => copyImageToClipboard(blob))
         .catch(() => {
           // Export failed silently
         });

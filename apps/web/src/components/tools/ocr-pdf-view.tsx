@@ -1,5 +1,6 @@
 import { Copy, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
+import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { DocumentView } from "./document-view";
 
@@ -43,12 +44,11 @@ export function OcrPdfView() {
 
   const copy = async () => {
     if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    // Falls back to execCommand on plain-http installs, where the async
+    // Clipboard API does not exist (Sentry WEB-G).
+    if (await copyToClipboard(text)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // clipboard unavailable; ignore
     }
   };
 

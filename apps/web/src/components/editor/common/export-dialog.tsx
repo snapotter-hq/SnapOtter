@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
-import { cn } from "@/lib/utils";
+import { cn, copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
   AdjustmentValues,
@@ -80,7 +80,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   const aspectRatio = canvasSize.width / canvasSize.height;
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -313,11 +313,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     try {
       const res = await fetch(dataUrl);
       const blob = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setCopyStatus("copied");
+      // Image copy has no fallback on plain-http installs (no ClipboardItem
+      // there), so failure gets surfaced on the button instead of thrown.
+      setCopyStatus((await copyImageToClipboard(blob)) ? "copied" : "failed");
       setTimeout(() => setCopyStatus("idle"), 2000);
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
+      setCopyStatus("failed");
+      setTimeout(() => setCopyStatus("idle"), 2000);
     }
   }, [settings, canvasSize]);
 
@@ -608,7 +611,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted text-foreground rounded hover:bg-muted/80 transition-colors"
             >
               {copyStatus === "copied" ? <Check size={14} /> : <ClipboardCopy size={14} />}
-              {copyStatus === "copied" ? "Copied" : "Copy"}
+              {copyStatus === "copied"
+                ? "Copied"
+                : copyStatus === "failed"
+                  ? "Copy failed"
+                  : "Copy"}
             </button>
           </div>
 

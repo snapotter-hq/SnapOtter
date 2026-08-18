@@ -30,3 +30,19 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     }
   }
 }
+
+/**
+ * Copy an image blob to the clipboard. Unlike text, images have no
+ * execCommand fallback, so on insecure (plain-http) contexts, where
+ * navigator.clipboard and ClipboardItem do not exist, this reports failure
+ * instead of throwing (Sentry WEB-G).
+ */
+export async function copyImageToClipboard(blob: Blob): Promise<boolean> {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}

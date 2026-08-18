@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { copyToClipboard, generateId } from "../../../apps/web/src/lib/utils";
+import { copyImageToClipboard, copyToClipboard, generateId } from "../../../apps/web/src/lib/utils";
 
 describe("generateId", () => {
   it("returns a valid UUID v4 string", () => {
@@ -45,5 +45,59 @@ describe("copyToClipboard", () => {
       throw new Error("not supported");
     });
     expect(await copyToClipboard("hello")).toBe(false);
+  });
+});
+
+describe("copyImageToClipboard", () => {
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = globalThis.ClipboardItem;
+
+  afterEach(() => {
+    Object.assign(navigator, { clipboard: originalClipboard });
+    if (originalClipboardItem === undefined) {
+      delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+    } else {
+      globalThis.ClipboardItem = originalClipboardItem;
+    }
+    vi.restoreAllMocks();
+  });
+
+  const blob = () => new Blob(["png-bytes"], { type: "image/png" });
+
+  it("returns false without throwing when navigator.clipboard is missing (insecure context)", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {};
+
+    await expect(copyImageToClipboard(blob())).resolves.toBe(false);
+  });
+
+  it("returns false without throwing when ClipboardItem is missing", async () => {
+    Object.assign(navigator, { clipboard: { write: vi.fn() } });
+    delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+
+    await expect(copyImageToClipboard(blob())).resolves.toBe(false);
+  });
+
+  it("writes the blob and returns true when the API is available", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { write } });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      items: unknown;
+      constructor(items: unknown) {
+        this.items = items;
+      }
+    };
+
+    await expect(copyImageToClipboard(blob())).resolves.toBe(true);
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false when the write itself rejects", async () => {
+    Object.assign(navigator, {
+      clipboard: { write: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {};
+
+    await expect(copyImageToClipboard(blob())).resolves.toBe(false);
   });
 });

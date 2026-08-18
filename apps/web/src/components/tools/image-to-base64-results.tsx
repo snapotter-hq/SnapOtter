@@ -1,5 +1,6 @@
 import { Check, ClipboardCopy, Download, FileJson, FileText, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { copyToClipboard } from "@/lib/utils";
 import type { Base64Result } from "@/stores/base64-store";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
@@ -66,12 +67,14 @@ function downloadFile(content: string, filename: string, type: string) {
 // -- CopyButton -------------------------------------------------------------
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // copyToClipboard falls back to execCommand on plain-http installs, where
+    // navigator.clipboard does not exist (Sentry WEB-G).
+    const ok = await copyToClipboard(text);
+    setStatus(ok ? "copied" : "failed");
+    setTimeout(() => setStatus("idle"), 2000);
   }, [text]);
 
   return (
@@ -80,8 +83,12 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       onClick={handleCopy}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
     >
-      {copied ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
-      {copied ? "Copied!" : (label ?? "Copy")}
+      {status === "copied" ? (
+        <Check className="h-3.5 w-3.5" />
+      ) : (
+        <ClipboardCopy className="h-3.5 w-3.5" />
+      )}
+      {status === "copied" ? "Copied!" : status === "failed" ? "Copy failed" : (label ?? "Copy")}
     </button>
   );
 }
