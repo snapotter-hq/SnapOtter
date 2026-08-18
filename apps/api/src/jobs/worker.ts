@@ -21,7 +21,8 @@
  * are deferred until the final attempt so intermediate retries stay
  * invisible to the client.
  */
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -88,6 +89,7 @@ import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
+import { resolveOutputSource } from "./output-resolve.js";
 import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
 import { runSystemJob } from "./system-jobs.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -333,16 +335,23 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       const ctx: ToolProcessCtx = { signal, scratchDir, report };
 
       // Dispatch: AI handler or standard tool registry
-      let resultBuffer: Buffer;
+      let resultBuffer: Buffer | null = null;
+      // Set instead of resultBuffer when the output exceeds the buffering cap
+      // (Sentry NODE-2Z): the scratch file streams to storage untouched.
+      let resultStreamPath: string | null = null;
+      let resultSize = 0;
       let resultFilename: string;
       let resultContentType: string;
       let resultPayload: Record<string, unknown> | undefined;
-      let extraOutputs: Array<{ name: string; buffer: Buffer; contentType: string }> | undefined;
+      let extraOutputs:
+        | Array<{ name: string; buffer?: Buffer; scratchPath?: string; contentType: string }>
+        | undefined;
 
       if (hasAiPathJobHandler(data.toolId)) {
         if (!pathInput) throw new Error(`No path-backed input for ${data.toolId}`);
         const aiResult = await runAiPathToolJob(data, pathInput, ctx);
         resultBuffer = aiResult.buffer;
+        resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
         resultContentType = aiResult.contentType;
         resultPayload = aiResult.resultPayload;
@@ -351,6 +360,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         if (!inputBuffer) throw new Error(`No buffered input for ${data.toolId}`);
         const aiResult = await runAiToolJob(data, inputBuffer, ctx);
         resultBuffer = aiResult.buffer;
+        resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
         resultContentType = aiResult.contentType;
         resultPayload = aiResult.resultPayload;
@@ -369,14 +379,15 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           report,
         });
 
-        // Resolve buffer OR scratchPath for the primary output
-        if (result.buffer) {
-          resultBuffer = result.buffer;
-        } else if (result.scratchPath) {
-          resultBuffer = await readFile(result.scratchPath);
+        // Resolve buffer OR scratchPath for the primary output. Over-cap
+        // scratch files stay on disk and stream to storage below.
+        const primary = await resolveOutputSource(result, `Tool ${data.toolId}`);
+        if (primary.kind === "buffer") {
+          resultBuffer = primary.buffer;
         } else {
-          throw new Error(`Tool ${data.toolId} returned neither buffer nor scratchPath`);
+          resultStreamPath = primary.scratchPath;
         }
+        resultSize = primary.size;
         resultFilename = result.filename;
         resultContentType = result.contentType;
         resultPayload = result.resultPayload;
@@ -385,15 +396,14 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         if (result.extraOutputs) {
           extraOutputs = await Promise.all(
             result.extraOutputs.map(async (extra) => {
-              let buf: Buffer;
-              if (extra.buffer) {
-                buf = extra.buffer;
-              } else if (extra.scratchPath) {
-                buf = await readFile(extra.scratchPath);
-              } else {
-                throw new Error(`Extra output "${extra.name}" has neither buffer nor scratchPath`);
-              }
-              return { name: extra.name, buffer: buf, contentType: extra.contentType };
+              const source = await resolveOutputSource(extra, `Extra output "${extra.name}"`);
+              return source.kind === "buffer"
+                ? { name: extra.name, buffer: source.buffer, contentType: extra.contentType }
+                : {
+                    name: extra.name,
+                    scratchPath: source.scratchPath,
+                    contentType: extra.contentType,
+                  };
             }),
           );
         }
@@ -410,45 +420,74 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Generated PDFs carry the conversion engine's name as Producer/Creator
       // (LibreOffice, Ghostscript, pdfcpu, ...); stamp SnapOtter instead.
       // Best effort: a failed scrub keeps the original bytes.
-      if (SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && outName.toLowerCase().endsWith(".pdf")) {
+      if (
+        SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) &&
+        outName.toLowerCase().endsWith(".pdf") &&
+        resultBuffer
+      ) {
         resultBuffer = await scrubPdfProducer(resultBuffer);
+        resultSize = resultBuffer.length;
       }
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
-      await putObject(primaryKey, resultBuffer);
+      if (resultBuffer) {
+        await putObject(primaryKey, resultBuffer);
+      } else if (resultStreamPath) {
+        resultSize = await putObjectStream(primaryKey, createReadStream(resultStreamPath), {
+          signal,
+        });
+      }
       const outputRefs: string[] = [primaryKey];
 
       // Write extra outputs (AI tools may produce multiple files)
       if (extraOutputs) {
         for (const extra of extraOutputs) {
           const extraKey = `outputs/${jobId}/${extra.name}`;
-          const body =
-            SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && extra.name.toLowerCase().endsWith(".pdf")
-              ? await scrubPdfProducer(extra.buffer)
-              : extra.buffer;
-          await putObject(extraKey, body);
+          if (extra.buffer) {
+            const body =
+              SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && extra.name.toLowerCase().endsWith(".pdf")
+                ? await scrubPdfProducer(extra.buffer)
+                : extra.buffer;
+            await putObject(extraKey, body);
+          } else if (extra.scratchPath) {
+            // Over-cap extra: streamed as-is. The producer scrub needs bytes in
+            // memory, and no real PDF reaches the buffering cap.
+            await putObjectStream(extraKey, createReadStream(extra.scratchPath), { signal });
+          }
           outputRefs.push(extraKey);
         }
       }
 
-      // Generate preview for non-browser-previewable formats
-      const previewRef = await generatePreview(resultBuffer, resultContentType, jobId);
+      // Generate preview for non-browser-previewable formats. A streamed
+      // over-cap output ships without one: the poster pipeline needs the bytes
+      // in memory, and no preview beats no result.
+      const previewRef = resultBuffer
+        ? await generatePreview(resultBuffer, resultContentType, jobId)
+        : undefined;
 
       // Auto-save when the input came from the user's library (data.fileId is
       // set by the route when the upload referenced a library file). saveMode
       // picks between an independent new file (default) and a superseding
       // version. Without a fileId this is a no-op, so tool-first uploads are
       // not auto-saved.
-      const savedFileId = await autoSaveToLibrary({
-        fileId: data.fileId,
-        saveMode: data.saveMode,
-        userId: data.userId,
-        buffer: resultBuffer,
-        outName,
-        contentType: resultContentType,
-        toolId: data.toolId,
-      });
+      let savedFileId: string | undefined;
+      if (resultBuffer) {
+        savedFileId = await autoSaveToLibrary({
+          fileId: data.fileId,
+          saveMode: data.saveMode,
+          userId: data.userId,
+          buffer: resultBuffer,
+          outName,
+          contentType: resultContentType,
+          toolId: data.toolId,
+        });
+      } else if (data.fileId) {
+        logger.info(
+          { jobId, toolId: data.toolId, bytes: resultSize },
+          "output exceeds the buffering cap; skipping library auto-save",
+        );
+      }
 
       const durationMs = Date.now() - startTime;
 
@@ -458,7 +497,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         filename: outName,
         contentType: resultContentType,
         originalSize,
-        processedSize: resultBuffer.length,
+        processedSize: resultSize,
         previewRef,
         savedFileId,
         resultPayload,
@@ -484,7 +523,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               completedAt: new Date(),
               durationMs,
               bytesIn: originalSize,
-              bytesOut: resultBuffer.length,
+              bytesOut: resultSize,
               outputRefs,
               progress: { percent: 100, stage: "complete", result: legacyResult },
             })
@@ -505,7 +544,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             status: "completed",
             output_format: safeFormatTag(outName) ?? "unknown",
             bytes_in: originalSize,
-            bytes_out: resultBuffer.length,
+            bytes_out: resultSize,
           },
           data.analyticsDistinctId,
         );
