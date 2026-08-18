@@ -77,7 +77,7 @@ export function columnsEngineCanFill(table: string, sourceColumns: string[]): Se
   return out;
 }
 
-function convertRow(table: string, row: SqliteRow): SqliteRow {
+export function convertRow(table: string, row: SqliteRow): SqliteRow {
   const out: SqliteRow = {};
   const rename = RENAMES[table] ?? {};
   for (const [rawCol, raw] of Object.entries(row)) {
@@ -126,6 +126,15 @@ function convertRow(table: string, row: SqliteRow): SqliteRow {
         throw new Error(
           `Invalid JSON in ${table}.${col} (row id=${String(row.id)}): ${(e as Error).message}`,
         );
+      }
+      // A double-encoded 1.x permissions cell parses to a jsonb string, which
+      // the settings UI then chokes on forever (issue #846). Only a string
+      // array may cross; api_keys.permissions is nullable, roles.permissions
+      // is NOT NULL, so their fallbacks differ.
+      if (col === "permissions") {
+        const parsed = out[col];
+        const clean = Array.isArray(parsed) ? parsed.filter((p) => typeof p === "string") : null;
+        out[col] = clean ?? (table === "roles" ? [] : null);
       }
     } else {
       out[col] = raw;

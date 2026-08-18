@@ -2087,7 +2087,7 @@ function PeopleSection() {
 
 /* ────────────────────── API Keys ────────────────────── */
 
-function ApiKeysSection() {
+export function ApiKeysSection() {
   const { t } = useTranslation();
   const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2309,7 +2309,7 @@ function ApiKeysSection() {
                 <p className="text-xs text-muted-foreground font-mono">
                   {k.prefix}... &middot; Created {new Date(k.createdAt).toLocaleDateString()}
                 </p>
-                {k.permissions && (
+                {Array.isArray(k.permissions) && k.permissions.length > 0 && (
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
                     Scoped: {k.permissions.join(", ")}
                   </p>
@@ -3111,7 +3111,9 @@ function RolesSection() {
                         setEditingRole(role);
                         setEditName(role.name);
                         setEditDescription(role.description);
-                        setEditPermissions([...role.permissions]);
+                        setEditPermissions(
+                          Array.isArray(role.permissions) ? [...role.permissions] : [],
+                        );
                       }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Edit role"
@@ -3135,7 +3137,7 @@ function RolesSection() {
                 <p className="text-xs text-muted-foreground">{role.description}</p>
               )}
               <div className="flex flex-wrap gap-1.5">
-                {role.permissions.map((perm) => (
+                {(Array.isArray(role.permissions) ? role.permissions : []).map((perm) => (
                   <span
                     key={perm}
                     className="inline-block px-2 py-0.5 rounded-full bg-muted text-xs font-mono text-muted-foreground"
