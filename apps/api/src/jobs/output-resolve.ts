@@ -20,7 +20,7 @@ export type ResolvedOutput =
 
 export async function resolveOutputSource(
   out: { buffer?: Buffer; scratchPath?: string },
-  label: string,
+  missingSourceMessage: string,
   opts: { maxBufferedBytes?: number } = {},
 ): Promise<ResolvedOutput> {
   if (out.buffer) {
@@ -33,5 +33,7 @@ export async function resolveOutputSource(
     }
     return { kind: "buffer", buffer: await readFile(out.scratchPath), size };
   }
-  throw new Error(`${label} returned neither buffer nor scratchPath`);
+  // The caller supplies its full historical message; integration tests and
+  // logs pin these strings per call site.
+  throw new Error(missingSourceMessage);
 }

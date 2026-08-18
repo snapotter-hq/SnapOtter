@@ -30,14 +30,14 @@ describe("resolveOutputSource", () => {
 
   it("passes an in-memory buffer through untouched", async () => {
     const buffer = Buffer.from("result-bytes");
-    const out = await resolveOutputSource({ buffer }, "tool x");
+    const out = await resolveOutputSource({ buffer }, "unused message");
 
     expect(out).toEqual({ kind: "buffer", buffer, size: buffer.length });
   });
 
   it("buffers a scratch file under the cap, as before", async () => {
     const p = await scratchFile(4096);
-    const out = await resolveOutputSource({ scratchPath: p }, "tool x");
+    const out = await resolveOutputSource({ scratchPath: p }, "unused message");
 
     expect(out.kind).toBe("buffer");
     expect(out.size).toBe(4096);
@@ -46,15 +46,19 @@ describe("resolveOutputSource", () => {
 
   it("resolves an over-cap scratch file to a streamable source instead of buffering", async () => {
     const p = await scratchFile(4096);
-    const out = await resolveOutputSource({ scratchPath: p }, "tool x", { maxBufferedBytes: 1024 });
+    const out = await resolveOutputSource({ scratchPath: p }, "unused message", {
+      maxBufferedBytes: 1024,
+    });
 
     expect(out).toEqual({ kind: "stream", scratchPath: p, size: 4096 });
   });
 
-  it("throws a named error when neither buffer nor scratchPath is present", async () => {
-    await expect(resolveOutputSource({}, "tool x")).rejects.toThrow(
-      "tool x returned neither buffer nor scratchPath",
-    );
+  it("throws the caller's exact message when neither buffer nor scratchPath is present", async () => {
+    // Call sites pass their full historical strings; worker-branches
+    // integration tests pin them verbatim.
+    await expect(
+      resolveOutputSource({}, "Tool x returned neither buffer nor scratchPath"),
+    ).rejects.toThrow("Tool x returned neither buffer nor scratchPath");
   });
 
   it("keeps the default cap under Node's 2 GiB single-read limit", () => {

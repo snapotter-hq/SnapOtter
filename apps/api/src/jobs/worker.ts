@@ -381,7 +381,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
         // Resolve buffer OR scratchPath for the primary output. Over-cap
         // scratch files stay on disk and stream to storage below.
-        const primary = await resolveOutputSource(result, `Tool ${data.toolId}`);
+        const primary = await resolveOutputSource(
+          result,
+          `Tool ${data.toolId} returned neither buffer nor scratchPath`,
+        );
         if (primary.kind === "buffer") {
           resultBuffer = primary.buffer;
         } else {
@@ -396,7 +399,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         if (result.extraOutputs) {
           extraOutputs = await Promise.all(
             result.extraOutputs.map(async (extra) => {
-              const source = await resolveOutputSource(extra, `Extra output "${extra.name}"`);
+              const source = await resolveOutputSource(
+                extra,
+                `Extra output "${extra.name}" has neither buffer nor scratchPath`,
+              );
               return source.kind === "buffer"
                 ? { name: extra.name, buffer: source.buffer, contentType: extra.contentType }
                 : {
