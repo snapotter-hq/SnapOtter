@@ -48,6 +48,48 @@ test.describe("Sticky mobile CTA", () => {
     expect(alpha).toBe(1);
   });
 
+  // The bar auto-hides while scrolling down so the browser's URL-bar
+  // collapse (which re-anchors every fixed bottom element and toggles
+  // safe-area-inset-bottom on Android Chrome) never moves it in view.
+  // Shown/hidden is judged by bounding box, not class names: hidden means
+  // the bar's top is at or below the viewport's bottom edge.
+  const barTop = (page: import("@playwright/test").Page) =>
+    page
+      .locator("#mobile-cta")
+      .boundingBox()
+      .then((box) => box?.y ?? Number.POSITIVE_INFINITY);
+
+  test("slides away while scrolling down and back on scroll up", async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto("/");
+    await expect(page.locator("#mobile-cta")).toBeVisible();
+
+    // Two spaced scroll steps keep the idle-reveal timer from firing while
+    // we assert the hidden state.
+    await page.evaluate(() => window.scrollBy(0, 900));
+    await page.waitForTimeout(200);
+    await page.evaluate(() => window.scrollBy(0, 300));
+    await expect
+      .poll(() => barTop(page), { timeout: 2000 })
+      .toBeGreaterThanOrEqual(PHONE.height - 1);
+
+    await page.evaluate(() => window.scrollBy(0, -300));
+    await expect.poll(() => barTop(page), { timeout: 2000 }).toBeLessThan(PHONE.height);
+  });
+
+  test("slides back on its own once scrolling stops", async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto("/");
+
+    await page.evaluate(() => window.scrollBy(0, 1200));
+    await expect
+      .poll(() => barTop(page), { timeout: 2000 })
+      .toBeGreaterThanOrEqual(PHONE.height - 1);
+
+    // No further scrolling: the idle timer should bring the bar back.
+    await expect.poll(() => barTop(page), { timeout: 4000 }).toBeLessThan(PHONE.height);
+  });
+
   test("is hidden on desktop where the navbar CTAs are already visible", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto("/");

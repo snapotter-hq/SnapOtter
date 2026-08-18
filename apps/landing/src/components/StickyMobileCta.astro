@@ -4,8 +4,13 @@
 // Persistent bottom CTA for phones. The navbar's CTAs live in its md:flex
 // desktop cluster and are hidden below md, so without this a phone visitor has
 // no call to action until they open the hamburger. Hidden again at md+, where
-// the navbar CTAs reappear. CSS-only, no client JS: it is always-visible while
-// mounted, so the responsive breakpoint alone decides when it shows.
+// the navbar CTAs reappear.
+//
+// A small scroll script slides the bar away while scrolling down and back on
+// scroll up or after scrolling stops. Mobile browsers re-anchor fixed bottom
+// elements when the URL bar collapses (and Android Chrome toggles
+// safe-area-inset-bottom with it), so an always-visible bar hops around
+// mid-scroll; keeping it off-screen during the scroll hides that.
 //
 // Actions mirror what the hero and navbar already offer, reusing their i18n
 // keys so no new strings are needed: "Try the live demo" (lowest friction) and
@@ -30,7 +35,7 @@ const { locale = "en" } = Astro.props;
       during the URL-bar collapse animation (guarded by e2e). */}
   <div
     id="mobile-cta"
-    class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-surface px-4 py-3"
+    class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-surface px-4 py-3 transition-transform duration-300 motion-reduce:transition-none"
     style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));"
   >
     <a
@@ -51,3 +56,28 @@ const { locale = "en" } = Astro.props;
     </a>
   </div>
 </div>
+
+<script>
+  const bar = document.getElementById("mobile-cta");
+  if (bar) {
+    let lastY = window.scrollY;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const show = () => bar.classList.remove("translate-y-full");
+    const hide = () => bar.classList.add("translate-y-full");
+    window.addEventListener(
+      "scroll",
+      () => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        lastY = y;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(show, 1000);
+        // Small deltas are jitter from the URL-bar resize itself; reacting
+        // to them would re-trigger the exact hop this script exists to hide.
+        if (y <= 0 || delta < -4) show();
+        else if (delta > 4) hide();
+      },
+      { passive: true },
+    );
+  }
+</script>
