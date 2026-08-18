@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
 i18n_output_hash: 8f6eabc592c0
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Sleutels krijgen het voorvoegsel `si_` en worden opgeslagen als scrypt-hashes. D
 | `GET` | `/api/auth/saml/login` | Publiek | SAML-login starten |
 | `POST` | `/api/auth/saml/callback` | Publiek | SAML assertion consumer service |
 
-Wanneer MFA is ingeschakeld voor een gebruiker, retourneert `POST /api/auth/login` een `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` in plaats van een sessietoken. Stuur die `mfaToken` samen met een TOTP- of herstelcode naar `/api/auth/mfa/complete`.
+Wanneer MFA is ingeschakeld voor een gebruiker, retourneert `POST /api/auth/login` een `{"requiresMfa":true,"mfaToken":"..."}` in plaats van een sessietoken. Stuur die `mfaToken` samen met een TOTP- of herstelcode naar `/api/auth/mfa/complete`.
 
 ### Permissies {#permissions}
 

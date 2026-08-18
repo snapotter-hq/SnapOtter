@@ -486,7 +486,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // "unavailable" sentinel and unenrolled users fail closed instead of
       // skipping the policy.
       let mfaOutcome: ExternalMfaOutcome = user.totpEnabled ? "challenge" : "proceed";
-      let mfaRequiredByPolicy = false;
       let mfaModule: typeof import("./mfa.js") | undefined;
       try {
         mfaModule = await import("./mfa.js");
@@ -515,11 +514,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           });
         }
         mfaOutcome = mfaModule.resolveExternalLoginMfaOutcome(policy, user.role, user.totpEnabled);
-        // Informational flag for the challenge response below; when the read
-        // failed it stays false, which only affects display -- enforcement
-        // for enrolled users is the challenge itself.
-        mfaRequiredByPolicy =
-          policy !== "unavailable" && mfaModule.isMfaRequiredForUser(policy, user.role);
       }
 
       // ── MFA challenge ──────────────────────────────────────────
@@ -532,7 +526,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(200).send({
           requiresMfa: true,
           mfaToken,
-          mfaRequired: mfaRequiredByPolicy,
           message: "MFA verification required",
         });
       }

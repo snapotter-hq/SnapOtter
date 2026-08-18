@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
 i18n_output_hash: cf7876adfe84
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ As chaves têm o prefixo `si_` e são armazenadas como hashes scrypt. A chave br
 | `GET` | `/api/auth/saml/login` | Público | Iniciar o login SAML |
 | `POST` | `/api/auth/saml/callback` | Público | Serviço consumidor de asserções SAML |
 
-Quando o MFA está habilitado para um usuário, `POST /api/auth/login` retorna `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` em vez de um token de sessão. Envie esse `mfaToken` junto com um código TOTP ou de recuperação para `/api/auth/mfa/complete`.
+Quando o MFA está habilitado para um usuário, `POST /api/auth/login` retorna `{"requiresMfa":true,"mfaToken":"..."}` em vez de um token de sessão. Envie esse `mfaToken` junto com um código TOTP ou de recuperação para `/api/auth/mfa/complete`.
 
 ### Permissões {#permissions}
 

@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
 i18n_output_hash: a4289adc1b56
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | 공개 | SAML 로그인 시작 |
 | `POST` | `/api/auth/saml/callback` | 공개 | SAML 어설션 컨슈머 서비스 |
 
-사용자에 대해 MFA가 활성화되면 `POST /api/auth/login`는 세션 토큰 대신 `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}`를 반환합니다. 해당 `mfaToken`와 함께 TOTP 또는 복구 코드를 `/api/auth/mfa/complete`로 전송하세요.
+사용자에 대해 MFA가 활성화되면 `POST /api/auth/login`는 세션 토큰 대신 `{"requiresMfa":true,"mfaToken":"..."}`를 반환합니다. 해당 `mfaToken`와 함께 TOTP 또는 복구 코드를 `/api/auth/mfa/complete`로 전송하세요.
 
 ### 권한 {#permissions}
 

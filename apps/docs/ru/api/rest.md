@@ -1,7 +1,7 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
 i18n_output_hash: b2ec4e36cb9f
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | Публичный | Начало входа через SAML |
 | `POST` | `/api/auth/saml/callback` | Публичный | Служба потребителя утверждений SAML |
 
-Когда для пользователя включён MFA, `POST /api/auth/login` возвращает `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` вместо токена сессии. Отправьте этот `mfaToken` вместе с кодом TOTP или кодом восстановления на `/api/auth/mfa/complete`.
+Когда для пользователя включён MFA, `POST /api/auth/login` возвращает `{"requiresMfa":true,"mfaToken":"..."}` вместо токена сессии. Отправьте этот `mfaToken` вместе с кодом TOTP или кодом восстановления на `/api/auth/mfa/complete`.
 
 ### Разрешения {#permissions}
 

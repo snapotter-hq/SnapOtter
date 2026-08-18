@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
 i18n_output_hash: 9fa4a9a91996
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Key 以 `si_` 為前綴並以 scrypt 雜湊儲存，原始 key 只會顯示一�
 | `GET` | `/api/auth/saml/login` | Public | 啟動 SAML 登入 |
 | `POST` | `/api/auth/saml/callback` | Public | SAML assertion consumer service |
 
-當使用者啟用 MFA 時，`POST /api/auth/login` 會回傳 `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` 而非 session token。將該 `mfaToken` 加上 TOTP 或復原代碼送至 `/api/auth/mfa/complete`。
+當使用者啟用 MFA 時，`POST /api/auth/login` 會回傳 `{"requiresMfa":true,"mfaToken":"..."}` 而非 session token。將該 `mfaToken` 加上 TOTP 或復原代碼送至 `/api/auth/mfa/complete`。
 
 ### 權限 {#permissions}
 

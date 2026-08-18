@@ -1,7 +1,7 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
 i18n_output_hash: 20d37040e8ea
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | Публічний | Початок входу SAML |
 | `POST` | `/api/auth/saml/callback` | Публічний | Служба споживача твердження SAML |
 
-Коли для користувача ввімкнено MFA, `POST /api/auth/login` повертає `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` замість токена сесії. Надішліть цей `mfaToken` разом із кодом TOTP або кодом відновлення на `/api/auth/mfa/complete`.
+Коли для користувача ввімкнено MFA, `POST /api/auth/login` повертає `{"requiresMfa":true,"mfaToken":"..."}` замість токена сесії. Надішліть цей `mfaToken` разом із кодом TOTP або кодом відновлення на `/api/auth/mfa/complete`.
 
 ### Дозволи {#permissions}
 

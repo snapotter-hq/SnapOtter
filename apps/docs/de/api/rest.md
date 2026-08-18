@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
 i18n_output_hash: 8efd33eca67a
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Schlüssel erhalten das Präfix `si_` und werden als scrypt-Hashes gespeichert. 
 | `GET` | `/api/auth/saml/login` | Öffentlich | SAML-Login starten |
 | `POST` | `/api/auth/saml/callback` | Öffentlich | SAML Assertion Consumer Service |
 
-Wenn MFA für einen Benutzer aktiviert ist, gibt `POST /api/auth/login` statt eines Sitzungs-Tokens `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` zurück. Senden Sie dieses `mfaToken` zusammen mit einem TOTP- oder Wiederherstellungscode an `/api/auth/mfa/complete`.
+Wenn MFA für einen Benutzer aktiviert ist, gibt `POST /api/auth/login` statt eines Sitzungs-Tokens `{"requiresMfa":true,"mfaToken":"..."}` zurück. Senden Sie dieses `mfaToken` zusammen mit einem TOTP- oder Wiederherstellungscode an `/api/auth/mfa/complete`.
 
 ### Berechtigungen {#permissions}
 

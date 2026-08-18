@@ -7,7 +7,6 @@ interface AuthState {
   authEnabled: boolean;
   isAuthenticated: boolean;
   mustChangePassword: boolean;
-  mfaRequired: boolean;
   role: string | null;
   permissions: string[];
   oidcEnabled: boolean;
@@ -70,7 +69,6 @@ export function useAuth() {
     authEnabled: false,
     isAuthenticated: false,
     mustChangePassword: false,
-    mfaRequired: false,
     role: null,
     permissions: [],
     oidcEnabled: false,
@@ -97,7 +95,6 @@ export function useAuth() {
               authEnabled: false,
               isAuthenticated: true,
               mustChangePassword: false,
-              mfaRequired: false,
               role: "admin",
               permissions: ANON_ADMIN_PERMISSIONS,
               oidcEnabled: false,
@@ -127,7 +124,6 @@ export function useAuth() {
               authEnabled: true,
               isAuthenticated: true,
               mustChangePassword: mustChange,
-              mfaRequired: session.user?.mfaRequired === true,
               role: session.user?.role ?? null,
               permissions: session.user?.permissions ?? [],
               oidcEnabled: config.oidcEnabled ?? false,
@@ -147,7 +143,6 @@ export function useAuth() {
               authEnabled: true,
               isAuthenticated: false,
               mustChangePassword: false,
-              mfaRequired: false,
               role: null,
               permissions: [],
               oidcEnabled: config.oidcEnabled ?? false,

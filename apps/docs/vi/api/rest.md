@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
 i18n_output_hash: a2d3795ef769
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Khóa có tiền tố `si_` và được lưu dưới dạng hash scrypt - khóa
 | `GET` | `/api/auth/saml/login` | Công khai | Bắt đầu đăng nhập SAML |
 | `POST` | `/api/auth/saml/callback` | Công khai | Dịch vụ tiêu thụ khẳng định SAML |
 
-Khi MFA được bật cho một người dùng, `POST /api/auth/login` trả về `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` thay vì token phiên. Gửi `mfaToken` đó cùng mã TOTP hoặc mã khôi phục tới `/api/auth/mfa/complete`.
+Khi MFA được bật cho một người dùng, `POST /api/auth/login` trả về `{"requiresMfa":true,"mfaToken":"..."}` thay vì token phiên. Gửi `mfaToken` đó cùng mã TOTP hoặc mã khôi phục tới `/api/auth/mfa/complete`.
 
 ### Quyền hạn {#permissions}
 

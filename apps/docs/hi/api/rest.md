@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
 i18n_output_hash: 40efba210bee
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | सार्वजनिक | SAML लॉगिन शुरू करें |
 | `POST` | `/api/auth/saml/callback` | सार्वजनिक | SAML असर्शन कंज़्यूमर सर्विस |
 
-जब किसी उपयोगकर्ता के लिए MFA सक्षम होता है, तो `POST /api/auth/login` सेशन टोकन के बजाय `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` लौटाता है। उस `mfaToken` के साथ एक TOTP या रिकवरी कोड `/api/auth/mfa/complete` को भेजें।
+जब किसी उपयोगकर्ता के लिए MFA सक्षम होता है, तो `POST /api/auth/login` सेशन टोकन के बजाय `{"requiresMfa":true,"mfaToken":"..."}` लौटाता है। उस `mfaToken` के साथ एक TOTP या रिकवरी कोड `/api/auth/mfa/complete` को भेजें।
 
 ### अनुमतियाँ {#permissions}
 

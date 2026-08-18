@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
 i18n_output_hash: 450fd529e479
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Les clés sont préfixées par `si_` et stockées sous forme de hachages scrypt 
 | `GET` | `/api/auth/saml/login` | Public | Démarrer la connexion SAML |
 | `POST` | `/api/auth/saml/callback` | Public | Service consommateur d'assertions SAML |
 
-Lorsque l'authentification multifacteur est activée pour un utilisateur, `POST /api/auth/login` renvoie `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` au lieu d'un jeton de session. Envoyez ce `mfaToken` accompagné d'un code TOTP ou d'un code de récupération à `/api/auth/mfa/complete`.
+Lorsque l'authentification multifacteur est activée pour un utilisateur, `POST /api/auth/login` renvoie `{"requiresMfa":true,"mfaToken":"..."}` au lieu d'un jeton de session. Envoyez ce `mfaToken` accompagné d'un code TOTP ou d'un code de récupération à `/api/auth/mfa/complete`.
 
 ### Autorisations {#permissions}
 

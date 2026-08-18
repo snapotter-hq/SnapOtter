@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
 i18n_output_hash: 7793faea1aad
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Kunci diberi awalan `si_` dan disimpan sebagai hash scrypt - kunci mentah ditamp
 | `GET` | `/api/auth/saml/login` | Publik | Mulai login SAML |
 | `POST` | `/api/auth/saml/callback` | Publik | Layanan konsumen asersi SAML |
 
-Ketika MFA diaktifkan untuk seorang pengguna, `POST /api/auth/login` mengembalikan `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` alih-alih token sesi. Kirim `mfaToken` tersebut ditambah kode TOTP atau kode pemulihan ke `/api/auth/mfa/complete`.
+Ketika MFA diaktifkan untuk seorang pengguna, `POST /api/auth/login` mengembalikan `{"requiresMfa":true,"mfaToken":"..."}` alih-alih token sesi. Kirim `mfaToken` tersebut ditambah kode TOTP atau kode pemulihan ke `/api/auth/mfa/complete`.
 
 ### Izin {#permissions}
 

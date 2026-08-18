@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
 i18n_output_hash: c43973438a42
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | 公开 | 开始 SAML 登录 |
 | `POST` | `/api/auth/saml/callback` | 公开 | SAML 断言消费者服务 |
 
-当用户启用了 MFA 时，`POST /api/auth/login` 会返回 `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` 而不是会话令牌。将该 `mfaToken` 连同 TOTP 或恢复码一起发送到 `/api/auth/mfa/complete`。
+当用户启用了 MFA 时，`POST /api/auth/login` 会返回 `{"requiresMfa":true,"mfaToken":"..."}` 而不是会话令牌。将该 `mfaToken` 连同 TOTP 或恢复码一起发送到 `/api/auth/mfa/complete`。
 
 ### 权限 {#permissions}
 

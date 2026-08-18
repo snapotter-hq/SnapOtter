@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
 i18n_output_hash: aa42f6d4ddbe
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | Public | SAML ログインを開始 |
 | `POST` | `/api/auth/saml/callback` | Public | SAML アサーションコンシューマーサービス |
 
-ユーザーに対して MFA が有効な場合、`POST /api/auth/login` はセッショントークンの代わりに `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` を返します。その `mfaToken` と TOTP またはリカバリコードを `/api/auth/mfa/complete` に送信してください。
+ユーザーに対して MFA が有効な場合、`POST /api/auth/login` はセッショントークンの代わりに `{"requiresMfa":true,"mfaToken":"..."}` を返します。その `mfaToken` と TOTP またはリカバリコードを `/api/auth/mfa/complete` に送信してください。
 
 ### パーミッション {#permissions}
 

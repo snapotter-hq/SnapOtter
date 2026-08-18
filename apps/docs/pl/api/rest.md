@@ -1,7 +1,7 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
 i18n_output_hash: 4b25a4ffd694
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Klucze są poprzedzone przedrostkiem `si_` i przechowywane jako skróty scrypt -
 | `GET` | `/api/auth/saml/login` | Publiczny | Rozpoczęcie logowania SAML |
 | `POST` | `/api/auth/saml/callback` | Publiczny | Usługa konsumenta asercji SAML |
 
-Gdy MFA jest włączone dla użytkownika, `POST /api/auth/login` zwraca `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` zamiast tokena sesji. Wyślij ten `mfaToken` wraz z kodem TOTP lub kodem odzyskiwania do `/api/auth/mfa/complete`.
+Gdy MFA jest włączone dla użytkownika, `POST /api/auth/login` zwraca `{"requiresMfa":true,"mfaToken":"..."}` zamiast tokena sesji. Wyślij ten `mfaToken` wraz z kodem TOTP lub kodem odzyskiwania do `/api/auth/mfa/complete`.
 
 ### Uprawnienia {#permissions}
 

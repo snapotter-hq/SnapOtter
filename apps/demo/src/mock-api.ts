@@ -953,7 +953,6 @@ export function matchDemoRoute(url: string, method: string, body?: unknown): Res
         role: "admin",
         permissions: PERMISSIONS,
         mustChangePassword: false,
-        mfaRequired: false,
         loginMethod: "local",
         hasLocalPassword: true,
       },

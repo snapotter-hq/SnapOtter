@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
 i18n_output_hash: 34c52fe6305e
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | สาธารณะ | เริ่มการลงชื่อเข้าใช้ SAML |
 | `POST` | `/api/auth/saml/callback` | สาธารณะ | บริการ SAML assertion consumer |
 
-เมื่อเปิดใช้งาน MFA สำหรับผู้ใช้ `POST /api/auth/login` จะคืนค่า `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` แทนโทเคนเซสชัน ส่ง `mfaToken` นั้นพร้อมรหัส TOTP หรือรหัสกู้คืนไปยัง `/api/auth/mfa/complete`
+เมื่อเปิดใช้งาน MFA สำหรับผู้ใช้ `POST /api/auth/login` จะคืนค่า `{"requiresMfa":true,"mfaToken":"..."}` แทนโทเคนเซสชัน ส่ง `mfaToken` นั้นพร้อมรหัส TOTP หรือรหัสกู้คืนไปยัง `/api/auth/mfa/complete`
 
 ### สิทธิ์ {#permissions}
 

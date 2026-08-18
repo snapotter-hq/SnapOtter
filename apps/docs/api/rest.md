@@ -77,7 +77,7 @@ Keys are prefixed `si_` and stored as scrypt hashes - the raw key is shown once 
 | `GET` | `/api/auth/saml/login` | Public | Start SAML login |
 | `POST` | `/api/auth/saml/callback` | Public | SAML assertion consumer service |
 
-When MFA is enabled for a user, `POST /api/auth/login` returns `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` instead of a session token. Send that `mfaToken` plus a TOTP or recovery code to `/api/auth/mfa/complete`.
+When MFA is enabled for a user, `POST /api/auth/login` returns `{"requiresMfa":true,"mfaToken":"..."}` instead of a session token. Send that `mfaToken` plus a TOTP or recovery code to `/api/auth/mfa/complete`.
 
 ### Permissions {#permissions}
 

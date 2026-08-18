@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
 i18n_output_hash: 4756237a0bdc
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Nycklar har prefixet `si_` och lagras som scrypt-hashar - den råa nyckeln visas
 | `GET` | `/api/auth/saml/login` | Publik | Starta SAML-inloggning |
 | `POST` | `/api/auth/saml/callback` | Publik | SAML assertion consumer service |
 
-När MFA är aktiverat för en användare returnerar `POST /api/auth/login` `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` istället för en sessionstoken. Skicka den `mfaToken` plus en TOTP- eller återställningskod till `/api/auth/mfa/complete`.
+När MFA är aktiverat för en användare returnerar `POST /api/auth/login` `{"requiresMfa":true,"mfaToken":"..."}` istället för en sessionstoken. Skicka den `mfaToken` plus en TOTP- eller återställningskod till `/api/auth/mfa/complete`.
 
 ### Behörigheter {#permissions}
 

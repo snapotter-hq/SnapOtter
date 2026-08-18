@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
 i18n_output_hash: 89f2ba5743eb
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/saml/login` | عام | بدء تسجيل دخول SAML |
 | `POST` | `/api/auth/saml/callback` | عام | خدمة استهلاك تأكيدات SAML |
 
-عند تفعيل MFA لمستخدم، يُرجع `POST /api/auth/login` القيمة `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` بدلًا من رمز الجلسة. أرسل ذلك `mfaToken` إضافةً إلى رمز TOTP أو رمز استرداد إلى `/api/auth/mfa/complete`.
+عند تفعيل MFA لمستخدم، يُرجع `POST /api/auth/login` القيمة `{"requiresMfa":true,"mfaToken":"..."}` بدلًا من رمز الجلسة. أرسل ذلك `mfaToken` إضافةً إلى رمز TOTP أو رمز استرداد إلى `/api/auth/mfa/complete`.
 
 ### الأذونات {#permissions}
 

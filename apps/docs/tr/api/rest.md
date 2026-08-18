@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
 i18n_output_hash: 4ae115bf377e
-i18n_source_hash: 7e0a0db4abe0
+i18n_source_hash: 899149b272e4
 i18n_provenance: human
 ---
 
@@ -80,7 +80,7 @@ Anahtarlar `si_` ön ekiyle işaretlenir ve scrypt karma değerleri olarak sakla
 | `GET` | `/api/auth/saml/login` | Herkese açık | SAML oturum açmayı başlat |
 | `POST` | `/api/auth/saml/callback` | Herkese açık | SAML doğrulama tüketici hizmeti |
 
-Bir kullanıcı için MFA etkinleştirildiğinde, `POST /api/auth/login` bir oturum belirteci yerine `{"requiresMfa":true,"mfaToken":"...","mfaRequired":true|false}` döndürür. Bu `mfaToken` değerini bir TOTP veya kurtarma kodu ile birlikte `/api/auth/mfa/complete` adresine gönderin.
+Bir kullanıcı için MFA etkinleştirildiğinde, `POST /api/auth/login` bir oturum belirteci yerine `{"requiresMfa":true,"mfaToken":"..."}` döndürür. Bu `mfaToken` değerini bir TOTP veya kurtarma kodu ile birlikte `/api/auth/mfa/complete` adresine gönderin.
 
 ### İzinler {#permissions}
 
