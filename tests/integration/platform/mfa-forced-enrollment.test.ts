@@ -237,6 +237,18 @@ describe("POST /api/auth/login MFA policy read failure (#815)", () => {
       .from(schema.sessions)
       .where(eq(schema.sessions.userId, userId));
     expect(sessionsAfter.length).toBe(sessionsBefore);
+
+    // The deny is auditable: audit writes are inserts, so they survive the
+    // broken settings reads.
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "LOGIN_FAILED"));
+    const denyRow = auditRows.find((row) => {
+      const details = row.details as { username?: string; reason?: string } | null;
+      return details?.username === username && details?.reason === "mfa_policy_unavailable";
+    });
+    expect(denyRow).toBeDefined();
   });
 
   it("still challenges an enrolled user when the policy read throws (no admin lockout)", async () => {

@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
+import { reportError } from "../lib/error-report.js";
 import { resolveExternalUser, sanitizeUsername } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
@@ -322,19 +323,26 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Two failures used to share one silent catch here and they want
-      // opposite defaults (#815). The import failing means the MFA plugin
-      // isn't part of this build at all, so the login stays policy-free (an
-      // enrolled user still gets the challenge below). A loaded module whose
-      // policy READ fails maps to the "unavailable" sentinel instead: the
-      // stored policy may well be "required", so unenrolled users fail
-      // closed rather than silently skipping the policy.
+      // opposite defaults (#815). A missing MFA module keeps the login
+      // policy-free (an enrolled user still gets the challenge below). A
+      // loaded module whose policy READ fails maps to the "unavailable"
+      // sentinel instead: the stored policy may well be "required", so
+      // unenrolled users fail closed rather than silently skipping the
+      // policy.
       const totpEnabled = dbUser?.totpEnabled ?? false;
       let mfaOutcome: ExternalMfaOutcome = totpEnabled ? "challenge" : "proceed";
       let mfaModule: typeof import("./mfa.js") | undefined;
       try {
         mfaModule = await import("./mfa.js");
-      } catch {
-        // MFA plugin not loaded
+      } catch (err) {
+        // Unreachable today: index.ts imports mfa.js statically at boot, so a
+        // broken module means the server never started. Kept as a guard for a
+        // future conditional registration; if it ever fires, logins proceed
+        // policy-free, which must never be silent.
+        request.log.error(
+          { err },
+          "OIDC callback: MFA module failed to load; proceeding without policy",
+        );
       }
       if (mfaModule) {
         let policy: MfaPolicy | "unavailable" = "unavailable";
@@ -345,22 +353,22 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
             { err, userId: resolvedUser.id },
             "OIDC callback: failed to read the MFA policy",
           );
+          // request.log has no Sentry bridge, and by catching here the error
+          // never reaches the global handler's reportError. Report explicitly
+          // so a settings fault denying logins is visible in triage.
+          void reportError(err, {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            statusCode: 503,
+            subsystem: "mfa-policy",
+          });
         }
         mfaOutcome = mfaModule.resolveExternalLoginMfaOutcome(
           policy,
           resolvedUser.role,
           totpEnabled,
         );
-      }
-
-      if (mfaOutcome === "policy_unavailable") {
-        recordOidcFailure();
-        await audit("OIDC_LOGIN_FAILED", {
-          userId: resolvedUser.id,
-          username: resolvedUser.username,
-          reason: "mfa_policy_unavailable",
-        });
-        return redirectToLogin(reply, "mfa_policy_unavailable");
       }
 
       if (mfaOutcome === "challenge") {
@@ -382,6 +390,20 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           reason: "mfa_enrollment_required",
         });
         return redirectToLogin(reply, "mfa_enrollment_required");
+      }
+
+      if (mfaOutcome !== "proceed") {
+        // "policy_unavailable" today, and by construction any future outcome
+        // variant nobody wires up here: only an explicit "proceed" reaches
+        // session creation, so drift fails closed instead of recreating
+        // #815's fail-open.
+        recordOidcFailure();
+        await audit("OIDC_LOGIN_FAILED", {
+          userId: resolvedUser.id,
+          username: resolvedUser.username,
+          reason: "mfa_policy_unavailable",
+        });
+        return redirectToLogin(reply, "mfa_policy_unavailable");
       }
 
       // 5. Create session

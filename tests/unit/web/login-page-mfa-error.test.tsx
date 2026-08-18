@@ -61,6 +61,51 @@ describe("LoginPage error messages", () => {
     expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
   });
 
+  it("shows the retryable policy message when the API returns MFA_POLICY_UNAVAILABLE", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: "The MFA policy could not be checked. Please try again.",
+          code: "MFA_POLICY_UNAVAILABLE",
+        }),
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    // A DB blip must not read as "wrong password".
+    await waitFor(() => {
+      expect(screen.getByText(/mfa policy could not be checked/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a connection error, not invalid credentials, for a 5xx with an unparseable body", async () => {
+    // A reverse proxy answering 502 with HTML mid-restart: json() rejects.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new Error("Unexpected token < in JSON");
+        },
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(screen.getByText(/connection error/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
+  });
+
   it("still shows a generic message for a plain invalid-credentials response", async () => {
     vi.stubGlobal(
       "fetch",

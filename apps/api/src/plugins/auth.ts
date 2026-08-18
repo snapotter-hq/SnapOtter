@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
+import { reportError } from "../lib/error-report.js";
 import {
   checkLoginThrottle,
   clearLoginFailures,
@@ -478,19 +479,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Two failures used to share one silent catch here and they want
-      // opposite defaults (#815). The import failing means the MFA plugin
-      // isn't part of this build at all, so logins stay policy-free (an
-      // enrolled user still gets the TOTP challenge below). A loaded module
-      // whose policy READ fails is different: the stored policy may well be
-      // "required", so the read failure maps to the "unavailable" sentinel
-      // and unenrolled users fail closed instead of skipping the policy.
+      // opposite defaults (#815). A missing MFA module keeps logins
+      // policy-free (an enrolled user still gets the TOTP challenge below).
+      // A loaded module whose policy READ fails is different: the stored
+      // policy may well be "required", so the read failure maps to the
+      // "unavailable" sentinel and unenrolled users fail closed instead of
+      // skipping the policy.
       let mfaOutcome: ExternalMfaOutcome = user.totpEnabled ? "challenge" : "proceed";
       let mfaRequiredByPolicy = false;
       let mfaModule: typeof import("./mfa.js") | undefined;
       try {
         mfaModule = await import("./mfa.js");
-      } catch {
-        // MFA plugin not loaded
+      } catch (err) {
+        // Unreachable today: index.ts imports mfa.js statically at boot, so a
+        // broken module means the server never started. Kept as a guard for a
+        // future conditional registration; if it ever fires, logins proceed
+        // policy-free, which must never be silent.
+        request.log.error({ err }, "login: MFA module failed to load; proceeding without policy");
       }
       if (mfaModule) {
         let policy: MfaPolicy | "unavailable" = "unavailable";
@@ -498,6 +503,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           policy = await mfaModule.getMfaPolicy();
         } catch (err) {
           request.log.error({ err, userId: user.id }, "login: failed to read the MFA policy");
+          // request.log has no Sentry bridge, and by catching here the error
+          // never reaches the global handler's reportError. Report explicitly
+          // so a settings fault denying logins is visible in triage.
+          void reportError(err, {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            statusCode: 503,
+            subsystem: "mfa-policy",
+          });
         }
         mfaOutcome = mfaModule.resolveExternalLoginMfaOutcome(policy, user.role, user.totpEnabled);
         // Informational flag for the challenge response below; when the read
@@ -522,22 +537,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      if (mfaOutcome === "policy_unavailable") {
-        // Only unenrolled users land here (enrolled ones were challenged
-        // above). Denying with a distinct retryable code beats minting a
-        // policy-exempt session off a transient settings fault (#815).
-        authAttempts.inc({ method: "password", result: "failure" });
-        await audit("LOGIN_FAILED", {
-          userId: user.id,
-          username: user.username,
-          reason: "mfa_policy_unavailable",
-        });
-        return reply.status(503).send({
-          error: "The MFA policy could not be checked. Please try again.",
-          code: "MFA_POLICY_UNAVAILABLE",
-        });
-      }
-
       if (mfaOutcome === "enrollment_required") {
         // Licensed instances walk the user through enrollment right here instead
         // of hard-blocking, so a required policy cannot strand a not-yet-enrolled
@@ -559,6 +558,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({
           error: "MFA enrollment is required before login",
           code: "MFA_ENROLLMENT_REQUIRED",
+        });
+      }
+
+      if (mfaOutcome !== "proceed") {
+        // "policy_unavailable" today, and by construction any future outcome
+        // variant nobody wires up here: only an explicit "proceed" reaches
+        // session creation, so drift fails closed instead of recreating
+        // #815's fail-open. Only unenrolled users can land here (enrolled
+        // ones were challenged above); the distinct retryable code beats
+        // minting a policy-exempt session off a transient settings fault.
+        authAttempts.inc({ method: "password", result: "failure" });
+        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        await audit("LOGIN_FAILED", {
+          userId: user.id,
+          username: user.username,
+          reason: "mfa_policy_unavailable",
+        });
+        return reply.status(503).send({
+          error: "The MFA policy could not be checked. Please try again.",
+          code: "MFA_POLICY_UNAVAILABLE",
         });
       }
 

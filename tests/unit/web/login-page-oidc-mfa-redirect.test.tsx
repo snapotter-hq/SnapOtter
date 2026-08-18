@@ -50,6 +50,11 @@ describe("LoginPage OIDC/SAML MFA redirect handling", () => {
     expect(screen.getByText(/multi-factor authentication/i)).toBeInTheDocument();
   });
 
+  it("shows the retryable policy message for the mfa_policy_unavailable error code", () => {
+    renderLoginPage("/login?error=mfa_policy_unavailable");
+    expect(screen.getByText(/mfa policy could not be checked/i)).toBeInTheDocument();
+  });
+
   it("does not show the TOTP prompt for an empty mfaToken param", () => {
     renderLoginPage("/login?mfaToken=");
     expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();

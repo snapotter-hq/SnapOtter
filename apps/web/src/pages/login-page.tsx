@@ -237,6 +237,11 @@ export function LoginPage() {
           setError(t.auth.mfaEnrollmentRequired);
         } else if (failure?.code === "MFA_POLICY_UNAVAILABLE") {
           setError(t.auth.mfaPolicyUnavailable);
+        } else if (res.status >= 500) {
+          // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
+          // is not a credentials problem; claiming "invalid credentials"
+          // invites password resets during an outage.
+          setError(t.auth.connectionError);
         } else {
           setError(t.auth.invalidCredentials);
         }

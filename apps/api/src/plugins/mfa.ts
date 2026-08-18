@@ -8,6 +8,7 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
+import { logger } from "../lib/logger.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -120,6 +121,15 @@ export async function getMfaPolicy(): Promise<MfaPolicy> {
     .limit(1);
   const raw = result[0]?.value;
   if (raw === "required" || raw === "admins_only") return raw;
+  if (raw !== undefined && raw !== "optional") {
+    // Writes are Zod-validated, so an unrecognized stored value means the DB
+    // was modified out of band. Treating it as "optional" disarms the policy,
+    // which must at least be loud (it is indistinguishable from tampering).
+    logger.warn(
+      { value: raw },
+      "mfaPolicy setting holds an unrecognized value; treating as optional",
+    );
+  }
   return "optional";
 }
 

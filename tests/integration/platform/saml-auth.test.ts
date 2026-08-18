@@ -336,4 +336,36 @@ describe("SAML callback", () => {
       mfaOutcomeMock.mockReturnValue("proceed");
     }
   });
+
+  it("still challenges an enrolled user when the MFA policy lookup fails (#815)", async () => {
+    const email = `mfaerr-enrolled-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+
+    // First login auto-creates the account, then mark it TOTP-enrolled.
+    mfaOutcomeMock.mockReturnValue("proceed");
+    expect((await postCallback()).statusCode).toBe(302);
+    await db
+      .update(schema.users)
+      .set({ totpEnabled: true })
+      .where(eq(schema.users.externalId, email));
+
+    getMfaPolicyMock.mockRejectedValueOnce(new Error("mfa policy store unavailable"));
+    // Mirror what the real resolver returns for ("unavailable", role, true).
+    mfaOutcomeMock.mockReturnValue("challenge");
+    try {
+      const res = await postCallback();
+
+      // A settings blip must not lock out enrolled users: the challenge is
+      // at least as strict as any policy, so it is issued as usual.
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toMatch(/^\/login\?mfaToken=/);
+      // The caller passed the sentinel with the REAL enrollment state; a
+      // regression that hardcodes totpEnabled=false on the failure path, or
+      // denies before consulting the resolver, trips this.
+      expect(mfaOutcomeMock).toHaveBeenLastCalledWith("unavailable", expect.any(String), true);
+    } finally {
+      getMfaPolicyMock.mockResolvedValue({});
+      mfaOutcomeMock.mockReturnValue("proceed");
+    }
+  });
 });
