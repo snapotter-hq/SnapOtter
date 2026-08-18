@@ -32,7 +32,12 @@ import {
   selectOcrRuntimeTarget,
 } from "@snapotter/ai";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
-import { FEATURE_BUNDLES, getRequiredBundlesForTool } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  getRequiredBundlesForTool,
+  isSafeMessageError,
+  SafeError,
+} from "@snapotter/shared";
 import * as tar from "tar";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
 
@@ -368,8 +373,16 @@ function openKernelInstallLockFile(): number {
         // A permanent lock inode may have been created by another pod UID and
         // shared through fsGroup. Opening O_RDWR already proved this replica's
         // access; do not require ownership merely to reapply an identical-safe
-        // mode. Still fail closed if the inherited inode is world-accessible.
+        // mode. Still fail closed if the inherited inode is world-accessible,
+        // but say what to fix: the raw EPERM got retried blind (NODE-5E).
         if ((code !== "EPERM" && code !== "EACCES") || (mode & 0o007) !== 0) {
+          if (code === "EPERM" || code === "EACCES") {
+            throw new SafeError(
+              "The AI install lock file on the data volume is owned by another user and is world-accessible. " +
+                "Fix ownership on the data volume (match PUID/PGID to the app user, or delete <data>/ai/install.flock) and retry.",
+              { kind: "operational", code: "install-lock-perms", statusCode: 503, cause: error },
+            );
+          }
           throw error;
         }
       }
@@ -614,6 +627,9 @@ export function acquireInstallLock(bundleId: string): boolean {
         // Preserve the acquisition failure.
       }
     }
+    // A SafeError carries its own operator-facing message and classification;
+    // rewrapping it in a plain Error would demote it back to a bug-class blob.
+    if (isSafeMessageError(error)) throw error;
     throw new Error(
       `Unable to acquire the AI install lock: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },

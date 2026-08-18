@@ -397,6 +397,30 @@ describe("Install lock", () => {
     expect(JSON.parse(readFileSync(lockPath, "utf-8")).bundleId).toBe("ocr");
   });
 
+  // The fail-closed policy for a world-accessible foreign inode is deliberate;
+  // what escaped was a raw "EPERM fchmod" the admin retried against 20 times
+  // in a day (Sentry NODE-5E). The rejection has to say what to fix.
+  it("rejects a world-accessible foreign kernel inode with an actionable operational error", () => {
+    writeFileSync(kernelLockPath, "", { mode: 0o666 });
+    chmodSync(kernelLockPath, 0o666);
+    fsFaults.denyOwnerOnlyMutationPath = kernelLockPath;
+
+    let thrown: unknown;
+    try {
+      mod.acquireInstallLock("ocr");
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "install-lock-perms",
+    });
+    // The message must point the operator at the volume fix, not just EPERM.
+    expect((thrown as Error).message).toMatch(/data volume/i);
+    expect((thrown as Error).message).toMatch(/PUID|ownership/i);
+  });
+
   it("heartbeats an owned lease so a long install cannot be stolen", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
