@@ -3642,6 +3642,7 @@ export const ko: TranslationKeys = {
     mfaInvalidCode: "잘못된 코드입니다. 다시 시도해 주세요.",
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "조직에서 다단계 인증을 요구합니다. 계정 설정에서 MFA를 설정해 주세요.",
+    mfaPolicyUnavailable: "MFA 정책을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     methodSaml: "SAML",
     passwordManagedByProvider: "비밀번호는 ID 제공자에서 관리됩니다.",
     enterUsername: "사용자명 입력",

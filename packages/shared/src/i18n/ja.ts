@@ -3663,6 +3663,8 @@ export const ja: TranslationKeys = {
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
+    mfaPolicyUnavailable:
+      "MFA ポリシーを確認できませんでした。しばらくしてからもう一度お試しください。",
     methodSaml: "SAML",
     passwordManagedByProvider: "パスワードはIDプロバイダーで管理されています。",
     enterUsername: "ユーザー名を入力",

@@ -214,6 +214,7 @@ export function LoginPage() {
         saml_user_not_authorized: t.auth.samlUserNotAuthorized,
         saml_user_limit_reached: t.auth.samlUserLimitReached,
         mfa_enrollment_required: t.auth.mfaEnrollmentRequired,
+        mfa_policy_unavailable: t.auth.mfaPolicyUnavailable,
       };
       setError(errorMessages[authError] || t.auth.oidcGenericError);
       setSearchParams({}, { replace: true });
@@ -232,11 +233,13 @@ export function LoginPage() {
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => null);
-        setError(
-          failure?.code === "MFA_ENROLLMENT_REQUIRED"
-            ? t.auth.mfaEnrollmentRequired
-            : t.auth.invalidCredentials,
-        );
+        if (failure?.code === "MFA_ENROLLMENT_REQUIRED") {
+          setError(t.auth.mfaEnrollmentRequired);
+        } else if (failure?.code === "MFA_POLICY_UNAVAILABLE") {
+          setError(t.auth.mfaPolicyUnavailable);
+        } else {
+          setError(t.auth.invalidCredentials);
+        }
         return;
       }
       const data = await res.json();

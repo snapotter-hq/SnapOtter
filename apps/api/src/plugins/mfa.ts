@@ -8,7 +8,6 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
-import { getSettingString } from "../lib/settings-helpers.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -110,7 +109,16 @@ async function decryptSecret(stored: string): Promise<string | null> {
 export type MfaPolicy = "optional" | "admins_only" | "required";
 
 export async function getMfaPolicy(): Promise<MfaPolicy> {
-  const raw = await getSettingString("mfaPolicy", "optional");
+  // Deliberately not getSettingString: that helper swallows DB errors into
+  // its default, which would silently disarm a required policy whenever the
+  // settings read fails (#815). A missing row legitimately means "optional";
+  // a failed read must throw so login paths can fail closed.
+  const result = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(eq(schema.settings.key, "mfaPolicy"))
+    .limit(1);
+  const raw = result[0]?.value;
   if (raw === "required" || raw === "admins_only") return raw;
   return "optional";
 }
@@ -125,14 +133,26 @@ export function isMfaRequiredForUser(policy: MfaPolicy, userRole: string): boole
 // password, OIDC, SAML) so a new auth method can't silently diverge from the
 // others the way OIDC/SAML once did (they blocked on policy alone, with no
 // totpEnabled check and no challenge step -- snapotter-hq/SnapOtter#533).
-export type ExternalMfaOutcome = "proceed" | "challenge" | "enrollment_required";
+//
+// "unavailable" is the fail-closed sentinel for a failed policy READ (#815):
+// callers map a getMfaPolicy() rejection to it instead of guessing a policy.
+// An unenrolled user is then denied ("policy_unavailable"), because the
+// stored policy may well be "required". An enrolled user still gets the
+// challenge: TOTP is at least as strict as any policy, so a flaky settings
+// read can't lock out enrolled users (including the admin, mid-incident).
+export type ExternalMfaOutcome =
+  | "proceed"
+  | "challenge"
+  | "enrollment_required"
+  | "policy_unavailable";
 
 export function resolveExternalLoginMfaOutcome(
-  policy: MfaPolicy,
+  policy: MfaPolicy | "unavailable",
   userRole: string,
   totpEnabled: boolean,
 ): ExternalMfaOutcome {
   if (totpEnabled) return "challenge";
+  if (policy === "unavailable") return "policy_unavailable";
   if (isMfaRequiredForUser(policy, userRole)) return "enrollment_required";
   return "proceed";
 }

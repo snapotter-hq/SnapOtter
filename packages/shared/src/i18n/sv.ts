@@ -3713,6 +3713,7 @@ export const sv: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
+    mfaPolicyUnavailable: "MFA-policyn kunde inte kontrolleras. Försök igen om en stund.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Lösenordsändringar hanteras av din identitetsleverantör.",
     enterUsername: "Ange användarnamn",

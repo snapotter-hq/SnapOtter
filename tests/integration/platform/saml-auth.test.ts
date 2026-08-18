@@ -25,9 +25,10 @@ const samlMock = vi.hoisted(() => ({
 }));
 const mfaOutcomeMock = vi.hoisted(() => vi.fn(() => "proceed"));
 // A controllable handle for getMfaPolicy so a single test can make the MFA
-// policy lookup reject and drive saml.ts's `catch { /* MFA plugin not loaded */ }`
-// branch (the whole MFA block is best-effort: a policy-lookup failure must fall
-// back to "proceed", not fail the login).
+// policy lookup reject and drive saml.ts's policy-read catch. Since #815 a
+// failed policy read no longer falls back to "proceed": the caller passes the
+// "unavailable" sentinel to the outcome resolver, which denies unenrolled
+// users with a distinct retryable error instead of waving them through.
 const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 vi.mock("@node-saml/node-saml", () => ({
@@ -297,34 +298,42 @@ describe("SAML callback", () => {
     }
   });
 
-  it("still logs in when the MFA policy lookup fails (best-effort MFA block)", async () => {
-    // saml.ts wraps the getMfaPolicy/resolveExternalLoginMfaOutcome lookup in a
-    // try/catch that swallows failures and leaves the outcome at "proceed" (the
-    // MFA plugin may not be loaded). Make the policy lookup reject once and
-    // confirm the login still completes: session created, redirect to `/`.
+  it("fails closed when the MFA policy lookup fails and the user is not enrolled (#815)", async () => {
+    // Make the policy lookup reject once. saml.ts must map the failure to the
+    // "unavailable" sentinel and pass it to the outcome resolver instead of
+    // swallowing it into "proceed": the stored policy may well be "required",
+    // so an unenrolled user is denied with a distinct retryable error param.
     const email = `mfaerr-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
     getMfaPolicyMock.mockRejectedValueOnce(new Error("mfa policy store unavailable"));
+    // Mirror what the real resolver returns for ("unavailable", role, false);
+    // the pure mapping itself is covered exhaustively in tests/unit/api/mfa.test.ts.
+    mfaOutcomeMock.mockReturnValue("policy_unavailable");
 
     try {
       const res = await postCallback();
 
       expect(res.statusCode).toBe(302);
-      expect(res.headers.location).toBe("/");
+      expect(res.headers.location).toBe("/login?error=mfa_policy_unavailable");
       const setCookie = res.headers["set-cookie"];
       const cookieStr = Array.isArray(setCookie) ? setCookie.join("; ") : setCookie || "";
-      expect(cookieStr).toContain("snapotter-session=");
+      expect(cookieStr).not.toContain("snapotter-session=");
 
-      // A real session was still created despite the MFA lookup throwing.
+      // The caller fed the read failure to the resolver as the sentinel
+      // rather than skipping the MFA decision entirely.
+      expect(mfaOutcomeMock).toHaveBeenCalledWith("unavailable", expect.any(String), false);
+
+      // No session row was minted for the resolved user.
       const [user] = await db.select().from(schema.users).where(eq(schema.users.externalId, email));
       expect(user).toBeDefined();
       const sessions = await db
         .select()
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, user?.id as string));
-      expect(sessions.length).toBeGreaterThan(0);
+      expect(sessions.length).toBe(0);
     } finally {
       getMfaPolicyMock.mockResolvedValue({});
+      mfaOutcomeMock.mockReturnValue("proceed");
     }
   });
 });

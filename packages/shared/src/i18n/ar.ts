@@ -3685,6 +3685,7 @@ export const ar: TranslationKeys = {
     mfaInvalidCode: "رمز غير صالح. يرجى المحاولة مرة أخرى.",
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "تتطلب مؤسستك المصادقة متعددة العوامل. يرجى إعداد MFA في إعدادات حسابك.",
+    mfaPolicyUnavailable: "تعذّر التحقق من سياسة MFA. يرجى المحاولة مرة أخرى بعد قليل.",
     methodSaml: "SAML",
     passwordManagedByProvider: "يتم إدارة تغيير كلمة المرور بواسطة مزود الهوية الخاص بك.",
     enterUsername: "أدخل اسم المستخدم",

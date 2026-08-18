@@ -3514,6 +3514,7 @@ export const hi: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "आपके संगठन को मल्टी-फ़ैक्टर प्रमाणीकरण आवश्यक है। कृपया अपनी खाता सेटिंग्स में MFA सेट अप करें।",
+    mfaPolicyUnavailable: "MFA नीति की जाँच नहीं हो सकी। कृपया थोड़ी देर बाद फिर से प्रयास करें।",
     methodSaml: "SAML",
     passwordManagedByProvider: "पासवर्ड बदलाव आपके आइडेंटिटी प्रोवाइडर द्वारा प्रबंधित किए जाते हैं।",
     enterUsername: "यूज़रनेम दर्ज करें",

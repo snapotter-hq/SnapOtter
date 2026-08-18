@@ -3709,6 +3709,7 @@ export const vi: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
+    mfaPolicyUnavailable: "Không thể kiểm tra chính sách MFA. Vui lòng thử lại sau giây lát.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Việc đổi mật khẩu được quản lý bởi nhà cung cấp danh tính của bạn.",
     enterUsername: "Nhập tên đăng nhập",

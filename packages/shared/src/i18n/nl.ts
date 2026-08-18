@@ -3724,6 +3724,8 @@ export const nl: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Uw organisatie vereist meerfactorauthenticatie. Stel MFA in via uw accountinstellingen.",
+    mfaPolicyUnavailable:
+      "Het MFA-beleid kon niet worden gecontroleerd. Probeer het over enkele ogenblikken opnieuw.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Wachtwoordwijzigingen worden beheerd door je identiteitsprovider.",
     enterUsername: "Voer gebruikersnaam in",

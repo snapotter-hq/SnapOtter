@@ -3731,6 +3731,7 @@ export const it: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "La tua organizzazione richiede l'autenticazione a più fattori. Configura l'MFA nelle impostazioni del tuo account.",
+    mfaPolicyUnavailable: "Impossibile verificare la policy MFA. Riprova tra qualche istante.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Le modifiche alla password sono gestite dal tuo provider di identità.",

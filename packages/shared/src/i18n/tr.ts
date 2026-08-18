@@ -3722,6 +3722,7 @@ export const tr: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",
+    mfaPolicyUnavailable: "MFA politikası kontrol edilemedi. Lütfen birazdan tekrar deneyin.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Parola değişiklikleri kimlik sağlayıcınız tarafından yönetilmektedir.",

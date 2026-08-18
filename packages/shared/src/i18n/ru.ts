@@ -3720,6 +3720,7 @@ export const ru: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Ваша организация требует многофакторную аутентификацию. Настройте MFA в параметрах учётной записи.",
+    mfaPolicyUnavailable: "Не удалось проверить политику MFA. Повторите попытку чуть позже.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Управление паролем осуществляется Вашим провайдером идентификации.",
     enterUsername: "Введите имя пользователя",

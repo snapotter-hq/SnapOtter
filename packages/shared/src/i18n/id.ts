@@ -3715,6 +3715,7 @@ export const id: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
+    mfaPolicyUnavailable: "Kebijakan MFA tidak dapat diperiksa. Silakan coba lagi sebentar lagi.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Perubahan kata sandi dikelola oleh penyedia identitas Anda.",
     enterUsername: "Masukkan nama pengguna",

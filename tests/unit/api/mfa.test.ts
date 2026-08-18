@@ -191,9 +191,10 @@ describe("MFA", () => {
   });
 
   describe("resolveExternalLoginMfaOutcome", () => {
-    // Exhaustive over the full input space: 3 policies x 2 roles x 2
-    // totpEnabled states. Role only matters via isMfaRequiredForUser, which
-    // branches solely on role === "admin", so {admin, user} covers it.
+    // Exhaustive over the full input space: 3 policies plus the "unavailable"
+    // read-failure sentinel, x 2 roles x 2 totpEnabled states. Role only
+    // matters via isMfaRequiredForUser, which branches solely on
+    // role === "admin", so {admin, user} covers it.
     it.each([
       ["optional", "user", false, "proceed"],
       ["optional", "user", true, "challenge"],
@@ -210,6 +211,15 @@ describe("MFA", () => {
       ["required", "user", true, "challenge"],
       ["required", "admin", false, "enrollment_required"],
       ["required", "admin", true, "challenge"],
+      // "unavailable" is the #815 fail-closed sentinel: the policy read
+      // failed, so an unenrolled user must be denied (the stored policy may
+      // well be "required"), while an enrolled user still gets the TOTP
+      // challenge, which is at least as strict as any policy. That carve-out
+      // is what keeps a flaky settings read from locking out enrolled admins.
+      ["unavailable", "user", false, "policy_unavailable"],
+      ["unavailable", "user", true, "challenge"],
+      ["unavailable", "admin", false, "policy_unavailable"],
+      ["unavailable", "admin", true, "challenge"],
     ] as const)("policy=%s role=%s totpEnabled=%s -> %s", (policy, role, totpEnabled, expected) => {
       expect(resolveExternalLoginMfaOutcome(policy, role, totpEnabled)).toBe(expected);
     });
@@ -217,6 +227,15 @@ describe("MFA", () => {
     it("enrollment takes priority: an enrolled user is challenged even under a required policy", () => {
       expect(resolveExternalLoginMfaOutcome("required", "admin", true)).not.toBe(
         "enrollment_required",
+      );
+    });
+
+    it("never proceeds when the policy is unavailable and the user is not enrolled (#815)", () => {
+      expect(resolveExternalLoginMfaOutcome("unavailable", "user", false)).toBe(
+        "policy_unavailable",
+      );
+      expect(resolveExternalLoginMfaOutcome("unavailable", "admin", false)).toBe(
+        "policy_unavailable",
       );
     });
   });

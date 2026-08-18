@@ -189,3 +189,83 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe("POST /api/auth/login MFA policy read failure (#815)", () => {
+  // Makes every settings-style select ({ value: ... } selection) throw while
+  // leaving full-row selects (users, sessions) untouched. getSettingString /
+  // getSettingNumber callers swallow the error internally and fall back to
+  // their defaults, so the only reader this breaks is the strict MFA policy
+  // read, which must NOT swallow it (#815).
+  function breakSettingsReads() {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "value" in selection) {
+        throw new Error("simulated settings store failure");
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+  }
+
+  it("fails closed with 503 MFA_POLICY_UNAVAILABLE for an unenrolled user when the policy read throws", async () => {
+    const { username, password, userId } = await createUnenrolledUser();
+    await setMfaPolicy("required");
+    const sessionsBefore = (
+      await db.select().from(schema.sessions).where(eq(schema.sessions.userId, userId))
+    ).length;
+
+    const selectSpy = breakSettingsReads();
+    try {
+      const res = await login(username, password);
+
+      // Must NOT hand out a session, an enrollment, or a challenge: the
+      // stored policy may well be "required", so a failed read denies with a
+      // distinct retryable code instead of waving the user through.
+      expect(res.statusCode).toBe(503);
+      const body = JSON.parse(res.body);
+      expect(body.code).toBe("MFA_POLICY_UNAVAILABLE");
+      expect(body.token).toBeUndefined();
+      expect(body.requiresMfa).toBeUndefined();
+      expect(body.requiresMfaEnrollment).toBeUndefined();
+    } finally {
+      selectSpy.mockRestore();
+    }
+
+    const sessionsAfter = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfter.length).toBe(sessionsBefore);
+  });
+
+  it("still challenges an enrolled user when the policy read throws (no admin lockout)", async () => {
+    const { username, password } = await createUnenrolledUser("admin");
+    await setMfaPolicy("required");
+
+    // Enroll for real via the forced-enrollment flow, before breaking reads.
+    const firstLogin = await login(username, password);
+    const { enrollmentToken, uri } = JSON.parse(firstLogin.body);
+    const completeRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode(uri) },
+    });
+    expect(completeRes.statusCode).toBe(200);
+
+    const selectSpy = breakSettingsReads();
+    try {
+      const res = await login(username, password);
+
+      // The TOTP challenge is at least as strict as any policy, so a broken
+      // policy read must not turn into a lockout for enrolled users.
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.requiresMfa).toBe(true);
+      expect(body.mfaToken).toBeDefined();
+      expect(body.token).toBeUndefined();
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+});

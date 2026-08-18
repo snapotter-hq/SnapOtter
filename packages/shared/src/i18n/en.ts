@@ -3658,6 +3658,7 @@ export const en = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",
+    mfaPolicyUnavailable: "The MFA policy could not be checked. Please try again in a moment.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Password changes are managed by your identity provider.",
     enterUsername: "Enter username",

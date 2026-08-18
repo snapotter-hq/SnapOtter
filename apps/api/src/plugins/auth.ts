@@ -25,6 +25,7 @@ import {
   isDisabledRole,
   requirePermission,
 } from "../permissions.js";
+import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 
 const scryptAsync = promisify(scrypt);
 
@@ -476,13 +477,34 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
       }
 
+      // Two failures used to share one silent catch here and they want
+      // opposite defaults (#815). The import failing means the MFA plugin
+      // isn't part of this build at all, so logins stay policy-free (an
+      // enrolled user still gets the TOTP challenge below). A loaded module
+      // whose policy READ fails is different: the stored policy may well be
+      // "required", so the read failure maps to the "unavailable" sentinel
+      // and unenrolled users fail closed instead of skipping the policy.
+      let mfaOutcome: ExternalMfaOutcome = user.totpEnabled ? "challenge" : "proceed";
       let mfaRequiredByPolicy = false;
+      let mfaModule: typeof import("./mfa.js") | undefined;
       try {
-        const { getMfaPolicy, isMfaRequiredForUser } = await import("./mfa.js");
-        const policy = await getMfaPolicy();
-        mfaRequiredByPolicy = isMfaRequiredForUser(policy, user.role);
+        mfaModule = await import("./mfa.js");
       } catch {
         // MFA plugin not loaded
+      }
+      if (mfaModule) {
+        let policy: MfaPolicy | "unavailable" = "unavailable";
+        try {
+          policy = await mfaModule.getMfaPolicy();
+        } catch (err) {
+          request.log.error({ err, userId: user.id }, "login: failed to read the MFA policy");
+        }
+        mfaOutcome = mfaModule.resolveExternalLoginMfaOutcome(policy, user.role, user.totpEnabled);
+        // Informational flag for the challenge response below; when the read
+        // failed it stays false, which only affects display -- enforcement
+        // for enrolled users is the challenge itself.
+        mfaRequiredByPolicy =
+          policy !== "unavailable" && mfaModule.isMfaRequiredForUser(policy, user.role);
       }
 
       // ── MFA challenge ──────────────────────────────────────────
@@ -500,7 +522,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      if (mfaRequiredByPolicy) {
+      if (mfaOutcome === "policy_unavailable") {
+        // Only unenrolled users land here (enrolled ones were challenged
+        // above). Denying with a distinct retryable code beats minting a
+        // policy-exempt session off a transient settings fault (#815).
+        authAttempts.inc({ method: "password", result: "failure" });
+        await audit("LOGIN_FAILED", {
+          userId: user.id,
+          username: user.username,
+          reason: "mfa_policy_unavailable",
+        });
+        return reply.status(503).send({
+          error: "The MFA policy could not be checked. Please try again.",
+          code: "MFA_POLICY_UNAVAILABLE",
+        });
+      }
+
+      if (mfaOutcome === "enrollment_required") {
         // Licensed instances walk the user through enrollment right here instead
         // of hard-blocking, so a required policy cannot strand a not-yet-enrolled
         // user (snapotter-hq/SnapOtter#811). Unlicensed instances (a policy stored

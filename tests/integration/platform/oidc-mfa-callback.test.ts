@@ -334,4 +334,70 @@ describe("OIDC callback MFA outcomes", () => {
       selectSpy.mockRestore();
     }
   });
+
+  // Makes every settings-style select ({ value: ... } selection) throw while
+  // leaving full-row and totpEnabled selects untouched. getSettingString /
+  // getSettingNumber callers swallow the error internally, so the only reader
+  // this breaks is the strict MFA policy read (#815).
+  function breakSettingsReads() {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "value" in selection) {
+        throw new Error("simulated settings store failure");
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+  }
+
+  it("fails closed with a distinct error when the MFA policy read throws and the user is not enrolled (#815)", async () => {
+    const { externalId } = await insertOidcUser({ role: "user", totpEnabled: false });
+    await setMfaPolicy("required");
+
+    const selectSpy = breakSettingsReads();
+    try {
+      const res = await callbackAsUser(externalId);
+
+      // The stored policy may well be "required", so a failed policy read
+      // must deny the login with a retryable, distinct error param instead
+      // of defaulting to "no policy" and minting a session.
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe("/login?error=mfa_policy_unavailable");
+      const setCookie = res.headers["set-cookie"];
+      expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  it("still challenges an enrolled user when the MFA policy read throws, and the challenge is completable (#815)", async () => {
+    const { username, externalId, totpUri } = await insertAndEnrollOidcUser({ role: "user" });
+    await setMfaPolicy("required");
+
+    const selectSpy = breakSettingsReads();
+    let mfaToken: string;
+    try {
+      const res = await callbackAsUser(externalId);
+
+      // Enrollment beats policy: the TOTP challenge is at least as strict as
+      // any policy, so a broken policy read must not lock out enrolled users.
+      expect(res.statusCode).toBe(302);
+      const location = res.headers.location as string;
+      expect(location).toMatch(/^\/login\?mfaToken=/);
+      const setCookie = res.headers["set-cookie"];
+      expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+      mfaToken = location.split("mfaToken=")[1];
+    } finally {
+      selectSpy.mockRestore();
+    }
+
+    const completeRes = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(totpUri) },
+    });
+    expect(completeRes.statusCode).toBe(200);
+    expect(JSON.parse(completeRes.body).user.username).toBe(username);
+  });
 });

@@ -3728,6 +3728,7 @@ export const pl: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",
+    mfaPolicyUnavailable: "Nie udało się sprawdzić polityki MFA. Spróbuj ponownie za chwilę.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Zarządzanie hasłem odbywa się przez dostawcę tożsamości.",
     enterUsername: "Wprowadź nazwę użytkownika",

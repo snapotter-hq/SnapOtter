@@ -378,12 +378,12 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(await findUserByExternalId(sub)).toBeUndefined();
   });
 
-  it("logs the user in when the MFA policy lookup throws (optional plugin fails open)", async () => {
+  it("fails closed with a distinct error when the MFA policy lookup throws (#815)", async () => {
     // The dynamic import("./mfa.js") in the callback resolves to this same
     // module instance, so spying getMfaPolicy to reject drives the callback's
-    // MFA try/catch (oidc.ts:325-327). A thrown policy lookup must fail OPEN:
-    // MFA is an optional enterprise plugin, so login proceeds and a session is
-    // created rather than the user being blocked.
+    // policy-read catch. A thrown policy lookup must fail CLOSED for an
+    // unenrolled user: the stored policy may well be "required", so the
+    // login is denied with a retryable error param instead of a session.
     const spy = vi
       .spyOn(mfaModule, "getMfaPolicy")
       .mockRejectedValue(new Error("simulated MFA policy lookup failure"));
@@ -391,15 +391,16 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const sub = `sub-mfathrow-${Math.random().toString(36).slice(2, 10)}`;
       const res = await callbackWithClaims({
         sub,
-        preferred_username: `mfaopen-${Math.random().toString(36).slice(2, 8)}`,
+        preferred_username: `mfaclosed-${Math.random().toString(36).slice(2, 8)}`,
       });
 
       expect(res.statusCode).toBe(302);
-      expect(res.headers.location).toBe("/");
+      expect(res.headers.location).toBe("/login?error=mfa_policy_unavailable");
       const setCookie = res.headers["set-cookie"];
-      expect(String(setCookie ?? "")).toContain("snapotter-session=");
+      expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
 
-      // A real session row was written and the success analytics event fired.
+      // Provisioning happens before the MFA decision, so the user row may
+      // exist, but no session row was minted and no login success fired.
       const user = await findUserByExternalId(sub);
       expect(user).toBeDefined();
       const [session] = await db
@@ -407,8 +408,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, user?.id ?? ""))
         .limit(1);
-      expect(session).toBeDefined();
-      expect(trackEventSpy).toHaveBeenCalledWith("auth_login", { method: "oidc" });
+      expect(session).toBeUndefined();
+      expect(trackEventSpy).not.toHaveBeenCalledWith("auth_login", { method: "oidc" });
+      expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
     } finally {
       spy.mockRestore();
     }

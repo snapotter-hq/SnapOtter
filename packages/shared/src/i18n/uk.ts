@@ -3718,6 +3718,7 @@ export const uk: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Ваша організація вимагає багатофакторну автентифікацію. Налаштуйте MFA в параметрах облікового запису.",
+    mfaPolicyUnavailable: "Не вдалося перевірити політику MFA. Повторіть спробу трохи пізніше.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Керування паролем здійснюється Вашим постачальником ідентифікації.",
     enterUsername: "Введіть ім'я користувача",
