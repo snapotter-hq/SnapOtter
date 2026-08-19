@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
   disableUserMfa,
@@ -138,8 +138,21 @@ describe("runRecoveryCli", () => {
     expect(await readPolicy()).toBe("optional");
   });
 
-  it("returns 0 for status", async () => {
-    expect(await runRecoveryCli(["status"])).toBe(0);
+  it("returns 0 for status and prints the policy to stdout", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await runRecoveryCli(["status"])).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith("MFA policy: required");
+      expect(errSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+      errSpy.mockRestore();
+    }
   });
 
   it("returns 1 for disable-mfa with no username", async () => {
@@ -156,5 +169,109 @@ describe("runRecoveryCli", () => {
 
   it("returns 0 for help", async () => {
     expect(await runRecoveryCli(["help"])).toBe(0);
+  });
+});
+
+// #867: the status diagnostic must never report a failed policy read as
+// "optional". An operator runs this mid-incident against a possibly-degraded
+// DB; a swallowed read that prints "optional" over a stored "required" sends
+// them to the wrong login wall.
+describe("mfaStatus when the policy read fails (#867)", () => {
+  // Fail only the settings {value} read (what getMfaPolicy issues); the
+  // enrolled-users {username} read must still reach the real DB.
+  function failSettingsRead(): ReturnType<typeof vi.spyOn> {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "value" in selection) {
+        throw new Error("simulated settings read failure");
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+  }
+
+  it("reports the read failure instead of defaulting to optional, and still lists enrolled users", async () => {
+    // Arm a required policy: a swallowed read would masquerade as "optional".
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+    const { username } = await insertUser({ totpEnabled: true, totpSecret: "s" });
+
+    const selectSpy = failSettingsRead();
+    try {
+      const status = await mfaStatus();
+      expect(status.policy).toBeNull();
+      expect(status.policyError).toContain("simulated settings read failure");
+      // The independent enrollment gate is still reported.
+      expect(status.enrolled).toContain(username);
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  it("runRecoveryCli status exits 1 and prints a 'could not read' line when the policy read fails", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+
+    const selectSpy = failSettingsRead();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const code = await runRecoveryCli(["status"]);
+      expect(code).toBe(1);
+      // The underlying cause must ride along, not just the "could not read"
+      // label: the whole point is the operator sees WHY, so they don't read it
+      // as "MFA is fine."
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining("MFA policy: could not read (simulated settings read failure)"),
+      );
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  // The recovery CLI's whole job is to run mid-incident against a degraded DB,
+  // and a full outage is the most likely one. Both reads must then degrade to a
+  // reported failure with a clean non-zero exit, never an unhandled rejection or
+  // a masqueraded "optional".
+  it("mfaStatus reports both reads as failed, without throwing, when the whole DB is down", async () => {
+    const selectSpy = vi.spyOn(db, "select").mockImplementation(() => {
+      throw new Error("whole DB down");
+    });
+    try {
+      const status = await mfaStatus();
+      expect(status.policy).toBeNull();
+      expect(status.policyError).toContain("whole DB down");
+      expect(status.enrolled).toEqual([]);
+      expect(status.enrolledError).toContain("whole DB down");
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  it("runRecoveryCli status resolves to 1 (never rejects) and reports both gates when the whole DB is down", async () => {
+    const selectSpy = vi.spyOn(db, "select").mockImplementation(() => {
+      throw new Error("whole DB down");
+    });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const code = await runRecoveryCli(["status"]);
+      expect(code).toBe(1);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("MFA policy: could not read"));
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Enrolled users: could not read"),
+      );
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

@@ -3,8 +3,9 @@ import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { closeDb, db, schema } from "../db/index.js";
 import { auditLog } from "../lib/audit.js";
-import { getSettingString, upsertSetting } from "../lib/settings-helpers.js";
+import { upsertSetting } from "../lib/settings-helpers.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
+import { getMfaPolicy, type MfaPolicy } from "../plugins/mfa.js";
 
 // auditLog's first parameter is a FastifyBaseLogger, but a CLI has no request.
 // It only calls .info(obj, msg) and .warn(obj, msg), so a console-backed shim
@@ -46,13 +47,42 @@ export async function disableUserMfa(username: string): Promise<DisableMfaResult
 }
 
 /** Read-only snapshot for diagnosing which login gate is blocking someone. */
-export async function mfaStatus(): Promise<{ policy: string; enrolled: string[] }> {
-  const policy = await getSettingString("mfaPolicy", "optional");
-  const rows = await db
-    .select({ username: schema.users.username })
-    .from(schema.users)
-    .where(eq(schema.users.totpEnabled, true));
-  return { policy, enrolled: rows.map((r) => r.username) };
+export async function mfaStatus(): Promise<{
+  policy: MfaPolicy | null;
+  policyError?: string;
+  enrolled: string[];
+  enrolledError?: string;
+}> {
+  // The two login gates (the policy, and whether the user is enrolled) are read
+  // independently, and each read is reported on its own. This command runs
+  // mid-incident against a possibly-degraded DB, so a failed read must surface
+  // as a failed read, never be swallowed. That is the #867 fix: getMfaPolicy
+  // reads the settings row directly and throws on a DB fault, where the old
+  // getSettingString path returned "optional". Reporting "optional" over a
+  // stored "required" sends the operator to the wrong wall. A read that fails
+  // leaves its value empty and records the cause; the other gate is still read
+  // and reported, so a partial fault still tells the operator something useful.
+  let policy: MfaPolicy | null = null;
+  let policyError: string | undefined;
+  try {
+    policy = await getMfaPolicy();
+  } catch (err) {
+    policyError = err instanceof Error ? err.message : String(err);
+  }
+
+  let enrolled: string[] = [];
+  let enrolledError: string | undefined;
+  try {
+    const rows = await db
+      .select({ username: schema.users.username })
+      .from(schema.users)
+      .where(eq(schema.users.totpEnabled, true));
+    enrolled = rows.map((r) => r.username);
+  } catch (err) {
+    enrolledError = err instanceof Error ? err.message : String(err);
+  }
+
+  return { policy, policyError, enrolled, enrolledError };
 }
 
 const USAGE = `snapotter-admin: offline MFA recovery
@@ -67,14 +97,24 @@ export async function runRecoveryCli(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   switch (command) {
     case "status": {
-      const { policy, enrolled } = await mfaStatus();
-      console.log(`MFA policy: ${policy}`);
-      console.log(
-        enrolled.length
-          ? `Enrolled users (${enrolled.length}): ${enrolled.join(", ")}`
-          : "Enrolled users: none",
-      );
-      return 0;
+      const { policy, policyError, enrolled, enrolledError } = await mfaStatus();
+      // A failed read goes loud on stderr with a non-zero exit below, so it can
+      // never read as "this gate is fine, look elsewhere" (#867).
+      if (policyError) {
+        console.error(`MFA policy: could not read (${policyError})`);
+      } else {
+        console.log(`MFA policy: ${policy}`);
+      }
+      if (enrolledError) {
+        console.error(`Enrolled users: could not read (${enrolledError})`);
+      } else {
+        console.log(
+          enrolled.length
+            ? `Enrolled users (${enrolled.length}): ${enrolled.join(", ")}`
+            : "Enrolled users: none",
+        );
+      }
+      return policyError || enrolledError ? 1 : 0;
     }
     case "reset-mfa-policy": {
       await resetMfaPolicy();
