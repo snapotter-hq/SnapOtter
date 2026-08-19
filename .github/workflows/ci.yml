@@ -121,9 +121,10 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    # Headroom for a degraded-apt-mirror day: both bounded install attempts
-    # plus the tests still fit (#876).
-    timeout-minutes: 15
+    # Headroom for a degraded-apt-mirror day: the full bounded recovery
+    # ladder (~27m worst case) plus the tests still fit (#876). A 15m cap
+    # killed this job mid-recovery on a real degraded day.
+    timeout-minutes: 35
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
