@@ -1,33 +1,36 @@
 #!/usr/bin/env bash
-# Bounded apt install with a mirror fallback (#876).
+# Bounded apt install with connection re-rolls and a mirror fallback (#876).
 #
 # Every network step runs under timeout(1): apt's own Acquire::http::Timeout
 # only catches dead connections, not a mirror that keeps trickling bytes at
-# kB/s. When the first attempt stalls or fails, swap the Azure mirror for the
-# canonical archive in the apt sources and retry once, so the worst case is
-# bounded instead of eating the job's whole timeout budget.
+# kB/s. Mirror degradation is per-connection (one runner pulled 154 MB at
+# 3.7 MB/s from the same host that trickled to another), and apt resumes
+# partial downloads, so several cheap attempts beat one patient one: each
+# new attempt re-rolls the connection and keeps the bytes already fetched.
+# The Azure mirror gets one shot, then sources swap to the canonical archive.
 set -euo pipefail
 
 read -r -a packages <<< "$PACKAGES"
 
+update_budget="${UPDATE_TIMEOUT:-120}"
+install_budget="${INSTALL_TIMEOUT:-300}"
+attempts="${ATTEMPTS:-3}"
+
 attempt() {
-  sudo timeout -k 30 "$1" apt-get update -qq &&
-    sudo timeout -k 30 "$2" apt-get install -y \
+  sudo timeout -k 30 "$update_budget" apt-get update -qq &&
+    sudo timeout -k 30 "$install_budget" apt-get install -y \
       --no-install-recommends "${packages[@]}"
 }
 
-update_budget="${UPDATE_TIMEOUT:-120}"
-install_budget="${INSTALL_TIMEOUT:-360}"
-
-if attempt "$update_budget" "$install_budget"; then exit 0; fi
-
-echo "::warning::apt via the Azure mirror stalled or failed; retrying via archive.ubuntu.com"
-# A timed-out apt can leave packages unpacked but unconfigured.
-sudo dpkg --configure -a || true
-# Classic sources.list and deb822 ubuntu.sources both just name the host.
-sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
-  -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} + 2>/dev/null || true
-# The retry is the last chance before the job fails, and the mirror swap
-# forces a full index refresh, so it gets patient budgets: a slow-but-flowing
-# mirror beats a dead job (a 120s retry update died on a real degraded day).
-attempt "$((update_budget * 3))" "$((install_budget * 2))"
+for i in $(seq 1 "$attempts"); do
+  if attempt; then exit 0; fi
+  echo "::warning::apt attempt ${i}/${attempts} stalled or failed"
+  # A timed-out apt can leave packages unpacked but unconfigured.
+  sudo dpkg --configure -a || true
+  if [ "$i" = 1 ]; then
+    # Classic sources.list and deb822 ubuntu.sources both just name the host.
+    sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
+      -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} + 2>/dev/null || true
+  fi
+done
+exit 1

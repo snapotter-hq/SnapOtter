@@ -10,9 +10,9 @@ inputs:
     required: false
     default: chromium
   deps-timeout:
-    description: Seconds allowed for each install-deps attempt
+    description: Seconds allowed for each install-deps attempt (3 attempts; downloads resume across them)
     required: false
-    default: "420"
+    default: "300"
 runs:
   using: composite
   steps:
