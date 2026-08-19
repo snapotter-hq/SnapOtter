@@ -9,13 +9,13 @@ inputs:
     description: Space-separated apt package list
     required: true
   update-timeout:
-    description: Seconds allowed for each apt-get update
+    description: Seconds allowed for the first apt-get update (the fallback retry gets 3x)
     required: false
     default: "120"
   install-timeout:
-    description: Seconds allowed for each apt-get install attempt
+    description: Seconds allowed for the first apt-get install (the fallback retry gets 2x)
     required: false
-    default: "420"
+    default: "360"
 runs:
   using: composite
   steps:
