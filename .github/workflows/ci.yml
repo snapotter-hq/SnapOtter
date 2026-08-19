@@ -121,16 +121,21 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # Headroom for a degraded-apt-mirror day: both bounded install attempts
+    # plus the tests still fit (#876).
+    timeout-minutes: 15
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install system dependencies (HEIC + ExifTool + ImageMagick + exotic format tools)
+        uses: ./.github/actions/apt-install
+        with:
+          packages: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
+
+      - name: Install the ImageMagick EXR coder and verify
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
@@ -158,7 +163,9 @@ jobs:
   test-integration:
     name: Integration (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Headroom for a degraded-apt-mirror day: both bounded install attempts
+    # plus the tests still fit (#876).
+    timeout-minutes: 40
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
@@ -169,17 +176,19 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install system dependencies (image formats + docs + Fast OCR)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libheif-examples libheif-plugin-x265 libheif-plugin-libde265 \
-            libimage-exiftool-perl libraw-bin imagemagick ghostscript \
-            libjxl-tools libopenjp2-tools \
-            qpdf libreoffice-calc libreoffice-impress libreoffice-writer \
-            tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu \
-            tesseract-ocr-fra tesseract-ocr-spa \
+        uses: ./.github/actions/apt-install
+        with:
+          packages: >-
+            libheif-examples libheif-plugin-x265 libheif-plugin-libde265
+            libimage-exiftool-perl libraw-bin imagemagick ghostscript
+            libjxl-tools libopenjp2-tools
+            qpdf libreoffice-calc libreoffice-impress libreoffice-writer
+            tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu
+            tesseract-ocr-fra tesseract-ocr-spa
             tesseract-ocr-chi-sim tesseract-ocr-jpn
 
+      - name: Install the ImageMagick EXR coder and verify the format toolchain
+        run: |
           if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
             sudo apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
           elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
