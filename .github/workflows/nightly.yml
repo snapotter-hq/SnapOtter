@@ -65,7 +65,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run full e2e suite (shard)
         run: pnpm playwright test --project=chromium --shard=${{ matrix.shard }}/4
         env:
@@ -121,7 +121,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run serial bucket (global-state specs)
         run: pnpm playwright test --project=chromium-serial --workers=1
       # chromium-widths owns the exact CSS boundary and wide-screen assertions.
@@ -187,7 +187,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run editor suite
         run: pnpm playwright test --config playwright.editor.config.ts
         env:
@@ -250,7 +250,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-all-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright browsers
-        run: pnpm playwright install --with-deps chromium firefox webkit
+        uses: ./.github/actions/playwright-install
+        with:
+          browsers: chromium firefox webkit
       - name: Run cross-browser spec
         run: pnpm playwright test --project=firefox --project=webkit
         env:
@@ -306,7 +308,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-all-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright browsers (chromium + webkit)
-        run: pnpm playwright install --with-deps chromium webkit
+        uses: ./.github/actions/playwright-install
+        with:
+          browsers: chromium webkit
       - name: Run all device projects
         run: pnpm playwright test --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium --grep-invert "@visual"
         env:

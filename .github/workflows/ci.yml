@@ -247,7 +247,9 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
+    # attempts plus the specs still fit.
+    timeout-minutes: 25
     needs: changes
     if: needs.changes.outputs.code == 'true'
     services:
@@ -285,7 +287,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run smoke specs
         # tools-all.spec.ts is the full 240-tool per-tool render matrix (~250 tests)
         # -- a comprehensive check, not a PR-gate smoke test. It runs in the nightly
@@ -305,7 +307,9 @@ jobs:
   test-e2e-mobile-smoke:
     name: E2E Mobile Smoke (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
+    # attempts plus the specs still fit.
+    timeout-minutes: 25
     needs: changes
     if: needs.changes.outputs.code == 'true'
     services:
@@ -343,7 +347,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run mobile device specs (Pixel 7)
         run: pnpm playwright test --project=mobile-chromium --grep @mobile --grep-invert @visual
         env:
@@ -359,7 +363,9 @@ jobs:
   test-e2e-landing:
     name: E2E Landing (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
+    # attempts plus the specs still fit.
+    timeout-minutes: 25
     needs: changes
     if: needs.changes.outputs.landing == 'true'
     steps:
@@ -374,7 +380,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run landing e2e suite
         # The landing is a static Astro site with no database, so this needs no
         # Postgres/Redis services. The suite's webServer starts `astro dev` on 4350.
@@ -396,8 +402,9 @@ jobs:
     name: E2E Docs (Chromium)
     runs-on: ubuntu-latest
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
-    # which the config allows up to 10 minutes for on a loaded machine.
-    timeout-minutes: 30
+    # which the config allows up to 10 minutes for on a loaded machine. The
+    # extra 10 is degraded-apt-mirror headroom (#876).
+    timeout-minutes: 40
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     steps:
@@ -412,7 +419,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run docs e2e suite
         # Static VitePress site with no database, so no Postgres/Redis services.
         # The suite's webServer builds the site and serves the preview itself.
