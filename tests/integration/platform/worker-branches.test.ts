@@ -468,9 +468,14 @@ describe("tool job failure paths", () => {
     expect(props.execution_hint).toBe("fast");
 
     // The queue job is terminally failed (this is what fired the pool's
-    // failed-handler on the final attempt).
-    const queueJob = await getQueue("image").getJob(jobId);
-    expect(await queueJob?.getState()).toBe("failed");
+    // failed-handler on the final attempt). Poll for it: the durable row and
+    // analytics flip inside the processor's failure handling, before the
+    // rejection propagates into BullMQ's own active -> failed move.
+    await waitFor(async () => {
+      const queueJob = await getQueue("image").getJob(jobId);
+      if (!queueJob) return undefined;
+      return (await queueJob.getState()) === "failed" ? queueJob : undefined;
+    }, 10_000);
   }, 30_000);
 
   it("fails when an extra output has neither buffer nor scratchPath", async () => {
