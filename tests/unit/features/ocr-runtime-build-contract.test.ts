@@ -128,10 +128,13 @@ describe("OCR v3 runtime artifact contract", () => {
       /^ {2}test-integration:\n[\s\S]*?(?=^ {2}test-e2e-smoke:)/m,
     )?.[0];
     expect(integrationJob).toBeDefined();
-    const systemDependencyRunBlock = integrationJob?.match(
-      /^ {6}- name: Install system dependencies[^\n]*\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
-    )?.groups?.run;
-    expect(systemDependencyRunBlock).toBeDefined();
+
+    // The install goes through .github/actions/apt-install (#876), so the
+    // payload lives in the step's folded `packages:` scalar.
+    const packagesBlock = integrationJob?.match(
+      /^ {6}- name: Install system dependencies[^\n]*\n {8}uses: \.\/\.github\/actions\/apt-install\n {8}with:\n {10}packages: >-\n(?<packages>(?: {12}[^\n]+\n)+)/m,
+    )?.groups?.packages;
+    expect(packagesBlock).toBeDefined();
 
     const expectedPackages = [
       "tesseract-ocr",
@@ -142,20 +145,17 @@ describe("OCR v3 runtime artifact contract", () => {
       "tesseract-ocr-chi-sim",
       "tesseract-ocr-jpn",
     ];
-    const systemDependencyLines = systemDependencyRunBlock?.split("\n") ?? [];
-    const installStart = systemDependencyLines.findIndex((line) =>
-      line.includes("sudo apt-get install -y --no-install-recommends"),
-    );
-    expect(installStart).toBeGreaterThanOrEqual(0);
-    const installCommand: string[] = [];
-    for (let index = installStart; index < systemDependencyLines.length; index++) {
-      const line = systemDependencyLines[index];
-      installCommand.push(line);
-      if (!line.trimEnd().endsWith("\\")) break;
-    }
-    const installedPackages =
-      installCommand.join("\n").match(/\btesseract-ocr(?:-[a-z0-9-]+)?\b/g) ?? [];
+    const installedPackages = packagesBlock?.match(/\btesseract-ocr(?:-[a-z0-9-]+)?\b/g) ?? [];
     expect([...new Set(installedPackages)].sort()).toEqual([...expectedPackages].sort());
+
+    // The post-install checks moved to the follow-up verification step.
+    const systemDependencyLines =
+      integrationJob
+        ?.match(
+          /^ {6}- name: Install the ImageMagick EXR coder and verify the format toolchain\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
+        )
+        ?.groups?.run?.split("\n") ?? [];
+    expect(systemDependencyLines.length).toBeGreaterThan(0);
 
     const osdPath = "/usr/share/tesseract-ocr/5/tessdata/osd.traineddata";
     const orderedCommands: Array<[string, (line: string) => boolean]> = [
@@ -174,10 +174,10 @@ describe("OCR v3 runtime artifact contract", () => {
           /\[\[ "\$\{actual\[\*\]\}" == "\$\{expected\[\*\]\}" \]\] \|\| \{/.test(line.trim()),
       ],
     ];
-    let previousCommand = installStart + installCommand.length - 1;
+    let previousCommand = -1;
     for (const [label, matches] of orderedCommands) {
       const command = systemDependencyLines.findIndex(matches);
-      expect(command, `${label} must follow the integration apt install command`).toBeGreaterThan(
+      expect(command, `${label} must appear in order in the verification step`).toBeGreaterThan(
         previousCommand,
       );
       previousCommand = command;

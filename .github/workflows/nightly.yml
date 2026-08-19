@@ -52,10 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -66,7 +65,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run full e2e suite (shard)
         run: pnpm playwright test --project=chromium --shard=${{ matrix.shard }}/4
         env:
@@ -109,10 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -123,7 +121,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run serial bucket (global-state specs)
         run: pnpm playwright test --project=chromium-serial --workers=1
       # chromium-widths owns the exact CSS boundary and wide-screen assertions.
@@ -176,10 +174,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -190,7 +187,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
       - name: Run editor suite
         run: pnpm playwright test --config playwright.editor.config.ts
         env:
@@ -253,7 +250,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-all-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright browsers
-        run: pnpm playwright install --with-deps chromium firefox webkit
+        uses: ./.github/actions/playwright-install
+        with:
+          browsers: chromium firefox webkit
       - name: Run cross-browser spec
         run: pnpm playwright test --project=firefox --project=webkit
         env:
@@ -296,10 +295,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
       - name: Get Playwright version
         id: pw-version
@@ -310,7 +308,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-all-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright browsers (chromium + webkit)
-        run: pnpm playwright install --with-deps chromium webkit
+        uses: ./.github/actions/playwright-install
+        with:
+          browsers: chromium webkit
       - name: Run all device projects
         run: pnpm playwright test --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium --grep-invert "@visual"
         env:
@@ -367,10 +367,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
         run: |
           POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
@@ -437,10 +436,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - uses: ./.github/actions/setup
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -503,10 +501,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install system dependencies
-        run: |
-          read -r -a system_deps <<< "$SYSTEM_DEPS"
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${system_deps[@]}"
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ env.SYSTEM_DEPS }}
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
         run: |
           POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)

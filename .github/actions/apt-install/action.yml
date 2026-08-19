@@ -1,0 +1,28 @@
+name: Install apt packages with a mirror fallback
+description: >-
+  apt-get install with every network step bounded by a timeout. The runner's
+  Azure apt mirror can degrade to kB/s and eat an entire job budget before
+  tests start (#876); when an attempt stalls or fails, sources are switched
+  to the canonical Ubuntu archive and the install is retried once.
+inputs:
+  packages:
+    description: Space-separated apt package list
+    required: true
+  update-timeout:
+    description: Seconds allowed for each apt-get update attempt
+    required: false
+    default: "120"
+  install-timeout:
+    description: Seconds allowed for each apt-get install attempt (3 attempts; downloads resume across them)
+    required: false
+    default: "300"
+runs:
+  using: composite
+  steps:
+    - name: apt-get install (Azure mirror, then archive.ubuntu.com)
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        UPDATE_TIMEOUT: ${{ inputs.update-timeout }}
+        INSTALL_TIMEOUT: ${{ inputs.install-timeout }}
+      run: bash "${{ github.action_path }}/install.sh"

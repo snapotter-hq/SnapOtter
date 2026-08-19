@@ -1,0 +1,24 @@
+name: Install Playwright browsers with bounded system deps
+description: >-
+  Splits the browser download (Playwright CDN + actions/cache) from the
+  system-dependency apt install, and bounds the apt half with a timeout and
+  one retry. An unbounded "playwright install --with-deps" stalls for the
+  rest of the job budget when an apt mirror degrades (#876).
+inputs:
+  browsers:
+    description: Space-separated Playwright browser list
+    required: false
+    default: chromium
+  deps-timeout:
+    description: Seconds allowed for each install-deps attempt (3 attempts; downloads resume across them)
+    required: false
+    default: "300"
+runs:
+  using: composite
+  steps:
+    - name: playwright install, then bounded install-deps
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        DEPS_TIMEOUT: ${{ inputs.deps-timeout }}
+      run: bash "${{ github.action_path }}/install.sh"
