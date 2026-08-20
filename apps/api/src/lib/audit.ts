@@ -5,6 +5,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { computeHmac } from "./audit-integrity.js";
 import { deriveAuditHmacKey } from "./encryption.js";
+import { isEnterpriseFeatureEnabled } from "./enterprise-feature.js";
 
 const MAX_AUDIT_INPUT_LENGTH = 200;
 
@@ -29,12 +30,7 @@ export async function isToolAuditEnabled(): Promise<boolean> {
     // fall through to enterprise check
   }
 
-  try {
-    const enterprise = await import("@snapotter/enterprise");
-    return enterprise.isFeatureEnabled("audit_export");
-  } catch {
-    return false;
-  }
+  return isEnterpriseFeatureEnabled("audit_export");
 }
 
 const AUDIT_STRIP_RE = /[<>&"'\r\n\0\x85\u2028\u2029]/g;

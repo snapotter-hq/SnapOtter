@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import {
   checkLoginThrottle,
@@ -361,11 +362,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // SSO enforcement check
       const ssoEnforced = await getSettingString("ssoEnforcement", "false");
       if (ssoEnforced === "true") {
-        let isEnabled = false;
-        try {
-          const { isFeatureEnabled } = await import("@snapotter/enterprise");
-          isEnabled = isFeatureEnabled("sso_enforcement");
-        } catch {}
+        const isEnabled = await isEnterpriseFeatureEnabled("sso_enforcement");
 
         if (isEnabled) {
           const breakGlassUsername = await getSettingString("ssoBreakGlassUsername", "");

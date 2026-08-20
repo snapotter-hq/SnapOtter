@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
 
 const querySchema = z.object({
@@ -42,13 +43,7 @@ export async function registerAuditExport(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Check enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("audit_export");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("audit_export");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "Audit export requires an enterprise license with the audit_export feature",

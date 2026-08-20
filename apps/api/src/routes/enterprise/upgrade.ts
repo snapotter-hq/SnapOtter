@@ -7,16 +7,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { pingRedis } from "../../jobs/connection.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
 
 function requireUpgradeFeature(reply: FastifyReply): Promise<boolean> {
   return (async () => {
-    try {
-      const { isFeatureEnabled } = await import("@snapotter/enterprise");
-      if (isFeatureEnabled("upgrade_management")) return true;
-    } catch {
-      // Enterprise package not available
-    }
+    if (await isEnterpriseFeatureEnabled("upgrade_management")) return true;
     reply.status(403).send({
       error: "Upgrade management requires a license with the upgrade_management feature",
     });

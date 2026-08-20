@@ -5,6 +5,7 @@ import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { encrypt } from "../../lib/encryption.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
 
 const configSchema = z.object({
@@ -27,13 +28,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("siem_forwarding");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("siem_forwarding");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "SIEM forwarding requires an enterprise license with the siem_forwarding feature",
@@ -70,13 +65,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("siem_forwarding");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("siem_forwarding");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "SIEM forwarding requires an enterprise license with the siem_forwarding feature",

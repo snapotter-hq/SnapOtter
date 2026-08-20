@@ -14,6 +14,7 @@ import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { encrypt } from "../../lib/encryption.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { deliverWebhook } from "../../lib/webhook-delivery.js";
 import { requirePermission } from "../../permissions.js";
@@ -67,13 +68,7 @@ async function writeDestinations(destinations: WebhookDestination[]): Promise<vo
 }
 
 async function checkFeatureGate(reply: FastifyReply): Promise<boolean> {
-  let featureEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    featureEnabled = isFeatureEnabled("admin_alerts");
-  } catch {
-    // Enterprise package not available
-  }
+  const featureEnabled = await isEnterpriseFeatureEnabled("admin_alerts");
   if (!featureEnabled) {
     reply.status(403).send({
       error: "Webhook management requires a license with the admin_alerts feature",

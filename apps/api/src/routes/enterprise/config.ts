@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import {
   getSettingPolicy,
   isConfigExportableSetting,
@@ -108,13 +109,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("config_export_import");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("config_export_import");
       if (!featureEnabled) {
         return reply.status(403).send({
           error:
@@ -179,13 +174,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("config_export_import");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("config_export_import");
       if (!featureEnabled) {
         return reply.status(403).send({
           error:

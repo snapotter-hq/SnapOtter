@@ -27,6 +27,7 @@ import { eq, lt } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
 
 type ArchivalState = "PENDING" | "EXPORTING" | "EXPORTED" | "PURGING" | "COMPLETE";
@@ -68,13 +69,7 @@ function getArchiveDir(): string {
 
 export async function runAuditArchive(log?: FastifyBaseLogger): Promise<void> {
   // 1. Check enterprise feature gate
-  let featureEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    featureEnabled = isFeatureEnabled("tamper_resistant_audit");
-  } catch {
-    // Enterprise package not available
-  }
+  const featureEnabled = await isEnterpriseFeatureEnabled("tamper_resistant_audit", "worker");
   if (!featureEnabled) {
     return;
   }

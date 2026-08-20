@@ -8,6 +8,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import {
   findUniqueUsername,
@@ -57,13 +58,7 @@ function redirectToLogin(reply: FastifyReply, errorCode: string): void {
 export async function registerSaml(app: FastifyInstance): Promise<void> {
   if (!env.SAML_ENABLED) return;
 
-  let isEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    isEnabled = isFeatureEnabled("saml_sso");
-  } catch {
-    // Enterprise package not available
-  }
+  const isEnabled = await isEnterpriseFeatureEnabled("saml_sso", "boot");
 
   if (!isEnabled) {
     app.log.warn("SAML is enabled via env but saml_sso enterprise feature is not licensed");

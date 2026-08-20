@@ -2,6 +2,7 @@ import type { Permission, Role } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "./db/index.js";
+import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
 import { type AuthUser, getAuthUser } from "./plugins/auth.js";
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -158,12 +159,7 @@ function normalizeManagedRole(role: string): string {
 }
 
 async function isPerToolPermissionEnforced(): Promise<boolean> {
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    return isFeatureEnabled("per_tool_permissions");
-  } catch {
-    return false;
-  }
+  return isEnterpriseFeatureEnabled("per_tool_permissions");
 }
 
 async function toolPermissionAllows(

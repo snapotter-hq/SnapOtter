@@ -21,6 +21,7 @@ import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
+import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
 import { reportError, setSentryInstanceTag } from "./lib/error-report.js";
 import { stripInternalPaths } from "./lib/errors.js";
 import {
@@ -261,13 +262,7 @@ try {
 // Enforce the gate at boot so an unlicensed deploy fails fast rather than silently
 // writing data to S3 it isn't entitled to use.
 if (env.STORAGE_MODE === "s3") {
-  let s3Licensed = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    s3Licensed = isFeatureEnabled("s3_storage");
-  } catch {
-    s3Licensed = false;
-  }
+  const s3Licensed = await isEnterpriseFeatureEnabled("s3_storage", "boot");
   if (!s3Licensed) {
     console.error(
       "[FATAL] STORAGE_MODE=s3 requires a license that includes the s3_storage feature. " +
@@ -658,15 +653,9 @@ app.get("/api/v1/config/auth", async () => {
   }
 
   // SAML SSO requires both env flag and enterprise license
-  let samlLicensed = false;
-  if (env.SAML_ENABLED) {
-    try {
-      const { isFeatureEnabled } = await import("@snapotter/enterprise");
-      samlLicensed = isFeatureEnabled("saml_sso");
-    } catch {
-      // Enterprise package not available
-    }
-  }
+  const samlLicensed = env.SAML_ENABLED
+    ? await isEnterpriseFeatureEnabled("saml_sso", "boot")
+    : false;
   if (env.SAML_ENABLED && samlLicensed) {
     config.samlEnabled = true;
     config.samlProviderName = env.SAML_PROVIDER_NAME || "SSO";

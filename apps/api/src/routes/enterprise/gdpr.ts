@@ -7,6 +7,7 @@ import { requestCancel } from "../../jobs/cancel.js";
 import { getQueue } from "../../jobs/queues.js";
 import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
 import { auditFromRequest } from "../../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { deleteStoredFile, deleteThumbnail } from "../../lib/file-storage.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
@@ -104,13 +105,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("gdpr_lifecycle");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "GDPR data export requires an enterprise license with the gdpr_lifecycle feature",
@@ -175,13 +170,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("gdpr_lifecycle");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "GDPR data export requires an enterprise license with the gdpr_lifecycle feature",
@@ -241,13 +230,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("gdpr_lifecycle");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "GDPR data purge requires an enterprise license with the gdpr_lifecycle feature",
@@ -330,13 +313,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("gdpr_lifecycle");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "GDPR data purge requires an enterprise license with the gdpr_lifecycle feature",

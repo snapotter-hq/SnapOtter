@@ -14,6 +14,7 @@ import { statfs } from "node:fs/promises";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { getSettingString } from "../lib/settings-helpers.js";
 
 /**
@@ -24,12 +25,7 @@ import { getSettingString } from "../lib/settings-helpers.js";
  * stormed Sentry, not this one).
  */
 async function alertsLicensed(): Promise<boolean> {
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    return isFeatureEnabled("admin_alerts");
-  } catch {
-    return false;
-  }
+  return isEnterpriseFeatureEnabled("admin_alerts", "worker");
 }
 
 export async function evaluateAlerts(): Promise<void> {

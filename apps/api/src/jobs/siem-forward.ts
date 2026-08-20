@@ -18,6 +18,7 @@ import { asc, eq, gte } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { decrypt, isEncrypted } from "../lib/encryption.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
 import { deliverWebhook } from "../lib/webhook-delivery.js";
 import { readSiemConfig } from "../routes/enterprise/siem.js";
@@ -42,12 +43,7 @@ async function readSettingValue(key: string): Promise<string | null> {
  * event storm (NODE-1E, July 2026).
  */
 async function siemLicensed(): Promise<boolean> {
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    return isFeatureEnabled("siem_forwarding");
-  } catch {
-    return false;
-  }
+  return isEnterpriseFeatureEnabled("siem_forwarding", "worker");
 }
 
 export async function runSiemForward(): Promise<{ forwarded: number } | undefined> {

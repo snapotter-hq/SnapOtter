@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
@@ -109,13 +110,7 @@ async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<b
 // ── Enterprise Feature Gate ──────────────────────────────────────
 
 async function requireScimFeature(reply: FastifyReply): Promise<boolean> {
-  let featureEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    featureEnabled = isFeatureEnabled("scim");
-  } catch {
-    // Enterprise package not available
-  }
+  const featureEnabled = await isEnterpriseFeatureEnabled("scim");
   if (!featureEnabled) {
     reply
       .status(403)

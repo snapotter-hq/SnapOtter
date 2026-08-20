@@ -10,6 +10,7 @@
  */
 import { BlockList } from "node:net";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 
 // Paths exempt from IP filtering -- infrastructure probes, IdP callbacks
 const EXEMPT_PATHS = [
@@ -97,13 +98,7 @@ const ALLOWLIST_CHANNEL = "ip:allowlist:refresh";
 
 export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
   // Only run if enterprise feature is enabled
-  let isEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    isEnabled = isFeatureEnabled("ip_allowlist");
-  } catch {
-    // Enterprise package not available
-  }
+  const isEnabled = await isEnterpriseFeatureEnabled("ip_allowlist", "boot");
   if (!isEnabled) return;
 
   // Load allowlist from settings table

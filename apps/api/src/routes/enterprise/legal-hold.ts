@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
 
 const holdSchema = z.object({
@@ -20,13 +21,7 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("legal_hold");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("legal_hold");
       if (!featureEnabled) {
         return reply
           .status(403)
@@ -82,13 +77,7 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
     if (!user) return;
 
     // Enterprise feature gate
-    let featureEnabled = false;
-    try {
-      const { isFeatureEnabled } = await import("@snapotter/enterprise");
-      featureEnabled = isFeatureEnabled("legal_hold");
-    } catch {
-      // Enterprise package not available
-    }
+    const featureEnabled = await isEnterpriseFeatureEnabled("legal_hold");
     if (!featureEnabled) {
       return reply
         .status(403)

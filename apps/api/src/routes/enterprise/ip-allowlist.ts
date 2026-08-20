@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
+import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
 import { isValidCidr, publishAllowlistRefresh } from "../../plugins/ip-allowlist.js";
 
@@ -27,13 +28,7 @@ export async function registerIpAllowlistRoutes(app: FastifyInstance): Promise<v
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("ip_allowlist");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("ip_allowlist");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "IP allowlisting requires an enterprise license with the ip_allowlist feature",
@@ -58,13 +53,7 @@ export async function registerIpAllowlistRoutes(app: FastifyInstance): Promise<v
       if (!user) return;
 
       // Enterprise feature gate
-      let featureEnabled = false;
-      try {
-        const { isFeatureEnabled } = await import("@snapotter/enterprise");
-        featureEnabled = isFeatureEnabled("ip_allowlist");
-      } catch {
-        // Enterprise package not available
-      }
+      const featureEnabled = await isEnterpriseFeatureEnabled("ip_allowlist");
       if (!featureEnabled) {
         return reply.status(403).send({
           error: "IP allowlisting requires an enterprise license with the ip_allowlist feature",

@@ -1,6 +1,7 @@
 import { type Permission, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { type ZodIssue, z } from "zod";
 import { env } from "../config.js";
+import { isEnterpriseFeatureEnabled } from "./enterprise-feature.js";
 
 export type SettingAuthority = Permission | "full-admin" | "none";
 
@@ -205,13 +206,7 @@ export async function validateSettingsRuntimeConstraints(
     ({ key, value }) => key === "mfaPolicy" && (value === "admins_only" || value === "required"),
   );
   if (enforcesMfa) {
-    let mfaLicensed = false;
-    try {
-      const { isFeatureEnabled } = await import("@snapotter/enterprise");
-      mfaLicensed = isFeatureEnabled("mfa");
-    } catch {
-      // Enterprise package not available.
-    }
+    const mfaLicensed = await isEnterpriseFeatureEnabled("mfa");
 
     if (!mfaLicensed) {
       return {

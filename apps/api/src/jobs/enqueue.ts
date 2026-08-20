@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -225,11 +226,10 @@ export async function waitForJob(
  * never block job creation.
  */
 async function computeDeleteAfter(jobId: string, userId: string): Promise<void> {
-  let isTeamRetentionEnabled = false;
-  try {
-    const { isFeatureEnabled } = await import("@snapotter/enterprise");
-    isTeamRetentionEnabled = isFeatureEnabled("team_retention_overrides");
-  } catch {}
+  const isTeamRetentionEnabled = await isEnterpriseFeatureEnabled(
+    "team_retention_overrides",
+    "worker",
+  );
 
   if (!isTeamRetentionEnabled) return;
 
