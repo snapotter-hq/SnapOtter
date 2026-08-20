@@ -109,19 +109,46 @@ async function decryptSecret(stored: string): Promise<string | null> {
 
 export type MfaPolicy = "optional" | "admins_only" | "required";
 
-export async function getMfaPolicy(): Promise<MfaPolicy> {
-  // Deliberately not getSettingString: that helper swallows DB errors into
-  // its default, which would silently disarm a required policy whenever the
-  // settings read fails (#815). A missing row legitimately means "optional";
-  // a failed read must throw so login paths can fail closed.
+/**
+ * Read the stored `mfaPolicy` row and classify it. `policy` is what login
+ * enforces; `recognized` is false only when the stored value is none of the
+ * three known policies, which means the row was written out of band (a hand-run
+ * UPDATE, a restored or tampered row, wrong casing like "REQUIRED"), since every
+ * in-app write goes through a Zod-validated route.
+ *
+ * Deliberately not getSettingString: that helper swallows DB errors into its
+ * default, which would silently disarm a required policy whenever the settings
+ * read fails (#815). A missing row legitimately means "optional"; a failed read
+ * must throw so login paths can fail closed.
+ *
+ * `getMfaPolicy` is the normalizing wrapper most callers want. The recovery CLI
+ * uses `raw`/`recognized` to surface a garbage value instead of printing an
+ * authoritative-looking "optional" over it (snapotter-hq/SnapOtter#873).
+ */
+export async function readMfaPolicySetting(): Promise<{
+  policy: MfaPolicy;
+  raw: string | undefined;
+  recognized: boolean;
+}> {
   const result = await db
     .select({ value: schema.settings.value })
     .from(schema.settings)
     .where(eq(schema.settings.key, "mfaPolicy"))
     .limit(1);
   const raw = result[0]?.value;
-  if (raw === "required" || raw === "admins_only") return raw;
-  if (raw !== undefined && raw !== "optional") {
+  if (raw === "required" || raw === "admins_only") {
+    return { policy: raw, raw, recognized: true };
+  }
+  // A missing row (undefined) legitimately means "optional", and so does a
+  // stored "optional". Anything else is an out-of-band value: enforced as
+  // optional, but flagged so it does not pass as a genuine one.
+  const recognized = raw === undefined || raw === "optional";
+  return { policy: "optional", raw, recognized };
+}
+
+export async function getMfaPolicy(): Promise<MfaPolicy> {
+  const { policy, raw, recognized } = await readMfaPolicySetting();
+  if (!recognized) {
     // Writes are Zod-validated, so an unrecognized stored value means the DB
     // was modified out of band. Treating it as "optional" disarms the policy,
     // which must at least be loud (it is indistinguishable from tampering).
@@ -130,7 +157,7 @@ export async function getMfaPolicy(): Promise<MfaPolicy> {
       "mfaPolicy setting holds an unrecognized value; treating as optional",
     );
   }
-  return "optional";
+  return policy;
 }
 
 export function isMfaRequiredForUser(policy: MfaPolicy, userRole: string): boolean {

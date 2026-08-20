@@ -275,3 +275,76 @@ describe("mfaStatus when the policy read fails (#867)", () => {
     }
   });
 });
+
+// #873: a *successful* read of an unrecognized stored mfaPolicy value (an
+// out-of-band DB edit, wrong casing like "REQUIRED", a restored/tampered row)
+// must be reported distinctly, not flattened to a bare "optional". Login treats
+// such a value as optional too, so this is not a lockout mislead, but the
+// operator must learn the stored row holds a garbage value worth cleaning up.
+describe("mfaStatus with an unrecognized stored policy (#873)", () => {
+  async function setRawPolicy(value: string): Promise<void> {
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value } });
+  }
+
+  it("reports the raw value alongside the enforced optional, without an error", async () => {
+    await setRawPolicy("REQUIRED"); // wrong casing: not one of the three known policies
+
+    const status = await mfaStatus();
+
+    expect(status.policy).toBe("optional"); // what login actually enforces
+    expect(status.unrecognizedPolicyValue).toBe("REQUIRED");
+    expect(status.policyError).toBeUndefined();
+  });
+
+  it("does not flag a legitimately missing policy row as unrecognized", async () => {
+    // A fresh install has no mfaPolicy row; that is a genuine "optional", not a
+    // tampered value, and must never trip the unrecognized-value path.
+    await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
+
+    const status = await mfaStatus();
+
+    expect(status.policy).toBe("optional");
+    expect(status.unrecognizedPolicyValue).toBeUndefined();
+    expect(status.policyError).toBeUndefined();
+  });
+
+  it("runRecoveryCli status exits 1 and surfaces the raw value on stderr", async () => {
+    await setRawPolicy("REQUIRED");
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const code = await runRecoveryCli(["status"]);
+      expect(code).toBe(1);
+      // The line names the raw stored value and the effective policy, so the
+      // operator sees both the anomaly and that login is not the blocker.
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('stored value "REQUIRED" is not a recognized policy'),
+      );
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("MFA policy: optional"));
+      // It must NOT also print a bare, authoritative-looking "optional" line.
+      expect(logSpy).not.toHaveBeenCalledWith("MFA policy: optional");
+    } finally {
+      errSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  it("runRecoveryCli status stays clean (exit 0, stdout) for a legitimately missing row", async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      expect(await runRecoveryCli(["status"])).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith("MFA policy: optional");
+      expect(errSpy).not.toHaveBeenCalled();
+    } finally {
+      errSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
