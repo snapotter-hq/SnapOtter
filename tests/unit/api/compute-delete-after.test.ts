@@ -47,7 +47,9 @@ describe("computeDeleteAfter logic (source verification)", () => {
   });
 
   it("gates on team_retention_overrides enterprise feature", () => {
-    expect(source).toContain('isFeatureEnabled("team_retention_overrides")');
+    // The gate goes through the shared isEnterpriseFeatureEnabled helper (#868);
+    // the regex spans the line break biome inserts on the wrapped call.
+    expect(source).toMatch(/isEnterpriseFeatureEnabled\(\s*"team_retention_overrides"/);
   });
 
   it("returns early when feature is not enabled", () => {
