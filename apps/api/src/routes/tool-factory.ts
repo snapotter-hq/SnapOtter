@@ -10,7 +10,7 @@ import {
   TOOL_BUNDLE_MAP,
   TOOLS,
 } from "@snapotter/shared";
-import { and, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { env } from "../config.js";
@@ -520,7 +520,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           });
         }
 
-        // Check per-user concurrent job limit before enqueuing
+        // Check per-user concurrent job limit before enqueuing. Type
+        // "single" rows are SSE alias bookkeeping, not work (#808: they now
+        // carry the owner so cancels can be authorized); counting them
+        // would double-charge every tool-route run against the limit.
         const userId = authUser.id;
         const maxConcurrent = await getSettingNumber("maxConcurrentJobsPerUser", 0);
         if (maxConcurrent > 0 && userId) {
@@ -531,6 +534,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               and(
                 sql`${schema.jobs.userId} = ${userId}`,
                 inArray(schema.jobs.status, ["queued", "processing"]),
+                ne(schema.jobs.type, "single"),
               ),
             );
 
@@ -607,6 +611,24 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
           return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
         } catch (err) {
+          // A cancel that lands inside the sync window surfaces here as the
+          // worker's UnrecoverableError("Canceled") (#808). Answer the
+          // structural canceled shape the web client maps to its localized
+          // canceled state, mirroring pipeline and batch. The message alone
+          // is forgeable (a tool can fail with exactly this string), so the
+          // row the worker committed before throwing is the authority; a
+          // mismatch falls through to the logged generic path.
+          if (err instanceof Error && err.message === "Canceled") {
+            const wasCanceled = await db
+              .select({ status: schema.jobs.status })
+              .from(schema.jobs)
+              .where(eq(schema.jobs.id, jobId))
+              .then((rows) => rows[0]?.status === "canceled")
+              .catch(() => false);
+            if (wasCanceled) {
+              return reply.status(422).send({ error: "Canceled", canceled: true });
+            }
+          }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.
           request.log.error({ err, toolId: config.toolId }, "tool processing failed");

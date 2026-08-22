@@ -623,9 +623,33 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           .catch(() => {});
 
         if (isCanceled) {
-          // Ephemeral terminal event for live SSE clients. Uses
-          // publishEphemeral so the replay key is set without
-          // overwriting the DB row (which stays "canceled").
+          if (progressJobId !== jobId) {
+            // Alias dual write (#808), the finalize's #766 pattern: a
+            // reconnecting client replays from the alias row, so it needs
+            // the same terminal state, not just an ephemeral frame that
+            // expires with the Redis key. Guarded, so a cancel racing a
+            // committed completion cannot downgrade it. A failed write
+            // must not replace the UnrecoverableError thrown below
+            // (anything else would let BullMQ retry a canceled job), so it
+            // logs at error level (a dropped terminal write is the one
+            // failure a client may never recover from) and falls through
+            // to the ephemeral publish, which requestCancel's repair path
+            // backs up on the next cancel.
+            try {
+              await cancelSingleJobGuarded({ jobId: progressJobId });
+            } catch (aliasErr) {
+              logger.error(
+                { err: aliasErr, jobId, progressJobId },
+                "canceled alias terminal write failed",
+              );
+            }
+          }
+          // Ephemeral terminal event for live SSE clients, published
+          // unconditionally: liveness must not depend on the durable write
+          // (which the guard also skips when a reused alias id is still
+          // terminal from an earlier run). publishEphemeral sets the
+          // replay key without overwriting the DB row (which stays
+          // "canceled").
           publishEphemeral({
             jobId: progressJobId,
             type: "single",

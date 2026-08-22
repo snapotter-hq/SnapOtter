@@ -7,7 +7,7 @@
  */
 import { context, propagation } from "@opentelemetry/api";
 import { FlowProducer, type Job, QueueEvents } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
@@ -176,6 +176,53 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     inputRefs: data.inputRefs,
     settings: stripNulBytes((data.dbSettings ?? data.settings) as Record<string, unknown>),
   });
+
+  // Client-facing SSE alias row (#808). The web client cancels by the id it
+  // generated (clientJobId); the queue job lives under the server jobId.
+  // The pointer stamped here lets requestCancel resolve one to the other,
+  // and the owner lets the cancel route authorize the run's own starter.
+  // Awaited and committed before the queue add, so from the first moment
+  // cancelable work exists the pointer is durable. Unlike the pipeline
+  // route's pre-insert (which runs before any progress write), enqueue
+  // happens after validation has already published progress frames, so the
+  // lazy persist layer may have created this row first: ownerless rows are
+  // claimed (this run's own lazy insert, or an abandoned channel), while a
+  // row another user owns is left alone so a reused id cannot transfer it
+  // or strip their cancel authorization.
+  if (data.clientJobId && data.clientJobId !== data.jobId) {
+    const aliasSettings = { artifactJobId: data.jobId };
+    const claimableOwner = data.userId
+      ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, data.userId))
+      : isNull(schema.jobs.userId);
+    const res = await db
+      .insert(schema.jobs)
+      .values({
+        id: data.clientJobId,
+        userId: data.userId,
+        pool: data.pool,
+        type: "single",
+        status: "queued",
+        inputRefs: [],
+        settings: aliasSettings,
+      })
+      .onConflictDoUpdate({
+        target: schema.jobs.id,
+        // Only alias rows are claimable: a colliding batch parent or
+        // pipeline row the same user owns must keep its own cancel
+        // metadata (batch parent ids ARE client-supplied, so that
+        // collision is reachable).
+        set: { settings: aliasSettings, userId: data.userId },
+        setWhere: and(eq(schema.jobs.type, "single"), claimableOwner),
+      });
+    if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
+      // The claim was skipped (foreign owner or non-alias collision). The
+      // run proceeds, but its starter cannot cancel through this id; make
+      // that debuggable instead of a silent 404 months later.
+      console.warn(
+        `alias claim skipped for clientJobId ${data.clientJobId} (job ${data.jobId}); cancel by this id will not resolve`,
+      );
+    }
+  }
 
   // Fire-and-forget: compute deleteAfter from team retention override
   if (data.userId) {

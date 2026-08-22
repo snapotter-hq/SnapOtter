@@ -1,0 +1,521 @@
+/**
+ * Single-tool cancel (#808): requestCancel's alias resolution for plain
+ * tool runs, the enqueue-time alias stamping, and the worker's dual
+ * terminal write when an active run is canceled through its alias.
+ *
+ * Follows the batch-cancel.test.ts harness: no HTTP app is built. The test
+ * tool is registered directly in the process registry, jobs are enqueued
+ * through the real enqueueToolJob (the seam every single-tool route shares,
+ * factory and custom AI routes alike), and the real workers drain them
+ * against this fork's Postgres + Redis. Queue pauses stand in for "the job
+ * is still waiting" so removal is deterministic instead of a race.
+ */
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Injects a bounded fault into the worker's durable alias write so the
+// liveness fallback (the ephemeral terminal frame must reach live SSE
+// clients even when the DB write fails) is testable. Scoped by target id so
+// every other test runs against the real implementation.
+const guardedWriteFault = vi.hoisted(() => ({ target: null as string | null }));
+
+vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    cancelSingleJobGuarded: async (args: { jobId: string }) => {
+      if (args.jobId === guardedWriteFault.target) {
+        throw new Error("injected alias-write outage");
+      }
+      return actual.cancelSingleJobGuarded(args);
+    },
+  };
+});
+
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { runMigrations } from "../../../apps/api/src/db/migrate.js";
+import {
+  requestCancel,
+  startCancelListener,
+  stopCancelListener,
+} from "../../../apps/api/src/jobs/cancel.js";
+import {
+  createRedisSubscriberConnection,
+  sharedRedis,
+} from "../../../apps/api/src/jobs/connection.js";
+import {
+  closeQueueEvents,
+  enqueueToolJob,
+  waitForJob,
+} from "../../../apps/api/src/jobs/enqueue.js";
+import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
+import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
+import { putObject } from "../../../apps/api/src/lib/object-storage.js";
+import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
+
+const passthroughSchema = { parse: (v: unknown) => v } as never;
+
+interface RunSettings {
+  mode: "fast" | "slow";
+  tag: string;
+}
+
+// Behavior keyed on settings: fast returns instantly, slow waits on the
+// worker's abort signal, so a cancel has a real running target. Every
+// invocation records its tag, so "this run never started" is a positive
+// assertion instead of a timing guess.
+const invoked: string[] = [];
+registerToolProcessFn({
+  toolId: "wt-single-cancel",
+  settingsSchema: passthroughSchema,
+  process: async (
+    inputBuffer: Buffer,
+    settings: unknown,
+    filename: string,
+    ctx?: ToolProcessCtx,
+  ) => {
+    const { mode, tag } = settings as RunSettings;
+    invoked.push(tag);
+    if (mode === "slow") {
+      await new Promise<void>((resolve, reject) => {
+        const signal = ctx?.signal;
+        if (!signal) {
+          reject(new Error("wt-single-cancel requires an abort signal"));
+          return;
+        }
+        if (signal.aborted) {
+          reject(new Error("aborted before start"));
+          return;
+        }
+        const timer = setTimeout(resolve, 20_000);
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new Error("aborted by signal"));
+          },
+          { once: true },
+        );
+      });
+    }
+    return { buffer: inputBuffer, filename, contentType: "image/png" };
+  },
+});
+
+mkdirSync(process.env.WORKSPACE_PATH ?? "", { recursive: true });
+await runMigrations();
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+type JobRow = typeof schema.jobs.$inferSelect;
+
+async function waitFor<T>(probe: () => Promise<T | undefined>, timeoutMs = 20_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await probe();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline) throw new Error(`condition not met within ${timeoutMs}ms`);
+    await delay(150);
+  }
+}
+
+async function jobRow(jobId: string): Promise<JobRow | undefined> {
+  const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+  return row;
+}
+
+async function terminalRow(jobId: string, timeoutMs = 25_000): Promise<JobRow> {
+  return waitFor(async () => {
+    const row = await jobRow(jobId);
+    return row && row.status !== "queued" && row.status !== "processing" ? row : undefined;
+  }, timeoutMs);
+}
+
+async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
+  const raw = await waitFor(async () => {
+    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+    return value ?? undefined;
+  }, 25_000);
+  return JSON.parse(raw) as Record<string, unknown>;
+}
+
+/** Collect ids published on the cancel channel for the duration of `fn`. */
+async function collectCancelPublishes(fn: () => Promise<void>): Promise<string[]> {
+  const received: string[] = [];
+  const sub = createRedisSubscriberConnection();
+  await sub.subscribe(`${bullPrefix()}:cancel`);
+  sub.on("message", (_ch: string, msg: string) => received.push(msg));
+  try {
+    await fn();
+    // Publishes are awaited inside requestCancel, but delivery to this
+    // subscriber is async; give the frames a beat to arrive.
+    await delay(300);
+    return received;
+  } finally {
+    await sub.quit();
+  }
+}
+
+/** Insert a users row so jobs.userId's FK holds; returns the id. */
+async function createOwner(): Promise<string> {
+  const id = randomUUID();
+  await db.insert(schema.users).values({
+    id,
+    username: `wt-single-cancel-${id.slice(0, 8)}`,
+  });
+  return id;
+}
+
+interface EnqueueOpts {
+  mode: "fast" | "slow";
+  tag: string;
+  clientJobId?: string;
+  userId?: string | null;
+}
+
+/** Enqueue a single-tool run the way every tool route does. */
+async function enqueueSingleRun(
+  opts: EnqueueOpts,
+): Promise<{ jobId: string; userId: string | null }> {
+  const jobId = randomUUID();
+  const userId = opts.userId === undefined ? await createOwner() : opts.userId;
+  const uploadKey = `uploads/${jobId}/input.png`;
+  await putObject(uploadKey, Buffer.from("payload"));
+  await enqueueToolJob({
+    kind: "tool",
+    jobId,
+    toolId: "wt-single-cancel",
+    userId,
+    pool: "image",
+    inputRefs: [uploadKey],
+    filename: "input.png",
+    settings: { mode: opts.mode, tag: opts.tag },
+    clientJobId: opts.clientJobId,
+  });
+  return { jobId, userId };
+}
+
+beforeAll(async () => {
+  await startCancelListener();
+  startWorkers();
+}, 30_000);
+
+afterAll(async () => {
+  await closeWorkers();
+  await stopCancelListener();
+  await closeQueueEvents();
+  await closeQueues();
+  await sharedRedis().quit();
+}, 20_000);
+
+// ── Tests ───────────────────────────────────────────────────────
+
+describe("enqueueToolJob alias stamping (#808)", () => {
+  it("pre-inserts the alias row with owner, pool, and artifact pointer", async () => {
+    const clientJobId = randomUUID();
+    const queue = getQueue("image");
+    await queue.pause();
+    try {
+      const { jobId, userId } = await enqueueSingleRun({
+        mode: "fast",
+        tag: "stamp-a",
+        clientJobId,
+      });
+
+      const alias = await jobRow(clientJobId);
+      expect(alias?.type).toBe("single");
+      expect(alias?.userId).toBe(userId);
+      expect(alias?.pool).toBe("image");
+      expect((alias?.settings ?? {}) as { artifactJobId?: string }).toMatchObject({
+        artifactJobId: jobId,
+      });
+    } finally {
+      await queue.resume();
+    }
+  });
+
+  it("claims the lazily created ownerless SSE row instead of leaving it pointerless", async () => {
+    // A progress frame that beats the enqueue creates the alias row the way
+    // persistSingleFileProgress does: type single, no owner, no settings.
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      type: "single",
+      status: "processing",
+      inputRefs: [],
+    });
+
+    const { jobId, userId } = await enqueueSingleRun({
+      mode: "fast",
+      tag: "stamp-lazy",
+      clientJobId,
+    });
+    await terminalRow(jobId);
+
+    const alias = await jobRow(clientJobId);
+    expect(alias?.userId).toBe(userId);
+    expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(jobId);
+  });
+
+  it("does not clobber a same-owner batch parent row that collides with the alias id", async () => {
+    // Batch parent ids ARE the client-supplied id, so a collision with a
+    // later single-tool run is reachable for the same user. The upsert must
+    // not replace the parent's cancel metadata with an alias pointer.
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner,
+      type: "batch",
+      status: "processing",
+      inputRefs: [],
+      settings: { flowChildCount: 2, stepCount: 1 },
+    });
+
+    const { jobId } = await enqueueSingleRun({
+      mode: "fast",
+      tag: "batch-collide",
+      clientJobId,
+      userId: owner,
+    });
+    await terminalRow(jobId);
+
+    const parent = await jobRow(clientJobId);
+    expect(parent?.type).toBe("batch");
+    expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+  });
+
+  it("leaves a foreign user's row untouched when its id is reused", async () => {
+    const foreignOwner = await createOwner();
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: foreignOwner,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { artifactJobId: "foreign-artifact" },
+    });
+
+    const { jobId } = await enqueueSingleRun({ mode: "fast", tag: "stamp-foreign", clientJobId });
+    await terminalRow(jobId);
+
+    const alias = await jobRow(clientJobId);
+    expect(alias?.userId).toBe(foreignOwner);
+    expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      "foreign-artifact",
+    );
+  });
+});
+
+describe("requestCancel through a single-tool alias (#808)", () => {
+  it("resolves a waiting job: removes it and settles both rows terminally", async () => {
+    const clientJobId = randomUUID();
+    const queue = getQueue("image");
+    await queue.pause();
+    let jobId: string;
+    try {
+      ({ jobId } = await enqueueSingleRun({ mode: "fast", tag: "wait-cancel", clientJobId }));
+      expect(await requestCancel(clientJobId)).toBe(true);
+    } finally {
+      await queue.resume();
+    }
+
+    // The queue job is gone, both rows are canceled, and the client-facing
+    // channel got its terminal frame (a reconnecting client must not replay
+    // a live run that will never finish, the #766 lesson).
+    expect(await getQueue("image").getJob(jobId)).toBeUndefined();
+    expect((await jobRow(jobId))?.status).toBe("canceled");
+    expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+    expect(invoked).not.toContain("wait-cancel");
+  });
+
+  it("resolves an active job: publishes the server id and the worker settles both rows", async () => {
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({ mode: "slow", tag: "active-cancel", clientJobId });
+    await waitFor(async () => (invoked.includes("active-cancel") ? true : undefined));
+
+    const received = await collectCancelPublishes(async () => {
+      expect(await requestCancel(clientJobId)).toBe(true);
+    });
+    expect(received).toContain(jobId);
+
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+  });
+
+  it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
+    // The route's structural 422 keys on this exact chain: worker
+    // UnrecoverableError("Canceled") -> BullMQ failedReason ->
+    // waitUntilFinished rejection. Pin it here so the HTTP suite's canned
+    // waitForJob stays an honest stand-in.
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({ mode: "slow", tag: "sync-window", clientJobId });
+    await waitFor(async () => (invoked.includes("sync-window") ? true : undefined));
+
+    const settled = waitForJob("image", jobId).then(
+      () => "resolved",
+      (err) => (err instanceof Error ? err.message : String(err)),
+    );
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect(await settled).toBe("Canceled");
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+  });
+
+  it("cancels a live run whose reused alias id is terminal from an earlier run", async () => {
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    const first = await enqueueSingleRun({
+      mode: "fast",
+      tag: "reuse-1",
+      clientJobId,
+      userId: owner,
+    });
+    await terminalRow(first.jobId);
+    await terminalRow(clientJobId);
+
+    const second = await enqueueSingleRun({
+      mode: "slow",
+      tag: "reuse-2",
+      clientJobId,
+      userId: owner,
+    });
+    await waitFor(async () => (invoked.includes("reuse-2") ? true : undefined));
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+
+    // The alias row is still terminal from run 1 (nonterminal frames
+    // cannot resurrect it), but the pointer follows run 2. The cancel must
+    // reach run 2's live job, not answer false off the stale alias status.
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect((await terminalRow(second.jobId)).status).toBe("canceled");
+
+    // The alias row keeps run 1's terminal state (the guarded write cannot
+    // downgrade it); the live channel still settles through the ephemeral
+    // frame.
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+    expect((await jobRow(clientJobId))?.status).toBe("completed");
+  });
+
+  it("heals a half-canceled run instead of answering false forever", async () => {
+    // A prior cancel removed the queue job and marked the artifact row,
+    // but died before the alias settled (a crash or 500 between the
+    // writes). The retry must converge: settle the alias, answer true.
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    const artifactId = randomUUID();
+    await db.insert(schema.jobs).values([
+      {
+        id: artifactId,
+        userId: owner,
+        type: "tool",
+        status: "canceled",
+        completedAt: new Date(),
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        userId: owner,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { artifactJobId: artifactId },
+      },
+    ]);
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.error).toBe("Canceled");
+  });
+
+  it("still delivers the terminal frame when the durable alias write fails", async () => {
+    // Liveness must not depend on DB health: the pre-#808 worker always
+    // published the ephemeral frame, and the dual write keeps that
+    // guarantee. The row stays unsettled (the write failed), which the
+    // repair path above covers on the next cancel.
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({ mode: "slow", tag: "fault-cancel", clientJobId });
+    await waitFor(async () => (invoked.includes("fault-cancel") ? true : undefined));
+
+    guardedWriteFault.target = clientJobId;
+    try {
+      expect(await requestCancel(clientJobId)).toBe(true);
+      expect((await terminalRow(jobId)).status).toBe("canceled");
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Canceled");
+    } finally {
+      guardedWriteFault.target = null;
+    }
+    expect((await jobRow(clientJobId))?.status).not.toBe("canceled");
+  });
+
+  it("returns false for a terminal alias row and does not flag anything", async () => {
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({ mode: "fast", tag: "done-cancel", clientJobId });
+    await terminalRow(jobId);
+    await terminalRow(clientJobId);
+
+    expect(await requestCancel(clientJobId)).toBe(false);
+    expect((await jobRow(jobId))?.status).toBe("completed");
+  });
+
+  it("returns false when the pointer resolves to no queue job", async () => {
+    // The enqueue window: the alias row is durable but the queue add has
+    // not happened yet. The cancel answers an honest false (button stays
+    // armed) instead of pretending the run stopped.
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { artifactJobId: randomUUID() },
+    });
+
+    expect(await requestCancel(clientJobId)).toBe(false);
+    expect((await jobRow(clientJobId))?.status).toBe("queued");
+  });
+
+  it("keeps the direct server-id cancel path working with no clientJobId", async () => {
+    const queue = getQueue("image");
+    await queue.pause();
+    let jobId: string;
+    try {
+      ({ jobId } = await enqueueSingleRun({ mode: "fast", tag: "direct-cancel" }));
+      expect(await requestCancel(jobId)).toBe(true);
+    } finally {
+      await queue.resume();
+    }
+    expect((await jobRow(jobId))?.status).toBe("canceled");
+    expect(invoked).not.toContain("direct-cancel");
+  });
+
+  it("keeps the ephemeral terminal frame on a direct-id active cancel", async () => {
+    // API callers with no clientJobId ride the worker's publishEphemeral
+    // branch; the alias dual write must not have stripped it.
+    const { jobId } = await enqueueSingleRun({ mode: "slow", tag: "direct-active" });
+    await waitFor(async () => (invoked.includes("direct-active") ? true : undefined));
+
+    expect(await requestCancel(jobId)).toBe(true);
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    const frame = await terminalFrame(jobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+  });
+});

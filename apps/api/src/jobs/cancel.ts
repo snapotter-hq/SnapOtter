@@ -2,7 +2,7 @@
  * Cooperative job cancellation via Redis pub/sub.
  *
  * - Workers call registerCancelable(jobId) on start and unregister on finish.
- * - requestCancel(jobId) handles six states:
+ * - requestCancel(jobId) handles seven states:
  *   1. Batch parent (plain or pipeline-batch): flag the batch canceled and
  *      publish every runnable child id on the cancel channel; batch-finalize
  *      commits terminal state (#767, #771).
@@ -10,10 +10,13 @@
  *      publish the step ids; pipeline-finalize commits terminal state (#771).
  *   3. Pipeline SSE alias: resolve the settings.pipelineFlowId pointer the
  *      route stamped, then cancel the flow the same way (#771).
- *   4. Waiting/delayed: remove from queue, mark DB row canceled.
- *   5. Active (in a worker): publish the jobId on the cancel channel;
+ *   4. Single-tool SSE alias: resolve the settings.artifactJobId pointer
+ *      enqueueToolJob stamped, then run the queue scan under the server id;
+ *      a removed queued job also settles the alias row terminally (#808).
+ *   5. Waiting/delayed: remove from queue, mark DB row canceled.
+ *   6. Active (in a worker): publish the jobId on the cancel channel;
  *      the worker's AbortSignal fires and it cleans up.
- *   6. Terminal or absent: no-op, returns false.
+ *   7. Terminal or absent: no-op, returns false.
  * - startCancelListener() subscribes to the cancel channel and fires
  *   registered AbortControllers.
  */
@@ -21,6 +24,7 @@
 import { eq } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
+import { cancelSingleJobGuarded } from "../routes/progress.js";
 import { markBatchCanceled } from "./batch-progress.js";
 import { createRedisSubscriberConnection, sharedRedis } from "./connection.js";
 import { getQueue } from "./queues.js";
@@ -77,6 +81,7 @@ interface CancelRowSettings {
   stepCount?: number;
   clientJobId?: string;
   pipelineFlowId?: string;
+  artifactJobId?: string;
 }
 
 function isTerminal(status: string): boolean {
@@ -183,8 +188,54 @@ export async function requestCancel(jobId: string): Promise<boolean> {
       }
       return true;
     }
+
+    // Single-tool SSE alias (#808): the client-facing id a tool route
+    // enqueued under a server-generated uuid. Follow the pointer into the
+    // queue scan without consulting the alias row's own status: on a
+    // reused id it is stale (terminal from the previous run, since
+    // nonterminal frames cannot resurrect it), and the artifact side of
+    // the scan already refuses terminal runs. A removed queued job never
+    // reaches a worker, so nothing else would ever emit a frame for it:
+    // the alias row gets the same terminal write and announcement (#766's
+    // lesson: a reconnecting client replays from this row, and a
+    // nonterminal alias replays a live run that will never finish). An
+    // active job's worker settles both rows itself.
+    if (settings.artifactJobId) {
+      const outcome = await cancelQueueJob(settings.artifactJobId);
+      if (outcome === "removed") {
+        await cancelSingleJobGuarded({ jobId });
+        return true;
+      }
+      if (outcome === "signaled") return true;
+
+      // Nothing in any queue. Either the run is genuinely over, or a
+      // prior cancel removed the job but died before the alias settled (a
+      // crash or thrown write between the two). The artifact row is
+      // authoritative: heal a nonterminal alias over a canceled artifact
+      // so retries converge instead of answering false forever.
+      if (!isTerminal(row.status)) {
+        const [artifact] = await db
+          .select({ status: schema.jobs.status })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, settings.artifactJobId));
+        if (artifact?.status === "canceled") {
+          await cancelSingleJobGuarded({ jobId });
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
+  return (await cancelQueueJob(jobId)) !== false;
+}
+
+/**
+ * Scan the pools for a queue job under `jobId` and cancel it: remove it
+ * when waiting/delayed (marking its DB row canceled), signal the worker
+ * when active. Returns false when the job is terminal or in no queue.
+ */
+async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | false> {
   for (const pool of POOLS) {
     const queue = getQueue(pool);
     const job = await queue.getJob(jobId);
@@ -199,13 +250,13 @@ export async function requestCancel(jobId: string): Promise<boolean> {
         .update(schema.jobs)
         .set({ status: "canceled", completedAt: new Date() })
         .where(eq(schema.jobs.id, jobId));
-      return true;
+      return "removed";
     }
 
     // Active: publish cancel signal for the worker
     if (state === "active") {
       await sharedRedis().publish(CANCEL_CHANNEL(), jobId);
-      return true;
+      return "signaled";
     }
 
     // Terminal (completed, failed): no-op
