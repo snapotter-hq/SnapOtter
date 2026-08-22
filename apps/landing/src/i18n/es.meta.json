@@ -1913,6 +1913,18 @@
     "outputHash": "ee75116f4d54",
     "stale": false
   },
+  "home.hero.socialProof.aria": {
+    "sourceHash": "50afdc91b27a",
+    "provenance": "machine",
+    "outputHash": "0aab945452a1",
+    "stale": false
+  },
+  "home.hero.socialProof.label": {
+    "sourceHash": "ada83367da9b",
+    "provenance": "machine",
+    "outputHash": "4411d5ea617d",
+    "stale": false
+  },
   "home.hero.subtitle": {
     "sourceHash": "dfe178b3af59",
     "provenance": "machine",
@@ -1924,6 +1936,18 @@
     "provenance": "machine",
     "outputHash": "cef7fbf27fc5",
     "stale": false
+  },
+  "home.metaDescription": {
+    "sourceHash": "",
+    "provenance": "human",
+    "outputHash": "",
+    "stale": true
+  },
+  "home.metaTitle": {
+    "sourceHash": "",
+    "provenance": "human",
+    "outputHash": "",
+    "stale": true
   },
   "home.openSource.discord": {
     "sourceHash": "62d97f750910",
@@ -2265,6 +2289,18 @@
     "sourceHash": "ed98fc54e23b",
     "provenance": "machine",
     "outputHash": "ed98fc54e23b",
+    "stale": false
+  },
+  "home.testimonials.subtitle": {
+    "sourceHash": "3c24e097cef5",
+    "provenance": "machine",
+    "outputHash": "e5d10b28a610",
+    "stale": false
+  },
+  "home.testimonials.title": {
+    "sourceHash": "70321a69082a",
+    "provenance": "machine",
+    "outputHash": "1ef3e403bbfd",
     "stale": false
   },
   "home.toolGrid.browseCatalog": {

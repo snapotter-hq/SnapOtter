@@ -1,11 +1,11 @@
-# Account Recovery
+# Account Recovery {#account-recovery}
 
 If you get locked out of SnapOtter (most often by an MFA policy you can no
 longer satisfy), you can recover from inside the container without a database
 client. Recovery commands are offline and require shell access to the container,
 which already means full control of the instance.
 
-## Which wall am I hitting?
+## Which wall am I hitting? {#which-wall-am-i-hitting}
 
 SnapOtter's login applies two independent MFA gates. Diagnose first:
 
@@ -20,7 +20,7 @@ This prints the current MFA policy and which users have TOTP enrolled.
 - **You are prompted for a code you cannot produce** (lost your phone and your
   recovery codes): your account is enrolled. Clear that enrollment.
 
-## Relax the MFA policy
+## Relax the MFA policy {#relax-the-mfa-policy}
 
 ```bash
 docker exec -it snapotter snapotter-admin reset-mfa-policy
@@ -29,7 +29,7 @@ docker exec -it snapotter snapotter-admin reset-mfa-policy
 This sets the policy back to `optional`. It applies on your next login with no
 restart. It only ever sets `optional`, so it cannot turn enforcement back on.
 
-## Clear one user's TOTP enrollment
+## Clear one user's TOTP enrollment {#clear-one-user-s-totp-enrollment}
 
 ```bash
 docker exec -it snapotter snapotter-admin disable-mfa <username>
@@ -38,7 +38,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 If the policy still requires MFA for that user, they will hit the enrollment
 wall next, so also run `reset-mfa-policy`, log in, and re-enroll from Settings.
 
-## Older images and fallbacks
+## Older images and fallbacks {#older-images-and-fallbacks}
 
 On an image built before the `snapotter-admin` wrapper existed, call the script
 directly:
@@ -58,7 +58,7 @@ docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
 
 On the multi-container setup, point `psql` at your own `DATABASE_URL` instead.
 
-## Locked out of SSO, not MFA?
+## Locked out of SSO, not MFA? {#locked-out-of-sso-not-mfa}
 
 If an enforced SSO login is failing, use the break-glass local account instead:
 set `ssoBreakGlassUsername` to a local admin under Settings > Security before you
