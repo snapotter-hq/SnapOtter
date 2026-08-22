@@ -32,16 +32,39 @@ describe("docs-md adapter", () => {
     expect(units[0].kind).toBe("markdown");
   });
 
-  it("injects stable explicit anchors into English headings, idempotently", async () => {
-    await seed("guide/x.md", "# Getting Started\n\n## Quick Start\n\n## Already {#pinned}\n");
+  it("extract does not modify English source files on disk (read-only, #870)", async () => {
+    const before = "# Getting Started\n\n## Quick Start\n\nBody.\n"; // no explicit anchors
+    await seed("guide/ro.md", before);
     const adapter = createDocsAdapter({ root });
     await adapter.extract();
+    const after = await readFile(join(root, "guide/ro.md"), "utf8");
+    // A parity check must never mutate sources; extract() is read-only. The
+    // anchor normalization moved to persistSourceAnchors() on the write path.
+    expect(after).toBe(before);
+  });
+
+  it("extract anchors the returned sourceText in memory without writing to disk", async () => {
+    await seed("guide/mem.md", "# Getting Started\n\nBody.\n");
+    const adapter = createDocsAdapter({ root });
+    const units = await adapter.extract();
+    // Anchors are masked out of sourceText, but the slug survives inside a mask
+    // token, so the translated unit still carries the stable anchor. The point
+    // here: extraction produced anchored units while leaving the file untouched.
+    expect(units[0].sourceText).toContain("Getting Started");
+    const onDisk = await readFile(join(root, "guide/mem.md"), "utf8");
+    expect(onDisk).toBe("# Getting Started\n\nBody.\n");
+  });
+
+  it("persistSourceAnchors injects stable explicit anchors into English headings, idempotently", async () => {
+    await seed("guide/x.md", "# Getting Started\n\n## Quick Start\n\n## Already {#pinned}\n");
+    const adapter = createDocsAdapter({ root });
+    await adapter.persistSourceAnchors();
     const onDisk = await readFile(join(root, "guide/x.md"), "utf8");
     expect(onDisk).toContain("# Getting Started {#getting-started}");
     expect(onDisk).toContain("## Quick Start {#quick-start}");
     expect(onDisk).toContain("## Already {#pinned}"); // untouched
-    // Running extract again does not double-anchor.
-    await adapter.extract();
+    // Running it again does not double-anchor.
+    await adapter.persistSourceAnchors();
     const again = await readFile(join(root, "guide/x.md"), "utf8");
     expect(again).toBe(onDisk);
   });
@@ -52,7 +75,7 @@ describe("docs-md adapter", () => {
       "## Example Request\n\ntext\n\n## Example Request\n\nmore\n\n## Example Request\n",
     );
     const adapter = createDocsAdapter({ root });
-    await adapter.extract();
+    await adapter.persistSourceAnchors();
     const onDisk = await readFile(join(root, "guide/z.md"), "utf8");
     expect(onDisk).toContain("## Example Request {#example-request}");
     expect(onDisk).toContain("## Example Request {#example-request-1}");
@@ -62,7 +85,7 @@ describe("docs-md adapter", () => {
   it("does not treat fenced # lines as headings", async () => {
     await seed("guide/y.md", "# Real Heading\n\n```bash\n# not a heading\n```\n");
     const adapter = createDocsAdapter({ root });
-    await adapter.extract();
+    await adapter.persistSourceAnchors();
     const onDisk = await readFile(join(root, "guide/y.md"), "utf8");
     expect(onDisk).toContain("# Real Heading {#real-heading}");
     expect(onDisk).toContain("# not a heading\n"); // still inside the fence, no anchor

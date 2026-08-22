@@ -126,6 +126,22 @@ function injectAnchors(body) {
 }
 
 /**
+ * Read a root doc and compute its anchored form without writing. Returns the
+ * original bytes (so callers can detect a no-op), the split frontmatter, the
+ * anchored body, and the rebuilt full document. Shared by the read-only
+ * extract() and the write-side persistSourceAnchors() (#870).
+ * @param {string} abs
+ * @returns {Promise<{ original: string, fm: string|null, anchored: string, rebuilt: string }>}
+ */
+async function anchorDoc(abs) {
+  const original = await readFile(abs, "utf8");
+  const { fm, body } = splitFrontmatter(original);
+  const anchored = injectAnchors(body);
+  const rebuilt = fm != null ? `---\n${fm}\n---\n${anchored}` : anchored;
+  return { original, fm, anchored, rebuilt };
+}
+
+/**
  * Docs-dialect pre-mask over non-code segments: hide `:::` container markers
  * (keep the title label), `[[toc]]`, and explicit `{#anchor}` slugs so the model
  * never rewrites them. Returns masked text plus the token table.
@@ -279,24 +295,37 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
   return {
     name: "docs",
 
+    // Read-only: builds the anchored, masked units in memory without touching
+    // the English sources. A parity check must never mutate the tree (#870); the
+    // on-disk anchor normalization lives in persistSourceAnchors() on the write
+    // path. extract() still anchors in memory so a unit's sourceText (and its
+    // hash) matches what persistSourceAnchors() commits.
     async extract() {
       const files = await listRootMarkdown(root);
       const units = [];
       for (const id of files) {
-        const abs = join(root, id);
-        const original = await readFile(abs, "utf8");
-        const { fm, body } = splitFrontmatter(original);
-        const anchored = injectAnchors(body);
-        const rebuilt = fm != null ? `---\n${fm}\n---\n${anchored}` : anchored;
-        // Persist anchored English source in place (idempotent) so the running
-        // site and every locale share the same stable slugs.
-        if (rebuilt !== original) await writeFile(abs, rebuilt, "utf8");
+        const { fm, anchored } = await anchorDoc(join(root, id));
         const { masked, tokens } = maskDocs(anchored);
         tokenTables.set(id, tokens);
         const sourceText = fm != null ? `---\n${fm}\n---\n${masked}` : masked;
         units.push({ id, sourceText, kind: "markdown" });
       }
       return units;
+    },
+
+    // Adapter extra (not part of the 3-method contract): normalize English
+    // headings to explicit {#slug} anchors in place, so the running site and
+    // every locale share stable slugs. This is the write half extract() used to
+    // do as a side effect; it belongs on the translate write path, never the
+    // read-only parity check (#870). Idempotent: already-anchored files are a
+    // no-op, so a clean tree stays clean.
+    async persistSourceAnchors() {
+      const files = await listRootMarkdown(root);
+      for (const id of files) {
+        const abs = join(root, id);
+        const { original, rebuilt } = await anchorDoc(abs);
+        if (rebuilt !== original) await writeFile(abs, rebuilt, "utf8");
+      }
     },
 
     async load(locale) {

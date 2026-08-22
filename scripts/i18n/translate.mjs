@@ -68,6 +68,14 @@ async function main() {
     const mod = await ADAPTERS[surface]();
     const adapter = mod.adapter;
 
+    // Normalize the English source anchors here, on the write path where
+    // mutating the tree is expected. The read-only parity check (i18n:check)
+    // never does this, which is the whole point of moving it off extract()
+    // (snapotter-hq/SnapOtter#870). Optional: only the docs adapter defines it.
+    if (typeof adapter.persistSourceAnchors === "function") {
+      await adapter.persistSourceAnchors();
+    }
+
     if (args.mode === "export") {
       const units = await adapter.extract();
       for (const locale of locales) {
