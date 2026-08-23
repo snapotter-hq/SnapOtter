@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { FEATURE_BUNDLES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -635,7 +635,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // authorization. A foreign or pre-#771 ownerless row is left
             // alone, the old lazy-create semantics, with no 409 so the
             // response cannot become an id-existence oracle.
-            await db
+            const aliasRes = await db
               .insert(schema.jobs)
               .values({
                 id: clientJobId,
@@ -648,9 +648,23 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               })
               .onConflictDoUpdate({
                 target: schema.jobs.id,
+                // Only alias rows are re-pointable (#887): a colliding
+                // batch parent or tool artifact the same user owns must
+                // keep its own cancel metadata (batch parent ids ARE
+                // client-supplied, so that collision is reachable).
                 set: { settings: { pipelineFlowId: jobId } },
-                setWhere: eq(schema.jobs.userId, userId),
+                setWhere: and(eq(schema.jobs.type, "single"), eq(schema.jobs.userId, userId)),
               });
+            if (((aliasRes as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
+              // The claim was skipped (foreign owner or non-alias
+              // collision). The run proceeds, but its starter cannot
+              // cancel through this id; make that debuggable instead of a
+              // silent 404 months later.
+              request.log.warn(
+                { clientJobId, pipelineFlowId: jobId },
+                "pipeline alias claim skipped; cancel by this id will not resolve",
+              );
+            }
 
             // Report initial progress. Awaited: this write settles the
             // client-facing row the SSE replays, which is the evidence a

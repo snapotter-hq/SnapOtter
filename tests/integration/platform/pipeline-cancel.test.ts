@@ -40,6 +40,43 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
   };
 });
 
+// Injects a bounded fault into the finalize's durable terminal write so the
+// liveness fallback (#888: the client's terminal frame must not depend on
+// DB health) is testable. Scoped by target id so every other test runs
+// against the real implementation.
+const guardedWriteFault = vi.hoisted(() => ({ target: null as string | null }));
+
+vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    cancelSingleJobGuarded: async (args: { jobId: string }) => {
+      if (args.jobId === guardedWriteFault.target) {
+        throw new Error("injected terminal-write outage");
+      }
+      return actual.cancelSingleJobGuarded(args);
+    },
+  };
+});
+
+// Captures Sentry-bound reports: a swallowed terminal-write fault must
+// still phone home (#888), and pino has no Sentry transport.
+const reported = vi.hoisted(() => ({ errors: [] as unknown[] }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (
+      err: unknown,
+      ctx: Parameters<typeof actual.reportError>[1],
+    ): Promise<void> => {
+      reported.errors.push(err);
+      return actual.reportError(err, ctx);
+    },
+  };
+});
+
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { runMigrations } = await import("../../../apps/api/src/db/migrate.js");
@@ -617,6 +654,119 @@ describe("cooperative step skip and canceled finalize", () => {
     const payload = returned.resultPayload as { canceled?: boolean; error?: string };
     expect(payload.canceled).toBe(true);
     expect(payload.error).toBe("Canceled");
+  });
+
+  it("still delivers the terminal frame when the finalize's alias write fails (#888)", async () => {
+    // The finalize's guarded write is the durable half; the client's
+    // terminal frame is the liveness half and must not die with it. A
+    // thrown alias write also must not fail the finalize itself: its
+    // canceled resultPayload is what the sync route's structural 422
+    // branches on.
+    const clientJobId = randomUUID();
+    const tag = `fault-fin-${clientJobId.slice(0, 8)}`;
+    const { flowId, stepIds } = await enqueuePipelineFlow({
+      steps: [{ mode: "slow", tag }],
+      clientJobId,
+    });
+    await waitFor(async () => {
+      const row = await jobRow(stepIds[0]);
+      return row?.status === "processing" ? true : undefined;
+    });
+
+    guardedWriteFault.target = clientJobId;
+    reported.errors.length = 0;
+    try {
+      expect(await requestCancel(clientJobId)).toBe(true);
+
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Canceled");
+
+      // The flow row's own (unfaulted) write still settles, and the
+      // finalize still returns the canceled payload.
+      expect((await terminalRow(flowId)).status).toBe("canceled");
+      const returned = await finalizeReturnValue(flowId);
+      const payload = returned.resultPayload as { canceled?: boolean };
+      expect(payload.canceled).toBe(true);
+
+      // The swallowed fault still phones home: pino has no Sentry
+      // transport, so the catch must call reportError itself.
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected terminal-write outage",
+        ),
+      ).toBe(true);
+
+      // The alias row itself is unsettled (the write failed) until a
+      // retry cancel heals it off the canceled flow row.
+      expect((await jobRow(clientJobId))?.status).not.toBe("canceled");
+    } finally {
+      guardedWriteFault.target = null;
+    }
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect((await jobRow(clientJobId))?.status).toBe("canceled");
+  });
+
+  it("heals a nonterminal alias over a canceled flow instead of flagging forever (#888)", async () => {
+    // The faulted-dual-write residue: flow row canceled, alias never
+    // settled. Flag-and-publish would answer true every time and converge
+    // nothing; the heal settles the row so replay stops showing a live
+    // run. A completed flow stays refusable: healing it as canceled would
+    // lie about a finished run.
+    const clientJobId = randomUUID();
+    const flowId = randomUUID();
+    await db.insert(schema.jobs).values([
+      {
+        id: flowId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "canceled",
+        completedAt: new Date(),
+        inputRefs: [],
+        settings: { stepCount: 1, clientJobId },
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: flowId },
+      },
+    ]);
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.error).toBe("Canceled");
+  });
+
+  it("refuses to heal a nonterminal alias over a completed flow", async () => {
+    const clientJobId = randomUUID();
+    const flowId = randomUUID();
+    await db.insert(schema.jobs).values([
+      {
+        id: flowId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "completed",
+        completedAt: new Date(),
+        inputRefs: [],
+        settings: { stepCount: 1, clientJobId },
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: flowId },
+      },
+    ]);
+
+    expect(await requestCancel(clientJobId)).toBe(false);
+    expect((await jobRow(clientJobId))?.status).toBe("processing");
   });
 
   it("a cancel that lands after every step finished completes normally", async () => {

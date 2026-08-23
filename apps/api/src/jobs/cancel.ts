@@ -177,11 +177,26 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     const settings = (row.settings ?? {}) as CancelRowSettings;
     if (settings.pipelineFlowId) {
       if (isTerminal(row.status)) return false;
-      await markBatchCanceled(jobId);
       const [flowRow] = await db
-        .select({ settings: schema.jobs.settings })
+        .select({ status: schema.jobs.status, settings: schema.jobs.settings })
         .from(schema.jobs)
         .where(eq(schema.jobs.id, settings.pipelineFlowId));
+
+      // The run is over but the alias never settled: the finalize's dual
+      // write can fault (#888), and flag-and-publish would answer true
+      // every time while converging nothing. The flow row is
+      // authoritative: heal the alias over a canceled flow so replay
+      // stops showing a live run; a completed or failed flow refuses,
+      // since healing it as canceled would lie about a finished run.
+      if (flowRow && isTerminal(flowRow.status)) {
+        if (flowRow.status === "canceled") {
+          await cancelSingleJobGuarded({ jobId });
+          return true;
+        }
+        return false;
+      }
+
+      await markBatchCanceled(jobId);
       const stepCount = ((flowRow?.settings ?? {}) as CancelRowSettings).stepCount ?? 0;
       for (let j = 0; j < stepCount; j++) {
         await publishCancel(`${settings.pipelineFlowId}-s${j}`);
@@ -270,7 +285,21 @@ async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | f
 
     // Waiting or delayed: remove from queue and mark DB row
     if (state === "waiting" || state === "delayed") {
-      await job.remove();
+      try {
+        await job.remove();
+      } catch (err) {
+        // Lost the race (#889): a worker took the lock between getState
+        // and remove, so the job is active now; signal its worker instead
+        // of letting the throw 500 the cancel. BullMQ has no typed error
+        // here, so match its message (bullmq 5.80.9, Job.remove; a unit
+        // tripwire pins the wording against upgrades) and let anything
+        // else (Redis down) propagate loudly. The worker's abort path
+        // owns the terminal write for active jobs, so no row update here.
+        const message = err instanceof Error ? err.message : String(err);
+        if (!/locked by another worker/.test(message)) throw err;
+        await sharedRedis().publish(CANCEL_CHANNEL(), jobId);
+        return "signaled";
+      }
       await db
         .update(schema.jobs)
         .set({ status: "canceled", completedAt: new Date() })

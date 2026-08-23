@@ -148,6 +148,44 @@ describe("route-stamped cancel metadata (#771)", () => {
     expect(flow?.type).toBe("pipeline");
   });
 
+  it("does not clobber a same-owner batch parent row that collides with the alias id (#887)", async () => {
+    // Batch parent ids ARE the client-supplied id, so this collision is
+    // reachable by an API caller reusing an id across the two endpoints.
+    // The alias upsert must not replace the parent's cancel metadata, or a
+    // later cancel of that batch publishes zero child aborts.
+    const owner = await createUserAndLogin(app, `pipe-alias-collide-${Date.now()}`);
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner.userId,
+      type: "batch",
+      status: "processing",
+      inputRefs: [],
+      settings: { flowChildCount: 2, stepCount: 1 },
+    });
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { "content-type": contentType, authorization: `Bearer ${owner.token}` },
+      body,
+    });
+    expect([200, 202]).toContain(res.statusCode);
+    await waitForTerminalFrame(clientJobId);
+
+    const parent = await jobRow(clientJobId);
+    expect(parent?.type).toBe("batch");
+    expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+  });
+
   it("stamps stepCount on the pipeline-batch parent", async () => {
     const clientJobId = randomUUID();
     const { body, contentType } = createMultipartPayload([

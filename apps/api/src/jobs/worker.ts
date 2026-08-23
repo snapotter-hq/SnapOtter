@@ -687,6 +687,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
                 { err: aliasErr, jobId, progressJobId },
                 "canceled alias terminal write failed",
               );
+              // Same class as the finalize's settle fault (#888): pino has
+              // no Sentry transport, so the catch reports its own fault.
+              void reportError(aliasErr, {
+                source: "worker",
+                pool: data.pool,
+                jobId: progressJobId,
+              });
             }
           }
           // Ephemeral terminal event for live SSE clients, published
@@ -1016,10 +1023,42 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   if (canceled) {
     // Guarded dual write (#766): the SSE channel (clientJobId) and the
     // authoritative flow row can differ; both must settle canceled or a
-    // reconnecting client replays a live row forever.
-    await cancelSingleJobGuarded({ jobId: data.jobId });
+    // reconnecting client replays a live row forever. Each write catches
+    // its own fault (#888): a thrown write used to fail the whole
+    // finalize, turning the user's cancel into a generic pipeline failure
+    // and dropping the terminal frame with it. The fault is logged AND
+    // reported (pino has no Sentry transport, and a dropped terminal
+    // write is the one failure a client may never recover from);
+    // requestCancel's pipeline-alias heal converges the row on a later
+    // cancel, off the canceled flow row this finalize still commits.
+    const settleGuarded = async (rowId: string) => {
+      try {
+        await cancelSingleJobGuarded({ jobId: rowId });
+      } catch (err) {
+        logger.error(
+          { err, jobId: data.jobId, target: rowId },
+          "canceled pipeline terminal write failed",
+        );
+        void reportError(err, { source: "worker", pool: data.pool, jobId: rowId });
+      }
+    };
+    await settleGuarded(data.jobId);
     if (progressJobId !== data.jobId) {
-      await cancelSingleJobGuarded({ jobId: progressJobId });
+      await settleGuarded(progressJobId);
+    }
+    // Ephemeral terminal event for live SSE clients, published
+    // unconditionally for single-run pipelines: liveness must not depend
+    // on the durable write (which the guard also skips when a reused
+    // alias id is still terminal from an earlier run). Pipeline-batch
+    // per-file finalizes report through the parent batch channel instead.
+    if (!data.parentId) {
+      publishEphemeral({
+        jobId: progressJobId,
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: "Canceled",
+      });
     }
 
     // Batch progress (pipeline-batch only): the canceled file counts like a
@@ -1634,9 +1673,9 @@ export function startWorkers(): void {
       // SSE channel (clientJobId) and the authoritative flow row can differ,
       // so both get the guarded write; a committed completion is never
       // downgraded, and the frame is announced only for a transition this
-      // call owned. A finalize that dies inside its own cancel dual-write
-      // (#771) lands here too and gets labeled a failure; once that write
-      // threw, the net cannot know the run was canceled.
+      // call owned. Since #888 the cancel dual-write catches its own faults
+      // and the finalize survives them, so canceled runs no longer land
+      // here; this net covers crashes and stall evictions only.
       if (data?.kind === "pipeline-finalize") {
         const netFail = (jobId: string) =>
           failSingleJobGuarded({ jobId, message: "Pipeline processing failed" }).catch((netErr) => {
