@@ -2004,6 +2004,8 @@ export const hi: TranslationKeys = {
       submit: "पिक्सेलेट करें",
       submitBatch: "पिक्सेलेट करें ({count} फ़ाइलें)",
       progressLabel: "पिक्सेलेट हो रहा है",
+      dimensionsFailed:
+        "छवि के आयाम पढ़े नहीं जा सके, इसलिए चयन लागू नहीं किया जा सकता। फाइल फिर से जोड़ें या पूरी छवि को पिक्सेलेट करें।",
     },
     vignette: {
       strength: "तीव्रता",
@@ -2855,6 +2857,10 @@ export const hi: TranslationKeys = {
     previewUnavailable: "प्रीव्यू प्रोसेसिंग के बाद उपलब्ध होगा",
     generatePreview: "प्रीव्यू बनाएं",
     previewFailed: "प्रीव्यू बनाना विफल रहा",
+    previewNotAvailable: "प्रीव्यू उपलब्ध नहीं है",
+    resultPreviewFailed: "परिणाम का प्रीव्यू लोड नहीं हो सका",
+    resultPreviewFailedHint: "प्रोसेसिंग पूरी हो गई। फाइल सहेजने के लिए डाउनलोड बटन का उपयोग करें।",
+    resultPreviewErrorId: "त्रुटि ID: {id}",
     backToTools: "टूल्स पर वापस जाएं",
     original: "मूल",
     processed: "प्रोसेस्ड",

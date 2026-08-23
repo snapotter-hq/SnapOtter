@@ -2199,6 +2199,8 @@ export const de: TranslationKeys = {
       submit: "Verpixeln",
       submitBatch: "Verpixeln ({count} Dateien)",
       progressLabel: "Wird verpixelt",
+      dimensionsFailed:
+        "Die Bildabmessungen konnten nicht gelesen werden, daher kann die Auswahl nicht angewendet werden. Fügen Sie die Datei erneut hinzu oder verpixeln Sie das ganze Bild.",
     },
     vignette: {
       strength: "Stärke",
@@ -3053,6 +3055,11 @@ export const de: TranslationKeys = {
     previewUnavailable: "Vorschau ist nach der Verarbeitung verfügbar",
     generatePreview: "Vorschau erzeugen",
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
+    previewNotAvailable: "Vorschau nicht verfügbar",
+    resultPreviewFailed: "Ergebnisvorschau konnte nicht geladen werden",
+    resultPreviewFailedHint:
+      "Die Verarbeitung ist abgeschlossen. Verwenden Sie die Download-Schaltfläche, um Ihre Datei zu speichern.",
+    resultPreviewErrorId: "Fehler-ID: {id}",
     backToTools: "Zurück zu Werkzeugen",
     original: "Original",
     processed: "Verarbeitet",

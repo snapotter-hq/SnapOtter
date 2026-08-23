@@ -2175,6 +2175,8 @@ export const ar: TranslationKeys = {
       submit: "بكسلة",
       submitBatch: "بكسلة ({count} ملفات)",
       progressLabel: "جارٍ البكسلة",
+      dimensionsFailed:
+        "تعذرت قراءة أبعاد الصورة، لذا لا يمكن تطبيق التحديد. أضف الملف مرة أخرى أو طبّق البكسلة على الصورة كاملة.",
     },
     vignette: {
       strength: "الشدة",
@@ -3025,6 +3027,10 @@ export const ar: TranslationKeys = {
     previewUnavailable: "ستتوفر المعاينة بعد المعالجة",
     generatePreview: "إنشاء معاينة",
     previewFailed: "فشل إنشاء المعاينة",
+    previewNotAvailable: "المعاينة غير متوفرة",
+    resultPreviewFailed: "تعذر تحميل معاينة النتيجة",
+    resultPreviewFailedHint: "اكتملت المعالجة. استخدم زر التحميل لحفظ ملفك.",
+    resultPreviewErrorId: "معرّف الخطأ: {id}",
     backToTools: "العودة إلى الأدوات",
     original: "الأصلي",
     processed: "المعالَج",

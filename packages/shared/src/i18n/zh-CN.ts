@@ -1946,6 +1946,8 @@ export const zhCN: TranslationKeys = {
       submit: "像素化",
       submitBatch: "像素化（{count} 个文件）",
       progressLabel: "正在像素化",
+      dimensionsFailed:
+        "无法读取图像尺寸，因此无法应用选区。请重新添加文件或对整张图像进行像素化。",
     },
     vignette: {
       strength: "强度",
@@ -2795,6 +2797,10 @@ export const zhCN: TranslationKeys = {
     previewUnavailable: "处理完成后可预览",
     generatePreview: "生成预览",
     previewFailed: "预览生成失败",
+    previewNotAvailable: "预览不可用",
+    resultPreviewFailed: "结果预览加载失败",
+    resultPreviewFailedHint: "处理已完成。请使用下载按钮保存文件。",
+    resultPreviewErrorId: "错误 ID：{id}",
     backToTools: "返回工具",
     original: "原始",
     processed: "已处理",

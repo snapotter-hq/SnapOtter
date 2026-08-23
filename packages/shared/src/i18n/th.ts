@@ -2158,6 +2158,7 @@ export const th: TranslationKeys = {
       submit: "ทำพิกเซล",
       submitBatch: "ทำพิกเซล ({count} ไฟล์)",
       progressLabel: "กำลังทำพิกเซล",
+      dimensionsFailed: "ไม่สามารถอ่านขนาดของภาพได้ จึงไม่สามารถใช้พื้นที่ที่เลือกได้ เพิ่มไฟล์อีกครั้งหรือทำพิกเซลทั้งภาพ",
     },
     vignette: {
       strength: "ความเข้ม",
@@ -3008,6 +3009,10 @@ export const th: TranslationKeys = {
     previewUnavailable: "ตัวอย่างจะพร้อมใช้งานหลังประมวลผลเสร็จ",
     generatePreview: "สร้างตัวอย่าง",
     previewFailed: "สร้างตัวอย่างไม่สำเร็จ",
+    previewNotAvailable: "ไม่มีตัวอย่างให้แสดง",
+    resultPreviewFailed: "โหลดตัวอย่างผลลัพธ์ไม่สำเร็จ",
+    resultPreviewFailedHint: "การประมวลผลเสร็จสิ้นแล้ว ใช้ปุ่มดาวน์โหลดเพื่อบันทึกไฟล์",
+    resultPreviewErrorId: "รหัสข้อผิดพลาด: {id}",
     backToTools: "กลับไปยังเครื่องมือ",
     original: "ต้นฉบับ",
     processed: "ประมวลผลแล้ว",

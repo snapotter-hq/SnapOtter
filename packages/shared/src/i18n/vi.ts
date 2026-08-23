@@ -2189,6 +2189,8 @@ export const vi: TranslationKeys = {
       submit: "Làm khảm",
       submitBatch: "Làm khảm ({count} tệp)",
       progressLabel: "Đang làm khảm",
+      dimensionsFailed:
+        "Không thể đọc kích thước ảnh nên không áp dụng được vùng chọn. Thêm lại tệp hoặc làm khảm toàn bộ ảnh.",
     },
     vignette: {
       strength: "Cường độ",
@@ -3041,6 +3043,10 @@ export const vi: TranslationKeys = {
     previewUnavailable: "Xem trước sẽ có sau khi xử lý",
     generatePreview: "Tạo xem trước",
     previewFailed: "Tạo xem trước thất bại",
+    previewNotAvailable: "Không có bản xem trước",
+    resultPreviewFailed: "Không tải được bản xem trước kết quả",
+    resultPreviewFailedHint: "Đã xử lý xong. Sử dụng nút tải xuống để lưu tệp.",
+    resultPreviewErrorId: "ID lỗi: {id}",
     backToTools: "Quay lại Công cụ",
     original: "Gốc",
     processed: "Đã xử lý",

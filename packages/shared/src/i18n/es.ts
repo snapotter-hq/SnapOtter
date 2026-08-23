@@ -2181,6 +2181,8 @@ export const es: TranslationKeys = {
       submit: "Pixelar",
       submitBatch: "Pixelar ({count} archivos)",
       progressLabel: "Pixelando",
+      dimensionsFailed:
+        "No se pudieron leer las dimensiones de la imagen, así que la selección no se puede aplicar. Añade el archivo de nuevo o pixela la imagen completa.",
     },
     vignette: {
       strength: "Intensidad",
@@ -3034,6 +3036,11 @@ export const es: TranslationKeys = {
     previewUnavailable: "La vista previa estará disponible después del procesamiento",
     generatePreview: "Generar vista previa",
     previewFailed: "Error al generar la vista previa",
+    previewNotAvailable: "Vista previa no disponible",
+    resultPreviewFailed: "No se pudo cargar la vista previa del resultado",
+    resultPreviewFailedHint:
+      "El procesamiento ha finalizado. Usa el botón de descarga para guardar tu archivo.",
+    resultPreviewErrorId: "ID de error: {id}",
     backToTools: "Volver a herramientas",
     original: "Original",
     processed: "Procesado",

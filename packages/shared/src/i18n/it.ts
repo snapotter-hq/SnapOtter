@@ -2196,6 +2196,8 @@ export const it: TranslationKeys = {
       submit: "Pixelatura",
       submitBatch: "Pixelatura ({count} file)",
       progressLabel: "Applicazione pixelatura",
+      dimensionsFailed:
+        "Impossibile leggere le dimensioni dell'immagine, quindi la selezione non può essere applicata. Aggiungi di nuovo il file o applica la pixelatura all'intera immagine.",
     },
     vignette: {
       strength: "Intensità",
@@ -3049,6 +3051,11 @@ export const it: TranslationKeys = {
     previewUnavailable: "L'anteprima sarà disponibile dopo l'elaborazione",
     generatePreview: "Genera anteprima",
     previewFailed: "Generazione dell'anteprima non riuscita",
+    previewNotAvailable: "Anteprima non disponibile",
+    resultPreviewFailed: "Impossibile caricare l'anteprima del risultato",
+    resultPreviewFailedHint:
+      "L'elaborazione è completata. Usa il pulsante di download per salvare il file.",
+    resultPreviewErrorId: "ID errore: {id}",
     backToTools: "Torna agli strumenti",
     original: "Originale",
     processed: "Elaborato",

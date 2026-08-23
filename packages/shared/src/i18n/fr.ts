@@ -2206,6 +2206,8 @@ export const fr: TranslationKeys = {
       submit: "Pixéliser",
       submitBatch: "Pixéliser ({count} fichiers)",
       progressLabel: "Pixélisation",
+      dimensionsFailed:
+        "Impossible de lire les dimensions de l'image, la sélection ne peut donc pas être appliquée. Ajoutez à nouveau le fichier ou pixélisez l'image entière.",
     },
     vignette: {
       strength: "Intensité",
@@ -3059,6 +3061,11 @@ export const fr: TranslationKeys = {
     previewUnavailable: "L'aperçu sera disponible après le traitement",
     generatePreview: "Générer l'aperçu",
     previewFailed: "Échec de la génération de l'aperçu",
+    previewNotAvailable: "Aperçu non disponible",
+    resultPreviewFailed: "Échec du chargement de l'aperçu du résultat",
+    resultPreviewFailedHint:
+      "Le traitement est terminé. Utilisez le bouton de téléchargement pour enregistrer votre fichier.",
+    resultPreviewErrorId: "ID d'erreur : {id}",
     backToTools: "Retour aux outils",
     original: "Original",
     processed: "Traité",

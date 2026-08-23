@@ -733,7 +733,8 @@ export function ToolPage() {
             <ImageViewer
               src={processedUrl}
               filename={outName}
-              fileSize={currentEntry?.processedSize ?? 0}
+              fileSize={currentEntry?.processedSize ?? null}
+              resultContext={{ toolId }}
             />
           );
         }
@@ -750,7 +751,7 @@ export function ToolPage() {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
         const previewSrc = hasProcessed ? (processedUrl ?? originalBlobUrl) : undefined;
         const previewSize = hasProcessed
-          ? (currentEntry?.processedSize ?? 0)
+          ? (currentEntry?.processedSize ?? null)
           : (currentEntry?.file?.size ?? 0);
         return (
           <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
@@ -964,7 +965,12 @@ export function ToolPage() {
 
     if (hasProcessed && originalBlobUrl && displayMode === "no-comparison") {
       return (
-        <ImageViewer src={displayUrl} filename={processedFileName} fileSize={processedSize ?? 0} />
+        <ImageViewer
+          src={displayUrl}
+          filename={processedFileName}
+          fileSize={processedSize}
+          resultContext={{ toolId }}
+        />
       );
     }
 
@@ -988,7 +994,8 @@ export function ToolPage() {
           <ImageViewer
             src={resultSrc}
             filename={processedFileName}
-            fileSize={processedSize ?? 0}
+            fileSize={processedSize}
+            resultContext={{ toolId }}
             imageWrapperStyle={imageWrapperStyle}
             imageWrapperChildren={imageWrapperChildren}
           />
@@ -1007,7 +1014,12 @@ export function ToolPage() {
 
     if (hasProcessed && originalBlobUrl && displayMode === "live-preview") {
       return (
-        <ImageViewer src={displayUrl} filename={processedFileName} fileSize={processedSize ?? 0} />
+        <ImageViewer
+          src={displayUrl}
+          filename={processedFileName}
+          fileSize={processedSize}
+          resultContext={{ toolId }}
+        />
       );
     }
 

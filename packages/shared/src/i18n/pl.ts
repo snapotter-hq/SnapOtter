@@ -2192,6 +2192,8 @@ export const pl: TranslationKeys = {
       submit: "Pikselizuj",
       submitBatch: "Pikselizuj ({count} plików)",
       progressLabel: "Pikselizacja",
+      dimensionsFailed:
+        "Nie udało się odczytać wymiarów obrazu, więc zaznaczenie nie może zostać zastosowane. Dodaj plik ponownie lub pikselizuj cały obraz.",
     },
     vignette: {
       strength: "Siła",
@@ -3045,6 +3047,11 @@ export const pl: TranslationKeys = {
     previewUnavailable: "Podgląd będzie dostępny po przetworzeniu",
     generatePreview: "Generuj podgląd",
     previewFailed: "Generowanie podglądu nie powiodło się",
+    previewNotAvailable: "Podgląd niedostępny",
+    resultPreviewFailed: "Nie udało się wczytać podglądu wyniku",
+    resultPreviewFailedHint:
+      "Przetwarzanie zakończone. Użyj przycisku pobierania, aby zapisać plik.",
+    resultPreviewErrorId: "ID błędu: {id}",
     backToTools: "Powrót do narzędzi",
     original: "Oryginał",
     processed: "Przetworzony",

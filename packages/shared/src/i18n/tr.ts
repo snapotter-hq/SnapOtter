@@ -2194,6 +2194,8 @@ export const tr: TranslationKeys = {
       submit: "Pikselle",
       submitBatch: "Pikselle ({count} dosya)",
       progressLabel: "Pikselleştiriliyor",
+      dimensionsFailed:
+        "Görselin boyutları okunamadığı için seçim uygulanamıyor. Dosyayı yeniden ekleyin veya tüm görseli pikselleyin.",
     },
     vignette: {
       strength: "Yoğunluk",
@@ -3046,6 +3048,11 @@ export const tr: TranslationKeys = {
     previewUnavailable: "Önizleme işlemden sonra kullanılabilir olacak",
     generatePreview: "Önizleme Oluştur",
     previewFailed: "Önizleme oluşturulamadı",
+    previewNotAvailable: "Önizleme kullanılamıyor",
+    resultPreviewFailed: "Sonuç önizlemesi yüklenemedi",
+    resultPreviewFailedHint:
+      "İşlem tamamlandı. Dosyanızı kaydetmek için indirme düğmesini kullanın.",
+    resultPreviewErrorId: "Hata kimliği: {id}",
     backToTools: "Araçlara Dön",
     original: "Orijinal",
     processed: "İşlenmiş",

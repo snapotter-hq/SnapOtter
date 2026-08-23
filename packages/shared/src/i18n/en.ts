@@ -2139,6 +2139,8 @@ export const en = {
       submit: "Pixelate",
       submitBatch: "Pixelate ({count} files)",
       progressLabel: "Pixelating",
+      dimensionsFailed:
+        "Couldn't read the image dimensions, so the selection can't be applied. Add the file again or pixelate the whole image.",
     },
     vignette: {
       strength: "Strength",
@@ -2991,6 +2993,10 @@ export const en = {
     previewUnavailable: "Preview will be available after processing",
     generatePreview: "Generate Preview",
     previewFailed: "Preview generation failed",
+    previewNotAvailable: "Preview not available",
+    resultPreviewFailed: "Result preview failed to load",
+    resultPreviewFailedHint: "Processing finished. Use the download button to save your file.",
+    resultPreviewErrorId: "Error ID: {id}",
     backToTools: "Back to Tools",
     original: "Original",
     processed: "Processed",

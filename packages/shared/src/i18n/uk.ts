@@ -2191,6 +2191,8 @@ export const uk: TranslationKeys = {
       submit: "Пікселізувати",
       submitBatch: "Пікселізувати ({count} файлів)",
       progressLabel: "Пікселізація",
+      dimensionsFailed:
+        "Не вдалося прочитати розміри зображення, тому виділення не можна застосувати. Додайте файл ще раз або пікселізуйте все зображення.",
     },
     vignette: {
       strength: "Інтенсивність",
@@ -3043,6 +3045,11 @@ export const uk: TranslationKeys = {
     previewUnavailable: "Попередній перегляд буде доступний після обробки",
     generatePreview: "Створити попередній перегляд",
     previewFailed: "Не вдалося створити попередній перегляд",
+    previewNotAvailable: "Попередній перегляд недоступний",
+    resultPreviewFailed: "Не вдалося завантажити попередній перегляд результату",
+    resultPreviewFailedHint:
+      "Обробку завершено. Скористайтеся кнопкою завантаження для збереження файлу.",
+    resultPreviewErrorId: "ID помилки: {id}",
     backToTools: "Назад до інструментів",
     original: "Оригінал",
     processed: "Оброблено",

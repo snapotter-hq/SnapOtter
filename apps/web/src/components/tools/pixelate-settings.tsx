@@ -24,17 +24,35 @@ export function PixelateSettings({
   const [blockSize, setBlockSize] = useState(12);
   const [mode, setMode] = useState<PixelateMode>("whole");
 
-  // Natural image dimensions (for converting normalized box to pixel region)
+  // Natural image dimensions (for converting normalized box to pixel region).
+  // Selection mode is blocked until these are known: without them the drawn box
+  // would be silently dropped and the whole image pixelated (#797).
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [dimsFailed, setDimsFailed] = useState(false);
   useEffect(() => {
-    if (!blobUrl) {
-      setDims(null);
-      return;
-    }
+    setDims(null);
+    setDimsFailed(false);
+    if (!blobUrl) return;
     const img = new Image();
     img.onload = () => setDims({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => setDimsFailed(true);
     img.src = blobUrl;
+    return () => {
+      // Neutralize stale callbacks if the file changes mid-probe
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [blobUrl]);
+
+  // Server-preview formats (TIFF, RAW, HEIC) swap blobUrl for a preview capped
+  // at 1200px, but the server pixelates the ORIGINAL file, so the region must
+  // be placed in the true pixel space carried by the entry (X-Original-Width/
+  // Height from the decode). The probe covers plain formats, where blobUrl is
+  // the original file itself.
+  const effectiveDims =
+    entry?.originalWidth != null && entry?.originalHeight != null
+      ? { w: entry.originalWidth, h: entry.originalHeight }
+      : dims;
 
   // Normalized selection box in 0..1 (default centered 40x40%)
   const [boxX, setBoxX] = useState(0.3);
@@ -167,9 +185,9 @@ export function PixelateSettings({
 
   const handleProcess = () => {
     const settings: Record<string, unknown> = { blockSize };
-    if (mode === "selection" && dims) {
-      const W = dims.w;
-      const H = dims.h;
+    if (mode === "selection" && effectiveDims) {
+      const W = effectiveDims.w;
+      const H = effectiveDims.h;
       const left = Math.round(boxX * W);
       const top = Math.round(boxY * H);
       const width = Math.max(1, Math.min(Math.round(boxW * W), W - left));
@@ -184,7 +202,7 @@ export function PixelateSettings({
   };
 
   const hasFile = files.length > 0;
-  const canProcess = hasFile && !processing;
+  const canProcess = hasFile && !processing && (mode !== "selection" || effectiveDims != null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -290,6 +308,11 @@ export function PixelateSettings({
           {hasFile && (
             <p className="text-[10px] text-muted-foreground">
               Drag the selection box on the image to reposition
+            </p>
+          )}
+          {dimsFailed && effectiveDims == null && (
+            <p className="text-xs text-destructive-ink">
+              {t.toolSettings.pixelate.dimensionsFailed}
             </p>
           )}
         </div>

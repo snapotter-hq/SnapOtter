@@ -2189,6 +2189,8 @@ export const id: TranslationKeys = {
       submit: "Pikselasi",
       submitBatch: "Pikselasi ({count} file)",
       progressLabel: "Mempikselasi",
+      dimensionsFailed:
+        "Dimensi gambar tidak dapat dibaca, jadi seleksi tidak dapat diterapkan. Tambahkan file lagi atau pikselasi seluruh gambar.",
     },
     vignette: {
       strength: "Kekuatan",
@@ -3042,6 +3044,10 @@ export const id: TranslationKeys = {
     previewUnavailable: "Pratinjau akan tersedia setelah pemrosesan",
     generatePreview: "Buat Pratinjau",
     previewFailed: "Pembuatan pratinjau gagal",
+    previewNotAvailable: "Pratinjau tidak tersedia",
+    resultPreviewFailed: "Pratinjau hasil gagal dimuat",
+    resultPreviewFailedHint: "Pemrosesan selesai. Gunakan tombol unduh untuk menyimpan file Anda.",
+    resultPreviewErrorId: "ID kesalahan: {id}",
     backToTools: "Kembali ke Alat",
     original: "Asli",
     processed: "Diproses",

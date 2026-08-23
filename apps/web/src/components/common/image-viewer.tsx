@@ -1,9 +1,12 @@
+import { SafeError } from "@snapotter/shared";
 import { useGesture } from "@use-gesture/react";
 import { FileImage, Maximize, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Point, resolvePanStart } from "@/components/common/image-viewer-drag";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { formatFileSize } from "@/lib/download";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface BgPreviewState {
@@ -22,7 +25,14 @@ export interface BgPreviewState {
 interface ImageViewerProps {
   src: string;
   filename: string;
-  fileSize: number;
+  /** null = unknown; the size line is omitted rather than shown as zero */
+  fileSize: number | null;
+  /**
+   * Set when src is a completed job's result. A load failure then reports to
+   * Sentry and shows recovery copy (the download often still works) instead
+   * of the generic "no preview" fallback.
+   */
+  resultContext?: { toolId?: string };
   originalWidth?: number | null;
   originalHeight?: number | null;
   cssRotate?: number;
@@ -50,6 +60,7 @@ export function ImageViewer({
   bgPreview,
   imageWrapperStyle,
   imageWrapperChildren,
+  resultContext,
 }: ImageViewerProps) {
   const { t } = useTranslation();
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
@@ -57,7 +68,9 @@ export function ImageViewer({
   const [naturalHeight, setNaturalHeight] = useState<number | null>(null);
   const [fitMode, setFitMode] = useState<"fit" | "actual">("fit");
   const [loadError, setLoadError] = useState(false);
+  const [errorEventId, setErrorEventId] = useState<string | null>(null);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const reportedSrcRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const zoomRef = useRef(zoom);
@@ -81,9 +94,27 @@ export function ImageViewer({
     }
   }, []);
 
+  const isResult = resultContext != null;
+  const resultToolId = resultContext?.toolId;
+
   const handleImageError = useCallback(() => {
     setLoadError(true);
-  }, []);
+    // A completed result that stops loading (output-retention 404, lapsed
+    // session, revoked blob) is otherwise invisible; report it and surface the
+    // event id. Once per src: a re-render must not spam Sentry.
+    if (!isResult || reportedSrcRef.current === src) return;
+    reportedSrcRef.current = src;
+    void captureHandledError(
+      new SafeError("Result image failed to load", {
+        kind: "operational",
+        code: src.startsWith("blob:") ? "blob-url" : "download-url",
+      }),
+      { error_class: "operational", ...(resultToolId ? { tool_id: resultToolId } : {}) },
+    ).then((id) => {
+      // Drop the id if src changed while the report was in flight
+      if (id && reportedSrcRef.current === src) setErrorEventId(id);
+    });
+  }, [isResult, resultToolId, src]);
 
   const zoomIn = useCallback(() => {
     setZoom((prev) => {
@@ -120,6 +151,8 @@ export function ImageViewer({
     setNaturalWidth(null);
     setNaturalHeight(null);
     setLoadError(false);
+    setErrorEventId(null);
+    reportedSrcRef.current = null;
     setPanOffset({ x: 0, y: 0 });
   }, [src]);
 
@@ -193,6 +226,29 @@ export function ImageViewer({
           ...(cssFilter && { filter: cssFilter, transition: "filter 0.15s ease" }),
         };
 
+  const errorCard = (
+    <div className="flex flex-col items-center justify-center gap-3 text-center p-4">
+      <FileImage className="h-8 w-8 text-muted-foreground" />
+      {isResult ? (
+        <>
+          <p className="text-sm font-medium text-foreground">{t.toolPage.resultPreviewFailed}</p>
+          <p className="text-xs text-muted-foreground">{t.toolPage.resultPreviewFailedHint}</p>
+          <p className="text-xs text-muted-foreground">{filename}</p>
+          {errorEventId && (
+            <p className="text-[10px] font-mono text-muted-foreground">
+              {format(t.toolPage.resultPreviewErrorId, { id: errorEventId })}
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">{t.toolPage.previewNotAvailable}</p>
+          <p className="text-xs text-muted-foreground">{filename}</p>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col w-full h-full max-w-3xl mx-auto min-h-0">
       {/* Toolbar */}
@@ -251,12 +307,8 @@ export function ImageViewer({
         )}
         style={{ backgroundColor: "hsl(var(--muted) / 0.2)" }}
       >
-        {loadError ? (
-          <div className="flex flex-col items-center justify-center gap-3 text-center">
-            <FileImage className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Preview not available</p>
-            <p className="text-xs text-muted-foreground">{filename}</p>
-          </div>
+        {loadError && !imageWrapperStyle ? (
+          errorCard
         ) : bgPreview?.backgroundSrc || bgPreview?.containerBackground ? (
           /* Layered bg-removal preview: background layer + subject layer */
           <div
@@ -337,22 +389,30 @@ export function ImageViewer({
             }}
           >
             {imageWrapperChildren}
-            <img
-              ref={imgRef}
-              src={src}
-              alt={filename}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              className="select-none"
-              style={{
-                display: "block",
-                flex: "0 1 auto",
-                minHeight: 0,
-                maxWidth: "100%",
-                objectFit: "contain" as const,
-              }}
-              draggable={false}
-            />
+            {loadError ? (
+              /* Keep the wrapper and its overlay children mounted: for
+                 input-overlay tools (pixelate) the overlay is the control for
+                 the next run, so the error card renders in the image's place
+                 instead of replacing the whole branch (#797). */
+              errorCard
+            ) : (
+              <img
+                ref={imgRef}
+                src={src}
+                alt={filename}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                className="select-none"
+                style={{
+                  display: "block",
+                  flex: "0 1 auto",
+                  minHeight: 0,
+                  maxWidth: "100%",
+                  objectFit: "contain" as const,
+                }}
+                draggable={false}
+              />
+            )}
           </div>
         ) : (
           <img
@@ -377,7 +437,7 @@ export function ImageViewer({
               {originalWidth || naturalWidth} x {originalHeight || naturalHeight}
             </span>
           )}
-          <span>{formatFileSize(fileSize)}</span>
+          {fileSize != null && <span>{formatFileSize(fileSize)}</span>}
         </div>
       </div>
     </div>

@@ -2128,6 +2128,8 @@ export const ko: TranslationKeys = {
       submit: "픽셀화",
       submitBatch: "픽셀화 ({count}개 파일)",
       progressLabel: "픽셀화 중",
+      dimensionsFailed:
+        "이미지 크기를 읽을 수 없어 선택 영역을 적용할 수 없습니다. 파일을 다시 추가하거나 전체 이미지를 픽셀화하세요.",
     },
     vignette: {
       strength: "강도",
@@ -2979,6 +2981,10 @@ export const ko: TranslationKeys = {
     previewUnavailable: "처리 후 미리보기를 사용할 수 있습니다",
     generatePreview: "미리보기 생성",
     previewFailed: "미리보기 생성 실패",
+    previewNotAvailable: "미리보기를 사용할 수 없습니다",
+    resultPreviewFailed: "결과 미리보기를 불러오지 못했습니다",
+    resultPreviewFailedHint: "처리는 완료되었습니다. 다운로드 버튼으로 파일을 저장하세요.",
+    resultPreviewErrorId: "오류 ID: {id}",
     backToTools: "도구로 돌아가기",
     original: "원본",
     processed: "처리됨",

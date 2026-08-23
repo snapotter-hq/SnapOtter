@@ -1946,6 +1946,8 @@ export const zhTW: TranslationKeys = {
       submit: "像素化",
       submitBatch: "像素化（{count} 個檔案）",
       progressLabel: "正在像素化",
+      dimensionsFailed:
+        "無法讀取影像尺寸，因此無法套用選取範圍。請重新加入檔案或將整張影像像素化。",
     },
     vignette: {
       strength: "強度",
@@ -2795,6 +2797,10 @@ export const zhTW: TranslationKeys = {
     previewUnavailable: "處理完成後即可預覽",
     generatePreview: "產生預覽",
     previewFailed: "預覽產生失敗",
+    previewNotAvailable: "預覽無法使用",
+    resultPreviewFailed: "結果預覽載入失敗",
+    resultPreviewFailedHint: "處理已完成。請使用下載按鈕儲存檔案。",
+    resultPreviewErrorId: "錯誤 ID：{id}",
     backToTools: "返回工具列表",
     original: "原始",
     processed: "已處理",

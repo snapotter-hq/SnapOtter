@@ -22,7 +22,8 @@ export interface NonNativePreviewProps {
   file?: File;
   src?: string;
   filename: string;
-  fileSize: number;
+  /** null = unknown; the size is omitted rather than shown as zero */
+  fileSize: number | null;
   modality: "video" | "audio";
 }
 
@@ -124,7 +125,8 @@ export function NonNativePreview({
           </div>
           <p className="font-medium text-foreground mb-1">{filename}</p>
           <p className="text-sm text-muted-foreground mb-3">
-            {ext} &middot; {formatFileSize(fileSize)}
+            {ext}
+            {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
           </p>
           <button
             type="button"
@@ -149,7 +151,8 @@ export function NonNativePreview({
           </div>
           <p className="font-medium text-foreground mb-1">{filename}</p>
           <p className="text-sm text-muted-foreground mb-4">
-            {ext} &middot; {formatFileSize(fileSize)}
+            {ext}
+            {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
           </p>
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-3">
             <div
@@ -175,7 +178,8 @@ export function NonNativePreview({
           </div>
           <p className="font-medium text-foreground mb-1">{t.toolPage.previewFailed}</p>
           <p className="text-sm text-muted-foreground mb-3">
-            {filename} &middot; {formatFileSize(fileSize)}
+            {filename}
+            {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
           </p>
           <button
             type="button"

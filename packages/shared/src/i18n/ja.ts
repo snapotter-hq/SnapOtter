@@ -2148,6 +2148,8 @@ export const ja: TranslationKeys = {
       submit: "モザイク化",
       submitBatch: "モザイク化 ({count} ファイル)",
       progressLabel: "モザイク化中",
+      dimensionsFailed:
+        "画像の寸法を読み取れなかったため、選択範囲を適用できません。ファイルを追加し直すか、画像全体をモザイク化してください。",
     },
     vignette: {
       strength: "強度",
@@ -2999,6 +3001,11 @@ export const ja: TranslationKeys = {
     previewUnavailable: "プレビューは処理後に表示されます",
     generatePreview: "プレビューを生成",
     previewFailed: "プレビューの生成に失敗しました",
+    previewNotAvailable: "プレビューを利用できません",
+    resultPreviewFailed: "結果のプレビューを読み込めませんでした",
+    resultPreviewFailedHint:
+      "処理は完了しています。ダウンロードボタンでファイルを保存してください。",
+    resultPreviewErrorId: "エラーID: {id}",
     backToTools: "ツール一覧に戻る",
     original: "元画像",
     processed: "処理済み",

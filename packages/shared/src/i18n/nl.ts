@@ -2196,6 +2196,8 @@ export const nl: TranslationKeys = {
       submit: "Pixeleren",
       submitBatch: "Pixeleren ({count} bestanden)",
       progressLabel: "Pixeleren",
+      dimensionsFailed:
+        "De afmetingen van de afbeelding konden niet worden gelezen, dus de selectie kan niet worden toegepast. Voeg het bestand opnieuw toe of pixeleer de hele afbeelding.",
     },
     vignette: {
       strength: "Sterkte",
@@ -3049,6 +3051,11 @@ export const nl: TranslationKeys = {
     previewUnavailable: "Voorbeeld beschikbaar na verwerking",
     generatePreview: "Voorbeeld genereren",
     previewFailed: "Voorbeeld genereren mislukt",
+    previewNotAvailable: "Voorbeeld niet beschikbaar",
+    resultPreviewFailed: "Resultaatvoorbeeld kon niet worden geladen",
+    resultPreviewFailedHint:
+      "De verwerking is voltooid. Gebruik de downloadknop om je bestand op te slaan.",
+    resultPreviewErrorId: "Fout-ID: {id}",
     backToTools: "Terug naar Tools",
     original: "Origineel",
     processed: "Verwerkt",

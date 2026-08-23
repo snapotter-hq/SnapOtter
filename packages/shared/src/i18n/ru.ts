@@ -2191,6 +2191,8 @@ export const ru: TranslationKeys = {
       submit: "Пикселизировать",
       submitBatch: "Пикселизировать ({count} файлов)",
       progressLabel: "Пикселизация",
+      dimensionsFailed:
+        "Не удалось прочитать размеры изображения, поэтому выделение нельзя применить. Добавьте файл заново или пикселизируйте всё изображение.",
     },
     vignette: {
       strength: "Интенсивность",
@@ -3044,6 +3046,11 @@ export const ru: TranslationKeys = {
     previewUnavailable: "Предпросмотр будет доступен после обработки",
     generatePreview: "Сгенерировать предпросмотр",
     previewFailed: "Не удалось сгенерировать предпросмотр",
+    previewNotAvailable: "Предпросмотр недоступен",
+    resultPreviewFailed: "Не удалось загрузить предпросмотр результата",
+    resultPreviewFailedHint:
+      "Обработка завершена. Используйте кнопку скачивания для сохранения файла.",
+    resultPreviewErrorId: "ID ошибки: {id}",
     backToTools: "Назад к инструментам",
     original: "Оригинал",
     processed: "Обработано",

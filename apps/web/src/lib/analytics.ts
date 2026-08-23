@@ -171,6 +171,31 @@ export function setSentryTag(key: string, value: string): void {
     .catch(() => {});
 }
 
+/**
+ * Capture a handled (non-crash) error and return its Sentry event id so UI
+ * copy can reference it, or null when telemetry is off (analytics disabled,
+ * no web DSN baked, or opted out). Only allowlisted tags survive the scrubber
+ * (see sentry-scrub.ts TAG_ALLOWLIST), and the error must carry an authored
+ * SafeError message or beforeSend reduces it to its type. Lazy import so this
+ * module keeps no static @sentry/react dependency.
+ */
+export async function captureHandledError(
+  error: Error,
+  tags?: Record<string, string>,
+): Promise<string | null> {
+  if (!enabled) return null;
+  try {
+    const Sentry = await import("@sentry/react");
+    if (!Sentry.getClient()) return null;
+    return Sentry.withScope((scope) => {
+      if (tags) scope.setTags(tags);
+      return Sentry.captureException(error);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function track(event: string, properties?: Record<string, unknown>): void {
   if (!enabled || !posthog) return;
   try {

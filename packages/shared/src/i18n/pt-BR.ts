@@ -2192,6 +2192,8 @@ export const ptBR: TranslationKeys = {
       submit: "Pixelar",
       submitBatch: "Pixelar ({count} arquivos)",
       progressLabel: "Pixelando",
+      dimensionsFailed:
+        "Não foi possível ler as dimensões da imagem, então a seleção não pode ser aplicada. Adicione o arquivo novamente ou pixele a imagem inteira.",
     },
     vignette: {
       strength: "Intensidade",
@@ -3044,6 +3046,11 @@ export const ptBR: TranslationKeys = {
     previewUnavailable: "A pré-visualização estará disponível após o processamento",
     generatePreview: "Gerar pré-visualização",
     previewFailed: "Falha ao gerar pré-visualização",
+    previewNotAvailable: "Pré-visualização indisponível",
+    resultPreviewFailed: "Falha ao carregar a pré-visualização do resultado",
+    resultPreviewFailedHint:
+      "O processamento foi concluído. Use o botão de download para salvar seu arquivo.",
+    resultPreviewErrorId: "ID do erro: {id}",
     backToTools: "Voltar para Ferramentas",
     original: "Original",
     processed: "Processado",

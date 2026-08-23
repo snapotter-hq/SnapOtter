@@ -2187,6 +2187,8 @@ export const sv: TranslationKeys = {
       submit: "Pixelera",
       submitBatch: "Pixelera ({count} filer)",
       progressLabel: "Pixelerar",
+      dimensionsFailed:
+        "Bildens dimensioner kunde inte läsas, så markeringen kan inte tillämpas. Lägg till filen igen eller pixelera hela bilden.",
     },
     vignette: {
       strength: "Styrka",
@@ -3040,6 +3042,11 @@ export const sv: TranslationKeys = {
     previewUnavailable: "Förhandsgranskning tillgänglig efter bearbetning",
     generatePreview: "Generera förhandsgranskning",
     previewFailed: "Förhandsgranskning misslyckades",
+    previewNotAvailable: "Förhandsvisning är inte tillgänglig",
+    resultPreviewFailed: "Resultatets förhandsvisning kunde inte läsas in",
+    resultPreviewFailedHint:
+      "Bearbetningen är klar. Använd nedladdningsknappen för att spara din fil.",
+    resultPreviewErrorId: "Fel-ID: {id}",
     backToTools: "Tillbaka till verktyg",
     original: "Original",
     processed: "Bearbetad",
