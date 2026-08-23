@@ -10,7 +10,7 @@
  * Terminal events are cached in a Redis key (10-min TTL) so that
  * SSE reconnects can replay the final frame without polling the DB.
  */
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
@@ -636,6 +636,15 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
 
 export interface CancelSingleJobArgs {
   jobId: string;
+  /**
+   * When set, the guarded write additionally requires the row's
+   * settings.artifactJobId to still equal this id. A single-tool cancel
+   * resolves the pointer before it settles; if a new run re-pointed the
+   * channel in between, the row belongs to a run the user never canceled
+   * and must be left alone (#886). Alias-less callers (pipeline finalize)
+   * omit it.
+   */
+  expectedArtifactJobId?: string;
 }
 
 /**
@@ -668,6 +677,9 @@ export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise
         and(
           eq(schema.jobs.id, args.jobId),
           notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          args.expectedArtifactJobId
+            ? sql`${schema.jobs.settings}->>'artifactJobId' = ${args.expectedArtifactJobId}`
+            : undefined,
         ),
       );
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;

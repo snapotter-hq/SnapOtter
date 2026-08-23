@@ -21,7 +21,7 @@
  *   registered AbortControllers.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
 import { cancelSingleJobGuarded } from "../routes/progress.js";
@@ -191,35 +191,60 @@ export async function requestCancel(jobId: string): Promise<boolean> {
 
     // Single-tool SSE alias (#808): the client-facing id a tool route
     // enqueued under a server-generated uuid. Follow the pointer into the
-    // queue scan without consulting the alias row's own status: on a
-    // reused id it is stale (terminal from the previous run, since
-    // nonterminal frames cannot resurrect it), and the artifact side of
-    // the scan already refuses terminal runs. A removed queued job never
-    // reaches a worker, so nothing else would ever emit a frame for it:
-    // the alias row gets the same terminal write and announcement (#766's
-    // lesson: a reconnecting client replays from this row, and a
+    // queue scan; the artifact side of the scan refuses terminal runs, so
+    // the alias row's own status never gates resolution. A removed queued
+    // job never reaches a worker, so nothing else would ever emit a frame
+    // for it: the alias row gets the same terminal write and announcement
+    // (#766's lesson: a reconnecting client replays from this row, and a
     // nonterminal alias replays a live run that will never finish). An
-    // active job's worker settles both rows itself.
+    // active job's worker settles both rows itself. Every settle carries
+    // the pointer it resolved, so one landing after a new run re-pointed
+    // the channel no-ops instead of killing that run (#886).
     if (settings.artifactJobId) {
-      const outcome = await cancelQueueJob(settings.artifactJobId);
+      const expectedArtifactJobId = settings.artifactJobId;
+      const outcome = await cancelQueueJob(expectedArtifactJobId);
       if (outcome === "removed") {
-        await cancelSingleJobGuarded({ jobId });
+        await cancelSingleJobGuarded({ jobId, expectedArtifactJobId });
         return true;
       }
       if (outcome === "signaled") return true;
 
-      // Nothing in any queue. Either the run is genuinely over, or a
-      // prior cancel removed the job but died before the alias settled (a
-      // crash or thrown write between the two). The artifact row is
-      // authoritative: heal a nonterminal alias over a canceled artifact
-      // so retries converge instead of answering false forever.
+      // Nothing in any queue. Three live cases, told apart by the
+      // artifact row, which is authoritative:
+      //   - canceled: a prior cancel removed the job but died before the
+      //     alias settled. Heal the alias so retries converge instead of
+      //     answering false forever.
+      //   - absent or still queued: the run has not reached the queue
+      //     (#886): the factory stamped the pointer before validation, or
+      //     the enqueue is between its row insert and the queue add.
+      //     Settle the alias durably; the worker's gate refuses the run
+      //     however it later materializes, with no TTL to outlive. The
+      //     publish is a belt for the sliver where a worker picked the
+      //     job up between the queue scan and the artifact read.
+      //   - anything else (completed, failed, processing): the run is
+      //     genuinely over or actively finishing; refuse.
       if (!isTerminal(row.status)) {
         const [artifact] = await db
           .select({ status: schema.jobs.status })
           .from(schema.jobs)
-          .where(eq(schema.jobs.id, settings.artifactJobId));
+          .where(eq(schema.jobs.id, expectedArtifactJobId));
         if (artifact?.status === "canceled") {
-          await cancelSingleJobGuarded({ jobId });
+          await cancelSingleJobGuarded({ jobId, expectedArtifactJobId });
+          return true;
+        }
+        if (!artifact || artifact.status === "queued") {
+          if (artifact) {
+            // Conditional, so a job that went active in this instant is
+            // not clobbered; the publish below reaches its worker instead.
+            await db
+              .update(schema.jobs)
+              .set({ status: "canceled", completedAt: new Date() })
+              .where(
+                and(eq(schema.jobs.id, expectedArtifactJobId), eq(schema.jobs.status, "queued")),
+              );
+          }
+          await cancelSingleJobGuarded({ jobId, expectedArtifactJobId });
+          await publishCancel(expectedArtifactJobId);
           return true;
         }
       }

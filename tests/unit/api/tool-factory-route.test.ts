@@ -34,6 +34,8 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: vi.fn().mockResolvedValue({}),
+  insertToolJobAlias: vi.fn().mockResolvedValue(undefined),
+  upsertToolJobAlias: vi.fn().mockResolvedValue(undefined),
   waitForJob: vi.fn().mockResolvedValue({
     outputRefs: ["outputs/mock-job/result.png"],
     filename: "result.png",

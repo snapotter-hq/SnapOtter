@@ -7,7 +7,7 @@
  */
 import { context, propagation } from "@opentelemetry/api";
 import { FlowProducer, type Job, QueueEvents } from "bullmq";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
@@ -150,6 +150,108 @@ export function injectTraceContext(data: ToolJobData): void {
 // ── Enqueue + wait ──────────────────────────────────────────────
 
 /**
+ * Insert the client-facing SSE alias row before validation starts (#886).
+ *
+ * The tool factory calls this right after multipart parse, ahead of the
+ * first progress write, so a cancel landing in the validation window has a
+ * durable pointer to resolve. Insert-only: at this point the lazy persist
+ * layer cannot have created the row yet, so a conflict can only be a
+ * reused id, and the previous run's state (its terminal result included)
+ * must survive until this run proves viable at enqueue, where
+ * upsertToolJobAlias claims and re-points it. Resetting here would leave
+ * the channel replaying a live run forever if this run then dies in
+ * validation.
+ */
+export async function insertToolJobAlias(args: {
+  jobId: string;
+  clientJobId: string;
+  userId: string | null;
+  pool: Pool;
+}): Promise<void> {
+  await db
+    .insert(schema.jobs)
+    .values({
+      id: args.clientJobId,
+      userId: args.userId,
+      pool: args.pool,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { artifactJobId: args.jobId },
+    })
+    .onConflictDoNothing();
+}
+
+/**
+ * Upsert the client-facing SSE alias row for a single-tool run (#808).
+ *
+ * The web client cancels by the id it generated (clientJobId); the queue
+ * job lives under the server jobId. The pointer stamped here lets
+ * requestCancel resolve one to the other, and the owner lets the cancel
+ * route authorize the run's own starter. The tool factory calls this right
+ * after multipart parse (#886), before validation, so a cancel landing in
+ * the validation window already has a durable pointer; enqueueToolJob
+ * calls it again as the catch-all for custom routes.
+ *
+ * Conflict semantics: the lazy persist layer may have created this row
+ * first (ownerless), so ownerless rows are claimed; a row another user
+ * owns is left alone so a reused id cannot transfer it or strip their
+ * cancel authorization; and only type "single" rows are claimable, so a
+ * colliding batch parent or pipeline row keeps its own cancel metadata
+ * (batch parent ids ARE client-supplied, so that collision is reachable).
+ *
+ * When the stored pointer differs from this run's jobId (a new run reusing
+ * an old channel), the row's status resets to "queued" so a stale terminal
+ * state from the previous run neither replays as this run's outcome nor
+ * trips the worker's canceled-alias gate (#886). When the pointer is
+ * unchanged (this run's own second stamp), the status is preserved, so a
+ * cancel that already settled the alias survives the re-stamp.
+ */
+export async function upsertToolJobAlias(args: {
+  jobId: string;
+  clientJobId: string;
+  userId: string | null;
+  pool: Pool;
+}): Promise<void> {
+  const aliasSettings = { artifactJobId: args.jobId };
+  const claimableOwner = args.userId
+    ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, args.userId))
+    : isNull(schema.jobs.userId);
+  const isRepoint = sql`${schema.jobs.settings}->>'artifactJobId' is distinct from ${args.jobId}`;
+  const res = await db
+    .insert(schema.jobs)
+    .values({
+      id: args.clientJobId,
+      userId: args.userId,
+      pool: args.pool,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: aliasSettings,
+    })
+    .onConflictDoUpdate({
+      target: schema.jobs.id,
+      set: {
+        settings: aliasSettings,
+        userId: args.userId,
+        status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
+        completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
+        error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,
+        progress: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.progress} END`,
+      },
+      setWhere: and(eq(schema.jobs.type, "single"), claimableOwner),
+    });
+  if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
+    // The claim was skipped (foreign owner or non-alias collision). The
+    // run proceeds, but its starter cannot cancel through this id; make
+    // that debuggable instead of a silent 404 months later.
+    console.warn(
+      `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); cancel by this id will not resolve`,
+    );
+  }
+}
+
+/**
  * Insert a durable job row and enqueue the job in BullMQ.
  * Returns the BullMQ Job instance.
  */
@@ -177,51 +279,18 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     settings: stripNulBytes((data.dbSettings ?? data.settings) as Record<string, unknown>),
   });
 
-  // Client-facing SSE alias row (#808). The web client cancels by the id it
-  // generated (clientJobId); the queue job lives under the server jobId.
-  // The pointer stamped here lets requestCancel resolve one to the other,
-  // and the owner lets the cancel route authorize the run's own starter.
-  // Awaited and committed before the queue add, so from the first moment
-  // cancelable work exists the pointer is durable. Unlike the pipeline
-  // route's pre-insert (which runs before any progress write), enqueue
-  // happens after validation has already published progress frames, so the
-  // lazy persist layer may have created this row first: ownerless rows are
-  // claimed (this run's own lazy insert, or an abandoned channel), while a
-  // row another user owns is left alone so a reused id cannot transfer it
-  // or strip their cancel authorization.
+  // Client-facing SSE alias row (#808), re-stamped here as the catch-all
+  // for routes that never call upsertToolJobAlias themselves (the custom
+  // AI routes). The tool factory also stamps it right after multipart
+  // parse (#886), so for factory runs this second upsert is an idempotent
+  // re-point of the same values.
   if (data.clientJobId && data.clientJobId !== data.jobId) {
-    const aliasSettings = { artifactJobId: data.jobId };
-    const claimableOwner = data.userId
-      ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, data.userId))
-      : isNull(schema.jobs.userId);
-    const res = await db
-      .insert(schema.jobs)
-      .values({
-        id: data.clientJobId,
-        userId: data.userId,
-        pool: data.pool,
-        type: "single",
-        status: "queued",
-        inputRefs: [],
-        settings: aliasSettings,
-      })
-      .onConflictDoUpdate({
-        target: schema.jobs.id,
-        // Only alias rows are claimable: a colliding batch parent or
-        // pipeline row the same user owns must keep its own cancel
-        // metadata (batch parent ids ARE client-supplied, so that
-        // collision is reachable).
-        set: { settings: aliasSettings, userId: data.userId },
-        setWhere: and(eq(schema.jobs.type, "single"), claimableOwner),
-      });
-    if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
-      // The claim was skipped (foreign owner or non-alias collision). The
-      // run proceeds, but its starter cannot cancel through this id; make
-      // that debuggable instead of a silent 404 months later.
-      console.warn(
-        `alias claim skipped for clientJobId ${data.clientJobId} (job ${data.jobId}); cancel by this id will not resolve`,
-      );
-    }
+    await upsertToolJobAlias({
+      jobId: data.jobId,
+      clientJobId: data.clientJobId,
+      userId: data.userId,
+      pool: data.pool,
+    });
   }
 
   // Fire-and-forget: compute deleteAfter from team retention override

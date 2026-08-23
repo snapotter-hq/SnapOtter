@@ -136,6 +136,38 @@ describe("route-stamped alias metadata (#808)", () => {
     expect(artifact?.userId).toBe(alias?.userId);
   });
 
+  it("stamps the alias before validation, not just at enqueue (#886)", async () => {
+    // A run that dies in input validation never reaches enqueueToolJob.
+    // The factory must have stamped the pointer and owner by then, or a
+    // cancel clicked during a slow decode has nothing to resolve.
+    const clientJobId = randomUUID();
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "photo.png",
+        contentType: "image/png",
+        content: Buffer.from("not a png at all"),
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBeLessThan(500);
+
+    const alias = await jobRow(clientJobId);
+    expect(alias?.type).toBe("single");
+    expect(alias?.userId).not.toBeNull();
+    expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      "string",
+    );
+  });
+
   it("re-points the alias at the newest artifact when a clientJobId is reused", async () => {
     const clientJobId = randomUUID();
     await runResize(clientJobId, adminToken);

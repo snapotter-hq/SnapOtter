@@ -295,6 +295,36 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     try {
       await mkdir(scratchDir, { recursive: true });
 
+      // Cooperative window cancel (#886): a cancel that landed before this
+      // job reached the queue settled the alias row durably; honor it
+      // before any work or status write. The pointer match keeps a stale
+      // canceled alias from a previous run under a reused id from killing
+      // this one (upsertToolJobAlias resets the row on re-point, so both
+      // halves agree). Aborting the signal routes the throw through the
+      // catch's existing cancel bookkeeping (row, metrics, frame,
+      // UnrecoverableError). A fault in the read falls through to normal
+      // processing, mirroring the pipeline step's skip: a failed check
+      // must not wedge the job.
+      if (data.clientJobId && data.clientJobId !== jobId) {
+        try {
+          const [alias] = await db
+            .select({ status: schema.jobs.status, settings: schema.jobs.settings })
+            .from(schema.jobs)
+            .where(eq(schema.jobs.id, data.clientJobId));
+          const pointer = (alias?.settings as { artifactJobId?: string } | null)?.artifactJobId;
+          if (alias?.status === "canceled" && pointer === jobId) {
+            ac.abort();
+            throw new Error("Canceled");
+          }
+        } catch (gateErr) {
+          if (signal.aborted) throw gateErr;
+          logger.warn(
+            { err: gateErr, jobId, clientJobId: data.clientJobId },
+            "window-cancel gate read failed; processing the job normally",
+          );
+        }
+      }
+
       // Mark job as processing in the durable row
       await db
         .update(schema.jobs)
@@ -645,7 +675,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             // to the ephemeral publish, which requestCancel's repair path
             // backs up on the next cancel.
             try {
-              await cancelSingleJobGuarded({ jobId: progressJobId });
+              // The pointer condition spares a channel a newer run has
+              // already re-pointed (#886): this job's cancel must not
+              // repaint that run's row.
+              await cancelSingleJobGuarded({
+                jobId: progressJobId,
+                expectedArtifactJobId: jobId,
+              });
             } catch (aliasErr) {
               logger.error(
                 { err: aliasErr, jobId, progressJobId },

@@ -15,7 +15,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { enqueueToolJob, waitForJob } from "../jobs/enqueue.js";
+import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
 import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
@@ -342,6 +342,17 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         });
       }
 
+      // Stamp the client-facing alias before validation starts (#886):
+      // decode can take seconds on a big HEIC, and a cancel clicked in
+      // that window needs a durable pointer to resolve. Awaited, and ahead
+      // of the first progress write, so the lazy persist layer can never
+      // create the row first. Insert-only: a reused id keeps its previous
+      // run's state until enqueueToolJob claims and re-points it.
+      const pool = resolveToolPool(config.toolId);
+      if (clientJobId && clientJobId !== jobId) {
+        await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool });
+      }
+
       const reportProgress = (percent: number, stage?: string) => {
         if (!clientJobId) return;
         void updateSingleFileProgress({
@@ -548,7 +559,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         }
 
         const startTime = Date.now();
-        const pool = resolveToolPool(config.toolId);
 
         // Enqueue for the BullMQ worker
         const dbSettings = config.redactSettingsForAudit
