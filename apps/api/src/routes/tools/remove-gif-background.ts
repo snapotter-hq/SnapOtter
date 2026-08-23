@@ -9,7 +9,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
-import { enqueueToolJob } from "../../jobs/enqueue.js";
+import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -168,6 +168,13 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           error: "Failed to parse multipart request",
           details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
+      }
+
+      // Stamp the client-facing alias before any pre-enqueue work (#892): a
+      // cancel landing between parse and enqueueToolJob needs a durable pointer
+      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+      if (clientJobId && clientJobId !== jobId) {
+        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
       }
 
       const saveMode = parseSaveModeField(saveModeRaw);

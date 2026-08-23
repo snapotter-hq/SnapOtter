@@ -7,7 +7,7 @@ import type { SignPlacement } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
-import { enqueueToolJob, waitForJob } from "../../jobs/enqueue.js";
+import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -92,6 +92,13 @@ export function registerSignPdf(app: FastifyInstance) {
         error: "Failed to parse multipart request",
         details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
+    }
+
+    // Stamp the client-facing alias before any pre-enqueue work (#892): a
+    // cancel landing between parse and enqueueToolJob needs a durable pointer
+    // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+    if (clientJobId && clientJobId !== jobId) {
+      await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" });
     }
 
     const saveMode = parseSaveModeField(saveModeRaw);

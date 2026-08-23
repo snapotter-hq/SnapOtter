@@ -168,6 +168,37 @@ describe("route-stamped alias metadata (#808)", () => {
     );
   });
 
+  it("stamps the alias on an AI custom route before its own validation (#892)", async () => {
+    // The custom AI routes bypass createToolRoute, so #886's factory stamp
+    // never runs for them. A run that dies in the route's own pre-enqueue
+    // work (here: the ocr settings parse) must still leave an owned,
+    // pointered alias row, or a cancel clicked in that window has nothing
+    // to resolve. Invalid settings JSON is used instead of the 501 bundle
+    // path because it dies before enqueueToolJob in every environment;
+    // with a bundle installed the 501 path would enqueue and stamp the
+    // row anyway, pinning nothing.
+    const clientJobId = randomUUID();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not json" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+
+    const alias = await jobRow(clientJobId);
+    expect(alias?.type).toBe("single");
+    expect(alias?.userId).not.toBeNull();
+    expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      "string",
+    );
+  });
+
   it("re-points the alias at the newest artifact when a clientJobId is reused", async () => {
     const clientJobId = randomUUID();
     await runResize(clientJobId, adminToken);
