@@ -611,6 +611,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
         jobDuration.observe({ pool: data.pool }, durationMs / 1000);
 
+        // Swallowed so the rethrow below stays authoritative, but logged:
+        // for a canceled child or step this row is the only evidence the
+        // finalize reads when it labels the run (#809), so a dropped write
+        // here must be visible somewhere.
         await db
           .update(schema.jobs)
           .set({
@@ -620,7 +624,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             error: { message: friendlyError(finalError) },
           })
           .where(eq(schema.jobs.id, jobId))
-          .catch(() => {});
+          .catch((writeErr) => {
+            logger.error(
+              { err: writeErr, jobId, toolId: data.toolId },
+              "terminal status write failed",
+            );
+          });
 
         if (isCanceled) {
           if (progressJobId !== jobId) {
@@ -955,19 +964,18 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   const progressJobId = data.clientJobId ?? data.jobId;
 
   // ── Cancel path (#771) ──────────────────────────────────────
-  // Cancel requires both halves (#770's too-late rule): the flag proves a
-  // cancel was requested, a canceled step proves it landed before the work
-  // finished. A flag with zero canceled steps means every step completed
-  // first; that pipeline completes normally, matching a too-late cancel on
-  // a single run. The flag's 1h TTL means a cancel on a pipeline that runs
-  // longer than that settles as a failure whose message still reads
-  // "Canceled": the same accepted tradeoff batch finalize inherited from
-  // #770. Intermediate step outputs are internal artifacts (a
-  // half-processed frame is not a deliverable), so a canceled pipeline
-  // returns nothing.
-  const cancelScope = data.parentId ?? data.clientJobId ?? data.jobId;
-  const canceled =
-    failedAtStep !== null && failedStepCanceled && (await isBatchCanceled(cancelScope));
+  // A canceled step row is durable proof a user cancel landed (#809):
+  // every writer of that status (the flag skip, requestCancel's queued-job
+  // removal, the cancel-channel abort) traces back to a user cancel
+  // somewhere in the run, including one scoped to a single step id. The
+  // Redis flag is deliberately not read here: its 1h TTL can expire under
+  // a tail longer than that, and a canceled run must settle as canceled
+  // regardless of how long the tail took. #770's too-late rule holds
+  // without the flag: zero canceled steps means every step completed
+  // first, and that pipeline completes normally below. Intermediate step
+  // outputs are internal artifacts (a half-processed frame is not a
+  // deliverable), so a canceled pipeline returns nothing.
+  const canceled = failedAtStep !== null && failedStepCanceled;
 
   if (canceled) {
     // Guarded dual write (#766): the SSE channel (clientJobId) and the
@@ -1374,11 +1382,14 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   const counters = await readBatchCounters(data.jobId);
   const failedFiles = Math.max(0, totalFiles - successEntries.length);
 
-  // Cancel requires both halves: the flag proves a cancel was requested, a
-  // canceled child proves it landed before the work finished. A flag with
-  // zero canceled children means every file completed first; that batch
-  // completes normally, matching a too-late cancel on a single run.
-  const canceled = canceledChildren > 0 && (await isBatchCanceled(data.jobId));
+  // A canceled child row is durable proof a user cancel landed (#809):
+  // every writer of that status traces back to a user cancel somewhere in
+  // the run, including one scoped to a single child id. The Redis flag is
+  // deliberately not read here: its 1h TTL can expire under a tail longer
+  // than that, and a canceled run must settle as canceled anyway. #770's
+  // too-late rule holds without it: zero canceled children means every
+  // file completed first, and that batch completes normally.
+  const canceled = canceledChildren > 0;
 
   if (canceled && successEntries.length === 0) {
     await cancelBatchJob({

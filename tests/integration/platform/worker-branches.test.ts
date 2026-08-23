@@ -627,7 +627,9 @@ describe("pipeline finalize", () => {
       inputRefs: [],
       error: { message: "Canceled" },
     });
-    // Both halves of #770's too-late rule: the flag plus the canceled step.
+    // The realistic sub-1h shape: the flag is still live alongside the
+    // canceled step. The label no longer depends on the flag (#809); the
+    // expired-flag twin below pins that.
     await markBatchCanceled(jobId);
 
     await enqueueToolJob(
@@ -653,6 +655,43 @@ describe("pipeline finalize", () => {
     expect(props.status).toBe("canceled");
     expect(props.is_batch).toBe(false);
     expect(props.file_count).toBe(1);
+  });
+
+  it("commits a canceled run when the cancel flag expired before the finalize (#809)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "canceled",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "Canceled" },
+    });
+    // No markBatchCanceled: a tail longer than the flag's 1h TTL reaches the
+    // finalize after the flag expired. The durable canceled row alone must
+    // prove the cancel (#809).
+
+    await enqueueToolJob(
+      toolJob({
+        jobId,
+        toolId: "pipeline",
+        kind: "pipeline-finalize",
+        totalSteps: 1,
+        filename: "chain.png",
+      }),
+    );
+
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.error?.message).toBe("Canceled");
+
+    const frame = await terminalFrame(jobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+
+    const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+    expect(events[0].status).toBe("canceled");
   });
 
   it("propagates a failed step, records the batch outcome, and emits failed analytics", async () => {
@@ -1077,6 +1116,108 @@ describe("batch children and finalize", () => {
       { index: 1, filename: "orig.png", error: "child died" },
       { index: 2, filename: "file-2", error: "Child job row not found" },
     ]);
+  });
+
+  it("settles an all-canceled batch as canceled when the cancel flag expired (#809)", async () => {
+    const jobId = `bf-${randomUUID()}`;
+    for (const i of [0, 1]) {
+      await db.insert(schema.jobs).values({
+        id: `${jobId}-f${i}`,
+        type: "batch-child",
+        status: "canceled",
+        toolId: "wt-echo",
+        pool: "image",
+        inputRefs: [`uploads/seed-809/in${i}.png`],
+        error: { message: "Canceled" },
+      });
+    }
+    // No cancel flag: it expired before the finalize ran. The durable
+    // canceled rows alone must prove the cancel (#809).
+
+    await enqueueToolJob(
+      toolJob({
+        jobId,
+        toolId: "batch",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 2,
+        settings: { flowChildCount: 2 },
+        filename: "",
+      }),
+    );
+
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.outputRefs ?? []).toEqual([]);
+
+    const frame = await terminalFrame(jobId);
+    expect(frame.status).toBe("failed");
+    const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
+    expect(errors[0]).toEqual({ filename: "", error: "Canceled" });
+
+    const result = await waitFor(async () => {
+      const job = await getQueue("system").getJob(jobId);
+      return job?.returnvalue ?? undefined;
+    });
+    const payload = result.resultPayload as { canceled?: boolean; allFailed?: boolean };
+    expect(payload.canceled).toBe(true);
+    expect(payload.allFailed).toBe(true);
+  });
+
+  it("keeps the partial ZIP and settles canceled when the flag expired mid-batch (#809)", async () => {
+    const jobId = `bf-${randomUUID()}`;
+    await putObject("outputs/seed-809/ok.png", Buffer.from("ok-bytes"));
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f0`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: ["uploads/seed-809/in0.png"],
+      outputRefs: ["outputs/seed-809/ok.png"],
+    });
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f1`,
+      type: "batch-child",
+      status: "canceled",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: ["uploads/seed-809/in1.png"],
+      error: { message: "Canceled" },
+    });
+
+    await enqueueToolJob(
+      toolJob({
+        jobId,
+        toolId: "batch",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 2,
+        settings: { flowChildCount: 2 },
+        filename: "",
+      }),
+    );
+
+    // The parent row is canceled (the authoritative outcome), while the
+    // announced frame keeps the completed-with-result shape so the client
+    // settles on the partial ZIP.
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.outputRefs?.length).toBe(1);
+
+    const zip = new AdmZip(await getObjectBuffer((row.outputRefs ?? [])[0]));
+    expect(zip.getEntries().map((e) => e.entryName)).toEqual(["ok.png"]);
+
+    const frame = await terminalFrame(jobId);
+    expect(frame.status).toBe("completed");
+    const frameResult = (frame.result ?? {}) as { downloadUrl?: string };
+    expect(frameResult.downloadUrl).toContain(`/api/v1/download/${jobId}/`);
+
+    const result = await waitFor(async () => {
+      const job = await getQueue("system").getJob(jobId);
+      return job?.returnvalue ?? undefined;
+    });
+    expect((result.resultPayload as { canceled?: boolean }).canceled).toBe(true);
   });
 
   it("rejects unknown jobs on the system pool and terminally fails them", async () => {

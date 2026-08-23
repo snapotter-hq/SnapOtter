@@ -469,6 +469,41 @@ describe("cooperative child skip and canceled finalize", () => {
     expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
   });
 
+  it("a direct cancel of one queued child settles the run canceled and the flow still finalizes (#809)", async () => {
+    // The child-scoped shape #809's behavior change is about: no run-level
+    // flag, just requestCancel on a single child id. slow f0 holds the
+    // pool's one slot, so fast f1 is deterministically waiting when the
+    // cancel removes it from the queue. BullMQ drops the parent's
+    // dependency on a removed child, so the finalize must still run once
+    // f0 completes, and the canceled f1 row alone labels the run.
+    const { parentId } = await enqueueBatchFlow(["slow-1.png", "fast.png"]);
+
+    await waitFor(async () => {
+      const active = await jobRow(`${parentId}-f0`);
+      return active?.status === "processing" ? true : undefined;
+    });
+
+    expect(await requestCancel(`${parentId}-f1`)).toBe(true);
+    const canceledChild = await terminalRow(`${parentId}-f1`);
+    expect(canceledChild.status).toBe("canceled");
+
+    // No wedge: the finalize runs after f0's 20s hold resolves.
+    const parent = await terminalRow(parentId, 35_000);
+    expect(parent.status).toBe("canceled");
+    expect(parent.outputRefs?.length).toBe(1);
+
+    const zip = new AdmZip(await getObjectBuffer((parent.outputRefs ?? [])[0]));
+    const names = zip.getEntries().map((e) => e.entryName);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/^slow-1/);
+
+    const returned = await finalizeReturnValue(parentId);
+    expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+
+    const completedChild = await jobRow(`${parentId}-f0`);
+    expect(completedChild?.status).toBe("completed");
+  }, 45_000);
+
   it("a cancel that lands after every child finished completes normally", async () => {
     const { parentId } = await enqueueBatchFlow(["fast-a.png", "fast-b.png"]);
 
