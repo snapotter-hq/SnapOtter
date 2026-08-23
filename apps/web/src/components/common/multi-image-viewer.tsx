@@ -112,7 +112,7 @@ export function MultiImageViewer() {
           ) : currentEntry.previewLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
+              <p className="text-sm text-muted-foreground">{t.toolPage.generatingPreview}</p>
             </div>
           ) : (
             <ImageViewer

@@ -258,20 +258,20 @@ export function ImageViewer({
           onClick={zoomOut}
           disabled={zoom <= ZOOM_STEPS[0]}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Zoom out"
+          title={t.a11y.zoomOut}
           aria-label={t.a11y.zoomOut}
         >
           <ZoomOut className="h-4 w-4" />
         </button>
         <span className="text-xs text-muted-foreground min-w-[3rem] text-center tabular-nums">
-          {fitMode === "fit" ? "Fit" : `${zoom}%`}
+          {fitMode === "fit" ? t.common.fit : `${zoom}%`}
         </span>
         <button
           type="button"
           onClick={zoomIn}
           disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Zoom in"
+          title={t.a11y.zoomIn}
           aria-label={t.a11y.zoomIn}
         >
           <ZoomIn className="h-4 w-4" />
@@ -281,7 +281,7 @@ export function ImageViewer({
           type="button"
           onClick={fitToContainer}
           className={`px-2 py-1 rounded text-xs ${fitMode === "fit" ? "bg-primary/10 text-primary-ink" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-          title="Fit to view"
+          title={t.a11y.fitToView}
           aria-label={t.a11y.fitToView}
         >
           <Maximize className="h-3.5 w-3.5" />
@@ -290,7 +290,7 @@ export function ImageViewer({
           type="button"
           onClick={actualSize}
           className={`px-2 py-1 rounded text-xs ${fitMode === "actual" && zoom === 100 ? "bg-primary/10 text-primary-ink" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-          title="Actual size (100%)"
+          title={t.a11y.actualSize}
           aria-label={t.a11y.actualSize}
         >
           <Minimize2 className="h-3.5 w-3.5" />

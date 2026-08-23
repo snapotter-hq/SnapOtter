@@ -973,8 +973,8 @@ export function AutomatePage() {
                     phase={progress.phase === "idle" ? "processing" : progress.phase}
                     label={
                       files.length > 1
-                        ? `Processing ${files.length} files...`
-                        : "Processing pipeline..."
+                        ? format(t.automate.processingMultiple, { count: files.length })
+                        : t.automate.processingPipeline
                     }
                     stage={progress.stage}
                     percent={progress.percent}
@@ -1065,7 +1065,7 @@ export function AutomatePage() {
                     }}
                     className="px-2 py-1.5 rounded text-sm text-muted-foreground hover:bg-muted"
                   >
-                    Cancel
+                    {t.common.cancel}
                   </button>
                 </div>
               )}

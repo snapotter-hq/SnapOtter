@@ -213,7 +213,7 @@ export function PixelateSettings({
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Mode toggle */}
       <div>
-        <span className="text-xs text-muted-foreground">Mode</span>
+        <span className="text-xs text-muted-foreground">{t.toolSettings.pixelate.mode}</span>
         <div className="flex gap-1 mt-1">
           <button
             type="button"
@@ -225,7 +225,7 @@ export function PixelateSettings({
                 : "bg-muted text-muted-foreground hover:text-foreground"
             }`}
           >
-            Whole image
+            {t.toolSettings.pixelate.wholeImage}
           </button>
           <button
             type="button"
@@ -237,7 +237,7 @@ export function PixelateSettings({
                 : "bg-muted text-muted-foreground hover:text-foreground"
             }`}
           >
-            Selection
+            {t.toolSettings.pixelate.selection}
           </button>
         </div>
       </div>
@@ -261,7 +261,7 @@ export function PixelateSettings({
         />
         {mode === "whole" && (
           <p className="text-[10px] text-muted-foreground mt-1">
-            Applies pixelation to the full image
+            {t.toolSettings.pixelate.wholeHint}
           </p>
         )}
       </div>
@@ -272,7 +272,7 @@ export function PixelateSettings({
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="pixelate-region-width" className="text-xs text-muted-foreground">
-                Width
+                {t.toolSettings.pixelate.width}
               </label>
               <span className="text-xs font-mono text-foreground">{Math.round(boxW * 100)}%</span>
             </div>
@@ -290,7 +290,7 @@ export function PixelateSettings({
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="pixelate-region-height" className="text-xs text-muted-foreground">
-                Height
+                {t.toolSettings.pixelate.height}
               </label>
               <span className="text-xs font-mono text-foreground">{Math.round(boxH * 100)}%</span>
             </div>
@@ -306,9 +306,7 @@ export function PixelateSettings({
             />
           </div>
           {hasFile && (
-            <p className="text-[10px] text-muted-foreground">
-              Drag the selection box on the image to reposition
-            </p>
+            <p className="text-[10px] text-muted-foreground">{t.toolSettings.pixelate.dragHint}</p>
           )}
           {dimsFailed && effectiveDims == null && (
             <p className="text-xs text-destructive-ink">
