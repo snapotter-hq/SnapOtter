@@ -749,6 +749,77 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(invoked).not.toContain("direct-cancel");
   });
 
+  it("settles the alias when a queued run is canceled by its server id (#885)", async () => {
+    // The reverse direction of the alias resolution: an API caller who
+    // cancels with the server id from the 200/202 payload must not strand
+    // the SSE channel replaying a live run forever. Only the queued
+    // removal needs this; active cancels dual-write through the worker.
+    const clientJobId = randomUUID();
+    const unrelatedAlias = randomUUID();
+    const owner = await createOwner();
+    await db.insert(schema.jobs).values({
+      id: unrelatedAlias,
+      userId: owner,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { artifactJobId: randomUUID() },
+    });
+
+    const queue = getQueue("image");
+    await queue.pause();
+    let jobId: string;
+    try {
+      ({ jobId } = await enqueueSingleRun({
+        mode: "fast",
+        tag: "direct-alias",
+        clientJobId,
+        userId: owner,
+      }));
+      expect(await requestCancel(jobId)).toBe(true);
+    } finally {
+      await queue.resume();
+    }
+
+    expect((await jobRow(jobId))?.status).toBe("canceled");
+    const alias = await jobRow(clientJobId);
+    expect(alias?.status).toBe("canceled");
+    // The settle stayed inside the route's authorization: the alias owner
+    // is the artifact owner by construction.
+    expect(alias?.userId).toBe(owner);
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+
+    // Resolution is by pointer: a channel pointing at some other run is
+    // not touched.
+    expect((await jobRow(unrelatedAlias))?.status).toBe("queued");
+  });
+
+  it("keeps a committed direct-id cancel when the reverse settle faults (#885)", async () => {
+    // The job removal and the server-row write already committed; a
+    // faulted settle must not turn that into a 500. The alias stays
+    // stranded until an alias-side cancel heals it off the canceled
+    // artifact, which is the convergence this test walks end to end.
+    const clientJobId = randomUUID();
+    const queue = getQueue("image");
+    await queue.pause();
+    let jobId: string;
+    guardedWriteFault.target = clientJobId;
+    try {
+      ({ jobId } = await enqueueSingleRun({ mode: "fast", tag: "reverse-fault", clientJobId }));
+      expect(await requestCancel(jobId)).toBe(true);
+      expect((await jobRow(jobId))?.status).toBe("canceled");
+      expect((await jobRow(clientJobId))?.status).toBe("queued");
+    } finally {
+      guardedWriteFault.target = null;
+      await queue.resume();
+    }
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+    expect((await jobRow(clientJobId))?.status).toBe("canceled");
+  });
+
   it("keeps the ephemeral terminal frame on a direct-id active cancel", async () => {
     // API callers with no clientJobId ride the worker's publishEphemeral
     // branch; the alias dual write must not have stripped it.

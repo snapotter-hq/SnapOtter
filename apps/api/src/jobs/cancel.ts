@@ -21,7 +21,7 @@
  *   registered AbortControllers.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
 import { cancelSingleJobGuarded } from "../routes/progress.js";
@@ -267,7 +267,44 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     }
   }
 
-  return (await cancelQueueJob(jobId)) !== false;
+  const outcome = await cancelQueueJob(jobId);
+
+  // Reverse alias settle (#885): removing a queued job by its server id
+  // leaves any SSE alias pointing at it nonterminal, and nothing else will
+  // ever settle it (no worker runs a removed job; active cancels
+  // dual-write through the worker instead). Tool artifact rows carry no
+  // reverse pointer (their settings are the tool's own, possibly
+  // redacted), so resolve by the pointer itself, scoped to type "single"
+  // so a pipeline flow row's clientJobId shape can never match. Cancels
+  // are rare enough that the jsonb scan needs no index. The settle's own
+  // pointer condition keeps a channel a newer run re-pointed untouched,
+  // and the alias owner is the artifact owner by construction (the upsert
+  // claims only ownerless or same-owner rows), so the route's
+  // authorization already covered this row.
+  if (outcome === "removed") {
+    // Best-effort as a whole, lookup included: the cancel itself already
+    // committed (job removed, server row canceled), so a fault anywhere
+    // here must not 500 it. A later alias-side cancel converges the row
+    // through the heal branch, which reads the canceled artifact this
+    // cancel wrote.
+    try {
+      const aliases = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(
+          and(
+            eq(schema.jobs.type, "single"),
+            sql`${schema.jobs.settings}->>'artifactJobId' = ${jobId}`,
+          ),
+        );
+      for (const alias of aliases) {
+        await cancelSingleJobGuarded({ jobId: alias.id, expectedArtifactJobId: jobId });
+      }
+    } catch (err) {
+      console.error("reverse alias settle failed", jobId, err);
+    }
+  }
+  return outcome !== false;
 }
 
 /**
