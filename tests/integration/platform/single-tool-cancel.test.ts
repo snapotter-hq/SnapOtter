@@ -51,6 +51,7 @@ import {
   enqueueToolJob,
   insertToolJobAlias,
   waitForJob,
+  warmQueueEvents,
 } from "../../../apps/api/src/jobs/enqueue.js";
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
@@ -206,6 +207,12 @@ async function enqueueSingleRun(
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
+  // The sync-window test arms waitForJob and cancels concurrently; a
+  // lazily created QueueEvents consumer can position at the stream tail
+  // AFTER the failed event publishes on a loaded CI shard, hanging both
+  // promises. Warm the consumers up front, the way the production spine
+  // does for exactly this reason.
+  await warmQueueEvents();
 }, 30_000);
 
 afterAll(async () => {
