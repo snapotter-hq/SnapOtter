@@ -59,7 +59,7 @@ After acknowledging your report, we will keep you informed of our progress towar
 - **Image uploads**: Magic-byte verification against a known format table, null-byte buffer detection, configurable megapixel limit (`MAX_MEGAPIXELS`), configurable upload size limit (`MAX_UPLOAD_SIZE_MB`)
 - **SVG sanitization**: Strips DOCTYPE declarations (XXE prevention), removes `<script>` tags, `<foreignObject>` elements, event handlers, and blocks dangerous URI schemes (`javascript:`, `data:text/html`, `file:`, external URLs in `href`/`xlink:href`)
 - **API validation**: Zod schemas on tool routes and environment config; manual validation on auth routes
-- **Database queries**: Parameterized via Drizzle ORM (PostgreSQL) — no raw string concatenation
+- **Database queries**: Parameterized via Drizzle ORM (PostgreSQL), no raw string concatenation
 - **Database privileges**: The application connects with DML rights only (`SELECT`, `INSERT`, `UPDATE`, `DELETE` on its own tables). Schema changes run on a separate privileged connection, opened at boot and closed before the first request. On installs created by the current image neither role is a cluster superuser, so SQL injection cannot reach `COPY ... FROM PROGRAM`, `pg_read_file`, or extension installation. See [Least-privilege roles](https://docs.snapotter.com/guide/database#least-privilege-roles)
 
 ### HTTP Security
@@ -150,7 +150,7 @@ The following configurations are recommended for production deployments:
 - [ ] Set `PROCESSING_TIMEOUT_S` to prevent long-running operations from monopolizing resources
 - [ ] Set `MAX_SVG_SIZE_MB` to limit SVG upload sizes
 - [ ] Set `MAX_PDF_PAGES` to limit PDF processing scope
-- [ ] Forward structured logs to a centralized log aggregator (audit events emit at `info` level — do not set `LOG_LEVEL` above `info` or audit stdout output will be suppressed)
+- [ ] Forward structured logs to a centralized log aggregator (audit events emit at `info` level, so do not set `LOG_LEVEL` above `info` or audit stdout output will be suppressed)
 - [ ] Monitor the `/api/v1/health` endpoint with your infrastructure monitoring
 - [ ] Restrict Docker socket access if running alongside other containers
 
