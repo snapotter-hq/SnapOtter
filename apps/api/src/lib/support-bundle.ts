@@ -17,18 +17,19 @@ import archiver from "archiver";
 import { desc, inArray, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { redactUrl } from "./redact-url.js";
 
 // Keys whose values are fully replaced with "<redacted>"
 const REDACT_PATTERN = /PASSWORD|SECRET|KEY|DSN/i;
 
 // Keys that get userinfo-only redaction
-const URL_REDACT_KEYS = new Set(["DATABASE_URL", "REDIS_URL"]);
+const URL_REDACT_KEYS = new Set(["DATABASE_URL", "DATABASE_MIGRATION_URL", "REDIS_URL"]);
 
 function redactEnv(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(env)) {
     if (URL_REDACT_KEYS.has(key) && typeof value === "string") {
-      out[key] = value.replace(/:\/\/[^@]*@/, "://***@");
+      out[key] = redactUrl(value);
     } else if (REDACT_PATTERN.test(key)) {
       out[key] = "<redacted>";
     } else {

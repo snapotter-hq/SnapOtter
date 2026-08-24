@@ -36,6 +36,7 @@ const envMock = vi.hoisted(() => ({
     LOG_DIR: "/var/log/snapotter",
     WORKSPACE_PATH: "/data/workspace",
     DATABASE_URL: "postgres://user:secret@db:5432/snapotter",
+    DATABASE_MIGRATION_URL: "postgres://owner:0wner@P4ss@db:5432/snapotter",
     REDIS_URL: "redis://user:secret@redis:6379",
     DEFAULT_PASSWORD: "hunter2",
     SESSION_SECRET: "topsecret",
@@ -138,6 +139,7 @@ beforeEach(() => {
 
   // Restore env mutations from prior tests.
   envMock.env.DATABASE_URL = "postgres://user:secret@db:5432/snapotter";
+  envMock.env.DATABASE_MIGRATION_URL = "postgres://owner:0wner@P4ss@db:5432/snapotter";
   envMock.env.LOG_DIR = "/var/log/snapotter";
 });
 
@@ -153,6 +155,20 @@ describe("buildSupportBundle config.json redaction", () => {
     const config = readEntry(zip, "config.json") as Record<string, unknown>;
     expect(config.DATABASE_URL).toBe("postgres://***@db:5432/snapotter");
     expect(config.REDIS_URL).toBe("redis://***@redis:6379");
+  });
+
+  // DATABASE_MIGRATION_URL carries the OWNER password, more privileged than the
+  // runtime credential, and its key matches no REDACT_PATTERN token. The
+  // password holds an "@" on purpose: a first-"@" regex would emit
+  // "://***@P4ss@db..." and leak the tail. Asserted against the whole
+  // serialized config so a passthrough anywhere else trips this too.
+  it("masks userinfo in DATABASE_MIGRATION_URL", async () => {
+    const zip = await buildAndUnzip();
+    const raw = zip.getEntry("config.json")?.getData().toString("utf-8") ?? "";
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    expect(config.DATABASE_MIGRATION_URL).toBe("postgres://***@db:5432/snapotter");
+    expect(config.DATABASE_MIGRATION_URL).toMatch(/:\/\/\*\*\*@/);
+    expect(raw).not.toContain("P4ss");
   });
 
   it("fully redacts keys matching PASSWORD|SECRET|KEY|DSN", async () => {

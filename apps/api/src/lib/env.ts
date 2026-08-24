@@ -37,6 +37,11 @@ const envSchema = z
     RATE_LIMIT_PER_MIN: z.coerce.number().default(1000),
     API_KEYS_RATE_LIMIT_PER_MIN: z.coerce.number().default(30),
     DATABASE_URL: z.string().default("postgres://snapotter:snapotter@localhost:5432/snapotter"),
+    // Privileged connection used only during boot, for migrations and for
+    // granting the runtime role. When empty the app runs single-role: DATABASE_URL
+    // does both jobs, exactly as it did before the split. Managed Postgres
+    // (RDS, Supabase) usually cannot create roles, so single-role stays supported.
+    DATABASE_MIGRATION_URL: z.string().default(""),
     // How long to wait for Postgres/Redis to accept connections at startup before
     // giving up. A dependency ordered but not yet ready (fresh boot) recovers within
     // this window instead of crash-looping. 0 = try once, fail fast.
