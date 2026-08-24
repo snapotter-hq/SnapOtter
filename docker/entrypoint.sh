@@ -65,7 +65,12 @@ if [ "$RUN_MODE" = "embedded" ]; then
   embedded_requires_root "$(id -u)" || exit 1
   EMBEDDED_MODE=1
   export EMBEDDED_MODE
-  export DATABASE_URL="postgres://snapotter:snapotter@127.0.0.1:5432/snapotter"
+  # Same split as the Compose stack: requests are served by the DML-only
+  # snapotter_app role, and only the short-lived boot connection uses the
+  # database owner. Both roles are created by the first-boot bootstrap; on a data
+  # dir from before the split the app creates snapotter_app itself at boot.
+  export DATABASE_URL="postgres://snapotter_app:snapotter_app@127.0.0.1:5432/snapotter"
+  export DATABASE_MIGRATION_URL="postgres://snapotter:snapotter@127.0.0.1:5432/snapotter"
   export REDIS_URL="redis://127.0.0.1:6379"
   # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
   # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
