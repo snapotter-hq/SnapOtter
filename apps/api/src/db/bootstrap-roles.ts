@@ -1,5 +1,5 @@
 import { SafeError } from "@snapotter/shared";
-import type { Client } from "pg";
+import pg, { type Client } from "pg";
 
 /**
  * Build and run a DDL statement with Postgres doing its own identifier and
@@ -18,8 +18,52 @@ async function exec(client: Client, template: string, args: string[]): Promise<v
 }
 
 /**
- * Create the runtime role if it is missing and align its password with
- * DATABASE_URL. Idempotent: safe on every boot.
+ * Does the runtime role already accept this password?
+ *
+ * Answered by logging in, because SQL offers no way to compare a password
+ * against the stored SCRAM verifier.
+ *
+ * The target comes from the privileged client's own connection rather than a
+ * second connection string. resolveRoleSplit() has already required that
+ * DATABASE_URL and DATABASE_MIGRATION_URL name the same host, port, and
+ * database, so by then they are the same server by construction.
+ *
+ * Any failure answers false, not only 28P01. A pg_hba rule or an exhausted
+ * connection limit leaves the password unknowable, and falling through to the
+ * ALTER is what this did before the probe existed. A runtime role that truly
+ * cannot connect fails later against the runtime pool, which says so plainly.
+ */
+async function passwordAlreadyWorks(
+  client: Client,
+  role: string,
+  password: string,
+): Promise<boolean> {
+  const probe = new pg.Client({
+    host: client.host,
+    port: client.port,
+    database: client.database,
+    ssl: client.ssl,
+    user: role,
+    password,
+  });
+  try {
+    await probe.connect();
+  } catch {
+    return false;
+  }
+  await probe.end();
+  return true;
+}
+
+/** XX000 internal_error, which is what "tuple concurrently updated" reports as. */
+function isConcurrentUpdate(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "XX000";
+}
+
+/**
+ * Create the runtime role if it is missing, and align its password with
+ * DATABASE_URL only when it does not already match. Idempotent: safe on every
+ * boot.
  *
  * Returns true when the role did not exist and was created.
  */
@@ -51,10 +95,32 @@ export async function ensureRuntimeRole(
       "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
       [role, password],
     );
-  } else {
-    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [role, password]);
+    return true;
   }
-  return created;
+
+  // The overwhelmingly common boot: nothing to change, so change nothing. The
+  // ALTER below used to run unconditionally, which rewrote pg_authid and
+  // invalidated the role cache cluster-wide on every restart for no benefit.
+  if (await passwordAlreadyWorks(client, role, password)) return false;
+
+  try {
+    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [role, password]);
+  } catch (err) {
+    // Postgres does not queue concurrent writers of a pg_authid row, so two
+    // boots that both found the password stale can still collide here and the
+    // loser gets "tuple concurrently updated". The advisory lock in migrate.ts
+    // does not cover this: advisory lock ids are scoped per database, so it
+    // serializes the replicas of one deployment but not two SnapOtter databases
+    // on one cluster whose DATABASE_URLs name the same role.
+    //
+    // Re-probe rather than retry. If the boot that won set the value this one
+    // wanted, the work is already done and repeating the ALTER would only
+    // recreate the race.
+    if (!isConcurrentUpdate(err) || !(await passwordAlreadyWorks(client, role, password))) {
+      throw err;
+    }
+  }
+  return false;
 }
 
 /**

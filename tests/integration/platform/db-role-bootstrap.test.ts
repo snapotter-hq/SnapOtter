@@ -51,6 +51,11 @@ const ghostRole = `${role}_ghost`;
 // export it.
 const MIGRATION_LOCK_KEY = 7_421_001;
 
+// How many boots the concurrency spec fires at once. Three already collided on
+// every one of 15 trials against the unconditional ALTER; four keeps a margin
+// without adding much to the connection count parallel forks share.
+const CONCURRENT_BOOTS = 4;
+
 // A quote in the password is the case %L has to survive; string concatenation
 // would produce a syntax error here, or worse.
 const password = "pr0be'pw\"x";
@@ -162,6 +167,20 @@ async function execAsOwner(template: string, arg: string): Promise<void> {
   await owner.query(rows[0].stmt);
 }
 
+/**
+ * The row version of a role, which changes on a write and never on a read.
+ *
+ * pg_roles is a view and exposes no xmin, so this reads pg_authid, the table
+ * behind it. Only a superuser may, which the fork's base role is.
+ */
+async function roleXmin(name: string): Promise<string> {
+  const { rows } = await owner.query<{ xmin: string }>(
+    "SELECT xmin::text AS xmin FROM pg_authid WHERE rolname = $1",
+    [name],
+  );
+  return rows[0].xmin;
+}
+
 beforeAll(async () => {
   owner = new pg.Client({ connectionString: privilegedUrl });
   await owner.connect();
@@ -227,8 +246,12 @@ describe("runtime role provisioning", () => {
   });
 
   it("aligns the password of an existing role", async () => {
+    const before = await roleXmin(role);
     const created = await ensureRuntimeRole(owner, role, rotatedPassword);
     expect(created).toBe(false);
+    // The write the steady-state boot skips. Without this the no-write spec
+    // below could pass on a call that never does anything.
+    expect(await roleXmin(role)).not.toBe(before);
     await expect(
       asRuntime((client) => client.query("SELECT 1"), rotatedPassword),
     ).resolves.toBeDefined();
@@ -236,6 +259,66 @@ describe("runtime role provisioning", () => {
     // Restore so the remaining specs are order-independent.
     await ensureRuntimeRole(owner, role, password);
     await expect(asRuntime((client) => client.query("SELECT 1"))).resolves.toBeDefined();
+  });
+
+  // Every boot called ALTER ROLE whether or not the password had changed, which
+  // rewrote pg_authid and invalidated the role cache cluster-wide for nothing.
+  it("writes nothing when the password already matches", async () => {
+    const before = await roleXmin(role);
+    await expect(ensureRuntimeRole(owner, role, password)).resolves.toBe(false);
+    expect(await roleXmin(role)).toBe(before);
+  });
+
+  // The failure that rewrite caused. Postgres does not queue concurrent writers
+  // of a pg_authid row, so simultaneous boots issuing the same no-op ALTER got
+  // "tuple concurrently updated" (XX000) and died at boot. Separate clients and
+  // one Promise.all are what make the statements truly land together; issued in
+  // sequence they would prove nothing.
+  it("survives simultaneous boots passing the password it already has", async () => {
+    const baseline = await backendCount();
+    const clients = Array.from(
+      { length: CONCURRENT_BOOTS },
+      () => new pg.Client({ connectionString: privilegedUrl }),
+    );
+    await Promise.all(clients.map((client) => client.connect()));
+    try {
+      const results = await Promise.all(
+        clients.map((client) => ensureRuntimeRole(client, role, password)),
+      );
+      expect(results).toEqual(Array(CONCURRENT_BOOTS).fill(false));
+    } finally {
+      await Promise.all(clients.map((client) => client.end()));
+    }
+    // Hand the backend count back as it was found: the boot spec below asserts
+    // on it, and a connection still draining here would read as a leak there.
+    await settleTo(backendCount, baseline);
+  });
+
+  // The residual race: skipping the write when the password matches does not
+  // help boots that all find it stale, so they still collide on the ALTER. The
+  // loser has to notice the winner set the value it wanted and carry on.
+  it("survives simultaneous boots that all need the same password change", async () => {
+    const baseline = await backendCount();
+    const clients = Array.from(
+      { length: CONCURRENT_BOOTS },
+      () => new pg.Client({ connectionString: privilegedUrl }),
+    );
+    await Promise.all(clients.map((client) => client.connect()));
+    try {
+      const results = await Promise.all(
+        clients.map((client) => ensureRuntimeRole(client, role, rotatedPassword)),
+      );
+      expect(results).toEqual(Array(CONCURRENT_BOOTS).fill(false));
+      await expect(
+        asRuntime((client) => client.query("SELECT 1"), rotatedPassword),
+      ).resolves.toBeDefined();
+    } finally {
+      await Promise.all(clients.map((client) => client.end()));
+      // Restore even when the assertions above threw. Leaving the password
+      // rotated would redden every later spec instead of only this one.
+      await ensureRuntimeRole(owner, role, password).catch(() => {});
+      await settleTo(backendCount, baseline);
+    }
   });
 
   // ALTER ROLE cannot clear rolsuper here, so adopting one silently would leave
