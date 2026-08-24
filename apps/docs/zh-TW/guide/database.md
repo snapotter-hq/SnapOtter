@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter 使用 PostgreSQL 17 搭配 [Drizzle ORM](https://orm.drizzle.team/)（pg-core／node-postgres）來持久化資料。結構定義於 `apps/api/src/db/schema.ts`。
 
-連線透過 `DATABASE_URL` 環境變數設定（預設為 `postgres://snapotter:snapotter@postgres:5432/snapotter`）。在 Docker Compose 中，Postgres 容器把資料儲存在 `SnapOtter-pgdata` 具名磁碟區。
+連線透過 `DATABASE_URL` 環境變數設定（預設為 `postgres://snapotter:snapotter@postgres:5432/snapotter`）。在 Docker Compose 中，Postgres 容器把資料儲存在 `SnapOtter-pgdata` 具名磁碟區。 請求由一個只能讀寫資料列的角色提供服務，詳見下方的[最小權限角色](#least-privilege-roles)。
 
 ## 資料表 {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 在生產環境中，待處理的遷移會在啟動時自動套用。
 
+## 最小權限角色 {#least-privilege-roles}
+
+兩個角色，兩種職責。`DATABASE_URL` 負責提供請求服務，對應用程式的資料表持有 `SELECT`、`INSERT`、`UPDATE`、`DELETE` 權限，以及對其序列的 `USAGE` 與 `SELECT` 權限。清單就只有這些。它無法建立或刪除資料表、安裝擴充功能、執行 `TRUNCATE`、讀取 `pg_authid`、建立資料庫、變更角色，也無法碰觸存放遷移歷史的 `drizzle` 結構描述。
+
+`DATABASE_MIGRATION_URL` 才是具特權的那一個。它會在開機期間執行遷移，並把權限授予執行階段角色，然後在任何一個請求被服務之前就關閉連線。
+
+Compose 與一體式映像檔已經是這樣接線的，既有的安裝也包含在內。開機時，SnapOtter 會在執行階段角色不存在時建立它、授予權限、執行遷移，接著把授權補到先前就已存在的資料表上。升級不需要手動執行任何 SQL。
+
+把 `DATABASE_MIGRATION_URL` 留空則會以單一角色模式執行，由 `DATABASE_URL` 同時擔起兩種職責，和拆分之前完全一樣。這是受支援的設定，不是被淘汰的設定。在受管理的 Postgres 上，這才是正確答案，因為建立角色往往輪不到你來做。
+
+### 外部與受管理的 Postgres {#external-and-managed-postgres}
+
+在 RDS、Supabase、Cloud SQL，或任何你自行維運的叢集上，這種拆分屬於選用。先建立一次執行階段角色：
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+接著把兩組連線字串都交給 SnapOtter，並指向同一個主機、連接埠與資料庫：
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+到此為止。SnapOtter 會自行套用授權，並在每次遷移之後重新套用，因此未來版本新增的資料表也會被涵蓋，不需要任何人為它執行 SQL。
+
+`DATABASE_MIGRATION_URL` 中的角色必須擁有 SnapOtter 的資料表，因為只有資料表的擁有者才能對它授權。在既有的安裝上，這代表你一直用來執行 SnapOtter 的那個角色，而不是為此新建的角色。若把它指向一個什麼都不擁有的新角色，開機就會失敗，並回報正是這個原因的錯誤。它同時需要 `CREATEROLE` 才能建立與維護執行階段角色，也需要建立 `drizzle` 結構描述的權限。
+
+如果兩個 URL 指定同一個角色，拆分就會關閉，而 SnapOtter 會在記錄中明講，不會假裝沒事。如果你的供應商沒有任何角色能同時擁有資料表並持有 `CREATEROLE`，就以單一角色模式執行。
+
+### 為什麼不去動超級使用者旗標 {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter 絕不會自行從角色上移除 `SUPERUSER`。在拆分之前建立的安裝上，`snapotter` 是叢集唯一的超級使用者，把它降級會讓叢集一個超級使用者都不剩，只能停掉伺服器、透過單一使用者模式才救得回來。改把長期連線移到受限角色上，才是換來保護的做法。超級使用者只在開機那幾秒出現在連線上，之後就消失了。
+
+全新的一體式安裝從來沒有這個問題。它們會拿到三個角色：`postgres`（啟動用的超級使用者，不出現在 SnapOtter 使用的任何連線字串中）、`snapotter`（`NOSUPERUSER`，擁有資料，只在開機時連線），以及 `snapotter_app`（只碰資料列，負責提供請求服務）。
+
+若仍要把較舊的 `snapotter` 降級，請先建立第二個超級使用者，並以它登入確認可用。接著執行 `ALTER ROLE snapotter NOSUPERUSER`。
+
 ## 備份與還原{#backup-and-restore}
 
 關聯式資料庫位於 Postgres 容器的 `SnapOtter-pgdata` 卷中，而不是應用程式的 `/data` 卷中。
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+這兩個指令都以擁有者 `snapotter` 的身分連線，也應該繼續這樣做。執行階段角色看不到 `drizzle` 結構描述，因此以該角色取得的轉儲會不完整。`--no-owner` 會讓還原出來的物件歸執行還原的人所有，所以由擁有者來執行，才能讓所有權落在授權所預期的位置。在全新叢集上有一點要注意：`pg_dump` 會帶走授權，卻不會帶走授權所指名的角色，所以請在還原之前先建立 `snapotter_app`，否則 `--exit-on-error` 會在第一個 `GRANT` 就停下來。無論如何，SnapOtter 都會在下次開機時重新套用授權。
 
 此資料庫轉儲不包含以 `/data/files` 保存的庫物件或 Redis 中持久的 BullMQ 狀態。使用[安全性與強化](/zh-TW/guide/security#backup-and-recovery) 中的協調程序備份和還原這些內容。
 

@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter sử dụng PostgreSQL 17 với [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) để lưu trữ dữ liệu bền vững. Lược đồ được định nghĩa trong `apps/api/src/db/schema.ts`.
 
-Kết nối được cấu hình qua biến môi trường `DATABASE_URL` (mặc định `postgres://snapotter:snapotter@postgres:5432/snapotter`). Trong Docker Compose, container Postgres lưu dữ liệu của nó trong volume có tên `SnapOtter-pgdata`.
+Kết nối được cấu hình qua biến môi trường `DATABASE_URL` (mặc định `postgres://snapotter:snapotter@postgres:5432/snapotter`). Trong Docker Compose, container Postgres lưu dữ liệu của nó trong volume có tên `SnapOtter-pgdata`. Các yêu cầu được phục vụ trên một vai trò chỉ có thể đọc và ghi các hàng, được trình bày trong phần [Vai trò đặc quyền tối thiểu](#least-privilege-roles) bên dưới.
 
 ## Bảng {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Trong môi trường sản xuất, các di trú đang chờ được áp dụng tự động khi khởi động.
 
+## Vai trò đặc quyền tối thiểu {#least-privilege-roles}
+
+Hai vai trò, hai nhiệm vụ. `DATABASE_URL` phục vụ các yêu cầu và nắm giữ `SELECT`, `INSERT`, `UPDATE`, `DELETE` trên các bảng của ứng dụng, cùng với `USAGE` và `SELECT` trên các sequence của chúng. Đó là toàn bộ danh sách. Nó không thể tạo hay xóa bảng, cài đặt tiện ích mở rộng, `TRUNCATE`, đọc `pg_authid`, tạo cơ sở dữ liệu, thay đổi một vai trò, hay động tới lược đồ `drizzle` nơi lưu lịch sử di trú.
+
+`DATABASE_MIGRATION_URL` mới là kết nối có đặc quyền. Nó chạy các di trú và cấp quyền cho vai trò thời gian chạy trong lúc khởi động, rồi đóng lại trước khi có bất kỳ yêu cầu nào được phục vụ.
+
+Compose và ảnh all-in-one đã được cấu hình sẵn theo cách này, bao gồm cả các bản cài đặt hiện có. Khi khởi động, SnapOtter tạo vai trò thời gian chạy nếu nó chưa có, cấp quyền cho nó, chạy di trú, rồi quét cấp quyền lên cả những bảng đã tồn tại từ trước. Việc nâng cấp không cần chạy SQL thủ công.
+
+Để trống `DATABASE_MIGRATION_URL` sẽ chạy ở chế độ một vai trò, với `DATABASE_URL` đảm nhiệm cả hai nhiệm vụ đúng như trước khi tách. Đây là một cấu hình được hỗ trợ, không phải một cấu hình lỗi thời. Đó là lựa chọn đúng trên Postgres được quản lý, nơi việc tạo vai trò thường không thuộc quyền của bạn.
+
+### Postgres bên ngoài và được quản lý {#external-and-managed-postgres}
+
+Trên RDS, Supabase, Cloud SQL, hay bất kỳ cụm nào bạn tự vận hành, việc tách vai trò là tùy chọn. Hãy tạo vai trò thời gian chạy một lần:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Sau đó cung cấp cho SnapOtter cả hai chuỗi kết nối, cùng trỏ tới một host, port và cơ sở dữ liệu:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Dừng ở đó. SnapOtter tự áp dụng các cấp quyền và áp dụng lại chúng sau mỗi lần di trú, nên một bảng được thêm bởi bản phát hành sau này vẫn được bao phủ mà không ai phải chạy SQL cho nó.
+
+Vai trò trong `DATABASE_MIGRATION_URL` phải sở hữu các bảng của SnapOtter, vì chỉ chủ sở hữu của một bảng mới có thể cấp quyền trên bảng đó. Trên một bản cài đặt hiện có, điều đó có nghĩa là vai trò mà bạn vẫn dùng để chạy SnapOtter, chứ không phải một vai trò mới tạo riêng cho việc này. Nếu bạn trỏ nó tới một vai trò mới không sở hữu gì cả, quá trình khởi động sẽ thất bại với một lỗi nói đúng điều này. Nó cũng cần `CREATEROLE` để tạo và duy trì vai trò thời gian chạy, cùng với quyền tạo lược đồ `drizzle`.
+
+Nếu bạn đặt cùng một vai trò trong cả hai URL thì việc tách bị tắt, và SnapOtter ghi rõ điều đó trong nhật ký thay vì giả vờ ngược lại. Nếu nhà cung cấp của bạn không có vai trò nào vừa sở hữu được các bảng vừa có `CREATEROLE`, hãy chạy ở chế độ một vai trò.
+
+### Vì sao bit superuser được để nguyên {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter không bao giờ tự ý gỡ `SUPERUSER` khỏi một vai trò. Trên một bản cài đặt được tạo trước khi tách vai trò, `snapotter` là superuser duy nhất của cụm, và hạ quyền nó sẽ khiến cụm không còn superuser nào, chỉ có thể khôi phục qua chế độ một người dùng với máy chủ đã dừng. Thay vào đó, chính việc chuyển kết nối lâu dài sang vai trò bị hạn chế mới là thứ mang lại sự bảo vệ. Superuser chỉ có mặt trên đường truyền trong vài giây khởi động rồi biến mất.
+
+Các bản cài đặt all-in-one mới không bao giờ gặp vấn đề đó. Chúng có ba vai trò: `postgres` (superuser khởi tạo, không xuất hiện trong bất kỳ chuỗi kết nối nào SnapOtter dùng), `snapotter` (`NOSUPERUSER`, sở hữu dữ liệu, chỉ kết nối lúc khởi động), và `snapotter_app` (chỉ thao tác trên hàng, phục vụ các yêu cầu).
+
+Nếu vẫn muốn hạ quyền một `snapotter` cũ, hãy tạo một superuser thứ hai trước và đăng nhập bằng nó để xác nhận nó hoạt động. Sau đó chạy `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Sao lưu và khôi phục {#backup-and-restore}
 
 Cơ sở dữ liệu quan hệ nằm trong ổ `SnapOtter-pgdata` của vùng chứa Postgres chứ không phải ổ `/data` của ứng dụng.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Cả hai lệnh đều kết nối với tư cách `snapotter`, tức chủ sở hữu, và nên tiếp tục như vậy. Vai trò thời gian chạy không nhìn thấy được lược đồ `drizzle`, nên một bản kết xuất lấy bằng vai trò đó sẽ không đầy đủ. `--no-owner` để các đối tượng được khôi phục thuộc quyền sở hữu của người chạy lệnh khôi phục, nên chạy nó với tư cách chủ sở hữu sẽ đặt quyền sở hữu đúng chỗ mà các cấp quyền mong đợi. Một lưu ý trên cụm mới: `pg_dump` mang theo các cấp quyền nhưng không mang theo các vai trò mà chúng nhắc tới, vì vậy hãy tạo `snapotter_app` trước khi khôi phục, nếu không `--exit-on-error` sẽ dừng ngay ở `GRANT` đầu tiên. Dù thế nào thì SnapOtter cũng sẽ áp dụng lại các cấp quyền ở lần khởi động kế tiếp.
 
 Kết xuất cơ sở dữ liệu này không chứa các đối tượng thư viện đã lưu ở `/data/files` hoặc trạng thái BullMQ bền vững trong Redis. Sao lưu và khôi phục chúng bằng quy trình phối hợp trong [Bảo mật & tăng cường](/vi/guide/security#backup-and-recovery).
 

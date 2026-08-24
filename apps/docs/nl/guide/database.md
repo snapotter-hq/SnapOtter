@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter gebruikt PostgreSQL 17 met [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) voor gegevensopslag. Het schema is gedefinieerd in `apps/api/src/db/schema.ts`.
 
-De verbinding wordt geconfigureerd via de omgevingsvariabele `DATABASE_URL` (standaard `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose slaat de Postgres-container zijn gegevens op in het benoemde volume `SnapOtter-pgdata`.
+De verbinding wordt geconfigureerd via de omgevingsvariabele `DATABASE_URL` (standaard `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose slaat de Postgres-container zijn gegevens op in het benoemde volume `SnapOtter-pgdata`. Verzoeken worden afgehandeld door een rol die alleen rijen kan lezen en schrijven, wat hieronder wordt behandeld onder [Rollen met minimale rechten](#least-privilege-roles).
 
 ## Tabellen {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 In productie worden openstaande migraties automatisch toegepast bij het opstarten.
 
+## Rollen met minimale rechten {#least-privilege-roles}
+
+Twee rollen, twee taken. `DATABASE_URL` handelt verzoeken af en heeft `SELECT`, `INSERT`, `UPDATE`, `DELETE` op de tabellen van de app, plus `USAGE` en `SELECT` op hun sequences. Dat is de hele lijst. De rol kan geen tabel aanmaken of verwijderen, geen extensie installeren, geen `TRUNCATE` uitvoeren, `pg_authid` niet lezen, geen database aanmaken, geen rol wijzigen en niet aan het `drizzle`-schema komen, waar de migratiegeschiedenis staat.
+
+`DATABASE_MIGRATION_URL` is de bevoorrechte rol. Die voert migraties uit en kent tijdens het opstarten rechten toe aan de runtime-rol, en sluit daarna af voordat er ook maar één verzoek wordt afgehandeld.
+
+Compose en de alles-in-één-image zijn al zo ingericht, bestaande installaties inbegrepen. Bij het opstarten maakt SnapOtter de runtime-rol aan als die ontbreekt, kent de rechten toe, voert de migraties uit en trekt de rechten daarna door naar tabellen die er al stonden. Upgraden vergt geen handmatige SQL.
+
+Laat je `DATABASE_MIGRATION_URL` leeg, dan draait alles op één rol en doet `DATABASE_URL` beide taken, precies zoals vóór de splitsing. Dat is een ondersteunde configuratie en geen verouderde. Op beheerde Postgres is het vaak het juiste antwoord, want daar mag je meestal zelf geen rollen aanmaken.
+
+### Externe en beheerde Postgres {#external-and-managed-postgres}
+
+Op RDS, Supabase, Cloud SQL of een cluster dat je zelf draait, is de splitsing optioneel. Maak de runtime-rol eenmalig aan:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Geef SnapOtter vervolgens beide verbindingsstrings, gericht op dezelfde host, poort en database:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Meer is niet nodig. SnapOtter kent de rechten zelf toe en doet dat na elke migratie opnieuw, zodat een tabel die in een toekomstige release bij komt gedekt is zonder dat iemand daar SQL voor hoeft te draaien.
+
+De rol in `DATABASE_MIGRATION_URL` moet eigenaar zijn van de SnapOtter-tabellen, want alleen de eigenaar van een tabel kan er rechten op toekennen. Op een bestaande installatie is dat de rol waaronder je SnapOtter al draait, niet een verse rol die je er speciaal voor aanmaakt. Wijs je een nieuwe rol aan die nergens eigenaar van is, dan mislukt het opstarten met precies die foutmelding. De rol heeft ook `CREATEROLE` nodig om de runtime-rol aan te maken en te onderhouden, plus het recht om het `drizzle`-schema aan te maken.
+
+Noem je in beide URL's dezelfde rol, dan is de splitsing uit, en SnapOtter meldt dat in het log in plaats van te doen alsof. Geeft je provider je geen rol die zowel eigenaar van de tabellen kan zijn als `CREATEROLE` kan hebben, draai dan op één rol.
+
+### Waarom het superuser-bit ongemoeid blijft {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter haalt nooit uit zichzelf `SUPERUSER` bij een rol weg. Op een installatie die van vóór de splitsing dateert, is `snapotter` de enige superuser van het cluster, en degraderen zou het cluster er zonder achterlaten, alleen nog te herstellen via de single-user-modus met een gestopte server. De bescherming komt in plaats daarvan van het verplaatsen van de langlopende verbinding naar de beperkte rol. De superuser zit de paar seconden van het opstarten op de lijn en is daarna weg.
+
+Nieuwe alles-in-één-installaties hebben dat probleem nooit. Die krijgen drie rollen: `postgres` (bootstrap-superuser, komt in geen enkele verbindingsstring van SnapOtter voor), `snapotter` (`NOSUPERUSER`, eigenaar van de gegevens, verbindt alleen bij het opstarten) en `snapotter_app` (alleen rijen, handelt verzoeken af).
+
+Wil je een oudere `snapotter` toch degraderen, maak dan eerst een tweede superuser aan en log daarmee in om te bevestigen dat die werkt. Voer daarna `ALTER ROLE snapotter NOSUPERUSER` uit.
+
 ## Back-up en herstel {#backup-and-restore}
 
 De relationele database bevindt zich in het `SnapOtter-pgdata`-volume van de Postgres-container, niet in het `/data`-volume van de app.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Beide commando's verbinden als `snapotter`, de eigenaar, en dat moet zo blijven. De runtime-rol kan het `drizzle`-schema niet zien, dus een dump die onder die rol wordt gemaakt komt er onvolledig uit. `--no-owner` laat herstelde objecten in eigendom van degene die het herstel uitvoert, dus door het als eigenaar te draaien komt het eigendom te liggen waar de rechten het verwachten. Eén valkuil op een vers cluster: `pg_dump` neemt de rechten wel mee, maar niet de rollen waar ze naar verwijzen, dus maak `snapotter_app` aan vóór het herstellen, anders stopt `--exit-on-error` bij de eerste `GRANT`. SnapOtter kent de rechten hoe dan ook opnieuw toe bij de volgende keer opstarten.
 
 Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` of de duurzame BullMQ-status in Redis. Maak een back-up en herstel deze met de gecoördineerde procedure in [Beveiliging en verharding](/nl/guide/security#backup-and-recovery).
 

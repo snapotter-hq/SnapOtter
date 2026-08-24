@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter menggunakan PostgreSQL 17 dengan [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) untuk persistensi data. Skema didefinisikan di `apps/api/src/db/schema.ts`.
 
-Koneksi dikonfigurasi melalui variabel lingkungan `DATABASE_URL` (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). Di Docker Compose, kontainer Postgres menyimpan datanya di volume bernama `SnapOtter-pgdata`.
+Koneksi dikonfigurasi melalui variabel lingkungan `DATABASE_URL` (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). Di Docker Compose, kontainer Postgres menyimpan datanya di volume bernama `SnapOtter-pgdata`. Permintaan dilayani menggunakan peran yang hanya dapat membaca dan menulis baris, yang dibahas di [Peran hak akses minimal](#least-privilege-roles) di bawah.
 
 ## Tabel {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Di produksi, migrasi yang tertunda diterapkan secara otomatis saat startup.
 
+## Peran hak akses minimal {#least-privilege-roles}
+
+Dua peran, dua tugas. `DATABASE_URL` melayani permintaan dan memegang `SELECT`, `INSERT`, `UPDATE`, `DELETE` pada tabel aplikasi ditambah `USAGE` dan `SELECT` pada sequence-nya. Hanya itu daftarnya. Peran ini tidak dapat membuat atau menghapus tabel, memasang ekstensi, menjalankan `TRUNCATE`, membaca `pg_authid`, membuat database, mengubah peran, atau menyentuh skema `drizzle` tempat riwayat migrasi disimpan.
+
+`DATABASE_MIGRATION_URL` adalah peran yang berhak istimewa. Peran ini menjalankan migrasi dan memberikan hak kepada peran runtime saat boot, lalu menutup koneksinya sebelum satu permintaan pun dilayani.
+
+Compose dan image all-in-one sudah dirangkai seperti ini, termasuk instalasi yang sudah ada. Saat boot, SnapOtter membuat peran runtime jika belum ada, memberikan haknya, menjalankan migrasi, lalu menyapukan hak tersebut ke tabel yang sudah ada sebelumnya. Pemutakhiran tidak memerlukan SQL manual.
+
+Membiarkan `DATABASE_MIGRATION_URL` kosong akan berjalan dalam mode peran tunggal, dengan `DATABASE_URL` mengerjakan kedua tugas persis seperti sebelum pemisahan. Ini adalah konfigurasi yang didukung, bukan konfigurasi yang usang. Ini juga jawaban yang tepat pada Postgres terkelola, tempat pembuatan peran sering kali bukan wewenang Anda.
+
+### Postgres eksternal dan terkelola {#external-and-managed-postgres}
+
+Pada RDS, Supabase, Cloud SQL, atau cluster mana pun yang Anda jalankan sendiri, pemisahan ini bersifat opsional. Buat peran runtime sekali saja:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Lalu berikan kedua string koneksi kepada SnapOtter, yang mengarah ke host, port, dan database yang sama:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Cukup sampai di situ. SnapOtter menerapkan hak akses itu sendiri dan menerapkannya ulang setelah setiap migrasi, sehingga tabel yang ditambahkan oleh rilis mendatang ikut tercakup tanpa ada yang perlu menjalankan SQL untuknya.
+
+Peran di `DATABASE_MIGRATION_URL` harus memiliki tabel SnapOtter, karena hanya pemilik tabel yang dapat memberikan hak atasnya. Pada instalasi yang sudah ada, itu berarti peran yang selama ini Anda pakai untuk menjalankan SnapOtter, bukan peran baru yang dibuat khusus untuk keperluan ini. Arahkan ke peran baru yang tidak memiliki apa pun dan boot akan gagal dengan pesan kesalahan yang menyatakan persis hal ini. Peran itu juga membutuhkan `CREATEROLE` untuk membuat dan memelihara peran runtime, serta hak untuk membuat skema `drizzle`.
+
+Sebutkan peran yang sama di kedua URL dan pemisahan pun nonaktif, dan SnapOtter menyatakannya di log alih-alih berpura-pura sebaliknya. Jika penyedia Anda tidak memberi peran yang sekaligus dapat memiliki tabel dan memegang `CREATEROLE`, jalankan mode peran tunggal.
+
+### Mengapa bit superuser dibiarkan apa adanya {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter tidak pernah mencabut `SUPERUSER` dari sebuah peran atas inisiatifnya sendiri. Pada instalasi yang dibuat sebelum pemisahan, `snapotter` adalah satu-satunya superuser di cluster, dan menurunkan haknya akan membuat cluster tidak punya superuser sama sekali, yang hanya bisa dipulihkan lewat mode pengguna tunggal dengan server dalam keadaan berhenti. Memindahkan koneksi berumur panjang ke peran yang dibatasi itulah yang memberi perlindungan. Superuser berada di jalur koneksi hanya selama beberapa detik saat boot, lalu hilang.
+
+Instalasi all-in-one yang baru tidak pernah mengalami masalah itu. Instalasi tersebut mendapat tiga peran: `postgres` (superuser bootstrap, tidak muncul di satu pun string koneksi yang dipakai SnapOtter), `snapotter` (`NOSUPERUSER`, memiliki data, hanya terhubung saat boot), dan `snapotter_app` (hanya baris, melayani permintaan).
+
+Untuk tetap menurunkan hak `snapotter` lama, buat superuser kedua terlebih dahulu dan masuk dengan peran itu untuk memastikan berfungsi. Setelah itu, `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Cadangkan dan pulihkan {#backup-and-restore}
 
 Basis data relasional berada di volume `SnapOtter-pgdata` container Postgres, bukan volume `/data` aplikasi.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Kedua perintah tersebut terhubung sebagai `snapotter`, sang pemilik, dan sebaiknya tetap begitu. Peran runtime tidak dapat melihat skema `drizzle`, sehingga dump yang diambil dengan peran itu akan keluar dalam keadaan tidak lengkap. `--no-owner` membuat objek hasil pemulihan dimiliki oleh siapa pun yang menjalankan pemulihan, jadi menjalankannya sebagai pemilik menempatkan kepemilikan sesuai yang diharapkan oleh hak akses tersebut. Satu hal yang perlu diperhatikan pada cluster baru: `pg_dump` membawa hak aksesnya, tetapi tidak membawa peran yang disebutkannya, jadi buat `snapotter_app` sebelum memulihkan atau `--exit-on-error` akan berhenti pada `GRANT` pertama. Bagaimanapun juga, SnapOtter menerapkan ulang hak akses itu pada boot berikutnya.
 
 Dump database ini tidak berisi objek perpustakaan yang disimpan di `/data/files` atau status BullMQ yang tahan lama di Redis. Cadangkan dan pulihkan dengan prosedur terkoordinasi di [Keamanan & Pengerasan](/id/guide/security#backup-and-recovery).
 

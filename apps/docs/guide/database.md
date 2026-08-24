@@ -6,7 +6,7 @@ description: PostgreSQL database schema, tables, migrations, and backup procedur
 
 SnapOtter uses PostgreSQL 17 with [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) for data persistence. The schema is defined in `apps/api/src/db/schema.ts`.
 
-The connection is configured via the `DATABASE_URL` environment variable (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, the Postgres container stores its data in the `SnapOtter-pgdata` named volume.
+The connection is configured via the `DATABASE_URL` environment variable (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, the Postgres container stores its data in the `SnapOtter-pgdata` named volume. Requests are served on a role that can only read and write rows, which is covered under [Least-privilege roles](#least-privilege-roles) below.
 
 ## Tables {#tables}
 
@@ -165,6 +165,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 In production, pending migrations are applied automatically on startup.
 
+## Least-privilege roles {#least-privilege-roles}
+
+Two roles, two jobs. `DATABASE_URL` serves requests and holds `SELECT`, `INSERT`, `UPDATE`, `DELETE` on the app's tables plus `USAGE` and `SELECT` on their sequences. That is the entire list. It cannot create or drop a table, install an extension, `TRUNCATE`, read `pg_authid`, create a database, alter a role, or touch the `drizzle` schema where migration history lives.
+
+`DATABASE_MIGRATION_URL` is the privileged one. It runs migrations and grants the runtime role during boot, then closes before a single request is served.
+
+Compose and the all-in-one image are wired this way already, existing installs included. On boot SnapOtter creates the runtime role if it is missing, grants it, migrates, then sweeps the grants onto tables that were there before. Upgrading needs no manual SQL.
+
+Leaving `DATABASE_MIGRATION_URL` empty runs single-role, with `DATABASE_URL` doing both jobs exactly as it did before the split. That is a supported configuration, not a deprecated one. It is the right answer on managed Postgres, where creating roles is often not yours to do.
+
+### External and managed Postgres {#external-and-managed-postgres}
+
+On RDS, Supabase, Cloud SQL, or any cluster you run yourself, the split is opt-in. Create the runtime role once:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Then hand SnapOtter both connection strings, pointed at the same host, port, and database:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Stop there. SnapOtter applies the grants itself and reapplies them after every migration, so a table added by a future release is covered without anyone running SQL for it.
+
+The role in `DATABASE_MIGRATION_URL` has to own the SnapOtter tables, because only a table's owner can grant on it. On an existing install that means the role you have been running SnapOtter as, not a fresh one created for the purpose. Point it at a new role that owns nothing and boot fails with an error saying exactly this. It also needs `CREATEROLE` to create and maintain the runtime role, and the right to create the `drizzle` schema.
+
+Name the same role in both URLs and the split is off, and SnapOtter says so in the log instead of pretending otherwise. If your provider gives you no role that can both own the tables and hold `CREATEROLE`, run single-role.
+
+### Why the superuser bit is left alone {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter never strips `SUPERUSER` from a role by itself. On an install created before the split, `snapotter` is the cluster's only superuser, and demoting it would leave the cluster with none, recoverable only through single-user mode with the server stopped. Moving the long-lived connection to the restricted role is what buys the protection instead. The superuser is on the wire for the few seconds of boot and then gone.
+
+Fresh all-in-one installs never have that problem. They get three roles: `postgres` (bootstrap superuser, absent from every connection string SnapOtter uses), `snapotter` (`NOSUPERUSER`, owns the data, connects only at boot), and `snapotter_app` (rows only, serves requests).
+
+To demote an older `snapotter` anyway, create a second superuser first and log in as it to confirm it works. Then `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Backup and restore {#backup-and-restore}
 
 The relational database lives in the Postgres container's `SnapOtter-pgdata` volume, not the app's `/data` volume.
@@ -183,6 +223,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Both commands connect as `snapotter`, the owner, and should keep doing so. The runtime role can't see the `drizzle` schema, so a dump taken as that role would come out incomplete. `--no-owner` leaves restored objects owned by whoever runs the restore, so running it as the owner puts ownership where the grants expect it. One catch on a fresh cluster: `pg_dump` carries the grants but not the roles they name, so create `snapotter_app` before restoring or `--exit-on-error` stops on the first `GRANT`. SnapOtter reapplies the grants on its next boot regardless.
 
 This database dump does not contain saved library objects in `/data/files` or durable BullMQ state in Redis. Back up and restore those with the coordinated procedure in [Security & Hardening](/guide/security#backup-and-recovery).
 

@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter는 데이터 영속성을 위해 PostgreSQL 17과 [Drizzle ORM](https://orm.drizzle.team/)(pg-core / node-postgres)을 사용합니다. 스키마는 `apps/api/src/db/schema.ts`에 정의되어 있습니다.
 
-연결은 `DATABASE_URL` 환경 변수로 구성됩니다(기본값 `postgres://snapotter:snapotter@postgres:5432/snapotter`). Docker Compose에서는 Postgres 컨테이너가 데이터를 `SnapOtter-pgdata` 명명된 볼륨에 저장합니다.
+연결은 `DATABASE_URL` 환경 변수로 구성됩니다(기본값 `postgres://snapotter:snapotter@postgres:5432/snapotter`). Docker Compose에서는 Postgres 컨테이너가 데이터를 `SnapOtter-pgdata` 명명된 볼륨에 저장합니다. 요청은 행을 읽고 쓰는 것만 가능한 역할로 처리되며, 자세한 내용은 아래 [최소 권한 역할](#least-privilege-roles)에서 다룹니다.
 
 ## 테이블 {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 프로덕션에서는 시작 시 대기 중인 마이그레이션이 자동으로 적용됩니다.
 
+## 최소 권한 역할 {#least-privilege-roles}
+
+역할은 둘, 맡는 일도 둘입니다. `DATABASE_URL`은 요청을 처리하며 앱 테이블에 대한 `SELECT`, `INSERT`, `UPDATE`, `DELETE` 권한과 해당 시퀀스에 대한 `USAGE` 및 `SELECT` 권한을 가집니다. 목록은 그게 전부입니다. 이 역할은 테이블을 만들거나 삭제할 수 없고, 확장을 설치하거나 `TRUNCATE`를 실행할 수 없으며, `pg_authid`를 읽거나 데이터베이스를 만들거나 역할을 변경할 수 없고, 마이그레이션 이력이 들어 있는 `drizzle` 스키마에도 손댈 수 없습니다.
+
+`DATABASE_MIGRATION_URL`이 권한을 가진 쪽입니다. 부팅 중에 마이그레이션을 실행하고 런타임 역할에 권한을 부여한 뒤, 요청이 하나라도 처리되기 전에 연결을 닫습니다.
+
+Compose와 올인원 이미지는 이미 이렇게 구성되어 있으며, 기존 설치본도 마찬가지입니다. SnapOtter는 부팅 시 런타임 역할이 없으면 만들고, 권한을 부여하고, 마이그레이션한 다음, 이전부터 있던 테이블에도 권한을 적용합니다. 업그레이드에 수동 SQL은 필요하지 않습니다.
+
+`DATABASE_MIGRATION_URL`을 비워 두면 단일 역할로 동작하며, `DATABASE_URL`이 분리 이전과 똑같이 두 가지 일을 모두 처리합니다. 이는 지원되는 구성이며 폐기 예정 방식이 아닙니다. 역할을 만드는 일이 사용자 몫이 아닌 경우가 많은 관리형 Postgres에서는 이 방식이 맞습니다.
+
+### 외부 및 관리형 Postgres {#external-and-managed-postgres}
+
+RDS, Supabase, Cloud SQL, 또는 직접 운영하는 클러스터에서는 이 분리가 선택 사항입니다. 런타임 역할을 한 번 만드세요.
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+그런 다음 같은 호스트, 포트, 데이터베이스를 가리키는 두 연결 문자열을 SnapOtter에 전달하세요.
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+여기까지면 됩니다. SnapOtter가 권한을 직접 적용하고 마이그레이션할 때마다 다시 적용하므로, 향후 릴리스에서 추가되는 테이블도 누군가 SQL을 실행하지 않아도 함께 처리됩니다.
+
+`DATABASE_MIGRATION_URL`에 지정한 역할은 SnapOtter 테이블을 소유해야 합니다. 테이블에 권한을 부여할 수 있는 것은 그 테이블의 소유자뿐이기 때문입니다. 기존 설치본이라면 이는 그동안 SnapOtter를 실행해 온 역할을 뜻하며, 이 용도로 새로 만든 역할이 아닙니다. 아무것도 소유하지 않은 새 역할을 지정하면 부팅이 실패하고 바로 이 내용을 알리는 오류가 표시됩니다. 또한 런타임 역할을 만들고 관리하기 위한 `CREATEROLE` 권한과 `drizzle` 스키마를 만들 권한도 필요합니다.
+
+두 URL에 같은 역할을 지정하면 분리는 꺼지며, SnapOtter는 아닌 척하지 않고 로그에 그렇게 남깁니다. 테이블을 소유하면서 `CREATEROLE`도 가질 수 있는 역할을 제공업체가 주지 않는다면 단일 역할로 운영하세요.
+
+### 슈퍼유저 비트를 그대로 두는 이유 {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter는 어떤 역할에서도 `SUPERUSER`를 스스로 제거하지 않습니다. 분리 이전에 만들어진 설치본에서는 `snapotter`가 클러스터의 유일한 슈퍼유저이며, 이를 강등하면 클러스터에 슈퍼유저가 하나도 남지 않아 서버를 멈춘 채 단일 사용자 모드로만 복구할 수 있게 됩니다. 그 대신 오래 유지되는 연결을 제한된 역할로 옮기는 것이 보호를 얻는 방법입니다. 슈퍼유저는 부팅되는 몇 초 동안만 연결에 올라왔다가 사라집니다.
+
+새로 설치한 올인원에는 이런 문제가 없습니다. 여기에는 역할이 세 개 생깁니다. `postgres`(부트스트랩 슈퍼유저, SnapOtter가 사용하는 어떤 연결 문자열에도 등장하지 않음), `snapotter`(`NOSUPERUSER`, 데이터를 소유하며 부팅 시에만 연결), `snapotter_app`(행만 다루며 요청을 처리)입니다.
+
+그래도 오래된 `snapotter`를 강등하려면, 먼저 두 번째 슈퍼유저를 만들고 그 역할로 로그인해 동작하는지 확인하세요. 그런 다음 `ALTER ROLE snapotter NOSUPERUSER`를 실행합니다.
+
 ## {#backup-and-restore} 백업 및 복원
 
 관계형 데이터베이스는 앱의 `/data` 볼륨이 아닌 Postgres 컨테이너의 `SnapOtter-pgdata` 볼륨에 있습니다.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+두 명령 모두 소유자인 `snapotter`로 연결하며, 앞으로도 그래야 합니다. 런타임 역할은 `drizzle` 스키마를 볼 수 없으므로 그 역할로 받은 덤프는 불완전하게 나옵니다. `--no-owner`는 복원된 개체의 소유권을 복원을 실행한 쪽에 남기므로, 소유자로 복원을 실행하면 권한이 기대하는 자리에 소유권이 놓입니다. 새 클러스터에서 한 가지 주의할 점은, `pg_dump`가 권한은 가져오지만 거기에 이름이 적힌 역할까지 가져오지는 않는다는 것입니다. 그래서 복원 전에 `snapotter_app`을 만들어 두지 않으면 `--exit-on-error`가 첫 번째 `GRANT`에서 멈춥니다. 어느 쪽이든 SnapOtter는 다음 부팅 때 권한을 다시 적용합니다.
 
 이 데이터베이스 덤프에는 Redis의 `/data/files` 또는 내구성 있는 BullMQ 상태에 저장된 라이브러리 개체가 포함되어 있지 않습니다. [보안 및 강화](/ko/guide/security#backup-and-recovery)의 조정된 절차에 따라 백업 및 복원하세요.
 

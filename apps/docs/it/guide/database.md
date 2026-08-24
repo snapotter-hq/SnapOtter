@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter usa PostgreSQL 17 con [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) per la persistenza dei dati. Lo schema è definito in `apps/api/src/db/schema.ts`.
 
-La connessione è configurata tramite la variabile d'ambiente `DATABASE_URL` (predefinita `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, il container Postgres memorizza i suoi dati nel volume denominato `SnapOtter-pgdata`.
+La connessione è configurata tramite la variabile d'ambiente `DATABASE_URL` (predefinita `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose, il container Postgres memorizza i suoi dati nel volume denominato `SnapOtter-pgdata`. Le richieste vengono servite con un ruolo che può soltanto leggere e scrivere righe, come descritto più avanti in [Ruoli con privilegi minimi](#least-privilege-roles).
 
 ## Tabelle {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 In produzione, le migrazioni in sospeso vengono applicate automaticamente all'avvio.
 
+## Ruoli con privilegi minimi {#least-privilege-roles}
+
+Due ruoli, due compiti. `DATABASE_URL` serve le richieste e detiene `SELECT`, `INSERT`, `UPDATE`, `DELETE` sulle tabelle dell'app, più `USAGE` e `SELECT` sulle relative sequenze. L'elenco finisce qui. Non può creare o eliminare una tabella, installare un'estensione, eseguire `TRUNCATE`, leggere `pg_authid`, creare un database, modificare un ruolo o toccare lo schema `drizzle`, dove risiede la cronologia delle migrazioni.
+
+`DATABASE_MIGRATION_URL` è quello privilegiato. Esegue le migrazioni e assegna i permessi al ruolo di runtime durante l'avvio, poi si chiude prima che venga servita una singola richiesta.
+
+Compose e l'immagine all-in-one sono già configurati così, installazioni esistenti comprese. All'avvio SnapOtter crea il ruolo di runtime se manca, gli assegna i permessi, esegue le migrazioni e poi estende i permessi alle tabelle già presenti. L'aggiornamento non richiede alcun SQL manuale.
+
+Se lasci vuoto `DATABASE_MIGRATION_URL`, si passa alla modalità a ruolo unico, con `DATABASE_URL` che svolge entrambi i compiti esattamente come faceva prima della separazione. È una configurazione supportata, non deprecata. È la scelta giusta su Postgres gestito, dove spesso la creazione dei ruoli non spetta a te.
+
+### Postgres esterno e gestito {#external-and-managed-postgres}
+
+Su RDS, Supabase, Cloud SQL o su qualsiasi cluster che gestisci tu, la separazione è facoltativa. Crea il ruolo di runtime una sola volta:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Poi passa a SnapOtter entrambe le stringhe di connessione, puntate allo stesso host, alla stessa porta e allo stesso database:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Fermati qui. SnapOtter applica i permessi da sé e li riapplica dopo ogni migrazione, così una tabella aggiunta da una versione futura è coperta senza che nessuno debba eseguire SQL apposta.
+
+Il ruolo indicato in `DATABASE_MIGRATION_URL` deve essere proprietario delle tabelle di SnapOtter, perché solo il proprietario di una tabella può concedere permessi su di essa. In un'installazione esistente si tratta del ruolo con cui hai eseguito SnapOtter finora, non di uno nuovo creato allo scopo. Se lo fai puntare a un ruolo nuovo che non possiede nulla, l'avvio fallisce con un errore che dice esattamente questo. Servono inoltre `CREATEROLE`, per creare e mantenere il ruolo di runtime, e il diritto di creare lo schema `drizzle`.
+
+Se indichi lo stesso ruolo in entrambi gli URL la separazione è disattivata, e SnapOtter lo scrive nel log invece di far finta di nulla. Se il tuo provider non ti offre un ruolo capace sia di possedere le tabelle sia di avere `CREATEROLE`, usa la modalità a ruolo unico.
+
+### Perché il bit di superuser resta invariato {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter non rimuove mai da solo `SUPERUSER` da un ruolo. In un'installazione creata prima della separazione, `snapotter` è l'unico superuser del cluster, e degradarlo lascerebbe il cluster senza nessuno, con un recupero possibile solo tramite la modalità single-user a server fermo. A garantire la protezione è invece lo spostamento della connessione a lunga durata sul ruolo limitato. Il superuser resta sulla linea per i pochi secondi dell'avvio e poi sparisce.
+
+Le nuove installazioni all-in-one non hanno questo problema. Ottengono tre ruoli: `postgres` (superuser di bootstrap, assente da ogni stringa di connessione usata da SnapOtter), `snapotter` (`NOSUPERUSER`, possiede i dati, si connette solo all'avvio) e `snapotter_app` (solo righe, serve le richieste).
+
+Per degradare comunque un vecchio `snapotter`, crea prima un secondo superuser e accedi con quello per verificare che funzioni. Poi `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Backup e ripristino {#backup-and-restore}
 
 Il database relazionale si trova nel volume `SnapOtter-pgdata` del contenitore Postgres, non nel volume `/data` dell'app.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Entrambi i comandi si connettono come `snapotter`, il proprietario, e devono continuare a farlo. Il ruolo di runtime non vede lo schema `drizzle`, quindi un dump eseguito con quel ruolo risulterebbe incompleto. `--no-owner` lascia gli oggetti ripristinati di proprietà di chi esegue il ripristino, quindi eseguirlo come proprietario colloca la proprietà dove i permessi se l'aspettano. Un dettaglio da tenere presente su un cluster nuovo: `pg_dump` porta con sé i permessi ma non i ruoli che vi sono nominati, quindi crea `snapotter_app` prima del ripristino, altrimenti `--exit-on-error` si ferma al primo `GRANT`. In ogni caso SnapOtter riapplica i permessi al successivo avvio.
 
 Questo dump del database non contiene oggetti di libreria salvati in `/data/files` o lo stato BullMQ durevole in Redis. Effettuare il backup e il ripristino di quelli con la procedura coordinata in [Sicurezza e rafforzamento](/it/guide/security#backup-and-recovery).
 

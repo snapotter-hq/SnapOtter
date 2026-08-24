@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter använder PostgreSQL 17 med [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) för datapersistens. Schemat definieras i `apps/api/src/db/schema.ts`.
 
-Anslutningen konfigureras via miljövariabeln `DATABASE_URL` (standard `postgres://snapotter:snapotter@postgres:5432/snapotter`). I Docker Compose lagrar Postgres-containern sina data i den namngivna volymen `SnapOtter-pgdata`.
+Anslutningen konfigureras via miljövariabeln `DATABASE_URL` (standard `postgres://snapotter:snapotter@postgres:5432/snapotter`). I Docker Compose lagrar Postgres-containern sina data i den namngivna volymen `SnapOtter-pgdata`. Förfrågningar betjänas via en roll som bara kan läsa och skriva rader, vilket beskrivs under [Roller med minsta möjliga behörighet](#least-privilege-roles) nedan.
 
 ## Tabeller {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 I produktion tillämpas väntande migrationer automatiskt vid uppstart.
 
+## Roller med minsta möjliga behörighet {#least-privilege-roles}
+
+Två roller, två uppgifter. `DATABASE_URL` betjänar förfrågningar och har `SELECT`, `INSERT`, `UPDATE`, `DELETE` på appens tabeller plus `USAGE` och `SELECT` på deras sekvenser. Det är hela listan. Den kan inte skapa eller ta bort en tabell, installera ett tillägg, köra `TRUNCATE`, läsa `pg_authid`, skapa en databas, ändra en roll eller röra schemat `drizzle` där migrationshistoriken ligger.
+
+`DATABASE_MIGRATION_URL` är den privilegierade. Den kör migrationer och ger körningsrollen dess behörigheter under uppstarten, och stängs sedan innan en enda förfrågan har betjänats.
+
+Compose och allt-i-ett-avbildningen är redan kopplade på det här sättet, befintliga installationer inräknade. Vid uppstart skapar SnapOtter körningsrollen om den saknas, ger den behörigheter, migrerar och lägger sedan ut behörigheterna på tabeller som redan fanns. Uppgraderingen kräver ingen manuell SQL.
+
+Om du lämnar `DATABASE_MIGRATION_URL` tom körs allt med en enda roll, där `DATABASE_URL` sköter båda uppgifterna precis som före uppdelningen. Det är en konfiguration som stöds, inte en föråldrad. Det är rätt svar på hanterad Postgres, där det ofta inte är du som får skapa roller.
+
+### Extern och hanterad Postgres {#external-and-managed-postgres}
+
+På RDS, Supabase, Cloud SQL eller vilket kluster du än driver själv är uppdelningen frivillig. Skapa körningsrollen en gång:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Lämna sedan över båda anslutningssträngarna till SnapOtter, riktade mot samma värd, port och databas:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Stanna där. SnapOtter tillämpar behörigheterna själv och tillämpar dem på nytt efter varje migration, så en tabell som läggs till i en framtida version täcks in utan att någon behöver köra SQL för den.
+
+Rollen i `DATABASE_MIGRATION_URL` måste äga SnapOtter-tabellerna, eftersom bara en tabells ägare kan ge behörigheter på den. I en befintlig installation betyder det den roll som du hittills har kört SnapOtter som, inte en ny roll skapad för ändamålet. Pekar du den mot en ny roll som inte äger något misslyckas uppstarten med ett fel som säger precis detta. Den behöver också `CREATEROLE` för att skapa och underhålla körningsrollen, samt rätten att skapa schemat `drizzle`.
+
+Anger du samma roll i båda URL:erna är uppdelningen avstängd, och SnapOtter skriver det i loggen i stället för att låtsas om något annat. Om din leverantör inte ger dig någon roll som både kan äga tabellerna och ha `CREATEROLE`, kör med en enda roll.
+
+### Varför superanvändarflaggan lämnas orörd {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter tar aldrig bort `SUPERUSER` från en roll på egen hand. I en installation som skapades före uppdelningen är `snapotter` klustrets enda superanvändare, och att degradera den skulle lämna klustret helt utan, något som bara går att rädda i enanvändarläge med servern stoppad. Det som ger skyddet i stället är att den långlivade anslutningen flyttas till den begränsade rollen. Superanvändaren är uppkopplad under uppstartens få sekunder och sedan borta.
+
+Nya allt-i-ett-installationer har aldrig det problemet. De får tre roller: `postgres` (superanvändare för bootstrap, saknas i varje anslutningssträng som SnapOtter använder), `snapotter` (`NOSUPERUSER`, äger data, ansluter bara vid uppstart) och `snapotter_app` (bara rader, betjänar förfrågningar).
+
+Vill du ändå degradera en äldre `snapotter`, skapa först en andra superanvändare och logga in som den för att bekräfta att den fungerar. Kör sedan `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Säkerhetskopiera och återställa {#backup-and-restore}
 
 Relationsdatabasen finns i Postgres-behållarens `SnapOtter-pgdata`-volym, inte appens `/data`-volym.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Båda kommandona ansluter som `snapotter`, ägaren, och bör fortsätta göra det. Körningsrollen kan inte se schemat `drizzle`, så en dump tagen som den rollen blir ofullständig. `--no-owner` gör att återställda objekt ägs av den som kör återställningen, så om du kör den som ägaren hamnar ägarskapet där behörigheterna förväntar sig det. En hake i ett nytt kluster: `pg_dump` tar med behörigheterna men inte rollerna de nämner, så skapa `snapotter_app` innan du återställer, annars stannar `--exit-on-error` vid första `GRANT`. SnapOtter tillämpar behörigheterna på nytt vid nästa uppstart oavsett.
 
 Denna databasdump innehåller inte sparade biblioteksobjekt i `/data/files` eller hållbart BullMQ-tillstånd i Redis. Säkerhetskopiera och återställ dem med den samordnade proceduren i [Säkerhet och härdning](/sv/guide/security#backup-and-recovery).
 

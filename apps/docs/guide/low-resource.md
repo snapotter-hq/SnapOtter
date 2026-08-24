@@ -31,7 +31,8 @@ services:
     volumes:
       - ./snapotter-data:/data
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@db:5432/snapotter
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@db:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@db:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
       # Small-box profile: see the table below for what each cap does.
       - CONCURRENT_JOBS=1
@@ -53,9 +54,9 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      - POSTGRES_USER=snapotter
-      - POSTGRES_PASSWORD=snapotter     # Change this for non-local deployments
-      - POSTGRES_DB=snapotter
+      - POSTGRES_USER=${POSTGRES_USER:-snapotter}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      - POSTGRES_DB=${POSTGRES_DB:-snapotter}
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     restart: unless-stopped

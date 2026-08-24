@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 O SnapOtter usa PostgreSQL 17 com [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) para persistência de dados. O esquema é definido em `apps/api/src/db/schema.ts`.
 
-A conexão é configurada através da variável de ambiente `DATABASE_URL` (padrão `postgres://snapotter:snapotter@postgres:5432/snapotter`). No Docker Compose, o contêiner do Postgres armazena seus dados no volume nomeado `SnapOtter-pgdata`.
+A conexão é configurada através da variável de ambiente `DATABASE_URL` (padrão `postgres://snapotter:snapotter@postgres:5432/snapotter`). No Docker Compose, o contêiner do Postgres armazena seus dados no volume nomeado `SnapOtter-pgdata`. As requisições são atendidas por um papel que só consegue ler e gravar linhas, o que é detalhado em [Papéis de privilégio mínimo](#least-privilege-roles) mais abaixo.
 
 ## Tabelas {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Em produção, as migrações pendentes são aplicadas automaticamente na inicialização.
 
+## Papéis de privilégio mínimo {#least-privilege-roles}
+
+Dois papéis, duas tarefas. O `DATABASE_URL` atende às requisições e detém `SELECT`, `INSERT`, `UPDATE`, `DELETE` nas tabelas do aplicativo, além de `USAGE` e `SELECT` nas sequências delas. Essa é a lista inteira. Ele não pode criar nem remover uma tabela, instalar uma extensão, executar `TRUNCATE`, ler `pg_authid`, criar um banco de dados, alterar um papel ou tocar no esquema `drizzle`, onde fica o histórico de migrações.
+
+O `DATABASE_MIGRATION_URL` é o privilegiado. Ele executa as migrações e concede as permissões ao papel de execução durante a inicialização, e então se encerra antes de qualquer requisição ser atendida.
+
+O Compose e a imagem tudo-em-um já vêm configurados assim, inclusive as instalações existentes. Na inicialização, o SnapOtter cria o papel de execução caso ele não exista, concede as permissões, aplica as migrações e depois estende essas permissões às tabelas que já estavam lá. Atualizar não exige nenhum SQL manual.
+
+Deixar o `DATABASE_MIGRATION_URL` vazio faz tudo rodar com um papel único, com o `DATABASE_URL` cumprindo as duas tarefas exatamente como fazia antes da separação. Essa é uma configuração suportada, e não uma configuração obsoleta. É a resposta certa no Postgres gerenciado, onde criar papéis muitas vezes não está nas suas mãos.
+
+### Postgres externo e gerenciado {#external-and-managed-postgres}
+
+No RDS, no Supabase, no Cloud SQL ou em qualquer cluster que você mesmo administre, a separação é opcional. Crie o papel de execução uma única vez:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Depois entregue ao SnapOtter as duas strings de conexão, apontando para o mesmo host, a mesma porta e o mesmo banco de dados:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Pare por aí. O próprio SnapOtter aplica as permissões e as reaplica depois de cada migração, então uma tabela adicionada por uma versão futura já fica coberta sem que ninguém precise rodar SQL para isso.
+
+O papel indicado em `DATABASE_MIGRATION_URL` precisa ser dono das tabelas do SnapOtter, porque só o dono de uma tabela pode conceder permissões sobre ela. Em uma instalação existente, isso significa o papel com o qual você vem executando o SnapOtter, e não um papel novo criado para esse fim. Aponte para um papel novo que não seja dono de nada e a inicialização falha com um erro dizendo exatamente isso. Ele também precisa de `CREATEROLE` para criar e manter o papel de execução, e do direito de criar o esquema `drizzle`.
+
+Informe o mesmo papel nas duas URLs e a separação fica desligada, e o SnapOtter avisa isso no log em vez de fingir o contrário. Se o seu provedor não oferece nenhum papel capaz de ser dono das tabelas e ao mesmo tempo ter `CREATEROLE`, fique com o papel único.
+
+### Por que o bit de superusuário fica intocado {#why-the-superuser-bit-is-left-alone}
+
+O SnapOtter nunca remove `SUPERUSER` de um papel por conta própria. Em uma instalação criada antes da separação, `snapotter` é o único superusuário do cluster, e rebaixá-lo deixaria o cluster sem nenhum, algo recuperável apenas pelo modo monousuário com o servidor parado. Quem garante a proteção, em vez disso, é mover a conexão de longa duração para o papel restrito. O superusuário fica na rede pelos poucos segundos da inicialização e depois some.
+
+Instalações tudo-em-um novas nunca têm esse problema. Elas ganham três papéis: `postgres` (superusuário de bootstrap, ausente de toda string de conexão que o SnapOtter usa), `snapotter` (`NOSUPERUSER`, dono dos dados, conecta apenas na inicialização) e `snapotter_app` (só linhas, atende às requisições).
+
+Para rebaixar um `snapotter` antigo mesmo assim, crie primeiro um segundo superusuário e faça login com ele para confirmar que funciona. Depois, `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Backup e restauração {#backup-and-restore}
 
 O banco de dados relacional reside no volume `SnapOtter-pgdata` do contêiner Postgres, não no volume `/data` do aplicativo.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Os dois comandos se conectam como `snapotter`, o dono, e devem continuar assim. O papel de execução não enxerga o esquema `drizzle`, então um dump feito com esse papel sairia incompleto. `--no-owner` deixa os objetos restaurados sob a posse de quem executa a restauração, então rodar isso como o dono coloca a posse onde as permissões esperam encontrá-la. Uma pegadinha em um cluster novo: o `pg_dump` leva as permissões, mas não os papéis que elas citam, então crie `snapotter_app` antes de restaurar ou `--exit-on-error` para no primeiro `GRANT`. De qualquer forma, o SnapOtter reaplica as permissões na próxima inicialização.
 
 Este dump do banco de dados não contém objetos de biblioteca salvos em `/data/files` ou estado BullMQ durável no Redis. Faça backup e restaure-os com o procedimento coordenado em [Segurança e Proteção](/pt-BR/guide/security#backup-and-recovery).
 

@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter, veri kalıcılığı için [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) ile birlikte PostgreSQL 17 kullanır. Şema `apps/api/src/db/schema.ts` dosyasında tanımlanır.
 
-Bağlantı, `DATABASE_URL` ortam değişkeni üzerinden yapılandırılır (varsayılan `postgres://snapotter:snapotter@postgres:5432/snapotter`). Docker Compose'da, Postgres container'ı verilerini `SnapOtter-pgdata` adlı volume'da saklar.
+Bağlantı, `DATABASE_URL` ortam değişkeni üzerinden yapılandırılır (varsayılan `postgres://snapotter:snapotter@postgres:5432/snapotter`). Docker Compose'da, Postgres container'ı verilerini `SnapOtter-pgdata` adlı volume'da saklar. İstekler, yalnızca satır okuyup yazabilen bir rol üzerinden karşılanır; bu konu aşağıdaki [En az ayrıcalıklı roller](#least-privilege-roles) bölümünde ele alınmıştır.
 
 ## Tablolar {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 Üretimde, bekleyen migration'lar başlatma sırasında otomatik olarak uygulanır.
 
+## En az ayrıcalıklı roller {#least-privilege-roles}
+
+İki rol, iki görev. `DATABASE_URL` istekleri karşılar ve uygulamanın tabloları üzerinde `SELECT`, `INSERT`, `UPDATE`, `DELETE`, bunların sequence'ları üzerinde de `USAGE` ve `SELECT` yetkilerini taşır. Listenin tamamı bu. Tablo oluşturamaz veya silemez, uzantı kuramaz, `TRUNCATE` yapamaz, `pg_authid` içeriğini okuyamaz, veritabanı oluşturamaz, rol değiştiremez ve migration geçmişinin bulunduğu `drizzle` şemasına dokunamaz.
+
+Ayrıcalıklı olan `DATABASE_MIGRATION_URL` değişkenidir. Başlatma sırasında migration'ları çalıştırır ve çalışma zamanı rolüne yetkileri verir, ardından tek bir istek bile karşılanmadan kapanır.
+
+Compose ve hepsi bir arada imaj, mevcut kurulumlar dahil olmak üzere zaten bu şekilde yapılandırılmıştır. SnapOtter, açılışta çalışma zamanı rolü yoksa onu oluşturur, yetkilerini verir, migration'ları uygular ve ardından daha önceden var olan tablolara da bu yetkileri işler. Yükseltme için elle SQL çalıştırmak gerekmez.
+
+`DATABASE_MIGRATION_URL` değerini boş bırakırsanız tek rolle çalışılır ve `DATABASE_URL` ayrımdan önce olduğu gibi her iki görevi de üstlenir. Bu, kullanımdan kaldırılmış değil, desteklenen bir yapılandırmadır. Rol oluşturmanın çoğu zaman sizin elinizde olmadığı yönetilen Postgres hizmetlerinde de doğru seçenek budur.
+
+### Harici ve yönetilen Postgres {#external-and-managed-postgres}
+
+RDS, Supabase, Cloud SQL ya da kendi işlettiğiniz herhangi bir kümede bu ayrım isteğe bağlıdır. Çalışma zamanı rolünü bir kez oluşturun:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Ardından aynı sunucuyu, portu ve veritabanını gösteren her iki bağlantı dizesini de SnapOtter'a verin:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Bu kadarı yeterli. Yetkileri SnapOtter kendisi uygular ve her migration'dan sonra yeniden verir; böylece ileriki bir sürümde eklenen bir tablo, kimse onun için SQL çalıştırmadan kapsama girer.
+
+`DATABASE_MIGRATION_URL` içindeki rolün SnapOtter tablolarının sahibi olması gerekir, çünkü bir tablo üzerinde yalnızca sahibi yetki verebilir. Mevcut bir kurulumda bu, SnapOtter'ı o güne dek çalıştırdığınız roldür; bu iş için yeni açılmış bir rol değil. Hiçbir şeyin sahibi olmayan yeni bir rolü gösterirseniz açılış tam olarak bunu söyleyen bir hatayla başarısız olur. Ayrıca çalışma zamanı rolünü oluşturup sürdürebilmek için `CREATEROLE` yetkisine ve `drizzle` şemasını oluşturma hakkına ihtiyaç duyar.
+
+Her iki URL'de aynı rolü yazarsanız ayrım devre dışı kalır ve SnapOtter bunu gizlemek yerine günlüğe düşer. Sağlayıcınız size hem tabloların sahibi olabilen hem de `CREATEROLE` yetkisi taşıyan bir rol vermiyorsa tek rolle çalıştırın.
+
+### Superuser bitine neden dokunulmuyor {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter, bir rolden `SUPERUSER` yetkisini kendiliğinden asla almaz. Ayrımdan önce oluşturulmuş bir kurulumda `snapotter`, kümenin tek superuser'ıdır; bu yetkiyi düşürmek kümeyi hiç superuser'sız bırakır ve bu durumdan ancak sunucu durdurulup tek kullanıcılı kipe geçilerek dönülebilir. Korumayı bunun yerine uzun ömürlü bağlantının kısıtlı role taşınması sağlar. Superuser yalnızca açılışın birkaç saniyesi boyunca hatta olur, sonra çekilir.
+
+Sıfırdan kurulan hepsi bir arada kurulumlarda bu sorun hiç yaşanmaz. Bunlarda üç rol bulunur: `postgres` (önyükleme superuser'ı, SnapOtter'ın kullandığı hiçbir bağlantı dizesinde yer almaz), `snapotter` (`NOSUPERUSER`, verinin sahibidir, yalnızca açılışta bağlanır) ve `snapotter_app` (yalnızca satırlar, istekleri karşılar).
+
+Eski bir `snapotter` rolünün yetkisini yine de düşürmek isterseniz önce ikinci bir superuser oluşturun ve çalıştığını doğrulamak için onunla oturum açın. Sonra `ALTER ROLE snapotter NOSUPERUSER` komutunu verin.
+
 ## Yedekleme ve geri yükleme {#backup-and-restore}
 
 İlişkisel veritabanı, uygulamanın `/data` biriminde değil, Postgres kapsayıcısının `SnapOtter-pgdata` biriminde bulunur.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Her iki komut da sahip olan `snapotter` rolüyle bağlanır ve böyle kalmalıdır. Çalışma zamanı rolü `drizzle` şemasını göremediği için o rolle alınan bir döküm eksik çıkar. `--no-owner`, geri yüklenen nesnelerin sahipliğini geri yüklemeyi çalıştıran kişiye bırakır; komutu sahiple çalıştırmak da sahipliği yetkilerin beklediği yere koyar. Sıfırdan bir kümede tek bir püf noktası var: `pg_dump` yetkileri taşır ama bunların adını verdiği rolleri taşımaz, bu yüzden geri yüklemeden önce `snapotter_app` rolünü oluşturun; yoksa `--exit-on-error` ilk `GRANT` komutunda durur. SnapOtter yine de bir sonraki açılışta yetkileri yeniden uygular.
 
 Bu veritabanı dökümü, `/data/files`'de veya Redis'te dayanıklı BullMQ durumunda kaydedilmiş kitaplık nesnelerini içermiyor. Bunları [Güvenlik ve Güçlendirme](/tr/guide/security#backup-and-recovery) bölümündeki koordineli prosedürle yedekleyin ve geri yükleyin.
 

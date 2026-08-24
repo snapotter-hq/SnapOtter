@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter はデータの永続化に PostgreSQL 17 と [Drizzle ORM](https://orm.drizzle.team/)（pg-core / node-postgres）を使用します。スキーマは `apps/api/src/db/schema.ts` で定義されています。
 
-接続は `DATABASE_URL` 環境変数（デフォルト `postgres://snapotter:snapotter@postgres:5432/snapotter`）で設定します。Docker Compose では、Postgres コンテナが `SnapOtter-pgdata` という名前付きボリュームにデータを保存します。
+接続は `DATABASE_URL` 環境変数（デフォルト `postgres://snapotter:snapotter@postgres:5432/snapotter`）で設定します。Docker Compose では、Postgres コンテナが `SnapOtter-pgdata` という名前付きボリュームにデータを保存します。 リクエストは、後述の [最小権限ロール](#least-privilege-roles) で説明するとおり、行の読み取りと書き込みしかできないロールで処理されます。
 
 ## テーブル {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 本番環境では、保留中のマイグレーションが起動時に自動的に適用されます。
 
+## 最小権限ロール {#least-privilege-roles}
+
+2 つのロールに、2 つの役割。`DATABASE_URL` はリクエストを処理するためのもので、アプリのテーブルに対する `SELECT`、`INSERT`、`UPDATE`、`DELETE`、およびそれらのシーケンスに対する `USAGE` と `SELECT` を持ちます。権限はこれがすべてです。テーブルの作成や削除、拡張機能のインストール、`TRUNCATE`、`pg_authid` の読み取り、データベースの作成、ロールの変更はできず、マイグレーション履歴が置かれている `drizzle` スキーマに触れることもできません。
+
+特権を持つのは `DATABASE_MIGRATION_URL` の方です。起動中にマイグレーションを実行してランタイムロールに権限を付与し、リクエストを 1 件も処理しないうちに接続を閉じます。
+
+Compose とオールインワンイメージは、既存のインストールも含めてすでにこの構成になっています。SnapOtter は起動時に、ランタイムロールがなければ作成して権限を付与し、マイグレーションを実行したうえで、以前から存在していたテーブルにも権限を行き渡らせます。アップグレードのために手作業で SQL を実行する必要はありません。
+
+`DATABASE_MIGRATION_URL` を空のままにすると単一ロールで動作し、分割前とまったく同じように `DATABASE_URL` が両方の役割を担います。これは非推奨ではなく、サポートされた構成です。ロールの作成が自分の裁量では行えないことも多いマネージド Postgres では、こちらが適切な選択です。
+
+### 外部およびマネージドの Postgres {#external-and-managed-postgres}
+
+RDS、Supabase、Cloud SQL、あるいは自分で運用しているクラスタでは、この分割はオプトインです。ランタイムロールを一度だけ作成します。
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+そのうえで、同じホスト、ポート、データベースを指す 2 つの接続文字列を SnapOtter に渡します。
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+作業はここまでです。権限の付与は SnapOtter 自身が行い、マイグレーションのたびに付与し直すため、将来のリリースで追加されるテーブルについても、誰かが SQL を実行しなくてもカバーされます。
+
+`DATABASE_MIGRATION_URL` に指定するロールは、SnapOtter のテーブルを所有している必要があります。テーブルに対して権限を付与できるのは、その所有者だけだからです。既存のインストールでは、そのために新しく作ったロールではなく、これまで SnapOtter を動かしてきたロールがこれに当たります。何も所有していない新規ロールを指定すると、まさにその旨を伝えるエラーで起動に失敗します。さらに、ランタイムロールを作成して維持するための `CREATEROLE` と、`drizzle` スキーマを作成する権限も必要です。
+
+両方の URL に同じロールを指定すると分割は無効になり、SnapOtter はそれを取り繕わずログに記録します。テーブルを所有しつつ `CREATEROLE` も持てるロールがプロバイダ側で用意できない場合は、単一ロールで運用してください。
+
+### スーパーユーザー属性をそのままにしている理由 {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter がロールから `SUPERUSER` を独自に外すことはありません。分割より前に作成されたインストールでは `snapotter` がクラスタで唯一のスーパーユーザーであり、これを降格させるとクラスタにスーパーユーザーが 1 つも残らず、サーバーを停止したうえでのシングルユーザーモードでしか復旧できなくなります。代わりに、長時間維持される接続を制限付きのロールへ移すことで保護を得ています。スーパーユーザーが接続に現れるのは起動時の数秒間だけで、あとは姿を消します。
+
+新規のオールインワンインストールでは、この問題は起きません。ロールは 3 つ用意されます。`postgres`（ブートストラップ用のスーパーユーザーで、SnapOtter が使うどの接続文字列にも登場しません）、`snapotter`（`NOSUPERUSER`。データを所有し、接続するのは起動時だけです）、`snapotter_app`（行だけを扱い、リクエストを処理します）です。
+
+それでも古い `snapotter` を降格させたい場合は、先に 2 つ目のスーパーユーザーを作成し、そのロールでログインできることを確認してください。そのうえで `ALTER ROLE snapotter NOSUPERUSER` を実行します。
+
 ## {#backup-and-restore} のバックアップと復元
 
 リレーショナル データベースは、アプリの `/data` ボリュームではなく、Postgres コンテナーの `SnapOtter-pgdata` ボリュームに存在します。
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+どちらのコマンドも所有者である `snapotter` として接続しており、今後もそのままにしてください。ランタイムロールからは `drizzle` スキーマが見えないため、そのロールで取得したダンプは不完全になります。`--no-owner` を指定すると、リストアされたオブジェクトの所有者はリストアを実行した人になるので、所有者として実行すれば権限設定が前提とする所有関係どおりになります。新しいクラスタでは 1 つ注意点があります。`pg_dump` は権限の設定を含めますが、そこで名指しされているロールまでは含めません。そのため、リストアの前に `snapotter_app` を作成しておかないと、`--exit-on-error` によって最初の `GRANT` で停止します。いずれにせよ、SnapOtter は次回の起動時に権限を付与し直します。
 
 このデータベース ダンプには、`/data/files` で保存されたライブラリ オブジェクトや、Redis の永続的な BullMQ 状態は含まれません。 [セキュリティと強化](/ja/guide/security#backup-and-recovery) の連携手順でバックアップと復元を行ってください。
 

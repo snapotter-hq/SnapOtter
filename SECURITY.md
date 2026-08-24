@@ -60,6 +60,7 @@ After acknowledging your report, we will keep you informed of our progress towar
 - **SVG sanitization**: Strips DOCTYPE declarations (XXE prevention), removes `<script>` tags, `<foreignObject>` elements, event handlers, and blocks dangerous URI schemes (`javascript:`, `data:text/html`, `file:`, external URLs in `href`/`xlink:href`)
 - **API validation**: Zod schemas on tool routes and environment config; manual validation on auth routes
 - **Database queries**: Parameterized via Drizzle ORM (PostgreSQL) — no raw string concatenation
+- **Database privileges**: The application connects with DML rights only (`SELECT`, `INSERT`, `UPDATE`, `DELETE` on its own tables). Schema changes run on a separate privileged connection, opened at boot and closed before the first request. On installs created by the current image neither role is a cluster superuser, so SQL injection cannot reach `COPY ... FROM PROGRAM`, `pg_read_file`, or extension installation. See [Least-privilege roles](https://docs.snapotter.com/guide/database#least-privilege-roles)
 
 ### HTTP Security
 

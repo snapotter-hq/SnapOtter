@@ -10,7 +10,7 @@ i18n_hash_version: 2
 
 SnapOtter używa PostgreSQL 17 z [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) do trwałego przechowywania danych. Schemat jest zdefiniowany w `apps/api/src/db/schema.ts`.
 
-Połączenie konfiguruje się za pomocą zmiennej środowiskowej `DATABASE_URL` (domyślnie `postgres://snapotter:snapotter@postgres:5432/snapotter`). W Docker Compose kontener Postgres przechowuje swoje dane w nazwanym wolumenie `SnapOtter-pgdata`.
+Połączenie konfiguruje się za pomocą zmiennej środowiskowej `DATABASE_URL` (domyślnie `postgres://snapotter:snapotter@postgres:5432/snapotter`). W Docker Compose kontener Postgres przechowuje swoje dane w nazwanym wolumenie `SnapOtter-pgdata`. Żądania są obsługiwane przez rolę, która może wyłącznie odczytywać i zapisywać wiersze, co opisano poniżej w sekcji [Role o najmniejszych uprawnieniach](#least-privilege-roles).
 
 ## Tabele {#tables}
 
@@ -169,6 +169,46 @@ npx drizzle-kit migrate    # apply pending migrations
 
 W środowisku produkcyjnym oczekujące migracje są stosowane automatycznie przy uruchomieniu.
 
+## Role o najmniejszych uprawnieniach {#least-privilege-roles}
+
+Dwie role, dwa zadania. `DATABASE_URL` obsługuje żądania i ma uprawnienia `SELECT`, `INSERT`, `UPDATE`, `DELETE` do tabel aplikacji oraz `USAGE` i `SELECT` do ich sekwencji. To cała lista. Nie może utworzyć ani usunąć tabeli, zainstalować rozszerzenia, wykonać `TRUNCATE`, odczytać `pg_authid`, utworzyć bazy danych, zmienić roli ani sięgnąć do schematu `drizzle`, w którym przechowywana jest historia migracji.
+
+`DATABASE_MIGRATION_URL` to ta uprzywilejowana. Wykonuje migracje i nadaje uprawnienia roli wykonawczej podczas uruchamiania, a potem zamyka połączenie, zanim zostanie obsłużone jakiekolwiek żądanie.
+
+Compose i obraz all-in-one są już tak skonfigurowane, łącznie z istniejącymi instalacjami. Przy uruchomieniu SnapOtter tworzy rolę wykonawczą, jeśli jej brakuje, nadaje jej uprawnienia, wykonuje migracje, a następnie rozciąga uprawnienia na tabele, które istniały wcześniej. Aktualizacja nie wymaga ręcznego SQL-a.
+
+Pozostawienie pustej zmiennej `DATABASE_MIGRATION_URL` uruchamia tryb jednorolowy, w którym `DATABASE_URL` wykonuje oba zadania dokładnie tak jak przed podziałem. Jest to konfiguracja wspierana, a nie wycofywana. Na zarządzanym Postgresie to właściwy wybór, ponieważ tworzenie ról często nie leży w Twojej gestii.
+
+### Zewnętrzny i zarządzany Postgres {#external-and-managed-postgres}
+
+Na RDS, Supabase, Cloud SQL lub dowolnym klastrze, który prowadzisz samodzielnie, podział jest opcjonalny. Rolę wykonawczą tworzysz raz:
+
+```sql
+CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+```
+
+Następnie przekaż SnapOtterowi oba ciągi połączenia, wskazujące ten sam host, port i bazę danych:
+
+```bash
+DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
+DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
+```
+
+Na tym poprzestań. SnapOtter sam nadaje uprawnienia i nadaje je ponownie po każdej migracji, więc tabela dodana w przyszłym wydaniu zostanie objęta bez uruchamiania SQL-a przez kogokolwiek.
+
+Rola wskazana w `DATABASE_MIGRATION_URL` musi być właścicielem tabel SnapOttera, ponieważ uprawnienia do tabeli może nadawać wyłącznie jej właściciel. W istniejącej instalacji oznacza to rolę, na której dotąd działał SnapOtter, a nie nową, utworzoną specjalnie w tym celu. Jeśli wskażesz nową rolę, która nie jest niczego właścicielem, uruchomienie zakończy się błędem mówiącym dokładnie o tym. Potrzebuje ona także uprawnienia `CREATEROLE`, aby tworzyć i utrzymywać rolę wykonawczą, oraz prawa do utworzenia schematu `drizzle`.
+
+Podanie tej samej roli w obu adresach URL wyłącza podział, a SnapOtter zapisuje to w dzienniku, zamiast udawać, że jest inaczej. Jeśli Twój dostawca nie daje Ci roli, która jednocześnie jest właścicielem tabel i ma uprawnienie `CREATEROLE`, uruchom tryb jednorolowy.
+
+### Dlaczego bit superużytkownika pozostaje nietknięty {#why-the-superuser-bit-is-left-alone}
+
+SnapOtter nigdy sam nie odbiera roli uprawnienia `SUPERUSER`. W instalacji utworzonej przed podziałem `snapotter` jest jedynym superużytkownikiem klastra, a jego degradacja pozostawiłaby klaster bez żadnego, co da się naprawić tylko w trybie jednoużytkownikowym przy zatrzymanym serwerze. Ochronę daje zamiast tego przeniesienie długotrwałego połączenia na rolę o ograniczonych uprawnieniach. Superużytkownik jest w sieci przez kilka sekund uruchamiania, a potem znika.
+
+Nowe instalacje all-in-one nigdy nie mają tego problemu. Otrzymują trzy role: `postgres` (superużytkownik startowy, nieobecny w żadnym ciągu połączenia używanym przez SnapOttera), `snapotter` (`NOSUPERUSER`, właściciel danych, łączy się tylko przy uruchamianiu) oraz `snapotter_app` (tylko wiersze, obsługuje żądania).
+
+Aby mimo wszystko zdegradować starszą rolę `snapotter`, najpierw utwórz drugiego superużytkownika i zaloguj się na niego, aby potwierdzić, że działa. Następnie `ALTER ROLE snapotter NOSUPERUSER`.
+
 ## Utwórz kopię zapasową i przywróć {#backup-and-restore}
 
 Relacyjna baza danych znajduje się w woluminie `SnapOtter-pgdata` kontenera Postgres, a nie w wolumenie `/data` aplikacji.
@@ -187,6 +227,8 @@ docker exec -i SnapOtter-postgres \
   pg_restore --exit-on-error --clean --if-exists --no-owner \
   -U snapotter -d snapotter < snapotter.dump
 ```
+
+Oba polecenia łączą się jako `snapotter`, czyli właściciel, i tak powinno pozostać. Rola wykonawcza nie widzi schematu `drizzle`, więc zrzut wykonany na tej roli byłby niekompletny. `--no-owner` sprawia, że właścicielem przywróconych obiektów zostaje ten, kto uruchamia przywracanie, więc uruchomienie go jako właściciel umieszcza własność tam, gdzie oczekują tego nadane uprawnienia. Jedna pułapka na świeżym klastrze: `pg_dump` przenosi uprawnienia, ale nie role, które w nich występują, więc utwórz `snapotter_app` przed przywracaniem, w przeciwnym razie `--exit-on-error` zatrzyma się na pierwszym `GRANT`. Niezależnie od tego SnapOtter ponownie nada uprawnienia przy kolejnym uruchomieniu.
 
 Ten zrzut bazy danych nie zawiera zapisanych obiektów biblioteki w `/data/files` ani trwałego stanu BullMQ w Redis. Utwórz kopię zapasową i przywróć te dane, stosując skoordynowaną procedurę w [Bezpieczeństwo i wzmacnianie](/pl/guide/security#backup-and-recovery).
 
