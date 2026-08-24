@@ -6,6 +6,7 @@ import { formatHeaders } from "@/lib/api";
 import {
   COLLAGE_TEMPLATES,
   type CollageTemplate,
+  collageTemplateLabel,
   getTemplateById,
   getTemplatesForCount,
 } from "@/lib/collage-templates";
@@ -450,7 +451,7 @@ function TemplateButton({
           : "border-border hover:border-primary/50 bg-muted/30",
       )}
       title={format(t.toolSettings.collage.templateTitle, {
-        label: template.label,
+        label: collageTemplateLabel(t, template),
         count: template.imageCount,
       })}
     >
@@ -462,6 +463,7 @@ function TemplateButton({
 
 /** Renders a mini SVG preview of a template layout. */
 function TemplateDiagram({ template, size }: { template: CollageTemplate; size: number }) {
+  const { t } = useTranslation();
   const padding = 2;
   const gap = 1.5;
   const inner = size - padding * 2;
@@ -475,7 +477,7 @@ function TemplateDiagram({ template, size }: { template: CollageTemplate; size: 
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       role="img"
-      aria-label={template.label}
+      aria-label={collageTemplateLabel(t, template)}
     >
       {rects.map((r) => (
         <rect

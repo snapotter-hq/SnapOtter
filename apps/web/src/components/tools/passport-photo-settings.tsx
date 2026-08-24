@@ -24,6 +24,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
+import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -295,6 +296,7 @@ function CountryOption({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation();
   const doc = spec.documents[0];
   return (
     <button
@@ -305,7 +307,7 @@ function CountryOption({
       }`}
     >
       <span>{spec.flag}</span>
-      <span className="flex-1 text-start">{spec.name}</span>
+      <span className="flex-1 text-start">{passportCountryName(t, spec)}</span>
       <span className="text-muted-foreground tabular-nums text-[10px]">
         {formatDimensions(doc)}
       </span>
@@ -574,7 +576,7 @@ export function PassportPhotoSettings() {
         >
           <span>{selectedSpec.flag}</span>
           <span className="flex-1 text-start truncate">
-            {selectedSpec.name}
+            {passportCountryName(t, selectedSpec)}
             <span className="text-muted-foreground ms-1.5 text-xs">
               {formatDimensions(docSpec)}
             </span>
@@ -835,7 +837,9 @@ export function PassportPhotoSettings() {
 
       {/* Spec info bar */}
       <div className="text-[11px] text-muted-foreground space-y-0.5 bg-muted/50 rounded-lg px-3 py-2">
-        <p className="font-medium text-foreground">{docSpec.label}</p>
+        <p className="font-medium text-foreground">
+          {passportDocLabel(t, getCountrySpec(countryCode))}
+        </p>
         <p>
           {format(t.toolSettings["passport-photo"].dimensionsSummary, {
             width: docSpec.width,

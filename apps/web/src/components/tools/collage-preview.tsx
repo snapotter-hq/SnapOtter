@@ -151,8 +151,12 @@ function UploadArea() {
 }
 
 function ProcessingView() {
+  const { t } = useTranslation();
   const progress = useCollageStore((s) => s.progress);
-  const label = progress < 80 ? "Uploading images..." : "Processing collage...";
+  const label =
+    progress < 80
+      ? t.toolSettings.collage.uploadingImages
+      : t.toolSettings.collage.processingCollage;
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 px-8">

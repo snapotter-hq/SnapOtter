@@ -189,6 +189,7 @@ export function ColorControls({
       <div className="space-y-2">
         <SliderControl
           label={t.toolSettings.color.brightness}
+          id="brightness"
           value={brightness}
           onChange={setBrightness}
           min={-100}
@@ -196,6 +197,7 @@ export function ColorControls({
         />
         <SliderControl
           label={t.toolSettings.color.contrast}
+          id="contrast"
           value={contrast}
           onChange={setContrast}
           min={-100}
@@ -203,6 +205,7 @@ export function ColorControls({
         />
         <SliderControl
           label={t.toolSettings.color.exposure}
+          id="exposure"
           value={exposure}
           onChange={setExposure}
           min={-100}
@@ -215,6 +218,7 @@ export function ColorControls({
       <div className="space-y-2">
         <SliderControl
           label={t.toolSettings.color.saturation}
+          id="saturation"
           value={saturation}
           onChange={setSaturation}
           min={-100}
@@ -222,6 +226,7 @@ export function ColorControls({
         />
         <SliderControl
           label={t.toolSettings.color.temperature}
+          id="temperature"
           value={temperature}
           onChange={setTemperature}
           min={-100}
@@ -230,6 +235,7 @@ export function ColorControls({
         />
         <SliderControl
           label={t.toolSettings.color.tint}
+          id="tint"
           value={tint}
           onChange={setTint}
           min={-100}
@@ -238,6 +244,7 @@ export function ColorControls({
         />
         <SliderControl
           label={t.toolSettings.color.hue}
+          id="hue"
           value={hue}
           onChange={setHue}
           min={-180}
@@ -250,6 +257,7 @@ export function ColorControls({
       <div className="space-y-2">
         <SliderControl
           label={t.toolSettings.color.sharpness}
+          id="sharpness"
           value={sharpness}
           onChange={setSharpness}
           min={0}
@@ -294,6 +302,7 @@ export function ColorControls({
         <div className="space-y-2 ps-1">
           <SliderControl
             label={t.toolSettings.color.red}
+            id="red"
             value={red}
             onChange={setRed}
             min={0}
@@ -302,6 +311,7 @@ export function ColorControls({
           />
           <SliderControl
             label={t.toolSettings.color.green}
+            id="green"
             value={green}
             onChange={setGreen}
             min={0}
@@ -310,6 +320,7 @@ export function ColorControls({
           />
           <SliderControl
             label={t.toolSettings.color.blue}
+            id="blue"
             value={blue}
             onChange={setBlue}
             min={0}
@@ -459,6 +470,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function SliderControl({
+  id,
   label,
   value,
   onChange,
@@ -467,6 +479,7 @@ function SliderControl({
   color,
   hint,
 }: {
+  id: string;
   label: string;
   value: number;
   onChange: (v: number) => void;
@@ -475,18 +488,18 @@ function SliderControl({
   color?: string;
   hint?: string;
 }) {
-  const id = `color-slider-${label.toLowerCase()}`;
+  const sliderId = `color-slider-${id}`;
   return (
     <div>
       <div className="flex justify-between items-center">
-        <label htmlFor={id} className={`text-xs ${color || "text-muted-foreground"}`}>
+        <label htmlFor={sliderId} className={`text-xs ${color || "text-muted-foreground"}`}>
           {label}
           {hint && <span className="text-[10px] text-muted-foreground ms-1">({hint})</span>}
         </label>
         <span className="text-xs font-mono text-foreground tabular-nums w-8 text-end">{value}</span>
       </div>
       <input
-        id={id}
+        id={sliderId}
         type="range"
         min={min}
         max={max}

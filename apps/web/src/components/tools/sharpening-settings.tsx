@@ -166,6 +166,7 @@ export function SharpeningSettings() {
         {method === "adaptive" && (
           <SliderControl
             label={t.toolSettings.sharpening.textureAmount}
+            id="texture-amount"
             value={m2}
             onChange={(v) => {
               setM2(v);
@@ -179,6 +180,7 @@ export function SharpeningSettings() {
         {method === "unsharp-mask" && (
           <SliderControl
             label={t.toolSettings.sharpening.amount}
+            id="amount"
             value={amount}
             onChange={(v) => {
               setAmount(v);
@@ -193,6 +195,7 @@ export function SharpeningSettings() {
         {method === "high-pass" && (
           <SliderControl
             label={t.toolSettings.sharpening.strength}
+            id="strength"
             value={strength}
             onChange={(v) => {
               setStrength(v);
@@ -240,6 +243,7 @@ export function SharpeningSettings() {
             <>
               <SliderControl
                 label={t.toolSettings.sharpening.radius}
+                id="radius"
                 value={sigma}
                 onChange={(v) => {
                   setSigma(v);
@@ -252,6 +256,7 @@ export function SharpeningSettings() {
               />
               <SliderControl
                 label={t.toolSettings.sharpening.flatProtection}
+                id="flat-protection"
                 value={m1}
                 onChange={(v) => {
                   setM1(v);
@@ -264,6 +269,7 @@ export function SharpeningSettings() {
               />
               <SliderControl
                 label={t.toolSettings.sharpening.detailThreshold}
+                id="detail-threshold"
                 value={x1}
                 onChange={(v) => {
                   setX1(v);
@@ -276,6 +282,7 @@ export function SharpeningSettings() {
               />
               <SliderControl
                 label={t.toolSettings.sharpening.haloLimitLight}
+                id="halo-limit-(light)"
                 value={y2}
                 onChange={(v) => {
                   setY2(v);
@@ -287,6 +294,7 @@ export function SharpeningSettings() {
               />
               <SliderControl
                 label={t.toolSettings.sharpening.haloLimitDark}
+                id="halo-limit-(dark)"
                 value={y3}
                 onChange={(v) => {
                   setY3(v);
@@ -302,6 +310,7 @@ export function SharpeningSettings() {
             <>
               <SliderControl
                 label={t.toolSettings.sharpening.radius}
+                id="radius"
                 value={radius}
                 onChange={(v) => {
                   setRadius(v);
@@ -314,6 +323,7 @@ export function SharpeningSettings() {
               />
               <SliderControl
                 label={t.toolSettings.sharpening.threshold}
+                id="threshold"
                 value={threshold}
                 onChange={(v) => {
                   setThreshold(v);
@@ -416,6 +426,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function SliderControl({
+  id,
   label,
   value,
   onChange,
@@ -425,6 +436,7 @@ function SliderControl({
   color,
   hint,
 }: {
+  id: string;
   label: string;
   value: number;
   onChange: (v: number) => void;
@@ -434,12 +446,12 @@ function SliderControl({
   color?: string;
   hint?: string;
 }) {
-  const id = `sharpen-slider-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const sliderId = `sharpen-slider-${id}`;
   const displayValue = step && step < 1 ? value.toFixed(1) : String(value);
   return (
     <div>
       <div className="flex justify-between items-center">
-        <label htmlFor={id} className={`text-xs ${color || "text-muted-foreground"}`}>
+        <label htmlFor={sliderId} className={`text-xs ${color || "text-muted-foreground"}`}>
           {label}
           {hint && <span className="text-[10px] text-muted-foreground ms-1">({hint})</span>}
         </label>
@@ -448,7 +460,7 @@ function SliderControl({
         </span>
       </div>
       <input
-        id={id}
+        id={sliderId}
         type="range"
         min={min}
         max={max}
