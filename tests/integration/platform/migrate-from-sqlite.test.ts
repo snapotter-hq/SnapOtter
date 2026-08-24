@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../../../apps/api/src/db/index.js";
 import {
@@ -10,6 +11,27 @@ import {
   migrateFromSqlite,
 } from "../../../apps/api/src/db/migrate-from-sqlite.js";
 import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
+
+/**
+ * Empty the tables the importer writes into, so each suite starts from the
+ * "fresh 2.0 install" the migrator expects.
+ *
+ * On its own connection as the owning role: TRUNCATE is not among the runtime
+ * role's grants and must not become one, since the app never truncates. Only
+ * this reset does, and that is a test-fixture need rather than an application
+ * one.
+ */
+async function truncateMigratedTables(): Promise<void> {
+  const client = new pg.Client({ connectionString: process.env.TEST_PRIVILEGED_DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(
+      "TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE",
+    );
+  } finally {
+    await client.end();
+  }
+}
 
 function buildFixtureSqlite(path: string): void {
   const s = new Database(path);
@@ -83,15 +105,11 @@ describe("migrate-from-sqlite", () => {
   beforeAll(async () => {
     buildFixtureSqlite(sqlitePath);
     // simulate empty 2.0 target: wipe all rows the suite DB may have
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
 
   afterAll(async () => {
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
 
   it("copies all rows with converted types", async () => {
@@ -443,15 +461,11 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
 
   beforeAll(async () => {
     buildRepresentativeSqlite(reprPath);
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
 
   afterAll(async () => {
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
 
   it("imports all tables with correct row counts", async () => {
@@ -594,14 +608,10 @@ describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
   beforeAll(async () => {
     buildLegacySqlite(realPath);
     seeded = await seedRealistic1xData(realPath);
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
   afterAll(async () => {
-    await db.execute(
-      sql`TRUNCATE user_files, audit_log, jobs, pipelines, api_keys, sessions, roles, settings, teams, users CASCADE`,
-    );
+    await truncateMigratedTables();
   });
 
   it("excludes sessions from the migrated set", () => {

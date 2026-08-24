@@ -17,11 +17,14 @@ import {
 // provisioning, the grants, and runMigrations / probeDatabase /
 // assertDatabaseConfig / bootConnectionLabel in split mode.
 //
-// DATABASE_URL is this fork's own database, owned by the privileged base user
-// (tests/setup/per-fork-env.ts). Roles, unlike databases, are cluster-wide, so
-// the probe role name is derived from the fork database to keep parallel forks
-// from racing to create and drop the same role.
-const privilegedUrl = process.env.DATABASE_URL as string;
+// TEST_PRIVILEGED_DATABASE_URL is this fork's own database as the base role that
+// owns it (tests/setup/per-fork-env.ts). DATABASE_URL is deliberately NOT that:
+// the suite runs as the least-privilege runtime role, which cannot create roles
+// or grant anything, so every owner-side statement below needs this one. Roles,
+// unlike databases, are cluster-wide, so the probe role name is derived from the
+// fork database to keep parallel forks from racing to create and drop the same
+// role.
+const privilegedUrl = process.env.TEST_PRIVILEGED_DATABASE_URL as string;
 
 function databaseName(url: string): string {
   return decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
@@ -387,8 +390,15 @@ describe("split-mode boot that succeeds", () => {
     // Ending the session would release the lock on its own, so this pins the end
     // state rather than the unlock statement: a pooled or leaked connection
     // holding it would show up here.
+    //
+    // Scoped to this fork's database. pg_locks reports the whole cluster, while
+    // an advisory lock's tag carries the database it was taken in, so an
+    // unscoped count also sees the sibling forks that hold this same key for the
+    // duration of their own boot.
     const { rows } = await owner.query<{ held: number }>(
-      "SELECT count(*)::int AS held FROM pg_locks WHERE locktype = 'advisory' AND objid = $1",
+      `SELECT count(*)::int AS held FROM pg_locks
+       WHERE locktype = 'advisory' AND objid = $1
+         AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
       [MIGRATION_LOCK_KEY],
     );
     expect(rows[0].held).toBe(0);

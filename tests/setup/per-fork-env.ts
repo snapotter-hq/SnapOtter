@@ -16,6 +16,34 @@ if (!baseUrl) {
   throw new Error("TEST_PG_BASE_URL missing; tests/global-setup.ts did not run");
 }
 
+// The least-privilege role the app serves requests as. Created cluster-wide and
+// granted on the template in tests/global-setup.ts, so this fork's cloned
+// database already carries the grants.
+const runtimeRole = process.env.TEST_RUNTIME_ROLE;
+const runtimePassword = process.env.TEST_RUNTIME_PASSWORD;
+if (!runtimeRole || !runtimePassword) {
+  throw new Error(
+    "TEST_RUNTIME_ROLE / TEST_RUNTIME_PASSWORD missing; tests/global-setup.ts did not run",
+  );
+}
+
+// Each worker process logs in as its own member of that role rather than as the
+// role itself.
+//
+// ensureRuntimeRole() realigns the runtime password on every boot, and every
+// test file boots. Postgres does not queue concurrent writers of a pg_authid
+// row: the losers get "tuple concurrently updated" (XX000, simple_heap_update),
+// which fails the boot outright. A deployment is safe from that because its
+// replicas share one database and the migration advisory lock (which is
+// database-scoped) serializes them. This harness is the one shape where that
+// lock does not help, since it runs a database per test file against a single
+// cluster. One login role per worker process restores the invariant: files
+// inside a process run one at a time, so no pg_authid row ever has two writers.
+//
+// Membership is what carries the privileges: the fork role inherits exactly the
+// grant set global-setup applied to the template and nothing besides.
+const forkRole = `${runtimeRole}_${process.pid}`;
+
 const redisBaseUrl = process.env.TEST_REDIS_BASE_URL;
 if (!redisBaseUrl) {
   throw new Error("TEST_REDIS_BASE_URL missing; tests/global-setup.ts did not run");
@@ -57,8 +85,35 @@ for (let attempt = 0; attempt < 5 && !created; attempt++) {
     await new Promise((r) => setTimeout(r, 150 + Math.floor(150 * attempt)));
   }
 }
+// Every file in this process reuses the same role, so this runs once per worker
+// and is a lookup thereafter. The name is derived from the pid and the password
+// is a harness constant, so neither can carry injection into the DDL below; the
+// shipping path quotes both server-side with format() instead (see
+// apps/api/src/db/bootstrap-roles.ts).
+const { rows: roleRows } = await admin.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [
+  forkRole,
+]);
+if (roleRows.length === 0) {
+  await admin.query(
+    `CREATE ROLE ${forkRole} LOGIN PASSWORD '${runtimePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS IN ROLE ${runtimeRole}`,
+  );
+}
 await admin.end();
 
 const forkUrl = new URL(baseUrl);
 forkUrl.pathname = `/${dbName}`;
-process.env.DATABASE_URL = forkUrl.toString();
+
+// Every integration test boots through the real privilege split: the boot path
+// migrates and provisions as the owning base role, then the app serves as the
+// restricted runtime role. Anything that quietly needs more than DML on the app
+// tables fails here rather than in a shipped deployment.
+const privilegedUrl = forkUrl.toString();
+process.env.DATABASE_MIGRATION_URL = privilegedUrl;
+// Tests whose own setup or teardown legitimately needs owner rights (TRUNCATE,
+// DDL) use this instead of widening what the runtime role may do.
+process.env.TEST_PRIVILEGED_DATABASE_URL = privilegedUrl;
+
+const runtimeUrl = new URL(forkUrl);
+runtimeUrl.username = encodeURIComponent(forkRole);
+runtimeUrl.password = encodeURIComponent(runtimePassword);
+process.env.DATABASE_URL = runtimeUrl.toString();
