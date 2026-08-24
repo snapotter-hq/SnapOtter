@@ -46,14 +46,17 @@ const bootRole = `${role}_boot`;
 // Never created at all. Standing in for the runtime role of an install that is
 // only now being switched to the split.
 const ghostRole = `${role}_ghost`;
+// Does not exist until the concurrent-creation spec races several boots at it.
+const raceRole = `${role}_race`;
 
 // Mirrors MIGRATION_LOCK_KEY in apps/api/src/db/migrate.ts, which does not
 // export it.
 const MIGRATION_LOCK_KEY = 7_421_001;
 
-// How many boots the concurrency spec fires at once. Three already collided on
-// every one of 15 trials against the unconditional ALTER; four keeps a margin
-// without adding much to the connection count parallel forks share.
+// How many boots the concurrency specs fire at once. Three already collided on
+// every one of 15 trials against both the unconditional ALTER and the
+// unguarded CREATE; four keeps a margin without adding much to the connection
+// count parallel forks share.
 const CONCURRENT_BOOTS = 4;
 
 // A quote in the password is the case %L has to survive; string concatenation
@@ -209,7 +212,7 @@ afterAll(async () => {
   if (!owner) return;
   await owner.query("DROP TABLE IF EXISTS probe_future_table").catch(() => {});
   await owner.query("DROP TABLE IF EXISTS probe_after_boot_table").catch(() => {});
-  for (const name of [role, strangerRole, superRole, adoptedRole, bootRole]) {
+  for (const name of [role, strangerRole, superRole, adoptedRole, bootRole, raceRole]) {
     // DROP OWNED BY also strips the default-privilege entries and the database
     // GRANT, which DROP ROLE would otherwise refuse over. It only reaches the
     // current database, which is where every grant was made.
@@ -292,6 +295,40 @@ describe("runtime role provisioning", () => {
     // Hand the backend count back as it was found: the boot spec below asserts
     // on it, and a connection still draining here would read as a leak there.
     await settleTo(backendCount, baseline);
+  });
+
+  // The same race one step earlier, on a role that does not exist yet: every
+  // boot looks, sees nothing, and issues CREATE ROLE. Exactly one can win.
+  it("survives simultaneous boots that all create the role", async () => {
+    const baseline = await backendCount();
+    const clients = Array.from(
+      { length: CONCURRENT_BOOTS },
+      () => new pg.Client({ connectionString: privilegedUrl }),
+    );
+    await Promise.all(clients.map((client) => client.connect()));
+    try {
+      const results = await Promise.all(
+        clients.map((client) => ensureRuntimeRole(client, raceRole, password)),
+      );
+      // Only the boot that really created it may say so: migrate.ts logs
+      // "Created least-privilege runtime role" off this, and several
+      // deployments each claiming the creation would be a lie.
+      expect(results.filter(Boolean)).toHaveLength(1);
+      expect(results).toHaveLength(CONCURRENT_BOOTS);
+
+      // The losers adopted the winner's role rather than half-configuring one.
+      const { rows } = await owner.query(
+        "SELECT rolsuper, rolcanlogin FROM pg_roles WHERE rolname = $1",
+        [raceRole],
+      );
+      expect(rows).toEqual([{ rolsuper: false, rolcanlogin: true }]);
+      await expect(
+        asRole(raceRole, password, (client) => client.query("SELECT 1")),
+      ).resolves.toBeDefined();
+    } finally {
+      await Promise.all(clients.map((client) => client.end()));
+      await settleTo(backendCount, baseline);
+    }
   });
 
   // The residual race: skipping the write when the password matches does not

@@ -55,72 +55,114 @@ async function passwordAlreadyWorks(
   return true;
 }
 
-/** XX000 internal_error, which is what "tuple concurrently updated" reports as. */
-function isConcurrentUpdate(err: unknown): boolean {
-  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "XX000";
+/**
+ * SQLSTATEs that mean another boot got there first, not that this boot failed.
+ *
+ * Two SnapOtter databases on one cluster whose DATABASE_URLs name the same role
+ * can reach these: the advisory lock in migrate.ts serializes the replicas of a
+ * single deployment, but advisory lock ids are scoped per database, so it does
+ * nothing across two of them.
+ */
+// "tuple concurrently updated": Postgres does not queue concurrent writers of a
+// pg_authid row, so the loser of two simultaneous ALTER ROLEs gets this.
+const CONCURRENT_UPDATE = "XX000";
+// A lost CREATE ROLE surfaces as whichever check the loser happens to trip.
+// Which one is timing: the winner has to commit before the loser's syscache
+// lookup to produce 42710, and in a real race it usually does not, so 23505 is
+// what actually shows up. Both mean the role is there now.
+const DUPLICATE_OBJECT = "42710"; // the lookup inside CREATE ROLE saw it
+const UNIQUE_VIOLATION = "23505"; // both passed that lookup; the index caught it
+
+function hasSqlState(err: unknown, ...states: string[]): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const { code } = err as { code?: unknown };
+  return typeof code === "string" && states.includes(code);
+}
+
+/**
+ * Is the role already there? Refuses rather than answers when it is a
+ * superuser: only a superuser may clear that attribute, and the migration role
+ * may be no more than CREATEROLE, so there is no demoting it from here. Serving
+ * requests as one would leave COPY ... FROM PROGRAM reachable while the
+ * deployment looks split.
+ */
+async function vetExistingRole(client: Client, role: string): Promise<boolean> {
+  const { rows } = await client.query<{ rolsuper: boolean }>(
+    "SELECT rolsuper FROM pg_roles WHERE rolname = $1",
+    [role],
+  );
+  if (rows.length === 0) return false;
+  if (rows[0].rolsuper) {
+    throw new SafeError(
+      "The role in DATABASE_URL is a Postgres superuser, so the privilege split would have no effect. Point DATABASE_URL at a non-superuser role, or run ALTER ROLE <role> NOSUPERUSER as a superuser.",
+      { kind: "operational", code: "runtime-role-superuser" },
+    );
+  }
+  return true;
+}
+
+/** Point an existing role's password at DATABASE_URL, writing only if it differs. */
+async function alignPassword(client: Client, role: string, password: string): Promise<void> {
+  // The overwhelmingly common boot: nothing to change, so change nothing. The
+  // ALTER below used to run unconditionally, which rewrote pg_authid and
+  // invalidated the role cache cluster-wide on every restart for no benefit.
+  if (await passwordAlreadyWorks(client, role, password)) return;
+
+  try {
+    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [role, password]);
+  } catch (err) {
+    // Two boots that both found the password stale can still collide here.
+    // Re-probe rather than retry: if the boot that won set the value this one
+    // wanted, the work is done, and repeating the ALTER would only recreate the
+    // race.
+    if (
+      !hasSqlState(err, CONCURRENT_UPDATE) ||
+      !(await passwordAlreadyWorks(client, role, password))
+    ) {
+      throw err;
+    }
+  }
 }
 
 /**
  * Create the runtime role if it is missing, and align its password with
  * DATABASE_URL only when it does not already match. Idempotent: safe on every
- * boot.
+ * boot, and safe when several boots run it at once.
  *
- * Returns true when the role did not exist and was created.
+ * Returns true only for the boot that actually created the role. One that lost
+ * the race returns false, so it does not announce a creation it had no part in.
  */
 export async function ensureRuntimeRole(
   client: Client,
   role: string,
   password: string,
 ): Promise<boolean> {
-  const { rows } = await client.query<{ rolsuper: boolean }>(
-    "SELECT rolsuper FROM pg_roles WHERE rolname = $1",
-    [role],
-  );
-  const created = rows.length === 0;
-
-  // An existing superuser cannot be demoted from here: only a superuser may
-  // clear that attribute, and the migration role may be no more than
-  // CREATEROLE. Serving requests as one would leave COPY ... FROM PROGRAM
-  // reachable while the deployment looks split, so refuse instead.
-  if (!created && rows[0].rolsuper) {
-    throw new SafeError(
-      "The role in DATABASE_URL is a Postgres superuser, so the privilege split would have no effect. Point DATABASE_URL at a non-superuser role, or run ALTER ROLE <role> NOSUPERUSER as a superuser.",
-      { kind: "operational", code: "runtime-role-superuser" },
-    );
+  if (await vetExistingRole(client, role)) {
+    await alignPassword(client, role, password);
+    return false;
   }
 
-  if (created) {
+  try {
     await exec(
       client,
       "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
       [role, password],
     );
     return true;
-  }
-
-  // The overwhelmingly common boot: nothing to change, so change nothing. The
-  // ALTER below used to run unconditionally, which rewrote pg_authid and
-  // invalidated the role cache cluster-wide on every restart for no benefit.
-  if (await passwordAlreadyWorks(client, role, password)) return false;
-
-  try {
-    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [role, password]);
   } catch (err) {
-    // Postgres does not queue concurrent writers of a pg_authid row, so two
-    // boots that both found the password stale can still collide here and the
-    // loser gets "tuple concurrently updated". The advisory lock in migrate.ts
-    // does not cover this: advisory lock ids are scoped per database, so it
-    // serializes the replicas of one deployment but not two SnapOtter databases
-    // on one cluster whose DATABASE_URLs name the same role.
-    //
-    // Re-probe rather than retry. If the boot that won set the value this one
-    // wanted, the work is already done and repeating the ALTER would only
-    // recreate the race.
-    if (!isConcurrentUpdate(err) || !(await passwordAlreadyWorks(client, role, password))) {
-      throw err;
-    }
+    if (!hasSqlState(err, DUPLICATE_OBJECT, UNIQUE_VIOLATION)) throw err;
+    // Another boot created the role between the lookup above and this
+    // statement. Vet it rather than adopt it: a role that appeared underneath us
+    // is precisely one nothing has checked, and refusing a superuser is what
+    // that lookup is for. If it is somehow gone again, this was not a lost race
+    // and the original error is the honest thing to raise.
+    if (!(await vetExistingRole(client, role))) throw err;
+    // The winner read the same DATABASE_URL, so the password should already be
+    // ours. alignPassword confirms that without writing, and still has the
+    // ALTER (and its own recovery) if it somehow differs.
+    await alignPassword(client, role, password);
+    return false;
   }
-  return false;
 }
 
 /**
