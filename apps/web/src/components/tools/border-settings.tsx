@@ -2,7 +2,9 @@ import { Download } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 // ── Presets ──────────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ function ColorSwatches({
   onChange: (color: string) => void;
   id: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-1.5 mt-1">
       {COLOR_SWATCHES.map((swatch) => (
@@ -172,7 +175,7 @@ function ColorSwatches({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="h-6 w-6 rounded-full border border-border cursor-pointer appearance-none bg-transparent"
-        title="Custom color"
+        title={t.toolSettings.border.customColor}
       />
     </div>
   );
@@ -225,6 +228,7 @@ export function BorderControls({
   onChange,
   onImageStyle,
 }: BorderControlsProps) {
+  const { t } = useTranslation();
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [borderWidth, setBorderWidth] = useState(10);
   const [borderColor, setBorderColor] = useState("#000000");
@@ -319,7 +323,7 @@ export function BorderControls({
     <div className="space-y-4">
       {/* Presets */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1.5">Presets</p>
+        <p className="text-xs text-muted-foreground mb-1.5">{t.toolSettings.border.presets}</p>
         <div className="grid grid-cols-4 gap-1">
           {PRESETS.map((preset) => (
             <button
@@ -344,7 +348,7 @@ export function BorderControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="border-width" className="text-xs text-muted-foreground">
-            Border Width
+            {t.toolSettings.border.borderWidth}
           </label>
           <span className="text-xs font-mono text-foreground">{borderWidth}px</span>
         </div>
@@ -364,7 +368,7 @@ export function BorderControls({
 
       <div>
         <label htmlFor="border-color" className="text-xs text-muted-foreground">
-          Border Color
+          {t.toolSettings.border.borderColor}
         </label>
         <ColorSwatches
           id="border-color"
@@ -382,7 +386,7 @@ export function BorderControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="border-padding" className="text-xs text-muted-foreground">
-            Padding
+            {t.toolSettings.border.padding}
           </label>
           <span className="text-xs font-mono text-foreground">{padding}px</span>
         </div>
@@ -402,7 +406,7 @@ export function BorderControls({
 
       <div>
         <label htmlFor="padding-color" className="text-xs text-muted-foreground">
-          Padding Color
+          {t.toolSettings.border.paddingColor}
         </label>
         <ColorSwatches
           id="padding-color"
@@ -420,7 +424,7 @@ export function BorderControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="border-corner-radius" className="text-xs text-muted-foreground">
-            Corner Radius
+            {t.toolSettings.border.cornerRadius}
           </label>
           <span className="text-xs font-mono text-foreground">{cornerRadius}px</span>
         </div>
@@ -443,7 +447,9 @@ export function BorderControls({
       {/* Shadow */}
       <div>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Shadow</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t.toolSettings.border.shadow}
+          </span>
           <button
             type="button"
             role="switch"
@@ -469,7 +475,7 @@ export function BorderControls({
             <div>
               <div className="flex justify-between items-center">
                 <label htmlFor="shadow-blur" className="text-xs text-muted-foreground">
-                  Blur
+                  {t.toolSettings.border.blur}
                 </label>
                 <span className="text-xs font-mono text-foreground">{shadowBlur}px</span>
               </div>
@@ -491,7 +497,7 @@ export function BorderControls({
               <div>
                 <div className="flex justify-between items-center">
                   <label htmlFor="shadow-offset-x" className="text-xs text-muted-foreground">
-                    Offset X
+                    {t.toolSettings.border.offsetX}
                   </label>
                   <span className="text-xs font-mono text-foreground">{shadowOffsetX}</span>
                 </div>
@@ -511,7 +517,7 @@ export function BorderControls({
               <div>
                 <div className="flex justify-between items-center">
                   <label htmlFor="shadow-offset-y" className="text-xs text-muted-foreground">
-                    Offset Y
+                    {t.toolSettings.border.offsetY}
                   </label>
                   <span className="text-xs font-mono text-foreground">{shadowOffsetY}</span>
                 </div>
@@ -532,7 +538,7 @@ export function BorderControls({
 
             <div>
               <label htmlFor="shadow-color" className="text-xs text-muted-foreground">
-                Shadow Color
+                {t.toolSettings.border.shadowColor}
               </label>
               <ColorSwatches
                 id="shadow-color"
@@ -547,7 +553,7 @@ export function BorderControls({
             <div>
               <div className="flex justify-between items-center">
                 <label htmlFor="shadow-opacity" className="text-xs text-muted-foreground">
-                  Opacity
+                  {t.toolSettings.border.opacity}
                 </label>
                 <span className="text-xs font-mono text-foreground">{shadowOpacity}%</span>
               </div>
@@ -578,6 +584,7 @@ export function BorderSettings({
 }: {
   onImageStyle?: (style: React.CSSProperties | null) => void;
 }) {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("border");
@@ -619,7 +626,7 @@ export function BorderSettings({
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Applying border"
+          label={t.toolSettings.border.applyingBorder}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -631,7 +638,9 @@ export function BorderSettings({
           disabled={!canProcess}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `Apply Border (${files.length} files)` : "Apply Border"}
+          {files.length > 1
+            ? format(t.toolSettings.border.applyBorderBatch, { count: files.length })
+            : t.toolSettings.border.applyBorder}
         </button>
       )}
 
@@ -643,7 +652,7 @@ export function BorderSettings({
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

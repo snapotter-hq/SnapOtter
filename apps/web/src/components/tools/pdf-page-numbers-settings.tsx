@@ -41,12 +41,12 @@ export function PdfPageNumbersSettings() {
           onChange={(e) => setPosition(e.target.value as Position)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="bl">Bottom Left</option>
-          <option value="bc">Bottom Center</option>
-          <option value="br">Bottom Right</option>
-          <option value="tl">Top Left</option>
-          <option value="tc">Top Center</option>
-          <option value="tr">Top Right</option>
+          <option value="bl">{s.bottomLeft}</option>
+          <option value="bc">{s.bottomCenter}</option>
+          <option value="br">{s.bottomRight}</option>
+          <option value="tl">{s.topLeft}</option>
+          <option value="tc">{s.topCenter}</option>
+          <option value="tr">{s.topRight}</option>
         </select>
       </div>
 

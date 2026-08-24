@@ -58,7 +58,9 @@ export function LqipPlaceholderSettings() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Strategy */}
       <div>
-        <span className="text-xs text-muted-foreground">Strategy</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["lqip-placeholder"].strategy}
+        </span>
         <div className="flex gap-1 mt-1">
           {(["blur", "pixelate", "solid"] as const).map((s) => (
             <button
@@ -119,7 +121,9 @@ export function LqipPlaceholderSettings() {
 
       {/* Format */}
       <div>
-        <span className="text-xs text-muted-foreground">Format</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["lqip-placeholder"].format}
+        </span>
         <div className="flex gap-1 mt-1">
           {(["webp", "png", "jpeg"] as const).map((f) => (
             <button
@@ -132,7 +136,7 @@ export function LqipPlaceholderSettings() {
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              {f === "webp" ? "WebP" : f.toUpperCase()}
+              {f === "webp" ? t.toolSettings["lqip-placeholder"].webp : f.toUpperCase()}
             </button>
           ))}
         </div>
@@ -142,7 +146,9 @@ export function LqipPlaceholderSettings() {
       {format !== "png" && (
         <div>
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Quality</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["lqip-placeholder"].quality}
+            </span>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
           <input
@@ -258,6 +264,7 @@ function CopyBlock({
   copied: boolean;
   onCopy: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="flex justify-between items-center mb-1">
@@ -268,7 +275,7 @@ function CopyBlock({
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           {copied ? <Check className="h-3 w-3 text-success-ink" /> : <Copy className="h-3 w-3" />}
-          Copy
+          {t.common.copy}
         </button>
       </div>
       <div className="p-2 rounded bg-muted text-xs font-mono text-foreground overflow-hidden text-ellipsis whitespace-nowrap">

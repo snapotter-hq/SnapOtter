@@ -12,8 +12,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { EXIF_LABELS, exifStr, SKIP_KEYS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -132,6 +134,7 @@ function LabeledInput({
 }
 
 export function EditMetadataSettings() {
+  const { t } = useTranslation();
   const { entries, selectedIndex, files } = useFileStore();
   const {
     processFiles,
@@ -412,48 +415,48 @@ export function EditMetadataSettings() {
       {hasFile && inspecting && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
           <Loader2 className="h-3 w-3 animate-spin" />
-          Reading metadata...
+          {t.toolSettings["edit-metadata"].readingMetadata}
         </div>
       )}
       {hasFile && inspectError && !inspecting && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <AlertTriangle className="h-3 w-3 shrink-0" />
-          Could not read metadata - fields will start empty.
+          {t.toolSettings["edit-metadata"].couldNotReadMetadata}
         </div>
       )}
 
       {/* Section 1: Basic Info */}
       {hasFile && (
         <CollapsibleSection
-          title="Basic Info"
+          title={t.toolSettings["edit-metadata"].basicInfo}
           defaultOpen
           badge={inspectData ? "EXIF/IPTC" : undefined}
         >
           <div className="space-y-2.5">
             <LabeledInput
               id="em-description"
-              label="Description"
+              label={t.toolSettings["edit-metadata"].description}
               value={form.imageDescription}
               onChange={(v) => setField("imageDescription", v)}
-              placeholder="Image description"
+              placeholder={t.toolSettings["edit-metadata"].imageDescription}
             />
             <LabeledInput
               id="em-artist"
-              label="Artist"
+              label={t.toolSettings["edit-metadata"].artist}
               value={form.artist}
               onChange={(v) => setField("artist", v)}
-              placeholder="Photographer / creator name"
+              placeholder={t.toolSettings["edit-metadata"].photographerCreatorName}
             />
             <LabeledInput
               id="em-copyright"
-              label="Copyright"
+              label={t.toolSettings["edit-metadata"].copyright}
               value={form.copyright}
               onChange={(v) => setField("copyright", v)}
               placeholder="2026 Example Corp"
             />
             <LabeledInput
               id="em-software"
-              label="Software"
+              label={t.toolSettings["edit-metadata"].software}
               value={form.software}
               onChange={(v) => setField("software", v)}
               placeholder="e.g. Lightroom, Photoshop"
@@ -463,38 +466,38 @@ export function EditMetadataSettings() {
               <div className="space-y-2.5">
                 <LabeledInput
                   id="em-iptc-title"
-                  label="Title"
+                  label={t.toolSettings["edit-metadata"].title}
                   value={form.iptcTitle}
                   onChange={(v) => setField("iptcTitle", v)}
-                  placeholder="Image title"
+                  placeholder={t.toolSettings["edit-metadata"].imageTitle}
                 />
                 <LabeledInput
                   id="em-iptc-headline"
-                  label="Headline"
+                  label={t.toolSettings["edit-metadata"].headline}
                   value={form.iptcHeadline}
                   onChange={(v) => setField("iptcHeadline", v)}
-                  placeholder="Short headline"
+                  placeholder={t.toolSettings["edit-metadata"].shortHeadline}
                 />
                 <LabeledInput
                   id="em-iptc-city"
-                  label="City"
+                  label={t.toolSettings["edit-metadata"].city}
                   value={form.iptcCity}
                   onChange={(v) => setField("iptcCity", v)}
-                  placeholder="City name"
+                  placeholder={t.toolSettings["edit-metadata"].cityName}
                 />
                 <LabeledInput
                   id="em-iptc-state"
-                  label="State/Province"
+                  label={t.toolSettings["edit-metadata"].stateProvince}
                   value={form.iptcState}
                   onChange={(v) => setField("iptcState", v)}
-                  placeholder="State or province"
+                  placeholder={t.toolSettings["edit-metadata"].stateOrProvince}
                 />
                 <LabeledInput
                   id="em-iptc-country"
-                  label="Country"
+                  label={t.toolSettings["edit-metadata"].country}
                   value={form.iptcCountry}
                   onChange={(v) => setField("iptcCountry", v)}
-                  placeholder="Country name"
+                  placeholder={t.toolSettings["edit-metadata"].countryName}
                 />
               </div>
             </div>
@@ -504,7 +507,7 @@ export function EditMetadataSettings() {
 
       {/* Section 2: Date & Time */}
       {hasFile && (
-        <CollapsibleSection title="Date & Time">
+        <CollapsibleSection title={t.toolSettings["edit-metadata"].dateAndTime}>
           <div className="space-y-2.5">
             <div className="flex gap-2">
               <button
@@ -512,14 +515,14 @@ export function EditMetadataSettings() {
                 onClick={() => setField("dateMode", "edit")}
                 className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "edit" ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground"}`}
               >
-                Edit Dates
+                {t.toolSettings["edit-metadata"].editDates}
               </button>
               <button
                 type="button"
                 onClick={() => setField("dateMode", "shift")}
                 className={`flex-1 text-xs py-1.5 rounded-md border ${form.dateMode === "shift" ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground"}`}
               >
-                Shift All Dates
+                {t.toolSettings["edit-metadata"].shiftAllDates}
               </button>
             </div>
 
@@ -527,7 +530,7 @@ export function EditMetadataSettings() {
               <>
                 <LabeledInput
                   id="em-datetime"
-                  label="Date Modified"
+                  label={t.toolSettings["edit-metadata"].dateModified}
                   value={form.dateTime}
                   onChange={(v) => setField("dateTime", v)}
                   placeholder="YYYY:MM:DD HH:MM:SS"
@@ -535,7 +538,7 @@ export function EditMetadataSettings() {
                 />
                 <LabeledInput
                   id="em-datetime-original"
-                  label="Date Taken"
+                  label={t.toolSettings["edit-metadata"].dateTaken}
                   value={form.dateTimeOriginal}
                   onChange={(v) => setField("dateTimeOriginal", v)}
                   placeholder="YYYY:MM:DD HH:MM:SS"
@@ -544,7 +547,7 @@ export function EditMetadataSettings() {
             ) : (
               <div className="space-y-2">
                 <p className="text-[10px] text-muted-foreground">
-                  Shift all date fields by an offset (useful for timezone corrections)
+                  {t.toolSettings["edit-metadata"].shiftHint}
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="space-y-1">
@@ -552,7 +555,7 @@ export function EditMetadataSettings() {
                       htmlFor="em-date-shift-direction"
                       className="text-xs font-medium text-foreground"
                     >
-                      Direction
+                      {t.toolSettings["edit-metadata"].direction}
                     </label>
                     <select
                       id="em-date-shift-direction"
@@ -560,14 +563,14 @@ export function EditMetadataSettings() {
                       onChange={(e) => setField("dateShiftDirection", e.target.value as "+" | "-")}
                       className="px-2.5 py-1.5 rounded-md border border-border bg-background text-sm"
                     >
-                      <option value="+">+ Forward</option>
-                      <option value="-">- Backward</option>
+                      <option value="+">{t.toolSettings["edit-metadata"].forward}</option>
+                      <option value="-">{t.toolSettings["edit-metadata"].backward}</option>
                     </select>
                   </div>
                   <div className="flex-1">
                     <LabeledInput
                       id="em-date-shift"
-                      label="Hours:Minutes"
+                      label={t.toolSettings["edit-metadata"].hoursMinutes}
                       value={form.dateShiftValue}
                       onChange={(v) => setField("dateShiftValue", v)}
                       placeholder="1:30"
@@ -583,14 +586,17 @@ export function EditMetadataSettings() {
 
       {/* Section 3: Location (GPS) */}
       {hasFile && (
-        <CollapsibleSection title="Location (GPS)" warning={!!gpsCoords}>
+        <CollapsibleSection
+          title={t.toolSettings["edit-metadata"].locationGps}
+          warning={!!gpsCoords}
+        >
           <div className="space-y-2.5">
             {gpsCoords && (
               <div className="flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-500/10 border border-amber-500/20">
                 <MapPin className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                    Location data found
+                    {t.toolSettings["edit-metadata"].locationDataFound}
                   </p>
                   <p className="text-[10px] text-muted-foreground font-mono">
                     {gpsCoords.lat.toFixed(6)}, {gpsCoords.lon.toFixed(6)}
@@ -600,13 +606,13 @@ export function EditMetadataSettings() {
             )}
             {!gpsCoords && (
               <p className="text-[11px] text-muted-foreground italic">
-                No GPS data. Add coordinates below.
+                {t.toolSettings["edit-metadata"].noGpsData}
               </p>
             )}
 
             <LabeledInput
               id="em-gps-lat"
-              label="Latitude"
+              label={t.toolSettings["edit-metadata"].latitude}
               type="number"
               value={form.gpsLatitude}
               onChange={(v) => setField("gpsLatitude", v)}
@@ -616,7 +622,7 @@ export function EditMetadataSettings() {
             />
             <LabeledInput
               id="em-gps-lon"
-              label="Longitude"
+              label={t.toolSettings["edit-metadata"].longitude}
               type="number"
               value={form.gpsLongitude}
               onChange={(v) => setField("gpsLongitude", v)}
@@ -626,7 +632,7 @@ export function EditMetadataSettings() {
             />
             <LabeledInput
               id="em-gps-alt"
-              label="Altitude (meters)"
+              label={t.toolSettings["edit-metadata"].altitudeMeters}
               type="number"
               value={form.gpsAltitude}
               onChange={(v) => setField("gpsAltitude", v)}
@@ -641,7 +647,7 @@ export function EditMetadataSettings() {
                 onChange={(e) => setField("clearGps", e.target.checked)}
                 className="rounded"
               />
-              Remove all GPS data
+              {t.toolSettings["edit-metadata"].removeAllGpsData}
             </label>
           </div>
         </CollapsibleSection>
@@ -650,7 +656,7 @@ export function EditMetadataSettings() {
       {/* Section 4: Keywords */}
       {hasFile && (
         <CollapsibleSection
-          title="Keywords"
+          title={t.toolSettings["edit-metadata"].keywords}
           badge={form.keywords.length > 0 ? `${form.keywords.length}` : undefined}
         >
           <div className="space-y-2.5">
@@ -684,7 +690,7 @@ export function EditMetadataSettings() {
                     addKeyword();
                   }
                 }}
-                placeholder="Add keyword and press Enter"
+                placeholder={t.toolSettings["edit-metadata"].addKeywordPlaceholder}
                 className="flex-1 px-2.5 py-1.5 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <button
@@ -703,7 +709,7 @@ export function EditMetadataSettings() {
                   checked={form.keywordsMode === "add"}
                   onChange={() => setField("keywordsMode", "add")}
                 />
-                Add to existing
+                {t.toolSettings["edit-metadata"].addToExisting}
               </label>
               <label className="flex items-center gap-1.5 text-[11px] text-foreground">
                 <input
@@ -712,7 +718,7 @@ export function EditMetadataSettings() {
                   checked={form.keywordsMode === "set"}
                   onChange={() => setField("keywordsMode", "set")}
                 />
-                Replace all
+                {t.toolSettings["edit-metadata"].replaceAll}
               </label>
             </div>
           </div>
@@ -721,7 +727,7 @@ export function EditMetadataSettings() {
 
       {/* Section 5: All Metadata (raw view) */}
       {hasFile && inspectData && (
-        <CollapsibleSection title="All Metadata">
+        <CollapsibleSection title={t.toolSettings["edit-metadata"].allMetadata}>
           <div className="space-y-2">
             {inspectData.exif && Object.keys(inspectData.exif).length > 0 && (
               <CollapsibleSection
@@ -768,7 +774,9 @@ export function EditMetadataSettings() {
       {/* Section 6: Templates */}
       {hasFile && (
         <div className="space-y-2 border-t border-border pt-3">
-          <p className="text-xs font-medium text-muted-foreground">Templates</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            {t.toolSettings["edit-metadata"].templates}
+          </p>
           {templates.length > 0 && (
             <div className="space-y-1">
               {templates.map((t) => (
@@ -796,7 +804,7 @@ export function EditMetadataSettings() {
               type="text"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="Template name"
+              placeholder={t.toolSettings["edit-metadata"].templateNamePlaceholder}
               className="flex-1 px-2.5 py-1.5 rounded-md border border-border bg-background text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
@@ -804,7 +812,7 @@ export function EditMetadataSettings() {
               onClick={saveTemplate}
               disabled={!templateName.trim()}
               className="px-2 py-1.5 rounded-md border border-border hover:bg-muted/50 disabled:opacity-50"
-              title="Save current values as template"
+              title={t.toolSettings["edit-metadata"].saveCurrentValuesAsTemplate}
             >
               <BookmarkPlus className="h-3.5 w-3.5" />
             </button>
@@ -816,7 +824,7 @@ export function EditMetadataSettings() {
       {!hasFile && (
         <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground">
           <PenLine className="h-8 w-8 opacity-30" />
-          <p className="text-sm">Upload an image to edit its metadata.</p>
+          <p className="text-sm">{t.toolSettings["edit-metadata"].uploadPrompt}</p>
         </div>
       )}
 
@@ -825,19 +833,33 @@ export function EditMetadataSettings() {
       {/* Changes summary */}
       {hasFile && changes.total > 0 && !processing && (
         <div className="text-[11px] text-muted-foreground bg-muted/30 px-2.5 py-2 rounded-md">
-          <span className="font-medium text-foreground">{changes.total} changes:</span>{" "}
-          {changes.modified > 0 && `${changes.modified} modified`}
-          {changes.removed > 0 && `${changes.modified > 0 ? ", " : ""}${changes.removed} removed`}
-          {changes.gpsCleared && ", GPS cleared"}
-          {changes.gpsAdded && ", GPS added"}
-          {changes.hasShift && ", dates shifted"}
+          <span className="font-medium text-foreground">
+            {format(t.toolSettings["edit-metadata"].changes, { count: changes.total })}
+          </span>{" "}
+          {changes.modified > 0 &&
+            format(t.toolSettings["edit-metadata"].modified, { count: changes.modified })}
+          {changes.removed > 0 &&
+            `${changes.modified > 0 ? ", " : ""}${format(t.toolSettings["edit-metadata"].removed, {
+              count: changes.removed,
+            })}`}
+          {changes.gpsCleared && t.toolSettings["edit-metadata"].gpsCleared2}
+          {changes.gpsAdded && t.toolSettings["edit-metadata"].gpsAdded2}
+          {changes.hasShift && t.toolSettings["edit-metadata"].datesShifted2}
         </div>
       )}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["edit-metadata"].originalSizeKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["edit-metadata"].processedSizeKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -845,7 +867,7 @@ export function EditMetadataSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Writing metadata"
+          label={t.toolSettings["edit-metadata"].progressLabel}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -857,7 +879,7 @@ export function EditMetadataSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Apply Metadata
+          {t.toolSettings["edit-metadata"].submit}
         </button>
       )}
 
@@ -869,7 +891,7 @@ export function EditMetadataSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

@@ -55,7 +55,7 @@ export function BackgroundReplaceSettings() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Background Type Toggle */}
       <div>
-        <span className="mb-1.5 block text-sm font-medium">Background Type</span>
+        <span className="mb-1.5 block text-sm font-medium">{ts.backgroundType}</span>
         <div className="flex gap-1 rounded-md border border-border p-1">
           {(["color", "gradient"] as const).map((type) => (
             <button
@@ -68,7 +68,7 @@ export function BackgroundReplaceSettings() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {type === "color" ? "Color" : "Gradient"}
+              {type === "color" ? ts.color2 : ts.gradient}
             </button>
           ))}
         </div>
@@ -111,7 +111,7 @@ export function BackgroundReplaceSettings() {
                 htmlFor="bg-replace-grad1"
                 className="mb-1.5 block text-xs text-muted-foreground"
               >
-                Color 1
+                {ts.color1}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -138,7 +138,7 @@ export function BackgroundReplaceSettings() {
                 htmlFor="bg-replace-grad2"
                 className="mb-1.5 block text-xs text-muted-foreground"
               >
-                Color 2
+                {ts.color22}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -166,7 +166,7 @@ export function BackgroundReplaceSettings() {
               htmlFor="bg-replace-angle"
               className="mb-1.5 block text-xs text-muted-foreground"
             >
-              Angle: {gradientAngle}°
+              {format(ts.angleValue, { angle: gradientAngle })}
             </label>
             <input
               id="bg-replace-angle"
@@ -184,7 +184,7 @@ export function BackgroundReplaceSettings() {
       {/* Edge Feather */}
       <div>
         <label htmlFor="bg-replace-feather" className="mb-1.5 block text-sm font-medium">
-          Edge Feather: {feather}px
+          {format(ts.edgeFeatherValue, { feather })}
         </label>
         <input
           id="bg-replace-feather"
@@ -199,7 +199,7 @@ export function BackgroundReplaceSettings() {
 
       {/* Output Format Toggle */}
       <div>
-        <span className="mb-1.5 block text-sm font-medium">Output Format</span>
+        <span className="mb-1.5 block text-sm font-medium">{ts.outputFormat}</span>
         <div className="flex gap-1 rounded-md border border-border p-1">
           {(["png", "webp"] as const).map((fmt) => (
             <button

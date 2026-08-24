@@ -88,7 +88,7 @@ export function HistogramSettings() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Generates an RGB histogram chart showing the color distribution of the image.
+        {t.toolSettings.histogram.generatesAnRgbHistogramChart}
       </p>
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
@@ -169,7 +169,7 @@ export function HistogramSettings() {
             className="w-full rounded bg-neutral-900"
             preserveAspectRatio="none"
             role="img"
-            aria-label="Histogram chart"
+            aria-label={t.toolSettings.histogram.histogramChart}
             data-testid="histogram-svg"
           >
             {ALL_CHANNELS.filter((ch) => visible[ch]).map((ch) => (

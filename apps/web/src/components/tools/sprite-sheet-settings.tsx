@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format as formatMessage } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -109,7 +110,9 @@ export function SpriteSheetSettings() {
 
       {/* Format */}
       <div>
-        <span className="text-xs text-muted-foreground">Format</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["sprite-sheet"].format}
+        </span>
         <div className="flex gap-1 mt-1">
           {(["png", "webp", "jpeg"] as const).map((f) => (
             <button
@@ -123,7 +126,7 @@ export function SpriteSheetSettings() {
               }`}
               data-testid={`sprite-sheet-format-${f}`}
             >
-              {f === "webp" ? "WebP" : f.toUpperCase()}
+              {f === "webp" ? t.toolSettings["sprite-sheet"].webp : f.toUpperCase()}
             </button>
           ))}
         </div>
@@ -133,7 +136,9 @@ export function SpriteSheetSettings() {
       {format !== "png" && (
         <div>
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Quality</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["sprite-sheet"].quality}
+            </span>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
           <input
@@ -206,6 +211,7 @@ function SpriteOutput({
   copiedExport: "css" | "json" | null;
   setCopiedExport: (v: "css" | "json" | null) => void;
 }) {
+  const { t } = useTranslation();
   const frames = payload.frames as Frame[];
   const cols = payload.cols as number;
   const rows = payload.rows as number;
@@ -248,8 +254,14 @@ function SpriteOutput({
   return (
     <div className="space-y-3 pt-2 border-t border-border" data-testid="sprite-sheet-output">
       <p className="text-xs text-muted-foreground">
-        {cols} x {rows} grid · {cellWidth} x {cellHeight}px cells · {canvasWidth} x {canvasHeight}px
-        canvas
+        {formatMessage(t.toolSettings["sprite-sheet"].sheetSummary, {
+          cols,
+          rows,
+          cellWidth,
+          cellHeight,
+          canvasWidth,
+          canvasHeight,
+        })}
       </p>
       <div className="flex gap-1">
         <button
@@ -263,7 +275,7 @@ function SpriteOutput({
           ) : (
             <ClipboardCopy className="h-3 w-3" />
           )}
-          Copy CSS
+          {t.toolSettings["sprite-sheet"].copyCss}
         </button>
         <button
           type="button"
@@ -276,7 +288,7 @@ function SpriteOutput({
           ) : (
             <ClipboardCopy className="h-3 w-3" />
           )}
-          Copy JSON
+          {t.toolSettings["sprite-sheet"].copyJson}
         </button>
       </div>
     </div>

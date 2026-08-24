@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import {
   CATEGORIES,
@@ -99,6 +100,8 @@ function TextPreviewOverlay({
 // ── Gallery Phase ───────────────────────────────────────────────────
 
 function TemplateGallery() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["meme-generator"];
   const templates = useMemeStore((s) => s.templates);
   const searchQuery = useMemeStore((s) => s.searchQuery);
   const activeCategory = useMemeStore((s) => s.activeCategory);
@@ -162,7 +165,7 @@ function TemplateGallery() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search templates..."
+            placeholder={ts.searchTemplates}
             className={cn(INPUT_CLASS, "ps-8")}
           />
         </div>
@@ -203,7 +206,7 @@ function TemplateGallery() {
           className="w-full max-w-md py-3 rounded-lg border-2 border-dashed border-border text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors flex items-center justify-center gap-2"
         >
           <ImagePlus className="h-4 w-4" />
-          Upload Custom Image
+          {ts.uploadCustomImage}
         </button>
 
         {/* Template grid */}
@@ -234,7 +237,7 @@ function TemplateGallery() {
         {filtered.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">
             <Laugh className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            No templates match your search
+            {ts.noTemplatesMatchYourSearch}
           </div>
         )}
       </div>
@@ -245,6 +248,8 @@ function TemplateGallery() {
 // ── Layout Picker Phase (custom image) ──────────────────────────────
 
 function LayoutPicker() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["meme-generator"];
   const customImageUrl = useMemeStore((s) => s.customImageUrl);
   const customLayout = useMemeStore((s) => s.customLayout);
   const setCustomLayout = useMemeStore((s) => s.setCustomLayout);
@@ -266,10 +271,10 @@ function LayoutPicker() {
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3 w-3" />
-          Back to templates
+          {ts.backToTemplates}
         </button>
 
-        <p className="text-sm text-foreground font-medium">Choose a text layout</p>
+        <p className="text-sm text-foreground font-medium">{ts.chooseATextLayout}</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {(
@@ -320,6 +325,7 @@ function LayoutPicker() {
 // ── Editor Phase ────────────────────────────────────────────────────
 
 function EditorPreview() {
+  const { t } = useTranslation();
   const selectedTemplate = useMemeStore((s) => s.selectedTemplate);
   const customImageUrl = useMemeStore((s) => s.customImageUrl);
   const customLayout = useMemeStore((s) => s.customLayout);
@@ -362,7 +368,11 @@ function EditorPreview() {
           data-testid="meme-editor-preview"
           className="relative w-full rounded-lg overflow-hidden border border-border bg-muted/30"
         >
-          <img src={imageSrc} alt="Template preview" className="w-full h-auto block" />
+          <img
+            src={imageSrc}
+            alt={t.toolSettings["meme-generator"].templatePreview}
+            className="w-full h-auto block"
+          />
           <TextPreviewOverlay
             boxes={textBoxes}
             textValues={textBoxValues}
@@ -383,6 +393,8 @@ function EditorPreview() {
 // ── Result Phase ────────────────────────────────────────────────────
 
 function ResultView() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["meme-generator"];
   const resultUrl = useMemeStore((s) => s.resultUrl);
   const backToEditor = useMemeStore((s) => s.backToEditor);
   const backToGallery = useMemeStore((s) => s.backToGallery);
@@ -394,7 +406,7 @@ function ResultView() {
       <div className="flex-1 flex items-center justify-center p-4 min-h-0">
         <img
           src={resultUrl}
-          alt="Generated meme"
+          alt={ts.generatedMeme}
           className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
         />
       </div>
@@ -406,7 +418,7 @@ function ResultView() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors"
         >
           <RotateCcw className="h-4 w-4" />
-          Back to editor
+          {ts.backToEditor}
         </button>
         <a
           href={resultUrl}
@@ -415,7 +427,7 @@ function ResultView() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
         <button
           type="button"
@@ -424,7 +436,7 @@ function ResultView() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors"
         >
           <Sparkles className="h-4 w-4" />
-          New Meme
+          {ts.newMeme}
         </button>
       </div>
     </div>
@@ -434,15 +446,19 @@ function ResultView() {
 // ── Loading / Error States ──────────────────────────────────────────
 
 function LoadingView() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center h-full gap-2">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">Loading templates...</span>
+      <span className="text-sm text-muted-foreground">
+        {t.toolSettings["meme-generator"].loadingTemplates}
+      </span>
     </div>
   );
 }
 
 function ErrorView() {
+  const { t } = useTranslation();
   const error = useMemeStore((s) => s.error);
 
   return (
@@ -454,7 +470,7 @@ function ErrorView() {
           onClick={() => window.location.reload()}
           className="text-xs text-primary-ink hover:underline"
         >
-          Retry
+          {t.common.retry}
         </button>
       </div>
     </div>

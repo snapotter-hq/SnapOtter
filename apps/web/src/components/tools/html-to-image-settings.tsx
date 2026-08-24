@@ -91,7 +91,7 @@ export function HtmlToImageSettings() {
         >
           <option value="png">PNG</option>
           <option value="jpg">JPG</option>
-          <option value="webp">WebP</option>
+          <option value="webp">{ts.webp}</option>
         </select>
       </div>
 

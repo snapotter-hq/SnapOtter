@@ -193,8 +193,8 @@ export function TextOverlaySettings() {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>{format(ts.originalKb, { size: (originalSize / 1024).toFixed(1) })}</p>
+          <p>{format(ts.processedKb, { size: (processedSize / 1024).toFixed(1) })}</p>
         </div>
       )}
 

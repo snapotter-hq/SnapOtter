@@ -68,7 +68,7 @@ export function ConversionPresetSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="preset-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings["conversion-preset"].quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
@@ -87,7 +87,7 @@ export function ConversionPresetSettings() {
       {kind === "video" && (
         <div>
           <label htmlFor="preset-vq" className="text-xs text-muted-foreground">
-            Quality
+            {t.toolSettings["conversion-preset"].quality}
           </label>
           <select
             id="preset-vq"
@@ -95,9 +95,9 @@ export function ConversionPresetSettings() {
             onChange={(e) => setVideoQuality(e.target.value as "high" | "balanced" | "small")}
             className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           >
-            <option value="high">High</option>
-            <option value="balanced">Balanced</option>
-            <option value="small">Small</option>
+            <option value="high">{t.toolSettings["conversion-preset"].high}</option>
+            <option value="balanced">{t.toolSettings["conversion-preset"].balanced}</option>
+            <option value="small">{t.toolSettings["conversion-preset"].small}</option>
           </select>
         </div>
       )}
@@ -106,7 +106,7 @@ export function ConversionPresetSettings() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="preset-page" className="text-xs text-muted-foreground">
-              Page size
+              {t.toolSettings["conversion-preset"].pageSize}
             </label>
             <select
               id="preset-page"
@@ -122,7 +122,7 @@ export function ConversionPresetSettings() {
           </div>
           <div>
             <label htmlFor="preset-orient" className="text-xs text-muted-foreground">
-              Orientation
+              {t.toolSettings["conversion-preset"].orientation}
             </label>
             <select
               id="preset-orient"
@@ -130,8 +130,8 @@ export function ConversionPresetSettings() {
               onChange={(e) => setOrientation(e.target.value as "portrait" | "landscape")}
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             >
-              <option value="portrait">Portrait</option>
-              <option value="landscape">Landscape</option>
+              <option value="portrait">{t.toolSettings["conversion-preset"].portrait}</option>
+              <option value="landscape">{t.toolSettings["conversion-preset"].landscape}</option>
             </select>
           </div>
         </div>

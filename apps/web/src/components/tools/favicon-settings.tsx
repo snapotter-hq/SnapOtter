@@ -186,7 +186,9 @@ export function FaviconSettings() {
       {/* Live preview grid */}
       {hasFiles && blobUrl && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Preview</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            {t.toolSettings.favicon.preview}
+          </p>
           <div className="flex items-end justify-center gap-3">
             {PREVIEW_BOXES.map((px) => {
               const insetPx = Math.round((px * padding) / 100);
@@ -244,7 +246,7 @@ export function FaviconSettings() {
 
       {/* Background */}
       <div>
-        <span className="text-xs text-muted-foreground">Background</span>
+        <span className="text-xs text-muted-foreground">{t.toolSettings.favicon.background}</span>
         <div className="flex items-center gap-2 mt-1">
           <div className="flex flex-1 gap-1">
             <button
@@ -252,14 +254,14 @@ export function FaviconSettings() {
               onClick={() => setBgMode("transparent")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "transparent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Transparent
+              {t.toolSettings.favicon.transparent}
             </button>
             <button
               type="button"
               onClick={() => setBgMode("color")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "color" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Color
+              {t.toolSettings.favicon.color}
             </button>
           </div>
           {bgMode === "color" && (
@@ -267,7 +269,7 @@ export function FaviconSettings() {
               type="color"
               value={bgColor}
               onChange={(e) => setBgColor(e.target.value)}
-              aria-label="Background color"
+              aria-label={t.a11y.backgroundColor}
               className="h-7 w-9 shrink-0 rounded border border-border bg-background"
             />
           )}
@@ -277,7 +279,7 @@ export function FaviconSettings() {
       {/* Padding */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Padding</span>
+          <span className="text-xs text-muted-foreground">{t.toolSettings.favicon.padding}</span>
           <span className="text-xs font-mono text-foreground">{padding}%</span>
         </div>
         <input
@@ -293,7 +295,9 @@ export function FaviconSettings() {
       {/* Radius */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Corner Radius</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings.favicon.cornerRadius}
+          </span>
           <span className="text-xs font-mono text-foreground">{radius}%</span>
         </div>
         <input
@@ -305,25 +309,25 @@ export function FaviconSettings() {
           className="w-full mt-1"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Square</span>
-          <span>Circle</span>
+          <span>{t.toolSettings.favicon.square}</span>
+          <span>{t.toolSettings.favicon.circle}</span>
         </div>
       </div>
 
       {/* Theme color */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Theme Color</span>
+          <span className="text-xs text-muted-foreground">{t.toolSettings.favicon.themeColor}</span>
           <input
             type="color"
             value={themeColor}
             onChange={(e) => setThemeColor(e.target.value)}
-            aria-label="Theme color"
+            aria-label={t.toolSettings.favicon.themeColor2}
             className="h-7 w-9 shrink-0 rounded border border-border bg-background"
           />
         </div>
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Used in manifest.json for browser chrome
+          {t.toolSettings.favicon.usedInManifestJsonFor}
         </p>
       </div>
 
@@ -388,7 +392,7 @@ export function FaviconSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download Favicons ZIP
+          {t.toolSettings.favicon.downloadZip}
         </a>
       )}
     </div>

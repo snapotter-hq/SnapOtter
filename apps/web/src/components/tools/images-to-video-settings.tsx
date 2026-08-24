@@ -52,7 +52,7 @@ export function ImagesToVideoSettings() {
         >
           <option value="1080p">1080p (1920x1080)</option>
           <option value="720p">720p (1280x720)</option>
-          <option value="square">Square (1080x1080)</option>
+          <option value="square">{s.square1080x1080}</option>
         </select>
       </div>
 

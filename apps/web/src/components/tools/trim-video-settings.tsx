@@ -61,7 +61,7 @@ export function TrimVideoSettings() {
         />
         {!rangeValid && (
           <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
-            End time must be after start time
+            {s.endTimeMustBeAfter}
           </p>
         )}
       </div>

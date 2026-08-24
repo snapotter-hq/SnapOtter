@@ -85,7 +85,7 @@ export function ColorPaletteSettings() {
       {/* Color count slider */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Colors</span>
+          <span className="text-xs text-muted-foreground">{ts.colors}</span>
           <span className="text-xs font-mono text-foreground">{count}</span>
         </div>
         <input
@@ -102,7 +102,7 @@ export function ColorPaletteSettings() {
 
       {/* Format toggle */}
       <div>
-        <span className="text-xs text-muted-foreground">Format</span>
+        <span className="text-xs text-muted-foreground">{ts.format}</span>
         <div className="flex gap-1 mt-1">
           {(["hex", "rgb", "hsl"] as const).map((f) => (
             <button

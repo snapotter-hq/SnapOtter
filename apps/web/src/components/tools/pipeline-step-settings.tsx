@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 
 type ControlProps = {
   settings: Record<string, unknown>;
@@ -174,6 +175,7 @@ interface PipelineStepSettingsProps {
 }
 
 export function PipelineStepSettings({ toolId, settings, onChange }: PipelineStepSettingsProps) {
+  const { t } = useTranslation();
   const Control = CONTROLS[toolId];
 
   if (Control) {
@@ -194,7 +196,7 @@ export function PipelineStepSettings({ toolId, settings, onChange }: PipelineSte
 
   return (
     <p className="text-xs text-muted-foreground italic">
-      No configurable settings. Defaults will be used.
+      {t.toolSettings["pipeline-step"].noConfigurableSettingsDefaultsWill}
     </p>
   );
 }

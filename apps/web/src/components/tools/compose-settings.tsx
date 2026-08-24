@@ -2,6 +2,7 @@ import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function ComposeSettings() {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export function ComposeSettings() {
     <div className="space-y-4">
       <div>
         <label htmlFor="compose-overlay-image" className="text-xs text-muted-foreground">
-          Overlay Image
+          {t.toolSettings.compose.overlayImage}
         </label>
         <input
           id="compose-overlay-image"
@@ -77,14 +78,14 @@ export function ComposeSettings() {
           className="w-full mt-0.5 px-2 py-2 rounded border border-dashed border-border bg-background text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
         >
           <Upload className="h-4 w-4" />
-          {overlayFile ? overlayFile.name : "Choose overlay image"}
+          {overlayFile ? overlayFile.name : t.toolSettings.compose.chooseOverlayImage}
         </button>
       </div>
 
       <div className="flex gap-2">
         <div className="flex-1">
           <label htmlFor="compose-x-position" className="text-xs text-muted-foreground">
-            X Position
+            {t.toolSettings.compose.xPosition}
           </label>
           <input
             id="compose-x-position"
@@ -97,7 +98,7 @@ export function ComposeSettings() {
         </div>
         <div className="flex-1">
           <label htmlFor="compose-y-position" className="text-xs text-muted-foreground">
-            Y Position
+            {t.toolSettings.compose.yPosition}
           </label>
           <input
             id="compose-y-position"
@@ -113,7 +114,7 @@ export function ComposeSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="compose-opacity" className="text-xs text-muted-foreground">
-            Opacity
+            {t.toolSettings.compose.opacity}
           </label>
           <span className="text-xs font-mono text-foreground">{opacity}%</span>
         </div>
@@ -130,7 +131,7 @@ export function ComposeSettings() {
 
       <div>
         <label htmlFor="compose-blend-mode" className="text-xs text-muted-foreground">
-          Blend Mode
+          {t.toolSettings.compose.blendMode}
         </label>
         <select
           id="compose-blend-mode"
@@ -138,16 +139,16 @@ export function ComposeSettings() {
           onChange={(e) => setBlendMode(e.target.value)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="over">Normal</option>
-          <option value="multiply">Multiply</option>
-          <option value="screen">Screen</option>
-          <option value="overlay">Overlay</option>
-          <option value="darken">Darken</option>
-          <option value="lighten">Lighten</option>
-          <option value="hard-light">Hard Light</option>
-          <option value="soft-light">Soft Light</option>
-          <option value="difference">Difference</option>
-          <option value="exclusion">Exclusion</option>
+          <option value="over">{t.toolSettings.compose.normal}</option>
+          <option value="multiply">{t.toolSettings.compose.multiply}</option>
+          <option value="screen">{t.toolSettings.compose.screen}</option>
+          <option value="overlay">{t.toolSettings.compose.overlay}</option>
+          <option value="darken">{t.toolSettings.compose.darken}</option>
+          <option value="lighten">{t.toolSettings.compose.lighten}</option>
+          <option value="hard-light">{t.toolSettings.compose.hardLight}</option>
+          <option value="soft-light">{t.toolSettings.compose.softLight}</option>
+          <option value="difference">{t.toolSettings.compose.difference}</option>
+          <option value="exclusion">{t.toolSettings.compose.exclusion}</option>
         </select>
       </div>
 
@@ -155,8 +156,16 @@ export function ComposeSettings() {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.compose.originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.compose.processedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -168,7 +177,7 @@ export function ComposeSettings() {
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-        {processing ? "Processing..." : t.toolSettings.compose.submit}
+        {processing ? t.toolSettings.compose.processing : t.toolSettings.compose.submit}
       </button>
 
       {downloadUrl && (
@@ -179,7 +188,7 @@ export function ComposeSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

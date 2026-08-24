@@ -127,7 +127,7 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="compress-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings.compress.quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>

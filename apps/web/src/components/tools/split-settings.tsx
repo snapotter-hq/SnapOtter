@@ -1,7 +1,9 @@
 import { Download, Loader2, PackageOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
 import { useSplitStore } from "@/stores/split-store";
@@ -35,6 +37,7 @@ const OUTPUT_FORMATS = [
 const LOSSY_FORMATS = new Set(["jpg", "webp", "avif", "jxl"]);
 
 export function SplitSettings() {
+  const { t } = useTranslation();
   const { files, processing: fileStoreProcessing } = useFileStore();
   const {
     mode,
@@ -218,7 +221,7 @@ export function SplitSettings() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs text-muted-foreground mb-1.5">Split Mode</p>
+        <p className="text-xs text-muted-foreground mb-1.5">{t.toolSettings.split.splitMode}</p>
         <div className="flex gap-1">
           {MODES.map((m) => (
             <button
@@ -240,7 +243,7 @@ export function SplitSettings() {
       {mode === "grid" && (
         <>
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Presets</p>
+            <p className="text-xs text-muted-foreground mb-1.5">{t.toolSettings.split.presets}</p>
             <div className="grid grid-cols-3 gap-1">
               {PRESETS.map((p) => (
                 <button
@@ -262,7 +265,7 @@ export function SplitSettings() {
           <div className="flex gap-2">
             <div className="flex-1">
               <label htmlFor="split-columns" className="text-xs text-muted-foreground">
-                Columns
+                {t.toolSettings.split.columns}
               </label>
               <input
                 id="split-columns"
@@ -276,7 +279,7 @@ export function SplitSettings() {
             </div>
             <div className="flex-1">
               <label htmlFor="split-rows" className="text-xs text-muted-foreground">
-                Rows
+                {t.toolSettings.split.rows}
               </label>
               <input
                 id="split-rows"
@@ -297,7 +300,7 @@ export function SplitSettings() {
           <div className="flex gap-2">
             <div className="flex-1">
               <label htmlFor="split-tile-w" className="text-xs text-muted-foreground">
-                Tile Width (px)
+                {t.toolSettings.split.tileWidthPx}
               </label>
               <input
                 id="split-tile-w"
@@ -311,7 +314,7 @@ export function SplitSettings() {
             </div>
             <div className="flex-1">
               <label htmlFor="split-tile-h" className="text-xs text-muted-foreground">
-                Tile Height (px)
+                {t.toolSettings.split.tileHeightPx}
               </label>
               <input
                 id="split-tile-h"
@@ -326,8 +329,13 @@ export function SplitSettings() {
           </div>
           {imageDimensions && (
             <p className="text-[11px] text-muted-foreground">
-              Image: {imageDimensions.width}x{imageDimensions.height}px. Grid: {grid.columns}x
-              {grid.rows} = {tileCount} tiles
+              {format(t.toolSettings.split.imageGridSummary, {
+                width: imageDimensions.width,
+                height: imageDimensions.height,
+                cols: grid.columns,
+                rows: grid.rows,
+                count: tileCount,
+              })}
             </p>
           )}
         </div>
@@ -336,11 +344,18 @@ export function SplitSettings() {
       {mode === "grid" && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {grid.columns}x{grid.rows} = {tileCount} tiles
+            {format(t.toolSettings.split.gridSummary, {
+              cols: grid.columns,
+              rows: grid.rows,
+              count: tileCount,
+            })}
           </span>
           {tileDims && (
             <span className="tabular-nums">
-              ~{tileDims.width}x{tileDims.height}px each
+              {format(t.toolSettings.split.tileDimsEach, {
+                width: tileDims.width,
+                height: tileDims.height,
+              })}
             </span>
           )}
         </div>
@@ -351,7 +366,7 @@ export function SplitSettings() {
       )}
 
       <CollapsibleSection
-        title="Output Format"
+        title={t.toolSettings.split.outputFormat}
         badge={outputFormat === "original" ? "Auto" : outputFormat.toUpperCase()}
       >
         <div className="space-y-3 pt-1">
@@ -375,7 +390,7 @@ export function SplitSettings() {
             <div>
               <div className="flex justify-between items-center">
                 <label htmlFor="split-quality" className="text-xs text-muted-foreground">
-                  Quality
+                  {t.toolSettings.split.quality}
                 </label>
                 <span className="text-xs font-mono text-foreground">{quality}</span>
               </div>
@@ -404,18 +419,21 @@ export function SplitSettings() {
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing
-          ? "Splitting..."
+          ? t.toolSettings.split.splitting
           : files.length > 1
-            ? `Split ${files.length} Images (${tileCount} tiles each)`
-            : `Split into ${tileCount} Tiles`}
+            ? format(t.toolSettings.split.submitBatch, { count: files.length, tiles: tileCount })
+            : format(t.toolSettings.split.splitIntoTiles, { count: tileCount })}
       </button>
 
       {hasTiles && (
         <div className="space-y-3 border-t border-border pt-3">
           <p className="text-xs font-medium text-foreground">
             {files.length > 1
-              ? `${files.length} images split (${tiles.length} tiles each)`
-              : `${tiles.length} Tiles Generated`}
+              ? format(t.toolSettings.split.imagesSplitSummary, {
+                  count: files.length,
+                  tiles: tiles.length,
+                })
+              : format(t.toolSettings.split.tilesGenerated, { count: tiles.length })}
           </p>
           <div
             className="grid gap-1"
@@ -427,12 +445,12 @@ export function SplitSettings() {
                 type="button"
                 onClick={() => handleDownloadTile(i)}
                 className="group relative aspect-square rounded border border-border overflow-hidden hover:border-primary transition-colors bg-muted"
-                title={`Download tile ${tile.label}`}
+                title={format(t.toolSettings.split.downloadTile, { label: tile.label })}
               >
                 {tile.blobUrl && (
                   <img
                     src={tile.blobUrl}
-                    alt={`Tile ${tile.label}`}
+                    alt={format(t.toolSettings.split.tileAlt, { label: tile.label })}
                     className="w-full h-full object-cover"
                   />
                 )}
@@ -455,7 +473,7 @@ export function SplitSettings() {
             className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
           >
             <PackageOpen className="h-4 w-4" />
-            Download All as ZIP
+            {t.toolSettings.split.downloadAllAsZip}
           </button>
         </div>
       )}

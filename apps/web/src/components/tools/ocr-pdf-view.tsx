@@ -1,5 +1,6 @@
 import { Copy, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { DocumentView } from "./document-view";
@@ -11,6 +12,7 @@ import { DocumentView } from "./document-view";
  * the processed download URL once OCR completes.
  */
 export function OcrPdfView() {
+  const { t } = useTranslation();
   const entry = useFileStore((s) => s.entries[s.selectedIndex]);
   const processedUrl = entry?.processedUrl ?? null;
   const status = entry?.status;
@@ -62,7 +64,9 @@ export function OcrPdfView() {
       {/* Extracted text */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-sm font-medium text-foreground">Extracted Text</span>
+          <span className="text-sm font-medium text-foreground">
+            {t.toolSettings["ocr-pdf-view"].extractedText}
+          </span>
           {text != null && (
             <button
               type="button"
@@ -70,24 +74,26 @@ export function OcrPdfView() {
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Copy className="h-3.5 w-3.5" />
-              {copied ? "Copied" : "Copy"}
+              {copied ? t.toolSettings["ocr-pdf-view"].copied : t.common.copy}
             </button>
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-3">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading extracted text...</p>
+            <p className="text-sm text-muted-foreground">
+              {t.toolSettings["ocr-pdf-view"].loadingExtractedText}
+            </p>
           ) : text != null ? (
             <pre className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
-              {text || "(no text found)"}
+              {text || t.toolSettings["ocr-pdf-view"].noTextFound}
             </pre>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <FileText className="h-8 w-8 text-muted-foreground" />
               <p className="max-w-xs text-sm text-muted-foreground">
                 {status === "processing"
-                  ? "Extracting text..."
-                  : "The extracted text will appear here after you run OCR."}
+                  ? t.toolSettings["ocr-pdf-view"].extractingText
+                  : t.toolSettings["ocr-pdf-view"].theExtractedTextWillAppear}
               </p>
             </div>
           )}

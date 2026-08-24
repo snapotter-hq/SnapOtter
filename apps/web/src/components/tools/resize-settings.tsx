@@ -187,7 +187,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           type="number"
           value={width}
           onChange={(e) => handleWidthChange(e.target.value)}
-          placeholder="Auto"
+          placeholder={t.toolSettings.resize.auto}
           disabled={squareMode && contentAware}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
         />
@@ -201,7 +201,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           type="number"
           value={height}
           onChange={(e) => handleHeightChange(e.target.value)}
-          placeholder="Auto"
+          placeholder={t.toolSettings.resize.auto}
           disabled={squareMode && contentAware}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
         />
@@ -343,7 +343,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
         <div className="space-y-3">
           <div>
             <label htmlFor="resize-scale" className="text-xs text-muted-foreground">
-              Scale (%)
+              {t.toolSettings.resize.scalePercent}
             </label>
             <input
               id="resize-scale"
@@ -404,7 +404,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="blur-radius" className="text-xs text-muted-foreground">
-                Smoothing
+                {t.toolSettings.resize.smoothing}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">{blurRadius}</span>
             </div>
@@ -423,7 +423,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="sobel-threshold" className="text-xs text-muted-foreground">
-                Edge sensitivity
+                {t.toolSettings.resize.edgeSensitivity}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">{sobelThreshold}</span>
             </div>

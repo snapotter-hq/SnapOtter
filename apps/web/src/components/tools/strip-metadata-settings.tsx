@@ -6,6 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { format, plural } from "@/lib/format";
 import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -35,6 +36,7 @@ export function StripMetadataControls({
   hasExif,
   hasGps,
 }: StripMetadataControlsProps) {
+  const { t } = useTranslation();
   const [stripAll, setStripAll] = useState(true);
   const [stripExif, setStripExif] = useState(false);
   const [stripGps, setStripGps] = useState(false);
@@ -80,14 +82,16 @@ export function StripMetadataControls({
           onChange={(e) => handleStripAllChange(e.target.checked)}
           className="rounded"
         />
-        Remove All Metadata
+        {t.toolSettings["strip-metadata"].removeAllMetadata}
       </label>
 
       <div className="border-t border-border" />
 
       {/* Individual options */}
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">Or select specific metadata:</p>
+        <p className="text-xs text-muted-foreground">
+          {t.toolSettings["strip-metadata"].selectSpecific}
+        </p>
 
         <label
           className={`flex items-center gap-2 text-sm ${stripAll ? "text-muted-foreground" : "text-foreground"}`}
@@ -99,10 +103,12 @@ export function StripMetadataControls({
             disabled={stripAll}
             className="rounded"
           />
-          Strip EXIF (camera info, date, exposure)
+          {t.toolSettings["strip-metadata"].stripExif}
           {hasExif && !stripAll && (
             <span className="ms-auto text-[10px] text-muted-foreground">
-              {Object.keys(metadata?.exif ?? {}).filter((k) => !SKIP_KEYS.has(k)).length} fields
+              {format(t.toolSettings["strip-metadata"].fieldsCount, {
+                count: Object.keys(metadata?.exif ?? {}).filter((k) => !SKIP_KEYS.has(k)).length,
+              })}
             </span>
           )}
         </label>
@@ -117,10 +123,10 @@ export function StripMetadataControls({
             disabled={stripAll}
             className="rounded"
           />
-          Strip GPS (location data)
+          {t.toolSettings["strip-metadata"].stripGps}
           {hasGps && !stripAll && (
             <span className="ms-auto text-[10px] text-amber-700 dark:text-amber-400">
-              location found
+              {t.toolSettings["strip-metadata"].locationFound}
             </span>
           )}
         </label>
@@ -135,7 +141,7 @@ export function StripMetadataControls({
             disabled={stripAll}
             className="rounded"
           />
-          Strip ICC (color profile)
+          {t.toolSettings["strip-metadata"].stripIcc}
         </label>
 
         <label
@@ -148,7 +154,7 @@ export function StripMetadataControls({
             disabled={stripAll}
             className="rounded"
           />
-          Strip XMP (extensible metadata)
+          {t.toolSettings["strip-metadata"].stripXmp}
         </label>
       </div>
     </>
@@ -266,12 +272,14 @@ export function StripMetadataSettings() {
       {/* Metadata Display */}
       {hasFile && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Current Metadata</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            {t.toolSettings["strip-metadata"].currentMetadata}
+          </p>
 
           {inspecting && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Reading metadata...
+              {t.toolSettings["strip-metadata"].readingMetadata}
             </div>
           )}
 
@@ -279,7 +287,7 @@ export function StripMetadataSettings() {
 
           {metadata && !hasAnyMetadata && !inspecting && (
             <p className="text-xs text-muted-foreground italic py-1">
-              No metadata found in this image.
+              {t.toolSettings["strip-metadata"].noMetadataFound}
             </p>
           )}
 
@@ -293,7 +301,10 @@ export function StripMetadataSettings() {
                   <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20">
                     <MapPin className="h-3 w-3 text-amber-700 dark:text-amber-400 shrink-0" />
                     <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
-                      Location data: {gpsLat.toFixed(6)}, {gpsLon.toFixed(6)}
+                      {format(t.toolSettings["strip-metadata"].locationCoords, {
+                        lat: gpsLat.toFixed(6),
+                        lon: gpsLon.toFixed(6),
+                      })}
                     </span>
                   </div>
                   <a
@@ -306,8 +317,7 @@ export function StripMetadataSettings() {
                     {t.toolSettings["strip-metadata"].viewOnMap}
                   </a>
                   <p className="text-[10px] text-amber-700 dark:text-amber-400">
-                    This image contains your precise location. Consider removing GPS data before
-                    sharing.
+                    {t.toolSettings["strip-metadata"].locationWarning}
                   </p>
                 </div>
               )}
@@ -338,7 +348,7 @@ export function StripMetadataSettings() {
 
               {hasIcc && metadata.icc && (
                 <CollapsibleSection
-                  title="ICC Profile"
+                  title={t.toolSettings["strip-metadata"].iccProfile}
                   badge={`${Object.keys(metadata.icc).length} fields`}
                 >
                   <MetadataGrid data={metadata.icc} />
@@ -355,7 +365,15 @@ export function StripMetadataSettings() {
               )}
 
               <p className="text-[10px] text-muted-foreground">
-                {sectionCount} metadata {sectionCount === 1 ? "section" : "sections"} found
+                {plural(
+                  sectionCount,
+                  format(t.toolSettings["strip-metadata"].metadataSections, {
+                    count: sectionCount,
+                  }),
+                  format(t.toolSettings["strip-metadata"].metadataSectionsPlural, {
+                    count: sectionCount,
+                  }),
+                )}
               </p>
             </div>
           )}
@@ -377,9 +395,21 @@ export function StripMetadataSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
-          <p>Metadata removed: {((originalSize - processedSize) / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["strip-metadata"].originalSize, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["strip-metadata"].processedSize, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["strip-metadata"].metadataRemoved, {
+              size: ((originalSize - processedSize) / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -388,7 +418,7 @@ export function StripMetadataSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Removing metadata"
+          label={t.toolSettings["strip-metadata"].progressLabel}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -400,7 +430,7 @@ export function StripMetadataSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Remove Metadata
+          {t.toolSettings["strip-metadata"].submit}
         </button>
       )}
 
@@ -413,7 +443,7 @@ export function StripMetadataSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

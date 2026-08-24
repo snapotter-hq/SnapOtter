@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import ReactCrop, { type Crop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 
 export interface CropCanvasProps {
   imageSrc: string;
@@ -21,6 +23,7 @@ export function CropCanvas({
   onCropChange,
   onImageLoad,
 }: CropCanvasProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -116,7 +119,7 @@ export function CropCanvas({
           <img
             ref={imgRef}
             src={imageSrc}
-            alt="Crop preview"
+            alt={t.toolSettings["crop-canvas"].cropPreview}
             onLoad={handleImageLoad}
             className="max-w-full max-h-[calc(100dvh-12rem)] select-none"
             draggable={false}
@@ -127,11 +130,17 @@ export function CropCanvas({
       {/* Info bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border-t border-border text-xs text-muted-foreground shrink-0">
         <span>
-          Crop region: {pixelWidth} x {pixelHeight}
+          {format(t.toolSettings["crop-canvas"].cropRegionSize, {
+            width: pixelWidth,
+            height: pixelHeight,
+          })}
         </span>
         {imgDimensions && (
           <span>
-            Original: {imgDimensions.width} x {imgDimensions.height}
+            {format(t.toolSettings["crop-canvas"].originalSize, {
+              width: imgDimensions.width,
+              height: imgDimensions.height,
+            })}
           </span>
         )}
       </div>

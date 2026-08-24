@@ -113,7 +113,7 @@ export function VignetteSettings({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="vignette-radius" className="text-xs text-muted-foreground">
-            Radius
+            {t.toolSettings.vignette.radius}
           </label>
           <span className="text-xs font-mono text-foreground">{radius}%</span>
         </div>
@@ -133,7 +133,7 @@ export function VignetteSettings({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="vignette-softness" className="text-xs text-muted-foreground">
-            Softness
+            {t.toolSettings.vignette.softness}
           </label>
           <span className="text-xs font-mono text-foreground">{softness}%</span>
         </div>
@@ -153,7 +153,7 @@ export function VignetteSettings({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="vignette-roundness" className="text-xs text-muted-foreground">
-            Roundness
+            {t.toolSettings.vignette.roundness}
           </label>
           <span className="text-xs font-mono text-foreground">{roundness}%</span>
         </div>
@@ -173,7 +173,7 @@ export function VignetteSettings({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="vignette-centerX" className="text-xs text-muted-foreground">
-            Center X
+            {t.toolSettings.vignette.centerX}
           </label>
           <span className="text-xs font-mono text-foreground">{centerX}%</span>
         </div>
@@ -193,7 +193,7 @@ export function VignetteSettings({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="vignette-centerY" className="text-xs text-muted-foreground">
-            Center Y
+            {t.toolSettings.vignette.centerY}
           </label>
           <span className="text-xs font-mono text-foreground">{centerY}%</span>
         </div>

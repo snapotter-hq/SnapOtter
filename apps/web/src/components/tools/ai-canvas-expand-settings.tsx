@@ -100,7 +100,9 @@ export function AiCanvasExpandSettings() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Quality tier */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Quality</p>
+        <p className="text-xs text-muted-foreground mb-1">
+          {t.toolSettings["ai-canvas-expand"].quality}
+        </p>
         <div className="grid grid-cols-3 gap-1">
           {TIERS.map((t) => (
             <button
@@ -125,7 +127,9 @@ export function AiCanvasExpandSettings() {
 
       {/* Aspect ratio presets */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Extend to aspect ratio</p>
+        <p className="text-xs text-muted-foreground mb-1">
+          {t.toolSettings["ai-canvas-expand"].extendToAspectRatio}
+        </p>
         <div className="flex flex-wrap gap-1">
           {EXTEND_PRESETS.map(({ label, aspect }) => (
             <button
@@ -142,11 +146,13 @@ export function AiCanvasExpandSettings() {
 
       {/* Per-side extension */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Extend by (pixels)</p>
+        <p className="text-xs text-muted-foreground mb-1">
+          {t.toolSettings["ai-canvas-expand"].extendByPixels}
+        </p>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="cac-top" className="text-[10px] text-muted-foreground">
-              Top
+              {t.toolSettings["ai-canvas-expand"].top}
             </label>
             <input
               id="cac-top"
@@ -159,7 +165,7 @@ export function AiCanvasExpandSettings() {
           </div>
           <div>
             <label htmlFor="cac-right" className="text-[10px] text-muted-foreground">
-              Right
+              {t.toolSettings["ai-canvas-expand"].right}
             </label>
             <input
               id="cac-right"
@@ -172,7 +178,7 @@ export function AiCanvasExpandSettings() {
           </div>
           <div>
             <label htmlFor="cac-bottom" className="text-[10px] text-muted-foreground">
-              Bottom
+              {t.toolSettings["ai-canvas-expand"].bottom}
             </label>
             <input
               id="cac-bottom"
@@ -185,7 +191,7 @@ export function AiCanvasExpandSettings() {
           </div>
           <div>
             <label htmlFor="cac-left" className="text-[10px] text-muted-foreground">
-              Left
+              {t.toolSettings["ai-canvas-expand"].left}
             </label>
             <input
               id="cac-left"
@@ -203,8 +209,10 @@ export function AiCanvasExpandSettings() {
       {imgDimensions &&
         (extendTop > 0 || extendRight > 0 || extendBottom > 0 || extendLeft > 0) && (
           <p className="text-xs text-muted-foreground">
-            New size: {imgDimensions.width + extendLeft + extendRight} x{" "}
-            {imgDimensions.height + extendTop + extendBottom}
+            {format(t.toolSettings["ai-canvas-expand"].newSize, {
+              width: imgDimensions.width + extendLeft + extendRight,
+              height: imgDimensions.height + extendTop + extendBottom,
+            })}
           </p>
         )}
 
@@ -240,7 +248,7 @@ export function AiCanvasExpandSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

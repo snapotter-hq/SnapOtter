@@ -1,6 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import {
   COLLAGE_TEMPLATES,
@@ -8,6 +9,7 @@ import {
   getTemplateById,
   getTemplatesForCount,
 } from "@/lib/collage-templates";
+import { format, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 
@@ -37,6 +39,7 @@ const BG_PRESETS = [
 ];
 
 export function CollageSettings() {
+  const { t } = useTranslation();
   const store = useCollageStore();
   const {
     images,
@@ -173,25 +176,29 @@ export function CollageSettings() {
       {hasImages && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {imageCount} image{imageCount !== 1 ? "s" : ""} loaded
+            {plural(
+              imageCount,
+              format(t.toolSettings.collage.imagesLoadedOne, { count: imageCount }),
+              format(t.toolSettings.collage.imagesLoadedOther, { count: imageCount }),
+            )}
           </span>
           <button
             type="button"
             onClick={() => store.clearImages()}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            Clear all
+            {t.toolPage.clearAll}
           </button>
         </div>
       )}
 
       {/* Layout templates */}
-      <CollapsibleSection title="Layout" badge={template?.label} defaultOpen>
+      <CollapsibleSection title={t.toolSettings.collage.layout} badge={template?.label} defaultOpen>
         <div className="space-y-2">
           {matchingTemplates.length > 0 && (
             <div>
               <p className="text-[10px] text-muted-foreground mb-1.5">
-                Best for {imageCount} images
+                {format(t.toolSettings.collage.bestForImages, { count: imageCount })}
               </p>
               <div className="grid grid-cols-4 gap-1.5">
                 {matchingTemplates.map((t) => (
@@ -207,7 +214,9 @@ export function CollageSettings() {
           )}
           <div>
             {matchingTemplates.length > 0 && (
-              <p className="text-[10px] text-muted-foreground mb-1.5">All layouts</p>
+              <p className="text-[10px] text-muted-foreground mb-1.5">
+                {t.toolSettings.collage.allLayouts}
+              </p>
             )}
             <div className="grid grid-cols-4 gap-1.5">
               {allTemplates.map((t) => (
@@ -224,11 +233,11 @@ export function CollageSettings() {
       </CollapsibleSection>
 
       {/* Spacing & Style */}
-      <CollapsibleSection title="Spacing & Style" defaultOpen>
+      <CollapsibleSection title={t.toolSettings.collage.spacingStyle} defaultOpen>
         <div className="space-y-3">
           <div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Gap</span>
+              <span className="text-xs text-muted-foreground">{t.toolSettings.collage.gap}</span>
               <span className="text-xs font-mono text-foreground">{gap}px</span>
             </div>
             <input
@@ -243,7 +252,9 @@ export function CollageSettings() {
 
           <div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Corner Radius</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings.collage.cornerRadius}
+              </span>
               <span className="text-xs font-mono text-foreground">{cornerRadius}px</span>
             </div>
             <input
@@ -257,7 +268,9 @@ export function CollageSettings() {
           </div>
 
           <div>
-            <span className="text-xs text-muted-foreground">Background</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings.collage.background}
+            </span>
             <div className="flex items-center gap-1.5 mt-1">
               {BG_PRESETS.map((p) => (
                 <button
@@ -294,9 +307,14 @@ export function CollageSettings() {
       </CollapsibleSection>
 
       {/* Canvas */}
-      <CollapsibleSection title="Canvas" badge={aspectRatio === "free" ? undefined : aspectRatio}>
+      <CollapsibleSection
+        title={t.toolSettings.collage.canvas}
+        badge={aspectRatio === "free" ? undefined : aspectRatio}
+      >
         <div>
-          <span className="text-xs text-muted-foreground">Aspect Ratio</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings.collage.aspectRatio}
+          </span>
           <div className="flex flex-wrap gap-1 mt-1">
             {ASPECT_RATIOS.map((ar) => (
               <button
@@ -318,10 +336,10 @@ export function CollageSettings() {
       </CollapsibleSection>
 
       {/* Output */}
-      <CollapsibleSection title="Output" badge={outputFormat.toUpperCase()}>
+      <CollapsibleSection title={t.toolSettings.collage.output} badge={outputFormat.toUpperCase()}>
         <div className="space-y-3">
           <div>
-            <span className="text-xs text-muted-foreground">Format</span>
+            <span className="text-xs text-muted-foreground">{t.toolSettings.collage.format}</span>
             <div className="flex gap-1 mt-1">
               {OUTPUT_FORMATS.map((f) => (
                 <button
@@ -344,7 +362,9 @@ export function CollageSettings() {
           {outputFormat !== "png" && (
             <div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">Quality</span>
+                <span className="text-xs text-muted-foreground">
+                  {t.toolSettings.collage.quality}
+                </span>
                 <span className="text-xs font-mono text-foreground">{quality}%</span>
               </div>
               <input
@@ -372,7 +392,9 @@ export function CollageSettings() {
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {phase === "processing" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-        {phase === "processing" ? "Creating..." : `Create Collage (${imageCount} images)`}
+        {phase === "processing"
+          ? t.toolSettings.collage.creating
+          : format(t.toolSettings.collage.submitWithCount, { count: imageCount })}
       </button>
 
       {resultUrl && (
@@ -383,15 +405,23 @@ export function CollageSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download Collage
+          {t.toolSettings.collage.downloadCollage}
         </a>
       )}
 
       {/* Size info */}
       {originalSize != null && resultSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Input total: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Collage: {(resultSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.collage.inputTotalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.collage.collageKb, {
+              size: (resultSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
     </div>
@@ -408,6 +438,7 @@ function TemplateButton({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -418,7 +449,10 @@ function TemplateButton({
           ? "border-primary bg-primary/10"
           : "border-border hover:border-primary/50 bg-muted/30",
       )}
-      title={`${template.label} (${template.imageCount} images)`}
+      title={format(t.toolSettings.collage.templateTitle, {
+        label: template.label,
+        count: template.imageCount,
+      })}
     >
       <TemplateDiagram template={template} size={40} />
       <span className="text-[9px] text-muted-foreground leading-tight">{template.imageCount}</span>

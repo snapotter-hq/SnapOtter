@@ -1,7 +1,9 @@
 import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type Effect = "none" | "grayscale" | "sepia" | "invert";
@@ -19,6 +21,7 @@ export function ColorControls({
   onChange,
   onPreviewFilter,
 }: ColorControlsProps) {
+  const { t } = useTranslation();
   // Light
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
@@ -148,7 +151,7 @@ export function ColorControls({
       {/* Hidden SVG filters for live preview */}
       {hasTempTint && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
-          <title>Temperature and tint color filter</title>
+          <title>{t.toolSettings.color.temperatureAndTintColorFilter}</title>
           <filter id="snapotter-temp-tint-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -159,7 +162,7 @@ export function ColorControls({
       )}
       {hasChannelChanges && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
-          <title>Color channel filter</title>
+          <title>{t.toolSettings.color.colorChannelFilter}</title>
           <filter id="snapotter-channel-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -170,7 +173,7 @@ export function ColorControls({
       )}
       {sharpness > 0 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
-          <title>Sharpen filter</title>
+          <title>{t.toolSettings.color.sharpenFilter}</title>
           <filter id="snapotter-sharpen-filter" colorInterpolationFilters="sRGB">
             <feConvolveMatrix
               order="3"
@@ -182,24 +185,24 @@ export function ColorControls({
       )}
 
       {/* Light section */}
-      <SectionLabel>Light</SectionLabel>
+      <SectionLabel>{t.toolSettings.color.light}</SectionLabel>
       <div className="space-y-2">
         <SliderControl
-          label="Brightness"
+          label={t.toolSettings.color.brightness}
           value={brightness}
           onChange={setBrightness}
           min={-100}
           max={100}
         />
         <SliderControl
-          label="Contrast"
+          label={t.toolSettings.color.contrast}
           value={contrast}
           onChange={setContrast}
           min={-100}
           max={100}
         />
         <SliderControl
-          label="Exposure"
+          label={t.toolSettings.color.exposure}
           value={exposure}
           onChange={setExposure}
           min={-100}
@@ -208,17 +211,17 @@ export function ColorControls({
       </div>
 
       {/* Color section */}
-      <SectionLabel>Color</SectionLabel>
+      <SectionLabel>{t.toolSettings.color.color}</SectionLabel>
       <div className="space-y-2">
         <SliderControl
-          label="Saturation"
+          label={t.toolSettings.color.saturation}
           value={saturation}
           onChange={setSaturation}
           min={-100}
           max={100}
         />
         <SliderControl
-          label="Temperature"
+          label={t.toolSettings.color.temperature}
           value={temperature}
           onChange={setTemperature}
           min={-100}
@@ -226,21 +229,27 @@ export function ColorControls({
           hint="cool / warm"
         />
         <SliderControl
-          label="Tint"
+          label={t.toolSettings.color.tint}
           value={tint}
           onChange={setTint}
           min={-100}
           max={100}
           hint="green / magenta"
         />
-        <SliderControl label="Hue" value={hue} onChange={setHue} min={-180} max={180} />
+        <SliderControl
+          label={t.toolSettings.color.hue}
+          value={hue}
+          onChange={setHue}
+          min={-180}
+          max={180}
+        />
       </div>
 
       {/* Detail section */}
-      <SectionLabel>Detail</SectionLabel>
+      <SectionLabel>{t.toolSettings.color.detail}</SectionLabel>
       <div className="space-y-2">
         <SliderControl
-          label="Sharpness"
+          label={t.toolSettings.color.sharpness}
           value={sharpness}
           onChange={setSharpness}
           min={0}
@@ -249,7 +258,7 @@ export function ColorControls({
       </div>
 
       {/* Effects section */}
-      <SectionLabel>Effects</SectionLabel>
+      <SectionLabel>{t.toolSettings.color.effects}</SectionLabel>
       <div className="grid grid-cols-2 gap-1">
         {(["none", "grayscale", "sepia", "invert"] as const).map((e) => (
           <button
@@ -274,15 +283,17 @@ export function ColorControls({
         className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground w-full"
       >
         {channelsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        Color Channels
+        {t.toolSettings.color.colorChannels}
         {hasChannelChanges && (
-          <span className="ms-auto text-primary-ink text-[10px]">modified</span>
+          <span className="ms-auto text-primary-ink text-[10px]">
+            {t.toolSettings.color.modified}
+          </span>
         )}
       </button>
       {channelsOpen && (
         <div className="space-y-2 ps-1">
           <SliderControl
-            label="Red"
+            label={t.toolSettings.color.red}
             value={red}
             onChange={setRed}
             min={0}
@@ -290,7 +301,7 @@ export function ColorControls({
             color="text-destructive-ink"
           />
           <SliderControl
-            label="Green"
+            label={t.toolSettings.color.green}
             value={green}
             onChange={setGreen}
             min={0}
@@ -298,7 +309,7 @@ export function ColorControls({
             color="text-success-ink"
           />
           <SliderControl
-            label="Blue"
+            label={t.toolSettings.color.blue}
             value={blue}
             onChange={setBlue}
             min={0}
@@ -328,7 +339,7 @@ export function ColorControls({
           }}
           className="w-full text-xs py-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
         >
-          Reset All
+          {t.toolSettings.color.resetAll}
         </button>
       )}
     </>
@@ -343,6 +354,7 @@ interface ColorSettingsProps {
 }
 
 export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const {
     processFiles,
@@ -385,8 +397,16 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.color.originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.color.processedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -394,7 +414,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Adjusting colors"
+          label={t.toolSettings.color.adjustingColors}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -406,7 +426,9 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
           disabled={!hasFile || !hasChanges || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `Apply (${files.length} files)` : "Apply"}
+          {files.length > 1
+            ? format(t.toolSettings.color.submitBatch, { count: files.length })
+            : t.toolSettings.color.apply}
         </button>
       )}
 
@@ -419,7 +441,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

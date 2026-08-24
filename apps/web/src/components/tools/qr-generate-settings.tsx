@@ -13,6 +13,7 @@ import {
 import QRCodeStyling from "qr-code-styling";
 import { useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
+import { useTranslation } from "@/contexts/i18n-context";
 import {
   type ContentType,
   type CornerDotType,
@@ -77,6 +78,7 @@ const INPUT_CLASS =
 const TEXTAREA_CLASS = `${INPUT_CLASS} resize-none`;
 
 function UrlForm() {
+  const { t } = useTranslation();
   const { textData, setTextData } = useQrStore();
   return (
     <div>
@@ -88,7 +90,7 @@ function UrlForm() {
         type="url"
         value={textData}
         onChange={(e) => setTextData(e.target.value)}
-        placeholder="https://example.com"
+        placeholder={t.toolSettings["qr-generate"].httpsExampleCom}
         className={INPUT_CLASS}
         data-testid="qr-input-url"
       />
@@ -97,17 +99,18 @@ function UrlForm() {
 }
 
 function TextForm() {
+  const { t } = useTranslation();
   const { textData, setTextData } = useQrStore();
   return (
     <div>
       <label htmlFor="qr-text" className="text-xs text-muted-foreground">
-        Text
+        {t.toolSettings["qr-generate"].text}
       </label>
       <textarea
         id="qr-text"
         value={textData}
         onChange={(e) => setTextData(e.target.value)}
-        placeholder="Enter any text..."
+        placeholder={t.toolSettings["qr-generate"].enterAnyText}
         rows={3}
         className={TEXTAREA_CLASS}
         data-testid="qr-input-text"
@@ -117,12 +120,13 @@ function TextForm() {
 }
 
 function WifiForm() {
+  const { t } = useTranslation();
   const { wifiData, setWifiData } = useQrStore();
   return (
     <div className="space-y-2">
       <div>
         <label htmlFor="qr-wifi-ssid" className="text-xs text-muted-foreground">
-          Network Name (SSID)
+          {t.toolSettings["qr-generate"].networkNameSsid}
         </label>
         <input
           id="qr-wifi-ssid"
@@ -135,20 +139,20 @@ function WifiForm() {
       </div>
       <div>
         <label htmlFor="qr-wifi-password" className="text-xs text-muted-foreground">
-          Password
+          {t.toolSettings["qr-generate"].password}
         </label>
         <input
           id="qr-wifi-password"
           type="text"
           value={wifiData.password}
           onChange={(e) => setWifiData({ password: e.target.value })}
-          placeholder="Password"
+          placeholder={t.toolSettings["qr-generate"].password}
           className={INPUT_CLASS}
         />
       </div>
       <div>
         <label htmlFor="qr-wifi-encryption" className="text-xs text-muted-foreground">
-          Encryption
+          {t.toolSettings["qr-generate"].encryption}
         </label>
         <select
           id="qr-wifi-encryption"
@@ -158,7 +162,7 @@ function WifiForm() {
         >
           <option value="WPA">WPA / WPA2</option>
           <option value="WEP">WEP</option>
-          <option value="nopass">None</option>
+          <option value="nopass">{t.toolSettings["qr-generate"].none}</option>
         </select>
       </div>
       <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
@@ -168,7 +172,7 @@ function WifiForm() {
           onChange={(e) => setWifiData({ hidden: e.target.checked })}
           className="rounded border-border"
         />
-        Hidden network
+        {t.toolSettings["qr-generate"].hiddenNetwork}
       </label>
     </div>
   );
@@ -207,44 +211,45 @@ function VCardForm() {
 }
 
 function EmailForm() {
+  const { t } = useTranslation();
   const { emailData, setEmailData } = useQrStore();
   return (
     <div className="space-y-2">
       <div>
         <label htmlFor="qr-email-to" className="text-xs text-muted-foreground">
-          To
+          {t.toolSettings["qr-generate"].to}
         </label>
         <input
           id="qr-email-to"
           type="email"
           value={emailData.to}
           onChange={(e) => setEmailData({ to: e.target.value })}
-          placeholder="recipient@example.com"
+          placeholder={t.toolSettings["qr-generate"].recipientExampleCom}
           className={INPUT_CLASS}
         />
       </div>
       <div>
         <label htmlFor="qr-email-subject" className="text-xs text-muted-foreground">
-          Subject
+          {t.toolSettings["qr-generate"].subject}
         </label>
         <input
           id="qr-email-subject"
           type="text"
           value={emailData.subject}
           onChange={(e) => setEmailData({ subject: e.target.value })}
-          placeholder="Subject line"
+          placeholder={t.toolSettings["qr-generate"].subjectLine}
           className={INPUT_CLASS}
         />
       </div>
       <div>
         <label htmlFor="qr-email-body" className="text-xs text-muted-foreground">
-          Body
+          {t.toolSettings["qr-generate"].body}
         </label>
         <textarea
           id="qr-email-body"
           value={emailData.body}
           onChange={(e) => setEmailData({ body: e.target.value })}
-          placeholder="Email body..."
+          placeholder={t.toolSettings["qr-generate"].emailBody}
           rows={2}
           className={TEXTAREA_CLASS}
         />
@@ -254,11 +259,12 @@ function EmailForm() {
 }
 
 function PhoneForm() {
+  const { t } = useTranslation();
   const { phoneData, setPhoneData } = useQrStore();
   return (
     <div>
       <label htmlFor="qr-phone" className="text-xs text-muted-foreground">
-        Phone Number
+        {t.toolSettings["qr-generate"].phoneNumber}
       </label>
       <input
         id="qr-phone"
@@ -273,12 +279,13 @@ function PhoneForm() {
 }
 
 function SmsForm() {
+  const { t } = useTranslation();
   const { smsData, setSmsData } = useQrStore();
   return (
     <div className="space-y-2">
       <div>
         <label htmlFor="qr-sms-phone" className="text-xs text-muted-foreground">
-          Phone Number
+          {t.toolSettings["qr-generate"].phoneNumber}
         </label>
         <input
           id="qr-sms-phone"
@@ -291,13 +298,13 @@ function SmsForm() {
       </div>
       <div>
         <label htmlFor="qr-sms-message" className="text-xs text-muted-foreground">
-          Message
+          {t.toolSettings["qr-generate"].message}
         </label>
         <textarea
           id="qr-sms-message"
           value={smsData.message}
           onChange={(e) => setSmsData({ message: e.target.value })}
-          placeholder="Your message..."
+          placeholder={t.toolSettings["qr-generate"].yourMessage}
           rows={2}
           className={TEXTAREA_CLASS}
         />
@@ -345,6 +352,7 @@ function PillButton({
 // ── Main settings component ──────────────────────────────────────────
 
 export function QrGenerateSettings() {
+  const { t } = useTranslation();
   const store = useQrStore();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -433,10 +441,12 @@ export function QrGenerateSettings() {
       <ContentForm />
 
       {/* ── Style section ── */}
-      <CollapsibleSection title="Style" defaultOpen>
+      <CollapsibleSection title={t.toolSettings["qr-generate"].style} defaultOpen>
         <div className="space-y-3">
           <div>
-            <span className="text-xs text-muted-foreground mb-1.5 block">Dot Pattern</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">
+              {t.toolSettings["qr-generate"].dotPattern}
+            </span>
             <div className="grid grid-cols-3 gap-1.5">
               {DOT_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -450,7 +460,9 @@ export function QrGenerateSettings() {
             </div>
           </div>
           <div>
-            <span className="text-xs text-muted-foreground mb-1.5 block">Corner Square</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">
+              {t.toolSettings["qr-generate"].cornerSquare}
+            </span>
             <div className="grid grid-cols-2 gap-1.5">
               {CORNER_SQUARE_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -464,7 +476,9 @@ export function QrGenerateSettings() {
             </div>
           </div>
           <div>
-            <span className="text-xs text-muted-foreground mb-1.5 block">Corner Dot</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">
+              {t.toolSettings["qr-generate"].cornerDot}
+            </span>
             <div className="grid grid-cols-3 gap-1.5">
               {CORNER_DOT_TYPES.map(({ value, label }) => (
                 <PillButton
@@ -481,10 +495,12 @@ export function QrGenerateSettings() {
       </CollapsibleSection>
 
       {/* ── Colors section ── */}
-      <CollapsibleSection title="Colors">
+      <CollapsibleSection title={t.toolSettings["qr-generate"].colors}>
         <div className="space-y-3">
           <div>
-            <span className="text-xs text-muted-foreground">Dot Color</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["qr-generate"].dotColor}
+            </span>
             <div className="flex items-center gap-2 mt-0.5">
               <input
                 type="color"
@@ -511,7 +527,7 @@ export function QrGenerateSettings() {
               onChange={(e) => store.setDotGradientEnabled(e.target.checked)}
               className="rounded border-border"
             />
-            Use gradient
+            {t.toolSettings["qr-generate"].useGradient}
           </label>
 
           {store.dotGradientEnabled && (
@@ -519,7 +535,7 @@ export function QrGenerateSettings() {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label htmlFor="qr-gradient-from" className="text-[10px] text-muted-foreground">
-                    From
+                    {t.toolSettings["qr-generate"].from}
                   </label>
                   <input
                     id="qr-gradient-from"
@@ -531,7 +547,7 @@ export function QrGenerateSettings() {
                 </div>
                 <div className="flex-1">
                   <label htmlFor="qr-gradient-to" className="text-[10px] text-muted-foreground">
-                    To
+                    {t.toolSettings["qr-generate"].to}
                   </label>
                   <input
                     id="qr-gradient-to"
@@ -547,13 +563,13 @@ export function QrGenerateSettings() {
                   selected={store.dotGradientType === "linear"}
                   onClick={() => store.setDotGradientType("linear")}
                 >
-                  Linear
+                  {t.toolSettings["qr-generate"].linear}
                 </PillButton>
                 <PillButton
                   selected={store.dotGradientType === "radial"}
                   onClick={() => store.setDotGradientType("radial")}
                 >
-                  Radial
+                  {t.toolSettings["qr-generate"].radial}
                 </PillButton>
               </div>
               {store.dotGradientType === "linear" && (
@@ -563,7 +579,7 @@ export function QrGenerateSettings() {
                       htmlFor="qr-gradient-rotation"
                       className="text-[10px] text-muted-foreground"
                     >
-                      Rotation
+                      {t.toolSettings["qr-generate"].rotation}
                     </label>
                     <span className="text-[10px] font-mono text-foreground">
                       {store.dotGradientRotation}&deg;
@@ -586,7 +602,9 @@ export function QrGenerateSettings() {
 
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Background</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings["qr-generate"].background}
+              </span>
               <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
@@ -594,7 +612,7 @@ export function QrGenerateSettings() {
                   onChange={(e) => store.setBgTransparent(e.target.checked)}
                   className="rounded border-border"
                 />
-                Transparent
+                {t.toolSettings["qr-generate"].transparent}
               </label>
             </div>
             {!store.bgTransparent && (
@@ -623,7 +641,7 @@ export function QrGenerateSettings() {
               onChange={(e) => store.setUseCustomCornerColors(e.target.checked)}
               className="rounded border-border"
             />
-            Custom corner colors
+            {t.toolSettings["qr-generate"].customCornerColors}
           </label>
 
           {store.useCustomCornerColors && (
@@ -633,7 +651,7 @@ export function QrGenerateSettings() {
                   htmlFor="qr-corner-square-color"
                   className="text-[10px] text-muted-foreground"
                 >
-                  Corner Square
+                  {t.toolSettings["qr-generate"].cornerSquare}
                 </label>
                 <input
                   id="qr-corner-square-color"
@@ -645,7 +663,7 @@ export function QrGenerateSettings() {
               </div>
               <div className="flex-1">
                 <label htmlFor="qr-corner-dot-color" className="text-[10px] text-muted-foreground">
-                  Corner Dot
+                  {t.toolSettings["qr-generate"].cornerDot}
                 </label>
                 <input
                   id="qr-corner-dot-color"
@@ -661,7 +679,7 @@ export function QrGenerateSettings() {
       </CollapsibleSection>
 
       {/* ── Logo section ── */}
-      <CollapsibleSection title="Logo">
+      <CollapsibleSection title={t.toolSettings["qr-generate"].logo}>
         <div className="space-y-3">
           <input
             ref={logoInputRef}
@@ -675,7 +693,7 @@ export function QrGenerateSettings() {
             <div className="flex items-center gap-2">
               <img
                 src={store.logoDataUrl}
-                alt="Logo"
+                alt={t.toolSettings["qr-generate"].logo}
                 className="w-10 h-10 rounded border border-border object-contain"
               />
               <span className="flex-1 text-xs text-foreground truncate">
@@ -696,7 +714,7 @@ export function QrGenerateSettings() {
               className="w-full py-3 rounded-lg border-2 border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors flex items-center justify-center gap-2"
             >
               <ImagePlus className="h-4 w-4" />
-              Add logo image
+              {t.toolSettings["qr-generate"].addLogoImage}
             </button>
           )}
 
@@ -705,7 +723,7 @@ export function QrGenerateSettings() {
               <div>
                 <div className="flex justify-between items-center">
                   <label htmlFor="qr-logo-size" className="text-xs text-muted-foreground">
-                    Logo Size
+                    {t.toolSettings["qr-generate"].logoSize}
                   </label>
                   <span className="text-xs font-mono text-foreground">
                     {Math.round(store.logoSize * 100)}%
@@ -725,7 +743,7 @@ export function QrGenerateSettings() {
               <div>
                 <div className="flex justify-between items-center">
                   <label htmlFor="qr-logo-margin" className="text-xs text-muted-foreground">
-                    Logo Margin
+                    {t.toolSettings["qr-generate"].logoMargin}
                   </label>
                   <span className="text-xs font-mono text-foreground">{store.logoMargin}px</span>
                 </div>
@@ -747,7 +765,7 @@ export function QrGenerateSettings() {
                   onChange={(e) => store.setHideBackgroundDots(e.target.checked)}
                   className="rounded border-border"
                 />
-                Clean area behind logo
+                {t.toolSettings["qr-generate"].cleanAreaBehindLogo}
               </label>
             </>
           )}
@@ -755,10 +773,12 @@ export function QrGenerateSettings() {
       </CollapsibleSection>
 
       {/* ── Download section ── */}
-      <CollapsibleSection title="Download" defaultOpen>
+      <CollapsibleSection title={t.common.download} defaultOpen>
         <div className="space-y-3">
           <div>
-            <span className="text-xs text-muted-foreground mb-1.5 block">Format</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">
+              {t.toolSettings["qr-generate"].format}
+            </span>
             <div className="grid grid-cols-2 gap-1.5">
               {DOWNLOAD_FORMATS.map(({ value, label, desc }) => (
                 <button
@@ -789,7 +809,7 @@ export function QrGenerateSettings() {
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="qr-size" className="text-xs text-muted-foreground">
-                Size
+                {t.toolSettings["qr-generate"].size}
               </label>
               <span className="text-xs font-mono text-foreground">{store.size}px</span>
             </div>
@@ -807,7 +827,7 @@ export function QrGenerateSettings() {
 
           <div>
             <label htmlFor="qr-error-correction" className="text-xs text-muted-foreground">
-              Error Correction
+              {t.toolSettings["qr-generate"].errorCorrection}
             </label>
             <select
               id="qr-error-correction"
@@ -815,10 +835,10 @@ export function QrGenerateSettings() {
               onChange={(e) => store.setErrorCorrection(e.target.value as "L" | "M" | "Q" | "H")}
               className={INPUT_CLASS}
             >
-              <option value="L">Low (7%) - Max density</option>
-              <option value="M">Medium (15%) - General use</option>
-              <option value="Q">Quartile (25%) - With small logo</option>
-              <option value="H">High (30%) - With large logo</option>
+              <option value="L">{t.toolSettings["qr-generate"].low7MaxDensity}</option>
+              <option value="M">{t.toolSettings["qr-generate"].medium15GeneralUse}</option>
+              <option value="Q">{t.toolSettings["qr-generate"].quartile25WithSmallLogo}</option>
+              <option value="H">{t.toolSettings["qr-generate"].high30WithLargeLogo}</option>
             </select>
           </div>
 
@@ -830,7 +850,7 @@ export function QrGenerateSettings() {
             className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="h-4 w-4" />
-            Download QR Code
+            {t.toolSettings["qr-generate"].download}
           </button>
         </div>
       </CollapsibleSection>

@@ -182,20 +182,22 @@ export function RoundedCropSettings() {
       )}
       {hasFile && (
         <p className="text-center text-[10px] text-muted-foreground">
-          Drag the preview to reposition
+          {t.toolSettings["rounded-crop"].dragThePreviewToReposition}
         </p>
       )}
 
       {/* Shape */}
       <div>
-        <span className="text-xs text-muted-foreground">Shape</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["rounded-crop"].shape}
+        </span>
         <div className="flex gap-1 mt-1">
           <button
             type="button"
             onClick={() => setShape("rounded-square")}
             className={`flex-1 text-xs py-1.5 rounded ${shape === "rounded-square" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
-            Rounded square
+            {t.toolSettings["rounded-crop"].roundedSquare}
           </button>
           <button
             type="button"
@@ -211,7 +213,9 @@ export function RoundedCropSettings() {
       {shape === "rounded-square" && (
         <div>
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Corner radius</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["rounded-crop"].cornerRadius}
+            </span>
             <span className="text-xs font-mono text-foreground">{cornerRadius}%</span>
           </div>
           <input
@@ -228,7 +232,9 @@ export function RoundedCropSettings() {
       {/* Zoom */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Zoom</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings["rounded-crop"].zoom}
+          </span>
           <span className="text-xs font-mono text-foreground">{zoom.toFixed(1)}x</span>
         </div>
         <input
@@ -245,7 +251,9 @@ export function RoundedCropSettings() {
       {/* Border */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Border</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings["rounded-crop"].border}
+          </span>
           <span className="text-xs font-mono text-foreground">{borderWidth}px</span>
         </div>
         <div className="flex items-center gap-2 mt-1">
@@ -261,7 +269,7 @@ export function RoundedCropSettings() {
             type="color"
             value={borderColor}
             onChange={(e) => setBorderColor(e.target.value)}
-            aria-label="Border color"
+            aria-label={t.toolSettings["rounded-crop"].borderColor}
             className="h-7 w-9 shrink-0 rounded border border-border bg-background"
           />
         </div>
@@ -269,7 +277,9 @@ export function RoundedCropSettings() {
 
       {/* Background */}
       <div>
-        <span className="text-xs text-muted-foreground">Background</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["rounded-crop"].background}
+        </span>
         <div className="flex items-center gap-2 mt-1">
           <div className="flex flex-1 gap-1">
             <button
@@ -277,14 +287,14 @@ export function RoundedCropSettings() {
               onClick={() => setBgMode("transparent")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "transparent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Transparent
+              {t.toolSettings["rounded-crop"].transparent}
             </button>
             <button
               type="button"
               onClick={() => setBgMode("color")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "color" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Color
+              {t.toolSettings["rounded-crop"].color}
             </button>
           </div>
           {bgMode === "color" && (
@@ -292,7 +302,7 @@ export function RoundedCropSettings() {
               type="color"
               value={bgColor}
               onChange={(e) => setBgColor(e.target.value)}
-              aria-label="Background color"
+              aria-label={t.a11y.backgroundColor}
               className="h-7 w-9 shrink-0 rounded border border-border bg-background"
             />
           )}
@@ -302,7 +312,7 @@ export function RoundedCropSettings() {
       {/* Output size */}
       <div>
         <label htmlFor="rc-output-size" className="text-xs text-muted-foreground">
-          Output size (px)
+          {t.toolSettings["rounded-crop"].outputSizePx}
         </label>
         <input
           id="rc-output-size"
@@ -310,7 +320,7 @@ export function RoundedCropSettings() {
           min={16}
           value={outputSize}
           onChange={(e) => setOutputSize(e.target.value)}
-          placeholder="Original"
+          placeholder={t.toolPage.original}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
         />
       </div>

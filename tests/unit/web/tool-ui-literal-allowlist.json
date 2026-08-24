@@ -1,0 +1,23 @@
+{
+  "comment": "Rendered literals in apps/web/src/components/tools that are intentionally NOT translated (#906): format and tech names, placeholder examples, unit/stat abbreviations. Add here only when a string is genuinely locale-invariant; UI copy belongs in packages/shared/src/i18n.",
+  "values": [
+    "WebM",
+    "Markdown",
+    "Letter",
+    "Lin",
+    "Log",
+    "pt",
+    "mm",
+    "bytes",
+    "Data URI",
+    "LQIP preview",
+    "Squircle",
+    "mean / median / stdev",
+    "MyNetwork",
+    "2026 Example Corp",
+    "e.g. Lightroom, Photoshop",
+    "-90 to 90 (e.g. 51.5074)",
+    "-180 to 180 (e.g. -0.1278)",
+    "Optional (e.g. 25)"
+  ]
+}

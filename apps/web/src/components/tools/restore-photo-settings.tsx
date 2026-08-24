@@ -15,6 +15,7 @@ export function RestorePhotoControls({
   settings: initialSettings,
   onChange,
 }: RestorePhotoControlsProps) {
+  const { t } = useTranslation();
   const [scratchRemoval, setScratchRemoval] = useState(true);
   const [faceEnhancement, setFaceEnhancement] = useState(true);
   const [fidelity, setFidelity] = useState(70);
@@ -74,9 +75,9 @@ export function RestorePhotoControls({
         {/* Scratch Removal */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm font-medium">Scratch Removal</p>
+            <p className="text-sm font-medium">{t.toolSettings["restore-photo"].scratchRemoval}</p>
             <p className="text-[10px] text-muted-foreground">
-              Detect and repair scratches, tears, spots
+              {t.toolSettings["restore-photo"].scratchRemovalDesc}
             </p>
           </div>
           <input
@@ -90,9 +91,9 @@ export function RestorePhotoControls({
         {/* Face Enhancement */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm font-medium">Face Enhancement</p>
+            <p className="text-sm font-medium">{t.toolSettings["restore-photo"].faceEnhancement}</p>
             <p className="text-[10px] text-muted-foreground">
-              Restore degraded faces with CodeFormer AI
+              {t.toolSettings["restore-photo"].faceEnhancementDesc}
             </p>
           </div>
           <input
@@ -107,7 +108,9 @@ export function RestorePhotoControls({
         {faceEnhancement && (
           <div className="ps-2 border-s-2 border-primary/20">
             <div className="flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">Face Fidelity</p>
+              <p className="text-xs text-muted-foreground">
+                {t.toolSettings["restore-photo"].faceFidelity}
+              </p>
               <span className="text-xs font-mono tabular-nums">{fidelity}%</span>
             </div>
             <input
@@ -120,8 +123,8 @@ export function RestorePhotoControls({
               className="w-full h-1.5 rounded-full appearance-none bg-muted accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Enhanced</span>
-              <span>Faithful</span>
+              <span>{t.toolSettings["restore-photo"].enhanced}</span>
+              <span>{t.toolSettings["restore-photo"].faithful}</span>
             </div>
           </div>
         )}
@@ -129,9 +132,9 @@ export function RestorePhotoControls({
         {/* Noise Reduction */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm font-medium">Noise Reduction</p>
+            <p className="text-sm font-medium">{t.toolSettings["restore-photo"].noiseReduction}</p>
             <p className="text-[10px] text-muted-foreground">
-              Remove grain and noise from old photos
+              {t.toolSettings["restore-photo"].noiseReductionDesc}
             </p>
           </div>
           <input
@@ -146,7 +149,9 @@ export function RestorePhotoControls({
         {denoise && (
           <div className="ps-2 border-s-2 border-primary/20">
             <div className="flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">Denoise Strength</p>
+              <p className="text-xs text-muted-foreground">
+                {t.toolSettings["restore-photo"].denoiseStrength}
+              </p>
               <span className="text-xs font-mono tabular-nums">{denoiseStrength}</span>
             </div>
             <input
@@ -159,8 +164,8 @@ export function RestorePhotoControls({
               className="w-full h-1.5 rounded-full appearance-none bg-muted accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Subtle</span>
-              <span>Strong</span>
+              <span>{t.toolSettings["restore-photo"].subtle}</span>
+              <span>{t.toolSettings["restore-photo"].strong}</span>
             </div>
           </div>
         )}
@@ -170,9 +175,9 @@ export function RestorePhotoControls({
         {/* Auto-Colorize */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm font-medium">Auto-Colorize</p>
+            <p className="text-sm font-medium">{t.toolSettings["restore-photo"].autoColorize}</p>
             <p className="text-[10px] text-muted-foreground">
-              Add color to B&W photos using DDColor AI
+              {t.toolSettings["restore-photo"].autoColorizeDesc}
             </p>
           </div>
           <input
@@ -187,7 +192,9 @@ export function RestorePhotoControls({
         {colorize && (
           <div className="ps-2 border-s-2 border-primary/20">
             <div className="flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">Colorize Strength</p>
+              <p className="text-xs text-muted-foreground">
+                {t.toolSettings["restore-photo"].colorizeStrength}
+              </p>
               <span className="text-xs font-mono tabular-nums">{colorizeStrength}%</span>
             </div>
             <input
@@ -200,8 +207,8 @@ export function RestorePhotoControls({
               className="w-full h-1.5 rounded-full appearance-none bg-muted accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Subtle</span>
-              <span>Vivid</span>
+              <span>{t.toolSettings["restore-photo"].subtle}</span>
+              <span>{t.toolSettings["restore-photo"].vivid}</span>
             </div>
           </div>
         )}
@@ -246,8 +253,16 @@ export function RestorePhotoSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Restored: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["restore-photo"].originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["restore-photo"].restoredKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -256,7 +271,11 @@ export function RestorePhotoSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={hasMultiple ? `Restoring ${files.length} photos` : "Restoring photo"}
+          label={
+            hasMultiple
+              ? format(t.toolSettings["restore-photo"].progressLabelBatch, { count: files.length })
+              : t.toolSettings["restore-photo"].progressLabel
+          }
           percent={progress.percent}
           elapsed={progress.elapsed}
         />
@@ -283,7 +302,7 @@ export function RestorePhotoSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

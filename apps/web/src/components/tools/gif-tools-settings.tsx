@@ -12,13 +12,13 @@ type LoopMode = "infinite" | "once" | "custom";
 type ResizeTab = "pixel" | "percentage";
 type ExtractTab = "single" | "range" | "all";
 
-const MODES: { id: GifMode; label: string; requiresAnimation: boolean }[] = [
-  { id: "resize", label: "Resize", requiresAnimation: false },
-  { id: "optimize", label: "Optimize", requiresAnimation: false },
-  { id: "speed", label: "Speed", requiresAnimation: true },
-  { id: "reverse", label: "Reverse", requiresAnimation: true },
-  { id: "extract", label: "Extract", requiresAnimation: true },
-  { id: "rotate", label: "Rotate", requiresAnimation: false },
+const MODES: { id: GifMode; requiresAnimation: boolean }[] = [
+  { id: "resize", requiresAnimation: false },
+  { id: "optimize", requiresAnimation: false },
+  { id: "speed", requiresAnimation: true },
+  { id: "reverse", requiresAnimation: true },
+  { id: "extract", requiresAnimation: true },
+  { id: "rotate", requiresAnimation: false },
 ];
 
 export interface GifToolsControlsProps {
@@ -27,6 +27,7 @@ export interface GifToolsControlsProps {
 }
 
 export function GifToolsControls({ settings: initialSettings, onChange }: GifToolsControlsProps) {
+  const { t } = useTranslation();
   const { info, loading: infoLoading } = useGifInfo();
   const isAnimated = (info?.pages ?? 0) > 1;
 
@@ -170,19 +171,30 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
   const tabClass = (active: boolean) =>
     `flex-1 text-xs py-1.5 rounded ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`;
 
+  const modeLabels: Record<GifMode, string> = {
+    resize: t.toolSettings["gif-tools"].resize,
+    optimize: t.toolSettings["gif-tools"].optimize,
+    speed: t.toolSettings["gif-tools"].speed,
+    reverse: t.toolSettings["gif-tools"].reverse,
+    extract: t.toolSettings["gif-tools"].extract,
+    rotate: t.toolSettings["gif-tools"].rotateMode,
+  };
+
   const maxFrame = Math.max(0, (info?.pages ?? 1) - 1);
 
   return (
     <div className="space-y-4">
       {/* GIF Info Bar */}
       {infoLoading && (
-        <div className="text-xs text-muted-foreground animate-pulse">Reading GIF metadata...</div>
+        <div className="text-xs text-muted-foreground animate-pulse">
+          {t.toolSettings["gif-tools"].readingGifMetadata}
+        </div>
       )}
       {info && !infoLoading && (
         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground bg-muted rounded px-2 py-1.5">
           {isAnimated ? (
             <>
-              <span>{info.pages} frames</span>
+              <span>{format(t.toolSettings["gif-tools"].framesCount, { count: info.pages })}</span>
               <span className="text-border">|</span>
               <span>
                 {info.width}x{info.height}
@@ -194,7 +206,9 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
             </>
           ) : (
             <>
-              <span className="text-amber-700 dark:text-amber-400 font-medium">Static image</span>
+              <span className="text-amber-700 dark:text-amber-400 font-medium">
+                {t.toolSettings["gif-tools"].staticImage}
+              </span>
               <span className="text-border">|</span>
               <span>
                 {info.width}x{info.height}
@@ -208,7 +222,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
 
       {/* Mode Tabs (3x2 grid) */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Mode</p>
+        <p className="text-xs text-muted-foreground mb-1">{t.toolSettings["gif-tools"].mode}</p>
         <div className="grid grid-cols-3 gap-1">
           {MODES.map((m) => {
             const disabled = m.requiresAnimation && !isAnimated;
@@ -218,7 +232,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 type="button"
                 disabled={disabled}
                 onClick={() => setMode(m.id)}
-                title={disabled ? "Requires animated GIF" : undefined}
+                title={disabled ? t.toolSettings["gif-tools"].requiresAnimatedGif : undefined}
                 className={`text-xs py-1.5 rounded transition-colors ${
                   mode === m.id
                     ? "bg-primary text-primary-foreground"
@@ -227,7 +241,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                       : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m.label}
+                {modeLabels[m.id]}
               </button>
             );
           })}
@@ -244,14 +258,14 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               onClick={() => setResizeTab("pixel")}
               className={tabClass(resizeTab === "pixel")}
             >
-              Pixels
+              {t.toolSettings["gif-tools"].pixels}
             </button>
             <button
               type="button"
               onClick={() => setResizeTab("percentage")}
               className={tabClass(resizeTab === "percentage")}
             >
-              Percentage
+              {t.toolSettings["gif-tools"].percentage}
             </button>
           </div>
 
@@ -259,14 +273,14 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <label htmlFor="gif-width" className="text-xs text-muted-foreground">
-                  Width (px)
+                  {t.toolSettings["gif-tools"].widthPx}
                 </label>
                 <input
                   id="gif-width"
                   type="number"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
-                  placeholder="Auto"
+                  placeholder={t.toolSettings["gif-tools"].auto}
                   className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                 />
               </div>
@@ -274,20 +288,24 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 type="button"
                 onClick={() => setLockAspect(!lockAspect)}
                 className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-                title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                title={
+                  lockAspect
+                    ? t.toolSettings["gif-tools"].unlockAspectRatio
+                    : t.toolSettings["gif-tools"].lockAspectRatio
+                }
               >
                 {lockAspect ? <Link className="h-4 w-4" /> : <Unlink className="h-4 w-4" />}
               </button>
               <div className="flex-1">
                 <label htmlFor="gif-height" className="text-xs text-muted-foreground">
-                  Height (px)
+                  {t.toolSettings["gif-tools"].heightPx}
                 </label>
                 <input
                   id="gif-height"
                   type="number"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
-                  placeholder="Auto"
+                  placeholder={t.toolSettings["gif-tools"].auto}
                   className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                 />
               </div>
@@ -297,7 +315,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               <div>
                 <div className="flex items-center justify-between">
                   <label htmlFor="gif-pct" className="text-xs text-muted-foreground">
-                    Scale
+                    {t.toolSettings["gif-tools"].scale}
                   </label>
                   <span className="text-xs tabular-nums text-muted-foreground">{percentage}%</span>
                 </div>
@@ -333,7 +351,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="gif-colors" className="text-xs text-muted-foreground">
-                Colors
+                {t.toolSettings["gif-tools"].colors}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">{colors}</span>
             </div>
@@ -347,13 +365,15 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               onChange={(e) => setColors(Number(e.target.value))}
               className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
             />
-            <p className="text-[10px] text-muted-foreground mt-0.5">Fewer colors = smaller file</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {t.toolSettings["gif-tools"].fewerColorsSmallerFile}
+            </p>
           </div>
 
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="gif-dither" className="text-xs text-muted-foreground">
-                Dither
+                {t.toolSettings["gif-tools"].dither}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">
                 {dither.toFixed(1)}
@@ -374,7 +394,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="gif-effort" className="text-xs text-muted-foreground">
-                Effort
+                {t.toolSettings["gif-tools"].effort}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">{effort}</span>
             </div>
@@ -388,7 +408,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
             />
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              Higher effort = slower but smaller
+              {t.toolSettings["gif-tools"].higherEffortSlowerButSmaller}
             </p>
           </div>
         </div>
@@ -399,7 +419,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="gif-speed" className="text-xs text-muted-foreground">
-                Speed
+                {t.toolSettings["gif-tools"].speed}
               </label>
               <span className="text-xs tabular-nums text-muted-foreground">
                 {speedFactor.toFixed(1)}x
@@ -440,7 +460,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
       {mode === "reverse" && (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Reverses the playback order of all frames.
+            {t.toolSettings["gif-tools"].reversesThePlaybackOrderOf}
           </p>
           <label className="flex items-center gap-2 text-xs text-foreground">
             <input
@@ -449,13 +469,13 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               onChange={(e) => setReverseAdjustSpeed(e.target.checked)}
               className="rounded"
             />
-            Also adjust speed
+            {t.toolSettings["gif-tools"].alsoAdjustSpeed}
           </label>
           {reverseAdjustSpeed && (
             <div>
               <div className="flex items-center justify-between">
                 <label htmlFor="gif-rev-speed" className="text-xs text-muted-foreground">
-                  Speed
+                  {t.toolSettings["gif-tools"].speed}
                 </label>
                 <span className="text-xs tabular-nums text-muted-foreground">
                   {reverseSpeed.toFixed(1)}x
@@ -479,14 +499,18 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
       {mode === "extract" && (
         <div className="space-y-3">
           <div className="flex gap-1">
-            {(["single", "range", "all"] as const).map((t) => (
+            {(["single", "range", "all"] as const).map((tab) => (
               <button
-                key={t}
+                key={tab}
                 type="button"
-                onClick={() => setExtractTab(t)}
-                className={tabClass(extractTab === t)}
+                onClick={() => setExtractTab(tab)}
+                className={tabClass(extractTab === tab)}
               >
-                {t === "single" ? "Single" : t === "range" ? "Range" : "All"}
+                {tab === "single"
+                  ? t.toolSettings["gif-tools"].extractSingle
+                  : tab === "range"
+                    ? t.toolSettings["gif-tools"].extractRange
+                    : t.toolSettings["gif-tools"].extractAll}
               </button>
             ))}
           </div>
@@ -494,7 +518,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           {extractTab === "single" && (
             <div>
               <label htmlFor="gif-frame" className="text-xs text-muted-foreground">
-                Frame Number
+                {t.toolSettings["gif-tools"].frameNumber}
               </label>
               <input
                 id="gif-frame"
@@ -506,7 +530,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                0 to {maxFrame} (0 is first frame)
+                {format(t.toolSettings["gif-tools"].frameRangeHint, { max: maxFrame })}
               </p>
             </div>
           )}
@@ -515,7 +539,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
             <div className="flex gap-2">
               <div className="flex-1">
                 <label htmlFor="gif-frame-start" className="text-xs text-muted-foreground">
-                  Start
+                  {t.toolSettings["gif-tools"].start}
                 </label>
                 <input
                   id="gif-frame-start"
@@ -529,7 +553,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               </div>
               <div className="flex-1">
                 <label htmlFor="gif-frame-end" className="text-xs text-muted-foreground">
-                  End
+                  {t.toolSettings["gif-tools"].end}
                 </label>
                 <input
                   id="gif-frame-end"
@@ -547,12 +571,16 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
 
           {extractTab === "all" && (
             <p className="text-xs text-muted-foreground">
-              Extracts all {info?.pages ?? "?"} frames as individual images in a ZIP.
+              {format(t.toolSettings["gif-tools"].extractsAllFrames, {
+                count: info?.pages ?? "?",
+              })}
             </p>
           )}
 
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Output Format</p>
+            <p className="text-xs text-muted-foreground mb-1">
+              {t.toolSettings["gif-tools"].outputFormat}
+            </p>
             <div className="flex gap-1">
               <button
                 type="button"
@@ -566,7 +594,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 onClick={() => setExtractFormat("webp")}
                 className={tabClass(extractFormat === "webp")}
               >
-                WebP
+                {t.toolSettings["gif-tools"].webp}
               </button>
             </div>
           </div>
@@ -576,7 +604,9 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
       {mode === "rotate" && (
         <div className="space-y-3">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Angle</p>
+            <p className="text-xs text-muted-foreground mb-1">
+              {t.toolSettings["gif-tools"].angle}
+            </p>
             <div className="flex gap-1">
               {[90, 180, 270].map((a) => (
                 <button
@@ -595,18 +625,18 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Flip</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.toolSettings["gif-tools"].flip}</p>
             <div className="flex gap-1">
               <button type="button" onClick={() => setFlipH(!flipH)} className={tabClass(flipH)}>
                 <span className="flex items-center justify-center gap-1">
                   <FlipHorizontal2 className="h-3 w-3" />
-                  Horizontal
+                  {t.toolSettings["gif-tools"].horizontal}
                 </span>
               </button>
               <button type="button" onClick={() => setFlipV(!flipV)} className={tabClass(flipV)}>
                 <span className="flex items-center justify-center gap-1">
                   <FlipVertical2 className="h-3 w-3" />
-                  Vertical
+                  {t.toolSettings["gif-tools"].vertical}
                 </span>
               </button>
             </div>
@@ -616,7 +646,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
 
       {/* Loop Control */}
       <div className="border-t border-border pt-3">
-        <p className="text-xs text-muted-foreground mb-1">Loop</p>
+        <p className="text-xs text-muted-foreground mb-1">{t.toolSettings["gif-tools"].loop}</p>
         <div className="flex gap-1">
           {(["infinite", "once", "custom"] as const).map((l) => (
             <button
@@ -625,7 +655,11 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
               onClick={() => setLoopMode(l)}
               className={tabClass(loopMode === l)}
             >
-              {l === "infinite" ? "Infinite" : l === "once" ? "Once" : "Custom"}
+              {l === "infinite"
+                ? t.toolSettings["gif-tools"].infinite
+                : l === "once"
+                  ? t.toolSettings["gif-tools"].once
+                  : t.toolSettings["gif-tools"].customLoop}
             </button>
           ))}
         </div>
@@ -677,9 +711,15 @@ export function GifToolsSettings() {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
           <p>
-            Processed: {(processedSize / 1024).toFixed(1)} KB
+            {format(t.toolSettings["gif-tools"].originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["gif-tools"].processedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
             {originalSize > 0 && (
               <span className="ms-1">
                 ({Math.round(((processedSize - originalSize) / originalSize) * 100)}%)
@@ -708,7 +748,7 @@ export function GifToolsSettings() {
         >
           {files.length > 1
             ? format(t.toolSettings["gif-tools"].submitBatch, { count: files.length })
-            : "Process"}
+            : t.common.process}
         </button>
       )}
 
@@ -720,7 +760,7 @@ export function GifToolsSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

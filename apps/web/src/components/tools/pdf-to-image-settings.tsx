@@ -1,6 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 
@@ -64,10 +65,16 @@ export function PdfToImageSettings() {
               {store.loadingPreview ? (
                 <span className="flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Reading PDF...
+                  {t.toolSettings["pdf-to-image"].readingPdf}
                 </span>
               ) : store.pageCount !== null ? (
-                `${store.pageCount} page${store.pageCount !== 1 ? "s" : ""}`
+                plural(
+                  store.pageCount,
+                  format(t.toolSettings["pdf-to-image"].pageCount, { count: store.pageCount }),
+                  format(t.toolSettings["pdf-to-image"].pageCountPlural, {
+                    count: store.pageCount,
+                  }),
+                )
               ) : null}
             </p>
           </div>
@@ -149,7 +156,7 @@ export function PdfToImageSettings() {
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
-            Custom
+            {t.toolSettings["pdf-to-image"].custom}
           </button>
         </div>
         {store.customDpi ? (
@@ -202,12 +209,12 @@ export function PdfToImageSettings() {
           type="text"
           value={store.pages}
           onChange={(e) => store.setPages(e.target.value)}
-          placeholder="All pages"
+          placeholder={t.toolSettings["pdf-to-image"].allPages}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground"
         />
         {store.pageCount !== null && (
           <p className="text-xs text-muted-foreground mt-1">
-            e.g. 1-3, 5, 8-10 (document has {store.pageCount} pages)
+            {format(t.toolSettings["pdf-to-image"].pagesHint, { count: store.pageCount })}
           </p>
         )}
       </div>
@@ -226,7 +233,11 @@ export function PdfToImageSettings() {
         {store.processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {store.processing
           ? t.toolSettings["pdf-to-image"].converting
-          : `Convert ${selectedCount} page${selectedCount !== 1 ? "s" : ""}`}
+          : plural(
+              selectedCount,
+              format(t.toolSettings["pdf-to-image"].submit, { count: selectedCount }),
+              format(t.toolSettings["pdf-to-image"].submitPlural, { count: selectedCount }),
+            )}
       </button>
 
       {/* Download ZIP */}
@@ -238,7 +249,7 @@ export function PdfToImageSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download All (ZIP)
+          {t.toolSettings["pdf-to-image"].downloadAllZip}
           {store.zipSize != null && (
             <span className="text-xs opacity-70">
               {store.zipSize < 1024 * 1024

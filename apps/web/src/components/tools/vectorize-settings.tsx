@@ -143,7 +143,7 @@ export function VectorizeSettings() {
     <div className="space-y-4">
       {/* Preset */}
       <div>
-        <p className="text-xs text-muted-foreground">Preset</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.vectorize.preset}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["logo", "illustration", "photo"] as const).map((p) => (
             <button
@@ -174,7 +174,7 @@ export function VectorizeSettings() {
 
       {/* Color Mode */}
       <div>
-        <p className="text-xs text-muted-foreground">Color Mode</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.vectorize.colorMode}</p>
         <div className="flex gap-1 mt-1">
           {(["bw", "color"] as const).map((m) => (
             <button
@@ -183,7 +183,9 @@ export function VectorizeSettings() {
               onClick={() => updateSetting(setColorMode)(m)}
               className={`flex-1 text-xs py-1.5 rounded ${colorMode === m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              {m === "bw" ? "Black & White" : "Color"}
+              {m === "bw"
+                ? t.toolSettings.vectorize.blackWhite
+                : t.toolSettings.vectorize.colorModeColor}
             </button>
           ))}
         </div>
@@ -195,7 +197,7 @@ export function VectorizeSettings() {
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="vectorize-color-precision" className="text-xs text-muted-foreground">
-                Color Precision
+                {t.toolSettings.vectorize.colorPrecision}
               </label>
               <span className="text-xs font-mono text-foreground">{colorPrecision}</span>
             </div>
@@ -209,15 +211,15 @@ export function VectorizeSettings() {
               className="w-full mt-1"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Fewer colors</span>
-              <span>More colors</span>
+              <span>{t.toolSettings.vectorize.fewerColors}</span>
+              <span>{t.toolSettings.vectorize.moreColors}</span>
             </div>
           </div>
 
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="vectorize-layer-diff" className="text-xs text-muted-foreground">
-                Gradient Step
+                {t.toolSettings.vectorize.gradientStep}
               </label>
               <span className="text-xs font-mono text-foreground">{layerDifference}</span>
             </div>
@@ -231,8 +233,8 @@ export function VectorizeSettings() {
               className="w-full mt-1"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>Smooth gradients</span>
-              <span>Flat colors</span>
+              <span>{t.toolSettings.vectorize.smoothGradients}</span>
+              <span>{t.toolSettings.vectorize.flatColors}</span>
             </div>
           </div>
         </>
@@ -243,7 +245,7 @@ export function VectorizeSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="vectorize-threshold" className="text-xs text-muted-foreground">
-              Threshold
+              {t.toolSettings.vectorize.threshold}
             </label>
             <span className="text-xs font-mono text-foreground">{threshold}</span>
           </div>
@@ -257,8 +259,8 @@ export function VectorizeSettings() {
             className="w-full mt-1"
           />
           <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-            <span>More white</span>
-            <span>More black</span>
+            <span>{t.toolSettings.vectorize.moreWhite}</span>
+            <span>{t.toolSettings.vectorize.moreBlack}</span>
           </div>
         </div>
       )}
@@ -267,7 +269,7 @@ export function VectorizeSettings() {
 
       {/* Detail */}
       <div>
-        <p className="text-xs text-muted-foreground">Detail</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.vectorize.detail}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["low", "medium", "high"] as const).map((d) => (
             <button
@@ -284,7 +286,7 @@ export function VectorizeSettings() {
 
       {/* Smoothing */}
       <div>
-        <p className="text-xs text-muted-foreground">Smoothing</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.vectorize.smoothing}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["none", "polygon", "spline"] as const).map((m) => (
             <button
@@ -304,7 +306,7 @@ export function VectorizeSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="vectorize-corner" className="text-xs text-muted-foreground">
-              Corner Threshold
+              {t.toolSettings.vectorize.cornerThreshold}
             </label>
             <span className="text-xs font-mono text-foreground">{cornerThreshold}deg</span>
           </div>
@@ -318,15 +320,17 @@ export function VectorizeSettings() {
             className="w-full mt-1"
           />
           <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-            <span>More corners</span>
-            <span>Smoother</span>
+            <span>{t.toolSettings.vectorize.moreCorners}</span>
+            <span>{t.toolSettings.vectorize.smoother}</span>
           </div>
         </div>
       )}
 
       {/* Invert toggle */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Invert Colors</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings.vectorize.invertColors2}
+        </span>
         <button
           type="button"
           role="switch"
@@ -349,7 +353,11 @@ export function VectorizeSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.vectorize.originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
           <p>SVG: {(processedSize / 1024).toFixed(1)} KB</p>
         </div>
       )}
@@ -387,7 +395,7 @@ export function VectorizeSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download SVG
+          {t.toolSettings.vectorize.downloadSvg}
         </a>
       )}
     </div>

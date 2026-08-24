@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 
 const INK_COLORS = ["#13315c", "#1a1814", "#1f6feb"];
 const PEN_WIDTHS = { S: 2, M: 3.5, L: 6 } as const;
@@ -194,7 +195,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
                   <button
                     key={c}
                     type="button"
-                    aria-label={`ink ${c}`}
+                    aria-label={format(pad.inkColor, { color: c })}
                     onClick={() => setColor(c)}
                     className={`h-5 w-5 rounded-full ${color === c ? "ring-2 ring-primary-ink ring-offset-1" : ""}`}
                     style={{ background: c }}
@@ -258,7 +259,7 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
               {uploaded && (
                 <img
                   src={uploaded}
-                  alt="signature preview"
+                  alt={t.toolSettings["signature-pad"].signaturePreview}
                   className="mt-3 h-12 rounded border border-border object-contain"
                 />
               )}

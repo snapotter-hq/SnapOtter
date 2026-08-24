@@ -19,6 +19,7 @@ export function TransparencyFixerControls({
   settings: _settings,
   onChange,
 }: TransparencyFixerControlsProps) {
+  const { t } = useTranslation();
   const [defringe, setDefringe] = useState(30);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("png");
   const [removeWatermark, setRemoveWatermark] = useState(false);
@@ -36,7 +37,7 @@ export function TransparencyFixerControls({
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Upload a PNG with a fake transparent background and we'll fix it in one click.
+        {t.toolSettings["transparency-fixer"].description}
       </p>
 
       {/* Remove Watermark toggle */}
@@ -44,9 +45,11 @@ export function TransparencyFixerControls({
         <div className="flex items-center gap-2">
           <Droplets className="h-3.5 w-3.5 text-muted-foreground" />
           <div>
-            <p className="text-xs font-medium">Remove Watermark</p>
+            <p className="text-xs font-medium">
+              {t.toolSettings["transparency-fixer"].removeWatermark}
+            </p>
             <p className="text-[10px] text-muted-foreground">
-              Detect and remove semi-transparent watermarks
+              {t.toolSettings["transparency-fixer"].removeWatermarkHelp}
             </p>
           </div>
         </div>
@@ -75,7 +78,7 @@ export function TransparencyFixerControls({
         className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
       >
         {advancedOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        Advanced
+        {t.toolSettings["transparency-fixer"].advanced}
       </button>
 
       {advancedOpen && (
@@ -83,7 +86,9 @@ export function TransparencyFixerControls({
           {/* Defringe slider */}
           <div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Defringe</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings["transparency-fixer"].defringe}
+              </span>
               <span className="text-xs font-mono text-foreground tabular-nums w-8 text-end">
                 {defringe}
               </span>
@@ -101,7 +106,7 @@ export function TransparencyFixerControls({
           {/* Output Format dropdown */}
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Output Format
+              {t.toolSettings["transparency-fixer"].outputFormat}
             </p>
             <select
               value={outputFormat}
@@ -109,7 +114,7 @@ export function TransparencyFixerControls({
               className="px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground"
             >
               <option value="png">PNG</option>
-              <option value="webp">WebP</option>
+              <option value="webp">{t.toolSettings["transparency-fixer"].webp}</option>
             </select>
           </div>
         </div>
@@ -151,7 +156,11 @@ export function TransparencyFixerSettings() {
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
           label={
-            hasMultiple ? `Fixing transparency (${files.length} files)` : "Fixing transparency"
+            hasMultiple
+              ? format(t.toolSettings["transparency-fixer"].progressLabelBatch, {
+                  count: files.length,
+                })
+              : t.toolSettings["transparency-fixer"].progressLabel
           }
           percent={progress.percent}
           elapsed={progress.elapsed}

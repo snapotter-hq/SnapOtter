@@ -70,7 +70,7 @@ export function ChartMakerSettings() {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Optional chart title"
+          placeholder={t.toolSettings["chart-maker"].optionalChartTitle}
           maxLength={120}
           className={INPUT_CLASS}
         />
@@ -216,7 +216,7 @@ export function ChartMakerControls({ settings: initial, onChange }: ChartMakerCo
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Optional chart title"
+          placeholder={s.optionalChartTitle}
           maxLength={120}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         />

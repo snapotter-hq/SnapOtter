@@ -20,8 +20,10 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -52,10 +54,11 @@ interface GenerateResult {
   spec: { country: string; document: string };
 }
 
+type ComplianceCheckId = "faceCentered" | "headLevel" | "lookingStraight" | "faceSize";
+
 interface ComplianceCheck {
-  label: string;
+  id: ComplianceCheckId;
   pass: boolean;
-  detail: string;
 }
 
 // ── Zustand store ─────────────────────────────────────────────────
@@ -123,15 +126,6 @@ const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
 }));
 
 // ── Region groups ──────────────────────────────────────────────────
-
-const REGION_LABELS: Record<PassportRegion, string> = {
-  americas: "Americas",
-  europe: "Europe",
-  asia: "Asia",
-  "middle-east": "Middle East",
-  africa: "Africa",
-  oceania: "Oceania",
-};
 
 const REGION_ORDER: PassportRegion[] = [
   "americas",
@@ -217,8 +211,9 @@ function getPixelDimensions(doc: PassportDocumentSpec): { w: number; h: number }
 
 // ── File size presets ─────────────────────────────────────────────
 
+// "No limit" (value 0) resolves via i18n at render time; the rest are unit values.
 const FILE_SIZE_PRESETS = [
-  { label: "No limit", value: 0 },
+  { label: null, value: 0 },
   { label: "50 KB", value: 50 },
   { label: "100 KB", value: 100 },
   { label: "200 KB", value: 200 },
@@ -227,12 +222,14 @@ const FILE_SIZE_PRESETS = [
 
 // ── Common background colors for passport photos ──────────────────
 
-const COMMON_BG_COLORS = [
-  { color: "#FFFFFF", label: "White" },
-  { color: "#F0F0F0", label: "Off-white" },
-  { color: "#D4D4D4", label: "Light gray (UK/DE)" },
-  { color: "#BFDBFE", label: "Light blue (FR)" },
-  { color: "#EF4444", label: "Red (ID)" },
+type BgColorId = "white" | "offWhite" | "lightGray" | "lightBlue" | "red";
+
+const COMMON_BG_COLORS: { color: string; id: BgColorId }[] = [
+  { color: "#FFFFFF", id: "white" },
+  { color: "#F0F0F0", id: "offWhite" },
+  { color: "#D4D4D4", id: "lightGray" },
+  { color: "#BFDBFE", id: "lightBlue" },
+  { color: "#EF4444", id: "red" },
 ];
 
 // ── Canvas helpers ─────────────────────────────────────────────────
@@ -280,26 +277,10 @@ function runComplianceChecks(landmarks: FaceLandmarks): ComplianceCheck[] {
   const sizeOk = faceHeight > 0.15;
 
   return [
-    {
-      label: "Face centered",
-      pass: centerOk,
-      detail: "Face is off-center. Crop or reposition your photo.",
-    },
-    {
-      label: "Head level",
-      pass: levelOk,
-      detail: "Head is tilted. Straighten your head or rotate the photo.",
-    },
-    {
-      label: "Looking straight",
-      pass: straightOk,
-      detail: "Face is turned sideways. Look directly at the camera.",
-    },
-    {
-      label: "Face size",
-      pass: sizeOk,
-      detail: "Face is too small. Get closer to the camera or crop tighter.",
-    },
+    { id: "faceCentered", pass: centerOk },
+    { id: "headLevel", pass: levelOk },
+    { id: "lookingStraight", pass: straightOk },
+    { id: "faceSize", pass: sizeOk },
   ];
 }
 
@@ -336,6 +317,7 @@ function CountryOption({
 // ── Settings panel (left side) ─────────────────────────────────────
 
 export function PassportPhotoSettings() {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const { error } = useToolProcessor("passport-photo");
 
@@ -556,10 +538,27 @@ export function PassportPhotoSettings() {
 
   const regionGroups = groupByRegion();
 
+  const regionLabels: Record<PassportRegion, string> = {
+    americas: t.toolSettings["passport-photo"].regionAmericas,
+    europe: t.toolSettings["passport-photo"].regionEurope,
+    asia: t.toolSettings["passport-photo"].regionAsia,
+    "middle-east": t.toolSettings["passport-photo"].regionMiddleEast,
+    africa: t.toolSettings["passport-photo"].regionAfrica,
+    oceania: t.toolSettings["passport-photo"].regionOceania,
+  };
+
+  const bgColorLabels: Record<BgColorId, string> = {
+    white: t.toolSettings["passport-photo"].bgWhite,
+    offWhite: t.toolSettings["passport-photo"].bgOffWhite,
+    lightGray: t.toolSettings["passport-photo"].bgLightGray,
+    lightBlue: t.toolSettings["passport-photo"].bgLightBlue,
+    red: t.toolSettings["passport-photo"].bgRed,
+  };
+
   return (
     <div className="space-y-4">
       {/* Country selector */}
-      <SectionLabel>Country</SectionLabel>
+      <SectionLabel>{t.toolSettings["passport-photo"].country}</SectionLabel>
       <div ref={dropdownRef} className="relative">
         <button
           ref={buttonRef}
@@ -604,7 +603,7 @@ export function PassportPhotoSettings() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search countries..."
+                  placeholder={t.toolSettings["passport-photo"].searchCountries}
                   className="w-full ps-7 pe-2 py-1.5 rounded border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
                 />
               </div>
@@ -626,7 +625,9 @@ export function PassportPhotoSettings() {
                   }`}
                 >
                   <span>{"\u2699\uFE0F"}</span>
-                  <span className="flex-1 text-start">Custom Dimensions</span>
+                  <span className="flex-1 text-start">
+                    {t.toolSettings["passport-photo"].customDimensions}
+                  </span>
                   {isCustom && <Check className="h-3 w-3 text-primary shrink-0" />}
                 </button>
               )}
@@ -646,7 +647,9 @@ export function PassportPhotoSettings() {
                     />
                   ))
                 ) : (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">No countries found</p>
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    {t.toolSettings["passport-photo"].noCountriesFound}
+                  </p>
                 )
               ) : (
                 REGION_ORDER.map((region) => {
@@ -655,7 +658,7 @@ export function PassportPhotoSettings() {
                   return (
                     <div key={region}>
                       <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {REGION_LABELS[region]}
+                        {regionLabels[region]}
                       </p>
                       {specs.map((spec) => (
                         <CountryOption
@@ -681,7 +684,7 @@ export function PassportPhotoSettings() {
       {/* Document type toggle */}
       {uniqueDocTypes.length > 1 && (
         <>
-          <SectionLabel>Document Type</SectionLabel>
+          <SectionLabel>{t.toolSettings["passport-photo"].documentType}</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">
             {uniqueDocTypes.map((type) => (
               <button
@@ -704,7 +707,7 @@ export function PassportPhotoSettings() {
       {/* Custom dimensions input */}
       {isCustom && (
         <>
-          <SectionLabel>Dimensions (mm)</SectionLabel>
+          <SectionLabel>{t.toolSettings["passport-photo"].dimensionsMm}</SectionLabel>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -714,7 +717,7 @@ export function PassportPhotoSettings() {
                 const v = Number.parseInt(e.target.value, 10);
                 if (v > 0) setCustomDimensions(v, customHeightMm ?? 45);
               }}
-              placeholder="Width"
+              placeholder={t.toolSettings["passport-photo"].width}
               min="10"
               max="200"
               className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-xs text-foreground"
@@ -728,7 +731,7 @@ export function PassportPhotoSettings() {
                 const v = Number.parseInt(e.target.value, 10);
                 if (v > 0) setCustomDimensions(customWidthMm ?? 35, v);
               }}
-              placeholder="Height"
+              placeholder={t.toolSettings["passport-photo"].height}
               min="10"
               max="200"
               className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-xs text-foreground"
@@ -739,7 +742,7 @@ export function PassportPhotoSettings() {
       )}
 
       {/* DPI */}
-      <SectionLabel>DPI</SectionLabel>
+      <SectionLabel>{t.toolSettings["passport-photo"].dpi}</SectionLabel>
       <div className="flex items-center gap-2">
         <input
           type="number"
@@ -752,14 +755,16 @@ export function PassportPhotoSettings() {
           max="600"
           className="w-20 px-2 py-1.5 rounded border border-border bg-background text-xs text-foreground"
         />
-        <span className="text-xs text-muted-foreground">pixels per inch</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["passport-photo"].pixelsPerInch}
+        </span>
       </div>
 
       {/* Background color */}
-      <SectionLabel>Background Color</SectionLabel>
+      <SectionLabel>{t.toolSettings["passport-photo"].backgroundColor}</SectionLabel>
       <div className="space-y-2">
         <div className="flex gap-1.5 flex-wrap">
-          {COMMON_BG_COLORS.map(({ color, label }) => (
+          {COMMON_BG_COLORS.map(({ color, id }) => (
             <button
               key={color}
               type="button"
@@ -768,7 +773,7 @@ export function PassportPhotoSettings() {
                 bgColor === color ? "border-primary scale-110" : "border-border"
               }`}
               style={{ backgroundColor: color }}
-              title={label}
+              title={bgColorLabels[id]}
             />
           ))}
         </div>
@@ -790,7 +795,7 @@ export function PassportPhotoSettings() {
       </div>
 
       {/* File size limit */}
-      <SectionLabel>Max File Size</SectionLabel>
+      <SectionLabel>{t.toolSettings["passport-photo"].maxFileSize}</SectionLabel>
       <div className="space-y-2">
         <div className="flex gap-1.5 flex-wrap">
           {FILE_SIZE_PRESETS.map((preset) => (
@@ -807,7 +812,7 @@ export function PassportPhotoSettings() {
                   : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >
-              {preset.label}
+              {preset.label ?? t.toolSettings["passport-photo"].noLimit}
             </button>
           ))}
         </div>
@@ -820,7 +825,7 @@ export function PassportPhotoSettings() {
               const val = Number.parseInt(e.target.value, 10);
               if (val > 0) setMaxFileSizeKb(val);
             }}
-            placeholder="Custom KB..."
+            placeholder={t.toolSettings["passport-photo"].customKb}
             min="10"
             className="flex-1 px-2 py-1 rounded border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground"
           />
@@ -832,9 +837,19 @@ export function PassportPhotoSettings() {
       <div className="text-[11px] text-muted-foreground space-y-0.5 bg-muted/50 rounded-lg px-3 py-2">
         <p className="font-medium text-foreground">{docSpec.label}</p>
         <p>
-          {docSpec.width}x{docSpec.height}mm ({pxDims.w}x{pxDims.h}px) at {docSpec.dpi} DPI
+          {format(t.toolSettings["passport-photo"].dimensionsSummary, {
+            width: docSpec.width,
+            height: docSpec.height,
+            pxWidth: pxDims.w,
+            pxHeight: pxDims.h,
+            dpi: docSpec.dpi,
+          })}
         </p>
-        {maxFileSizeKb > 0 && <p>Max file size: {maxFileSizeKb} KB</p>}
+        {maxFileSizeKb > 0 && (
+          <p>
+            {t.toolSettings["passport-photo"].maxFileSize2} {maxFileSizeKb} KB
+          </p>
+        )}
       </div>
 
       {/* Errors */}
@@ -847,8 +862,8 @@ export function PassportPhotoSettings() {
         <ProgressCard
           active
           phase="processing"
-          label="Analyzing face"
-          stage="Detecting landmarks..."
+          label={t.toolSettings["passport-photo"].analyzingFace}
+          stage={t.toolSettings["passport-photo"].detectingLandmarksShort}
           percent={50}
           elapsed={0}
         />
@@ -864,7 +879,7 @@ export function PassportPhotoSettings() {
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <UserCheck className="h-4 w-4" />
-          Generate Passport Photo
+          {t.toolSettings["passport-photo"].generatePassportPhoto}
         </button>
       )}
 
@@ -872,7 +887,7 @@ export function PassportPhotoSettings() {
       {generating && (
         <div className="flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Generating...
+          {t.toolSettings["passport-photo"].generating}
         </div>
       )}
 
@@ -884,7 +899,7 @@ export function PassportPhotoSettings() {
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 hover:bg-primary/90"
         >
           <Download className="h-4 w-4" />
-          Download Photo
+          {t.toolSettings["passport-photo"].downloadPhoto}
         </a>
       )}
     </div>
@@ -894,6 +909,7 @@ export function PassportPhotoSettings() {
 // ── Preview panel (right side) ────────────────────────────────────
 
 export function PassportPhotoPreview() {
+  const { t } = useTranslation();
   const {
     analyzeResult,
     countryCode,
@@ -924,6 +940,24 @@ export function PassportPhotoPreview() {
 
   // Compliance checks
   const complianceChecks = analyzeResult ? runComplianceChecks(analyzeResult.landmarks) : [];
+  const complianceText: Record<ComplianceCheckId, { label: string; detail: string }> = {
+    faceCentered: {
+      label: t.toolSettings["passport-photo"].faceCentered,
+      detail: t.toolSettings["passport-photo"].faceCenteredDetail,
+    },
+    headLevel: {
+      label: t.toolSettings["passport-photo"].headLevel,
+      detail: t.toolSettings["passport-photo"].headLevelDetail,
+    },
+    lookingStraight: {
+      label: t.toolSettings["passport-photo"].lookingStraight,
+      detail: t.toolSettings["passport-photo"].lookingStraightDetail,
+    },
+    faceSize: {
+      label: t.toolSettings["passport-photo"].faceSize,
+      detail: t.toolSettings["passport-photo"].faceSizeDetail,
+    },
+  };
 
   // Render canvas
   const renderCanvas = useCallback(() => {
@@ -1096,9 +1130,11 @@ export function PassportPhotoPreview() {
           <UserCheck className="h-10 w-10 text-muted-foreground/40" />
         </div>
         <div>
-          <p className="text-sm font-medium text-foreground">Upload a portrait photo</p>
+          <p className="text-sm font-medium text-foreground">
+            {t.toolSettings["passport-photo"].uploadPortrait}
+          </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Drop or upload an image in the left panel to preview your passport photo
+            {t.toolSettings["passport-photo"].uploadHint}
           </p>
         </div>
       </div>
@@ -1111,9 +1147,11 @@ export function PassportPhotoPreview() {
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
         <Loader2 className="h-10 w-10 text-primary animate-spin" />
         <div>
-          <p className="text-sm font-medium text-foreground">Analyzing photo</p>
+          <p className="text-sm font-medium text-foreground">
+            {t.toolSettings["passport-photo"].analyzingPhoto}
+          </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Detecting face landmarks and removing background...
+            {t.toolSettings["passport-photo"].detectingLandmarks}
           </p>
         </div>
       </div>
@@ -1129,7 +1167,7 @@ export function PassportPhotoPreview() {
           type="button"
           onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
           className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Zoom out"
+          title={t.a11y.zoomOut}
         >
           <ZoomOut className="h-4 w-4" />
         </button>
@@ -1140,7 +1178,7 @@ export function PassportPhotoPreview() {
           type="button"
           onClick={() => setZoom(Math.min(5, zoom + 0.25))}
           className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Zoom in"
+          title={t.a11y.zoomIn}
         >
           <ZoomIn className="h-4 w-4" />
         </button>
@@ -1149,7 +1187,7 @@ export function PassportPhotoPreview() {
             type="button"
             onClick={() => setZoom(1)}
             className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Reset to 100%"
+            title={t.toolSettings["passport-photo"].resetTo100}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
@@ -1160,7 +1198,7 @@ export function PassportPhotoPreview() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center -mt-2">
-        What you see is what you download
+        {t.toolSettings["passport-photo"].whatYouSee}
       </p>
 
       {/* Canvas preview */}
@@ -1175,10 +1213,10 @@ export function PassportPhotoPreview() {
           <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
             <div className="flex items-center gap-1 bg-black/50 text-white text-[10px] px-2 py-1 rounded-md">
               <Move className="h-3 w-3" />
-              Drag to adjust
+              {t.toolSettings["passport-photo"].dragToAdjust}
             </div>
             <div className="bg-black/50 text-white text-[10px] px-2 py-1 rounded-md">
-              Scroll to zoom
+              {t.toolSettings["passport-photo"].scrollToZoom}
             </div>
           </div>
         </div>
@@ -1188,17 +1226,19 @@ export function PassportPhotoPreview() {
       {complianceChecks.length > 0 && (
         <div className="flex flex-wrap items-center gap-4 shrink-0 py-2">
           {complianceChecks.map((check) => (
-            <div key={check.label} className="flex items-center gap-1.5 text-xs">
+            <div key={check.id} className="flex items-center gap-1.5 text-xs">
               {check.pass ? (
                 <Check className="h-3.5 w-3.5 text-success-ink shrink-0" />
               ) : (
                 <X className="h-3.5 w-3.5 text-destructive-ink shrink-0" />
               )}
               <span className={check.pass ? "text-foreground" : "text-destructive-ink"}>
-                {check.label}
+                {complianceText[check.id].label}
               </span>
               {!check.pass && (
-                <span className="text-muted-foreground text-[10px]">- {check.detail}</span>
+                <span className="text-muted-foreground text-[10px]">
+                  - {complianceText[check.id].detail}
+                </span>
               )}
             </div>
           ))}
@@ -1209,7 +1249,7 @@ export function PassportPhotoPreview() {
       {generateResult && (
         <div className="flex items-center gap-2 text-xs text-success-ink bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg shrink-0">
           <Check className="h-4 w-4" />
-          Photo generated. Download from the left panel.
+          {t.toolSettings["passport-photo"].photoGenerated}
         </div>
       )}
     </div>

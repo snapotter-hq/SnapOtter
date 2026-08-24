@@ -1,6 +1,8 @@
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
@@ -9,6 +11,7 @@ type Alignment = "start" | "center" | "end";
 type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "jxl";
 
 export function StitchSettings() {
+  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
     useFileStore();
 
@@ -112,7 +115,7 @@ export function StitchSettings() {
     <div className="space-y-4">
       {/* Layout */}
       <div>
-        <p className="text-xs text-muted-foreground">Direction</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.stitch.direction}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["horizontal", "vertical", "grid"] as const).map((d) => (
             <button
@@ -131,7 +134,7 @@ export function StitchSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="stitch-grid-columns" className="text-xs text-muted-foreground">
-              Grid Columns
+              {t.toolSettings.stitch.gridColumns}
             </label>
             <span className="text-xs font-mono text-foreground">{gridColumns}</span>
           </div>
@@ -151,7 +154,7 @@ export function StitchSettings() {
 
       {/* Size Handling */}
       <div>
-        <p className="text-xs text-muted-foreground">Resize Mode</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.stitch.resizeMode}</p>
         <div className="grid grid-cols-4 gap-1 mt-1">
           {(["fit", "original", "stretch", "crop"] as const).map((m) => (
             <button
@@ -167,7 +170,7 @@ export function StitchSettings() {
       </div>
 
       <div>
-        <p className="text-xs text-muted-foreground">Alignment</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.stitch.alignment}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["start", "center", "end"] as const).map((a) => (
             <button
@@ -188,7 +191,7 @@ export function StitchSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="stitch-gap" className="text-xs text-muted-foreground">
-            Gap
+            {t.toolSettings.stitch.gap}
           </label>
           <span className="text-xs font-mono text-foreground">{gap}px</span>
         </div>
@@ -206,7 +209,7 @@ export function StitchSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="stitch-border" className="text-xs text-muted-foreground">
-            Border
+            {t.toolSettings.stitch.border}
           </label>
           <span className="text-xs font-mono text-foreground">{border}px</span>
         </div>
@@ -224,7 +227,7 @@ export function StitchSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="stitch-corner-radius" className="text-xs text-muted-foreground">
-            Corner Radius
+            {t.toolSettings.stitch.cornerRadius}
           </label>
           <span className="text-xs font-mono text-foreground">{cornerRadius}px</span>
         </div>
@@ -241,7 +244,7 @@ export function StitchSettings() {
 
       <div>
         <label htmlFor="stitch-background-color" className="text-xs text-muted-foreground">
-          Background Color
+          {t.toolSettings.stitch.backgroundColor}
         </label>
         <input
           id="stitch-background-color"
@@ -256,7 +259,7 @@ export function StitchSettings() {
 
       {/* Output */}
       <div>
-        <p className="text-xs text-muted-foreground">Format</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings.stitch.format}</p>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {(["png", "jpeg", "webp", "avif", "jxl"] as const).map((f) => (
             <button
@@ -275,7 +278,7 @@ export function StitchSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="stitch-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings.stitch.quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}%</span>
           </div>
@@ -296,7 +299,11 @@ export function StitchSettings() {
       {processing && (
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{uploadProgress < 100 ? "Uploading..." : "Stitching..."}</span>
+            <span>
+              {uploadProgress < 100
+                ? t.toolSettings.stitch.uploading
+                : t.toolSettings.stitch.stitching}
+            </span>
             {uploadProgress < 100 && <span>{uploadProgress}%</span>}
           </div>
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
@@ -322,9 +329,9 @@ export function StitchSettings() {
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing
           ? uploadProgress < 100
-            ? `Uploading... ${uploadProgress}%`
-            : "Stitching..."
-          : `Stitch ${files.length} images`}
+            ? formatMessage(t.toolSettings.stitch.uploadingPercent, { percent: uploadProgress })
+            : t.toolSettings.stitch.stitching
+          : formatMessage(t.toolSettings.stitch.submitCount, { count: files.length })}
       </button>
 
       {downloadUrl && (
@@ -335,7 +342,7 @@ export function StitchSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download Stitched Image
+          {t.toolSettings.stitch.downloadStitchedImage}
         </a>
       )}
     </div>

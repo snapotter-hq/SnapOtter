@@ -47,27 +47,28 @@ export function GifWebpSettings() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Converts GIF to WebP and WebP to GIF, preserving all animation frames. Direction is
-        determined automatically by the input file format.
+        {t.toolSettings["gif-webp"].convertsGifToWebpAnd}
       </p>
 
       {/* Lossless toggle */}
       <div>
-        <span className="text-xs text-muted-foreground">Compression</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["gif-webp"].compression}
+        </span>
         <div className="flex gap-1 mt-1">
           <button
             type="button"
             onClick={() => setLossless(false)}
             className={`flex-1 text-xs py-1.5 rounded ${!lossless ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
-            Lossy
+            {t.toolSettings["gif-webp"].lossy}
           </button>
           <button
             type="button"
             onClick={() => setLossless(true)}
             className={`flex-1 text-xs py-1.5 rounded ${lossless ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
-            Lossless
+            {t.toolSettings["gif-webp"].lossless}
           </button>
         </div>
       </div>
@@ -76,7 +77,9 @@ export function GifWebpSettings() {
       {!lossless && (
         <div>
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Quality</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["gif-webp"].quality}
+            </span>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
           <input
@@ -93,7 +96,7 @@ export function GifWebpSettings() {
       {/* Resize slider */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Resize</span>
+          <span className="text-xs text-muted-foreground">{t.toolSettings["gif-webp"].resize}</span>
           <span className="text-xs font-mono text-foreground">{resizePercent}%</span>
         </div>
         <input

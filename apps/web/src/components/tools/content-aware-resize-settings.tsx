@@ -16,6 +16,7 @@ export function ContentAwareResizeControls({
   settings: initialSettings,
   onChange,
 }: ContentAwareResizeControlsProps) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState<string>("");
   const [height, setHeight] = useState<string>("");
   const [protectFaces, setProtectFaces] = useState(false);
@@ -61,28 +62,28 @@ export function ContentAwareResizeControls({
       <div className="flex items-end gap-2">
         <div className="flex-1">
           <label htmlFor="car-width" className="text-xs text-muted-foreground">
-            Width (px)
+            {t.toolSettings["content-aware-resize"].widthPx}
           </label>
           <input
             id="car-width"
             type="number"
             value={width}
             onChange={(e) => setWidth(e.target.value)}
-            placeholder="Auto"
+            placeholder={t.toolSettings["content-aware-resize"].auto}
             disabled={squareMode}
             className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
           />
         </div>
         <div className="flex-1">
           <label htmlFor="car-height" className="text-xs text-muted-foreground">
-            Height (px)
+            {t.toolSettings["content-aware-resize"].heightPx}
           </label>
           <input
             id="car-height"
             type="number"
             value={height}
             onChange={(e) => setHeight(e.target.value)}
-            placeholder="Auto"
+            placeholder={t.toolSettings["content-aware-resize"].auto}
             disabled={squareMode}
             className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground disabled:opacity-50"
           />
@@ -97,7 +98,7 @@ export function ContentAwareResizeControls({
           onChange={(e) => setSquareMode(e.target.checked)}
           className="rounded"
         />
-        Resize to square
+        {t.toolSettings["content-aware-resize"].resizeToSquare}
       </label>
 
       {/* Face protection. HintIcon is a button, so it sits beside the label,
@@ -110,7 +111,7 @@ export function ContentAwareResizeControls({
             onChange={(e) => setProtectFaces(e.target.checked)}
             className="rounded"
           />
-          <span>Protect faces</span>
+          <span>{t.toolSettings["content-aware-resize"].protectFaces}</span>
         </label>
         <HintIcon text="Detect and protect face regions from seam removal using face detection" />
       </div>
@@ -119,7 +120,7 @@ export function ContentAwareResizeControls({
       <div>
         <div className="flex items-center justify-between">
           <label htmlFor="car-blur-radius" className="text-xs text-muted-foreground">
-            Smoothing
+            {t.toolSettings["content-aware-resize"].smoothing}
           </label>
           <span className="text-xs tabular-nums text-muted-foreground">{blurRadius}</span>
         </div>
@@ -138,7 +139,7 @@ export function ContentAwareResizeControls({
       <div>
         <div className="flex items-center justify-between">
           <label htmlFor="car-sobel-threshold" className="text-xs text-muted-foreground">
-            Edge sensitivity
+            {t.toolSettings["content-aware-resize"].edgeSensitivity}
           </label>
           <span className="text-xs tabular-nums text-muted-foreground">{sobelThreshold}</span>
         </div>
@@ -222,7 +223,7 @@ export function ContentAwareResizeSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

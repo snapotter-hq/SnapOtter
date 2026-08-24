@@ -3,8 +3,10 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 // -- Preset types -----------------------------------------------------------
@@ -309,7 +311,7 @@ function renderWindowsFrame(isDark: boolean, title: string): React.ReactNode {
   );
 }
 
-function renderBrowserFrame(isDark: boolean, title: string): React.ReactNode {
+function renderBrowserFrame(isDark: boolean, title: string, newTabLabel: string): React.ReactNode {
   return (
     <div data-testid="frame-preview-browser" style={{ flexShrink: 0 }}>
       <div
@@ -344,7 +346,7 @@ function renderBrowserFrame(isDark: boolean, title: string): React.ReactNode {
             color: isDark ? "#d4d4d4" : "#4b4b4b",
           }}
         >
-          {title || "New Tab"}
+          {title || newTabLabel}
         </div>
       </div>
       <div
@@ -378,7 +380,11 @@ function renderBrowserFrame(isDark: boolean, title: string): React.ReactNode {
   );
 }
 
-function renderDeviceFrame(isDark: boolean, deviceType: string): React.ReactNode {
+function renderDeviceFrame(
+  isDark: boolean,
+  deviceType: string,
+  frameLabelTemplate: string,
+): React.ReactNode {
   const label = DEVICE_LABELS[deviceType] || deviceType;
   return (
     <div
@@ -401,7 +407,7 @@ function renderDeviceFrame(isDark: boolean, deviceType: string): React.ReactNode
           textTransform: "uppercase" as const,
         }}
       >
-        {label} Frame
+        {format(frameLabelTemplate, { label })}
       </span>
     </div>
   );
@@ -439,6 +445,7 @@ function renderWatermark(text: string, position: string, opacity: number): React
 function renderFramePreview(
   frame: string,
   title: string,
+  labels: { newTab: string; frameLabel: string },
   watermarkText?: string,
   watermarkPosition?: string,
   watermarkOpacity?: number,
@@ -452,8 +459,8 @@ function renderFramePreview(
 
     if (type === "macos") frameNode = renderMacosFrame(isDark, title);
     else if (type === "windows") frameNode = renderWindowsFrame(isDark, title);
-    else if (type === "browser") frameNode = renderBrowserFrame(isDark, title);
-    else frameNode = renderDeviceFrame(isDark, type);
+    else if (type === "browser") frameNode = renderBrowserFrame(isDark, title, labels.newTab);
+    else frameNode = renderDeviceFrame(isDark, type, labels.frameLabel);
   }
 
   if (watermarkText) {
@@ -548,6 +555,8 @@ export function BeautifyControls({
   onImageOverlay,
   onBackgroundImage,
 }: BeautifyControlsProps) {
+  const { t } = useTranslation();
+  const bt = t.toolSettings.beautify;
   // State
   const [selectedPreset, setSelectedPreset] = useState<string | null>("Purple Haze");
   const [backgroundType, setBackgroundType] = useState<BackgroundTab>("linear-gradient");
@@ -670,6 +679,7 @@ export function BeautifyControls({
       renderFramePreview(
         resolvedFrame,
         frameTitle,
+        { newTab: bt.newTab, frameLabel: bt.frameLabel },
         watermarkText,
         watermarkPosition,
         watermarkOpacity,
@@ -699,6 +709,8 @@ export function BeautifyControls({
     watermarkPosition,
     watermarkOpacity,
     bgImageUrl,
+    bt.newTab,
+    bt.frameLabel,
   ]);
 
   const clearPreset = () => setSelectedPreset(null);
@@ -751,7 +763,7 @@ export function BeautifyControls({
   return (
     <div className="space-y-3">
       {/* 1. Quick Presets */}
-      <CollapsibleSection title="Quick Presets" defaultOpen>
+      <CollapsibleSection title={bt.quickPresets} defaultOpen>
         <div className="grid grid-cols-4 gap-1.5">
           {PRESETS.map((preset) => (
             <button
@@ -777,7 +789,7 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 2. Background */}
-      <CollapsibleSection title="Background" defaultOpen>
+      <CollapsibleSection title={bt.background} defaultOpen>
         <div className="space-y-3">
           {/* Tab buttons */}
           <div className="flex gap-1">
@@ -822,7 +834,7 @@ export function BeautifyControls({
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Linear
+                  {bt.linear}
                 </button>
                 <button
                   type="button"
@@ -836,13 +848,13 @@ export function BeautifyControls({
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Radial
+                  {bt.radial}
                 </button>
               </div>
 
               {/* Color stops */}
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Color Stops</p>
+                <p className="text-xs text-muted-foreground">{bt.colorStops}</p>
                 {gradientStops.map((stop, i) => (
                   <div key={`${stop.color}-${stop.position}`} className="flex items-center gap-2">
                     <input
@@ -871,7 +883,7 @@ export function BeautifyControls({
                   className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Plus className="h-3 w-3" />
-                  Add Stop
+                  {bt.addStop}
                 </button>
               </div>
 
@@ -883,7 +895,7 @@ export function BeautifyControls({
                       htmlFor="beautify-gradient-angle"
                       className="text-xs text-muted-foreground"
                     >
-                      Angle
+                      {bt.angle}
                     </label>
                     <span className="text-xs font-mono text-foreground">{gradientAngle}deg</span>
                   </div>
@@ -908,7 +920,7 @@ export function BeautifyControls({
           {backgroundType === "solid" && (
             <div>
               <label htmlFor="beautify-bg-color" className="text-xs text-muted-foreground">
-                Color
+                {bt.color}
               </label>
               <div className="flex items-center gap-2 mt-1">
                 <input
@@ -948,7 +960,7 @@ export function BeautifyControls({
                 className="w-full px-2 py-2 rounded border border-dashed border-border bg-background text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
               >
                 <Upload className="h-4 w-4" />
-                {bgImageFile ? bgImageFile.name : "Choose background image"}
+                {bgImageFile ? bgImageFile.name : bt.chooseBackgroundImage}
               </button>
             </div>
           )}
@@ -956,7 +968,7 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 3. Device Frame */}
-      <CollapsibleSection title="Device Frame" defaultOpen>
+      <CollapsibleSection title={bt.deviceFrame} defaultOpen>
         <div className="space-y-3">
           <div className="grid grid-cols-4 gap-1">
             {FRAME_TYPES.map((ft) => (
@@ -993,7 +1005,7 @@ export function BeautifyControls({
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Light
+                  {bt.light}
                 </button>
                 <button
                   type="button"
@@ -1007,21 +1019,21 @@ export function BeautifyControls({
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Dark
+                  {bt.dark}
                 </button>
               </div>
 
               {hasFrameTitle && (
                 <div>
                   <label htmlFor="beautify-frame-title" className="text-xs text-muted-foreground">
-                    Title
+                    {bt.title}
                   </label>
                   <input
                     id="beautify-frame-title"
                     type="text"
                     value={frameTitle}
                     onChange={(e) => setFrameTitle(e.target.value)}
-                    placeholder="Window title"
+                    placeholder={bt.windowTitle}
                     className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                   />
                 </div>
@@ -1032,12 +1044,12 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 4. Spacing */}
-      <CollapsibleSection title="Spacing" defaultOpen>
+      <CollapsibleSection title={bt.spacing} defaultOpen>
         <div className="space-y-3">
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="beautify-padding" className="text-xs text-muted-foreground">
-                Padding
+                {bt.padding}
               </label>
               <span className="text-xs font-mono text-foreground">{padding}px</span>
             </div>
@@ -1058,7 +1070,7 @@ export function BeautifyControls({
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="beautify-border-radius" className="text-xs text-muted-foreground">
-                Border Radius
+                {bt.borderRadius}
               </label>
               <span className="text-xs font-mono text-foreground">{borderRadius}px</span>
             </div>
@@ -1079,7 +1091,7 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 5. Shadow */}
-      <CollapsibleSection title="Shadow" defaultOpen>
+      <CollapsibleSection title={bt.shadow} defaultOpen>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1">
             {SHADOW_CHIPS.map((chip) => (
@@ -1106,7 +1118,7 @@ export function BeautifyControls({
               <div>
                 <div className="flex justify-between items-center">
                   <label htmlFor="beautify-shadow-blur" className="text-xs text-muted-foreground">
-                    Blur
+                    {bt.blur}
                   </label>
                   <span className="text-xs font-mono text-foreground">{shadowBlur}px</span>
                 </div>
@@ -1125,7 +1137,7 @@ export function BeautifyControls({
                 <div>
                   <div className="flex justify-between items-center">
                     <label htmlFor="beautify-shadow-x" className="text-xs text-muted-foreground">
-                      Offset X
+                      {bt.offsetX}
                     </label>
                     <span className="text-xs font-mono text-foreground">{shadowOffsetX}</span>
                   </div>
@@ -1142,7 +1154,7 @@ export function BeautifyControls({
                 <div>
                   <div className="flex justify-between items-center">
                     <label htmlFor="beautify-shadow-y" className="text-xs text-muted-foreground">
-                      Offset Y
+                      {bt.offsetY}
                     </label>
                     <span className="text-xs font-mono text-foreground">{shadowOffsetY}</span>
                   </div>
@@ -1160,7 +1172,7 @@ export function BeautifyControls({
 
               <div>
                 <label htmlFor="beautify-shadow-color" className="text-xs text-muted-foreground">
-                  Color
+                  {bt.color}
                 </label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
@@ -1180,7 +1192,7 @@ export function BeautifyControls({
                     htmlFor="beautify-shadow-opacity"
                     className="text-xs text-muted-foreground"
                   >
-                    Opacity
+                    {bt.opacity}
                   </label>
                   <span className="text-xs font-mono text-foreground">{shadowOpacity}%</span>
                 </div>
@@ -1200,7 +1212,7 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 6. Export Size */}
-      <CollapsibleSection title="Export Size">
+      <CollapsibleSection title={bt.exportSize}>
         <div className="flex flex-wrap gap-1">
           {SOCIAL_CHIPS.map((chip) => (
             <button
@@ -1223,25 +1235,25 @@ export function BeautifyControls({
       </CollapsibleSection>
 
       {/* 7. Watermark */}
-      <CollapsibleSection title="Watermark">
+      <CollapsibleSection title={bt.watermark}>
         <div className="space-y-3">
           <div>
             <label htmlFor="beautify-watermark-text" className="text-xs text-muted-foreground">
-              Text
+              {bt.text}
             </label>
             <input
               id="beautify-watermark-text"
               type="text"
               value={watermarkText}
               onChange={(e) => setWatermarkText(e.target.value)}
-              placeholder="Your watermark text"
+              placeholder={bt.yourWatermarkText}
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             />
           </div>
 
           <div>
             <label htmlFor="beautify-watermark-position" className="text-xs text-muted-foreground">
-              Position
+              {bt.position}
             </label>
             <select
               id="beautify-watermark-position"
@@ -1260,7 +1272,7 @@ export function BeautifyControls({
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="beautify-watermark-opacity" className="text-xs text-muted-foreground">
-                Opacity
+                {bt.opacity}
               </label>
               <span className="text-xs font-mono text-foreground">{watermarkOpacity}%</span>
             </div>
@@ -1289,6 +1301,7 @@ export function BeautifySettings({
   onImageStyle?: (style: React.CSSProperties | null) => void;
   onImageOverlay?: (children: React.ReactNode) => void;
 }) {
+  const { t } = useTranslation();
   const { files, setProcessedUrl, setSizes, setJobId } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("beautify");
@@ -1380,7 +1393,7 @@ export function BeautifySettings({
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Beautifying screenshot"
+          label={t.toolSettings.beautify.progressLabel}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -1393,10 +1406,10 @@ export function BeautifySettings({
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {manualProcessing
-            ? "Processing..."
+            ? t.toolSettings.beautify.processing
             : files.length > 1
-              ? `Beautify (${files.length} files)`
-              : "Beautify"}
+              ? format(t.toolSettings.beautify.submitBatch, { count: files.length })
+              : t.toolSettings.beautify.submit}
         </button>
       )}
 
@@ -1408,7 +1421,7 @@ export function BeautifySettings({
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

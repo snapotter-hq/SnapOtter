@@ -1,5 +1,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Crown, Search } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatFileSize } from "@/lib/download";
+import { format } from "@/lib/format";
 import type { DuplicateFileInfo } from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 
@@ -13,6 +15,7 @@ function getBestIndex(
 }
 
 function OverviewGrid() {
+  const { t } = useTranslation();
   const { results, setSelectedGroup } = useDuplicateStore();
   if (!results) return null;
 
@@ -21,26 +24,34 @@ function OverviewGrid() {
       {/* Summary bar */}
       <div className="flex flex-wrap gap-4 px-4 py-3 bg-muted rounded-lg text-xs items-center">
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Scanned:</span>
+          <span className="text-muted-foreground">
+            {t.toolSettings["find-duplicates-results"].scanned}
+          </span>
           <span className="text-foreground font-semibold">{results.totalImages}</span>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Duplicate groups:</span>
+          <span className="text-muted-foreground">
+            {t.toolSettings["find-duplicates-results"].duplicateGroups}
+          </span>
           <span className="text-amber-700 dark:text-amber-400 font-semibold">
             {results.duplicateGroups.length}
           </span>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Unique:</span>
+          <span className="text-muted-foreground">
+            {t.toolSettings["find-duplicates-results"].unique}
+          </span>
           <span className="text-success-ink font-semibold">{results.uniqueImages}</span>
         </div>
         {results.spaceSaveable > 0 && (
           <>
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Space saveable:</span>
+              <span className="text-muted-foreground">
+                {t.toolSettings["find-duplicates-results"].spaceSaveable}
+              </span>
               <span className="text-primary-ink font-semibold">
                 {formatFileSize(results.spaceSaveable)}
               </span>
@@ -54,9 +65,13 @@ function OverviewGrid() {
           <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
             <Search className="h-6 w-6 text-success-ink" />
           </div>
-          <p className="text-sm font-medium text-foreground">No duplicates found</p>
+          <p className="text-sm font-medium text-foreground">
+            {t.toolSettings["find-duplicates-results"].noDuplicatesFound}
+          </p>
           <p className="text-xs text-muted-foreground">
-            All {results.totalImages} images are unique.
+            {format(t.toolSettings["find-duplicates-results"].allImagesUnique, {
+              count: results.totalImages,
+            })}
           </p>
         </div>
       ) : (
@@ -73,11 +88,15 @@ function OverviewGrid() {
                   GROUP {group.groupId}
                 </span>
                 <span className="text-xs font-medium text-foreground">
-                  {Math.max(...group.files.map((f) => f.similarity))}% Similar
+                  {format(t.toolSettings["find-duplicates-results"].percentSimilar, {
+                    percent: Math.max(...group.files.map((f) => f.similarity)),
+                  })}
                 </span>
               </div>
               <span className="text-[11px] text-muted-foreground">
-                {group.files.length} images &middot; Click to compare &rsaquo;
+                {format(t.toolSettings["find-duplicates-results"].imagesClickToCompare, {
+                  count: group.files.length,
+                })}
               </span>
             </div>
             <div className="flex gap-2.5 overflow-x-auto pb-1">
@@ -95,7 +114,9 @@ function OverviewGrid() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-xs text-muted-foreground">No preview</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t.toolSettings["find-duplicates-results"].noPreview}
+                      </span>
                     )}
                     {file.isBest && (
                       <span className="absolute top-1 left-1 bg-green-500 text-green-950 text-[9px] px-1.5 py-0.5 rounded font-bold">
@@ -121,6 +142,7 @@ function OverviewGrid() {
 }
 
 function DetailComparison() {
+  const { t } = useTranslation();
   const {
     results,
     selectedGroupIndex,
@@ -152,7 +174,7 @@ function DetailComparison() {
           className="flex items-center gap-1 text-xs text-primary-ink hover:text-primary-ink-strong"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Back to Overview
+          {t.toolSettings["find-duplicates-results"].backToOverview}
         </button>
         <div className="flex items-center gap-2">
           <button
@@ -164,7 +186,10 @@ function DetailComparison() {
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <span className="text-xs text-foreground">
-            Group {selectedGroupIndex + 1} of {totalGroups}
+            {format(t.toolSettings["find-duplicates-results"].groupOf, {
+              current: selectedGroupIndex + 1,
+              total: totalGroups,
+            })}
           </span>
           <button
             type="button"
@@ -176,7 +201,9 @@ function DetailComparison() {
           </button>
         </div>
         <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-          {Math.max(...group.files.map((f) => f.similarity))}% Similar
+          {format(t.toolSettings["find-duplicates-results"].percentSimilar, {
+            percent: Math.max(...group.files.map((f) => f.similarity)),
+          })}
         </span>
       </div>
 
@@ -193,7 +220,11 @@ function DetailComparison() {
               type="button"
               onClick={() => overrideBest(selectedGroupIndex, fi)}
               className="text-start"
-              title={isCurrentBest ? "Selected as best" : "Click to mark as best"}
+              title={
+                isCurrentBest
+                  ? t.toolSettings["find-duplicates-results"].selectedAsBest
+                  : t.toolSettings["find-duplicates-results"].clickToMarkAsBest
+              }
             >
               <div
                 className={`rounded-lg overflow-hidden border-2 bg-background aspect-[4/3] flex items-center justify-center relative ${
@@ -207,7 +238,9 @@ function DetailComparison() {
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <span className="text-sm text-muted-foreground">No preview</span>
+                  <span className="text-sm text-muted-foreground">
+                    {t.toolSettings["find-duplicates-results"].noPreview}
+                  </span>
                 )}
                 {isCurrentBest && (
                   <span className="absolute top-2 left-2 bg-green-500 text-green-950 text-[10px] px-2 py-0.5 rounded font-bold flex items-center gap-1">
@@ -220,15 +253,23 @@ function DetailComparison() {
               <div className="mt-2 p-2.5 rounded-lg bg-muted border border-border text-xs space-y-1.5">
                 <p className="font-medium text-foreground truncate">{file.filename}</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <span className="text-muted-foreground">Dimensions</span>
+                  <span className="text-muted-foreground">
+                    {t.toolSettings["find-duplicates-results"].dimensions}
+                  </span>
                   <span className="text-foreground text-end">
                     {file.width} x {file.height}
                   </span>
-                  <span className="text-muted-foreground">File size</span>
+                  <span className="text-muted-foreground">
+                    {t.toolSettings["find-duplicates-results"].fileSize}
+                  </span>
                   <span className="text-foreground text-end">{formatFileSize(file.fileSize)}</span>
-                  <span className="text-muted-foreground">Format</span>
+                  <span className="text-muted-foreground">
+                    {t.toolSettings["find-duplicates-results"].format}
+                  </span>
                   <span className="text-foreground text-end">{file.format.toUpperCase()}</span>
-                  <span className="text-muted-foreground">Similarity</span>
+                  <span className="text-muted-foreground">
+                    {t.toolSettings["find-duplicates-results"].similarity}
+                  </span>
                   <span
                     className={`text-end font-medium ${file.similarity === 100 ? "text-success-ink" : "text-amber-700 dark:text-amber-400"}`}
                   >
@@ -243,8 +284,9 @@ function DetailComparison() {
 
       {group.files.length > 3 && (
         <p className="text-[10px] text-muted-foreground text-center">
-          Showing all {group.files.length} images in this group. Click any image to set it as
-          "best."
+          {format(t.toolSettings["find-duplicates-results"].showingAllImagesInGroup, {
+            count: group.files.length,
+          })}
         </p>
       )}
     </div>
@@ -252,13 +294,16 @@ function DetailComparison() {
 }
 
 export function FindDuplicatesResults() {
+  const { t } = useTranslation();
   const { results, scanning, viewMode } = useDuplicateStore();
 
   if (scanning) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
         <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-muted-foreground">Scanning for duplicates...</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["find-duplicates-results"].scanningForDuplicates}
+        </p>
       </div>
     );
   }
@@ -268,7 +313,7 @@ export function FindDuplicatesResults() {
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
         <Search className="h-10 w-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          Choose a detection mode and click "Scan" to find duplicates.
+          {t.toolSettings["find-duplicates-results"].chooseADetectionModeAnd}
         </p>
       </div>
     );

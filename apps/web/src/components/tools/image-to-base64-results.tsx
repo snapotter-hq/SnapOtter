@@ -1,5 +1,7 @@
 import { Check, ClipboardCopy, Download, FileJson, FileText, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import type { Base64Result } from "@/stores/base64-store";
 import { useBase64Store } from "@/stores/base64-store";
@@ -11,16 +13,14 @@ type TabId = "datauri" | "raw" | "html" | "css" | "json" | "markdown";
 
 interface Tab {
   id: TabId;
-  label: string;
   generate: (r: Base64Result) => string;
 }
 
 const TABS: Tab[] = [
-  { id: "datauri", label: "Data URI", generate: (r) => r.dataUri },
-  { id: "raw", label: "Raw Base64", generate: (r) => r.base64 },
+  { id: "datauri", generate: (r) => r.dataUri },
+  { id: "raw", generate: (r) => r.base64 },
   {
     id: "html",
-    label: "HTML",
     generate: (r) => {
       const alt = r.filename.replace(/\.[^.]+$/, "");
       return `<img src="${r.dataUri}" alt="${alt}" />`;
@@ -28,17 +28,14 @@ const TABS: Tab[] = [
   },
   {
     id: "css",
-    label: "CSS",
     generate: (r) => `background-image: url(${r.dataUri});`,
   },
   {
     id: "json",
-    label: "JSON",
     generate: (r) => JSON.stringify({ image: r.dataUri }, null, 2),
   },
   {
     id: "markdown",
-    label: "Markdown",
     generate: (r) => {
       const alt = r.filename.replace(/\.[^.]+$/, "");
       return `![${alt}](${r.dataUri})`;
@@ -67,6 +64,7 @@ function downloadFile(content: string, filename: string, type: string) {
 // -- CopyButton -------------------------------------------------------------
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   const handleCopy = useCallback(async () => {
@@ -88,7 +86,11 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       ) : (
         <ClipboardCopy className="h-3.5 w-3.5" />
       )}
-      {status === "copied" ? "Copied!" : status === "failed" ? "Copy failed" : (label ?? "Copy")}
+      {status === "copied"
+        ? t.common.copied
+        : status === "failed"
+          ? t.toolSettings["image-to-base64-results"].copyFailed
+          : (label ?? t.common.copy)}
     </button>
   );
 }
@@ -96,9 +98,19 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 // -- Single file result view ------------------------------------------------
 
 function FileResult({ result }: { result: Base64Result }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>("datauri");
   const tab = TABS.find((t) => t.id === activeTab) ?? TABS[0];
   const output = tab.generate(result);
+  // HTML/CSS/JSON/Markdown are format names and stay untranslated.
+  const tabLabels: Record<TabId, string> = {
+    datauri: t.toolSettings["image-to-base64-results"].tabDataUri,
+    raw: t.toolSettings["image-to-base64-results"].tabRawBase64,
+    html: "HTML",
+    css: "CSS",
+    json: "JSON",
+    markdown: "Markdown",
+  };
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([output], { type: "text/plain" });
@@ -146,7 +158,7 @@ function FileResult({ result }: { result: Base64Result }) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t.label}
+            {tabLabels[t.id]}
           </button>
         ))}
       </div>
@@ -160,14 +172,17 @@ function FileResult({ result }: { result: Base64Result }) {
 
       {/* Actions */}
       <div className="flex gap-2 mt-3">
-        <CopyButton text={output} label="Copy to Clipboard" />
+        <CopyButton
+          text={output}
+          label={t.toolSettings["image-to-base64-results"].copyToClipboard}
+        />
         <button
           type="button"
           onClick={handleDownload}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-muted-foreground text-xs font-medium hover:bg-muted/80 transition-colors"
         >
           <Download className="h-3.5 w-3.5" />
-          Download .txt
+          {t.toolSettings["image-to-base64-results"].downloadTxt}
         </button>
       </div>
     </div>
@@ -177,6 +192,8 @@ function FileResult({ result }: { result: Base64Result }) {
 // -- Main ResultsPanel ------------------------------------------------------
 
 export function ImageToBase64Results() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["image-to-base64-results"];
   const { results, errors, processing, progress } = useBase64Store();
   const { entries, selectedIndex, originalBlobUrl, selectedFileName } = useFileStore();
 
@@ -192,7 +209,7 @@ export function ImageToBase64Results() {
           {progress ? (
             <>
               <p className="text-sm text-muted-foreground text-center truncate w-full">
-                Converting{" "}
+                {ts.converting}{" "}
                 <span className="font-medium text-foreground">{progress.currentFile}</span>
               </p>
               <div className="w-full">
@@ -203,12 +220,15 @@ export function ImageToBase64Results() {
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
-                  {progress.completed} of {progress.total} files
+                  {format(ts.completedOfTotalFiles, {
+                    completed: progress.completed,
+                    total: progress.total,
+                  })}
                 </p>
               </div>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">Starting conversion...</p>
+            <p className="text-sm text-muted-foreground">{ts.startingConversion}</p>
           )}
         </div>
       </div>
@@ -222,13 +242,13 @@ export function ImageToBase64Results() {
         <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
           <img
             src={originalBlobUrl}
-            alt={selectedFileName ?? "Preview"}
+            alt={selectedFileName ?? ts.preview}
             className="max-h-[60%] max-w-full rounded-lg object-contain bg-muted"
           />
           <p className="text-sm text-muted-foreground text-center">
             {entries.length > 1
-              ? `${entries.length} files ready. Click "Convert to Base64" to start.`
-              : `Click "Convert to Base64" to convert.`}
+              ? format(ts.filesReadyClickConvert, { count: entries.length })
+              : ts.clickConvertToConvert}
           </p>
         </div>
       );
@@ -236,9 +256,7 @@ export function ImageToBase64Results() {
 
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-sm text-muted-foreground">
-          Upload images and click "Convert to Base64" to get started.
-        </p>
+        <p className="text-sm text-muted-foreground">{ts.uploadImagesAndClickConvert}</p>
       </div>
     );
   }
@@ -259,8 +277,13 @@ export function ImageToBase64Results() {
         <div className="mb-3 pb-3 border-b border-border">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-muted-foreground">
-              {results.length} of {entries.length} converted
-              {errors.length > 0 ? ` - ${errors.length} failed` : ""}
+              {errors.length > 0
+                ? format(ts.convertedOfTotalWithFailed, {
+                    done: results.length,
+                    total: entries.length,
+                    count: errors.length,
+                  })
+                : format(ts.convertedOfTotal, { done: results.length, total: entries.length })}
             </p>
           </div>
           <div className="flex gap-1.5 flex-wrap">
@@ -270,7 +293,7 @@ export function ImageToBase64Results() {
                 null,
                 2,
               )}
-              label="Copy All as JSON"
+              label={ts.copyAllAsJson}
             />
             <button
               type="button"
@@ -291,7 +314,7 @@ export function ImageToBase64Results() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
             >
               <FileJson className="h-3.5 w-3.5" />
-              Download All as JSON
+              {ts.downloadAllAsJson}
             </button>
             <button
               type="button"
@@ -304,7 +327,7 @@ export function ImageToBase64Results() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
             >
               <FileText className="h-3.5 w-3.5" />
-              Download All as Text
+              {ts.downloadAllAsText}
             </button>
           </div>
         </div>
@@ -325,9 +348,7 @@ export function ImageToBase64Results() {
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground">
-              No result for this file. It may not have been processed yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{ts.noResultForThisFile}</p>
           </div>
         )}
       </div>

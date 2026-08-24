@@ -38,7 +38,7 @@ export function HtmlToImageResults() {
       <div className="flex-1 overflow-auto p-4">
         <img
           src={resultUrl}
-          alt="Captured screenshot"
+          alt={t.toolSettings["html-to-image-results"].capturedScreenshot}
           className="mx-auto max-w-full rounded-lg border border-border shadow-sm"
         />
       </div>

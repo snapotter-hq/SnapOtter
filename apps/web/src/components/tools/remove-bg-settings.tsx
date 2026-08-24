@@ -290,24 +290,24 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             active={bgType === "transparent"}
             onClick={() => setBgType("transparent")}
             checkerboard
-            label="Transparent"
+            label={t.toolSettings["remove-bg"].transparent}
           />
           <BgTypeButton
             active={bgType === "color"}
             onClick={() => setBgType("color")}
             color={bgColor}
-            label="Color"
+            label={t.toolSettings["remove-bg"].color}
           />
           <BgTypeButton
             active={bgType === "gradient"}
             onClick={() => setBgType("gradient")}
             gradient={{ color1: gradColor1, color2: gradColor2 }}
-            label="Gradient"
+            label={t.toolSettings["remove-bg"].gradient}
           />
           <BgTypeButton
             active={bgType === "image"}
             onClick={() => setBgType("image")}
-            label="Image"
+            label={t.toolSettings["remove-bg"].image}
             isImage
           />
         </div>
@@ -377,20 +377,24 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
                 value={gradColor1}
                 onChange={(e) => setGradColor1(e.target.value)}
                 className="w-7 h-7 rounded border border-border cursor-pointer"
-                title="Start color"
+                title={t.toolSettings["remove-bg"].startColor}
               />
-              <span className="text-xs text-muted-foreground">to</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings["remove-bg"].to}
+              </span>
               <input
                 type="color"
                 value={gradColor2}
                 onChange={(e) => setGradColor2(e.target.value)}
                 className="w-7 h-7 rounded border border-border cursor-pointer"
-                title="End color"
+                title={t.toolSettings["remove-bg"].endColor}
               />
             </div>
             <div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">Direction</span>
+                <span className="text-xs text-muted-foreground">
+                  {t.toolSettings["remove-bg"].direction}
+                </span>
                 <span className="text-xs font-mono text-foreground">{gradAngle}°</span>
               </div>
               <input
@@ -416,13 +420,13 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
                   onClick={() => setBgImageFile(null)}
                   className="text-muted-foreground hover:text-foreground"
                 >
-                  Remove
+                  {t.toolSettings["remove-bg"].remove}
                 </button>
               </div>
             ) : (
               <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground cursor-pointer hover:border-primary/50 hover:text-foreground transition-colors">
                 <Upload className="h-3.5 w-3.5" />
-                Choose background image
+                {t.toolSettings["remove-bg"].chooseBackgroundImage}
                 <input
                   type="file"
                   accept="image/*,.avif,.heic,.heif,.hif"
@@ -466,10 +470,10 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
         className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
       >
         {effectsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        Effects
+        {t.toolSettings["remove-bg"].effects}
         {(blurEnabled || shadowEnabled || edgeRefine > 0 || decontaminate) && (
           <span className="ms-auto text-primary-ink text-[10px] normal-case font-normal">
-            active
+            {t.toolSettings["remove-bg"].active}
           </span>
         )}
       </button>
@@ -492,7 +496,9 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             {blurEnabled && (
               <div className="mt-1.5 ps-5">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Intensity</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t.toolSettings["remove-bg"].intensity}
+                  </span>
                   <span className="text-xs font-mono text-foreground tabular-nums w-8 text-end">
                     {blurIntensity}
                   </span>
@@ -525,7 +531,9 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             {shadowEnabled && (
               <div className="mt-1.5 ps-5">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Opacity</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t.toolSettings["remove-bg"].opacity}
+                  </span>
                   <span className="text-xs font-mono text-foreground tabular-nums w-8 text-end">
                     {shadowOpacity}
                   </span>
@@ -955,8 +963,16 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       {/* Size info */}
       {originalSize != null && processedSize != null && !processing && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["remove-bg"].originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["remove-bg"].processedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -998,7 +1014,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Download className="h-4 w-4" />
-              {applyingEffects ? t.toolSettings["remove-background"].rendering : "Download"}
+              {applyingEffects ? t.toolSettings["remove-background"].rendering : t.common.download}
             </button>
           ) : (
             <a
@@ -1008,7 +1024,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 hover:bg-primary/90"
             >
               <Download className="h-4 w-4" />
-              Download
+              {t.common.download}
             </a>
           )}
         </div>

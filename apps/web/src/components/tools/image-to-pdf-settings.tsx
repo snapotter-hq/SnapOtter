@@ -2,7 +2,9 @@ import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 const PAGE_SIZES: Record<string, [number, number]> = {
@@ -25,6 +27,8 @@ function PdfPagePreview({
   margin: number;
   imgUrl: string | null;
 }) {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["image-to-pdf"];
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
@@ -66,7 +70,7 @@ function PdfPagePreview({
 
   return (
     <div>
-      <p className="text-xs text-muted-foreground mb-2">Preview</p>
+      <p className="text-xs text-muted-foreground mb-2">{ts.preview}</p>
       <div className="flex justify-center">
         <div
           className="relative bg-white border border-border"
@@ -92,12 +96,16 @@ function PdfPagePreview({
           )}
           {/* Image thumbnail */}
           {imgStyle && imgUrl && (
-            <img src={imgUrl} alt="Preview" style={{ ...imgStyle, transition: "all 0.2s ease" }} />
+            <img
+              src={imgUrl}
+              alt={ts.preview}
+              style={{ ...imgStyle, transition: "all 0.2s ease" }}
+            />
           )}
           {/* Empty state placeholder */}
           {!imgUrl && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] text-muted-foreground">No image</span>
+              <span className="text-[10px] text-muted-foreground">{ts.noImage}</span>
             </div>
           )}
         </div>
@@ -106,6 +114,8 @@ function PdfPagePreview({
   );
 }
 export function ImageToPdfSettings() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["image-to-pdf"];
   const { files, selectedIndex, entries, error, setProcessing, setError } = useFileStore();
   const [pageSize, setPageSize] = useState<"A4" | "Letter" | "A3" | "A5">("A4");
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
@@ -258,8 +268,11 @@ export function ImageToPdfSettings() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        {files.length} image{files.length !== 1 ? "s" : ""} will be converted to{" "}
-        {collate ? "a single PDF, one image per page" : "separate PDFs, one per image"}.
+        {format(plural(files.length, ts.imageCount, ts.imageCountPlural), {
+          count: files.length,
+          mode: collate ? ts.singlePdfMode : ts.separatePdfMode,
+        })}
+        .
       </p>
 
       {files.length > 1 && (
@@ -270,13 +283,13 @@ export function ImageToPdfSettings() {
             onChange={(e) => setCollate(e.target.checked)}
             className="rounded border-border"
           />
-          <span className="text-xs text-foreground">Combine all images into one PDF</span>
+          <span className="text-xs text-foreground">{ts.combineAllImages}</span>
         </label>
       )}
 
       <div>
         <label htmlFor="image-to-pdf-page-size" className="text-xs text-muted-foreground">
-          Page Size
+          {ts.pageSize}
         </label>
         <select
           id="image-to-pdf-page-size"
@@ -292,21 +305,21 @@ export function ImageToPdfSettings() {
       </div>
 
       <div>
-        <p className="text-xs text-muted-foreground">Orientation</p>
+        <p className="text-xs text-muted-foreground">{ts.orientation}</p>
         <div className="flex gap-1 mt-1">
           <button
             type="button"
             onClick={() => setOrientation("portrait")}
             className={`flex-1 text-xs py-1.5 rounded ${orientation === "portrait" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
-            Portrait
+            {ts.portrait}
           </button>
           <button
             type="button"
             onClick={() => setOrientation("landscape")}
             className={`flex-1 text-xs py-1.5 rounded ${orientation === "landscape" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
-            Landscape
+            {ts.landscape}
           </button>
         </div>
       </div>
@@ -314,7 +327,7 @@ export function ImageToPdfSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="image-to-pdf-margin" className="text-xs text-muted-foreground">
-            Margin
+            {ts.margin}
           </label>
           <span className="text-xs font-mono text-foreground">{margin}pt</span>
         </div>
@@ -331,7 +344,7 @@ export function ImageToPdfSettings() {
 
       <div>
         <label htmlFor="image-to-pdf-target-size" className="text-xs text-muted-foreground">
-          Target file size (optional)
+          {ts.targetSizeLabel}
         </label>
         <div className="flex gap-2 mt-0.5">
           <input
@@ -355,7 +368,7 @@ export function ImageToPdfSettings() {
             <option value="MB">MB</option>
           </select>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">Leave empty for maximum quality</p>
+        <p className="text-[10px] text-muted-foreground mt-1">{ts.targetSizeHint}</p>
       </div>
 
       <PdfPagePreview
@@ -371,11 +384,11 @@ export function ImageToPdfSettings() {
         <ProgressCard
           active={busy}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Creating PDF"
+          label={ts.progressLabel}
           stage={
             progress.phase === "uploading"
-              ? "Uploading images..."
-              : `Processing ${files.length} pages...`
+              ? ts.uploadingImages
+              : format(ts.processingPages, { count: files.length })
           }
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -388,7 +401,9 @@ export function ImageToPdfSettings() {
           disabled={!hasFiles || busy}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {collate ? `Create PDF (${files.length} pages)` : `Create ${files.length} PDFs`}
+          {collate
+            ? format(ts.submitCollate, { count: files.length })
+            : format(ts.submitSeparate, { count: files.length })}
         </button>
       )}
 
@@ -400,7 +415,7 @@ export function ImageToPdfSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          {collate ? "Download PDF" : "Download ZIP"}
+          {collate ? ts.downloadPdf : ts.downloadZip}
         </a>
       )}
 
@@ -414,9 +429,11 @@ export function ImageToPdfSettings() {
           }`}
         >
           {compressionResult.targetMet ? (
-            <span>Target met (JPEG quality: {compressionResult.jpegQuality}%)</span>
+            <span>
+              {format(ts.targetMetWithQuality, { quality: compressionResult.jpegQuality })}
+            </span>
           ) : (
-            <span>Could not reach target. File compressed to minimum quality.</span>
+            <span>{ts.targetSizeNotMet}</span>
           )}
         </div>
       )}

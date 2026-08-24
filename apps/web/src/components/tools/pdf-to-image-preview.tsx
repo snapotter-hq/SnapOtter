@@ -1,4 +1,6 @@
 import { Check, Download, FileOutput, Loader2 } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format, plural } from "@/lib/format";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 
 const PREVIEWABLE_FORMATS = new Set(["png", "jpg", "webp", "gif", "avif"]);
@@ -10,6 +12,7 @@ function formatSize(bytes: number): string {
 }
 
 export function PdfToImagePreview() {
+  const { t } = useTranslation();
   const store = usePdfToImageStore();
 
   // No file uploaded
@@ -17,7 +20,9 @@ export function PdfToImagePreview() {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-center">
         <FileOutput className="h-12 w-12 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground">Upload a PDF to get started</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["pdf-to-image"].uploadAPdfToGet}
+        </p>
       </div>
     );
   }
@@ -27,7 +32,9 @@ export function PdfToImagePreview() {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full gap-3">
         <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-        <p className="text-sm text-muted-foreground">Generating page previews...</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["pdf-to-image"].generatingPagePreviews}
+        </p>
       </div>
     );
   }
@@ -39,8 +46,15 @@ export function PdfToImagePreview() {
         <div className="flex items-center gap-2 mb-3">
           <Loader2 className="h-4 w-4 text-primary animate-spin" />
           <p className="text-sm text-muted-foreground">
-            Converting {store.selectedPages.size} page
-            {store.selectedPages.size !== 1 ? "s" : ""}...
+            {plural(
+              store.selectedPages.size,
+              format(t.toolSettings["pdf-to-image"].convertingSelected, {
+                count: store.selectedPages.size,
+              }),
+              format(t.toolSettings["pdf-to-image"].convertingSelectedPlural, {
+                count: store.selectedPages.size,
+              }),
+            )}
           </p>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -53,7 +67,11 @@ export function PdfToImagePreview() {
                   isSelected ? "border-primary/50 opacity-100" : "border-border opacity-30"
                 }`}
               >
-                <img src={thumb.dataUrl} alt={`Page ${thumb.page}`} className="w-full h-auto" />
+                <img
+                  src={thumb.dataUrl}
+                  alt={format(t.toolSettings["pdf-to-image"].pageAlt, { page: thumb.page })}
+                  className="w-full h-auto"
+                />
                 {isSelected && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                     <Loader2 className="h-6 w-6 text-white animate-spin" />
@@ -79,8 +97,15 @@ export function PdfToImagePreview() {
       <div className="h-full w-full overflow-y-auto p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium text-foreground">
-            {store.results.length} page
-            {store.results.length !== 1 ? "s" : ""} converted
+            {plural(
+              store.results.length,
+              format(t.toolSettings["pdf-to-image"].pagesConverted, {
+                count: store.results.length,
+              }),
+              format(t.toolSettings["pdf-to-image"].pagesConvertedPlural, {
+                count: store.results.length,
+              }),
+            )}
             {totalSize > 0 && (
               <span className="text-muted-foreground font-normal ms-1">
                 ({formatSize(totalSize)})
@@ -101,12 +126,16 @@ export function PdfToImagePreview() {
                 {isPreviewable ? (
                   <img
                     src={result.downloadUrl}
-                    alt={`Page ${result.page}`}
+                    alt={format(t.toolSettings["pdf-to-image"].pageAlt, { page: result.page })}
                     className="w-full h-auto"
                     loading="lazy"
                   />
                 ) : thumb?.dataUrl ? (
-                  <img src={thumb.dataUrl} alt={`Page ${result.page}`} className="w-full h-auto" />
+                  <img
+                    src={thumb.dataUrl}
+                    alt={format(t.toolSettings["pdf-to-image"].pageAlt, { page: result.page })}
+                    className="w-full h-auto"
+                  />
                 ) : (
                   <div className="w-full aspect-[3/4] flex flex-col items-center justify-center gap-1">
                     <FileOutput className="h-8 w-8 text-muted-foreground/40" />
@@ -155,8 +184,17 @@ export function PdfToImagePreview() {
       <div className="h-full w-full overflow-y-auto p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm text-muted-foreground">
-            {store.selectedPages.size} of {store.pageCount} page
-            {store.pageCount !== 1 ? "s" : ""} selected
+            {plural(
+              store.pageCount ?? 0,
+              format(t.toolSettings["pdf-to-image"].selectedOfPages, {
+                selected: store.selectedPages.size,
+                total: store.pageCount ?? "",
+              }),
+              format(t.toolSettings["pdf-to-image"].selectedOfPagesPlural, {
+                selected: store.selectedPages.size,
+                total: store.pageCount ?? "",
+              }),
+            )}
           </p>
           <div className="flex gap-2">
             {!allSelected && (
@@ -165,7 +203,7 @@ export function PdfToImagePreview() {
                 onClick={() => store.selectAllPages()}
                 className="text-xs text-primary-ink hover:underline"
               >
-                Select All
+                {t.toolSettings["pdf-to-image"].selectAll}
               </button>
             )}
             {!noneSelected && (
@@ -174,7 +212,7 @@ export function PdfToImagePreview() {
                 onClick={() => store.deselectAllPages()}
                 className="text-xs text-primary-ink hover:underline"
               >
-                Deselect All
+                {t.toolSettings["pdf-to-image"].deselectAll}
               </button>
             )}
           </div>
@@ -193,7 +231,11 @@ export function PdfToImagePreview() {
                     : "border-border opacity-50 hover:opacity-75"
                 }`}
               >
-                <img src={thumb.dataUrl} alt={`Page ${thumb.page}`} className="w-full h-auto" />
+                <img
+                  src={thumb.dataUrl}
+                  alt={format(t.toolSettings["pdf-to-image"].pageAlt, { page: thumb.page })}
+                  className="w-full h-auto"
+                />
 
                 {/* Page number badge */}
                 <div className="absolute top-1.5 left-1.5 bg-background/80 backdrop-blur-sm border border-border px-1.5 py-0.5 rounded text-xs text-muted-foreground tabular-nums">
@@ -220,7 +262,9 @@ export function PdfToImagePreview() {
   return (
     <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-center">
       <FileOutput className="h-12 w-12 text-muted-foreground/40" />
-      <p className="text-sm text-muted-foreground">Upload a PDF to get started</p>
+      <p className="text-sm text-muted-foreground">
+        {t.toolSettings["pdf-to-image"].uploadAPdfToGet}
+      </p>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type EnhancementMode = "auto" | "portrait" | "landscape" | "low-light" | "food" | "document";
@@ -261,7 +262,7 @@ export function ImageEnhancementControls({
       {/* Hidden SVG filters for preview */}
       {toggles.whiteBalance && Math.abs(tempAdj) > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
-          <title>White balance temperature filter</title>
+          <title>{t.toolSettings["image-enhancement"].whiteBalanceTemperatureFilter}</title>
           <filter id="snapotter-enhance-temp-filter" colorInterpolationFilters="sRGB">
             <feColorMatrix
               type="matrix"
@@ -272,7 +273,7 @@ export function ImageEnhancementControls({
       )}
       {toggles.sharpness && sharpAdj > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
-          <title>Sharpen filter</title>
+          <title>{t.toolSettings["image-enhancement"].sharpenFilter}</title>
           <filter id="snapotter-enhance-sharpen-filter" colorInterpolationFilters="sRGB">
             <feConvolveMatrix
               order="3"
@@ -330,7 +331,7 @@ export function ImageEnhancementControls({
           <div>
             <p className="text-xs font-medium">{t.toolSettings.imageEnhancement.deepEnhance}</p>
             <p className="text-[10px] text-muted-foreground">
-              Removes noise and artifacts using AI
+              {t.toolSettings["image-enhancement"].removesNoiseAndArtifactsUsing}
             </p>
           </div>
         </div>
@@ -355,7 +356,7 @@ export function ImageEnhancementControls({
       {analyzing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <div className="h-3 w-3 border border-primary border-t-transparent rounded-full animate-spin" />
-          Analyzing image...
+          {t.toolSettings["image-enhancement"].analyzingImage}
         </div>
       )}
 
@@ -366,7 +367,7 @@ export function ImageEnhancementControls({
           </p>
           {analysis.issues.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Image looks good. Fine-tune with the intensity slider.
+              {t.toolSettings["image-enhancement"].imageLooksGoodFineTune}
             </p>
           ) : (
             <div className="flex flex-wrap gap-1">
@@ -430,6 +431,7 @@ export function ImageEnhancementSettings({
 }: {
   onPreviewFilter?: (filter: string) => void;
 }) {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const {
     processFiles,
@@ -466,8 +468,16 @@ export function ImageEnhancementSettings({
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Enhanced: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["image-enhancement"].originalSizeKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["image-enhancement"].enhancedSizeKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -475,7 +485,13 @@ export function ImageEnhancementSettings({
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={files.length > 1 ? `Enhancing ${files.length} images` : "Enhancing image"}
+          label={
+            files.length > 1
+              ? format(t.toolSettings.imageEnhancement.progressLabelBatch, {
+                  count: files.length,
+                })
+              : t.toolSettings.imageEnhancement.progressLabel
+          }
           percent={progress.percent}
           elapsed={progress.elapsed}
         />
@@ -487,10 +503,12 @@ export function ImageEnhancementSettings({
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {files.length > 1
-            ? `${settings.deepEnhance ? "Deep Enhance" : "Enhance"} (${files.length} files)`
+            ? settings.deepEnhance
+              ? format(t.toolSettings.imageEnhancement.submitDeepBatch, { count: files.length })
+              : format(t.toolSettings.imageEnhancement.submitBatch, { count: files.length })
             : settings.deepEnhance
-              ? "Deep Enhance"
-              : "Enhance"}
+              ? t.toolSettings["image-enhancement"].deepEnhance
+              : t.toolSettings["image-enhancement"].enhance}
         </button>
       )}
 
@@ -502,7 +520,7 @@ export function ImageEnhancementSettings({
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

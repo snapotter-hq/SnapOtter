@@ -48,7 +48,7 @@ export function ResizeVideoSettings() {
           onChange={(e) => setPreset(e.target.value as Preset)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="custom">Custom</option>
+          <option value="custom">{s.custom}</option>
           <option value="2160p">2160p (4K)</option>
           <option value="1440p">1440p (2K)</option>
           <option value="1080p">1080p</option>
@@ -168,7 +168,7 @@ export function ResizeVideoControls({ settings: initial, onChange }: ResizeVideo
           onChange={(e) => setPreset(e.target.value as Preset)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
-          <option value="custom">Custom</option>
+          <option value="custom">{s.custom}</option>
           <option value="2160p">2160p (4K)</option>
           <option value="1440p">1440p (2K)</option>
           <option value="1080p">1080p</option>

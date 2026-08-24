@@ -1,5 +1,6 @@
 import QRCodeStyling from "qr-code-styling";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { encodeQrData, useQrStore } from "@/stores/qr-store";
 
 const CHECKER_BG = "repeating-conic-gradient(#e5e5e5 0% 25%, #ffffff 0% 50%) 0 0 / 20px 20px";
@@ -11,6 +12,7 @@ function clearChildren(el: HTMLElement) {
 }
 
 export function QrGeneratePreview() {
+  const { t } = useTranslation();
   const store = useQrStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<QRCodeStyling | null>(null);
@@ -116,7 +118,9 @@ export function QrGeneratePreview() {
         <div ref={containerRef} className="flex items-center justify-center" />
       </div>
       {isEmpty && (
-        <p className="text-sm text-muted-foreground">Enter content to generate a QR code</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["qr-generate"].enterContentToGenerateA}
+        </p>
       )}
     </div>
   );

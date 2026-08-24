@@ -78,7 +78,7 @@ export function BarcodeGenerateSettings() {
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Enter text or number..."
+          placeholder={ts.enterTextOrNumber}
           className={INPUT_CLASS}
           data-testid="barcode-input-text"
         />
@@ -140,7 +140,7 @@ export function BarcodeGenerateSettings() {
         <div className="space-y-2">
           <img
             src={resultUrl}
-            alt="Generated barcode"
+            alt={ts.generatedBarcode}
             className="w-full rounded border border-border bg-white p-2"
           />
           <a

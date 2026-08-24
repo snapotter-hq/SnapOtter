@@ -1,8 +1,11 @@
 import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function CompareSettings() {
+  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError, setProcessedUrl } = useFileStore();
   const [secondFile, setSecondFile] = useState<File | null>(null);
   const [similarity, setSimilarity] = useState<number | null>(null);
@@ -52,7 +55,7 @@ export function CompareSettings() {
     <div className="space-y-4">
       <div>
         <label htmlFor="compare-second-image" className="text-xs text-muted-foreground">
-          Second Image
+          {t.toolSettings.compare.secondImage}
         </label>
         <input
           id="compare-second-image"
@@ -68,7 +71,7 @@ export function CompareSettings() {
           className="w-full mt-0.5 px-2 py-2 rounded border border-dashed border-border bg-background text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
         >
           <Upload className="h-4 w-4" />
-          {secondFile ? secondFile.name : "Choose second image"}
+          {secondFile ? secondFile.name : t.toolSettings.compare.chooseSecondImage}
         </button>
       </div>
 
@@ -77,7 +80,7 @@ export function CompareSettings() {
       {similarity !== null && (
         <div className="p-3 rounded-lg bg-muted">
           <p className="text-sm text-foreground font-medium">
-            Similarity: {similarity.toFixed(1)}%
+            {format(t.toolSettings.compare.similarity, { percent: similarity.toFixed(1) })}
           </p>
           <div className="mt-1 h-2 bg-background rounded-full overflow-hidden">
             <div className="h-full rounded-full bg-primary" style={{ width: `${similarity}%` }} />
@@ -93,7 +96,7 @@ export function CompareSettings() {
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-        {processing ? "Comparing..." : "Compare"}
+        {processing ? t.toolSettings.compare.comparing : t.toolSettings.compare.submit}
       </button>
 
       {downloadUrl && (
@@ -104,7 +107,7 @@ export function CompareSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download Diff Image
+          {t.toolSettings.compare.downloadDiffImage}
         </a>
       )}
     </div>

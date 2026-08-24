@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import {
   FONT_OPTIONS,
@@ -22,11 +23,12 @@ const INPUT_CLASS =
 // ── Gallery Phase Settings ──────────────────────────────────────────
 
 function GallerySettings() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
       <div className="text-center py-6">
         <p className="text-sm text-muted-foreground">
-          Select a template from the gallery or upload your own image to get started.
+          {t.toolSettings["meme-generator"].selectTemplate}
         </p>
       </div>
     </div>
@@ -36,10 +38,13 @@ function GallerySettings() {
 // ── Layout Picker Phase Settings ────────────────────────────────────
 
 function LayoutPickerSettings() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
       <div className="text-center py-6">
-        <p className="text-sm text-muted-foreground">Choose a text layout for your custom image.</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["meme-generator"].chooseLayout}
+        </p>
       </div>
     </div>
   );
@@ -48,6 +53,8 @@ function LayoutPickerSettings() {
 // ── Editor Phase Settings ───────────────────────────────────────────
 
 function EditorSettings() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["meme-generator"];
   const selectedTemplate = useMemeStore((s) => s.selectedTemplate);
   const customLayout = useMemeStore((s) => s.customLayout);
   const textBoxValues = useMemeStore((s) => s.textBoxValues);
@@ -87,7 +94,7 @@ function EditorSettings() {
         className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-3 w-3" />
-        Back to templates
+        {ts.backToTemplates}
       </button>
 
       {/* Template name */}
@@ -122,7 +129,7 @@ function EditorSettings() {
       {/* Font picker */}
       <div>
         <label htmlFor="font-picker" className="text-xs text-muted-foreground block mb-0.5">
-          Font
+          {ts.font}
         </label>
         <select
           id="font-picker"
@@ -143,10 +150,10 @@ function EditorSettings() {
       <div>
         <div className="flex justify-between items-center mb-0.5">
           <label htmlFor="font-size" className="text-xs text-muted-foreground">
-            Font Size
+            {ts.fontSize}
           </label>
           <span className="text-xs font-mono text-foreground">
-            {fontSize === 0 ? "Auto" : `${fontSize}px`}
+            {fontSize === 0 ? ts.auto : `${fontSize}px`}
           </span>
         </div>
         <input
@@ -166,7 +173,7 @@ function EditorSettings() {
       <div className="flex gap-2">
         <div className="flex-1 min-w-0">
           <label htmlFor="text-color" className="text-xs text-muted-foreground block mb-0.5">
-            Text
+            {ts.text}
           </label>
           <div className="flex items-center gap-1">
             <input
@@ -187,7 +194,7 @@ function EditorSettings() {
         </div>
         <div className="flex-1 min-w-0">
           <label htmlFor="stroke-color" className="text-xs text-muted-foreground block mb-0.5">
-            Stroke
+            {ts.stroke}
           </label>
           <div className="flex items-center gap-1">
             <input
@@ -210,7 +217,7 @@ function EditorSettings() {
 
       {/* Alignment */}
       <div>
-        <span className="text-xs text-muted-foreground block mb-1">Alignment</span>
+        <span className="text-xs text-muted-foreground block mb-1">{ts.alignment}</span>
         <div className="flex gap-1">
           {(["left", "center", "right"] as const).map((align) => {
             const Icon =
@@ -267,12 +274,12 @@ function EditorSettings() {
         {generating ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Generating...
+            {ts.generating}
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            Generate Meme
+            {ts.generate}
           </>
         )}
       </button>
@@ -283,13 +290,15 @@ function EditorSettings() {
 // ── Result Phase Settings ───────────────────────────────────────────
 
 function ResultSettings() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["meme-generator"];
   const resultUrl = useMemeStore((s) => s.resultUrl);
   const backToEditor = useMemeStore((s) => s.backToEditor);
   const backToGallery = useMemeStore((s) => s.backToGallery);
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Your meme is ready.</p>
+      <p className="text-xs text-muted-foreground">{ts.yourMemeIsReady}</p>
 
       {resultUrl && (
         <a
@@ -299,7 +308,7 @@ function ResultSettings() {
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2"
         >
           <Download className="h-4 w-4" />
-          Download Meme
+          {ts.downloadMeme}
         </a>
       )}
 
@@ -309,7 +318,7 @@ function ResultSettings() {
         onClick={backToEditor}
         className="w-full py-2.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
       >
-        Edit Again
+        {ts.editAgain}
       </button>
 
       <button
@@ -318,7 +327,7 @@ function ResultSettings() {
         onClick={backToGallery}
         className="w-full py-2.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
       >
-        New Meme
+        {ts.newMeme}
       </button>
     </div>
   );

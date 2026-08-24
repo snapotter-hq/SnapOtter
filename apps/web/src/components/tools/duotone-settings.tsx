@@ -94,7 +94,7 @@ export function DuotoneSettings({ onImageStyle, onImageOverlay }: DuotoneSetting
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Presets */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1.5">Presets</p>
+        <p className="text-xs text-muted-foreground mb-1.5">{t.toolSettings.duotone.presets}</p>
         <div className="grid grid-cols-4 gap-1.5">
           {PRESETS.map((p) => (
             <button
@@ -170,7 +170,7 @@ export function DuotoneSettings({ onImageStyle, onImageOverlay }: DuotoneSetting
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="duotone-intensity" className="text-xs text-muted-foreground">
-            Intensity
+            {t.toolSettings.duotone.intensity}
           </label>
           <span className="text-xs font-mono text-foreground tabular-nums">{intensity}%</span>
         </div>

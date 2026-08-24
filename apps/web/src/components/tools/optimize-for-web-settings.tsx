@@ -1,8 +1,10 @@
 import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type WebFormat = "webp" | "jpeg" | "avif" | "png" | "jxl";
@@ -29,6 +31,7 @@ function formatSize(bytes: number): string {
 }
 
 export function OptimizeForWebSettings() {
+  const { t } = useTranslation();
   const { files, entries, selectedIndex } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("optimize-for-web");
@@ -200,7 +203,9 @@ export function OptimizeForWebSettings() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Format selector */}
       <div>
-        <p className="text-sm font-medium text-muted-foreground">Output Format</p>
+        <p className="text-sm font-medium text-muted-foreground">
+          {t.toolSettings["optimize-for-web"].outputFormat}
+        </p>
         <div className="grid grid-cols-5 gap-1 mt-1">
           {(["webp", "jpeg", "avif", "png", "jxl"] as const).map((f) => (
             <button
@@ -224,7 +229,7 @@ export function OptimizeForWebSettings() {
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="web-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings["optimize-for-web"].quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
@@ -238,8 +243,8 @@ export function OptimizeForWebSettings() {
             className="w-full mt-1"
           />
           <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-            <span>Smallest file</span>
-            <span>Best quality</span>
+            <span>{t.toolSettings["optimize-for-web"].smallestFile}</span>
+            <span>{t.toolSettings["optimize-for-web"].bestQuality}</span>
           </div>
         </div>
       )}
@@ -256,13 +261,13 @@ export function OptimizeForWebSettings() {
           ) : (
             <ChevronRight className="h-3 w-3" />
           )}
-          <span>Max Dimensions</span>
+          <span>{t.toolSettings["optimize-for-web"].maxDimensions}</span>
         </button>
         {showDimensions && (
           <div className="grid grid-cols-2 gap-2 mt-2">
             <div>
               <label htmlFor="max-width" className="text-[10px] text-muted-foreground">
-                Max Width
+                {t.toolSettings["optimize-for-web"].maxWidth}
               </label>
               <input
                 id="max-width"
@@ -276,7 +281,7 @@ export function OptimizeForWebSettings() {
             </div>
             <div>
               <label htmlFor="max-height" className="text-[10px] text-muted-foreground">
-                Max Height
+                {t.toolSettings["optimize-for-web"].maxHeight}
               </label>
               <input
                 id="max-height"
@@ -295,7 +300,7 @@ export function OptimizeForWebSettings() {
       {/* Strip metadata toggle */}
       <div className="flex items-center justify-between">
         <label htmlFor="strip-meta" className="text-xs text-muted-foreground">
-          Strip Metadata
+          {t.toolSettings["optimize-for-web"].stripMetadata}
         </label>
         <button
           id="strip-meta"
@@ -319,17 +324,19 @@ export function OptimizeForWebSettings() {
       {(preview.originalSize || preview.loading) && (
         <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Size Comparison</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t.toolSettings["optimize-for-web"].sizeComparison}
+            </span>
             {preview.loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
           </div>
           {preview.originalSize != null && (
             <div className="text-xs text-muted-foreground">
-              Original: {formatSize(preview.originalSize)}
+              {t.toolSettings["optimize-for-web"].original} {formatSize(preview.originalSize)}
             </div>
           )}
           {preview.processedSize != null && (
             <div className="text-xs text-muted-foreground">
-              Optimized: {formatSize(preview.processedSize)}
+              {t.toolSettings["optimize-for-web"].optimized} {formatSize(preview.processedSize)}
               <span className="ms-1 font-medium uppercase text-[10px]">
                 {FORMAT_LABELS[format]}
               </span>
@@ -341,7 +348,11 @@ export function OptimizeForWebSettings() {
                 Number(savings) > 0 ? "text-success-ink" : "text-destructive-ink"
               }`}
             >
-              {Number(savings) > 0 ? `${savings}% smaller` : `${Math.abs(Number(savings))}% larger`}
+              {Number(savings) > 0
+                ? formatMessage(t.toolSettings["optimize-for-web"].smaller, { percent: savings })
+                : formatMessage(t.toolSettings["optimize-for-web"].larger, {
+                    percent: Math.abs(Number(savings)),
+                  })}
             </div>
           )}
         </div>
@@ -355,7 +366,7 @@ export function OptimizeForWebSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Optimizing"
+          label={t.toolSettings["optimize-for-web"].progressLabel}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -366,7 +377,11 @@ export function OptimizeForWebSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `Process & Download (${files.length} files)` : "Process & Download"}
+          {files.length > 1
+            ? formatMessage(t.toolSettings["optimize-for-web"].submitBatch, {
+                count: files.length,
+              })
+            : t.toolSettings["optimize-for-web"].submit}
         </button>
       )}
 
@@ -377,7 +392,7 @@ export function OptimizeForWebSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

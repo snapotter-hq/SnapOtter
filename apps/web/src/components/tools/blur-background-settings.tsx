@@ -59,10 +59,10 @@ export function BlurBackgroundSettings() {
       <div>
         <div className="mb-1.5 flex items-center justify-between">
           <label htmlFor="blur-bg-feather" className="text-sm font-medium">
-            Edge Feather
+            {ts.edgeFeather}
           </label>
           <span className="text-xs font-mono text-muted-foreground tabular-nums">
-            {feather === 0 ? "Off" : `${feather}px`}
+            {feather === 0 ? ts.off : `${feather}px`}
           </span>
         </div>
         <input
@@ -75,14 +75,12 @@ export function BlurBackgroundSettings() {
           onChange={(e) => setFeather(Number(e.target.value))}
           className="w-full"
         />
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Softens the edge between subject and blurred background
-        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{ts.softensTheEdgeBetweenSubject}</p>
       </div>
 
       {/* Output Format */}
       <div>
-        <p className="mb-1.5 text-sm font-medium">Output Format</p>
+        <p className="mb-1.5 text-sm font-medium">{ts.outputFormat}</p>
         <div className="grid grid-cols-2 gap-1.5">
           {(["png", "webp"] as const).map((fmt) => (
             <button

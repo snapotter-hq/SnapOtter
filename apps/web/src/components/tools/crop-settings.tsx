@@ -225,7 +225,7 @@ export function CropSettings({
               type="button"
               onClick={handleSwapAspect}
               className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Swap width/height"
+              title={t.toolSettings.crop.swapWidthHeight}
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
             </button>
@@ -255,7 +255,7 @@ export function CropSettings({
                 : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-foreground"
             }`}
           >
-            Custom
+            {t.toolSettings.crop.custom}
           </button>
         </div>
         {customMode && (
@@ -295,7 +295,9 @@ export function CropSettings({
         <div className="grid grid-cols-2 gap-2 mt-1">
           <div>
             <label htmlFor="crop-x" className="text-[10px] text-muted-foreground">
-              X{imgDimensions ? ` (of ${imgDimensions.width})` : ""}
+              {imgDimensions
+                ? format(t.toolSettings.crop.xOfMax, { max: imgDimensions.width })
+                : t.toolSettings.crop.x}
             </label>
             <input
               id="crop-x"
@@ -309,7 +311,9 @@ export function CropSettings({
           </div>
           <div>
             <label htmlFor="crop-y" className="text-[10px] text-muted-foreground">
-              Y{imgDimensions ? ` (of ${imgDimensions.height})` : ""}
+              {imgDimensions
+                ? format(t.toolSettings.crop.yOfMax, { max: imgDimensions.height })
+                : t.toolSettings.crop.y}
             </label>
             <input
               id="crop-y"
@@ -323,7 +327,9 @@ export function CropSettings({
           </div>
           <div>
             <label htmlFor="crop-width" className="text-[10px] text-muted-foreground">
-              Width{imgDimensions ? ` (of ${imgDimensions.width})` : ""}
+              {imgDimensions
+                ? format(t.toolSettings.crop.widthOfMax, { max: imgDimensions.width })
+                : t.toolSettings.crop.width}
             </label>
             <input
               id="crop-width"
@@ -337,7 +343,9 @@ export function CropSettings({
           </div>
           <div>
             <label htmlFor="crop-height" className="text-[10px] text-muted-foreground">
-              Height{imgDimensions ? ` (of ${imgDimensions.height})` : ""}
+              {imgDimensions
+                ? format(t.toolSettings.crop.heightOfMax, { max: imgDimensions.height })
+                : t.toolSettings.crop.height}
             </label>
             <input
               id="crop-height"
@@ -475,7 +483,7 @@ export function CropControls({ settings: initialSettings, onChange }: CropContro
         </div>
         <div>
           <label htmlFor="pipeline-crop-width" className="text-xs text-muted-foreground">
-            Width (px)
+            {t.toolSettings.crop.widthPx}
           </label>
           <input
             id="pipeline-crop-width"
@@ -483,13 +491,13 @@ export function CropControls({ settings: initialSettings, onChange }: CropContro
             value={width}
             onChange={(e) => setWidth(e.target.value)}
             min={1}
-            placeholder="Required"
+            placeholder={t.toolSettings.crop.required}
             className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           />
         </div>
         <div>
           <label htmlFor="pipeline-crop-height" className="text-xs text-muted-foreground">
-            Height (px)
+            {t.toolSettings.crop.heightPx}
           </label>
           <input
             id="pipeline-crop-height"
@@ -497,7 +505,7 @@ export function CropControls({ settings: initialSettings, onChange }: CropContro
             value={height}
             onChange={(e) => setHeight(e.target.value)}
             min={1}
-            placeholder="Required"
+            placeholder={t.toolSettings.crop.required}
             className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           />
         </div>

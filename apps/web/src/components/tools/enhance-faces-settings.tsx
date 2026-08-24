@@ -1,7 +1,9 @@
 import { Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 const MODEL_OPTIONS = [
@@ -19,6 +21,7 @@ export function EnhanceFacesControls({
   settings: initialSettings,
   onChange,
 }: EnhanceFacesControlsProps) {
+  const { t } = useTranslation();
   const [model, setModel] = useState<"gfpgan" | "auto" | "codeformer">("auto");
   const [strength, setStrength] = useState(80);
   const [onlyCenterFace, setOnlyCenterFace] = useState(false);
@@ -55,7 +58,9 @@ export function EnhanceFacesControls({
     <div className="space-y-4">
       {/* Quality */}
       <div>
-        <p className="text-sm font-medium text-muted-foreground mb-1.5">Quality</p>
+        <p className="text-sm font-medium text-muted-foreground mb-1.5">
+          {t.toolSettings["enhance-faces"].quality}
+        </p>
         <div className="flex gap-1">
           {MODEL_OPTIONS.map(({ value, label }) => (
             <button
@@ -78,7 +83,7 @@ export function EnhanceFacesControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="enhance-faces-strength" className="text-xs text-muted-foreground">
-            Enhancement Strength
+            {t.toolSettings["enhance-faces"].enhancementStrength}
           </label>
           <span className="text-xs font-mono text-foreground">{strength}%</span>
         </div>
@@ -93,8 +98,8 @@ export function EnhanceFacesControls({
           className="w-full mt-1"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Subtle</span>
-          <span>Maximum</span>
+          <span>{t.toolSettings["enhance-faces"].subtle}</span>
+          <span>{t.toolSettings["enhance-faces"].maximum}</span>
         </div>
       </div>
 
@@ -108,10 +113,12 @@ export function EnhanceFacesControls({
               onChange={(e) => setOnlyCenterFace(e.target.checked)}
               className="rounded border-border"
             />
-            <span className="text-sm text-foreground">Only enhance main face</span>
+            <span className="text-sm text-foreground">
+              {t.toolSettings["enhance-faces"].onlyEnhanceMainFace}
+            </span>
           </label>
           <p className="text-[11px] text-muted-foreground ms-6 mt-0.5">
-            For portraits - ignores background faces
+            {t.toolSettings["enhance-faces"].forPortraitsIgnoresBackgroundFaces}
           </p>
         </div>
       )}
@@ -120,7 +127,7 @@ export function EnhanceFacesControls({
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="enhance-faces-sensitivity" className="text-xs text-muted-foreground">
-            Detection Sensitivity
+            {t.toolSettings["enhance-faces"].detectionSensitivity}
           </label>
           <span className="text-xs font-mono text-foreground">{sensitivity}%</span>
         </div>
@@ -134,8 +141,8 @@ export function EnhanceFacesControls({
           className="w-full mt-1"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Fewer faces</span>
-          <span>More faces</span>
+          <span>{t.toolSettings["enhance-faces"].fewerFaces}</span>
+          <span>{t.toolSettings["enhance-faces"].moreFaces}</span>
         </div>
       </div>
     </div>
@@ -143,6 +150,7 @@ export function EnhanceFacesControls({
 }
 
 export function EnhanceFacesSettings() {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const {
     processFiles,
@@ -177,8 +185,16 @@ export function EnhanceFacesSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Enhanced: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["enhance-faces"].originalSizeKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["enhance-faces"].enhancedSizeKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -187,7 +203,13 @@ export function EnhanceFacesSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={hasMultiple ? `Enhancing ${files.length} images` : "Enhancing faces"}
+          label={
+            hasMultiple
+              ? format(t.toolSettings["enhance-faces"].progressLabelBatch, {
+                  count: files.length,
+                })
+              : t.toolSettings["enhance-faces"].progressLabel
+          }
           percent={progress.percent}
           elapsed={progress.elapsed}
         />
@@ -199,7 +221,9 @@ export function EnhanceFacesSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {hasMultiple ? `Enhance Faces (${files.length} files)` : "Enhance Faces"}
+          {hasMultiple
+            ? format(t.toolSettings["enhance-faces"].submitBatch, { count: files.length })
+            : t.toolSettings["enhance-faces"].submit}
         </button>
       )}
 
@@ -212,7 +236,7 @@ export function EnhanceFacesSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

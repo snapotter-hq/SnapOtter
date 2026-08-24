@@ -1,11 +1,14 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
 
+// Format names (JPEG, PNG, ...) are locale-invariant; "original" resolves via i18n.
 const OUTPUT_FORMATS = [
-  { value: "original", label: "Keep Original" },
+  { value: "original", label: null },
   { value: "jpeg", label: "JPEG" },
   { value: "png", label: "PNG" },
   { value: "webp", label: "WebP" },
@@ -14,6 +17,8 @@ const OUTPUT_FORMATS = [
 ] as const;
 
 export function ImageToBase64Settings() {
+  const { t } = useTranslation();
+  const ts = t.toolSettings["image-to-base64"];
   const { files } = useFileStore();
   const { processing, setProcessing, setProgress, addResult, addError, reset } = useBase64Store();
 
@@ -80,9 +85,9 @@ export function ImageToBase64Settings() {
     <div className="space-y-4">
       {/* Output Format */}
       <div>
-        <span className="text-xs font-medium text-muted-foreground">Output Image Format</span>
+        <span className="text-xs font-medium text-muted-foreground">{ts.outputImageFormat}</span>
         <p className="text-[10px] text-muted-foreground mb-1.5">
-          Convert before encoding to control MIME type and size
+          {ts.convertBeforeEncodingToControl}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {OUTPUT_FORMATS.map((fmt) => (
@@ -96,7 +101,7 @@ export function ImageToBase64Settings() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {fmt.label}
+              {fmt.value === "original" ? ts.keepOriginal : fmt.label}
             </button>
           ))}
         </div>
@@ -107,7 +112,7 @@ export function ImageToBase64Settings() {
         <div>
           <div className="flex items-center justify-between">
             <label htmlFor="b64-quality" className="text-xs font-medium text-muted-foreground">
-              Quality
+              {ts.quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}%</span>
           </div>
@@ -120,14 +125,14 @@ export function ImageToBase64Settings() {
             onChange={(e) => setQuality(Number(e.target.value))}
             className="w-full mt-1 accent-primary"
           />
-          <p className="text-[10px] text-muted-foreground">Lower quality = smaller base64 string</p>
+          <p className="text-[10px] text-muted-foreground">{ts.lowerQualitySmallerBase64String}</p>
         </div>
       )}
 
       {/* Max Width */}
       <div>
         <label htmlFor="b64-max-width" className="text-xs font-medium text-muted-foreground">
-          Max Width (px)
+          {ts.maxWidthPx}
         </label>
         <input
           id="b64-max-width"
@@ -135,7 +140,7 @@ export function ImageToBase64Settings() {
           min={0}
           value={maxWidth}
           onChange={(e) => setMaxWidth(Math.max(0, Number(e.target.value)))}
-          placeholder="0 = no limit"
+          placeholder={ts.t0NoLimit}
           className="mt-1 w-full rounded bg-muted px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
@@ -143,7 +148,7 @@ export function ImageToBase64Settings() {
       {/* Max Height */}
       <div>
         <label htmlFor="b64-max-height" className="text-xs font-medium text-muted-foreground">
-          Max Height (px)
+          {ts.maxHeightPx}
         </label>
         <input
           id="b64-max-height"
@@ -151,11 +156,11 @@ export function ImageToBase64Settings() {
           min={0}
           value={maxHeight}
           onChange={(e) => setMaxHeight(Math.max(0, Number(e.target.value)))}
-          placeholder="0 = no limit"
+          placeholder={ts.t0NoLimit}
           className="mt-1 w-full rounded bg-muted px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Resize before encoding. Aspect ratio is preserved. 0 = no limit.
+          {ts.resizeBeforeEncodingAspectRatio}
         </p>
       </div>
 
@@ -169,8 +174,10 @@ export function ImageToBase64Settings() {
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing
-          ? "Converting..."
-          : `Convert to Base64${files.length > 1 ? ` (${files.length})` : ""}`}
+          ? ts.converting
+          : files.length > 1
+            ? format(ts.submitWithCount, { count: files.length })
+            : ts.submit}
       </button>
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}

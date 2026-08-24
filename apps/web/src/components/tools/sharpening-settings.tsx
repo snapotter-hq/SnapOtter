@@ -122,7 +122,11 @@ export function SharpeningSettings() {
                 : "bg-muted text-muted-foreground hover:bg-primary/10"
             }`}
           >
-            {m === "adaptive" ? "Adaptive" : m === "unsharp-mask" ? "Unsharp Mask" : "High-Pass"}
+            {m === "adaptive"
+              ? t.toolSettings.sharpening.adaptive
+              : m === "unsharp-mask"
+                ? t.toolSettings.sharpening.unsharpMask
+                : t.toolSettings.sharpening.highPass}
           </button>
         ))}
       </div>
@@ -153,15 +157,15 @@ export function SharpeningSettings() {
       {/* Primary slider per method */}
       <SectionLabel>
         {method === "adaptive"
-          ? "Texture Amount"
+          ? t.toolSettings.sharpening.textureAmount
           : method === "unsharp-mask"
-            ? "Amount"
-            : "Strength"}
+            ? t.toolSettings.sharpening.amount
+            : t.toolSettings.sharpening.strength}
       </SectionLabel>
       <div className="space-y-2">
         {method === "adaptive" && (
           <SliderControl
-            label="Texture Amount"
+            label={t.toolSettings.sharpening.textureAmount}
             value={m2}
             onChange={(v) => {
               setM2(v);
@@ -174,7 +178,7 @@ export function SharpeningSettings() {
         )}
         {method === "unsharp-mask" && (
           <SliderControl
-            label="Amount"
+            label={t.toolSettings.sharpening.amount}
             value={amount}
             onChange={(v) => {
               setAmount(v);
@@ -188,7 +192,7 @@ export function SharpeningSettings() {
         )}
         {method === "high-pass" && (
           <SliderControl
-            label="Strength"
+            label={t.toolSettings.sharpening.strength}
             value={strength}
             onChange={(v) => {
               setStrength(v);
@@ -227,7 +231,7 @@ export function SharpeningSettings() {
         className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground w-full"
       >
         {advancedOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        Advanced Controls
+        {t.toolSettings.sharpening.advancedControls}
       </button>
 
       {advancedOpen && (
@@ -235,7 +239,7 @@ export function SharpeningSettings() {
           {method === "adaptive" && (
             <>
               <SliderControl
-                label="Radius"
+                label={t.toolSettings.sharpening.radius}
                 value={sigma}
                 onChange={(v) => {
                   setSigma(v);
@@ -247,7 +251,7 @@ export function SharpeningSettings() {
                 hint="sigma"
               />
               <SliderControl
-                label="Flat Protection"
+                label={t.toolSettings.sharpening.flatProtection}
                 value={m1}
                 onChange={(v) => {
                   setM1(v);
@@ -259,7 +263,7 @@ export function SharpeningSettings() {
                 hint="smooth areas"
               />
               <SliderControl
-                label="Detail Threshold"
+                label={t.toolSettings.sharpening.detailThreshold}
                 value={x1}
                 onChange={(v) => {
                   setX1(v);
@@ -271,7 +275,7 @@ export function SharpeningSettings() {
                 hint="flat vs texture"
               />
               <SliderControl
-                label="Halo Limit (Light)"
+                label={t.toolSettings.sharpening.haloLimitLight}
                 value={y2}
                 onChange={(v) => {
                   setY2(v);
@@ -282,7 +286,7 @@ export function SharpeningSettings() {
                 step={1}
               />
               <SliderControl
-                label="Halo Limit (Dark)"
+                label={t.toolSettings.sharpening.haloLimitDark}
                 value={y3}
                 onChange={(v) => {
                   setY3(v);
@@ -297,7 +301,7 @@ export function SharpeningSettings() {
           {method === "unsharp-mask" && (
             <>
               <SliderControl
-                label="Radius"
+                label={t.toolSettings.sharpening.radius}
                 value={radius}
                 onChange={(v) => {
                   setRadius(v);
@@ -309,7 +313,7 @@ export function SharpeningSettings() {
                 hint="px"
               />
               <SliderControl
-                label="Threshold"
+                label={t.toolSettings.sharpening.threshold}
                 value={threshold}
                 onChange={(v) => {
                   setThreshold(v);
@@ -324,7 +328,7 @@ export function SharpeningSettings() {
           )}
           {method === "high-pass" && (
             <>
-              <SectionLabel>Kernel Size</SectionLabel>
+              <SectionLabel>{t.toolSettings.sharpening.kernelSize}</SectionLabel>
               <div className="grid grid-cols-2 gap-1">
                 {([3, 5] as const).map((k) => (
                   <button
@@ -353,8 +357,16 @@ export function SharpeningSettings() {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.sharpening.originalSize, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.sharpening.processedSize, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -388,7 +400,7 @@ export function SharpeningSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

@@ -144,14 +144,16 @@ export function CircleCropSettings() {
       )}
       {hasFile && (
         <p className="text-center text-[10px] text-muted-foreground">
-          Drag the preview to reposition
+          {t.toolSettings["circle-crop"].dragThePreviewToReposition}
         </p>
       )}
 
       {/* Zoom */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Zoom</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings["circle-crop"].zoom}
+          </span>
           <span className="text-xs font-mono text-foreground">{zoom.toFixed(1)}x</span>
         </div>
         <input
@@ -168,7 +170,9 @@ export function CircleCropSettings() {
       {/* Border */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Border</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings["circle-crop"].border}
+          </span>
           <span className="text-xs font-mono text-foreground">{borderWidth}px</span>
         </div>
         <div className="flex items-center gap-2 mt-1">
@@ -184,7 +188,7 @@ export function CircleCropSettings() {
             type="color"
             value={borderColor}
             onChange={(e) => setBorderColor(e.target.value)}
-            aria-label="Border color"
+            aria-label={t.toolSettings["circle-crop"].borderColor}
             className="h-7 w-9 shrink-0 rounded border border-border bg-background"
           />
         </div>
@@ -192,7 +196,9 @@ export function CircleCropSettings() {
 
       {/* Background */}
       <div>
-        <span className="text-xs text-muted-foreground">Background</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["circle-crop"].background}
+        </span>
         <div className="flex items-center gap-2 mt-1">
           <div className="flex flex-1 gap-1">
             <button
@@ -200,14 +206,14 @@ export function CircleCropSettings() {
               onClick={() => setBgMode("transparent")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "transparent" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Transparent
+              {t.toolSettings["circle-crop"].transparent}
             </button>
             <button
               type="button"
               onClick={() => setBgMode("color")}
               className={`flex-1 text-xs py-1.5 rounded ${bgMode === "color" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Color
+              {t.toolSettings["circle-crop"].color}
             </button>
           </div>
           {bgMode === "color" && (
@@ -215,7 +221,7 @@ export function CircleCropSettings() {
               type="color"
               value={bgColor}
               onChange={(e) => setBgColor(e.target.value)}
-              aria-label="Background color"
+              aria-label={t.a11y.backgroundColor}
               className="h-7 w-9 shrink-0 rounded border border-border bg-background"
             />
           )}
@@ -225,7 +231,7 @@ export function CircleCropSettings() {
       {/* Output size */}
       <div>
         <label htmlFor="cc-output-size" className="text-xs text-muted-foreground">
-          Output size (px)
+          {t.toolSettings["circle-crop"].outputSizePx}
         </label>
         <input
           id="cc-output-size"
@@ -233,7 +239,7 @@ export function CircleCropSettings() {
           min={16}
           value={outputSize}
           onChange={(e) => setOutputSize(e.target.value)}
-          placeholder="Original"
+          placeholder={t.toolPage.original}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
         />
       </div>

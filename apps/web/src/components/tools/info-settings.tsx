@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 interface ImageInfoData {
@@ -184,9 +185,9 @@ export function InfoSettings() {
                     <span className="text-xs text-foreground capitalize">{ch.channel}</span>
                   </div>
                   <div className="flex gap-2 text-[10px] text-muted-foreground font-mono">
-                    <span>min:{ch.min}</span>
-                    <span>max:{ch.max}</span>
-                    <span>mean:{ch.mean}</span>
+                    <span>{format(ts.minValue, { value: ch.min })}</span>
+                    <span>{format(ts.maxValue, { value: ch.max })}</span>
+                    <span>{format(ts.meanValue, { value: ch.mean })}</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div

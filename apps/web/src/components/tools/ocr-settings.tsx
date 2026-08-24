@@ -367,7 +367,7 @@ export function OcrSettings() {
           className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full pt-1"
         >
           {langOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          Language
+          {t.toolSettings.ocr.language}
           <span className="ms-auto text-primary-ink text-[10px] normal-case font-normal">
             {langLabel}
           </span>
@@ -438,7 +438,7 @@ export function OcrSettings() {
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <Download className="h-3 w-3" />
-                  Download
+                  {t.common.download}
                 </button>
               )}
               <button
@@ -447,7 +447,7 @@ export function OcrSettings() {
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                {copied ? "Copied" : "Copy"}
+                {copied ? t.toolSettings.ocr.copied : t.common.copy}
               </button>
             </div>
           </div>
@@ -466,7 +466,7 @@ export function OcrSettings() {
             </>
           ) : (
             <p className="text-xs text-muted-foreground italic py-4 text-center">
-              No text detected in this image
+              {t.toolSettings.ocr.noTextDetected}
             </p>
           )}
         </div>

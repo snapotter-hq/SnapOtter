@@ -211,7 +211,9 @@ export function ImagePadSettings({ onImageStyle, onImageOverlay }: ImagePadSetti
 
       {/* Background Type */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1.5">Background</p>
+        <p className="text-xs text-muted-foreground mb-1.5">
+          {t.toolSettings["image-pad"].background}
+        </p>
         <div className="flex gap-1">
           {(["color", "transparent", "blur"] as const).map((bg) => (
             <button
@@ -224,7 +226,11 @@ export function ImagePadSettings({ onImageStyle, onImageOverlay }: ImagePadSetti
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {bg === "color" ? "Color" : bg === "transparent" ? "Transparent" : "Blur"}
+              {bg === "color"
+                ? t.toolSettings["image-pad"].color2
+                : bg === "transparent"
+                  ? t.toolSettings["image-pad"].transparent
+                  : t.toolSettings["image-pad"].blur}
             </button>
           ))}
         </div>
@@ -257,7 +263,9 @@ export function ImagePadSettings({ onImageStyle, onImageOverlay }: ImagePadSetti
       {/* Padding Slider */}
       <div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Padding</span>
+          <span className="text-xs text-muted-foreground">
+            {t.toolSettings["image-pad"].padding}
+          </span>
           <span className="text-xs font-mono text-foreground tabular-nums">{padding}%</span>
         </div>
         <input

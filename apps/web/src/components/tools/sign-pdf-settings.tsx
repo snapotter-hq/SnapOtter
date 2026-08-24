@@ -260,13 +260,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
               >
                 <img
                   src={s.dataUrl}
-                  alt="saved signature"
+                  alt={sp.savedSignature}
                   className="h-full w-full object-contain"
                 />
               </button>
               <button
                 type="button"
-                aria-label="delete signature"
+                aria-label={sp.deleteSignature}
                 onClick={() => {
                   deleteSignature(s.id);
                   refresh();

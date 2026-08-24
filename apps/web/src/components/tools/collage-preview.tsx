@@ -27,6 +27,7 @@ import { type DragEvent, useCallback, useEffect, useRef, useState } from "react"
 import { isImageFile } from "@/components/common/dropzone";
 import { useTranslation } from "@/contexts/i18n-context";
 import { type CollageTemplate, getTemplateById } from "@/lib/collage-templates";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -133,7 +134,7 @@ function UploadArea() {
     >
       <div className="flex flex-col items-center gap-4 p-8">
         <div className="text-3xl font-bold text-muted-foreground/30">
-          <span className="text-primary/30">SnapOtter</span>
+          <span className="text-primary/30">{t.toolSettings.collage.snapotter}</span>
         </div>
         <button
           type="button"
@@ -141,9 +142,9 @@ function UploadArea() {
           className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-primary text-primary-ink hover:bg-primary/5 transition-colors text-sm font-medium"
         >
           <Upload className="h-4 w-4" />
-          Upload images for collage
+          {t.toolSettings.collage.uploadImagesForCollage}
         </button>
-        <p className="text-sm text-muted-foreground">Drop 2 or more images here to get started</p>
+        <p className="text-sm text-muted-foreground">{t.toolSettings.collage.drop2OrMoreImages}</p>
       </div>
     </section>
   );
@@ -461,7 +462,7 @@ function CollageCell({
       ref={mergedRef}
       role="button"
       tabIndex={0}
-      aria-label={`Collage cell ${cellIndex + 1}`}
+      aria-label={format(t.toolSettings.collage.collageCell, { index: cellIndex + 1 })}
       className={cn(
         "relative overflow-hidden transition-shadow",
         isSelected && "ring-2 ring-primary-ink ring-offset-1",
@@ -530,17 +531,21 @@ function CollageCell({
                 ? "bg-primary/80 text-primary-foreground hover:bg-primary/90"
                 : "bg-black/50 text-white hover:bg-black/70",
             )}
-            title={transform.objectFit === "cover" ? "Fit entire image" : "Fill cell"}
+            title={
+              transform.objectFit === "cover"
+                ? t.toolSettings.collage.fitEntireImage
+                : t.toolSettings.collage.fillCell
+            }
           >
             {transform.objectFit === "contain" ? (
               <>
                 <Maximize className="h-3.5 w-3.5" />
-                Fit
+                {t.common.fit}
               </>
             ) : (
               <>
                 <Expand className="h-3.5 w-3.5" />
-                Fill
+                {t.a11y.fill}
               </>
             )}
           </button>
@@ -587,7 +592,7 @@ function CollageCell({
             type="button"
             onClick={handleReset}
             className="text-white hover:text-white/80 transition-colors shrink-0"
-            title="Reset position and zoom"
+            title={t.toolSettings.collage.resetPositionAndZoom}
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -659,6 +664,7 @@ function ImageStrip() {
 
 /** Result view after collage is created. */
 function ResultView() {
+  const { t } = useTranslation();
   const store = useCollageStore();
   const { resultUrl, resultSize, originalSize } = store;
 
@@ -669,16 +675,20 @@ function ResultView() {
       <div className="flex-1 flex items-center justify-center p-4 min-h-0 relative">
         <img
           src={resultUrl}
-          alt="Collage result"
+          alt={t.toolSettings.collage.collageResult}
           className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
         />
         {originalSize != null && resultSize != null && (
           <div className="absolute top-3 right-3 flex gap-2">
             <span className="bg-background/80 border border-border px-2 py-0.5 rounded text-xs text-muted-foreground">
-              {(originalSize / 1024).toFixed(0)} KB in
+              {format(t.toolSettings.collage.sizeKbIn, {
+                size: (originalSize / 1024).toFixed(0),
+              })}
             </span>
             <span className="bg-background/80 border border-border px-2 py-0.5 rounded text-xs text-muted-foreground">
-              {(resultSize / 1024).toFixed(0)} KB out
+              {format(t.toolSettings.collage.sizeKbOut, {
+                size: (resultSize / 1024).toFixed(0),
+              })}
             </span>
           </div>
         )}
@@ -690,7 +700,7 @@ function ResultView() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors"
         >
           <RotateCcw className="h-4 w-4" />
-          Back to editor
+          {t.toolSettings.collage.backToEditor}
         </button>
         <a
           href={resultUrl}
@@ -698,7 +708,7 @@ function ResultView() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       </div>
     </div>

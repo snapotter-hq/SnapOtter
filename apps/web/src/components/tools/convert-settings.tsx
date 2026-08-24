@@ -104,7 +104,7 @@ export function ConvertControls({ settings: initialSettings, onChange }: Convert
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="convert-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings.convert.quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
@@ -179,8 +179,16 @@ export function ConvertSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Processed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.convert.originalSizeKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.convert.processedSizeKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 

@@ -17,6 +17,7 @@ export function RedEyeRemovalControls({
   settings: initialSettings,
   onChange,
 }: RedEyeRemovalControlsProps) {
+  const { t } = useTranslation();
   const [sensitivity, setSensitivity] = useState(50);
   const [strength, setStrength] = useState(70);
   const [outputFormat, setOutputFormat] = useState<
@@ -61,7 +62,9 @@ export function RedEyeRemovalControls({
       {/* Sensitivity slider */}
       <div>
         <div className="flex justify-between items-center">
-          <p className="text-sm font-medium text-muted-foreground">Sensitivity</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {t.toolSettings["red-eye-removal"].sensitivity}
+          </p>
           <span className="text-sm font-mono tabular-nums font-medium">{sensitivity}</span>
         </div>
         <input
@@ -74,15 +77,17 @@ export function RedEyeRemovalControls({
           className="w-full h-1.5 rounded-full appearance-none bg-muted accent-primary"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Strict</span>
-          <span>Aggressive</span>
+          <span>{t.toolSettings["red-eye-removal"].strict}</span>
+          <span>{t.toolSettings["red-eye-removal"].aggressive}</span>
         </div>
       </div>
 
       {/* Correction Strength slider */}
       <div>
         <div className="flex justify-between items-center">
-          <p className="text-sm font-medium text-muted-foreground">Correction Strength</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {t.toolSettings["red-eye-removal"].correctionStrength}
+          </p>
           <span className="text-sm font-mono tabular-nums font-medium">{strength}</span>
         </div>
         <input
@@ -95,8 +100,8 @@ export function RedEyeRemovalControls({
           className="w-full h-1.5 rounded-full appearance-none bg-muted accent-primary"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Subtle</span>
-          <span>Dark</span>
+          <span>{t.toolSettings["red-eye-removal"].subtle}</span>
+          <span>{t.toolSettings["red-eye-removal"].dark}</span>
         </div>
       </div>
 
@@ -104,7 +109,9 @@ export function RedEyeRemovalControls({
 
       {/* Output format */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Output Format</p>
+        <p className="text-xs text-muted-foreground mb-1">
+          {t.toolSettings["red-eye-removal"].outputFormat}
+        </p>
         <div className="grid grid-cols-3 gap-1">
           {(["original", "png", "jpeg", "webp", "avif", "jxl"] as const).map((f) => (
             <button
@@ -113,7 +120,7 @@ export function RedEyeRemovalControls({
               onClick={() => setOutputFormat(f)}
               className={tabClass(outputFormat === f)}
             >
-              {f === "original" ? "Original" : f.toUpperCase()}
+              {f === "original" ? t.toolPage.original : f.toUpperCase()}
             </button>
           ))}
         </div>
@@ -123,7 +130,9 @@ export function RedEyeRemovalControls({
       {LOSSY_FORMATS.has(outputFormat) && (
         <div>
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-muted-foreground">Quality</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              {t.toolSettings["red-eye-removal"].quality}
+            </p>
             <span className="text-sm font-mono tabular-nums font-medium">{quality}</span>
           </div>
           <input
@@ -177,8 +186,16 @@ export function RedEyeRemovalSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Fixed: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings["red-eye-removal"].originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings["red-eye-removal"].fixedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -187,7 +204,13 @@ export function RedEyeRemovalSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={hasMultiple ? `Fixing red eye in ${files.length} images` : "Fixing red eye"}
+          label={
+            hasMultiple
+              ? format(t.toolSettings["red-eye-removal"].progressLabelBatch, {
+                  count: files.length,
+                })
+              : t.toolSettings["red-eye-removal"].progressLabel
+          }
           percent={progress.percent}
           elapsed={progress.elapsed}
         />
@@ -214,7 +237,7 @@ export function RedEyeRemovalSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

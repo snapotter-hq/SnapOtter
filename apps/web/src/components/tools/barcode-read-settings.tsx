@@ -1,7 +1,9 @@
 import { Check, Copy, Download, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -106,6 +108,7 @@ function scanOneFile(
 }
 
 export function BarcodeReadSettings() {
+  const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
   const [tryHarder, setTryHarder] = useState(false);
@@ -241,12 +244,11 @@ export function BarcodeReadSettings() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Scan images for QR codes, barcodes (Code 128, EAN, UPC, etc.), and 2D codes (DataMatrix,
-        PDF417, Aztec).
+        {t.toolSettings["barcode-read"].scanImagesForQrCodes}
       </p>
 
       {/* Thorough scan toggle */}
-      <SectionLabel>Options</SectionLabel>
+      <SectionLabel>{t.toolSettings["barcode-read"].options}</SectionLabel>
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
@@ -254,9 +256,11 @@ export function BarcodeReadSettings() {
           onChange={(e) => setTryHarder(e.target.checked)}
           className="rounded border-border accent-primary"
         />
-        <span className="text-sm text-muted-foreground">Thorough scan</span>
+        <span className="text-sm text-muted-foreground">
+          {t.toolSettings["barcode-read"].thoroughScan}
+        </span>
         <span
-          title="Spends more time analyzing the image. Enable for small, damaged, or low-contrast barcodes."
+          title={t.toolSettings["barcode-read"].spendsMoreTimeAnalyzingThe}
           className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-muted-foreground text-[10px] cursor-help"
         >
           ?
@@ -271,7 +275,7 @@ export function BarcodeReadSettings() {
         <ProgressCard
           active={processing}
           phase={progressPhase === "idle" ? "uploading" : progressPhase}
-          label="Scanning for barcodes"
+          label={t.toolSettings["barcode-read"].scanningForBarcodes}
           stage={progressStage}
           percent={progressPercent}
           elapsed={elapsed}
@@ -285,7 +289,9 @@ export function BarcodeReadSettings() {
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <Search className="h-4 w-4" />
-          {files.length > 1 ? `Scan Barcodes (${files.length} files)` : "Scan Barcodes"}
+          {files.length > 1
+            ? format(t.toolSettings["barcode-read"].scanBarcodesBatch, { count: files.length })
+            : t.toolSettings["barcode-read"].submit}
         </button>
       )}
 
@@ -296,8 +302,14 @@ export function BarcodeReadSettings() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">
               {totalBarcodes === 0
-                ? "No barcodes found"
-                : `Found ${totalBarcodes} barcode${totalBarcodes !== 1 ? "s" : ""}`}
+                ? t.toolSettings["barcode-read"].noBarcodesFound
+                : plural(
+                    totalBarcodes,
+                    format(t.toolSettings["barcode-read"].foundBarcode, { count: totalBarcodes }),
+                    format(t.toolSettings["barcode-read"].foundBarcodePlural, {
+                      count: totalBarcodes,
+                    }),
+                  )}
             </span>
             {totalBarcodes > 0 && (
               <div className="flex items-center gap-2">
@@ -315,7 +327,9 @@ export function BarcodeReadSettings() {
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   {copiedAll ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copiedAll ? "Copied" : "Copy all"}
+                  {copiedAll
+                    ? t.toolSettings["barcode-read"].copied
+                    : t.toolSettings["barcode-read"].copyAll}
                 </button>
               </div>
             )}
@@ -332,7 +346,9 @@ export function BarcodeReadSettings() {
               )}
 
               {fileResult.barcodes.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic py-1">No barcodes found</p>
+                <p className="text-xs text-muted-foreground italic py-1">
+                  {t.toolSettings["barcode-read"].noBarcodesFound}
+                </p>
               ) : (
                 fileResult.barcodes.map((barcode) => {
                   const idx = globalIndex++;
@@ -357,7 +373,7 @@ export function BarcodeReadSettings() {
                         type="button"
                         onClick={() => handleCopyOne(barcode.text, idx)}
                         className="shrink-0 p-1 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity"
-                        title="Copy value"
+                        title={t.toolSettings["barcode-read"].copyValue}
                       >
                         {copiedIndex === idx ? (
                           <Check className="h-3.5 w-3.5 text-success-ink" />

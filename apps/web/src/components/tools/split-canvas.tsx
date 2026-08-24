@@ -1,7 +1,9 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ZoomToolbar } from "@/components/common/zoom-toolbar";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useZoomPan } from "@/hooks/use-zoom-pan";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { useSplitStore } from "@/stores/split-store";
 
@@ -10,6 +12,7 @@ import { useSplitStore } from "@/stores/split-store";
  * showing exactly where the splits will happen.
  */
 export function SplitCanvas() {
+  const { t } = useTranslation();
   const { originalBlobUrl, selectedFileName, files, currentEntry } = useFileStore();
   const { getEffectiveGrid, imageDimensions, setImageDimensions, mode, tileWidth, tileHeight } =
     useSplitStore();
@@ -96,7 +99,7 @@ export function SplitCanvas() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
         <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-        <p className="text-sm text-muted-foreground">Generating preview...</p>
+        <p className="text-sm text-muted-foreground">{t.toolPage.generatingPreview}</p>
         <p className="text-xs text-muted-foreground">{filename}</p>
       </div>
     );
@@ -106,7 +109,9 @@ export function SplitCanvas() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-4">
         <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading preview...</p>
+        <p className="text-sm text-muted-foreground">
+          {t.toolSettings["split-canvas"].loadingPreview}
+        </p>
         <p className="text-xs text-muted-foreground">{filename}</p>
       </div>
     );
@@ -216,7 +221,7 @@ export function SplitCanvas() {
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
           >
-            <title>Split grid overlay</title>
+            <title>{t.toolSettings["split-canvas"].splitGridOverlay}</title>
             {/* Vertical lines */}
             {colPositions.map((x) => (
               <line
@@ -304,8 +309,13 @@ export function SplitCanvas() {
       {/* Image info bar */}
       {imageDimensions && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/80 border border-border rounded-full px-3 py-1 text-[11px] text-muted-foreground tabular-nums backdrop-blur-sm">
-          {imageDimensions.width} x {imageDimensions.height}px . {cols}x{rows} grid . {cols * rows}{" "}
-          tiles
+          {format(t.toolSettings["split-canvas"].infoBar, {
+            width: imageDimensions.width,
+            height: imageDimensions.height,
+            cols,
+            rows,
+            count: cols * rows,
+          })}
         </div>
       )}
     </div>

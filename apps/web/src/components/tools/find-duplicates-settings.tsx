@@ -1,20 +1,18 @@
 import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { formatFileSize } from "@/lib/download";
+import { format, plural } from "@/lib/format";
 import type { DuplicateResult } from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFileStore } from "@/stores/file-store";
 
 type Preset = "exact" | "similar" | "loose";
 const PRESET_THRESHOLDS: Record<Preset, number> = { exact: 2, similar: 8, loose: 14 };
-const PRESET_DESCRIPTIONS: Record<Preset, string> = {
-  exact: "Pixel-identical copies, same image in different formats.",
-  similar: "Resized, recompressed, or lightly edited copies.",
-  loose: "Visually related images, mild crops, different exposures.",
-};
 
 export function FindDuplicatesSettings() {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const {
     results,
@@ -216,7 +214,12 @@ export function FindDuplicatesSettings() {
   }, [files, results]);
 
   const hasFiles = files.length >= 2;
-  const activeDesc = preset ? PRESET_DESCRIPTIONS[preset] : null;
+  const presetDescriptions: Record<Preset, string> = {
+    exact: t.toolSettings["find-duplicates"].exactDesc,
+    similar: t.toolSettings["find-duplicates"].similarDesc,
+    loose: t.toolSettings["find-duplicates"].looseDesc,
+  };
+  const activeDesc = preset ? presetDescriptions[preset] : null;
 
   const presetBtnClass = (p: Preset) =>
     `flex-1 text-xs py-1.5 rounded ${preset === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`;
@@ -225,28 +228,30 @@ export function FindDuplicatesSettings() {
     <div className="space-y-4">
       {/* Sensitivity presets */}
       <div>
-        <span className="text-xs text-muted-foreground">Detection Mode</span>
+        <span className="text-xs text-muted-foreground">
+          {t.toolSettings["find-duplicates"].detectionMode}
+        </span>
         <div className="flex gap-1 mt-1">
           <button
             type="button"
             onClick={() => handlePreset("exact")}
             className={presetBtnClass("exact")}
           >
-            Exact
+            {t.toolSettings["find-duplicates"].exact}
           </button>
           <button
             type="button"
             onClick={() => handlePreset("similar")}
             className={presetBtnClass("similar")}
           >
-            Similar
+            {t.toolSettings["find-duplicates"].similar}
           </button>
           <button
             type="button"
             onClick={() => handlePreset("loose")}
             className={presetBtnClass("loose")}
           >
-            Loose
+            {t.toolSettings["find-duplicates"].loose}
           </button>
         </div>
       </div>
@@ -255,7 +260,7 @@ export function FindDuplicatesSettings() {
       <div>
         <div className="flex justify-between items-center">
           <label htmlFor="dup-threshold" className="text-xs text-muted-foreground">
-            Sensitivity
+            {t.toolSettings["find-duplicates"].sensitivity}
           </label>
           <span className="text-xs text-muted-foreground tabular-nums">{threshold} / 128</span>
         </div>
@@ -269,8 +274,8 @@ export function FindDuplicatesSettings() {
           className="w-full mt-1"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          <span>Strict match</span>
-          <span>Broad match</span>
+          <span>{t.toolSettings["find-duplicates"].strictMatch}</span>
+          <span>{t.toolSettings["find-duplicates"].broadMatch}</span>
         </div>
       </div>
 
@@ -291,9 +296,11 @@ export function FindDuplicatesSettings() {
             {scanning && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {scanning
               ? uploadProgress < 100
-                ? `Uploading... ${uploadProgress}%`
-                : "Analyzing..."
-              : `Scan ${files.length} Images`}
+                ? format(t.toolSettings["find-duplicates"].uploadingPercent, {
+                    percent: uploadProgress,
+                  })
+                : t.toolSettings["find-duplicates"].analyzing
+              : format(t.toolSettings["find-duplicates"].scanImages, { count: files.length })}
           </button>
           {scanning && (
             <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
@@ -312,22 +319,30 @@ export function FindDuplicatesSettings() {
           {/* Summary stats */}
           <div className="p-3 rounded-lg bg-muted text-xs space-y-1.5">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total scanned</span>
+              <span className="text-muted-foreground">
+                {t.toolSettings["find-duplicates"].totalScanned}
+              </span>
               <span className="text-foreground font-medium">{results.totalImages}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Duplicate groups</span>
+              <span className="text-muted-foreground">
+                {t.toolSettings["find-duplicates"].duplicateGroups}
+              </span>
               <span className="text-amber-700 dark:text-amber-400 font-medium">
                 {results.duplicateGroups.length}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Unique images</span>
+              <span className="text-muted-foreground">
+                {t.toolSettings["find-duplicates"].uniqueImages}
+              </span>
               <span className="text-success-ink font-medium">{results.uniqueImages}</span>
             </div>
             {results.spaceSaveable > 0 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Space saveable</span>
+                <span className="text-muted-foreground">
+                  {t.toolSettings["find-duplicates"].spaceSaveable}
+                </span>
                 <span className="text-primary-ink font-medium">
                   {formatFileSize(results.spaceSaveable)}
                 </span>
@@ -335,7 +350,9 @@ export function FindDuplicatesSettings() {
             )}
             {results.skippedFiles && results.skippedFiles.length > 0 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Skipped</span>
+                <span className="text-muted-foreground">
+                  {t.toolSettings["find-duplicates"].skipped}
+                </span>
                 <span className="text-amber-700 dark:text-amber-400 font-medium">
                   {results.skippedFiles.length}
                 </span>
@@ -346,8 +363,15 @@ export function FindDuplicatesSettings() {
           {results.skippedFiles && results.skippedFiles.length > 0 && (
             <details className="text-xs">
               <summary className="text-amber-700 dark:text-amber-400 cursor-pointer">
-                {results.skippedFiles.length} file{results.skippedFiles.length > 1 ? "s" : ""} could
-                not be analyzed
+                {plural(
+                  results.skippedFiles.length,
+                  format(t.toolSettings["find-duplicates"].skippedFileOne, {
+                    count: results.skippedFiles.length,
+                  }),
+                  format(t.toolSettings["find-duplicates"].skippedFileOther, {
+                    count: results.skippedFiles.length,
+                  }),
+                )}
               </summary>
               <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
                 {results.skippedFiles.map((sf) => (
@@ -368,7 +392,7 @@ export function FindDuplicatesSettings() {
                 className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2"
               >
                 <FolderArchive className="h-4 w-4" />
-                Download Grouped
+                {t.toolSettings["find-duplicates"].downloadGrouped}
               </button>
               <button
                 type="button"
@@ -376,7 +400,7 @@ export function FindDuplicatesSettings() {
                 className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
               >
                 <Download className="h-4 w-4" />
-                Download Unique Only
+                {t.toolSettings["find-duplicates"].downloadUniqueOnly}
               </button>
             </>
           )}
@@ -391,7 +415,7 @@ export function FindDuplicatesSettings() {
             }}
             className="w-full py-2 rounded-lg border border-border text-muted-foreground text-xs hover:text-foreground hover:border-foreground/20"
           >
-            Re-scan with different settings
+            {t.toolSettings["find-duplicates"].reScanWithDifferentSettings}
           </button>
         </div>
       )}

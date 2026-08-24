@@ -629,7 +629,7 @@ export function EraseObjectSettings({
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary/10 text-xs"
           >
             <Redo className="h-3.5 w-3.5" />
-            Undo
+            {t.toolSettings["erase-object"].undo}
           </button>
           <button
             type="button"
@@ -637,7 +637,7 @@ export function EraseObjectSettings({
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary/10 text-xs"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Clear
+            {t.toolSettings["erase-object"].clear}
           </button>
         </div>
       )}
@@ -645,7 +645,7 @@ export function EraseObjectSettings({
       {/* Output Format */}
       <div>
         <label htmlFor="eraser-format" className="text-xs text-muted-foreground">
-          Output Format
+          {t.toolSettings["erase-object"].outputFormat}
         </label>
         <select
           id="eraser-format"
@@ -666,7 +666,7 @@ export function EraseObjectSettings({
         <div>
           <div className="flex justify-between items-center">
             <label htmlFor="eraser-quality" className="text-xs text-muted-foreground">
-              Quality
+              {t.toolSettings["erase-object"].quality}
             </label>
             <span className="text-xs font-mono text-foreground">{quality}</span>
           </div>
@@ -700,8 +700,16 @@ export function EraseObjectSettings({
         currentEntry?.processedSize != null &&
         currentEntry?.status === "completed" && (
           <div className="text-xs text-muted-foreground space-y-0.5">
-            <p>Original: {(currentEntry.originalSize / 1024).toFixed(1)} KB</p>
-            <p>Processed: {(currentEntry.processedSize / 1024).toFixed(1)} KB</p>
+            <p>
+              {format(t.toolSettings["erase-object"].originalKb, {
+                size: (currentEntry.originalSize / 1024).toFixed(1),
+              })}
+            </p>
+            <p>
+              {format(t.toolSettings["erase-object"].processedKb, {
+                size: (currentEntry.processedSize / 1024).toFixed(1),
+              })}
+            </p>
           </div>
         )}
 
@@ -737,7 +745,7 @@ export function EraseObjectSettings({
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

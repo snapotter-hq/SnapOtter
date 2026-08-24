@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type OutputFormat = "png" | "jpg" | "webp" | "avif" | "tiff" | "gif" | "heif" | "jxl";
@@ -128,7 +129,9 @@ export function SvgToRasterSettings() {
       {/* SVG Info */}
       {hasFile && svgDims && (
         <div>
-          <p className="text-xs text-muted-foreground">SVG Dimensions</p>
+          <p className="text-xs text-muted-foreground">
+            {t.toolSettings["svg-to-raster"].svgDimensions}
+          </p>
           <div className="mt-1 px-2 py-1.5 rounded bg-muted text-sm text-foreground font-mono">
             {svgDims.width} x {svgDims.height}
             {sizingMode === "scale" && computedWidth && computedHeight && (
@@ -143,9 +146,11 @@ export function SvgToRasterSettings() {
 
       {hasFile && !svgDims && (
         <div>
-          <p className="text-xs text-muted-foreground">SVG Dimensions</p>
+          <p className="text-xs text-muted-foreground">
+            {t.toolSettings["svg-to-raster"].svgDimensions}
+          </p>
           <div className="mt-1 px-2 py-1.5 rounded bg-muted text-xs text-muted-foreground">
-            Could not detect dimensions. Using custom size.
+            {t.toolSettings["svg-to-raster"].couldNotDetectDimensionsUsing}
           </div>
         </div>
       )}
@@ -154,7 +159,7 @@ export function SvgToRasterSettings() {
 
       {/* Sizing Mode */}
       <div>
-        <p className="text-xs text-muted-foreground">Sizing</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings["svg-to-raster"].sizing}</p>
         <div className="grid grid-cols-2 gap-1 mt-1">
           <button
             type="button"
@@ -162,14 +167,14 @@ export function SvgToRasterSettings() {
             disabled={!svgDims}
             className={btnClass(sizingMode === "scale")}
           >
-            Scale Factor
+            {t.toolSettings["svg-to-raster"].scaleFactor}
           </button>
           <button
             type="button"
             onClick={() => setSizingMode("custom")}
             className={btnClass(sizingMode === "custom")}
           >
-            Custom Size
+            {t.toolSettings["svg-to-raster"].customSize}
           </button>
         </div>
       </div>
@@ -191,7 +196,9 @@ export function SvgToRasterSettings() {
           </div>
           <div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Scale</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings["svg-to-raster"].scaleMode}
+              </span>
               <span className="text-xs font-mono text-foreground">{scale}x</span>
             </div>
             <input
@@ -212,7 +219,7 @@ export function SvgToRasterSettings() {
         <div className="flex gap-2">
           <div className="flex-1">
             <label htmlFor="svg-custom-width" className="text-xs text-muted-foreground">
-              Width (px)
+              {t.toolSettings["svg-to-raster"].customWidth}
             </label>
             <input
               id="svg-custom-width"
@@ -226,14 +233,14 @@ export function SvgToRasterSettings() {
           </div>
           <div className="flex-1">
             <label htmlFor="svg-custom-height" className="text-xs text-muted-foreground">
-              Height (px)
+              {t.toolSettings["svg-to-raster"].customHeight}
             </label>
             <input
               id="svg-custom-height"
               type="number"
               value={customHeight}
               onChange={(e) => setCustomHeight(e.target.value)}
-              placeholder="Auto"
+              placeholder={t.toolSettings["svg-to-raster"].auto}
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             />
           </div>
@@ -244,7 +251,7 @@ export function SvgToRasterSettings() {
 
       {/* Render DPI */}
       <div>
-        <p className="text-xs text-muted-foreground">Render DPI</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings["svg-to-raster"].renderDpi}</p>
         <div className="grid grid-cols-4 gap-1 mt-1">
           {DPI_PRESETS.map((d) => (
             <button type="button" key={d} onClick={() => setDpi(d)} className={btnClass(dpi === d)}>
@@ -258,7 +265,7 @@ export function SvgToRasterSettings() {
 
       {/* Format */}
       <div>
-        <p className="text-xs text-muted-foreground">Format</p>
+        <p className="text-xs text-muted-foreground">{t.toolSettings["svg-to-raster"].format}</p>
         <div className="grid grid-cols-4 gap-1 mt-1">
           {FORMATS.map((f) => (
             <button
@@ -279,7 +286,9 @@ export function SvgToRasterSettings() {
           <div className="border-t border-border" />
           <div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Quality</span>
+              <span className="text-xs text-muted-foreground">
+                {t.toolSettings["svg-to-raster"].quality}
+              </span>
               <span className="text-xs font-mono text-foreground">{quality}</span>
             </div>
             <input
@@ -298,7 +307,9 @@ export function SvgToRasterSettings() {
 
       {/* Background */}
       <div>
-        <p className="text-xs text-muted-foreground">Background</p>
+        <p className="text-xs text-muted-foreground">
+          {t.toolSettings["svg-to-raster"].background}
+        </p>
         <div className="grid grid-cols-2 gap-1 mt-1">
           <button
             type="button"
@@ -306,14 +317,14 @@ export function SvgToRasterSettings() {
             disabled={NO_TRANSPARENCY_FORMATS.includes(format)}
             className={btnClass(bgMode === "transparent")}
           >
-            Transparent
+            {t.toolSettings["svg-to-raster"].bgTransparent}
           </button>
           <button
             type="button"
             onClick={() => setBgMode("color")}
             className={btnClass(bgMode === "color")}
           >
-            Color
+            {t.toolSettings["svg-to-raster"].bgColor}
           </button>
         </div>
       </div>
@@ -350,7 +361,13 @@ export function SvgToRasterSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={files.length > 1 ? `Converting ${files.length} files` : "Converting SVG"}
+          label={
+            files.length > 1
+              ? formatMessage(t.toolSettings["svg-to-raster"].progressLabelBatch, {
+                  count: files.length,
+                })
+              : t.toolSettings["svg-to-raster"].progressLabel
+          }
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -363,7 +380,9 @@ export function SvgToRasterSettings() {
           disabled={!hasFile || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `Convert (${files.length} files)` : "Convert SVG"}
+          {files.length > 1
+            ? formatMessage(t.toolSettings["svg-to-raster"].submitBatch, { count: files.length })
+            : t.toolSettings["svg-to-raster"].submit}
         </button>
       )}
 
@@ -376,7 +395,7 @@ export function SvgToRasterSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

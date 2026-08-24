@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ZoomToolbar } from "@/components/common/zoom-toolbar";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useZoomPan } from "@/hooks/use-zoom-pan";
 import { renderSize } from "@/hooks/zoom-pan-math";
 
@@ -48,6 +49,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
   { imageSrc, brushSize, mode, onStrokeChange, onMaskedCountChange },
   ref,
 ) {
+  const { t } = useTranslation();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -528,7 +530,7 @@ export const EraserCanvas = forwardRef<EraserCanvasRef, EraserCanvasProps>(funct
             <img
               ref={imgRef}
               src={imageSrc}
-              alt="Paint over objects to erase"
+              alt={t.toolSettings["eraser-canvas"].paintOverObjectsToErase}
               className="block"
               style={{ width: canvasSize.w, height: canvasSize.h }}
               draggable={false}

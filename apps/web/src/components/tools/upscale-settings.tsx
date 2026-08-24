@@ -110,7 +110,9 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
 
       {/* Quality */}
       <div>
-        <p className="text-sm font-medium text-muted-foreground mb-1.5">Quality</p>
+        <p className="text-sm font-medium text-muted-foreground mb-1.5">
+          {t.toolSettings.upscale.quality}
+        </p>
         <div className="flex gap-1">
           {MODEL_OPTIONS.map(({ value, label }) => (
             <button
@@ -149,7 +151,7 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
             {t.toolSettings.upscale.noiseReduction}
           </p>
           <span className="text-sm font-mono font-medium">
-            {denoise === 0 ? "Off" : denoise.toFixed(1)}
+            {denoise === 0 ? t.toolSettings.upscale.off : denoise.toFixed(1)}
           </span>
         </div>
         <input
@@ -162,14 +164,14 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
           className="w-full mt-1"
         />
         <p className="text-[11px] text-muted-foreground mt-1">
-          Smooths out grain and noise. Higher values remove more noise but may soften details.
+          {t.toolSettings.upscale.noiseReductionHint}
         </p>
       </div>
 
       {/* Output Format */}
       <div>
         <label htmlFor="upscale-format" className="text-sm font-medium text-muted-foreground">
-          Output Format
+          {t.toolSettings.upscale.outputFormat}
         </label>
         <select
           id="upscale-format"
@@ -189,7 +191,9 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
       {LOSSY_FORMATS.includes(outputFormat) && (
         <div>
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-muted-foreground">Quality</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              {t.toolSettings.upscale.quality}
+            </p>
             <span className="text-sm font-mono font-medium">{quality}</span>
           </div>
           <input
@@ -243,8 +247,12 @@ export function UpscaleSettings() {
       {/* Size info */}
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Upscaled: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.upscale.originalKb, { size: (originalSize / 1024).toFixed(1) })}
+          </p>
+          <p>
+            {format(t.toolSettings.upscale.upscaledKb, { size: (processedSize / 1024).toFixed(1) })}
+          </p>
         </div>
       )}
 
@@ -283,7 +291,7 @@ export function UpscaleSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </div>

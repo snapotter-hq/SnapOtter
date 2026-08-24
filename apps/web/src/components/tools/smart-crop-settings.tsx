@@ -5,6 +5,7 @@ import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type CropMode = "subject" | "face" | "trim";
@@ -160,7 +161,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
     <div className="flex items-end gap-2">
       <div className="flex-1">
         <label htmlFor="sc-width" className="text-xs text-muted-foreground">
-          Width (px)
+          {t.toolSettings["smart-crop"].widthPx}
         </label>
         <input
           id="sc-width"
@@ -178,13 +179,13 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
         type="button"
         onClick={swapDimensions}
         className="p-1.5 rounded border border-border text-muted-foreground hover:text-foreground"
-        title="Swap width and height"
+        title={t.toolSettings["smart-crop"].swapWidthAndHeight}
       >
         <ArrowLeftRight className="h-4 w-4" />
       </button>
       <div className="flex-1">
         <label htmlFor="sc-height" className="text-xs text-muted-foreground">
-          Height (px)
+          {t.toolSettings["smart-crop"].heightPx}
         </label>
         <input
           id="sc-height"
@@ -225,7 +226,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
     <div>
       <div className="flex justify-between items-center">
         <label htmlFor="sc-quality" className="text-xs text-muted-foreground">
-          Output Quality
+          {t.toolSettings["smart-crop"].outputQuality}
         </label>
         <span className="text-xs text-muted-foreground tabular-nums">{quality}%</span>
       </div>
@@ -239,7 +240,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
         className="w-full mt-1"
       />
       <p className="text-[10px] text-muted-foreground mt-0.5">
-        For JPEG and WebP outputs. PNG is always lossless.
+        {t.toolSettings["smart-crop"].outputQualityHint}
       </p>
     </div>
   );
@@ -273,14 +274,14 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               onClick={() => setSubjectTab("custom")}
               className={subTabClass("custom")}
             >
-              Custom Size
+              {t.toolSettings["smart-crop"].customSize}
             </button>
             <button
               type="button"
               onClick={() => setSubjectTab("presets")}
               className={subTabClass("presets")}
             >
-              Social Presets
+              {t.toolSettings["smart-crop"].socialPresets}
             </button>
           </div>
 
@@ -336,14 +337,14 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
                 onClick={() => setStrategy("attention")}
                 className={`flex-1 text-xs py-1.5 rounded ${strategy === "attention" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
               >
-                Attention
+                {t.toolSettings["smart-crop"].attention}
               </button>
               <button
                 type="button"
                 onClick={() => setStrategy("entropy")}
                 className={`flex-1 text-xs py-1.5 rounded ${strategy === "entropy" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
               >
-                Entropy
+                {t.toolSettings["smart-crop"].entropy}
               </button>
             </div>
           </div>
@@ -353,7 +354,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <label htmlFor="sc-padding" className="text-xs text-muted-foreground">
-                  Padding
+                  {t.toolSettings["smart-crop"].padding}
                 </label>
                 <HintIcon text="Extra breathing room around the focus area" />
               </div>
@@ -373,8 +374,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           {qualitySlider}
 
           <p className="text-[10px] text-muted-foreground">
-            Detects the most interesting region using saliency analysis and crops to your target
-            size.
+            {t.toolSettings["smart-crop"].subjectDescription}
           </p>
         </div>
       )}
@@ -384,7 +384,9 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
         <div className="space-y-4">
           {/* Face preset buttons */}
           <div>
-            <span className="text-xs text-muted-foreground">Framing</span>
+            <span className="text-xs text-muted-foreground">
+              {t.toolSettings["smart-crop"].framing}
+            </span>
             <div className="flex gap-1 mt-1">
               {SMART_CROP_FACE_PRESETS.map((p) => (
                 <button
@@ -407,7 +409,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="sc-sensitivity" className="text-xs text-muted-foreground">
-                Detection Sensitivity
+                {t.toolSettings["smart-crop"].detectionSensitivity}
               </label>
               <span className="text-xs font-mono text-foreground">{sensitivity}%</span>
             </div>
@@ -421,8 +423,8 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               className="w-full mt-1"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-              <span>More faces</span>
-              <span>Fewer false positives</span>
+              <span>{t.toolSettings["smart-crop"].moreFaces}</span>
+              <span>{t.toolSettings["smart-crop"].fewerFalsePositives}</span>
             </div>
           </div>
 
@@ -431,7 +433,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <label htmlFor="sc-face-padding" className="text-xs text-muted-foreground">
-                  Face Padding
+                  {t.toolSettings["smart-crop"].facePadding}
                 </label>
                 <HintIcon text="Extra space around detected faces" />
               </div>
@@ -451,8 +453,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           {qualitySlider}
 
           <p className="text-[10px] text-muted-foreground">
-            Uses AI face detection to keep faces properly framed. Falls back to Subject Focus if no
-            faces are detected.
+            {t.toolSettings["smart-crop"].faceDescription}
           </p>
         </div>
       )}
@@ -464,7 +465,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           <div>
             <div className="flex justify-between items-center">
               <label htmlFor="sc-threshold" className="text-xs text-muted-foreground">
-                Tolerance
+                {t.toolSettings["smart-crop"].trimTolerance}
               </label>
               <span className="text-xs text-muted-foreground tabular-nums">{threshold}</span>
             </div>
@@ -478,8 +479,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               className="w-full mt-1"
             />
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              How different a border pixel can be from the edge color and still be trimmed. Higher =
-              more aggressive.
+              {t.toolSettings["smart-crop"].trimDescription}
             </p>
           </div>
 
@@ -493,7 +493,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               className="rounded border-border"
             />
             <label htmlFor="sc-pad-square" className="text-sm text-foreground">
-              Pad to square
+              {t.toolSettings["smart-crop"].padToSquare}
             </label>
           </div>
 
@@ -501,7 +501,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             <div className="flex gap-2">
               <div className="flex-1">
                 <label htmlFor="sc-target-size" className="text-xs text-muted-foreground">
-                  Target size (px)
+                  {t.toolSettings["smart-crop"].targetSizePx}
                 </label>
                 <input
                   id="sc-target-size"
@@ -514,7 +514,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               </div>
               <div>
                 <label htmlFor="sc-pad-color" className="text-xs text-muted-foreground">
-                  Pad color
+                  {t.toolSettings["smart-crop"].padColor}
                 </label>
                 <input
                   id="sc-pad-color"
@@ -530,8 +530,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
           {qualitySlider}
 
           <p className="text-[10px] text-muted-foreground">
-            Removes uniform-color borders around your subject. Enable "Pad to square" for e-commerce
-            ready images.
+            {t.toolSettings["smart-crop"].trimHint}
           </p>
         </div>
       )}
@@ -540,6 +539,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
 }
 
 export function SmartCropSettings() {
+  const { t } = useTranslation();
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("smart-crop");
@@ -571,7 +571,11 @@ export function SmartCropSettings() {
   };
 
   const buttonLabel =
-    mode === "face" ? "Face Crop" : mode === "trim" ? "Trim Borders" : "Smart Crop";
+    mode === "face"
+      ? t.toolSettings["smart-crop"].submitFace
+      : mode === "trim"
+        ? t.toolSettings["smart-crop"].submitTrim
+        : t.toolSettings["smart-crop"].submitSubject;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -583,7 +587,7 @@ export function SmartCropSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label="Smart cropping"
+          label={t.toolSettings["smart-crop"].smartCropping}
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -595,7 +599,16 @@ export function SmartCropSettings() {
           disabled={!hasFile || !canProcess || processing}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {files.length > 1 ? `${buttonLabel} (${files.length} files)` : buttonLabel}
+          {files.length > 1
+            ? format(
+                mode === "face"
+                  ? t.toolSettings["smart-crop"].submitFaceBatch
+                  : mode === "trim"
+                    ? t.toolSettings["smart-crop"].submitTrimBatch
+                    : t.toolSettings["smart-crop"].submitSubjectBatch,
+                { count: files.length },
+              )
+            : buttonLabel}
         </button>
       )}
     </form>

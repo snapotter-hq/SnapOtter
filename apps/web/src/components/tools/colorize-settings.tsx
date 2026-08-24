@@ -8,11 +8,7 @@ import { useFileStore } from "@/stores/file-store";
 
 type Model = "auto" | "ddcolor" | "opencv";
 
-const MODEL_OPTIONS: { value: Model; label: string; desc: string }[] = [
-  { value: "opencv", label: "Fast", desc: "Quick results" },
-  { value: "auto", label: "Balanced", desc: "Best available" },
-  { value: "ddcolor", label: "Best", desc: "Highest quality" },
-];
+const MODEL_OPTIONS: Model[] = ["opencv", "auto", "ddcolor"];
 
 export function ColorizeSettings() {
   const { t } = useTranslation();
@@ -30,6 +26,12 @@ export function ColorizeSettings() {
 
   const [model, setModel] = useState<Model>("auto");
   const [intensity, setIntensity] = useState(100);
+
+  const modelText: Record<Model, { label: string; desc: string }> = {
+    opencv: { label: t.toolSettings.colorize.fast, desc: t.toolSettings.colorize.fastDesc },
+    auto: { label: t.toolSettings.colorize.balanced, desc: t.toolSettings.colorize.balancedDesc },
+    ddcolor: { label: t.toolSettings.colorize.best, desc: t.toolSettings.colorize.bestDesc },
+  };
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -54,37 +56,37 @@ export function ColorizeSettings() {
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {/* Model selector */}
-      <SectionLabel>AI Model</SectionLabel>
+      <SectionLabel>{t.toolSettings.colorize.aiModel}</SectionLabel>
       <div className="grid grid-cols-3 gap-1">
-        {MODEL_OPTIONS.map((opt) => (
+        {MODEL_OPTIONS.map((value) => (
           <button
             type="button"
-            key={opt.value}
-            onClick={() => setModel(opt.value)}
+            key={value}
+            onClick={() => setModel(value)}
             className={`text-xs py-2 rounded transition-colors ${
-              model === opt.value
+              model === value
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-primary/10"
             }`}
           >
-            <span className="block font-medium">{opt.label}</span>
-            <span className="block text-[10px] opacity-70">{opt.desc}</span>
+            <span className="block font-medium">{modelText[value].label}</span>
+            <span className="block text-[10px] opacity-70">{modelText[value].desc}</span>
           </button>
         ))}
       </div>
 
       {/* Color intensity */}
-      <SectionLabel>Color Intensity</SectionLabel>
+      <SectionLabel>{t.toolSettings.colorize.colorIntensity}</SectionLabel>
       <div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground">
             {intensity === 0
-              ? "Grayscale"
+              ? t.toolSettings.colorize.grayscaleLabel
               : intensity < 50
-                ? "Subtle"
+                ? t.toolSettings.colorize.subtleLabel
                 : intensity < 80
-                  ? "Natural"
-                  : "Vivid"}
+                  ? t.toolSettings.colorize.naturalLabel
+                  : t.toolSettings.colorize.vividLabel}
           </span>
           <span className="text-xs font-mono text-foreground tabular-nums w-10 text-end">
             {intensity}%
@@ -100,7 +102,7 @@ export function ColorizeSettings() {
           className="w-full mt-0.5"
         />
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Lower values produce more muted, vintage-style colors.
+          {t.toolSettings.colorize.intensityHint}
         </p>
       </div>
 
@@ -108,8 +110,16 @@ export function ColorizeSettings() {
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>Original: {(originalSize / 1024).toFixed(1)} KB</p>
-          <p>Colorized: {(processedSize / 1024).toFixed(1)} KB</p>
+          <p>
+            {format(t.toolSettings.colorize.originalKb, {
+              size: (originalSize / 1024).toFixed(1),
+            })}
+          </p>
+          <p>
+            {format(t.toolSettings.colorize.colorizedKb, {
+              size: (processedSize / 1024).toFixed(1),
+            })}
+          </p>
         </div>
       )}
 
@@ -117,7 +127,11 @@ export function ColorizeSettings() {
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
-          label={hasMultiple ? `Colorizing ${files.length} images` : "Colorizing"}
+          label={
+            hasMultiple
+              ? format(t.toolSettings.colorize.progressLabelBatch, { count: files.length })
+              : t.toolSettings.colorize.progressLabel
+          }
           stage={progress.stage}
           percent={progress.percent}
           elapsed={progress.elapsed}
@@ -143,7 +157,7 @@ export function ColorizeSettings() {
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />
-          Download
+          {t.common.download}
         </a>
       )}
     </form>

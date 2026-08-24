@@ -82,7 +82,7 @@ export function BulkRenameSettings() {
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         />
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Variables: {"{{index}}"}, {"{{padded}}"}, {"{{original}}"}
+          {t.toolSettings["bulk-rename"].patternHint}
         </p>
       </div>
 
@@ -113,7 +113,9 @@ export function BulkRenameSettings() {
               </div>
             ))}
             {files.length > 5 && (
-              <p className="text-[10px] text-muted-foreground">... and {files.length - 5} more</p>
+              <p className="text-[10px] text-muted-foreground">
+                {format(t.toolSettings["bulk-rename"].andMore, { count: files.length - 5 })}
+              </p>
             )}
           </div>
         </div>
