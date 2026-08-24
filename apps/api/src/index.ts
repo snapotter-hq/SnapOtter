@@ -10,7 +10,12 @@ import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
 import { env } from "./config.js";
 import { closeDb, db, schema } from "./db/index.js";
-import { runMigrations } from "./db/migrate.js";
+import {
+  assertDatabaseConfig,
+  bootConnectionLabel,
+  probeDatabase,
+  runMigrations,
+} from "./db/migrate.js";
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { assertRedisCompatible, closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
@@ -39,6 +44,7 @@ import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
+import { redactUrl } from "./lib/redact-url.js";
 import { getSettingString } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
@@ -86,12 +92,23 @@ import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 import { shutdownTracing } from "./tracing.js";
 
-// Run before anything else. Wait briefly for Postgres to accept connections: on a
-// fresh boot it may still be starting (Compose without a healthcheck gate, or a
-// systemd unit ordered after Debian's no-op `postgresql.service` umbrella rather
-// than the real cluster), and a short retry turns a crash-loop into a clean start.
+// Run before anything else, and before the retry loop below: a rejected
+// DATABASE_URL / DATABASE_MIGRATION_URL pair fails the same way on every attempt,
+// so retrying it would only delay the explanation by the whole startup window.
 try {
-  await waitForService(() => db.execute(sql`SELECT 1`).then(() => undefined), {
+  assertDatabaseConfig();
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
+  process.exit(1);
+}
+
+// Wait briefly for Postgres to accept connections: on a fresh boot it may still
+// be starting (Compose without a healthcheck gate, or a systemd unit ordered
+// after Debian's no-op `postgresql.service` umbrella rather than the real
+// cluster), and a short retry turns a crash-loop into a clean start.
+try {
+  await waitForService(() => probeDatabase(), {
     timeoutMs: env.DB_STARTUP_TIMEOUT_MS,
     intervalMs: 1_000,
     onRetry: (attempt) => {
@@ -102,12 +119,23 @@ try {
       }
     },
   });
+} catch (err) {
+  // The label is whichever connection the boot path probes, which in split mode
+  // is DATABASE_MIGRATION_URL, so point at both rather than only the one.
+  console.error(
+    `FATAL: Cannot connect to Postgres at ${bootConnectionLabel()}. Is the database running? (docker compose up, or check DATABASE_URL and DATABASE_MIGRATION_URL)`,
+  );
+  console.error(err);
+  process.exit(1);
+}
+
+try {
   await runMigrations();
 } catch (err) {
-  const safeUrl = env.DATABASE_URL.replace(/:\/\/[^@]*@/, "://***@");
-  console.error(
-    `FATAL: Cannot connect to Postgres at ${safeUrl}. Is the database running? (docker compose up, or set DATABASE_URL)`,
-  );
+  // Reached Postgres but could not migrate or provision the runtime role. The
+  // message already names the cause and the remedy, so print it rather than a
+  // connectivity hint.
+  console.error(`FATAL: ${(err as Error).message}`);
   console.error(err);
   process.exit(1);
 }
@@ -133,9 +161,8 @@ try {
     },
   );
 } catch (err) {
-  const safeUrl = env.REDIS_URL.replace(/:\/\/[^@]*@/, "://***@");
   console.error(
-    `FATAL: Cannot connect to Redis at ${safeUrl}. Is Redis running? (docker compose up, or set REDIS_URL)`,
+    `FATAL: Cannot connect to Redis at ${redactUrl(env.REDIS_URL)}. Is Redis running? (docker compose up, or set REDIS_URL)`,
   );
   console.error(err);
   process.exit(1);
