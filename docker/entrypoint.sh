@@ -158,8 +158,13 @@ print_security_warnings() {
   # Embedded Postgres/Redis are loopback-only and never network-exposed, so the
   # default-credential warnings below only apply to external (Compose) mode.
   if [ -z "${EMBEDDED_MODE:-}" ]; then
-    if echo "${DATABASE_URL:-}" | grep -q "snapotter:snapotter@"; then
-      printf '  \033[33mWARNING:%b Default Postgres credentials in use. Set POSTGRES_PASSWORD for production.\n' '\033[0m' >&2
+    # Both URLs, because the Compose stack now splits them: DATABASE_URL carries
+    # the runtime role (POSTGRES_APP_*) and DATABASE_MIGRATION_URL the owner
+    # (POSTGRES_*). Checking only the first would let a default owner password
+    # ship unwarned.
+    if printf '%s\n%s\n' "${DATABASE_URL:-}" "${DATABASE_MIGRATION_URL:-}" |
+      grep -qE "snapotter:snapotter@|snapotter_app:snapotter_app@"; then
+      printf '  \033[33mWARNING:%b Default Postgres credentials in use. Set POSTGRES_PASSWORD and POSTGRES_APP_PASSWORD for production.\n' '\033[0m' >&2
     fi
     if echo "${REDIS_URL:-}" | grep -q ":snapotter@"; then
       printf '  \033[33mWARNING:%b Default Redis password in use. Set REDIS_PASSWORD for production.\n' '\033[0m' >&2

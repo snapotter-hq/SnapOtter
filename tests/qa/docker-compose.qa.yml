@@ -40,7 +40,12 @@ services:
       # pinning the proxy trust would mean QA containers stop exercising the
       # shipped default, which is exactly the setting SEC-20260726-002 was
       # about. Override it in the environment when a test needs a specific one.
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      #
+      # Same privilege split the shipped Compose file runs: requests are served
+      # by a DML-only role, and the privileged URL is used at boot only, for
+      # migrations and for creating and granting that role.
+      - DATABASE_URL=postgres://snapotter_app:snapotter_app@postgres:5432/snapotter
+      - DATABASE_MIGRATION_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:

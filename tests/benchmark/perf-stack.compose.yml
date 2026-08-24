@@ -44,7 +44,11 @@ services:
       - MAX_WORKER_THREADS=0
       - MAX_PIPELINE_STEPS=50
       - ANALYTICS_ENABLED=false
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Shipped privilege split, verbatim: requests are served by a DML-only
+      # role, and the privileged URL is used at boot only, for migrations and
+      # for creating and granting that role.
+      - DATABASE_URL=postgres://snapotter_app:snapotter_app@postgres:5432/snapotter
+      - DATABASE_MIGRATION_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
       - REDIS_URL=redis://:snapotter@redis:6379
     depends_on:
       postgres:

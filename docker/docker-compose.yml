@@ -40,7 +40,15 @@ services:
       # Believe X-Forwarded-For only from a peer on a private network. Set to
       # `true` only if a proxy you control sits in front on a public address.
       - TRUST_PROXY=${TRUST_PROXY:-loopback,linklocal,uniquelocal}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
+      # Runtime connection: least-privilege role, DML only. Created and granted
+      # automatically at boot using DATABASE_MIGRATION_URL below, so upgrading an
+      # existing install needs no manual SQL. Set a strong POSTGRES_APP_PASSWORD
+      # alongside POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      # Privileged connection: used only during boot, for migrations and grants.
+      # Unset it to run single-role, for example against managed Postgres where
+      # the app may not create roles.
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-snapotter}@redis:6379
       # 1.x upgrade: uncomment to import the old SQLite database on first boot;
       # re-comment after the migration succeeds.
