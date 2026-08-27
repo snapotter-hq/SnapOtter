@@ -332,7 +332,8 @@ export function OcrSettings() {
   };
 
   const hasFile = files.length > 0;
-  const langLabel = LANGUAGES.find((l) => l.code === language)?.label ?? "Auto-detect";
+  const langLabel =
+    LANGUAGES.find((l) => l.code === language)?.label ?? t.toolSettings.ocr.autoDetect;
 
   return (
     <div className="space-y-3">

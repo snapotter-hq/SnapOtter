@@ -1,11 +1,13 @@
 // apps/web/src/components/editor/options/brush-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
 const BRUSH_OPTION_TOOLS = new Set<ToolType>(["brush", "eraser", "pencil"]);
 
 export function BrushOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const brushSize = useEditorStore((s) => s.brushSize);
   const brushOpacity = useEditorStore((s) => s.brushOpacity);
@@ -25,21 +27,23 @@ export function BrushOptions() {
       {/* Eraser mode selector */}
       {activeTool === "eraser" && (
         <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground w-12 shrink-0">Mode</span>
+          <span className="text-xs text-muted-foreground w-12 shrink-0">
+            {t.editor.options.shared.mode}
+          </span>
           <div className="flex gap-0.5 flex-1">
             <button
               type="button"
               onClick={() => setEraserMode("brush")}
               className={`flex-1 text-xs py-1 rounded ${eraserMode === "brush" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Brush
+              {t.editor.options.brush.eraserBrush}
             </button>
             <button
               type="button"
               onClick={() => setEraserMode("block")}
               className={`flex-1 text-xs py-1 rounded ${eraserMode === "block" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
-              Block
+              {t.editor.options.brush.eraserBlock}
             </button>
           </div>
         </div>
@@ -47,7 +51,7 @@ export function BrushOptions() {
 
       {/* Size */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Size
+        {t.editor.options.shared.size}
         <input
           type="range"
           min={1}
@@ -68,7 +72,7 @@ export function BrushOptions() {
 
       {/* Opacity */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Opacity
+        {t.editor.shapes.opacity}
         <input
           type="range"
           min={0}
@@ -91,7 +95,7 @@ export function BrushOptions() {
       {/* Hardness (not for pencil -- pencil is always hard) */}
       {activeTool !== "pencil" && (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Hardness
+          {t.editor.options.shared.hardness}
           <input
             type="range"
             min={0}
@@ -115,7 +119,9 @@ export function BrushOptions() {
       {/* Flow (not for pencil) */}
       {activeTool !== "pencil" && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground w-12 shrink-0">Flow</span>
+          <span className="text-xs text-muted-foreground w-12 shrink-0">
+            {t.editor.options.shared.flow}
+          </span>
           <input
             type="range"
             min={0}

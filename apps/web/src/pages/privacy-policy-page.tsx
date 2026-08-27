@@ -1,6 +1,32 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
+
+/**
+ * Renders a sentence that carries a single inline <code> token. The sentence
+ * stays in one translation key with a {code} placeholder, so a translator can
+ * move the token wherever their grammar wants it instead of being handed two
+ * half-sentences.
+ */
+function SentenceWithCode({
+  template,
+  code,
+  values = {},
+}: {
+  template: string;
+  code: string;
+  values?: Record<string, string>;
+}) {
+  const [before, after = ""] = template.split("{code}");
+  return (
+    <>
+      {format(before, values)}
+      <code className="text-xs bg-muted px-1 py-0.5 rounded">{code}</code>
+      {format(after, values)}
+    </>
+  );
+}
 
 export function PrivacyPolicyPage() {
   const { t } = useTranslation();
@@ -16,83 +42,68 @@ export function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold mb-2">{t.common.privacyPolicy}</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: June 24, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">{t.privacyPolicy.lastUpdated}</p>
 
         <div className="space-y-6 text-sm leading-relaxed text-muted-foreground">
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Overview</h2>
-            <p>
-              SnapOtter is a self-hosted, open-source file processing application. Your instance is
-              operated and controlled entirely by whoever deployed it. This policy describes how the
-              software itself handles your data.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.overview.heading}
+            </h2>
+            <p>{t.privacyPolicy.overview.body}</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Local Processing</h2>
-            <p>
-              All file processing happens entirely on the server where SnapOtter is deployed. Your
-              files are never sent to external services or third-party APIs. When you upload a file
-              for processing, it is handled in memory or in temporary storage on the host machine
-              and is not retained after the operation completes.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.localProcessing.heading}
+            </h2>
+            <p>{t.privacyPolicy.localProcessing.body}</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Analytics</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.analytics.heading}
+            </h2>
             <p>
-              SnapOtter includes basic analytics (tool usage, error reports) to help improve the
-              software. Your files, file names, and personal data are never part of this. Analytics
-              is on by default and can be disabled at runtime. An administrator can turn anonymous
-              product analytics off under Settings {">"} System {">"} Privacy, with no restart or
-              rebuild needed. For a compile-time hard-off, build with{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">SNAPOTTER_ANALYTICS=off</code>,
-              which strips it from the bundle entirely. Everything works normally without it.
+              <SentenceWithCode
+                template={t.privacyPolicy.analytics.body}
+                code="SNAPOTTER_ANALYTICS=off"
+                values={{ privacy: t.settings.privacy.title }}
+              />
             </p>
             <p className="mt-3">
-              SnapOtter also includes optional feedback prompts. Feedback is sent only when you
-              submit it, and only when analytics is enabled. Feedback events go to PostHog as{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">feedback_submitted</code>.
-              Contact name, email, and company are sent only if you check the contact permission
-              box. SnapOtter does not attach files, file names, upload paths, OCR/transcription
-              output, private document text, or raw error logs to feedback.
+              <SentenceWithCode
+                template={t.privacyPolicy.analytics.feedbackBody}
+                code="feedback_submitted"
+              />
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Data Storage</h2>
-            <p>
-              If authentication is enabled, the application stores user accounts (usernames and
-              hashed passwords) in a PostgreSQL database on the host machine. If you use the Files
-              feature, uploaded files are stored on the server's filesystem. All stored data remains
-              entirely under the control of the instance operator.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.dataStorage.heading}
+            </h2>
+            <p>{t.privacyPolicy.dataStorage.body}</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Third-Party Services</h2>
-            <p>
-              All processing happens locally; your files are never sent anywhere. Anonymous usage
-              analytics are powered by PostHog and Sentry as described above. AI-powered features
-              run locally using bundled models. No other external services are contacted.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.thirdParty.heading}
+            </h2>
+            <p>{t.privacyPolicy.thirdParty.body}</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Open Source</h2>
-            <p>
-              SnapOtter is fully open source. You can audit the source code to verify these claims
-              at any time. Transparency is a core principle of this project.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.openSource.heading}
+            </h2>
+            <p>{t.privacyPolicy.openSource.body}</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Your Control</h2>
-            <p>
-              Because SnapOtter is self-hosted, the instance operator has full control over all
-              data. You can delete your data at any time by removing files from the server or
-              deleting the database. No data exists outside of your infrastructure.
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {t.privacyPolicy.yourControl.heading}
+            </h2>
+            <p>{t.privacyPolicy.yourControl.body}</p>
           </section>
         </div>
       </div>

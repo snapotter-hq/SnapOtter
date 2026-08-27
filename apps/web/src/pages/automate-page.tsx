@@ -39,7 +39,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
 import { formatFileSize } from "@/lib/download";
-import { format } from "@/lib/format";
+import { format, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
@@ -455,20 +455,28 @@ export function AutomatePage() {
       }
       if (kind === "video") {
         return (
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+          >
             <MediaPlayerView />
           </Suspense>
         );
       }
       if (kind === "audio") {
         return (
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+          >
             <WaveformPlayer src={processedUrl} />
           </Suspense>
         );
       }
       // document / data: success card with filename + size
-      const fname = currentEntry?.processedFilename ?? selectedFileName ?? files[0]?.name ?? "file";
+      const fname =
+        currentEntry?.processedFilename ??
+        selectedFileName ??
+        files[0]?.name ??
+        t.automate.unnamedFile;
       const fsize = processedSize ?? 0;
       const ext = fname.split(".").pop()?.toUpperCase() ?? "";
       return (
@@ -498,20 +506,24 @@ export function AutomatePage() {
     }
     if (kind === "video") {
       return (
-        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <Suspense
+          fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+        >
           <MediaPlayerView />
         </Suspense>
       );
     }
     if (kind === "audio") {
       return (
-        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <Suspense
+          fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+        >
           <WaveformPlayer src={sourceUrl} />
         </Suspense>
       );
     }
     // document / data: placeholder card
-    const fname = selectedFileName ?? files[0]?.name ?? "file";
+    const fname = selectedFileName ?? files[0]?.name ?? t.automate.unnamedFile;
     const fsize = selectedFileSize ?? files[0]?.size ?? 0;
     const ext = fname.split(".").pop()?.toUpperCase() ?? "";
     return (
@@ -545,7 +557,9 @@ export function AutomatePage() {
             <h1 className="text-base font-semibold text-foreground flex-1">{t.automate.title}</h1>
             {hasFile && (
               <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                {files.length} file{files.length !== 1 ? "s" : ""}
+                {format(plural(files.length, t.automate.fileCount, t.automate.fileCountPlural), {
+                  count: files.length,
+                })}
               </span>
             )}
           </div>
@@ -582,21 +596,21 @@ export function AutomatePage() {
                   onClick={handleAddMore}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
-                  + Add
+                  {t.automate.addButton}
                 </button>
                 <button
                   type="button"
                   onClick={() => setLibraryModalOpen(true)}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
-                  Library
+                  {t.automate.libraryButton}
                 </button>
                 <button
                   type="button"
                   onClick={() => resetFiles()}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  Clear
+                  {t.automate.clearButton}
                 </button>
               </div>
             )}
@@ -786,7 +800,7 @@ export function AutomatePage() {
                 className="text-xs text-muted-foreground hover:text-primary-ink flex items-center gap-1 transition-colors"
               >
                 <Upload className="h-3 w-3" />
-                Import
+                {t.automate.importButton}
               </button>
             </div>
             {importError && (
@@ -808,14 +822,17 @@ export function AutomatePage() {
                     >
                       {p.name}
                       <span className="text-muted-foreground ms-1">
-                        ({p.steps.length} step{p.steps.length !== 1 ? "s" : ""})
+                        {format(
+                          plural(p.steps.length, t.automate.stepCount, t.automate.stepCountPlural),
+                          { count: p.steps.length },
+                        )}
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleExportPipeline(p)}
                       className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary-ink transition-all shrink-0"
-                      title="Export pipeline"
+                      title={t.automate.exportPipeline}
                     >
                       <Download className="h-3 w-3" />
                     </button>
@@ -823,7 +840,7 @@ export function AutomatePage() {
                       type="button"
                       onClick={() => handleDeletePipeline(p.id)}
                       className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
-                      title="Delete pipeline"
+                      title={t.automate.deletePipeline}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
@@ -834,7 +851,7 @@ export function AutomatePage() {
                   onClick={() => setShowAllSaved(false)}
                   className="text-xs text-muted-foreground hover:text-foreground mt-1"
                 >
-                  Show less
+                  {t.common.showLess}
                 </button>
               </div>
             ) : (
@@ -848,14 +865,17 @@ export function AutomatePage() {
                     >
                       {p.name}
                       <span className="text-muted-foreground ms-1">
-                        ({p.steps.length} step{p.steps.length !== 1 ? "s" : ""})
+                        {format(
+                          plural(p.steps.length, t.automate.stepCount, t.automate.stepCountPlural),
+                          { count: p.steps.length },
+                        )}
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleExportPipeline(p)}
                       className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary-ink transition-all shrink-0"
-                      title="Export pipeline"
+                      title={t.automate.exportPipeline}
                     >
                       <Download className="h-3 w-3" />
                     </button>
@@ -867,7 +887,7 @@ export function AutomatePage() {
                     onClick={() => setShowAllSaved(true)}
                     className="text-xs text-muted-foreground hover:text-foreground px-2 py-0.5"
                   >
-                    +{savedPipelines.length - 3} more
+                    {format(t.automate.moreCount, { count: savedPipelines.length - 3 })}
                   </button>
                 )}
               </div>
@@ -887,7 +907,14 @@ export function AutomatePage() {
               <p className="text-xs text-muted-foreground">
                 {steps.length === 0
                   ? t.automate.addToolsPrompt
-                  : `${steps.length} ${steps.length !== 1 ? "steps" : "step"} configured`}
+                  : format(
+                      plural(
+                        steps.length,
+                        t.automate.stepsConfigured,
+                        t.automate.stepsConfiguredPlural,
+                      ),
+                      { count: steps.length },
+                    )}
               </p>
             </div>
 
@@ -898,7 +925,7 @@ export function AutomatePage() {
                   <CheckCircle2 className="h-3.5 w-3.5 text-success-ink" />
                   <span className="text-foreground max-w-[120px] truncate">
                     {files.length > 1
-                      ? `${files.length} files`
+                      ? format(t.automate.fileCountPlural, { count: files.length })
                       : (selectedFileName ?? files[0].name)}
                   </span>
                   <span className="text-muted-foreground">
@@ -910,7 +937,7 @@ export function AutomatePage() {
                   onClick={handleAddMore}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
-                  + Add
+                  {t.automate.addButton}
                 </button>
                 <button
                   type="button"
@@ -918,14 +945,14 @@ export function AutomatePage() {
                   className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
-                  Library
+                  {t.automate.libraryButton}
                 </button>
                 <button
                   type="button"
                   onClick={() => resetFiles()}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  Clear
+                  {t.automate.clearButton}
                 </button>
               </div>
             ) : (
@@ -1028,7 +1055,7 @@ export function AutomatePage() {
                   className="px-4 py-2 rounded-lg border border-border text-muted-foreground font-medium flex items-center gap-2 hover:bg-muted hover:text-foreground text-sm"
                 >
                   <Save className="h-4 w-4" />
-                  Save
+                  {t.automate.saveButton}
                 </button>
               )}
 

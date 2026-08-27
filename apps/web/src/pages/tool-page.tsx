@@ -162,13 +162,15 @@ function FileSelectionInfo({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-foreground">Files ({files.length})</span>
+        <span className="text-xs font-medium text-foreground">
+          {format(t.toolPage.filesCount, { count: files.length })}
+        </span>
         <button
           type="button"
           onClick={onAddMore}
           className="text-xs text-primary-ink hover:text-primary-ink-strong"
         >
-          + Add more
+          {t.toolPage.addMore}
         </button>
       </div>
 
@@ -205,7 +207,9 @@ function FileSelectionInfo({
             onClick={() => setExpanded(!expanded)}
             className="text-xs text-primary-ink hover:text-primary-ink-strong"
           >
-            {expanded ? "Show less" : `Show ${files.length - COLLAPSED_LIMIT} more`}
+            {expanded
+              ? t.common.showLess
+              : format(t.common.showMore, { count: files.length - COLLAPSED_LIMIT })}
           </button>
         ) : (
           <span />
@@ -215,7 +219,7 @@ function FileSelectionInfo({
           onClick={onClear}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
-          Clear all
+          {t.toolPage.clearAll}
         </button>
       </div>
     </div>
@@ -699,7 +703,9 @@ export function ToolPage() {
       if (registryEntry?.ResultsPanel) {
         const Panel = registryEntry.ResultsPanel;
         return (
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+          >
             <Panel />
           </Suspense>
         );
@@ -717,7 +723,9 @@ export function ToolPage() {
         const audioSrc = processedUrl ?? originalBlobUrl;
         if (audioSrc) {
           return (
-            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+            <Suspense
+              fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+            >
               <WaveformPlayer src={audioSrc} />
             </Suspense>
           );
@@ -754,7 +762,9 @@ export function ToolPage() {
           ? (currentEntry?.processedSize ?? null)
           : (currentEntry?.file?.size ?? 0);
         return (
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+          >
             <NonNativePreview
               file={previewFile}
               src={previewSrc}
@@ -766,7 +776,9 @@ export function ToolPage() {
         );
       }
       return (
-        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <Suspense
+          fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+        >
           <MediaPlayerView />
         </Suspense>
       );
@@ -775,7 +787,9 @@ export function ToolPage() {
     // Document viewer: pdf.js canvas with pagination
     if (displayMode === "document" && hasFile) {
       return (
-        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <Suspense
+          fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+        >
           <DocumentView />
         </Suspense>
       );
@@ -837,7 +851,9 @@ export function ToolPage() {
         );
       const ResultsPanel = registryEntry.ResultsPanel;
       return (
-        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <Suspense
+          fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+        >
           <ResultsPanel />
         </Suspense>
       );
@@ -906,7 +922,9 @@ export function ToolPage() {
       if (registryEntry?.ResultsPanel) {
         const Panel = registryEntry.ResultsPanel;
         return (
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+          >
             <Panel />
           </Suspense>
         );
@@ -1054,7 +1072,9 @@ export function ToolPage() {
           tool?.modality === "video" ? "video" : tool?.modality === "audio" ? "audio" : null;
         if (previewModality && currentEntry?.file) {
           return (
-            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+            <Suspense
+              fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
+            >
               <NonNativePreview
                 file={currentEntry.file}
                 filename={fname}
@@ -1184,7 +1204,9 @@ export function ToolPage() {
           {canReorder && hasMultiple && (
             <p className="text-xs text-muted-foreground">{t.dropzone.reorderHint}</p>
           )}
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={<div className="text-xs text-muted-foreground">{t.common.loading}</div>}
+          >
             <ToolSettings {...settingsProps} />
           </Suspense>
         </div>

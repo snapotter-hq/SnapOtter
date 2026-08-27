@@ -425,7 +425,7 @@ function GeneralSection() {
   }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed]);
 
   const username = user?.username || "admin";
-  const role = user?.role || "unknown";
+  const role = user?.role || t.settings.general.roleUnknown;
 
   return (
     <div className="space-y-6">
@@ -1758,7 +1758,9 @@ function PeopleSection() {
                   {tm.name}
                 </option>
               ))}
-              {teams.length === 0 && <option value="Default">Default</option>}
+              {teams.length === 0 && (
+                <option value="Default">{t.settings.people.defaultTeamOption}</option>
+              )}
             </select>
           </div>
           <div className="flex items-center gap-3">
@@ -1853,7 +1855,9 @@ function PeopleSection() {
                   {tm.name}
                 </option>
               ))}
-              {teams.length === 0 && <option value="Default">Default</option>}
+              {teams.length === 0 && (
+                <option value="Default">{t.settings.people.defaultTeamOption}</option>
+              )}
             </select>
             <button
               type="submit"
@@ -2026,7 +2030,7 @@ function PeopleSection() {
                     setOpenMenuId(openMenuId === u.id ? null : u.id);
                   }}
                   className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  title="Actions"
+                  title={t.common.actions}
                   aria-label={t.common.actions}
                 >
                   <MoreVertical className="h-4 w-4" />
@@ -2248,7 +2252,7 @@ export function ApiKeysSection() {
       {/* Expiration date */}
       <div className="flex items-center gap-2">
         <label className="text-xs text-muted-foreground flex items-center gap-2">
-          Expires:
+          {t.settings.apiKeys.expiresLabel}
           <input
             type="datetime-local"
             value={expiresAt}
@@ -2263,7 +2267,7 @@ export function ApiKeysSection() {
             onClick={() => setExpiresAt("")}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            Clear
+            {t.settings.apiKeys.clearButton}
           </button>
         )}
       </div>
@@ -2279,7 +2283,7 @@ export function ApiKeysSection() {
               type="button"
               onClick={() => copyKey(newKey)}
               className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
-              title="Copy"
+              title={t.common.copy}
               aria-label={t.common.copy}
             >
               {copied ? (
@@ -2307,16 +2311,21 @@ export function ApiKeysSection() {
               <div>
                 <p className="text-sm font-medium text-foreground">{k.name}</p>
                 <p className="text-xs text-muted-foreground font-mono">
-                  {k.prefix}... &middot; Created {new Date(k.createdAt).toLocaleDateString()}
+                  {k.prefix}... &middot;{" "}
+                  {format(t.settings.apiKeys.createdPrefix, {
+                    date: new Date(k.createdAt).toLocaleDateString(),
+                  })}
                 </p>
                 {Array.isArray(k.permissions) && k.permissions.length > 0 && (
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                    Scoped: {k.permissions.join(", ")}
+                    {t.settings.apiKeys.scopedPrefix} {k.permissions.join(", ")}
                   </p>
                 )}
                 {k.expiresAt && (
                   <span className="text-xs text-amber-700 dark:text-amber-400">
-                    Expires {new Date(k.expiresAt).toLocaleDateString()}
+                    {format(t.settings.apiKeys.expiresPrefix, {
+                      date: new Date(k.expiresAt).toLocaleDateString(),
+                    })}
                   </span>
                 )}
               </div>
@@ -2324,7 +2333,7 @@ export function ApiKeysSection() {
                 type="button"
                 onClick={() => deleteKey(k.id)}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                title="Delete key"
+                title={t.a11y.deleteKey}
                 aria-label={t.a11y.deleteKey}
               >
                 <Trash2 className="h-4 w-4" />
@@ -2991,7 +3000,7 @@ function RolesSection() {
               type="submit"
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              Create
+              {t.common.create}
             </button>
             <button
               type="button"
@@ -3003,7 +3012,7 @@ function RolesSection() {
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
-              Cancel
+              {t.common.cancel}
             </button>
           </div>
         </form>
@@ -3063,14 +3072,14 @@ function RolesSection() {
               type="submit"
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              Save
+              {t.common.save}
             </button>
             <button
               type="button"
               onClick={() => setEditingRole(null)}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
-              Cancel
+              {t.common.cancel}
             </button>
           </div>
         </form>
@@ -3100,7 +3109,11 @@ function RolesSection() {
                     </span>
                   )}
                   <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-xs font-medium text-primary-ink">
-                    {role.userCount} user{role.userCount !== 1 ? "s" : ""}
+                    {plural(
+                      role.userCount,
+                      format(t.settings.people.userCount, { count: role.userCount }),
+                      format(t.settings.people.userCountPlural, { count: role.userCount }),
+                    )}
                   </span>
                 </div>
                 {!role.isBuiltin && (
@@ -3116,7 +3129,7 @@ function RolesSection() {
                         );
                       }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      title="Edit role"
+                      title={t.a11y.editRole}
                       aria-label={t.a11y.editRole}
                     >
                       <Pencil className="h-4 w-4" />
@@ -3125,7 +3138,7 @@ function RolesSection() {
                       type="button"
                       onClick={() => handleDelete(role)}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title="Delete role"
+                      title={t.a11y.deleteRole}
                       aria-label={t.a11y.deleteRole}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -3385,7 +3398,7 @@ function AuditLogSection() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Page {page} of {totalPages} ({total} entries)
+            {format(t.settings.auditLog.paginationInfo, { page, totalPages, total })}
           </span>
           <div className="flex gap-2">
             <button
@@ -3394,7 +3407,7 @@ function AuditLogSection() {
               onClick={() => setPage((p) => p - 1)}
               className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Previous
+              {t.settings.auditLog.previousButton}
             </button>
             <button
               type="button"
@@ -3402,7 +3415,7 @@ function AuditLogSection() {
               onClick={() => setPage((p) => p + 1)}
               className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Next
+              {t.settings.auditLog.nextButton}
             </button>
           </div>
         </div>
@@ -3581,7 +3594,11 @@ function ToolsSection() {
           {t.settings.tools.saveButton}
         </button>
         <span className="text-xs text-muted-foreground">
-          {disabledTools.length} tool{disabledTools.length !== 1 ? "s" : ""} disabled
+          {plural(
+            disabledTools.length,
+            format(t.settings.tools.disabledCountOne, { count: disabledTools.length }),
+            format(t.settings.tools.disabledCountOther, { count: disabledTools.length }),
+          )}
         </span>
       </div>
     </div>
@@ -3607,7 +3624,7 @@ function AboutSection() {
         </div>
         <p className="text-sm text-muted-foreground">{t.settings.about.appDescription}</p>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-muted-foreground">Version:</span>
+          <span className="text-muted-foreground">{t.settings.about.versionLabel}</span>
           <span className="font-mono text-foreground">{APP_VERSION}</span>
         </div>
       </div>

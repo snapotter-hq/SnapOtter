@@ -161,7 +161,7 @@ export function WaveformPlayer({ src, className }: WaveformPlayerProps) {
             onClick={togglePlayPause}
             disabled={!isReady}
             className="shrink-0 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40"
-            aria-label={isPlaying ? "Pause" : "Play"}
+            aria-label={isPlaying ? t.commonUi.waveform.pause : t.commonUi.waveform.play}
             data-testid="waveform-play-pause"
           >
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ms-0.5" />}

@@ -132,9 +132,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={
-              "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[My file](https://example.com/recording.mp3)"
-            }
+            placeholder={t.urlImport.textareaPlaceholder}
             className="w-full min-h-[120px] max-h-[240px] resize-y rounded-lg border border-border bg-muted px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <p className="text-xs text-muted-foreground">{t.urlImport.placeholder}</p>
@@ -153,7 +151,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                       type="button"
                       onClick={() => retryUrl(i)}
                       className="p-1 rounded hover:bg-muted text-muted-foreground"
-                      title="Retry"
+                      title={t.urlImport.retryButton}
                     >
                       <RotateCw className="h-3.5 w-3.5" />
                     </button>
@@ -172,9 +170,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-border shrink-0">
           <span className="text-xs text-muted-foreground">
-            {hasResults && !importing
-              ? format(t.urlImport.readyCount, { ready: readyCount, total: entries.length })
-              : ""}
+            {hasResults && !importing ? format(t.urlImport.readyCount, { count: readyCount }) : ""}
           </span>
           <div className="flex items-center gap-2">
             {hasResults && !importing ? (
@@ -184,7 +180,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                   onClick={handleBack}
                   className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted"
                 >
-                  Back
+                  {t.common.back}
                 </button>
                 <button
                   type="button"

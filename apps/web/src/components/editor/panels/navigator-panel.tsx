@@ -206,7 +206,7 @@ export function NavigatorPanel() {
   if (!sourceImageUrl) {
     return (
       <div className="px-2 py-3 text-center text-xs text-muted-foreground border-b border-border">
-        No image loaded
+        {t.editor.panels.navigator.noImageLoaded}
       </div>
     );
   }

@@ -141,8 +141,8 @@ export function ConvertSettings() {
   // Detect source format from filename
   const sourceFile = files[0];
   const sourceExt = sourceFile
-    ? sourceFile.name.split(".").pop()?.toLowerCase() || "unknown"
-    : "none";
+    ? sourceFile.name.split(".").pop()?.toLowerCase() || t.toolSettings.convert.unknownFormat
+    : "";
 
   const hasFile = files.length > 0;
 

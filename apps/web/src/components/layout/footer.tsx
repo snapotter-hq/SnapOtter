@@ -18,7 +18,7 @@ function LanguageSelector() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const current = supportedLocales.find((l) => l.code === locale);
+  const current = supportedLocales.find((l) => l.code === locale) ?? supportedLocales[0];
 
   return (
     <div ref={ref} className="relative">
@@ -26,10 +26,10 @@ function LanguageSelector() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors text-sm"
-        title="Language"
+        title={t.a11y.language}
       >
         <Globe className="h-4 w-4" />
-        {current?.nativeName ?? "English"}
+        {current?.nativeName}
       </button>
       {open && (
         <div className="absolute bottom-full mb-1 right-0 w-56 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg z-50">
@@ -66,6 +66,7 @@ function LanguageSelector() {
 }
 
 export function Footer() {
+  const { t } = useTranslation();
   const { resolvedTheme, toggleTheme } = useTheme();
 
   return (
@@ -74,7 +75,7 @@ export function Footer() {
         type="button"
         onClick={toggleTheme}
         className="p-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors"
-        title="Toggle Theme"
+        title={t.appLayout.footer.toggleTheme}
       >
         {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </button>

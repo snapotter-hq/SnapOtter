@@ -1,8 +1,11 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 export function AiInstallIndicator() {
+  const { t } = useTranslation();
   const { bundles, installing, queued, installAllActive, fetch } = useFeaturesStore();
 
   useEffect(() => {
@@ -25,7 +28,9 @@ export function AiInstallIndicator() {
       <div className="flex items-center gap-2 mb-2">
         <Download className="h-4 w-4 text-primary shrink-0" />
         <p className="text-sm font-medium text-foreground truncate">
-          Installing {activeBundle?.name ?? "AI Feature"}
+          {format(t.appLayout.aiInstall.installingBundle, {
+            name: activeBundle?.name ?? t.appLayout.aiInstall.defaultBundleName,
+          })}
         </p>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1.5">
@@ -41,8 +46,12 @@ export function AiInstallIndicator() {
         </div>
         {isBatchInstall && (
           <span className="text-xs text-muted-foreground">
-            {completedCount}/{totalBundles} installed
-            {queued.length > 0 && ` · ${queued.length} queued`}
+            {format(t.appLayout.aiInstall.bundlesInstalled, {
+              completed: completedCount,
+              total: totalBundles,
+            })}
+            {queued.length > 0 &&
+              ` · ${format(t.appLayout.aiInstall.bundlesQueued, { count: queued.length })}`}
           </span>
         )}
       </div>

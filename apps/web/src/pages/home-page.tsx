@@ -234,6 +234,7 @@ function HomeSearchBar({
   onChange: (v: string) => void;
   placeholder: string;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -277,7 +278,7 @@ function HomeSearchBar({
             inputRef.current?.focus();
           }}
           className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors"
-          aria-label="Clear search"
+          aria-label={t.homePage.clearSearch}
         >
           <X className="h-4 w-4 text-muted-foreground" />
         </button>

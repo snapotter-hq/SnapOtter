@@ -2,6 +2,7 @@ import { type PointerEvent, useCallback, useEffect, useRef, useState } from "rea
 import type { BgPreviewState } from "@/components/common/image-viewer";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useMobile } from "@/hooks/use-mobile";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface BeforeAfterSliderProps {
@@ -158,7 +159,7 @@ export function BeforeAfterSlider({
         {/* Before image (full width, bottom layer) */}
         <img
           src={beforeSrc}
-          alt="Original"
+          alt={t.comparison.original}
           className="block w-full max-h-[70dvh] object-contain"
           draggable={false}
         />
@@ -202,7 +203,7 @@ export function BeforeAfterSlider({
           {/* Processed image */}
           <img
             src={afterSrc}
-            alt="Processed"
+            alt={t.comparison.processed}
             className="relative w-full h-full object-contain"
             style={{ filter: bgPreview?.dropShadow || undefined }}
             onLoad={handleAfterImgLoad}
@@ -300,15 +301,19 @@ export function BeforeAfterSlider({
       {beforeSize != null && afterSize != null && (
         <div className="flex items-center gap-4 text-xs">
           <span className="px-2 py-1 rounded bg-muted text-muted-foreground">
-            Original: {formatSize(beforeSize)}
+            {format(t.comparison.originalSize, { size: formatSize(beforeSize) })}
           </span>
           <span className="px-2 py-1 rounded bg-primary/10 text-primary-ink font-medium">
-            Processed: {formatSize(afterSize)}
+            {format(t.comparison.processedSize, { size: formatSize(afterSize) })}
             {savingsPercent !== null && Number(savingsPercent) > 0 && (
-              <span className="ms-1">({savingsPercent}% smaller)</span>
+              <span className="ms-1">
+                {format(t.comparison.smallerBadge, { percent: savingsPercent })}
+              </span>
             )}
             {savingsPercent !== null && Number(savingsPercent) < 0 && (
-              <span className="ms-1">({Math.abs(Number(savingsPercent))}% larger)</span>
+              <span className="ms-1">
+                {format(t.comparison.largerBadge, { percent: Math.abs(Number(savingsPercent)) })}
+              </span>
             )}
           </span>
         </div>

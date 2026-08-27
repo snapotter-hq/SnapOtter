@@ -1,5 +1,6 @@
 import { Circle, Minus, PenTool, Plus, Square, Wand2 } from "lucide-react";
 import { useCallback } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, ToolType } from "@/types/editor";
@@ -42,6 +43,7 @@ function ToggleButton({
 }
 
 export function SelectionOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const setTool = useEditorStore((s) => s.setTool);
   const selectionMode = useEditorStore((s) => s.selectionMode);
@@ -86,26 +88,32 @@ export function SelectionOptions() {
       {/* Selection type toggle */}
       {!isMagicWand && (
         <div className="flex items-center gap-1">
-          <span className="me-1 text-xs text-muted-foreground">Type:</span>
+          <span className="me-1 text-xs text-muted-foreground">
+            {t.editor.options.selection.typeLabel}
+          </span>
           <ToggleButton
             active={selectionType === "rect" && isMarquee}
             onClick={() => handleTypeChange("rect")}
-            label="Rectangular"
+            label={t.editor.options.selection.rectangular}
           >
             <Square className="me-1 h-3.5 w-3.5" />
-            Rect
+            {t.editor.options.selection.rectShort}
           </ToggleButton>
           <ToggleButton
             active={selectionType === "ellipse" && isMarquee}
             onClick={() => handleTypeChange("ellipse")}
-            label="Elliptical"
+            label={t.editor.options.selection.elliptical}
           >
             <Circle className="me-1 h-3.5 w-3.5" />
-            Ellipse
+            {t.editor.options.selection.ellipseShort}
           </ToggleButton>
-          <ToggleButton active={isLasso} onClick={() => handleTypeChange("lasso")} label="Lasso">
+          <ToggleButton
+            active={isLasso}
+            onClick={() => handleTypeChange("lasso")}
+            label={t.editor.options.selection.lasso}
+          >
             <PenTool className="me-1 h-3.5 w-3.5" />
-            Lasso
+            {t.editor.options.selection.lasso}
           </ToggleButton>
         </div>
       )}
@@ -113,7 +121,9 @@ export function SelectionOptions() {
       {isMagicWand && (
         <div className="flex items-center gap-1">
           <Wand2 className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Magic Wand</span>
+          <span className="text-xs text-muted-foreground">
+            {t.editor.options.selection.magicWand}
+          </span>
         </div>
       )}
 
@@ -121,29 +131,31 @@ export function SelectionOptions() {
 
       {/* Selection mode buttons */}
       <div className="flex items-center gap-1">
-        <span className="me-1 text-xs text-muted-foreground">Mode:</span>
+        <span className="me-1 text-xs text-muted-foreground">
+          {t.editor.options.selection.modeLabel}
+        </span>
         <ToggleButton
           active={selectionMode === "new"}
           onClick={() => handleModeChange("new")}
-          label="New Selection"
+          label={t.editor.options.selection.newSelection}
         >
-          New
+          {t.editor.options.selection.newShort}
         </ToggleButton>
         <ToggleButton
           active={selectionMode === "add"}
           onClick={() => handleModeChange("add")}
-          label="Add to Selection"
+          label={t.editor.options.selection.addToSelection}
         >
           <Plus className="me-0.5 h-3 w-3" />
-          Add
+          {t.editor.options.selection.addShort}
         </ToggleButton>
         <ToggleButton
           active={selectionMode === "subtract"}
           onClick={() => handleModeChange("subtract")}
-          label="Subtract from Selection"
+          label={t.editor.options.selection.subtractFromSelection}
         >
           <Minus className="me-0.5 h-3 w-3" />
-          Sub
+          {t.editor.options.selection.subtractShort}
         </ToggleButton>
       </div>
 
@@ -155,16 +167,16 @@ export function SelectionOptions() {
             <ToggleButton
               active={activeTool === "lasso-free"}
               onClick={() => setTool("lasso-free")}
-              label="Freehand Lasso"
+              label={t.editor.options.selection.freehandLasso}
             >
-              Freehand
+              {t.editor.options.selection.freehandShort}
             </ToggleButton>
             <ToggleButton
               active={activeTool === "lasso-poly"}
               onClick={() => setTool("lasso-poly")}
-              label="Polygonal Lasso"
+              label={t.editor.options.selection.polygonalLasso}
             >
-              Polygonal
+              {t.editor.options.selection.polygonalShort}
             </ToggleButton>
           </div>
         </>
@@ -176,7 +188,7 @@ export function SelectionOptions() {
           <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-2">
             <label htmlFor="wand-tolerance" className="text-xs text-muted-foreground">
-              Tolerance:
+              {t.editor.options.selection.toleranceLabel}
             </label>
             <input
               id="wand-tolerance"
@@ -198,7 +210,7 @@ export function SelectionOptions() {
               onChange={(e) => setMagicWandContiguous(e.target.checked)}
               className="rounded border-border"
             />
-            Contiguous
+            {t.editor.options.shared.contiguous}
           </label>
         </>
       )}

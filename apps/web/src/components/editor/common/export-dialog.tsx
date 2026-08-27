@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn, copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
@@ -436,7 +437,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Export Image</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            {t.editor.ui.exportDialog.heading}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -454,7 +457,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <div className="flex justify-center p-2 bg-muted/30 rounded border border-border">
               <img
                 src={previewUrl}
-                alt="Export preview"
+                alt={t.editor.ui.exportDialog.previewAlt}
                 className="max-h-[120px] object-contain rounded"
               />
               {estimatedSize !== null && (
@@ -470,7 +473,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
           {/* Format */}
           <div>
-            <span className="block text-xs font-medium text-muted-foreground mb-1.5">Format</span>
+            <span className="block text-xs font-medium text-muted-foreground mb-1.5">
+              {t.editor.ui.exportDialog.format}
+            </span>
             <div className="flex gap-1">
               {FORMAT_OPTIONS.map((opt) => (
                 <button
@@ -500,7 +505,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           {supportsQuality && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Quality</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t.editor.ui.exportDialog.quality}
+                </span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {settings.quality}%
                 </span>
@@ -525,7 +532,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           {/* Dimensions */}
           <div>
             <span className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Dimensions
+              {t.editor.ui.exportDialog.dimensions}
             </span>
             <div className="flex items-center gap-2">
               <div className="flex-1">
@@ -536,7 +543,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-ring"
                   min={1}
                 />
-                <span className="text-[10px] text-muted-foreground">Width</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {t.editor.ui.exportDialog.width}
+                </span>
               </div>
               <button
                 type="button"
@@ -547,7 +556,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground",
                 )}
-                aria-label={settings.lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                aria-label={
+                  settings.lockAspect ? t.editor.ui.unlockAspectRatio : t.editor.ui.lockAspectRatio
+                }
               >
                 {settings.lockAspect ? <Lock size={14} /> : <Unlock size={14} />}
               </button>
@@ -559,7 +570,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   className="w-full px-2 py-1 text-xs bg-muted rounded border border-border text-foreground outline-none focus:border-ring"
                   min={1}
                 />
-                <span className="text-[10px] text-muted-foreground">Height</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {t.editor.ui.exportDialog.height}
+                </span>
               </div>
             </div>
             <button
@@ -573,7 +586,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               }
               className="mt-1 text-[10px] text-primary-ink hover:underline"
             >
-              Reset to original size ({canvasSize.width} x {canvasSize.height})
+              {format(t.editor.ui.exportDialog.resetToOriginalSize, {
+                width: canvasSize.width,
+                height: canvasSize.height,
+              })}
             </button>
           </div>
 
@@ -588,7 +604,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                 }
                 className="rounded border-border"
               />
-              <span className="text-xs text-foreground">Transparent background</span>
+              <span className="text-xs text-foreground">
+                {t.editor.ui.exportDialog.transparentBackground}
+              </span>
             </label>
           )}
         </div>
@@ -603,7 +621,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
             >
               <Download size={14} />
-              Export
+              {t.editor.ui.exportDialog.exportButton}
             </button>
             <button
               type="button"
@@ -612,10 +630,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             >
               {copyStatus === "copied" ? <Check size={14} /> : <ClipboardCopy size={14} />}
               {copyStatus === "copied"
-                ? "Copied"
+                ? t.editor.ui.exportDialog.copied
                 : copyStatus === "failed"
-                  ? "Copy failed"
-                  : "Copy"}
+                  ? t.editor.ui.exportDialog.copyFailed
+                  : t.common.copy}
             </button>
           </div>
 
@@ -627,7 +645,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <FileDown size={12} />
-              Save Project
+              {t.editor.ui.exportDialog.saveProject}
             </button>
             <button
               type="button"
@@ -635,7 +653,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <FileUp size={12} />
-              Load Project
+              {t.editor.ui.exportDialog.loadProject}
             </button>
           </div>
         </div>
@@ -829,26 +847,29 @@ export function AutosaveRecoveryBanner({
   onRestore: () => void;
   onDiscard: () => void;
 }) {
+  const { t } = useTranslation();
   const timeStr = new Date(data.timestamp).toLocaleString();
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/30 text-xs">
       <Save size={14} className="text-amber-700 dark:text-amber-400 shrink-0" />
-      <span className="text-foreground">Recovered unsaved work from {timeStr}.</span>
+      <span className="text-foreground">
+        {format(t.editor.ui.autosaveRecovery.message, { time: timeStr })}
+      </span>
       <div className="flex items-center gap-2 ms-auto">
         <button
           type="button"
           onClick={onRestore}
           className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
         >
-          Restore
+          {t.editor.ui.autosaveRecovery.restore}
         </button>
         <button
           type="button"
           onClick={onDiscard}
           className="px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          Discard
+          {t.editor.ui.autosaveRecovery.discard}
         </button>
       </div>
     </div>

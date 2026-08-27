@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RgbaColorPicker } from "react-colorful";
 import { createPortal } from "react-dom";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const CHECKERBOARD =
@@ -37,6 +39,7 @@ export function ShapeColorPicker({
   onOpacityChange,
   allowNone = true,
 }: ShapeColorPickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hexInput, setHexInput] = useState(color ?? "#000000");
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -120,7 +123,7 @@ export function ShapeColorPicker({
         style={{
           background: isNone ? undefined : CHECKERBOARD,
         }}
-        aria-label={`${label} color picker`}
+        aria-label={format(t.editor.ui.shapeColorPicker.ariaLabel, { label })}
       >
         {isNone ? (
           <span className="absolute inset-0 rounded bg-white">
@@ -171,7 +174,9 @@ export function ShapeColorPicker({
                     : "bg-muted text-muted-foreground border-border hover:text-foreground",
                 )}
               >
-                {isNone ? `${label}: None` : `No ${label}`}
+                {isNone
+                  ? format(t.editor.ui.shapeColorPicker.noneSelected, { label })
+                  : format(t.editor.ui.shapeColorPicker.setNone, { label })}
               </button>
             )}
 

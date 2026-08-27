@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { EditorLayer, ObjectEffects } from "@/types/editor";
@@ -203,7 +204,7 @@ export function LayersPanel() {
           type="button"
           onClick={addLayer}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="New Layer (Ctrl+Shift+N)"
+          title={t.editor.panels.layers.newLayerTitle}
           aria-label={t.a11y.addLayer}
           data-testid="add-layer-btn"
         >
@@ -240,7 +241,7 @@ export function LayersPanel() {
           }}
           disabled={layers.length <= 1}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Delete Layer"
+          title={t.editor.menu.layer.deleteLayer}
           aria-label={t.a11y.deleteLayer}
           data-testid="delete-layer-btn"
         >
@@ -284,10 +285,11 @@ export function LayersPanel() {
 // ---------------------------------------------------------------------------
 
 function BlendModeSelect({ value, onChange }: { value: string; onChange: (mode: string) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 min-w-0">
       <label htmlFor="blend-mode-select" className="text-[10px] text-muted-foreground shrink-0">
-        Blend
+        {t.editor.panels.layers.blend}
       </label>
       <select
         id="blend-mode-select"
@@ -311,11 +313,12 @@ function BlendModeSelect({ value, onChange }: { value: string; onChange: (mode: 
 // ---------------------------------------------------------------------------
 
 function OpacitySlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const { t } = useTranslation();
   const percent = Math.round(value * 100);
   return (
     <div className="flex items-center gap-2 min-w-0">
       <label htmlFor="layer-opacity-slider" className="text-[10px] text-muted-foreground shrink-0">
-        Opacity
+        {t.editor.panels.layers.opacity}
       </label>
       <input
         id="layer-opacity-slider"
@@ -363,6 +366,7 @@ function LayerRow({
   onReorder,
   onContextMenu,
 }: LayerRowProps) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(layer.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -509,8 +513,10 @@ function LayerRow({
         }}
         onPointerDown={(e) => e.stopPropagation()}
         className="shrink-0 text-muted-foreground hover:text-foreground"
-        title={layer.visible ? "Hide layer" : "Show layer"}
-        aria-label={layer.visible ? "Hide layer" : "Show layer"}
+        title={layer.visible ? t.editor.panels.layers.hideLayer : t.editor.panels.layers.showLayer}
+        aria-label={
+          layer.visible ? t.editor.panels.layers.hideLayer : t.editor.panels.layers.showLayer
+        }
       >
         {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
       </button>
@@ -524,8 +530,10 @@ function LayerRow({
         }}
         onPointerDown={(e) => e.stopPropagation()}
         className="shrink-0 text-muted-foreground hover:text-foreground"
-        title={layer.locked ? "Unlock layer" : "Lock layer"}
-        aria-label={layer.locked ? "Unlock layer" : "Lock layer"}
+        title={layer.locked ? t.editor.panels.layers.unlockLayer : t.editor.panels.layers.lockLayer}
+        aria-label={
+          layer.locked ? t.editor.panels.layers.unlockLayer : t.editor.panels.layers.lockLayer
+        }
       >
         {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
       </button>
@@ -535,7 +543,7 @@ function LayerRow({
         {layer.thumbnail ? (
           <img
             src={layer.thumbnail}
-            alt={`${layer.name} thumbnail`}
+            alt={format(t.editor.panels.layers.thumbnailAlt, { name: layer.name })}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -689,14 +697,15 @@ function LayerEffectsSection({
   effects: ObjectEffects | undefined;
   onChange: (key: keyof ObjectEffects, updates: Record<string, unknown>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1">
-        Layer Effects
+        {t.editor.panels.layers.effects.heading}
       </p>
 
       <EffectToggleSection
-        label="Drop Shadow"
+        label={t.editor.panels.layers.effects.dropShadow}
         enabled={effects?.dropShadow?.enabled ?? false}
         onToggle={(enabled) =>
           onChange("dropShadow", {
@@ -716,7 +725,7 @@ function LayerEffectsSection({
       </EffectToggleSection>
 
       <EffectToggleSection
-        label="Inner Shadow"
+        label={t.editor.panels.layers.effects.innerShadow}
         enabled={effects?.innerShadow?.enabled ?? false}
         onToggle={(enabled) =>
           onChange("innerShadow", {
@@ -736,7 +745,7 @@ function LayerEffectsSection({
       </EffectToggleSection>
 
       <EffectToggleSection
-        label="Outer Glow"
+        label={t.editor.panels.layers.effects.outerGlow}
         enabled={effects?.outerGlow?.enabled ?? false}
         onToggle={(enabled) =>
           onChange("outerGlow", {
@@ -755,7 +764,7 @@ function LayerEffectsSection({
       </EffectToggleSection>
 
       <EffectToggleSection
-        label="Stroke"
+        label={t.editor.panels.layers.effects.stroke}
         enabled={effects?.stroke?.enabled ?? false}
         onToggle={(enabled) =>
           onChange("stroke", {
@@ -791,6 +800,7 @@ function EffectToggleSection({
   onToggle: (enabled: boolean) => void;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -800,7 +810,11 @@ function EffectToggleSection({
           type="button"
           onClick={() => setExpanded(!expanded)}
           className="text-muted-foreground hover:text-foreground"
-          aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+          aria-label={
+            expanded
+              ? format(t.editor.panels.layers.effects.collapseAria, { label })
+              : format(t.editor.panels.layers.effects.expandAria, { label })
+          }
         >
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </button>
@@ -839,15 +853,16 @@ function ShadowControls({
   onChange: (updates: Record<string, unknown>) => void;
   includeSpread: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
       <EffectColorInput
-        label="Color"
+        label={t.editor.panels.layers.effects.color}
         value={values.color}
         onChange={(color) => onChange({ color })}
       />
       <EffectSlider
-        label="Opacity"
+        label={t.editor.panels.layers.effects.opacity}
         value={values.opacity}
         min={0}
         max={100}
@@ -855,7 +870,7 @@ function ShadowControls({
         onChange={(opacity) => onChange({ opacity })}
       />
       <EffectSlider
-        label="Angle"
+        label={t.editor.panels.layers.effects.angle}
         value={values.angle}
         min={0}
         max={360}
@@ -863,7 +878,7 @@ function ShadowControls({
         onChange={(angle) => onChange({ angle })}
       />
       <EffectSlider
-        label="Distance"
+        label={t.editor.panels.layers.effects.distance}
         value={values.distance}
         min={0}
         max={100}
@@ -871,7 +886,7 @@ function ShadowControls({
         onChange={(distance) => onChange({ distance })}
       />
       <EffectSlider
-        label="Blur"
+        label={t.editor.panels.layers.effects.blur}
         value={values.blur}
         min={0}
         max={100}
@@ -880,7 +895,7 @@ function ShadowControls({
       />
       {includeSpread && values.spread !== undefined && (
         <EffectSlider
-          label="Spread"
+          label={t.editor.panels.layers.effects.spread}
           value={values.spread}
           min={0}
           max={100}
@@ -903,15 +918,16 @@ function GlowControls({
   values: { color: string; opacity: number; blur: number; spread: number };
   onChange: (updates: Record<string, unknown>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
       <EffectColorInput
-        label="Color"
+        label={t.editor.panels.layers.effects.color}
         value={values.color}
         onChange={(color) => onChange({ color })}
       />
       <EffectSlider
-        label="Opacity"
+        label={t.editor.panels.layers.effects.opacity}
         value={values.opacity}
         min={0}
         max={100}
@@ -919,7 +935,7 @@ function GlowControls({
         onChange={(opacity) => onChange({ opacity })}
       />
       <EffectSlider
-        label="Blur"
+        label={t.editor.panels.layers.effects.blur}
         value={values.blur}
         min={0}
         max={100}
@@ -927,7 +943,7 @@ function GlowControls({
         onChange={(blur) => onChange({ blur })}
       />
       <EffectSlider
-        label="Spread"
+        label={t.editor.panels.layers.effects.spread}
         value={values.spread}
         min={0}
         max={100}
@@ -953,15 +969,16 @@ function StrokeControls({
   };
   onChange: (updates: Record<string, unknown>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
       <EffectColorInput
-        label="Color"
+        label={t.editor.panels.layers.effects.color}
         value={values.color}
         onChange={(color) => onChange({ color })}
       />
       <EffectSlider
-        label="Width"
+        label={t.editor.panels.layers.effects.width}
         value={values.width}
         min={1}
         max={20}
@@ -969,7 +986,9 @@ function StrokeControls({
         onChange={(width) => onChange({ width })}
       />
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground shrink-0 w-12">Position</span>
+        <span className="text-[10px] text-muted-foreground shrink-0 w-12">
+          {t.editor.panels.layers.effects.position}
+        </span>
         <select
           value={values.position}
           onChange={(e) =>
@@ -979,9 +998,9 @@ function StrokeControls({
           }
           className="flex-1 h-6 text-[10px] bg-muted border border-border rounded px-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         >
-          <option value="inside">Inside</option>
-          <option value="center">Center</option>
-          <option value="outside">Outside</option>
+          <option value="inside">{t.editor.panels.layers.effects.positionInside}</option>
+          <option value="center">{t.editor.panels.layers.effects.positionCenter}</option>
+          <option value="outside">{t.editor.panels.layers.effects.positionOutside}</option>
         </select>
       </div>
     </div>

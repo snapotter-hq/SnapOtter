@@ -3,6 +3,7 @@ import { type DragEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTouchDevice } from "@/hooks/use-mobile";
 import { useUrlImport } from "@/hooks/use-url-import";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { UrlImportModal } from "./url-import-modal";
 
@@ -386,7 +387,7 @@ export function Dropzone({
           <div className="flex flex-col items-center gap-2 mt-1">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary-ink text-xs font-medium">
               <FileImage className="h-3.5 w-3.5" />
-              {currentFiles.length} files selected
+              {format(t.dropzone.filesSelected, { count: currentFiles.length })}
             </span>
             <div className="max-h-32 overflow-y-auto w-full max-w-xs">
               {currentFiles.map((f) => (

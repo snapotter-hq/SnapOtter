@@ -1,6 +1,7 @@
 // apps/web/src/components/editor/panels/histogram-panel.tsx
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 
 const HIST_WIDTH = 256;
 const HIST_HEIGHT = 80;
@@ -118,6 +119,7 @@ interface HistogramPanelProps {
 
 // Issue #2: When no imageData is provided, show a placeholder message
 export function HistogramPanel({ imageData }: HistogramPanelProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stats, setStats] = useState<HistogramStats | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -179,27 +181,27 @@ export function HistogramPanel({ imageData }: HistogramPanelProps) {
       />
       {!imageData && !stats && (
         <p className="text-[10px] text-muted-foreground text-center py-1">
-          No histogram data available
+          {t.editor.panels.histogram.noData}
         </p>
       )}
       {stats && (
         <div className="grid grid-cols-3 gap-1 text-[10px] text-muted-foreground">
           <div>
-            <span className="font-medium">Mean</span>
+            <span className="font-medium">{t.editor.panels.histogram.mean}</span>
             <br />
             <span className="text-red-700 dark:text-red-400">{stats.mean[0]}</span>{" "}
             <span className="text-green-700 dark:text-green-400">{stats.mean[1]}</span>{" "}
             <span className="text-blue-700 dark:text-blue-400">{stats.mean[2]}</span>
           </div>
           <div>
-            <span className="font-medium">StdDev</span>
+            <span className="font-medium">{t.editor.panels.histogram.stdDev}</span>
             <br />
             <span className="text-red-700 dark:text-red-400">{stats.stdDev[0]}</span>{" "}
             <span className="text-green-700 dark:text-green-400">{stats.stdDev[1]}</span>{" "}
             <span className="text-blue-700 dark:text-blue-400">{stats.stdDev[2]}</span>
           </div>
           <div>
-            <span className="font-medium">Median</span>
+            <span className="font-medium">{t.editor.panels.histogram.median}</span>
             <br />
             <span className="text-red-700 dark:text-red-400">{stats.median[0]}</span>{" "}
             <span className="text-green-700 dark:text-green-400">{stats.median[1]}</span>{" "}

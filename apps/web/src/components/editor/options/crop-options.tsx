@@ -85,7 +85,7 @@ export function CropOptions() {
       {/* Aspect ratio dropdown */}
       <div className="flex items-center gap-1.5">
         <label htmlFor="crop-aspect" className="text-xs text-muted-foreground">
-          Ratio:
+          {t.editor.options.crop.ratioLabel}
         </label>
         <select
           id="crop-aspect"
@@ -124,7 +124,7 @@ export function CropOptions() {
       <button
         type="button"
         onClick={handleSwap}
-        title="Swap dimensions"
+        title={t.a11y.swapDimensions}
         aria-label={t.a11y.swapDimensions}
         className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
       >
@@ -151,7 +151,7 @@ export function CropOptions() {
       <button
         type="button"
         onClick={handleApply}
-        title="Apply Crop (Enter)"
+        title={t.editor.options.crop.applyTitle}
         aria-label={t.a11y.applyCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded bg-primary px-2.5 text-xs text-primary-foreground",
@@ -159,12 +159,12 @@ export function CropOptions() {
         )}
       >
         <Check className="h-3.5 w-3.5" />
-        Apply
+        {t.editor.options.shared.apply}
       </button>
       <button
         type="button"
         onClick={handleCancel}
-        title="Cancel Crop (Escape)"
+        title={t.editor.options.crop.cancelTitle}
         aria-label={t.a11y.cancelCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded border border-border px-2.5 text-xs",
@@ -172,7 +172,7 @@ export function CropOptions() {
         )}
       >
         <X className="h-3.5 w-3.5" />
-        Cancel
+        {t.common.cancel}
       </button>
     </div>
   );

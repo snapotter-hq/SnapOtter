@@ -9,6 +9,7 @@ import {
   getFileThumbnailUrl,
   type UserFile,
 } from "@/lib/api";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function AuthImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
@@ -180,7 +181,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search files..."
+              placeholder={t.files.searchPlaceholder}
               value={searchQuery}
               onChange={handleSearchChange}
               className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
@@ -197,7 +198,9 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             className="h-4 w-4 accent-primary"
           />
           <span className="text-xs text-muted-foreground flex-1">
-            {checkedIds.size > 0 ? `${checkedIds.size} selected` : `${files.length} files`}
+            {checkedIds.size > 0
+              ? format(t.files.selectedCount, { count: checkedIds.size })
+              : format(t.files.fileCount, { count: files.length })}
           </span>
         </div>
 
@@ -210,7 +213,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
           )}
           {!loading && files.length === 0 && (
             <div className="flex items-center justify-center h-32">
-              <p className="text-sm text-muted-foreground">No files found</p>
+              <p className="text-sm text-muted-foreground">{t.files.noFilesFound}</p>
             </div>
           )}
           {!loading && files.length > 0 && (
@@ -256,7 +259,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             onClick={onClose}
             className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
@@ -267,10 +270,12 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             {importing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Importing...
+                {t.commonUi.fileLibrary.importing}
               </>
+            ) : checkedIds.size > 0 ? (
+              format(t.commonUi.fileLibrary.importCount, { count: checkedIds.size })
             ) : (
-              <>Import{checkedIds.size > 0 ? ` (${checkedIds.size})` : ""}</>
+              t.automate.importButton
             )}
           </button>
         </div>

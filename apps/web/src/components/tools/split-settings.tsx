@@ -79,7 +79,10 @@ export function SplitSettings() {
 
   const tileWarning =
     tileDims && (tileDims.width < 50 || tileDims.height < 50)
-      ? `Tiles will be very small (${tileDims.width}x${tileDims.height}px)`
+      ? format(t.toolSettings.split.tileWarningSmall, {
+          width: tileDims.width,
+          height: tileDims.height,
+        })
       : null;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: files is a store value that triggers reset when changed

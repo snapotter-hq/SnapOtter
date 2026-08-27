@@ -344,6 +344,7 @@ function SponsorButton({ isDark, compact = false }: { isDark: boolean; compact?:
 }
 
 function ThemeToggle({ isDark }: { isDark: boolean }) {
+  const { t } = useTranslation();
   const { resolvedTheme, toggleTheme } = useTheme();
   return (
     <button
@@ -355,7 +356,7 @@ function ThemeToggle({ isDark }: { isDark: boolean }) {
           ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
           : "text-muted-foreground hover:text-foreground hover:bg-muted",
       )}
-      title="Toggle theme"
+      title={t.appLayout.topNav.toggleTheme}
     >
       {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
@@ -363,7 +364,7 @@ function ThemeToggle({ isDark }: { isDark: boolean }) {
 }
 
 function LanguageSelector({ isDark }: { isDark: boolean }) {
-  const { locale, setLocale, supportedLocales } = useTranslation();
+  const { t, locale, setLocale, supportedLocales } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -377,7 +378,7 @@ function LanguageSelector({ isDark }: { isDark: boolean }) {
     return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [open]);
 
-  const current = supportedLocales.find((l) => l.code === locale);
+  const current = supportedLocales.find((l) => l.code === locale) ?? supportedLocales[0];
 
   return (
     <div ref={ref} className="relative">
@@ -390,10 +391,10 @@ function LanguageSelector({ isDark }: { isDark: boolean }) {
             ? "text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#333]"
             : "text-muted-foreground hover:text-foreground hover:bg-muted",
         )}
-        title="Language"
+        title={t.a11y.language}
       >
         <Globe className="h-3.5 w-3.5" />
-        {current?.nativeName ?? "English"}
+        {current?.nativeName}
       </button>
       {open && (
         <div

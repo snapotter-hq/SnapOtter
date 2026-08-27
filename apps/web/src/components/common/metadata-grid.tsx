@@ -1,4 +1,6 @@
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { formatExifValue, SKIP_KEYS } from "@/lib/metadata-utils";
 
 export function MetadataGrid({
@@ -12,13 +14,16 @@ export function MetadataGrid({
   onRemove?: (key: string) => void;
   removedKeys?: Set<string>;
 }) {
+  const { t } = useTranslation();
   const entries = Object.entries(data).filter(
     ([k, v]) =>
       !SKIP_KEYS.has(k) && !k.startsWith("_") && v !== undefined && v !== null && String(v) !== "",
   );
 
   if (entries.length === 0) {
-    return <p className="text-[10px] text-muted-foreground italic">No data</p>;
+    return (
+      <p className="text-[10px] text-muted-foreground italic">{t.commonUi.metadataGrid.noData}</p>
+    );
   }
 
   const hasRemoveColumn = !!onRemove;
@@ -51,9 +56,12 @@ export function MetadataGrid({
                     type="button"
                     onClick={() => onRemove(k)}
                     className={`p-0.5 rounded hover:bg-muted/50 transition-colors ${isRemoved ? "text-destructive-ink" : "text-muted-foreground hover:text-destructive-ink"}`}
-                    title={
-                      isRemoved ? `Restore ${labelMap?.[k] ?? k}` : `Remove ${labelMap?.[k] ?? k}`
-                    }
+                    title={format(
+                      isRemoved
+                        ? t.commonUi.metadataGrid.restoreField
+                        : t.commonUi.metadataGrid.removeField,
+                      { field: labelMap?.[k] ?? k },
+                    )}
                   >
                     <Trash2 className="h-2.5 w-2.5" />
                   </button>

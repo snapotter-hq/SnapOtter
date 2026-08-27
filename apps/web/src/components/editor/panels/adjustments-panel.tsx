@@ -7,6 +7,7 @@ import { SliderRow } from "@/components/editor/common/slider-row";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { HistogramPanel } from "@/components/editor/panels/histogram-panel";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { AdjustmentValues } from "@/types/editor";
@@ -400,6 +401,7 @@ function AdjustmentsSlidersSection() {
 // ---------------------------------------------------------------------------
 
 function LevelsSection() {
+  const { t } = useTranslation();
   const [channel, setChannel] = useState<LevelsChannel>("rgb");
   const levels = useEditorStore((s) => s.levels);
   const setStoreLevels = useEditorStore((s) => s.setLevels);
@@ -433,16 +435,16 @@ function LevelsSection() {
           className="flex-1 px-1.5 py-0.5 text-xs bg-muted border border-border rounded text-foreground"
         >
           <option value="rgb">RGB</option>
-          <option value="red">Red</option>
-          <option value="green">Green</option>
-          <option value="blue">Blue</option>
+          <option value="red">{t.editor.panels.adjustments.channelRed}</option>
+          <option value="green">{t.editor.panels.adjustments.channelGreen}</option>
+          <option value="blue">{t.editor.panels.adjustments.channelBlue}</option>
         </select>
         <button
           type="button"
           onClick={handleAutoLevels}
           className="px-2 py-0.5 text-[10px] bg-muted hover:bg-muted/80 border border-border rounded text-foreground transition-colors"
         >
-          Auto
+          {t.editor.panels.adjustments.auto}
         </button>
       </div>
 
@@ -450,14 +452,14 @@ function LevelsSection() {
 
       <div className={cn("flex flex-col gap-1", channelColors[channel])}>
         <SliderRow
-          label="Black"
+          label={t.editor.panels.adjustments.levelsBlack}
           value={currentLevels.blackPoint}
           min={0}
           max={currentLevels.whitePoint - 1}
           onChange={(v) => updateLevel("blackPoint", v)}
         />
         <SliderRow
-          label="Gamma"
+          label={t.editor.panels.adjustments.levelsGamma}
           value={Math.round(currentLevels.gamma * 100) / 100}
           min={0.1}
           max={10}
@@ -465,7 +467,7 @@ function LevelsSection() {
           onChange={(v) => updateLevel("gamma", v)}
         />
         <SliderRow
-          label="White"
+          label={t.editor.panels.adjustments.levelsWhite}
           value={currentLevels.whitePoint}
           min={currentLevels.blackPoint + 1}
           max={255}
@@ -473,17 +475,17 @@ function LevelsSection() {
         />
       </div>
 
-      <SectionHeader title="Output" />
+      <SectionHeader title={t.editor.panels.adjustments.sectionOutput} />
 
       <SliderRow
-        label="Out Black"
+        label={t.editor.panels.adjustments.levelsOutBlack}
         value={currentLevels.outBlack}
         min={0}
         max={currentLevels.outWhite}
         onChange={(v) => updateLevel("outBlack", v)}
       />
       <SliderRow
-        label="Out White"
+        label={t.editor.panels.adjustments.levelsOutWhite}
         value={currentLevels.outWhite}
         min={currentLevels.outBlack}
         max={255}
@@ -597,6 +599,7 @@ function drawTriangle(
 // ---------------------------------------------------------------------------
 
 function CurvesSection() {
+  const { t } = useTranslation();
   const [channel, setChannel] = useState<CurveChannel>("rgb");
   const curves = useEditorStore((s) => s.curves);
   const setStoreCurves = useEditorStore((s) => s.setCurves);
@@ -788,9 +791,9 @@ function CurvesSection() {
           className="flex-1 px-1.5 py-0.5 text-xs bg-muted border border-border rounded text-foreground"
         >
           <option value="rgb">RGB</option>
-          <option value="red">Red</option>
-          <option value="green">Green</option>
-          <option value="blue">Blue</option>
+          <option value="red">{t.editor.panels.adjustments.channelRed}</option>
+          <option value="green">{t.editor.panels.adjustments.channelGreen}</option>
+          <option value="blue">{t.editor.panels.adjustments.channelBlue}</option>
         </select>
         <select
           value={preset}
@@ -802,7 +805,9 @@ function CurvesSection() {
               {name}
             </option>
           ))}
-          {preset === "Custom" && <option value="Custom">Custom</option>}
+          {preset === "Custom" && (
+            <option value="Custom">{t.editor.panels.adjustments.presetCustom}</option>
+          )}
         </select>
       </div>
 
@@ -819,7 +824,7 @@ function CurvesSection() {
       />
 
       <p className="text-[10px] text-muted-foreground text-center">
-        Click to add point. Drag to move. Double-click to remove.
+        {t.editor.panels.adjustments.curvesHint}
       </p>
     </div>
   );
@@ -938,6 +943,7 @@ function AdditionalBlursSection() {
 }
 
 function VignetteSection() {
+  const { t } = useTranslation();
   const filters = useEditorStore((s) => s.filters);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const setFilterParam = useEditorStore((s) => s.setFilterParam);
@@ -954,7 +960,9 @@ function VignetteSection() {
           onChange={() => toggleFilter("vignette")}
           className="accent-primary w-3.5 h-3.5"
         />
-        <span className="text-xs font-medium text-foreground">Vignette</span>
+        <span className="text-xs font-medium text-foreground">
+          {t.editor.panels.adjustments.vignette}
+        </span>
       </label>
       {filter.enabled &&
         VIGNETTE_PARAMS.map((p) => (
@@ -972,6 +980,7 @@ function VignetteSection() {
 }
 
 function GrainSection() {
+  const { t } = useTranslation();
   const filters = useEditorStore((s) => s.filters);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const setFilterParam = useEditorStore((s) => s.setFilterParam);
@@ -988,7 +997,9 @@ function GrainSection() {
           onChange={() => toggleFilter("grain")}
           className="accent-primary w-3.5 h-3.5"
         />
-        <span className="text-xs font-medium text-foreground">Grain</span>
+        <span className="text-xs font-medium text-foreground">
+          {t.editor.panels.adjustments.grain}
+        </span>
       </label>
       {filter.enabled &&
         GRAIN_PARAMS.map((p) => (
@@ -1010,6 +1021,7 @@ function GrainSection() {
 // ---------------------------------------------------------------------------
 
 export function AdjustmentsPanel() {
+  const { t } = useTranslation();
   const adjustments = useEditorStore((s) => s.adjustments);
   const filters = useEditorStore((s) => s.filters);
   const resetAdjustments = useEditorStore((s) => s.resetAdjustments);
@@ -1080,32 +1092,32 @@ export function AdjustmentsPanel() {
       <HistogramPanel imageData={histogramData} />
 
       {/* Auto Adjustments */}
-      <SectionHeader title="Auto" />
+      <SectionHeader title={t.editor.panels.adjustments.auto} />
       <AutoAdjustmentsSection />
 
       {/* Adjustment Sliders */}
-      <SectionHeader title="Adjustments" />
+      <SectionHeader title={t.editor.menu.image.adjustments.label} />
       <AdjustmentsSlidersSection />
 
       {/* Levels */}
-      <SectionHeader title="Levels" />
+      <SectionHeader title={t.editor.menu.image.adjustments.levels} />
       <LevelsSection />
 
       {/* Curves */}
-      <SectionHeader title="Curves" />
+      <SectionHeader title={t.editor.menu.image.adjustments.curves} />
       <CurvesSection />
 
       {/* Filters */}
-      <SectionHeader title="Filters" />
+      <SectionHeader title={t.editor.panels.adjustments.sectionFilters} />
       <ToggleFiltersSection />
       <SliderFiltersSection />
 
       {/* Additional Blurs */}
-      <SectionHeader title="Blur Effects" />
+      <SectionHeader title={t.editor.panels.adjustments.sectionBlurEffects} />
       <AdditionalBlursSection />
 
       {/* Vignette & Grain */}
-      <SectionHeader title="Effects" />
+      <SectionHeader title={t.editor.panels.adjustments.sectionEffects} />
       <VignetteSection />
       <GrainSection />
 
@@ -1122,7 +1134,7 @@ export function AdjustmentsPanel() {
               : "border-border text-muted-foreground cursor-not-allowed opacity-50",
           )}
         >
-          Reset All
+          {t.editor.panels.adjustments.resetAll}
         </button>
         <button
           type="button"
@@ -1135,7 +1147,7 @@ export function AdjustmentsPanel() {
               : "bg-primary/50 text-primary-foreground/50 cursor-not-allowed",
           )}
         >
-          Apply
+          {t.editor.panels.adjustments.apply}
         </button>
       </div>
     </div>

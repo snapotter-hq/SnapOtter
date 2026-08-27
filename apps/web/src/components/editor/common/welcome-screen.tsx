@@ -75,7 +75,7 @@ export function WelcomeScreen() {
             <h2 className="text-xl font-semibold text-foreground mb-1 flex items-center justify-center gap-2">
               {t.editor.welcome.heading}
               <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-primary/15 text-primary-ink">
-                Beta
+                {t.editor.ui.betaBadge}
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">{t.editor.welcome.dropDescription}</p>

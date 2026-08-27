@@ -1,6 +1,7 @@
 import { Lock, Unlock, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -66,7 +67,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
       <div className="w-[380px] rounded-lg border border-border bg-card shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-medium text-foreground">Image Size</h2>
+          <h2 className="text-sm font-medium text-foreground">{t.editor.ui.imageResize.heading}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -81,14 +82,17 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
         <div className="space-y-4 px-4 py-4">
           {/* Current size info */}
           <p className="text-xs text-muted-foreground">
-            Original: {canvasSize.width} x {canvasSize.height} px
+            {format(t.editor.ui.imageResize.original, {
+              width: canvasSize.width,
+              height: canvasSize.height,
+            })}
           </p>
 
           {/* Width / Lock / Height */}
           <div className="flex items-end gap-2">
             <div className="flex-1">
               <label htmlFor="img-w" className="mb-1 block text-xs text-muted-foreground">
-                Width (px)
+                {t.editor.ui.widthPx}
               </label>
               <input
                 id="img-w"
@@ -105,8 +109,8 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
             <button
               type="button"
               onClick={() => setLockAspect(!lockAspect)}
-              title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-              aria-label={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+              title={lockAspect ? t.editor.ui.unlockAspectRatio : t.editor.ui.lockAspectRatio}
+              aria-label={lockAspect ? t.editor.ui.unlockAspectRatio : t.editor.ui.lockAspectRatio}
               aria-pressed={lockAspect}
               className={cn(
                 "mb-4 flex h-8 w-8 items-center justify-center rounded transition-colors",
@@ -120,7 +124,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
 
             <div className="flex-1">
               <label htmlFor="img-h" className="mb-1 block text-xs text-muted-foreground">
-                Height (px)
+                {t.editor.ui.heightPx}
               </label>
               <input
                 id="img-h"
@@ -136,9 +140,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
           </div>
 
           {/* Info note */}
-          <p className="text-[10px] text-muted-foreground">
-            Scales all objects proportionally to the new dimensions.
-          </p>
+          <p className="text-[10px] text-muted-foreground">{t.editor.ui.imageResize.note}</p>
         </div>
 
         {/* Footer */}
@@ -151,7 +153,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
               "text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",
             )}
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
@@ -161,7 +163,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
               "hover:bg-primary/90 transition-colors",
             )}
           >
-            Apply
+            {t.editor.ui.apply}
           </button>
         </div>
       </div>

@@ -1,8 +1,10 @@
 // apps/web/src/components/editor/options/fill-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function FillOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const tolerance = useEditorStore((s) => s.fillTolerance);
   const contiguous = useEditorStore((s) => s.fillContiguous);
@@ -15,7 +17,7 @@ export function FillOptions() {
     <div className="flex items-center gap-3">
       {/* Tolerance */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Tolerance
+        {t.editor.options.fill.tolerance}
         <input
           type="range"
           min={0}
@@ -42,7 +44,7 @@ export function FillOptions() {
           onChange={(e) => setFillContiguous(e.target.checked)}
           className="accent-primary"
         />
-        Contiguous
+        {t.editor.options.shared.contiguous}
       </label>
     </div>
   );

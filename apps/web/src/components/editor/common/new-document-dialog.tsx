@@ -1,5 +1,6 @@
 // apps/web/src/components/editor/common/new-document-dialog.tsx
 import { useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -21,6 +22,7 @@ interface NewDocumentDialogProps {
 }
 
 export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState(1920);
   const [height, setHeight] = useState(1080);
   const [preset, setPreset] = useState("1920x1080 (HD)");
@@ -28,6 +30,12 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
   const loadImage = useEditorStore((s) => s.loadImage);
 
   if (!open) return null;
+
+  const backgroundLabels: Record<(typeof BACKGROUNDS)[number], string> = {
+    White: t.editor.ui.newDocument.backgrounds.white,
+    Black: t.editor.ui.newDocument.backgrounds.black,
+    Transparent: t.editor.ui.newDocument.backgrounds.transparent,
+  };
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = PRESETS.find((p) => p.label === e.target.value);
@@ -64,12 +72,14 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-card border border-border rounded-lg shadow-lg p-6 w-96">
-        <h2 className="text-lg font-semibold text-foreground mb-4">New Document</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">
+          {t.editor.ui.newDocument.heading}
+        </h2>
 
         <div className="space-y-3">
           <div>
             <label htmlFor="new-doc-preset" className="text-xs text-muted-foreground">
-              Preset
+              {t.editor.ui.newDocument.preset}
             </label>
             <select
               id="new-doc-preset"
@@ -88,7 +98,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
           <div className="flex gap-3">
             <div className="flex-1">
               <label htmlFor="new-doc-width" className="text-xs text-muted-foreground">
-                Width (px)
+                {t.editor.ui.widthPx}
               </label>
               <input
                 id="new-doc-width"
@@ -105,7 +115,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
             </div>
             <div className="flex-1">
               <label htmlFor="new-doc-height" className="text-xs text-muted-foreground">
-                Height (px)
+                {t.editor.ui.heightPx}
               </label>
               <input
                 id="new-doc-height"
@@ -123,7 +133,9 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
           </div>
 
           <div>
-            <span className="text-xs text-muted-foreground">Background</span>
+            <span className="text-xs text-muted-foreground">
+              {t.editor.ui.newDocument.background}
+            </span>
             <div className="flex gap-2 mt-1">
               {BACKGROUNDS.map((bg) => (
                 <button
@@ -137,7 +149,7 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
                       : "bg-muted text-muted-foreground border-border hover:bg-muted/80",
                   )}
                 >
-                  {bg}
+                  {backgroundLabels[bg]}
                 </button>
               ))}
             </div>
@@ -150,14 +162,14 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
             onClick={onClose}
             className="px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
             onClick={handleCreate}
             className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            Create
+            {t.common.create}
           </button>
         </div>
       </div>

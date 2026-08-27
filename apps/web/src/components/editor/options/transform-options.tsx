@@ -96,8 +96,16 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
       <button
         type="button"
         onClick={() => setLockedAspect(!lockedAspect)}
-        title={lockedAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-        aria-label={lockedAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+        title={
+          lockedAspect
+            ? t.editor.options.transform.unlockAspectRatio
+            : t.editor.options.transform.lockAspectRatio
+        }
+        aria-label={
+          lockedAspect
+            ? t.editor.options.transform.unlockAspectRatio
+            : t.editor.options.transform.lockAspectRatio
+        }
         aria-pressed={lockedAspect}
         className={cn(
           "flex h-6 w-6 items-center justify-center rounded transition-colors",
@@ -121,7 +129,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
 
       <NumericInput
         id="transform-rotation"
-        label="Rotation"
+        label={t.editor.options.transform.rotation}
         value={values.rotation}
         min={-360}
         max={360}
@@ -133,7 +141,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
       <button
         type="button"
         onClick={flipHorizontal}
-        title="Flip Horizontal"
+        title={t.editor.menu.edit.transform.flipHorizontal}
         aria-label={t.a11y.flipHorizontal}
         className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
@@ -142,7 +150,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
       <button
         type="button"
         onClick={flipVertical}
-        title="Flip Vertical"
+        title={t.editor.menu.edit.transform.flipVertical}
         aria-label={t.a11y.flipVertical}
         className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
@@ -154,7 +162,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
         type="button"
         onClick={cancelTransform}
         className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-        title="Cancel"
+        title={t.common.cancel}
       >
         <X className="h-4 w-4" />
       </button>
@@ -162,7 +170,7 @@ export function TransformOptions({ api }: { api: TransformToolApi }) {
         type="button"
         onClick={applyTransform}
         className="p-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-        title="Apply"
+        title={t.editor.options.shared.apply}
       >
         <Check className="h-4 w-4" />
       </button>

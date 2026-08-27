@@ -92,7 +92,7 @@ function LanguageSelector() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const current = supportedLocales.find((l) => l.code === locale);
+  const current = supportedLocales.find((l) => l.code === locale) ?? supportedLocales[0];
 
   return (
     <div ref={ref} className="relative">
@@ -118,7 +118,7 @@ function LanguageSelector() {
           <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
           <path d="M2 12h20" />
         </svg>
-        {current?.nativeName ?? "English"}
+        {current?.nativeName}
       </button>
       {open && (
         <div className="absolute bottom-full mb-1 left-0 w-56 max-h-64 overflow-y-auto rounded-lg border border-border bg-background shadow-lg z-50">

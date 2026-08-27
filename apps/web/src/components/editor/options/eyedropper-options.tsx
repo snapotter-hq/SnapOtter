@@ -1,6 +1,7 @@
 // apps/web/src/components/editor/options/eyedropper-options.tsx
 
 import { useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { ColorSwatch } from "../common/color-swatch";
@@ -24,6 +25,7 @@ export function EyedropperOptions({
   onSampleSizeChange,
   sampledColor,
 }: EyedropperOptionsProps) {
+  const { t } = useTranslation();
   const foregroundColor = useEditorStore((s) => s.foregroundColor);
   const [open, setOpen] = useState(false);
 
@@ -33,7 +35,9 @@ export function EyedropperOptions({
     <div className="flex items-center gap-3">
       {/* Sample size dropdown */}
       <div className="relative">
-        <span className="text-xs text-muted-foreground me-1.5">Sample:</span>
+        <span className="text-xs text-muted-foreground me-1.5">
+          {t.editor.options.eyedropper.sampleLabel}
+        </span>
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -53,7 +57,7 @@ export function EyedropperOptions({
             aria-hidden="true"
             role="img"
           >
-            <title>Toggle dropdown</title>
+            <title>{t.editor.options.eyedropper.toggleDropdown}</title>
             <path
               d="M1 1l4 4 4-4"
               stroke="currentColor"

@@ -97,6 +97,7 @@ function FilePreview({
   mimeType: string;
   name: string;
 }) {
+  const { t } = useTranslation();
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -204,7 +205,7 @@ function FilePreview({
               style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
             />
           </div>
-          <span className="text-xs text-muted-foreground">Generating preview...</span>
+          <span className="text-xs text-muted-foreground">{t.toolPage.generatingPreview}</span>
         </div>
       );
     }
@@ -217,11 +218,11 @@ function FilePreview({
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Play className="h-4 w-4" />
-          Generate Preview
+          {t.toolPage.generatePreview}
         </button>
         {previewError && (
           <span className="text-xs text-muted-foreground">
-            Preview generation failed. Try again.
+            {t.files.details.previewFailedRetry}
           </span>
         )}
       </div>
@@ -261,7 +262,7 @@ function FilePreview({
               style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
             />
           </div>
-          <span className="text-xs text-muted-foreground">Generating preview...</span>
+          <span className="text-xs text-muted-foreground">{t.toolPage.generatingPreview}</span>
         </div>
       );
     }
@@ -274,11 +275,11 @@ function FilePreview({
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Play className="h-4 w-4" />
-          Generate Preview
+          {t.toolPage.generatePreview}
         </button>
         {previewError && (
           <span className="text-xs text-muted-foreground">
-            Preview generation failed. Try again.
+            {t.files.details.previewFailedRetry}
           </span>
         )}
       </div>
@@ -318,7 +319,7 @@ function FilePreview({
               style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
             />
           </div>
-          <span className="text-xs text-muted-foreground">Generating preview...</span>
+          <span className="text-xs text-muted-foreground">{t.toolPage.generatingPreview}</span>
         </div>
       );
     }
@@ -331,11 +332,11 @@ function FilePreview({
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Play className="h-4 w-4" />
-          Generate Preview
+          {t.toolPage.generatePreview}
         </button>
         {previewError && (
           <span className="text-xs text-muted-foreground">
-            Preview generation failed. Try again.
+            {t.files.details.previewFailedRetry}
           </span>
         )}
       </div>

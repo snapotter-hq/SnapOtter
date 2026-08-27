@@ -183,7 +183,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
         >
           {/* System fonts */}
           <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            System Fonts
+            {t.editor.options.text.systemFonts}
           </div>
           {fonts.system.map((name) => (
             <button
@@ -205,7 +205,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (name: str
             <>
               <div className="h-px bg-border my-1" />
               <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                App Fonts
+                {t.editor.options.text.appFonts}
               </div>
               {fonts.selfHosted.map((name) => (
                 <button
@@ -323,7 +323,7 @@ export function TextOptions() {
         min={1}
         max={999}
         step={1}
-        label="Font size"
+        label={t.editor.options.text.fontSize}
         onChange={(v) => updateSelected({ fontSize: v })}
         width="w-14"
       />
@@ -332,16 +332,24 @@ export function TextOptions() {
 
       {/* Bold / Italic / Underline / Strikethrough */}
       <div className="flex items-center gap-0.5">
-        <ToggleButton active={isBold} onClick={toggleBold} label="Bold">
+        <ToggleButton active={isBold} onClick={toggleBold} label={t.editor.options.text.bold}>
           <Bold size={14} />
         </ToggleButton>
-        <ToggleButton active={isItalic} onClick={toggleItalic} label="Italic">
+        <ToggleButton active={isItalic} onClick={toggleItalic} label={t.editor.options.text.italic}>
           <Italic size={14} />
         </ToggleButton>
-        <ToggleButton active={hasUnderline} onClick={toggleUnderline} label="Underline">
+        <ToggleButton
+          active={hasUnderline}
+          onClick={toggleUnderline}
+          label={t.editor.options.text.underline}
+        >
           <Underline size={14} />
         </ToggleButton>
-        <ToggleButton active={hasStrikethrough} onClick={toggleStrikethrough} label="Strikethrough">
+        <ToggleButton
+          active={hasStrikethrough}
+          onClick={toggleStrikethrough}
+          label={t.editor.options.text.strikethrough}
+        >
           <Strikethrough size={14} />
         </ToggleButton>
       </div>
@@ -353,21 +361,21 @@ export function TextOptions() {
         <ToggleButton
           active={attrs.align === "left"}
           onClick={() => updateSelected({ align: "left" })}
-          label="Align left"
+          label={t.editor.options.text.alignLeft}
         >
           <AlignLeft size={14} />
         </ToggleButton>
         <ToggleButton
           active={attrs.align === "center"}
           onClick={() => updateSelected({ align: "center" })}
-          label="Align center"
+          label={t.editor.options.text.alignCenter}
         >
           <AlignCenter size={14} />
         </ToggleButton>
         <ToggleButton
           active={attrs.align === "right"}
           onClick={() => updateSelected({ align: "right" })}
-          label="Align right"
+          label={t.editor.options.text.alignRight}
         >
           <AlignRight size={14} />
         </ToggleButton>
@@ -383,7 +391,7 @@ export function TextOptions() {
           min={0.5}
           max={3.0}
           step={0.1}
-          label="Line height"
+          label={t.editor.options.text.lineHeight}
           onChange={(v) => updateSelected({ lineHeight: v })}
           width="w-14"
         />
@@ -397,7 +405,7 @@ export function TextOptions() {
           min={-5}
           max={20}
           step={0.5}
-          label="Letter spacing"
+          label={t.editor.options.text.letterSpacing}
           onChange={(v) => updateSelected({ letterSpacing: v })}
           width="w-14"
         />
@@ -406,7 +414,7 @@ export function TextOptions() {
       <div className="h-4 w-px bg-border" />
 
       {/* Color swatch */}
-      <label className="relative flex items-center" title="Text color">
+      <label className="relative flex items-center" title={t.a11y.textColor}>
         <div
           className="w-6 h-6 rounded border border-border cursor-pointer"
           style={{ backgroundColor: attrs.fill }}
@@ -425,15 +433,23 @@ export function TextOptions() {
       {/* Point / Area text toggle */}
       <button
         type="button"
-        title={isAreaText ? "Switch to Point Text" : "Switch to Area Text"}
-        aria-label={isAreaText ? "Switch to Point Text" : "Switch to Area Text"}
+        title={
+          isAreaText
+            ? t.editor.options.text.switchToPointText
+            : t.editor.options.text.switchToAreaText
+        }
+        aria-label={
+          isAreaText
+            ? t.editor.options.text.switchToPointText
+            : t.editor.options.text.switchToAreaText
+        }
         onClick={toggleTextMode}
         className={cn(
           "h-7 px-2 rounded border border-border text-xs transition-colors",
           "hover:bg-muted",
         )}
       >
-        {isAreaText ? "Area" : "Point"}
+        {isAreaText ? t.editor.options.text.area : t.editor.options.text.point}
       </button>
     </div>
   );

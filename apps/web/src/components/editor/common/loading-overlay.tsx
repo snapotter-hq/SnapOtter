@@ -48,7 +48,7 @@ export function LoadingOverlay() {
             aria-label={t.a11y.cancelOperation}
           >
             <X size={12} />
-            Cancel
+            {t.common.cancel}
           </button>
         )}
       </div>

@@ -1,11 +1,13 @@
 // apps/web/src/components/editor/options/pixel-brush-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
 const PIXEL_BRUSH_TOOLS = new Set<ToolType>(["blur-brush", "sharpen-brush", "smudge"]);
 
 export function PixelBrushOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const setTool = useEditorStore((s) => s.setTool);
   const brushSize = useEditorStore((s) => s.brushSize);
@@ -19,21 +21,21 @@ export function PixelBrushOptions() {
     <div className="flex items-center gap-3">
       {/* Tool toggle */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Tool
+        {t.editor.options.shared.tool}
         <select
           value={activeTool}
           onChange={(e) => setTool(e.target.value as ToolType)}
           className="h-6 text-xs bg-muted border border-border rounded px-1"
         >
-          <option value="blur-brush">Blur</option>
-          <option value="sharpen-brush">Sharpen</option>
-          <option value="smudge">Smudge</option>
+          <option value="blur-brush">{t.editor.options.pixelBrush.blur}</option>
+          <option value="sharpen-brush">{t.editor.options.pixelBrush.sharpen}</option>
+          <option value="smudge">{t.editor.options.pixelBrush.smudge}</option>
         </select>
       </label>
 
       {/* Size */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Size
+        {t.editor.options.shared.size}
         <input
           type="range"
           min={1}
@@ -54,7 +56,7 @@ export function PixelBrushOptions() {
 
       {/* Strength */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Strength
+        {t.editor.options.pixelBrush.strength}
         <input
           type="range"
           min={1}

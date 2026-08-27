@@ -1,11 +1,13 @@
 // apps/web/src/components/editor/options/dodge-burn-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
 const DODGE_BURN_TOOLS = new Set<ToolType>(["dodge", "burn", "sponge"]);
 
 export function DodgeBurnOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const setTool = useEditorStore((s) => s.setTool);
   const brushSize = useEditorStore((s) => s.brushSize);
@@ -27,21 +29,21 @@ export function DodgeBurnOptions() {
     <div className="flex items-center gap-3">
       {/* Tool toggle */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Tool
+        {t.editor.options.shared.tool}
         <select
           value={activeTool}
           onChange={(e) => setTool(e.target.value as ToolType)}
           className="h-6 text-xs bg-muted border border-border rounded px-1"
         >
-          <option value="dodge">Dodge</option>
-          <option value="burn">Burn</option>
-          <option value="sponge">Sponge</option>
+          <option value="dodge">{t.editor.options.dodgeBurn.dodge}</option>
+          <option value="burn">{t.editor.options.dodgeBurn.burn}</option>
+          <option value="sponge">{t.editor.options.dodgeBurn.sponge}</option>
         </select>
       </label>
 
       {/* Size */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Size
+        {t.editor.options.shared.size}
         <input
           type="range"
           min={1}
@@ -63,7 +65,7 @@ export function DodgeBurnOptions() {
       {/* Range (dodge/burn only) */}
       {isDodgeBurn && (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Range
+          {t.editor.options.dodgeBurn.range}
           <select
             value={dodgeBurnRange}
             onChange={(e) =>
@@ -71,9 +73,9 @@ export function DodgeBurnOptions() {
             }
             className="h-6 text-xs bg-muted border border-border rounded px-1"
           >
-            <option value="shadows">Shadows</option>
-            <option value="midtones">Midtones</option>
-            <option value="highlights">Highlights</option>
+            <option value="shadows">{t.editor.options.dodgeBurn.shadows}</option>
+            <option value="midtones">{t.editor.options.dodgeBurn.midtones}</option>
+            <option value="highlights">{t.editor.options.dodgeBurn.highlights}</option>
           </select>
         </label>
       )}
@@ -81,7 +83,7 @@ export function DodgeBurnOptions() {
       {/* Exposure (dodge/burn only) */}
       {isDodgeBurn && (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Exposure
+          {t.editor.options.dodgeBurn.exposure}
           <input
             type="range"
             min={1}
@@ -105,14 +107,14 @@ export function DodgeBurnOptions() {
       {/* Sponge mode */}
       {activeTool === "sponge" && (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Mode
+          {t.editor.options.shared.mode}
           <select
             value={spongeMode}
             onChange={(e) => setSpongeMode(e.target.value as "saturate" | "desaturate")}
             className="h-6 text-xs bg-muted border border-border rounded px-1"
           >
-            <option value="saturate">Saturate</option>
-            <option value="desaturate">Desaturate</option>
+            <option value="saturate">{t.editor.options.dodgeBurn.saturate}</option>
+            <option value="desaturate">{t.editor.options.dodgeBurn.desaturate}</option>
           </select>
         </label>
       )}
@@ -120,7 +122,7 @@ export function DodgeBurnOptions() {
       {/* Flow (sponge only) */}
       {activeTool === "sponge" && (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Flow
+          {t.editor.options.shared.flow}
           <input
             type="range"
             min={1}

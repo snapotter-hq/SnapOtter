@@ -9,6 +9,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { alignObjects } from "@/components/editor/tools/move-tool";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -47,6 +48,7 @@ function OptionButton({
 }
 
 export function MoveOptions() {
+  const { t } = useTranslation();
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const objects = useEditorStore((s) => s.objects);
   const updateObject = useEditorStore((s) => s.updateObject);
@@ -77,23 +79,23 @@ export function MoveOptions() {
 
   return (
     <div className="flex items-center gap-1">
-      <span className="me-2 text-xs text-muted-foreground">Align:</span>
+      <span className="me-2 text-xs text-muted-foreground">{t.editor.options.move.alignLabel}</span>
 
       <OptionButton
         icon={AlignStartHorizontal}
-        label="Align Left"
+        label={t.editor.options.move.alignLeft}
         onClick={() => handleAlign("left")}
         disabled={!hasSelection}
       />
       <OptionButton
         icon={AlignCenterHorizontal}
-        label="Align Center Horizontal"
+        label={t.editor.options.move.alignCenterHorizontal}
         onClick={() => handleAlign("center-h")}
         disabled={!hasSelection}
       />
       <OptionButton
         icon={AlignEndHorizontal}
-        label="Align Right"
+        label={t.editor.options.move.alignRight}
         onClick={() => handleAlign("right")}
         disabled={!hasSelection}
       />
@@ -102,36 +104,38 @@ export function MoveOptions() {
 
       <OptionButton
         icon={AlignStartVertical}
-        label="Align Top"
+        label={t.editor.options.move.alignTop}
         onClick={() => handleAlign("top")}
         disabled={!hasSelection}
       />
       <OptionButton
         icon={AlignCenterVertical}
-        label="Align Center Vertical"
+        label={t.editor.options.move.alignCenterVertical}
         onClick={() => handleAlign("center-v")}
         disabled={!hasSelection}
       />
       <OptionButton
         icon={AlignEndVertical}
-        label="Align Bottom"
+        label={t.editor.options.move.alignBottom}
         onClick={() => handleAlign("bottom")}
         disabled={!hasSelection}
       />
 
       <div className="mx-1 h-4 w-px bg-border" />
 
-      <span className="me-1 text-xs text-muted-foreground">Distribute:</span>
+      <span className="me-1 text-xs text-muted-foreground">
+        {t.editor.options.move.distributeLabel}
+      </span>
 
       <OptionButton
         icon={ArrowLeftRight}
-        label="Distribute Horizontally"
+        label={t.editor.options.move.distributeHorizontally}
         onClick={() => handleAlign("distribute-h")}
         disabled={!hasThreeOrMore}
       />
       <OptionButton
         icon={ArrowUpDown}
-        label="Distribute Vertically"
+        label={t.editor.options.move.distributeVertically}
         onClick={() => handleAlign("distribute-v")}
         disabled={!hasThreeOrMore}
       />

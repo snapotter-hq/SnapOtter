@@ -101,7 +101,7 @@ export function ChangePasswordPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Failed to change password");
+        setError(data.error || t.changePassword.failedError);
         return;
       }
 

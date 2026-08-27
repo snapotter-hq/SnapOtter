@@ -190,10 +190,16 @@ export function ReviewPanel({
         >
           <Download className="h-4 w-4" />
           {isMultiOutput
-            ? `${t.toolPage.downloadAll} (ZIP, ${formatFileSize(fileSize)})`
+            ? format(t.reviewPanel.downloadAllZipSize, { size: formatFileSize(fileSize) })
             : hasBatchStats && successCount != null && successCount > 1
-              ? `${format(t.toolPage.downloadFiles, { count: successCount })} (ZIP, ${formatFileSize(fileSize)})`
-              : `${t.toolPage.download} ${fileType} (${formatFileSize(fileSize)})`}
+              ? format(t.reviewPanel.downloadFilesZipSize, {
+                  count: successCount,
+                  size: formatFileSize(fileSize),
+                })
+              : format(t.reviewPanel.downloadTypeSize, {
+                  type: fileType,
+                  size: formatFileSize(fileSize),
+                })}
         </button>
       )}
 

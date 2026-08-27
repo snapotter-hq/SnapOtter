@@ -1,5 +1,7 @@
 // apps/web/src/components/editor/common/color-swatch.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type SwatchSize = "sm" | "md" | "lg";
@@ -35,6 +37,7 @@ export function ColorSwatch({
   label,
   ...dataProps
 }: ColorSwatchProps) {
+  const { t } = useTranslation();
   const isTransparent =
     color.length === 9 ||
     color.length === 5 ||
@@ -46,7 +49,7 @@ export function ColorSwatch({
     <button
       type="button"
       title={label ?? color}
-      aria-label={label ?? `Color ${color}`}
+      aria-label={label ?? format(t.editor.ui.colorSwatch.ariaLabel, { color })}
       onClick={onClick}
       className={cn(
         "relative rounded transition-shadow shrink-0",

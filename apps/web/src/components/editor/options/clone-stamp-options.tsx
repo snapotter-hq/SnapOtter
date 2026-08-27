@@ -1,8 +1,10 @@
 // apps/web/src/components/editor/options/clone-stamp-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function CloneStampOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const brushSize = useEditorStore((s) => s.brushSize);
   const brushOpacity = useEditorStore((s) => s.brushOpacity);
@@ -19,7 +21,7 @@ export function CloneStampOptions() {
     <div className="flex items-center gap-3">
       {/* Size */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Size
+        {t.editor.options.shared.size}
         <input
           type="range"
           min={1}
@@ -40,7 +42,7 @@ export function CloneStampOptions() {
 
       {/* Opacity */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Opacity
+        {t.editor.shapes.opacity}
         <input
           type="range"
           min={0}
@@ -62,7 +64,7 @@ export function CloneStampOptions() {
 
       {/* Hardness */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Hardness
+        {t.editor.options.shared.hardness}
         <input
           type="range"
           min={0}
@@ -90,10 +92,12 @@ export function CloneStampOptions() {
           onChange={(e) => setCloneAligned(e.target.checked)}
           className="accent-primary"
         />
-        Aligned
+        {t.editor.options.cloneStamp.aligned}
       </label>
 
-      <span className="text-[10px] text-muted-foreground">Alt+Click to set source</span>
+      <span className="text-[10px] text-muted-foreground">
+        {t.editor.options.cloneStamp.altClickHint}
+      </span>
     </div>
   );
 }

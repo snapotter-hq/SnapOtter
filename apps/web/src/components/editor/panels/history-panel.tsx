@@ -173,7 +173,7 @@ export function HistoryPanel() {
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
           aria-label={t.a11y.undo}
-          title="Undo (Ctrl+Z)"
+          title={t.editor.panels.history.undoTitle}
         >
           <Undo2 size={14} />
         </button>
@@ -188,7 +188,7 @@ export function HistoryPanel() {
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
           aria-label={t.a11y.redo}
-          title="Redo (Ctrl+Shift+Z)"
+          title={t.editor.panels.history.redoTitle}
         >
           <Redo2 size={14} />
         </button>
@@ -222,7 +222,9 @@ export function HistoryPanel() {
           );
         })}
         {entries.length === 0 && (
-          <div className="px-2 py-4 text-center text-xs text-muted-foreground">No history yet</div>
+          <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+            {t.editor.panels.history.empty}
+          </div>
         )}
       </div>
     </div>

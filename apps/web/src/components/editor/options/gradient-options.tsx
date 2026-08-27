@@ -1,8 +1,10 @@
 // apps/web/src/components/editor/options/gradient-options.tsx
 
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function GradientOptions() {
+  const { t } = useTranslation();
   const activeTool = useEditorStore((s) => s.activeTool);
   const gradientType = useEditorStore((s) => s.gradientType);
   const gradientOpacity = useEditorStore((s) => s.gradientOpacity);
@@ -19,20 +21,20 @@ export function GradientOptions() {
     <div className="flex items-center gap-3">
       {/* Type toggle */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Type
+        {t.editor.options.gradient.type}
         <select
           value={gradientType}
           onChange={(e) => setGradientType(e.target.value as "linear" | "radial")}
           className="h-6 text-xs bg-muted border border-border rounded px-1"
         >
-          <option value="linear">Linear</option>
-          <option value="radial">Radial</option>
+          <option value="linear">{t.editor.options.gradient.linear}</option>
+          <option value="radial">{t.editor.options.gradient.radial}</option>
         </select>
       </label>
 
       {/* Opacity */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Opacity
+        {t.editor.shapes.opacity}
         <input
           type="range"
           min={0}
@@ -60,7 +62,7 @@ export function GradientOptions() {
           onChange={(e) => setGradientReverse(e.target.checked)}
           className="accent-primary"
         />
-        Reverse
+        {t.editor.options.gradient.reverse}
       </label>
     </div>
   );

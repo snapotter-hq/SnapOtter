@@ -3,6 +3,7 @@
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -462,6 +463,7 @@ function MenuItemRow({ item, onClose }: { item: MenuItem; onClose: () => void })
 }
 
 export function EditorMenuBar(props: MenuBarCallbacks) {
+  const { t } = useTranslation();
   const menus = useMenuDefinitions(props);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -498,7 +500,7 @@ export function EditorMenuBar(props: MenuBarCallbacks) {
         type="button"
         onClick={() => navigate("/")}
         className="flex items-center gap-1.5 px-2.5 h-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border-r border-border"
-        title="Back to SnapOtter"
+        title={t.editor.menuBar.backTitle}
       >
         <ArrowLeft size={14} />
       </button>

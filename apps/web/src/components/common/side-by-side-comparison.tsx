@@ -42,7 +42,7 @@ export function SideBySideComparison({
           <div className="w-full rounded-lg border border-border overflow-hidden flex items-center justify-center bg-muted/30 p-2 min-h-[200px] max-h-[60dvh]">
             <img
               src={beforeSrc}
-              alt="Original"
+              alt={t.comparison.original}
               className="max-w-full max-h-[56dvh] object-contain rounded-sm"
               draggable={false}
               onLoad={(e) => {
@@ -69,7 +69,7 @@ export function SideBySideComparison({
           <div className="w-full rounded-lg border border-border overflow-hidden flex items-center justify-center bg-muted/30 p-2 min-h-[200px] max-h-[60dvh]">
             <img
               src={afterSrc}
-              alt="Processed"
+              alt={t.comparison.processed}
               className="max-w-full max-h-[56dvh] object-contain rounded-sm"
               draggable={false}
               onLoad={(e) => {

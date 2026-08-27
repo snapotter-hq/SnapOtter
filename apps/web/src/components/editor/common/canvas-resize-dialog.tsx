@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { AnchorPosition } from "@/types/editor";
@@ -45,6 +46,18 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
 
   if (!open) return null;
 
+  const anchorLabels: Record<AnchorPosition, string> = {
+    "top-left": t.editor.ui.canvasResize.anchors.topLeft,
+    "top-center": t.editor.ui.canvasResize.anchors.topCenter,
+    "top-right": t.editor.ui.canvasResize.anchors.topRight,
+    "center-left": t.editor.ui.canvasResize.anchors.centerLeft,
+    center: t.editor.ui.canvasResize.anchors.center,
+    "center-right": t.editor.ui.canvasResize.anchors.centerRight,
+    "bottom-left": t.editor.ui.canvasResize.anchors.bottomLeft,
+    "bottom-center": t.editor.ui.canvasResize.anchors.bottomCenter,
+    "bottom-right": t.editor.ui.canvasResize.anchors.bottomRight,
+  };
+
   const inputCn = cn(
     "h-8 w-full rounded border border-border bg-card px-2 text-sm text-foreground",
     "focus:border-ring focus:outline-none",
@@ -55,7 +68,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
       <div className="w-[380px] rounded-lg border border-border bg-card shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-medium text-foreground">Canvas Size</h2>
+          <h2 className="text-sm font-medium text-foreground">
+            {t.editor.ui.canvasResize.heading}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -70,14 +85,17 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
         <div className="space-y-4 px-4 py-4">
           {/* Current size info */}
           <p className="text-xs text-muted-foreground">
-            Current: {canvasSize.width} x {canvasSize.height} px
+            {format(t.editor.ui.canvasResize.current, {
+              width: canvasSize.width,
+              height: canvasSize.height,
+            })}
           </p>
 
           {/* Width / Height */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="canvas-w" className="mb-1 block text-xs text-muted-foreground">
-                Width (px)
+                {t.editor.ui.widthPx}
               </label>
               <input
                 id="canvas-w"
@@ -91,7 +109,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
             </div>
             <div>
               <label htmlFor="canvas-h" className="mb-1 block text-xs text-muted-foreground">
-                Height (px)
+                {t.editor.ui.heightPx}
               </label>
               <input
                 id="canvas-h"
@@ -107,15 +125,19 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
 
           {/* Anchor grid */}
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">Anchor:</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              {t.editor.ui.canvasResize.anchorLabel}
+            </p>
             <div className="inline-grid grid-cols-3 gap-1 rounded border border-border p-1.5">
               {ANCHOR_POSITIONS.map((pos) => (
                 <button
                   key={pos}
                   type="button"
                   onClick={() => setAnchor(pos)}
-                  title={pos.replace("-", " ")}
-                  aria-label={`Anchor ${pos.replace("-", " ")}`}
+                  title={anchorLabels[pos]}
+                  aria-label={format(t.editor.ui.canvasResize.anchorAriaLabel, {
+                    position: anchorLabels[pos],
+                  })}
                   aria-pressed={anchor === pos}
                   className={cn(
                     "h-5 w-5 rounded-sm transition-colors",
@@ -129,7 +151,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           {/* Background fill */}
           <div className="flex items-center gap-2">
             <label htmlFor="canvas-fill" className="text-xs text-muted-foreground">
-              Background:
+              {t.editor.ui.canvasResize.backgroundLabel}
             </label>
             <input
               id="canvas-fill"
@@ -160,7 +182,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               "text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",
             )}
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
@@ -170,7 +192,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               "hover:bg-primary/90 transition-colors",
             )}
           >
-            Apply
+            {t.editor.ui.apply}
           </button>
         </div>
       </div>

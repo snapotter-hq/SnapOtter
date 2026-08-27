@@ -13,13 +13,13 @@ interface FillDialogProps {
   onClose: () => void;
 }
 
-const FILL_PRESETS: { value: FillContent; label: string }[] = [
-  { value: "foreground", label: "Foreground Color" },
-  { value: "background", label: "Background Color" },
-  { value: "color", label: "Color..." },
-  { value: "white", label: "White" },
-  { value: "black", label: "Black" },
-  { value: "50gray", label: "50% Gray" },
+const FILL_CONTENTS: FillContent[] = [
+  "foreground",
+  "background",
+  "color",
+  "white",
+  "black",
+  "50gray",
 ];
 
 function resolveColor(
@@ -116,6 +116,15 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
 
   if (!open) return null;
 
+  const contentLabels: Record<FillContent, string> = {
+    foreground: t.editor.ui.fillDialog.contents.foreground,
+    background: t.editor.ui.fillDialog.contents.background,
+    color: t.editor.ui.fillDialog.contents.color,
+    white: t.editor.ui.fillDialog.contents.white,
+    black: t.editor.ui.fillDialog.contents.black,
+    "50gray": t.editor.ui.fillDialog.contents.fiftyGray,
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
@@ -123,19 +132,23 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
         role="dialog"
         aria-label={t.a11y.fill}
       >
-        <h3 className="text-sm font-semibold text-foreground mb-3">Fill</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          {t.editor.ui.fillDialog.heading}
+        </h3>
 
         {/* Content selector */}
         <div className="mb-3">
-          <span className="text-xs text-muted-foreground mb-1 block">Contents</span>
+          <span className="text-xs text-muted-foreground mb-1 block">
+            {t.editor.ui.fillDialog.contentsLabel}
+          </span>
           <select
             value={content}
             onChange={(e) => setContent(e.target.value as FillContent)}
             className="w-full h-8 text-sm bg-muted border border-border rounded px-2"
           >
-            {FILL_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
+            {FILL_CONTENTS.map((value) => (
+              <option key={value} value={value}>
+                {contentLabels[value]}
               </option>
             ))}
           </select>
@@ -144,7 +157,9 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
         {/* Custom color picker (only when "color" selected) */}
         {content === "color" && (
           <div className="mb-3">
-            <span className="text-xs text-muted-foreground mb-1 block">Custom Color</span>
+            <span className="text-xs text-muted-foreground mb-1 block">
+              {t.editor.ui.fillDialog.customColor}
+            </span>
             <input
               type="color"
               value={customColor}
@@ -156,7 +171,9 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
 
         {/* Opacity */}
         <div className="mb-4">
-          <span className="text-xs text-muted-foreground mb-1 block">Opacity</span>
+          <span className="text-xs text-muted-foreground mb-1 block">
+            {t.editor.ui.fillDialog.opacity}
+          </span>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -180,7 +197,9 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
 
         {/* Color preview */}
         <div className="mb-4 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Preview:</span>
+          <span className="text-xs text-muted-foreground">
+            {t.editor.ui.fillDialog.previewLabel}
+          </span>
           <div
             className="w-8 h-8 rounded border border-border"
             style={{
@@ -200,7 +219,7 @@ export function FillDialog({ open, onClose }: FillDialogProps) {
               "hover:bg-muted transition-colors",
             )}
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"

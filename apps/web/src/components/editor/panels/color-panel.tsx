@@ -4,6 +4,7 @@ import { ArrowLeftRight, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { ColorSwatch } from "../common/color-swatch";
@@ -162,7 +163,9 @@ function ColorInputFields({
                 "bg-muted border border-border text-foreground",
                 "focus:outline-none focus:ring-1 focus:ring-ring",
               )}
-              aria-label={`${ch.toUpperCase()} color channel`}
+              aria-label={format(t.editor.panels.color.channelAriaLabel, {
+                channel: ch.toUpperCase(),
+              })}
               data-testid={`color-${ch}-input`}
             />
           </div>
@@ -195,7 +198,9 @@ function ColorInputFields({
               "bg-muted border border-border text-foreground",
               "focus:outline-none focus:ring-1 focus:ring-ring",
             )}
-            aria-label={`${ch.toUpperCase()} color channel`}
+            aria-label={format(t.editor.panels.color.channelAriaLabel, {
+              channel: ch.toUpperCase(),
+            })}
             data-testid={`color-${ch}-input`}
           />
         </div>
@@ -217,6 +222,7 @@ function ColorPickerPopover({
   recentColors: string[];
   onRecentColorClick: (color: string) => void;
 }) {
+  const { t } = useTranslation();
   const [inputMode, setInputMode] = useState<InputMode>("hex");
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -277,7 +283,7 @@ function ColorPickerPopover({
       {/* Recent colors */}
       {recentColors.length > 0 && (
         <div className="mt-2.5 pt-2 border-t border-border">
-          <p className="text-[10px] text-muted-foreground mb-1.5">Recent</p>
+          <p className="text-[10px] text-muted-foreground mb-1.5">{t.editor.panels.color.recent}</p>
           <div className="flex flex-wrap gap-1">
             {recentColors.map((c) => (
               <ColorSwatch
@@ -390,7 +396,7 @@ export function ColorPanel() {
               "text-muted-foreground hover:text-foreground transition-colors",
               "bg-card/80 hover:bg-muted",
             )}
-            title="Swap colors (X)"
+            title={t.editor.panels.color.swapColorsTitle}
             aria-label={t.a11y.swapColors}
             data-testid="swap-colors"
           >
@@ -406,7 +412,7 @@ export function ColorPanel() {
               "text-muted-foreground hover:text-foreground transition-colors",
               "bg-card/80 hover:bg-muted",
             )}
-            title="Reset colors (D)"
+            title={t.editor.panels.color.resetColorsTitle}
             aria-label={t.a11y.resetColors}
             data-testid="reset-colors"
           >
@@ -416,7 +422,9 @@ export function ColorPanel() {
 
         {/* Hex input for foreground color */}
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] text-muted-foreground block mb-1">Foreground</span>
+          <span className="text-[10px] text-muted-foreground block mb-1">
+            {t.editor.panels.color.foreground}
+          </span>
           <input
             type="text"
             value={hexInput.toUpperCase()}

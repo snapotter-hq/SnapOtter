@@ -4,6 +4,7 @@ import { BeforeAfterSlider } from "@/components/common/before-after-slider";
 import { ImageViewer } from "@/components/common/image-viewer";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 /**
@@ -99,7 +100,7 @@ export function MultiImageViewer() {
               </div>
               <p className="text-sm font-medium">{processedFilename}</p>
               <p className="text-xs text-muted-foreground">
-                {processedExt} files cannot be previewed in the browser.
+                {format(t.commonUi.multiImageViewer.cannotPreview, { ext: processedExt })}
               </p>
             </div>
           ) : hasProcessed ? (
