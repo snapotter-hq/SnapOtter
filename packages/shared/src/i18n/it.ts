@@ -2899,6 +2899,7 @@ export const it: TranslationKeys = {
       submit: "Genera Placeholder",
       submitBatch: "Genera Placeholder ({count} file)",
       progressLabel: "Generazione placeholder",
+      previewAlt: "Anteprima LQIP",
     },
     "sprite-sheet": {
       format: "Formato",
@@ -4538,6 +4539,8 @@ export const it: TranslationKeys = {
       passwordCopied: "Copiato!",
       copyPasswordWarning:
         "Copia questa password adesso. Non potrai vederla dopo aver creato l'utente.",
+      memberCount: "{count} membro",
+      memberCountPlural: "{count} membri",
     },
     teams: {
       heading: "Team",
@@ -4929,7 +4932,6 @@ export const it: TranslationKeys = {
     modalityWarning: "Incompatibilità di modalità",
     modalityWarningTooltip:
       "Questo passaggio prevede {expected} ma riceve {received}; potrebbe non riuscire durante l'esecuzione della pipeline.",
-    unnamedFile: "file",
   },
   nav: {
     tools: "Strumenti",
@@ -5240,6 +5242,7 @@ export const it: TranslationKeys = {
     fileLibrary: {
       importing: "Importazione in corso...",
       importCount: "Importa ({count})",
+      import: "Importa",
     },
     metadataGrid: {
       noData: "Nessun dato",

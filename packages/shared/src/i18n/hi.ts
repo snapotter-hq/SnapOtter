@@ -2701,6 +2701,7 @@ export const hi: TranslationKeys = {
       submit: "प्लेसहोल्डर बनाएँ",
       submitBatch: "प्लेसहोल्डर बनाएँ ({count} फ़ाइलें)",
       progressLabel: "प्लेसहोल्डर बन रहा है",
+      previewAlt: "LQIP प्रीव्यू",
     },
     "sprite-sheet": {
       format: "फॉर्मेट",
@@ -4321,6 +4322,8 @@ export const hi: TranslationKeys = {
       copyPasswordButton: "पासवर्ड कॉपी करें",
       passwordCopied: "कॉपी हो गया!",
       copyPasswordWarning: "इस पासवर्ड को अभी कॉपी करें। उपयोगकर्ता बनाने के बाद आप इसे नहीं देख पाएंगे।",
+      memberCount: "{count} सदस्य",
+      memberCountPlural: "{count} सदस्य",
     },
     teams: {
       heading: "टीमें",
@@ -4700,7 +4703,6 @@ export const hi: TranslationKeys = {
     modalityWarning: "मोडैलिटी मेल नहीं खाती",
     modalityWarningTooltip:
       "यह चरण {expected} की अपेक्षा करता है लेकिन {received} प्राप्त करता है; पाइपलाइन चलाने पर यह विफल हो सकता है।",
-    unnamedFile: "फ़ाइल",
   },
   nav: {
     tools: "टूल्स",
@@ -5006,6 +5008,7 @@ export const hi: TranslationKeys = {
     fileLibrary: {
       importing: "आयात हो रहा है...",
       importCount: "आयात करें ({count})",
+      import: "इम्पोर्ट",
     },
     metadataGrid: {
       noData: "कोई डेटा नहीं",

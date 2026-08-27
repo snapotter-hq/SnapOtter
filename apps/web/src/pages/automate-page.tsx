@@ -472,11 +472,7 @@ export function AutomatePage() {
         );
       }
       // document / data: success card with filename + size
-      const fname =
-        currentEntry?.processedFilename ??
-        selectedFileName ??
-        files[0]?.name ??
-        t.automate.unnamedFile;
+      const fname = currentEntry?.processedFilename ?? selectedFileName ?? files[0]?.name ?? "";
       const fsize = processedSize ?? 0;
       const ext = fname.split(".").pop()?.toUpperCase() ?? "";
       return (
@@ -523,7 +519,7 @@ export function AutomatePage() {
       );
     }
     // document / data: placeholder card
-    const fname = selectedFileName ?? files[0]?.name ?? t.automate.unnamedFile;
+    const fname = selectedFileName ?? files[0]?.name ?? "";
     const fsize = selectedFileSize ?? files[0]?.size ?? 0;
     const ext = fname.split(".").pop()?.toUpperCase() ?? "";
     return (

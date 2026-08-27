@@ -2910,6 +2910,7 @@ export const fr: TranslationKeys = {
       submit: "Générer l'aperçu",
       submitBatch: "Générer l'aperçu ({count} fichiers)",
       progressLabel: "Génération de l'aperçu",
+      previewAlt: "Aperçu LQIP",
     },
     "sprite-sheet": {
       format: "Format",
@@ -4547,6 +4548,8 @@ export const fr: TranslationKeys = {
       passwordCopied: "Copié !",
       copyPasswordWarning:
         "Copiez ce mot de passe maintenant. Vous ne pourrez plus le voir après la création de l'utilisateur.",
+      memberCount: "{count} membre",
+      memberCountPlural: "{count} membres",
     },
     teams: {
       heading: "Équipes",
@@ -4941,7 +4944,6 @@ export const fr: TranslationKeys = {
     modalityWarning: "Incompatibilité de modalité",
     modalityWarningTooltip:
       "Cette étape attend {expected} mais reçoit {received} ; elle peut échouer lors de l'exécution du pipeline.",
-    unnamedFile: "fichier",
   },
   nav: {
     tools: "Outils",
@@ -5253,6 +5255,7 @@ export const fr: TranslationKeys = {
     fileLibrary: {
       importing: "Importation...",
       importCount: "Importer ({count})",
+      import: "Importer",
     },
     metadataGrid: {
       noData: "Aucune donnée",

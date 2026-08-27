@@ -2892,6 +2892,7 @@ export const pl: TranslationKeys = {
       submit: "Generuj placeholder",
       submitBatch: "Generuj placeholder ({count} plików)",
       progressLabel: "Generowanie placeholdera",
+      previewAlt: "Podgląd LQIP",
     },
     "sprite-sheet": {
       format: "Format",
@@ -4528,6 +4529,8 @@ export const pl: TranslationKeys = {
       passwordCopied: "Skopiowano!",
       copyPasswordWarning:
         "Skopiuj to hasło teraz. Nie będziesz mógł go zobaczyć po utworzeniu użytkownika.",
+      memberCount: "{count} członek",
+      memberCountPlural: "{count} członków",
     },
     teams: {
       heading: "Zespoły",
@@ -4922,7 +4925,6 @@ export const pl: TranslationKeys = {
     modalityWarning: "Niezgodność modalności",
     modalityWarningTooltip:
       "Ten krok oczekuje {expected}, ale otrzymuje {received}; może się nie powieść podczas uruchamiania potoku.",
-    unnamedFile: "plik",
   },
   nav: {
     tools: "Narzędzia",
@@ -5234,6 +5236,7 @@ export const pl: TranslationKeys = {
     fileLibrary: {
       importing: "Importowanie...",
       importCount: "Importuj ({count})",
+      import: "Importuj",
     },
     metadataGrid: {
       noData: "Brak danych",

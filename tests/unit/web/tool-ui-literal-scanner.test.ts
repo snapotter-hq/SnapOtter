@@ -115,6 +115,49 @@ describe("scanToolUiLiterals", () => {
     expect(texts(dir)).toEqual([]);
   });
 
+  it("does not mistake a prop for a same-named outer const", () => {
+    const dir = fixture({
+      "a.tsx": `const label = "Outer const, never rendered";
+      export function A({ label }: { label: string }) {
+        return <p>{label}</p>;
+      }`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
+  it("does not mistake a destructured prop for a same-named outer const", () => {
+    const dir = fixture({
+      "a.tsx": `const title = "Outer const, never rendered";
+      export function A({ title, size }: { title: string; size: number }) {
+        return <button title={title}>{size}</button>;
+      }`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
+  it("reports literals composed through format() in a rendered position", () => {
+    const dir = fixture({
+      "a.tsx": `import { format } from "@/lib/format";
+      export const A = ({ n }: { n: number }) => (
+        <div>
+          <span>{format("Removed {count} pages", { count: n })}</span>
+          <button title={format("Delete {count} items", { count: n })} />
+        </div>
+      );`,
+    });
+    expect(texts(dir).sort()).toEqual(["Delete {count} items", "Removed {count} pages"]);
+  });
+
+  it("reports both branches of a rendered plural()", () => {
+    const dir = fixture({
+      "a.tsx": `import { plural } from "@/lib/format";
+      export const A = ({ n }: { n: number }) => (
+        <span>{plural(n, "One file selected", "Many files selected")}</span>
+      );`,
+    });
+    expect(texts(dir).sort()).toEqual(["Many files selected", "One file selected"]);
+  });
+
   it("reports a module-scope local rendered inside a component", () => {
     const dir = fixture({
       "a.tsx": `const emptyMessage = "No files selected yet";
@@ -138,13 +181,22 @@ describe("scanToolUiLiterals", () => {
     expect(texts(dir)).toEqual(["Retry the upload"]);
   });
 
-  it("scans every directory it is given and reports repo-relative file paths", () => {
+  it("scans every directory it is given", () => {
     const one = fixture({ "one.tsx": `export const A = () => <p>First message here</p>;` });
     const two = fixture({ "two.tsx": `export const B = () => <p>Second message here</p>;` });
     const hits = scanToolUiLiterals([one, two]);
     expect(hits.map((h) => h.text).sort()).toEqual(["First message here", "Second message here"]);
-    expect(hits.every((h) => h.file.includes(path.sep))).toBe(true);
     expect(new Set(hits.map((h) => h.file)).size).toBe(2);
+  });
+
+  it("reports paths relative to the repo root for files inside it", () => {
+    const dir = path.resolve(__dirname, "../../../apps/web/src/components/tools");
+    const hits = scanToolUiLiterals(dir);
+    expect(hits.length).toBeGreaterThan(0);
+    for (const hit of hits) {
+      expect(path.isAbsolute(hit.file)).toBe(false);
+      expect(hit.file.startsWith("apps/web/src/components/tools/")).toBe(true);
+    }
   });
 
   it("still accepts a single directory string", () => {

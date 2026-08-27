@@ -2885,6 +2885,7 @@ export const es: TranslationKeys = {
       submit: "Generar marcador",
       submitBatch: "Generar marcador ({count} archivos)",
       progressLabel: "Generando marcador",
+      previewAlt: "Vista previa LQIP",
     },
     "sprite-sheet": {
       format: "Formato",
@@ -4522,6 +4523,8 @@ export const es: TranslationKeys = {
       passwordCopied: "¡Copiado!",
       copyPasswordWarning:
         "Copia esta contraseña ahora. No podrás verla después de crear el usuario.",
+      memberCount: "{count} miembro",
+      memberCountPlural: "{count} miembros",
     },
     teams: {
       heading: "Equipos",
@@ -4915,7 +4918,6 @@ export const es: TranslationKeys = {
     modalityWarning: "Incompatibilidad de modalidad",
     modalityWarningTooltip:
       "Este paso espera {expected} pero recibe {received}; puede fallar al ejecutar la canalización.",
-    unnamedFile: "archivo",
   },
   nav: {
     tools: "Herramientas",
@@ -5227,6 +5229,7 @@ export const es: TranslationKeys = {
     fileLibrary: {
       importing: "Importando...",
       importCount: "Importar ({count})",
+      import: "Importar",
     },
     metadataGrid: {
       noData: "Sin datos",

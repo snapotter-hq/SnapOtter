@@ -2641,6 +2641,7 @@ export const zhTW: TranslationKeys = {
       submit: "產生佔位圖",
       submitBatch: "產生佔位圖（{count} 個檔案）",
       progressLabel: "正在產生佔位圖",
+      previewAlt: "LQIP 預覽",
     },
     "sprite-sheet": {
       format: "格式",
@@ -4255,6 +4256,8 @@ export const zhTW: TranslationKeys = {
       copyPasswordButton: "複製密碼",
       passwordCopied: "已複製！",
       copyPasswordWarning: "請立即複製此密碼。建立使用者後將無法再次查看。",
+      memberCount: "{count}位成員",
+      memberCountPlural: "{count}位成員",
     },
     teams: {
       heading: "團隊",
@@ -4630,7 +4633,6 @@ export const zhTW: TranslationKeys = {
     step: "步驟",
     modalityWarning: "模態不相符",
     modalityWarningTooltip: "此步驟需要 {expected}，但收到 {received}；執行管線時可能會失敗。",
-    unnamedFile: "檔案",
   },
   nav: {
     tools: "工具",
@@ -4936,6 +4938,7 @@ export const zhTW: TranslationKeys = {
     fileLibrary: {
       importing: "匯入中...",
       importCount: "匯入（{count}）",
+      import: "匯入",
     },
     metadataGrid: {
       noData: "無資料",

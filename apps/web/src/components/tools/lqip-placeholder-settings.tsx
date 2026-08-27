@@ -208,7 +208,7 @@ export function LqipPlaceholderSettings() {
           <div className="flex items-start gap-3">
             <img
               src={dataUri}
-              alt="LQIP preview"
+              alt={t.toolSettings["lqip-placeholder"].previewAlt}
               className="rounded border border-border"
               style={{ width: 96, imageRendering: "auto" }}
             />

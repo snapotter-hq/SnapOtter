@@ -2641,6 +2641,7 @@ export const zhCN: TranslationKeys = {
       submit: "生成占位图",
       submitBatch: "生成占位图（{count} 个文件）",
       progressLabel: "正在生成占位图",
+      previewAlt: "LQIP 预览",
     },
     "sprite-sheet": {
       format: "格式",
@@ -4255,6 +4256,8 @@ export const zhCN: TranslationKeys = {
       copyPasswordButton: "复制密码",
       passwordCopied: "已复制！",
       copyPasswordWarning: "请立即复制此密码。创建用户后将无法再次查看。",
+      memberCount: "{count} 个成员",
+      memberCountPlural: "{count} 个成员",
     },
     teams: {
       heading: "团队",
@@ -4629,7 +4632,6 @@ export const zhCN: TranslationKeys = {
     step: "步骤",
     modalityWarning: "模态不匹配",
     modalityWarningTooltip: "此步骤需要 {expected}，但接收到 {received}；运行管道时可能会失败。",
-    unnamedFile: "文件",
   },
   nav: {
     tools: "工具",
@@ -4934,6 +4936,7 @@ export const zhCN: TranslationKeys = {
     fileLibrary: {
       importing: "导入中...",
       importCount: "导入（{count}）",
+      import: "导入",
     },
     metadataGrid: {
       noData: "无数据",

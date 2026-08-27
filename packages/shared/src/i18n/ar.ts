@@ -2873,6 +2873,7 @@ export const ar: TranslationKeys = {
       submit: "إنشاء عنصر نائب",
       submitBatch: "إنشاء عنصر نائب ({count} ملفات)",
       progressLabel: "جارٍ إنشاء العنصر النائب",
+      previewAlt: "معاينة LQIP",
     },
     "sprite-sheet": {
       format: "الصيغة",
@@ -4492,6 +4493,8 @@ export const ar: TranslationKeys = {
       copyPasswordButton: "نسخ كلمة المرور",
       passwordCopied: "تم النسخ!",
       copyPasswordWarning: "انسخ كلمة المرور الآن. لن تتمكن من رؤيتها بعد إنشاء المستخدم.",
+      memberCount: "{count} عضو",
+      memberCountPlural: "{count} أعضاء",
     },
     teams: {
       heading: "الفرق",
@@ -4872,7 +4875,6 @@ export const ar: TranslationKeys = {
     modalityWarning: "عدم توافق النوع",
     modalityWarningTooltip:
       "تتوقع هذه الخطوة {expected} لكنها تتلقى {received}؛ قد تفشل عند تشغيل المسار.",
-    unnamedFile: "ملف",
   },
   nav: {
     tools: "الأدوات",
@@ -5178,6 +5180,7 @@ export const ar: TranslationKeys = {
     fileLibrary: {
       importing: "جارٍ الاستيراد...",
       importCount: "استيراد ({count})",
+      import: "استيراد",
     },
     metadataGrid: {
       noData: "لا توجد بيانات",

@@ -2889,6 +2889,7 @@ export const sv: TranslationKeys = {
       submit: "Generera platshållare",
       submitBatch: "Generera platshållare ({count} filer)",
       progressLabel: "Genererar platshållare",
+      previewAlt: "LQIP-förhandsvisning",
     },
     "sprite-sheet": {
       format: "Format",
@@ -4519,6 +4520,8 @@ export const sv: TranslationKeys = {
       passwordCopied: "Kopierat!",
       copyPasswordWarning:
         "Kopiera detta lösenord nu. Du kan inte se det efter att användaren har skapats.",
+      memberCount: "{count} medlem",
+      memberCountPlural: "{count} medlemmar",
     },
     teams: {
       heading: "Team",
@@ -4906,7 +4909,6 @@ export const sv: TranslationKeys = {
     modalityWarning: "Modalitetsfel",
     modalityWarningTooltip:
       "Det här steget förväntar sig {expected} men tar emot {received}; det kan misslyckas när du kör pipelinen.",
-    unnamedFile: "fil",
   },
   nav: {
     tools: "Verktyg",
@@ -5215,6 +5217,7 @@ export const sv: TranslationKeys = {
     fileLibrary: {
       importing: "Importerar...",
       importCount: "Importera ({count})",
+      import: "Importera",
     },
     metadataGrid: {
       noData: "Ingen data",

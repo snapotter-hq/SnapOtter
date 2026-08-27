@@ -275,7 +275,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             ) : checkedIds.size > 0 ? (
               format(t.commonUi.fileLibrary.importCount, { count: checkedIds.size })
             ) : (
-              t.automate.importButton
+              t.commonUi.fileLibrary.import
             )}
           </button>
         </div>

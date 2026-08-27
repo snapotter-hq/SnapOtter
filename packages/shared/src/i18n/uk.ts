@@ -2893,6 +2893,7 @@ export const uk: TranslationKeys = {
       submit: "Створити заповнювач",
       submitBatch: "Створити заповнювач ({count} файлів)",
       progressLabel: "Створення заповнювача",
+      previewAlt: "Попередній перегляд LQIP",
     },
     "sprite-sheet": {
       format: "Формат",
@@ -4524,6 +4525,8 @@ export const uk: TranslationKeys = {
       passwordCopied: "Скопійовано!",
       copyPasswordWarning:
         "Скопіюйте цей пароль зараз. Після створення користувача ви не зможете його побачити.",
+      memberCount: "{count} учасник",
+      memberCountPlural: "{count} учасників",
     },
     teams: {
       heading: "Команди",
@@ -4914,7 +4917,6 @@ export const uk: TranslationKeys = {
     modalityWarning: "Невідповідність модальності",
     modalityWarningTooltip:
       "Цей крок очікує {expected}, але отримує {received}; він може завершитися помилкою під час запуску конвеєра.",
-    unnamedFile: "файл",
   },
   nav: {
     tools: "Інструменти",
@@ -5225,6 +5227,7 @@ export const uk: TranslationKeys = {
     fileLibrary: {
       importing: "Імпортування...",
       importCount: "Імпорт ({count})",
+      import: "Імпорт",
     },
     metadataGrid: {
       noData: "Немає даних",

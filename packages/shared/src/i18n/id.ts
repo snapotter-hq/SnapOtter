@@ -2890,6 +2890,7 @@ export const id: TranslationKeys = {
       submit: "Buat Placeholder",
       submitBatch: "Buat Placeholder ({count} file)",
       progressLabel: "Membuat placeholder",
+      previewAlt: "Pratinjau LQIP",
     },
     "sprite-sheet": {
       format: "Format",
@@ -4518,6 +4519,8 @@ export const id: TranslationKeys = {
       passwordCopied: "Disalin!",
       copyPasswordWarning:
         "Salin kata sandi ini sekarang. Anda tidak akan bisa melihatnya setelah membuat pengguna.",
+      memberCount: "{count} anggota",
+      memberCountPlural: "{count} anggota",
     },
     teams: {
       heading: "Tim",
@@ -4908,7 +4911,6 @@ export const id: TranslationKeys = {
     modalityWarning: "Ketidakcocokan modalitas",
     modalityWarningTooltip:
       "Langkah ini mengharapkan {expected} tetapi menerima {received}; mungkin gagal saat Anda menjalankan pipeline.",
-    unnamedFile: "file",
   },
   nav: {
     tools: "Alat",
@@ -5218,6 +5220,7 @@ export const id: TranslationKeys = {
     fileLibrary: {
       importing: "Mengimpor...",
       importCount: "Impor ({count})",
+      import: "Impor",
     },
     metadataGrid: {
       noData: "Tidak ada data",

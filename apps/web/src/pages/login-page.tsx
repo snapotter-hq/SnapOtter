@@ -92,7 +92,9 @@ function LanguageSelector() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const current = supportedLocales.find((l) => l.code === locale) ?? supportedLocales[0];
+  const current =
+    supportedLocales.find((l) => l.code === locale) ??
+    supportedLocales.find((l) => l.code === "en");
 
   return (
     <div ref={ref} className="relative">

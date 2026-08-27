@@ -2849,6 +2849,7 @@ export const ja: TranslationKeys = {
       submit: "プレースホルダーを生成",
       submitBatch: "プレースホルダーを生成 ({count} ファイル)",
       progressLabel: "プレースホルダーを生成中",
+      previewAlt: "LQIP プレビュー",
     },
     "sprite-sheet": {
       format: "フォーマット",
@@ -4472,6 +4473,8 @@ export const ja: TranslationKeys = {
       passwordCopied: "コピーしました！",
       copyPasswordWarning:
         "今すぐこのパスワードをコピーしてください。ユーザー作成後は表示できません。",
+      memberCount: "{count}人のメンバー",
+      memberCountPlural: "{count}人のメンバー",
     },
     teams: {
       heading: "チーム",
@@ -4855,7 +4858,6 @@ export const ja: TranslationKeys = {
     modalityWarning: "モダリティ不一致",
     modalityWarningTooltip:
       "このステップは {expected} を想定していますが {received} を受け取ります。パイプラインの実行時に失敗する可能性があります。",
-    unnamedFile: "ファイル",
   },
   nav: {
     tools: "ツール",
@@ -5164,6 +5166,7 @@ export const ja: TranslationKeys = {
     fileLibrary: {
       importing: "インポート中...",
       importCount: "インポート（{count}）",
+      import: "インポート",
     },
     metadataGrid: {
       noData: "データなし",

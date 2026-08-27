@@ -2902,6 +2902,7 @@ export const nl: TranslationKeys = {
       submit: "Plaatshouder genereren",
       submitBatch: "Plaatshouder genereren ({count} bestanden)",
       progressLabel: "Plaatshouder genereren",
+      previewAlt: "LQIP-voorbeeld",
     },
     "sprite-sheet": {
       format: "Formaat",
@@ -4536,6 +4537,8 @@ export const nl: TranslationKeys = {
       passwordCopied: "Gekopieerd!",
       copyPasswordWarning:
         "Kopieer dit wachtwoord nu. U kunt het niet meer zien na het aanmaken van de gebruiker.",
+      memberCount: "{count} lid",
+      memberCountPlural: "{count} leden",
     },
     teams: {
       heading: "Teams",
@@ -4926,7 +4929,6 @@ export const nl: TranslationKeys = {
     modalityWarning: "Modaliteitsmismatch",
     modalityWarningTooltip:
       "Deze stap verwacht {expected} maar ontvangt {received}; mogelijk mislukt deze bij het uitvoeren van de pipeline.",
-    unnamedFile: "bestand",
   },
   nav: {
     tools: "Tools",
@@ -5237,6 +5239,7 @@ export const nl: TranslationKeys = {
     fileLibrary: {
       importing: "Importeren...",
       importCount: "Importeren ({count})",
+      import: "Importeren",
     },
     metadataGrid: {
       noData: "Geen gegevens",

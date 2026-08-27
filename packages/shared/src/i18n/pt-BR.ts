@@ -2896,6 +2896,7 @@ export const ptBR: TranslationKeys = {
       submit: "Gerar placeholder",
       submitBatch: "Gerar placeholder ({count} arquivos)",
       progressLabel: "Gerando placeholder",
+      previewAlt: "Visualização LQIP",
     },
     "sprite-sheet": {
       format: "Formato",
@@ -4529,6 +4530,8 @@ export const ptBR: TranslationKeys = {
       copyPasswordButton: "Copiar senha",
       passwordCopied: "Copiado!",
       copyPasswordWarning: "Copie esta senha agora. Você não poderá vê-la após criar o usuário.",
+      memberCount: "{count} membro",
+      memberCountPlural: "{count} membros",
     },
     teams: {
       heading: "Equipes",
@@ -4922,7 +4925,6 @@ export const ptBR: TranslationKeys = {
     modalityWarning: "Incompatibilidade de modalidade",
     modalityWarningTooltip:
       "Esta etapa espera {expected}, mas recebe {received}; pode falhar ao executar o pipeline.",
-    unnamedFile: "arquivo",
   },
   nav: {
     tools: "Ferramentas",
@@ -5232,6 +5234,7 @@ export const ptBR: TranslationKeys = {
     fileLibrary: {
       importing: "Importando...",
       importCount: "Importar ({count})",
+      import: "Importar",
     },
     metadataGrid: {
       noData: "Sem dados",

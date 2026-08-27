@@ -8,6 +8,9 @@ import { format } from "@/lib/format";
  * stays in one translation key with a {code} placeholder, so a translator can
  * move the token wherever their grammar wants it instead of being handed two
  * half-sentences.
+ *
+ * Splits on the first {code} only and keeps the rest of the sentence, so a
+ * locale that drops the placeholder or repeats it loses no text.
  */
 function SentenceWithCode({
   template,
@@ -18,7 +21,9 @@ function SentenceWithCode({
   code: string;
   values?: Record<string, string>;
 }) {
-  const [before, after = ""] = template.split("{code}");
+  const at = template.indexOf("{code}");
+  const before = at === -1 ? template : template.slice(0, at);
+  const after = at === -1 ? "" : template.slice(at + "{code}".length);
   return (
     <>
       {format(before, values)}

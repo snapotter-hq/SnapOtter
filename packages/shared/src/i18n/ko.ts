@@ -2826,6 +2826,7 @@ export const ko: TranslationKeys = {
       submit: "플레이스홀더 생성",
       submitBatch: "플레이스홀더 생성 ({count}개 파일)",
       progressLabel: "플레이스홀더 생성 중",
+      previewAlt: "LQIP 미리보기",
     },
     "sprite-sheet": {
       format: "포맷",
@@ -4447,6 +4448,8 @@ export const ko: TranslationKeys = {
       copyPasswordButton: "비밀번호 복사",
       passwordCopied: "복사됨!",
       copyPasswordWarning: "지금 이 비밀번호를 복사하세요. 사용자 생성 후에는 확인할 수 없습니다.",
+      memberCount: "멤버 {count}명",
+      memberCountPlural: "멤버 {count}명",
     },
     teams: {
       heading: "팀",
@@ -4829,7 +4832,6 @@ export const ko: TranslationKeys = {
     modalityWarning: "모달리티 불일치",
     modalityWarningTooltip:
       "이 단계는 {expected}을(를) 기대하지만 {received}을(를) 받습니다. 파이프라인을 실행하면 실패할 수 있습니다.",
-    unnamedFile: "파일",
   },
   nav: {
     tools: "도구",
@@ -5138,6 +5140,7 @@ export const ko: TranslationKeys = {
     fileLibrary: {
       importing: "가져오는 중...",
       importCount: "가져오기 ({count})",
+      import: "가져오기",
     },
     metadataGrid: {
       noData: "데이터 없음",

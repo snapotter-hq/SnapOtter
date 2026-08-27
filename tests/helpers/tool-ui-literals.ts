@@ -37,10 +37,26 @@ function skip(s: string): boolean {
   return !/[a-zA-Z]{2}/.test(s) || NEVER_COPY.test(s.trim());
 }
 
+/**
+ * Template arguments of the two i18n composition helpers. `format(template,
+ * values)` substitutes into argument 0; `plural(count, one, other)` picks
+ * between arguments 1 and 2. A literal in one of those slots renders verbatim,
+ * so it has to be reported: this sweep made both helpers the standard way to
+ * build a sentence that carries an expression.
+ */
+function isComposedTemplateArgument(call: ts.CallExpression, arg: ts.Node): boolean {
+  if (!ts.isIdentifier(call.expression)) return false;
+  const index = call.arguments.indexOf(arg as ts.Expression);
+  if (call.expression.text === "format") return index === 0;
+  if (call.expression.text === "plural") return index === 1 || index === 2;
+  return false;
+}
+
 /** Parent hops that keep a literal on its way to being rendered verbatim. */
 function transparentParent(cur: ts.Node, parent: ts.Node): ts.Node | null {
   if (ts.isParenthesizedExpression(parent)) return parent;
   if (ts.isTemplateSpan(parent) || ts.isTemplateExpression(parent)) return parent;
+  if (ts.isCallExpression(parent)) return isComposedTemplateArgument(parent, cur) ? parent : null;
   if (ts.isConditionalExpression(parent)) return parent.condition === cur ? null : parent;
   if (ts.isBinaryExpression(parent)) {
     const op = parent.operatorToken.kind;
@@ -114,10 +130,23 @@ function hasStatements(
   );
 }
 
+/** Does this binding (plain, destructured or nested) introduce `name`? */
+function bindingIntroduces(binding: ts.BindingName, name: string): boolean {
+  if (ts.isIdentifier(binding)) return binding.text === name;
+  return binding.elements.some(
+    (element) => ts.isBindingElement(element) && bindingIntroduces(element.name, name),
+  );
+}
+
 /**
  * Resolve a rendered identifier to its nearest lexical `const`/`let`
  * declaration. Approximates scope by walking enclosing statement lists, so an
  * inner declaration shadows an outer one of the same name.
+ *
+ * Parameters shadow too, and in React they shadow constantly: `label`, `title`
+ * and `name` are all prop names here. Walking past a function that binds the
+ * identifier as a parameter would attribute a prop's value to an unrelated
+ * outer const and report a string that never renders, so stop there instead.
  */
 function resolveLocalDeclaration(id: ts.Identifier): ts.VariableDeclaration | null {
   let cur: ts.Node | undefined = id.parent;
@@ -131,6 +160,12 @@ function resolveLocalDeclaration(id: ts.Identifier): ts.VariableDeclaration | nu
           }
         }
       }
+    }
+    if (
+      ts.isFunctionLike(cur) &&
+      cur.parameters.some((parameter) => bindingIntroduces(parameter.name, id.text))
+    ) {
+      return null;
     }
     cur = cur.parent;
   }

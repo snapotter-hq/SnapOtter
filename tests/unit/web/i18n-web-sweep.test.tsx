@@ -64,9 +64,12 @@ describe("web-wide i18n sweep (#909)", () => {
     expect(screen.getAllByText(contains(processedLabel)).length).toBeGreaterThan(0);
     expect(screen.getAllByText(contains(smallerTail)).length).toBeGreaterThan(0);
     expect(screen.queryByAltText("Processed")).not.toBeInTheDocument();
-    expect(screen.queryByText(contains("smaller"))).not.toBeInTheDocument();
-    // The composed sentence must substitute, not render the raw placeholder.
-    expect(screen.queryByText(contains("{size}"))).not.toBeInTheDocument();
+    // queryAllByText, not queryByText: a function matcher also matches every
+    // ancestor, so a reintroduced literal would throw "found multiple" rather
+    // than fail the assertion.
+    expect(screen.queryAllByText(contains("smaller"))).toHaveLength(0);
+    // The composed sentence must substitute, not render any raw placeholder.
+    expect(screen.queryAllByText(contains("{size}"))).toHaveLength(0);
   });
 
   it("localizes the metadata grid empty state", async () => {
@@ -98,10 +101,12 @@ describe("web-wide i18n sweep (#909)", () => {
     expect(screen.getByText(de.privacyPolicy.yourControl.body)).toBeInTheDocument();
     expect(screen.queryByText(/self-hosted, open-source file processing/)).not.toBeInTheDocument();
 
-    // Identifiers stay untranslated, and the {code} placeholder is consumed.
+    // Identifiers stay untranslated, and no placeholder of any name survives
+    // into the DOM (a locale that renamed one would still be caught).
     expect(screen.getByText("SNAPOTTER_ANALYTICS=off")).toBeInTheDocument();
     expect(screen.getByText("feedback_submitted")).toBeInTheDocument();
-    expect(screen.queryByText(/\{code\}/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/\{privacy\}/)).not.toBeInTheDocument();
+    const anyPlaceholder = (_: string, el: Element | null) =>
+      /\{[a-z]+\}/i.test(el?.textContent ?? "");
+    expect(screen.queryAllByText(anyPlaceholder)).toHaveLength(0);
   });
 });

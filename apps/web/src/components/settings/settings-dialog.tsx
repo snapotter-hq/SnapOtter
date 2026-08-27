@@ -2635,7 +2635,14 @@ function TeamsSection() {
                       </span>
                       {isMobile && (
                         <span className="text-xs text-muted-foreground">
-                          {tm.memberCount} {plural(tm.memberCount, "member", "members")}
+                          {format(
+                            plural(
+                              tm.memberCount,
+                              t.settings.people.memberCount,
+                              t.settings.people.memberCountPlural,
+                            ),
+                            { count: tm.memberCount },
+                          )}
                         </span>
                       )}
                     </div>

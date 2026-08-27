@@ -2853,6 +2853,7 @@ export const th: TranslationKeys = {
       submit: "สร้างตัวยึดตำแหน่ง",
       submitBatch: "สร้างตัวยึดตำแหน่ง ({count} ไฟล์)",
       progressLabel: "กำลังสร้างตัวยึดตำแหน่ง",
+      previewAlt: "ตัวอย่าง LQIP",
     },
     "sprite-sheet": {
       format: "รูปแบบ",
@@ -4470,6 +4471,8 @@ export const th: TranslationKeys = {
       copyPasswordButton: "คัดลอกรหัสผ่าน",
       passwordCopied: "คัดลอกแล้ว!",
       copyPasswordWarning: "คัดลอกรหัสผ่านนี้ตอนนี้ คุณจะไม่สามารถดูได้หลังจากสร้างผู้ใช้",
+      memberCount: "{count} สมาชิก",
+      memberCountPlural: "{count} สมาชิก",
     },
     teams: {
       heading: "ทีม",
@@ -4846,7 +4849,6 @@ export const th: TranslationKeys = {
     step: "ขั้นตอน",
     modalityWarning: "ประเภทไม่ตรงกัน",
     modalityWarningTooltip: "ขั้นตอนนี้คาดหวัง {expected} แต่ได้รับ {received} อาจล้มเหลวเมื่อคุณเรียกใช้ไปป์ไลน์",
-    unnamedFile: "ไฟล์",
   },
   nav: {
     tools: "เครื่องมือ",
@@ -5152,6 +5154,7 @@ export const th: TranslationKeys = {
     fileLibrary: {
       importing: "กำลังนำเข้า...",
       importCount: "นำเข้า ({count})",
+      import: "นำเข้า",
     },
     metadataGrid: {
       noData: "ไม่มีข้อมูล",

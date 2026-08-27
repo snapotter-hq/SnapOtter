@@ -2894,6 +2894,7 @@ export const ru: TranslationKeys = {
       submit: "Создать заглушку",
       submitBatch: "Создать заглушку ({count} файлов)",
       progressLabel: "Создание заглушки",
+      previewAlt: "Предпросмотр LQIP",
     },
     "sprite-sheet": {
       format: "Формат",
@@ -4525,6 +4526,8 @@ export const ru: TranslationKeys = {
       passwordCopied: "Скопировано!",
       copyPasswordWarning:
         "Скопируйте этот пароль сейчас. После создания пользователя вы не сможете его увидеть.",
+      memberCount: "{count} участник",
+      memberCountPlural: "{count} участников",
     },
     teams: {
       heading: "Команды",
@@ -4916,7 +4919,6 @@ export const ru: TranslationKeys = {
     modalityWarning: "Несоответствие модальности",
     modalityWarningTooltip:
       "Этот шаг ожидает {expected}, но получает {received}; он может завершиться ошибкой при запуске конвейера.",
-    unnamedFile: "файл",
   },
   nav: {
     tools: "Инструменты",
@@ -5226,6 +5228,7 @@ export const ru: TranslationKeys = {
     fileLibrary: {
       importing: "Импорт...",
       importCount: "Импортировать ({count})",
+      import: "Импорт",
     },
     metadataGrid: {
       noData: "Нет данных",

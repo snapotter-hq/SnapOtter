@@ -2896,6 +2896,7 @@ export const tr: TranslationKeys = {
       submit: "Yer Tutucu Oluştur",
       submitBatch: "Yer Tutucu Oluştur ({count} dosya)",
       progressLabel: "Yer tutucu oluşturuluyor",
+      previewAlt: "LQIP önizlemesi",
     },
     "sprite-sheet": {
       format: "Biçim",
@@ -4528,6 +4529,8 @@ export const tr: TranslationKeys = {
       passwordCopied: "Kopyalandı!",
       copyPasswordWarning:
         "Bu şifreyi şimdi kopyalayın. Kullanıcıyı oluşturduktan sonra göremezsiniz.",
+      memberCount: "{count} üye",
+      memberCountPlural: "{count} üye",
     },
     teams: {
       heading: "Takımlar",
@@ -4918,7 +4921,6 @@ export const tr: TranslationKeys = {
     modalityWarning: "Modalite uyumsuzluğu",
     modalityWarningTooltip:
       "Bu adım {expected} bekliyor ancak {received} alıyor; işlem hattını çalıştırdığınızda başarısız olabilir.",
-    unnamedFile: "dosya",
   },
   nav: {
     tools: "Araçlar",
@@ -5229,6 +5231,7 @@ export const tr: TranslationKeys = {
     fileLibrary: {
       importing: "İçe aktarılıyor...",
       importCount: "İçe Aktar ({count})",
+      import: "İçe Aktar",
     },
     metadataGrid: {
       noData: "Veri yok",

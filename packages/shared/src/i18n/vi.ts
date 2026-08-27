@@ -2887,6 +2887,7 @@ export const vi: TranslationKeys = {
       submit: "Tạo ảnh giữ chỗ",
       submitBatch: "Tạo ảnh giữ chỗ ({count} tệp)",
       progressLabel: "Đang tạo ảnh giữ chỗ",
+      previewAlt: "Xem trước LQIP",
     },
     "sprite-sheet": {
       format: "Định dạng",
@@ -4515,6 +4516,8 @@ export const vi: TranslationKeys = {
       passwordCopied: "Đã sao chép!",
       copyPasswordWarning:
         "Sao chép mật khẩu này ngay bây giờ. Bạn sẽ không thể xem lại sau khi tạo người dùng.",
+      memberCount: "{count} thành viên",
+      memberCountPlural: "{count} thành viên",
     },
     teams: {
       heading: "Nhóm",
@@ -4899,7 +4902,6 @@ export const vi: TranslationKeys = {
     modalityWarning: "Không tương thích loại",
     modalityWarningTooltip:
       "Bước này cần {expected} nhưng nhận {received}; có thể không thành công khi bạn chạy quy trình.",
-    unnamedFile: "tệp",
   },
   nav: {
     tools: "Công cụ",
@@ -5206,6 +5208,7 @@ export const vi: TranslationKeys = {
     fileLibrary: {
       importing: "Đang nhập...",
       importCount: "Nhập ({count})",
+      import: "Nhập",
     },
     metadataGrid: {
       noData: "Không có dữ liệu",

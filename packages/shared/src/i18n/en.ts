@@ -2837,6 +2837,7 @@ export const en = {
       submit: "Generate Placeholder",
       submitBatch: "Generate Placeholder ({count} files)",
       progressLabel: "Generating placeholder",
+      previewAlt: "LQIP preview",
     },
     "sprite-sheet": {
       sheetSummary:
@@ -4463,6 +4464,8 @@ export const en = {
       passwordCopied: "Copied!",
       copyPasswordWarning:
         "Copy this password now. You won't be able to see it after creating the user.",
+      memberCount: "{count} member",
+      memberCountPlural: "{count} members",
     },
     teams: {
       heading: "Teams",
@@ -4845,7 +4848,6 @@ export const en = {
     modalityWarning: "Modality mismatch",
     modalityWarningTooltip:
       "This step expects {expected} but receives {received}; it may fail when you run the pipeline.",
-    unnamedFile: "file",
   },
   nav: {
     tools: "Tools",
@@ -5152,6 +5154,7 @@ export const en = {
     fileLibrary: {
       importing: "Importing...",
       importCount: "Import ({count})",
+      import: "Import",
     },
     metadataGrid: {
       noData: "No data",

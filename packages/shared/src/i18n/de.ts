@@ -2906,6 +2906,7 @@ export const de: TranslationKeys = {
       submit: "Platzhalter erstellen",
       submitBatch: "Platzhalter erstellen ({count} Dateien)",
       progressLabel: "Platzhalter wird erstellt",
+      previewAlt: "LQIP-Vorschau",
     },
     "sprite-sheet": {
       format: "Format",
@@ -4544,6 +4545,8 @@ export const de: TranslationKeys = {
       passwordCopied: "Kopiert!",
       copyPasswordWarning:
         "Kopieren Sie dieses Passwort jetzt. Nach dem Erstellen des Benutzers ist es nicht mehr sichtbar.",
+      memberCount: "{count} Mitglied",
+      memberCountPlural: "{count} Mitglieder",
     },
     teams: {
       heading: "Teams",
@@ -4940,7 +4943,6 @@ export const de: TranslationKeys = {
     modalityWarning: "Modalitätskonflikt",
     modalityWarningTooltip:
       "Dieser Schritt erwartet {expected}, erhält aber {received}; er kann beim Ausführen der Pipeline fehlschlagen.",
-    unnamedFile: "Datei",
   },
   nav: {
     tools: "Werkzeuge",
@@ -5253,6 +5255,7 @@ export const de: TranslationKeys = {
     fileLibrary: {
       importing: "Wird importiert...",
       importCount: "Importieren ({count})",
+      import: "Importieren",
     },
     metadataGrid: {
       noData: "Keine Daten",
