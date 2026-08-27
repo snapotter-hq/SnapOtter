@@ -394,6 +394,7 @@ function LanguageSelector({ isDark }: { isDark: boolean }) {
             : "text-muted-foreground hover:text-foreground hover:bg-muted",
         )}
         title={t.a11y.language}
+        data-testid="language-selector"
       >
         <Globe className="h-3.5 w-3.5" />
         {current?.nativeName}

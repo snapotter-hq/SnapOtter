@@ -1076,7 +1076,9 @@ test.describe("Language Selector", () => {
   });
 
   test("selecting a language updates the button label", async ({ loggedInPage: page }) => {
-    const langBtn = page.locator("button[title='Language']");
+    // By test id, not by title: the tooltip is translated, so a title-based
+    // locator stops matching the moment this test switches away from English.
+    const langBtn = page.getByTestId("language-selector");
     await expect(langBtn).toContainText("English");
 
     await langBtn.click();
