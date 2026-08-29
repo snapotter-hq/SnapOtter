@@ -407,6 +407,52 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
+  it("the failure sweep leaves completed and pending siblings alone", () => {
+    const files = ["a.mp4", "b.mp4", "c.mp4"].map(
+      (name) => new File([new ArrayBuffer(64)], name, { type: "video/mp4" }),
+    );
+    useFileStore.getState().setFiles(files);
+    // File A already carries a delivered result from an earlier run.
+    useFileStore.getState().updateEntry(0, { status: "completed", processedUrl: "blob:done" });
+    useFileStore.getState().setSelectedIndex(1);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles(files, { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "boom" });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: "blob:done",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "boom",
+    });
+    expect(useFileStore.getState().entries[2].status).toBe("pending");
+
+    hook.unmount();
+  });
+
+  it("falls back to a generic message when the failed frame carries no error", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0 });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Processing failed",
+    });
+    expect(useFileStore.getState().error).toBe("Processing failed");
+
+    unmount();
+  });
+
   it("fails the entry the run started with, not the currently selected one", () => {
     const fileA = new File([new ArrayBuffer(64)], "a.mp4", { type: "video/mp4" });
     const fileB = new File([new ArrayBuffer(64)], "b.mp4", { type: "video/mp4" });
