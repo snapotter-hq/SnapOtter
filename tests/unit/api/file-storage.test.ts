@@ -145,6 +145,31 @@ describe("getStoredFilePath", () => {
   });
 });
 
+// Regression guard for #899: createReadStream defers the open, so a missing
+// blob used to surface as an async "error" event after the caller's try/catch
+// had already exited (the download route then 500ed instead of 404ing). The
+// local branch must reject the promise itself so callers can catch it.
+describe("streamStoredFile", () => {
+  it("rejects with ENOENT when the stored file is missing", async () => {
+    const { streamStoredFile } = await importModule();
+    const err = (await streamStoredFile("00000000-dead-beef-0000-000000000000.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as NodeJS.ErrnoException | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.code).toBe("ENOENT");
+  });
+
+  it("streams back a saved file", async () => {
+    const { saveFile, streamStoredFile } = await importModule();
+    const name = await saveFile(Buffer.from("stream me"), "photo.png");
+    const stream = await streamStoredFile(name);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    expect(Buffer.concat(chunks).toString()).toBe("stream me");
+  });
+});
+
 // Regression guard for the path-traversal report: stored names are generated
 // basenames, so any separator/parent-reference/absolute name must be rejected
 // before it is joined onto FILES_STORAGE_PATH. Without the guard a poisoned
