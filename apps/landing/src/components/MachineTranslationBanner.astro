@@ -59,6 +59,10 @@ const CONTRIBUTE_URL = "https://docs.snapotter.com/guide/translations";
   (function () {
     var banner = document.querySelector("[data-mt-banner]");
     if (!banner) return;
+    // One top bar at a time: the recall banner's script runs first (it renders
+    // earlier in the body), so its visibility is settled by now. Skip this
+    // page view without marking the banner dismissed.
+    if (document.querySelector("[data-recall-banner]:not([hidden])")) return;
     var KEY = "snapotter:mt-banner";
     try {
       if (localStorage.getItem(KEY) === "dismissed") {

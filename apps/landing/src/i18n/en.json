@@ -26,6 +26,8 @@
   "switcher.label": "Change language",
   "banner.machineTranslated": "This page was machine-translated. Spotted a mistake? Help improve it.",
   "banner.dismiss": "Dismiss",
+  "banner.localeRecall": "You're seeing this page in {language} because you picked it here before.",
+  "banner.viewInEnglish": "View in English",
   "faq.metaTitle": "FAQ | SnapOtter",
   "faq.metaDescription": "Frequently asked questions about SnapOtter, self-hosted file-processing infrastructure.",
   "home.metaTitle": "SnapOtter | Self-Hosted File-Processing Infrastructure",

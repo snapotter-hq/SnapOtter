@@ -1,0 +1,94 @@
+---
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes component imports.
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// apps/landing/src/components/LocaleRecallBanner.astro
+//
+// Shown only right after the locale-recall script (Base.astro head) has
+// silently rewritten an English URL to this locale. Explains why the visitor
+// landed here and offers a one-click way back that also resets the stored
+// preference. Without it, one stray click on the language switcher traps a
+// browser in that language with no visible way out.
+import { nativeName, t } from "@/i18n";
+
+interface Props {
+  locale: string;
+  path: string; // the un-prefixed page path, e.g. "/faq"
+}
+
+const { locale, path } = Astro.props;
+const englishHref = path.endsWith("/") ? path : `${path}/`;
+---
+
+{locale !== "en" && (
+  <div
+    class="mt-banner border-b border-border bg-primary-subtle px-4 py-2 text-center text-xs text-foreground"
+    data-recall-banner
+    hidden
+  >
+    <span>{t(locale, "banner.localeRecall", { language: nativeName(locale) })} </span>
+    <a href={englishHref} class="font-semibold text-primary-ink underline" data-recall-revert>
+      {t(locale, "banner.viewInEnglish")}
+    </a>
+    <button
+      type="button"
+      class="ms-2 font-semibold text-muted hover:text-foreground"
+      aria-label={t(locale, "banner.dismiss")}
+      data-recall-dismiss
+    >
+      &times;
+    </button>
+  </div>
+)}
+
+<script is:inline>
+  (function () {
+    // This script also runs on English pages (the div just isn't rendered), so
+    // the marker MUST be consumed only after the banner null-check: the English
+    // page still parses while its recall redirect is pending, and consuming
+    // here would eat the marker before the localized page loads. Tradeoff: a
+    // redirect interrupted mid-flight strands the marker, so the next localized
+    // page view shows the banner once without a redirect. One-shot consumption
+    // caps that at a single wrong display.
+    var banner = document.querySelector("[data-recall-banner]");
+    if (!banner) return;
+    var FLAG = "snapotter:recall";
+    var DISMISSED = "snapotter:recall-dismissed";
+    try {
+      if (sessionStorage.getItem(FLAG) !== "1") return;
+      // One-shot: consume the marker so in-site navigation never re-triggers.
+      sessionStorage.removeItem(FLAG);
+      if (sessionStorage.getItem(DISMISSED) === "1") return;
+    } catch (e) {
+      return;
+    }
+    banner.hidden = false;
+    var revert = banner.querySelector("[data-recall-revert]");
+    if (revert) {
+      // The redirect carried the query and hash over; carry them back.
+      revert.href = revert.getAttribute("href") + location.search + location.hash;
+      revert.addEventListener("click", function () {
+        // Reset the stored preference before navigating, same pattern as the
+        // switcher, so future bare-URL visits stay English. If the write fails
+        // (quota), clear the key instead: no preference also means no redirect.
+        // Swallowing both would leave a button that bounces straight back here.
+        try {
+          localStorage.setItem("snapotter:locale", "en");
+        } catch (e) {
+          try {
+            localStorage.removeItem("snapotter:locale");
+          } catch (e2) {}
+        }
+      });
+    }
+    var close = banner.querySelector("[data-recall-dismiss]");
+    if (close) {
+      close.addEventListener("click", function () {
+        banner.hidden = true;
+        // Quiet for the rest of the session; the preference itself stands.
+        try {
+          sessionStorage.setItem(DISMISSED, "1");
+        } catch (e) {}
+      });
+    }
+  })();
+</script>

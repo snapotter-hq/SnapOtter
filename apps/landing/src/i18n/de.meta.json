@@ -233,10 +233,22 @@
     "outputHash": "b808f6e97075",
     "stale": false
   },
+  "banner.localeRecall": {
+    "sourceHash": "f14d32ca69c8",
+    "provenance": "machine",
+    "outputHash": "c981767a57a8",
+    "stale": false
+  },
   "banner.machineTranslated": {
     "sourceHash": "efec2514040c",
     "provenance": "machine",
     "outputHash": "0589780921fe",
+    "stale": false
+  },
+  "banner.viewInEnglish": {
+    "sourceHash": "340d82826f0d",
+    "provenance": "human",
+    "outputHash": "340d82826f0d",
     "stale": false
   },
   "category.adjustments": {

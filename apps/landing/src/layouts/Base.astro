@@ -4,6 +4,7 @@
 import "@/styles/globals.css";
 import { TOOLS } from "@snapotter/shared";
 import Analytics from "@/components/Analytics.astro";
+import LocaleRecallBanner from "@/components/LocaleRecallBanner.astro";
 import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
 import StickyMobileCta from "@/components/StickyMobileCta.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
@@ -69,6 +70,11 @@ const htmlDir = dirFor(locale);
           if (segs[0] === "tools" && segs.length === 3) return;
           var target = "/" + stored + (recallPath === "/" ? "/" : recallPath);
           if (target.charAt(target.length - 1) !== "/") target += "/";
+          // One-shot marker so the localized page can offer a revert banner:
+          // "you were redirected here" is knowable only on this side.
+          try {
+            sessionStorage.setItem("snapotter:recall", "1");
+          } catch (e) {}
           location.replace(target + location.search + location.hash);
         } catch (e) {}
       })();
@@ -132,6 +138,7 @@ const htmlDir = dirFor(locale);
   </head>
   <body>
     <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
+    <LocaleRecallBanner locale={locale} path={path} />
     <MachineTranslationBanner locale={locale} />
     <slot />
     {mobileCta && <StickyMobileCta locale={locale} />}
