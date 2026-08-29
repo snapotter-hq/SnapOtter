@@ -349,10 +349,13 @@ export function useToolProcessor(toolId: string) {
               } else {
                 // Unreachable by construction (async mode implies a batch run
                 // installed the handler); if the invariant ever breaks, fail
-                // visibly instead of leaving the run in silent limbo.
+                // visibly instead of leaving the run in silent limbo. That
+                // includes the entries: without the sweep this insurance
+                // still leaves them pulsing at "processing" (#929).
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
                 clearActiveJob();
+                settleProcessingEntries("Processing was interrupted. Retry when reconnected.");
                 setError("Processing was interrupted. Retry when reconnected.");
                 setProcessing(false);
                 setProgress(IDLE_PROGRESS);
