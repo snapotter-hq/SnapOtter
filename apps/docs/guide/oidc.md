@@ -1,10 +1,10 @@
 ---
-description: Set up Single Sign-On with OpenID Connect. Step-by-step guides for Keycloak, Authentik, Google, and other OIDC providers.
+description: Set up Single Sign-On with OpenID Connect. Step-by-step guides for Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta, and other OIDC providers.
 ---
 
 # OIDC / Single Sign-On {#oidc-single-sign-on}
 
-SnapOtter supports OpenID Connect (OIDC) for single sign-on. Users can log in with an external identity provider such as Keycloak, Authentik, or Google instead of (or alongside) local username/password authentication.
+SnapOtter supports OpenID Connect (OIDC) for single sign-on. Users can log in with an external identity provider such as Keycloak, Authentik, Google, or Microsoft Entra ID instead of (or alongside) local username/password authentication.
 
 ::: tip See also
 [SAML SSO](/guide/saml) | [SCIM Provisioning](/guide/scim) | [Users, Roles & Permissions](/guide/users-roles)
@@ -86,6 +86,29 @@ For example, if `EXTERNAL_URL` is `https://photos.example.com`, configure your p
 5. Copy the **Client ID** and **Client secret**.
 6. Set `OIDC_ISSUER_URL` to `https://accounts.google.com`.
 7. Set `OIDC_USERNAME_CLAIM` to `email` (Google does not provide `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. In the Azure portal, go to **Microsoft Entra ID > App registrations > New registration**.
+2. Name the app "SnapOtter". Under **Redirect URI**, select the **Web** platform and enter your callback URL (e.g. `https://photos.example.com/api/auth/oidc/callback`). Do not pick **Single-page application**: SnapOtter authenticates with a client secret, which Entra ID rejects on SPA registrations.
+3. Copy the **Application (client) ID** and **Directory (tenant) ID** from the **Overview** page.
+4. Go to **Certificates & secrets > New client secret** and copy the secret **Value** right away. It is shown only once, and the adjacent Secret ID is not the secret.
+5. Set `OIDC_ISSUER_URL` to `https://login.microsoftonline.com/<tenant-id>/v2.0`, using the Directory (tenant) ID from step 3.
+6. Leave `OIDC_USERNAME_CLAIM` at its default. Entra ID provides `preferred_username`, so the `email` override from the Google guide is not needed here.
+
+Always use your tenant ID in the issuer URL, not `common` or `organizations`. Those multi-tenant endpoints advertise the literal template `{tenantid}` as their issuer, which fails OIDC discovery validation.
+
+::: warning
+Entra ID's `preferred_username` tracks the user principal name, which changes when a user is renamed or moved to another tenant. SnapOtter reads the claim once, at first login, so the account keeps its original username afterwards. Logins keep working either way: returning users are matched by the token's stable subject, not by username.
+:::
+
+Switching to Entra ID does not turn off password login. See [Disabling local login](#disabling-local-login).
+
+### Okta and other providers {#okta-and-other-providers}
+
+Any provider that supports OIDC Discovery works the same way: create a confidential web client with your callback URL, then point `OIDC_ISSUER_URL` at the issuer. For Okta, create an app with the **OIDC - OpenID Connect** sign-in method and the **Web Application** type, then use your Okta domain as the issuer (e.g. `https://your-company.okta.com`).
+
+SnapOtter does not map identity provider groups to roles. New SSO users get `OIDC_DEFAULT_ROLE`, admins change roles under **Settings > Users**, and requesting group claims through `OIDC_SCOPES` has no effect.
 
 ## User provisioning {#user-provisioning}
 
