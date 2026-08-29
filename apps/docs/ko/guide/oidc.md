@@ -1,13 +1,13 @@
 ---
-description: "OpenID Connect로 싱글 사인온을 설정하세요. Keycloak, Authentik, Google 및 기타 OIDC 공급자에 대한 단계별 가이드입니다."
-i18n_source_hash: 4296343b3cc5
+description: "OpenID Connect로 싱글 사인온을 설정하세요. Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta 및 기타 OIDC 공급자에 대한 단계별 가이드입니다."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: cb2481dcd32f
 ---
 
 # OIDC / Single Sign-On {#oidc-single-sign-on}
 
-SnapOtter는 싱글 사인온을 위해 OpenID Connect(OIDC)를 지원합니다. 사용자는 로컬 사용자 이름/비밀번호 인증 대신(또는 이와 함께) Keycloak, Authentik, Google과 같은 외부 ID 공급자로 로그인할 수 있습니다.
+SnapOtter는 싱글 사인온을 위해 OpenID Connect(OIDC)를 지원합니다. 사용자는 로컬 사용자 이름/비밀번호 인증 대신(또는 이와 함께) Keycloak, Authentik, Google, Microsoft Entra ID와 같은 외부 ID 공급자로 로그인할 수 있습니다.
 
 ::: tip 함께 참고하기
 [SAML SSO](/ko/guide/saml) | [SCIM Provisioning](/ko/guide/scim) | [Users, Roles & Permissions](/ko/guide/users-roles)
@@ -89,6 +89,29 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 5. **Client ID**와 **Client secret**을 복사합니다.
 6. `OIDC_ISSUER_URL`을 `https://accounts.google.com`로 설정합니다.
 7. `OIDC_USERNAME_CLAIM`을 `email`으로 설정합니다(Google은 `preferred_username`을 제공하지 않습니다).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. Azure 포털에서 **Microsoft Entra ID > App registrations > New registration**으로 이동합니다.
+2. 앱 이름을 "SnapOtter"로 지정합니다. **Redirect URI**에서 **Web** 플랫폼을 선택하고 콜백 URL을 입력합니다(예: `https://photos.example.com/api/auth/oidc/callback`). **Single-page application**을 선택하지 마세요. SnapOtter는 클라이언트 시크릿으로 인증하는데, Entra ID는 SPA 등록에서 이를 거부합니다.
+3. **Overview** 페이지에서 **Application (client) ID**와 **Directory (tenant) ID**를 복사합니다.
+4. **Certificates & secrets > New client secret**으로 이동하여 시크릿 **Value**를 바로 복사합니다. 이 값은 한 번만 표시되며, 옆에 있는 Secret ID는 시크릿이 아닙니다.
+5. 3단계에서 복사한 Directory (tenant) ID를 사용하여 `OIDC_ISSUER_URL`을 `https://login.microsoftonline.com/<tenant-id>/v2.0`으로 설정합니다.
+6. `OIDC_USERNAME_CLAIM`은 기본값 그대로 둡니다. Entra ID는 `preferred_username`을 제공하므로, Google 가이드의 `email` 재정의는 여기서 필요하지 않습니다.
+
+issuer URL에는 `common`이나 `organizations`가 아니라 항상 사용자의 테넌트 ID를 사용하세요. 이러한 멀티 테넌트 엔드포인트는 리터럴 템플릿 `{tenantid}`를 issuer로 제시하므로 OIDC discovery 검증에 실패합니다.
+
+::: warning
+Entra ID의 `preferred_username`은 사용자 프린시펄 이름(user principal name)을 따르며, 이 값은 사용자 이름이 변경되거나 사용자가 다른 테넌트로 이동할 때 바뀝니다. SnapOtter는 첫 로그인 시 이 클레임을 한 번만 읽으므로, 그 후에도 계정은 원래 사용자 이름을 유지합니다. 어느 쪽이든 로그인은 계속 동작합니다. 재방문 사용자는 사용자 이름이 아니라 토큰의 안정적인 subject로 매칭되기 때문입니다.
+:::
+
+Entra ID로 전환해도 비밀번호 로그인이 꺼지지 않습니다. [Disabling local login](#disabling-local-login)을 참고하세요.
+
+### Okta 및 기타 공급자 {#okta-and-other-providers}
+
+OIDC Discovery를 지원하는 공급자라면 어떤 것이든 같은 방식으로 동작합니다. 콜백 URL로 confidential 웹 클라이언트를 생성한 다음, `OIDC_ISSUER_URL`이 issuer를 가리키도록 하세요. Okta의 경우 **OIDC - OpenID Connect** 로그인 방식과 **Web Application** 유형으로 앱을 생성한 다음, Okta 도메인을 issuer로 사용하세요(예: `https://your-company.okta.com`).
+
+SnapOtter는 ID 공급자의 그룹을 역할에 매핑하지 않습니다. 새 SSO 사용자는 `OIDC_DEFAULT_ROLE`을 받고, 관리자는 **Settings > Users**에서 역할을 변경하며, `OIDC_SCOPES`를 통해 그룹 클레임을 요청해도 아무 효과가 없습니다.
 
 ## User provisioning {#user-provisioning}
 

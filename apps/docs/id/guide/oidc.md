@@ -1,13 +1,13 @@
 ---
-description: "Siapkan Single Sign-On dengan OpenID Connect. Panduan langkah demi langkah untuk Keycloak, Authentik, Google, dan penyedia OIDC lainnya."
-i18n_source_hash: 4296343b3cc5
+description: "Siapkan Single Sign-On dengan OpenID Connect. Panduan langkah demi langkah untuk Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta, dan penyedia OIDC lainnya."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 5e6d2a00ca73
 ---
 
 # OIDC / Single Sign-On {#oidc-single-sign-on}
 
-SnapOtter mendukung OpenID Connect (OIDC) untuk single sign-on. Pengguna dapat login dengan penyedia identitas eksternal seperti Keycloak, Authentik, atau Google alih-alih (atau bersama) autentikasi username/kata sandi lokal.
+SnapOtter mendukung OpenID Connect (OIDC) untuk single sign-on. Pengguna dapat login dengan penyedia identitas eksternal seperti Keycloak, Authentik, Google, atau Microsoft Entra ID alih-alih (atau bersama) autentikasi username/kata sandi lokal.
 
 ::: tip Lihat juga
 [SAML SSO](/id/guide/saml) | [Provisioning SCIM](/id/guide/scim) | [Pengguna, Peran & Izin](/id/guide/users-roles)
@@ -89,6 +89,29 @@ Misalnya, jika `EXTERNAL_URL` adalah `https://photos.example.com`, konfigurasika
 5. Salin **Client ID** dan **Client secret**.
 6. Setel `OIDC_ISSUER_URL` ke `https://accounts.google.com`.
 7. Setel `OIDC_USERNAME_CLAIM` ke `email` (Google tidak menyediakan `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. Di portal Azure, buka **Microsoft Entra ID > App registrations > New registration**.
+2. Beri nama aplikasi "SnapOtter". Di bawah **Redirect URI**, pilih platform **Web** dan masukkan URL callback Anda (mis. `https://photos.example.com/api/auth/oidc/callback`). Jangan pilih **Single-page application**: SnapOtter melakukan autentikasi dengan client secret, yang ditolak Entra ID pada registrasi SPA.
+3. Salin **Application (client) ID** dan **Directory (tenant) ID** dari halaman **Overview**.
+4. Buka **Certificates & secrets > New client secret** dan segera salin **Value** dari secret tersebut. Nilai ini hanya ditampilkan sekali, dan Secret ID di sebelahnya bukanlah secret-nya.
+5. Setel `OIDC_ISSUER_URL` ke `https://login.microsoftonline.com/<tenant-id>/v2.0`, menggunakan Directory (tenant) ID dari langkah 3.
+6. Biarkan `OIDC_USERNAME_CLAIM` pada nilai default-nya. Entra ID menyediakan `preferred_username`, jadi override `email` dari panduan Google tidak diperlukan di sini.
+
+Selalu gunakan tenant ID Anda di URL issuer, bukan `common` atau `organizations`. Endpoint multi-tenant tersebut mengiklankan templat literal `{tenantid}` sebagai issuer-nya, yang gagal dalam validasi OIDC discovery.
+
+::: warning
+`preferred_username` di Entra ID mengikuti user principal name, yang berubah saat pengguna diganti namanya atau dipindahkan ke tenant lain. SnapOtter membaca klaim ini sekali, saat login pertama, sehingga akun tetap memakai username aslinya setelah itu. Apa pun kondisinya, login tetap berfungsi: pengguna yang kembali dicocokkan berdasarkan subject stabil dari token, bukan berdasarkan username.
+:::
+
+Beralih ke Entra ID tidak mematikan login kata sandi. Lihat [Menonaktifkan login lokal](#disabling-local-login).
+
+### Okta dan penyedia lainnya {#okta-and-other-providers}
+
+Penyedia mana pun yang mendukung OIDC Discovery bekerja dengan cara yang sama: buat confidential web client dengan URL callback Anda, lalu arahkan `OIDC_ISSUER_URL` ke issuer. Untuk Okta, buat aplikasi dengan metode sign-in **OIDC - OpenID Connect** dan tipe **Web Application**, lalu gunakan domain Okta Anda sebagai issuer (mis. `https://your-company.okta.com`).
+
+SnapOtter tidak memetakan grup penyedia identitas ke peran. Pengguna SSO baru mendapatkan `OIDC_DEFAULT_ROLE`, admin mengubah peran di **Settings > Users**, dan meminta klaim grup melalui `OIDC_SCOPES` tidak berpengaruh.
 
 ## Provisioning pengguna {#user-provisioning}
 

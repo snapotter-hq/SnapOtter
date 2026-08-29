@@ -1,13 +1,13 @@
 ---
-description: "Налаштуйте єдиний вхід за допомогою OpenID Connect. Покрокові інструкції для Keycloak, Authentik, Google та інших постачальників OIDC."
-i18n_source_hash: 4296343b3cc5
+description: "Налаштуйте єдиний вхід за допомогою OpenID Connect. Покрокові інструкції для Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta та інших постачальників OIDC."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: e4ed1e4c58ab
 ---
 
 # OIDC / Єдиний вхід {#oidc-single-sign-on}
 
-SnapOtter підтримує OpenID Connect (OIDC) для єдиного входу. Користувачі можуть входити через зовнішнього постачальника ідентифікації, такого як Keycloak, Authentik чи Google, замість (або разом із) локальної автентифікації за іменем користувача та паролем.
+SnapOtter підтримує OpenID Connect (OIDC) для єдиного входу. Користувачі можуть входити через зовнішнього постачальника ідентифікації, такого як Keycloak, Authentik, Google чи Microsoft Entra ID, замість (або разом із) локальної автентифікації за іменем користувача та паролем.
 
 ::: tip Дивіться також
 [SAML SSO](/uk/guide/saml) | [Провізіювання SCIM](/uk/guide/scim) | [Користувачі, ролі та дозволи](/uk/guide/users-roles)
@@ -89,6 +89,29 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 5. Скопіюйте **Client ID** та **Client secret**.
 6. Встановіть `OIDC_ISSUER_URL` на `https://accounts.google.com`.
 7. Встановіть `OIDC_USERNAME_CLAIM` на `email` (Google не надає `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. На порталі Azure перейдіть до **Microsoft Entra ID > App registrations > New registration**.
+2. Назвіть застосунок "SnapOtter". У розділі **Redirect URI** виберіть платформу **Web** і введіть ваш URL зворотного виклику (наприклад, `https://photos.example.com/api/auth/oidc/callback`). Не вибирайте **Single-page application**: SnapOtter автентифікується за допомогою секрету клієнта, який Entra ID відхиляє для SPA-реєстрацій.
+3. Скопіюйте **Application (client) ID** та **Directory (tenant) ID** зі сторінки **Overview**.
+4. Перейдіть до **Certificates & secrets > New client secret** і одразу скопіюйте **Value** секрету. Значення показується лише один раз, а розташований поруч Secret ID не є секретом.
+5. Встановіть `OIDC_ISSUER_URL` на `https://login.microsoftonline.com/<tenant-id>/v2.0`, використовуючи Directory (tenant) ID із кроку 3.
+6. Залиште `OIDC_USERNAME_CLAIM` зі значенням за замовчуванням. Entra ID надає `preferred_username`, тому перевизначення `email` з інструкції для Google тут не потрібне.
+
+Завжди використовуйте в URL емітента ID вашого tenant, а не `common` чи `organizations`. Ці багатоорендні кінцеві точки оголошують буквальний шаблон `{tenantid}` як свого емітента, що не проходить перевірку OIDC Discovery.
+
+::: warning
+Претензія `preferred_username` в Entra ID відстежує ім'я учасника-користувача (user principal name), яке змінюється, коли користувача перейменовують або переносять до іншого tenant. SnapOtter зчитує претензію лише один раз, під час першого входу, тому обліковий запис надалі зберігає своє початкове ім'я користувача. Вхід у будь-якому разі продовжує працювати: користувачів, що повертаються, зіставляють за стабільним subject токена, а не за іменем користувача.
+:::
+
+Перехід на Entra ID не вимикає вхід за паролем. Див. [Вимкнення локального входу](#disabling-local-login).
+
+### Okta та інші постачальники {#okta-and-other-providers}
+
+Будь-який постачальник, що підтримує OIDC Discovery, працює так само: створіть конфіденційний веб-клієнт із вашим URL зворотного виклику, а потім вкажіть в `OIDC_ISSUER_URL` емітента. Для Okta створіть застосунок із методом входу **OIDC - OpenID Connect** і типом **Web Application**, а потім використайте ваш домен Okta як емітента (наприклад, `https://your-company.okta.com`).
+
+SnapOtter не зіставляє групи постачальника ідентифікації з ролями. Нові користувачі SSO отримують `OIDC_DEFAULT_ROLE`, адміністратори змінюють ролі в розділі **Settings > Users**, а запит претензій груп через `OIDC_SCOPES` не має ефекту.
 
 ## Провізіювання користувачів {#user-provisioning}
 

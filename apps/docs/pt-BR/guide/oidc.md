@@ -1,13 +1,13 @@
 ---
-description: "Configure o Single Sign-On com OpenID Connect. Guias passo a passo para Keycloak, Authentik, Google e outros provedores OIDC."
-i18n_source_hash: 4296343b3cc5
+description: "Configure o Single Sign-On com OpenID Connect. Guias passo a passo para Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta e outros provedores OIDC."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: d91e31e0728d
 ---
 
 # OIDC / Single Sign-On {#oidc-single-sign-on}
 
-O SnapOtter oferece suporte a OpenID Connect (OIDC) para single sign-on. Os usuários podem fazer login com um provedor de identidade externo, como Keycloak, Authentik ou Google, em vez de (ou junto com) a autenticação local por usuário/senha.
+O SnapOtter oferece suporte a OpenID Connect (OIDC) para single sign-on. Os usuários podem fazer login com um provedor de identidade externo, como Keycloak, Authentik, Google ou Microsoft Entra ID, em vez de (ou junto com) a autenticação local por usuário/senha.
 
 ::: tip Veja também
 [SAML SSO](/pt-BR/guide/saml) | [Provisionamento SCIM](/pt-BR/guide/scim) | [Usuários, Papéis e Permissões](/pt-BR/guide/users-roles)
@@ -89,6 +89,29 @@ Por exemplo, se `EXTERNAL_URL` for `https://photos.example.com`, configure a URI
 5. Copie o **Client ID** e o **Client secret**.
 6. Defina `OIDC_ISSUER_URL` como `https://accounts.google.com`.
 7. Defina `OIDC_USERNAME_CLAIM` como `email` (o Google não fornece `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. No portal do Azure, vá para **Microsoft Entra ID > App registrations > New registration**.
+2. Nomeie o aplicativo como "SnapOtter". Em **Redirect URI**, selecione a plataforma **Web** e informe sua URL de callback (por exemplo, `https://photos.example.com/api/auth/oidc/callback`). Não escolha **Single-page application**: o SnapOtter se autentica com um segredo de cliente, que o Entra ID rejeita em registros SPA.
+3. Copie o **Application (client) ID** e o **Directory (tenant) ID** da página **Overview**.
+4. Vá para **Certificates & secrets > New client secret** e copie imediatamente o **Value** do segredo. Ele é exibido apenas uma vez, e o Secret ID ao lado não é o segredo.
+5. Defina `OIDC_ISSUER_URL` como `https://login.microsoftonline.com/<tenant-id>/v2.0`, usando o Directory (tenant) ID da etapa 3.
+6. Deixe `OIDC_USERNAME_CLAIM` no valor padrão. O Entra ID fornece `preferred_username`, então a substituição por `email` do guia do Google não é necessária aqui.
+
+Sempre use o ID do seu tenant na URL do issuer, não `common` nem `organizations`. Esses endpoints multi-tenant anunciam o template literal `{tenantid}` como issuer, o que falha na validação do OIDC Discovery.
+
+::: warning
+O `preferred_username` do Entra ID acompanha o user principal name, que muda quando um usuário é renomeado ou movido para outro tenant. O SnapOtter lê a claim uma única vez, no primeiro login, então a conta mantém seu nome de usuário original depois disso. Os logins continuam funcionando de qualquer maneira: usuários recorrentes são identificados pelo subject estável do token, não pelo nome de usuário.
+:::
+
+Mudar para o Entra ID não desativa o login por senha. Veja [Desabilitando o login local](#disabling-local-login).
+
+### Okta e outros provedores {#okta-and-other-providers}
+
+Qualquer provedor que ofereça suporte a OIDC Discovery funciona da mesma maneira: crie um cliente web confidencial com sua URL de callback e aponte `OIDC_ISSUER_URL` para o issuer. No Okta, crie um aplicativo com o método de login **OIDC - OpenID Connect** e o tipo **Web Application** e, em seguida, use seu domínio Okta como issuer (por exemplo, `https://your-company.okta.com`).
+
+O SnapOtter não mapeia grupos do provedor de identidade para papéis. Novos usuários SSO recebem `OIDC_DEFAULT_ROLE`, os administradores alteram os papéis em **Settings > Users**, e solicitar claims de grupo via `OIDC_SCOPES` não tem efeito.
 
 ## Provisionamento de usuários {#user-provisioning}
 

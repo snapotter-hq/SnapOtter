@@ -1,13 +1,13 @@
 ---
-description: "Configurez l'authentification unique avec OpenID Connect. Guides étape par étape pour Keycloak, Authentik, Google et d'autres fournisseurs OIDC."
-i18n_source_hash: 4296343b3cc5
+description: "Configurez l'authentification unique avec OpenID Connect. Guides étape par étape pour Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta et d'autres fournisseurs OIDC."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 6a7d713e4701
 ---
 
 # OIDC / Authentification unique {#oidc-single-sign-on}
 
-SnapOtter prend en charge OpenID Connect (OIDC) pour l'authentification unique. Les utilisateurs peuvent se connecter avec un fournisseur d'identité externe tel que Keycloak, Authentik ou Google au lieu de (ou en plus de) l'authentification locale par nom d'utilisateur/mot de passe.
+SnapOtter prend en charge OpenID Connect (OIDC) pour l'authentification unique. Les utilisateurs peuvent se connecter avec un fournisseur d'identité externe tel que Keycloak, Authentik, Google ou Microsoft Entra ID au lieu de (ou en plus de) l'authentification locale par nom d'utilisateur/mot de passe.
 
 ::: tip Voir aussi
 [SAML SSO](/fr/guide/saml) | [Provisionnement SCIM](/fr/guide/scim) | [Utilisateurs, rôles et permissions](/fr/guide/users-roles)
@@ -89,6 +89,29 @@ Par exemple, si `EXTERNAL_URL` est `https://photos.example.com`, configurez l'UR
 5. Copiez le **Client ID** et le **Client secret**.
 6. Définissez `OIDC_ISSUER_URL` sur `https://accounts.google.com`.
 7. Définissez `OIDC_USERNAME_CLAIM` sur `email` (Google ne fournit pas `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. Dans le portail Azure, allez dans **Microsoft Entra ID > App registrations > New registration**.
+2. Nommez l'application « SnapOtter ». Sous **Redirect URI**, sélectionnez la plateforme **Web** et saisissez votre URL de rappel (par ex. `https://photos.example.com/api/auth/oidc/callback`). Ne choisissez pas **Single-page application** : SnapOtter s'authentifie avec un secret client, ce qu'Entra ID refuse sur les enregistrements de type SPA.
+3. Copiez l'**Application (client) ID** et le **Directory (tenant) ID** depuis la page **Overview**.
+4. Allez dans **Certificates & secrets > New client secret** et copiez immédiatement la **Value** du secret. Elle n'est affichée qu'une seule fois, et le Secret ID adjacent n'est pas le secret.
+5. Définissez `OIDC_ISSUER_URL` sur `https://login.microsoftonline.com/<tenant-id>/v2.0`, en utilisant le Directory (tenant) ID de l'étape 3.
+6. Laissez `OIDC_USERNAME_CLAIM` à sa valeur par défaut. Entra ID fournit `preferred_username`, la substitution par `email` du guide Google n'est donc pas nécessaire ici.
+
+Utilisez toujours votre ID de tenant dans l'URL de l'émetteur, pas `common` ni `organizations`. Ces points de terminaison multi-tenant annoncent le modèle littéral `{tenantid}` comme émetteur, ce qui fait échouer la validation de la découverte OIDC.
+
+::: warning
+Le `preferred_username` d'Entra ID suit le nom d'utilisateur principal (user principal name), qui change lorsqu'un utilisateur est renommé ou déplacé vers un autre tenant. SnapOtter lit la revendication une seule fois, à la première connexion, le compte conserve donc ensuite son nom d'utilisateur d'origine. Les connexions continuent de fonctionner dans tous les cas : les utilisateurs qui reviennent sont identifiés par le sujet stable du jeton, pas par leur nom d'utilisateur.
+:::
+
+Passer à Entra ID ne désactive pas la connexion par mot de passe. Voir [Désactivation de la connexion locale](#disabling-local-login).
+
+### Okta et autres fournisseurs {#okta-and-other-providers}
+
+Tout fournisseur prenant en charge la découverte OIDC fonctionne de la même manière : créez un client web confidentiel avec votre URL de rappel, puis pointez `OIDC_ISSUER_URL` vers l'émetteur. Pour Okta, créez une application avec la méthode de connexion **OIDC - OpenID Connect** et le type **Web Application**, puis utilisez votre domaine Okta comme émetteur (par ex. `https://your-company.okta.com`).
+
+SnapOtter ne mappe pas les groupes du fournisseur d'identité vers des rôles. Les nouveaux utilisateurs SSO reçoivent `OIDC_DEFAULT_ROLE`, les administrateurs modifient les rôles sous **Settings > Users**, et demander des revendications de groupes via `OIDC_SCOPES` n'a aucun effet.
 
 ## Provisionnement des utilisateurs {#user-provisioning}
 

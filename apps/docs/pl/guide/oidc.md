@@ -1,13 +1,13 @@
 ---
-description: "Skonfiguruj logowanie jednokrotne z OpenID Connect. Przewodniki krok po kroku dla Keycloak, Authentik, Google i innych dostawców OIDC."
-i18n_source_hash: 4296343b3cc5
+description: "Skonfiguruj logowanie jednokrotne z OpenID Connect. Przewodniki krok po kroku dla Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta i innych dostawców OIDC."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 0a980a795fc3
 ---
 
 # OIDC / Logowanie jednokrotne {#oidc-single-sign-on}
 
-SnapOtter obsługuje OpenID Connect (OIDC) do logowania jednokrotnego. Użytkownicy mogą logować się za pomocą zewnętrznego dostawcy tożsamości, takiego jak Keycloak, Authentik czy Google, zamiast (lub obok) lokalnego uwierzytelniania nazwą użytkownika i hasłem.
+SnapOtter obsługuje OpenID Connect (OIDC) do logowania jednokrotnego. Użytkownicy mogą logować się za pomocą zewnętrznego dostawcy tożsamości, takiego jak Keycloak, Authentik, Google czy Microsoft Entra ID, zamiast (lub obok) lokalnego uwierzytelniania nazwą użytkownika i hasłem.
 
 ::: tip Zobacz też
 [SAML SSO](/pl/guide/saml) | [Provisioning SCIM](/pl/guide/scim) | [Użytkownicy, role i uprawnienia](/pl/guide/users-roles)
@@ -89,6 +89,29 @@ Na przykład, jeśli `EXTERNAL_URL` to `https://photos.example.com`, skonfiguruj
 5. Skopiuj **Client ID** oraz **Client secret**.
 6. Ustaw `OIDC_ISSUER_URL` na `https://accounts.google.com`.
 7. Ustaw `OIDC_USERNAME_CLAIM` na `email` (Google nie udostępnia `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. W portalu Azure przejdź do **Microsoft Entra ID > App registrations > New registration**.
+2. Nazwij aplikację „SnapOtter”. W sekcji **Redirect URI** wybierz platformę **Web** i wpisz swój adres URL wywołania zwrotnego (np. `https://photos.example.com/api/auth/oidc/callback`). Nie wybieraj opcji **Single-page application**: SnapOtter uwierzytelnia się za pomocą sekretu klienta, który Entra ID odrzuca przy rejestracjach SPA.
+3. Skopiuj **Application (client) ID** oraz **Directory (tenant) ID** ze strony **Overview**.
+4. Przejdź do **Certificates & secrets > New client secret** i od razu skopiuj **Value** sekretu. Wartość jest wyświetlana tylko raz, a widoczny obok Secret ID nie jest sekretem.
+5. Ustaw `OIDC_ISSUER_URL` na `https://login.microsoftonline.com/<tenant-id>/v2.0`, używając Directory (tenant) ID z kroku 3.
+6. Pozostaw `OIDC_USERNAME_CLAIM` z wartością domyślną. Entra ID udostępnia `preferred_username`, więc nadpisanie wartością `email` z przewodnika Google nie jest tu potrzebne.
+
+W URL-u wydawcy zawsze używaj identyfikatora swojego tenanta, a nie `common` ani `organizations`. Te wielodostępne (multi-tenant) punkty końcowe ogłaszają jako wydawcę dosłowny szablon `{tenantid}`, co powoduje niepowodzenie walidacji OIDC Discovery.
+
+::: warning
+Oświadczenie `preferred_username` w Entra ID odzwierciedla główną nazwę użytkownika (user principal name), która zmienia się, gdy użytkownik zostanie przemianowany lub przeniesiony do innego tenanta. SnapOtter odczytuje to oświadczenie tylko raz, przy pierwszym logowaniu, więc konto zachowuje potem swoją pierwotną nazwę użytkownika. Logowanie działa jednak nadal: powracający użytkownicy są dopasowywani po stabilnym identyfikatorze podmiotu (subject) z tokenu, a nie po nazwie użytkownika.
+:::
+
+Przejście na Entra ID nie wyłącza logowania hasłem. Zobacz [Wyłączanie logowania lokalnego](#disabling-local-login).
+
+### Okta i inni dostawcy {#okta-and-other-providers}
+
+Każdy dostawca obsługujący OIDC Discovery działa w ten sam sposób: utwórz poufnego klienta typu web ze swoim adresem URL wywołania zwrotnego, a następnie wskaż w `OIDC_ISSUER_URL` wydawcę. W przypadku Okta utwórz aplikację z metodą logowania **OIDC - OpenID Connect** i typem **Web Application**, a następnie użyj swojej domeny Okta jako wydawcy (np. `https://your-company.okta.com`).
+
+SnapOtter nie mapuje grup dostawcy tożsamości na role. Nowi użytkownicy SSO otrzymują rolę `OIDC_DEFAULT_ROLE`, administratorzy zmieniają role w **Settings > Users**, a żądanie oświadczeń o grupach przez `OIDC_SCOPES` nie ma żadnego efektu.
 
 ## Provisioning użytkowników {#user-provisioning}
 

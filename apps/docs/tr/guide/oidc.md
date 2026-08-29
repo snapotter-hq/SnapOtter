@@ -1,13 +1,13 @@
 ---
-description: "OpenID Connect ile Çoklu Oturum Açma kurulumu yapın. Keycloak, Authentik, Google ve diğer OIDC sağlayıcıları için adım adım kılavuzlar."
-i18n_source_hash: 4296343b3cc5
+description: "OpenID Connect ile Çoklu Oturum Açma kurulumu yapın. Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta ve diğer OIDC sağlayıcıları için adım adım kılavuzlar."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: d14739acc1c3
 ---
 
 # OIDC / Çoklu Oturum Açma {#oidc-single-sign-on}
 
-SnapOtter, çoklu oturum açma için OpenID Connect (OIDC) desteği sunar. Kullanıcılar, yerel kullanıcı adı/parola kimlik doğrulaması yerine (veya bununla birlikte) Keycloak, Authentik veya Google gibi harici bir kimlik sağlayıcıyla oturum açabilir.
+SnapOtter, çoklu oturum açma için OpenID Connect (OIDC) desteği sunar. Kullanıcılar, yerel kullanıcı adı/parola kimlik doğrulaması yerine (veya bununla birlikte) Keycloak, Authentik, Google veya Microsoft Entra ID gibi harici bir kimlik sağlayıcıyla oturum açabilir.
 
 ::: tip Ayrıca bkz.
 [SAML SSO](/tr/guide/saml) | [SCIM Sağlama](/tr/guide/scim) | [Kullanıcılar, Roller ve İzinler](/tr/guide/users-roles)
@@ -89,6 +89,29 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 5. **Client ID** ve **Client secret** öğelerini kopyalayın.
 6. `OIDC_ISSUER_URL` değerini `https://accounts.google.com` olarak ayarlayın.
 7. `OIDC_USERNAME_CLAIM` değerini `email` olarak ayarlayın (Google `preferred_username` sağlamaz).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. Azure portalında, **Microsoft Entra ID > App registrations > New registration** bölümüne gidin.
+2. Uygulamaya "SnapOtter" adını verin. **Redirect URI** altında **Web** platformunu seçin ve geri çağırma URL'nizi girin (örn. `https://photos.example.com/api/auth/oidc/callback`). **Single-page application** seçeneğini seçmeyin: SnapOtter, bir istemci gizli anahtarıyla kimlik doğrulaması yapar ve Entra ID bunu SPA kayıtlarında reddeder.
+3. **Overview** sayfasından **Application (client) ID** ve **Directory (tenant) ID** değerlerini kopyalayın.
+4. **Certificates & secrets > New client secret** bölümüne gidin ve gizli anahtarın **Value** değerini hemen kopyalayın. Yalnızca bir kez gösterilir ve hemen yanındaki Secret ID gizli anahtar değildir.
+5. `OIDC_ISSUER_URL` değerini, 3. adımdaki Directory (tenant) ID değerini kullanarak `https://login.microsoftonline.com/<tenant-id>/v2.0` olarak ayarlayın.
+6. `OIDC_USERNAME_CLAIM` değerini varsayılanında bırakın. Entra ID `preferred_username` sağladığından, Google kılavuzundaki `email` geçersiz kılması burada gerekli değildir.
+
+Veren URL'sinde her zaman kiracı kimliğinizi kullanın, `common` veya `organizations` kullanmayın. Bu çok kiracılı uç noktalar, veren olarak birebir `{tenantid}` şablonunu bildirir ve bu da OIDC keşif doğrulamasının başarısız olmasına neden olur.
+
+::: warning
+Entra ID'nin `preferred_username` istemi, kullanıcı yeniden adlandırıldığında veya başka bir kiracıya taşındığında değişen kullanıcı asıl adını (user principal name) izler. SnapOtter bu istemi yalnızca bir kez, ilk oturum açmada okur; bu nedenle hesap daha sonra özgün kullanıcı adını korur. Oturum açma her iki durumda da çalışmaya devam eder: geri dönen kullanıcılar, kullanıcı adına göre değil, token'daki sabit konu (subject) değerine göre eşleştirilir.
+:::
+
+Entra ID'ye geçmek parolayla oturum açmayı kapatmaz. [Yerel oturum açmayı devre dışı bırakma](#disabling-local-login) bölümüne bakın.
+
+### Okta ve diğer sağlayıcılar {#okta-and-other-providers}
+
+OIDC Discovery destekleyen her sağlayıcı aynı şekilde çalışır: geri çağırma URL'nizle gizli (confidential) bir web istemcisi oluşturun, ardından `OIDC_ISSUER_URL` değerini verene (issuer) yönlendirin. Okta için, **OIDC - OpenID Connect** oturum açma yöntemini ve **Web Application** türünü kullanan bir uygulama oluşturun, ardından veren olarak Okta alan adınızı kullanın (örn. `https://your-company.okta.com`).
+
+SnapOtter, kimlik sağlayıcı gruplarını rollere eşlemez. Yeni SSO kullanıcıları `OIDC_DEFAULT_ROLE` rolünü alır, yöneticiler rolleri **Settings > Users** altından değiştirir ve `OIDC_SCOPES` aracılığıyla grup istemleri talep etmenin bir etkisi yoktur.
 
 ## Kullanıcı sağlama {#user-provisioning}
 

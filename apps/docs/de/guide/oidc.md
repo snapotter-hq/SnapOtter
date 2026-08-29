@@ -1,13 +1,13 @@
 ---
-description: "Richten Sie Single Sign-On mit OpenID Connect ein. Schritt-für-Schritt-Anleitungen für Keycloak, Authentik, Google und andere OIDC-Anbieter."
-i18n_source_hash: 4296343b3cc5
+description: "Richten Sie Single Sign-On mit OpenID Connect ein. Schritt-für-Schritt-Anleitungen für Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta und andere OIDC-Anbieter."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 8f5a0caeda80
 ---
 
 # OIDC / Single Sign-On {#oidc-single-sign-on}
 
-SnapOtter unterstützt OpenID Connect (OIDC) für Single Sign-On. Benutzer können sich mit einem externen Identitätsanbieter wie Keycloak, Authentik oder Google anmelden, anstatt (oder zusätzlich zu) der lokalen Benutzername/Passwort-Authentifizierung.
+SnapOtter unterstützt OpenID Connect (OIDC) für Single Sign-On. Benutzer können sich mit einem externen Identitätsanbieter wie Keycloak, Authentik, Google oder Microsoft Entra ID anmelden, anstatt (oder zusätzlich zu) der lokalen Benutzername/Passwort-Authentifizierung.
 
 ::: tip Siehe auch
 [SAML SSO](/de/guide/saml) | [SCIM-Bereitstellung](/de/guide/scim) | [Benutzer, Rollen & Berechtigungen](/de/guide/users-roles)
@@ -89,6 +89,29 @@ Wenn `EXTERNAL_URL` beispielsweise `https://photos.example.com` ist, konfigurier
 5. Kopieren Sie die **Client ID** und das **Client secret**.
 6. Setzen Sie `OIDC_ISSUER_URL` auf `https://accounts.google.com`.
 7. Setzen Sie `OIDC_USERNAME_CLAIM` auf `email` (Google stellt `preferred_username` nicht bereit).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. Gehen Sie im Azure-Portal zu **Microsoft Entra ID > App registrations > New registration**.
+2. Nennen Sie die App "SnapOtter". Wählen Sie unter **Redirect URI** die Plattform **Web** und geben Sie Ihre Callback-URL ein (z. B. `https://photos.example.com/api/auth/oidc/callback`). Wählen Sie nicht **Single-page application**: SnapOtter authentifiziert sich mit einem Client-Secret, das Entra ID bei SPA-Registrierungen ablehnt.
+3. Kopieren Sie die **Application (client) ID** und die **Directory (tenant) ID** von der Seite **Overview**.
+4. Gehen Sie zu **Certificates & secrets > New client secret** und kopieren Sie den **Value** des Secrets sofort. Er wird nur einmal angezeigt, und die daneben stehende Secret ID ist nicht das Secret.
+5. Setzen Sie `OIDC_ISSUER_URL` auf `https://login.microsoftonline.com/<tenant-id>/v2.0` und verwenden Sie dabei die Directory (tenant) ID aus Schritt 3.
+6. Belassen Sie `OIDC_USERNAME_CLAIM` auf dem Standardwert. Entra ID stellt `preferred_username` bereit, daher ist das Überschreiben mit `email` aus der Google-Anleitung hier nicht nötig.
+
+Verwenden Sie in der Issuer-URL immer Ihre Tenant-ID, nicht `common` oder `organizations`. Diese Multi-Tenant-Endpunkte geben das wörtliche Template `{tenantid}` als Issuer an, wodurch die OIDC-Discovery-Validierung fehlschlägt.
+
+::: warning
+Der Claim `preferred_username` von Entra ID folgt dem Benutzerprinzipalnamen, der sich ändert, wenn ein Benutzer umbenannt oder in einen anderen Tenant verschoben wird. SnapOtter liest den Claim nur einmal bei der ersten Anmeldung, sodass das Konto danach seinen ursprünglichen Benutzernamen behält. Anmeldungen funktionieren in beiden Fällen weiter: Wiederkehrende Benutzer werden über das stabile Subject des Tokens zugeordnet, nicht über den Benutzernamen.
+:::
+
+Der Wechsel zu Entra ID deaktiviert die Passwort-Anmeldung nicht. Siehe [Lokale Anmeldung deaktivieren](#disabling-local-login).
+
+### Okta und andere Anbieter {#okta-and-other-providers}
+
+Jeder Anbieter, der OIDC Discovery unterstützt, funktioniert auf die gleiche Weise: Erstellen Sie einen vertraulichen Web-Client mit Ihrer Callback-URL und verweisen Sie `OIDC_ISSUER_URL` auf den Issuer. Für Okta erstellen Sie eine App mit der Anmeldemethode **OIDC - OpenID Connect** und dem Typ **Web Application** und verwenden dann Ihre Okta-Domain als Issuer (z. B. `https://your-company.okta.com`).
+
+SnapOtter ordnet Gruppen des Identitätsanbieters keinen Rollen zu. Neue SSO-Benutzer erhalten `OIDC_DEFAULT_ROLE`, Admins ändern Rollen unter **Einstellungen > Benutzer**, und das Anfordern von Gruppen-Claims über `OIDC_SCOPES` hat keine Wirkung.
 
 ## Benutzerbereitstellung {#user-provisioning}
 

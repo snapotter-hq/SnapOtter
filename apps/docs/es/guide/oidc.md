@@ -1,13 +1,13 @@
 ---
-description: "Configura el inicio de sesión único con OpenID Connect. Guías paso a paso para Keycloak, Authentik, Google y otros proveedores OIDC."
-i18n_source_hash: 4296343b3cc5
+description: "Configura el inicio de sesión único con OpenID Connect. Guías paso a paso para Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta y otros proveedores OIDC."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: ed919192ab76
 ---
 
 # OIDC / Inicio de sesión único {#oidc-single-sign-on}
 
-SnapOtter admite OpenID Connect (OIDC) para el inicio de sesión único. Los usuarios pueden iniciar sesión con un proveedor de identidad externo como Keycloak, Authentik o Google en lugar de (o junto a) la autenticación local con usuario y contraseña.
+SnapOtter admite OpenID Connect (OIDC) para el inicio de sesión único. Los usuarios pueden iniciar sesión con un proveedor de identidad externo como Keycloak, Authentik, Google o Microsoft Entra ID en lugar de (o junto a) la autenticación local con usuario y contraseña.
 
 ::: tip Consulta también
 [SAML SSO](/es/guide/saml) | [Aprovisionamiento SCIM](/es/guide/scim) | [Usuarios, roles y permisos](/es/guide/users-roles)
@@ -89,6 +89,29 @@ Por ejemplo, si `EXTERNAL_URL` es `https://photos.example.com`, configura la URI
 5. Copia el **Client ID** y el **Client secret**.
 6. Define `OIDC_ISSUER_URL` como `https://accounts.google.com`.
 7. Define `OIDC_USERNAME_CLAIM` como `email` (Google no proporciona `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. En el portal de Azure, ve a **Microsoft Entra ID > App registrations > New registration**.
+2. Llama a la aplicación "SnapOtter". En **Redirect URI**, selecciona la plataforma **Web** e introduce tu URL de callback (p. ej. `https://photos.example.com/api/auth/oidc/callback`). No elijas **Single-page application**: SnapOtter se autentica con un secreto de cliente, que Entra ID rechaza en los registros de tipo SPA.
+3. Copia el **Application (client) ID** y el **Directory (tenant) ID** de la página **Overview**.
+4. Ve a **Certificates & secrets > New client secret** y copia enseguida el **Value** del secreto. Solo se muestra una vez, y el Secret ID adyacente no es el secreto.
+5. Define `OIDC_ISSUER_URL` como `https://login.microsoftonline.com/<tenant-id>/v2.0`, usando el Directory (tenant) ID del paso 3.
+6. Deja `OIDC_USERNAME_CLAIM` en su valor predeterminado. Entra ID proporciona `preferred_username`, así que aquí no hace falta la sustitución por `email` de la guía de Google.
+
+Usa siempre el ID de tu tenant en la URL del emisor, no `common` ni `organizations`. Esos endpoints multi-tenant anuncian la plantilla literal `{tenantid}` como su emisor, lo que hace fallar la validación de OIDC Discovery.
+
+::: warning
+El claim `preferred_username` de Entra ID sigue el nombre principal de usuario, que cambia cuando un usuario es renombrado o trasladado a otro tenant. SnapOtter lee el claim una sola vez, en el primer inicio de sesión, así que después la cuenta conserva su nombre de usuario original. El inicio de sesión sigue funcionando en cualquier caso: los usuarios que regresan se identifican por el subject estable del token, no por el nombre de usuario.
+:::
+
+Cambiar a Entra ID no desactiva el inicio de sesión con contraseña. Consulta [Desactivar el inicio de sesión local](#disabling-local-login).
+
+### Okta y otros proveedores {#okta-and-other-providers}
+
+Cualquier proveedor que admita OIDC Discovery funciona de la misma manera: crea un cliente web confidencial con tu URL de callback y apunta `OIDC_ISSUER_URL` al emisor. Para Okta, crea una aplicación con el método de inicio de sesión **OIDC - OpenID Connect** y el tipo **Web Application**, y usa tu dominio de Okta como emisor (p. ej. `https://your-company.okta.com`).
+
+SnapOtter no asigna los grupos del proveedor de identidad a roles. Los usuarios SSO nuevos reciben `OIDC_DEFAULT_ROLE`, los administradores cambian los roles en **Ajustes > Usuarios**, y solicitar claims de grupos mediante `OIDC_SCOPES` no tiene ningún efecto.
 
 ## Aprovisionamiento de usuarios {#user-provisioning}
 

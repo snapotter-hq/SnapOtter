@@ -1,13 +1,13 @@
 ---
-description: "أعدّ الدخول الموحّد باستخدام OpenID Connect. أدلة تفصيلية خطوة بخطوة لـ Keycloak وAuthentik وGoogle ومزودي OIDC الآخرين."
-i18n_source_hash: 4296343b3cc5
+description: "أعدّ الدخول الموحّد باستخدام OpenID Connect. أدلة تفصيلية خطوة بخطوة لـ Keycloak وAuthentik وGoogle وMicrosoft Entra ID (Azure AD) وOkta ومزودي OIDC الآخرين."
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 3bb7beb03713
 ---
 
 # OIDC / الدخول الموحّد {#oidc-single-sign-on}
 
-تدعم SnapOtter بروتوكول OpenID Connect (OIDC) للدخول الموحّد. يمكن للمستخدمين تسجيل الدخول بمزوّد هوية خارجي مثل Keycloak أو Authentik أو Google بدلاً من (أو إلى جانب) مصادقة اسم المستخدم/كلمة المرور المحلية.
+تدعم SnapOtter بروتوكول OpenID Connect (OIDC) للدخول الموحّد. يمكن للمستخدمين تسجيل الدخول بمزوّد هوية خارجي مثل Keycloak أو Authentik أو Google أو Microsoft Entra ID بدلاً من (أو إلى جانب) مصادقة اسم المستخدم/كلمة المرور المحلية.
 
 ::: tip انظر أيضًا
 [SAML SSO](/ar/guide/saml) | [توفير SCIM](/ar/guide/scim) | [المستخدمون والأدوار والأذونات](/ar/guide/users-roles)
@@ -89,6 +89,29 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 5. انسخ **Client ID** و**Client secret**.
 6. اضبط `OIDC_ISSUER_URL` على `https://accounts.google.com`.
 7. اضبط `OIDC_USERNAME_CLAIM` على `email` (لا توفّر Google `preferred_username`).
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. في بوابة Azure، انتقل إلى **Microsoft Entra ID > App registrations > New registration**.
+2. سمِّ التطبيق "SnapOtter". ضمن **Redirect URI**، اختر منصة **Web** وأدخل عنوان رد الاتصال الخاص بك (مثل `https://photos.example.com/api/auth/oidc/callback`). لا تختر **Single-page application**: تصادق SnapOtter باستخدام سر عميل، وهو ما يرفضه Entra ID في تسجيلات SPA.
+3. انسخ **Application (client) ID** و**Directory (tenant) ID** من صفحة **Overview**.
+4. انتقل إلى **Certificates & secrets > New client secret** وانسخ قيمة السر **Value** على الفور. تُعرض هذه القيمة مرة واحدة فقط، وSecret ID المجاور لها ليس هو السر.
+5. اضبط `OIDC_ISSUER_URL` على `https://login.microsoftonline.com/<tenant-id>/v2.0`، مستخدمًا Directory (tenant) ID من الخطوة 3.
+6. اترك `OIDC_USERNAME_CLAIM` على قيمته الافتراضية. يوفّر Entra ID المطالبة `preferred_username`، لذا لا حاجة هنا إلى تجاوز `email` المذكور في دليل Google.
+
+استخدم دائمًا معرّف المستأجر الخاص بك في عنوان URL للمُصدِّر، وليس `common` أو `organizations`. تعلن نقاط النهاية متعددة المستأجرين هذه القالب الحرفي `{tenantid}` كمُصدِّر لها، وهو ما يُفشل التحقق من صحة اكتشاف OIDC.
+
+::: warning
+تتبع مطالبة `preferred_username` في Entra ID اسم المستخدم الأساسي (user principal name)، وهو يتغيّر عند إعادة تسمية المستخدم أو نقله إلى مستأجر آخر. تقرأ SnapOtter المطالبة مرة واحدة عند أول تسجيل دخول، لذا يحتفظ الحساب باسم المستخدم الأصلي بعد ذلك. يستمر تسجيل الدخول في العمل في كلتا الحالتين: تجري مطابقة المستخدمين العائدين عبر الموضوع الثابت (subject) في الرمز، وليس عبر اسم المستخدم.
+:::
+
+لا يؤدي التحوّل إلى Entra ID إلى إيقاف تسجيل الدخول بكلمة المرور. راجع [تعطيل تسجيل الدخول المحلي](#disabling-local-login).
+
+### Okta والمزوّدون الآخرون {#okta-and-other-providers}
+
+يعمل أي مزوّد يدعم اكتشاف OIDC بالطريقة نفسها: أنشئ عميل ويب سريًا بعنوان رد الاتصال الخاص بك، ثم وجّه `OIDC_ISSUER_URL` إلى المُصدِّر. بالنسبة إلى Okta، أنشئ تطبيقًا بطريقة تسجيل الدخول **OIDC - OpenID Connect** ونوع **Web Application**، ثم استخدم نطاق Okta الخاص بك كمُصدِّر (مثل `https://your-company.okta.com`).
+
+لا تُطابق SnapOtter مجموعات مزوّد الهوية مع الأدوار. يحصل مستخدمو SSO الجدد على `OIDC_DEFAULT_ROLE`، ويغيّر المسؤولون الأدوار ضمن **Settings > Users**، وطلب مطالبات المجموعات عبر `OIDC_SCOPES` ليس له أي تأثير.
 
 ## توفير المستخدمين {#user-provisioning}
 

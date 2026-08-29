@@ -1,13 +1,13 @@
 ---
-description: "使用 OpenID Connect 设置单点登录。提供 Keycloak、Authentik、Google 及其他 OIDC 提供商的分步指南。"
-i18n_source_hash: 4296343b3cc5
+description: "使用 OpenID Connect 设置单点登录。提供 Keycloak、Authentik、Google、Microsoft Entra ID (Azure AD)、Okta 及其他 OIDC 提供商的分步指南。"
+i18n_source_hash: 438fff2ba4c6
 i18n_provenance: human
 i18n_output_hash: 57678911503c
 ---
 
 # OIDC / 单点登录 {#oidc-single-sign-on}
 
-SnapOtter 支持使用 OpenID Connect（OIDC）进行单点登录。用户可以使用 Keycloak、Authentik 或 Google 等外部身份提供商登录，作为本地用户名/密码认证的替代方案（或与之并存）。
+SnapOtter 支持使用 OpenID Connect（OIDC）进行单点登录。用户可以使用 Keycloak、Authentik、Google 或 Microsoft Entra ID 等外部身份提供商登录，作为本地用户名/密码认证的替代方案（或与之并存）。
 
 ::: tip 另请参阅
 [SAML SSO](/zh-CN/guide/saml) | [SCIM 预置](/zh-CN/guide/scim) | [用户、角色与权限](/zh-CN/guide/users-roles)
@@ -89,6 +89,29 @@ ${EXTERNAL_URL}/api/auth/oidc/callback
 5. 复制 **Client ID** 和 **Client secret**。
 6. 将 `OIDC_ISSUER_URL` 设置为 `https://accounts.google.com`。
 7. 将 `OIDC_USERNAME_CLAIM` 设置为 `email`（Google 不提供 `preferred_username`）。
+
+### Azure AD / Entra ID {#azure-ad-entra-id}
+
+1. 在 Azure 门户中，进入 **Microsoft Entra ID > App registrations > New registration**。
+2. 将应用命名为“SnapOtter”。在 **Redirect URI** 下，选择 **Web** 平台并输入你的回调 URL（例如 `https://photos.example.com/api/auth/oidc/callback`）。不要选择 **Single-page application**：SnapOtter 使用客户端密钥进行认证，而 Entra ID 不接受 SPA 注册使用客户端密钥。
+3. 从 **Overview** 页面复制 **Application (client) ID** 和 **Directory (tenant) ID**。
+4. 进入 **Certificates & secrets > New client secret**，并立即复制密钥的 **Value**。该值只显示一次，旁边的 Secret ID 并不是密钥。
+5. 将 `OIDC_ISSUER_URL` 设置为 `https://login.microsoftonline.com/<tenant-id>/v2.0`，其中使用第 3 步中的 Directory (tenant) ID。
+6. 保持 `OIDC_USERNAME_CLAIM` 为默认值。Entra ID 提供 `preferred_username`，因此这里不需要 Google 指南中的 `email` 覆盖设置。
+
+在 issuer URL 中请始终使用你的租户 ID，而不是 `common` 或 `organizations`。这些多租户端点会将字面模板 `{tenantid}` 作为其 issuer 公布，这会导致 OIDC 发现验证失败。
+
+::: warning
+Entra ID 的 `preferred_username` 跟随用户主体名称，当用户被重命名或迁移到其他租户时该名称会改变。SnapOtter 只在首次登录时读取一次该声明，因此账户之后会保留其原始用户名。无论哪种情况，登录都能正常进行：回访用户通过令牌中稳定的 subject 进行匹配，而不是通过用户名。
+:::
+
+切换到 Entra ID 不会关闭密码登录。请参阅[禁用本地登录](#disabling-local-login)。
+
+### Okta 及其他提供商 {#okta-and-other-providers}
+
+任何支持 OIDC Discovery 的提供商都以同样的方式工作：使用你的回调 URL 创建一个保密型 Web 客户端，然后将 `OIDC_ISSUER_URL` 指向该 issuer。对于 Okta，创建一个使用 **OIDC - OpenID Connect** 登录方式和 **Web Application** 类型的应用，然后使用你的 Okta 域名作为 issuer（例如 `https://your-company.okta.com`）。
+
+SnapOtter 不会将身份提供商的组映射为角色。新的 SSO 用户会获得 `OIDC_DEFAULT_ROLE`，管理员可在 **Settings > Users** 下更改角色，通过 `OIDC_SCOPES` 请求组声明没有任何效果。
 
 ## 用户预置 {#user-provisioning}
 
