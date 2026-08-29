@@ -44,7 +44,7 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      "Fantastic software! I managed to replace [my old converter] and even got more features with SnapOtter.",
+      "Fantastic software! I managed to replace the old ass convertx and even got more features with SnapOtter.",
     author: "Self-hosted admin",
     context: "Shared via in-app feedback",
     hero: true,
