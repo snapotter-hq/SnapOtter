@@ -1,5 +1,18 @@
 import { runDocsScript } from "@snapotter/ai";
-import { SafeError, type SignPlacement } from "@snapotter/shared";
+import { SafeError, type SignPlacement, ToolInputError } from "@snapotter/shared";
+
+/**
+ * MuPDF's printer reports document damage as prefixed lines on the stream the
+ * scripts should have redirected to stderr ("error:" / "warning:", or "MuPDF
+ * error:" on newer releases): "error: cannot find object in xref (14 0 R)",
+ * "MuPDF error: syntax error: invalid key in dict". When such lines reach the
+ * JSON channel and nothing on it parses, the input PDF is broken (it passed
+ * `qpdf --check` only via recovery, exit 3), not our code (#898, NODE-60).
+ * The prefix requirement keeps Python tracebacks that merely mention these
+ * words classified as bugs.
+ */
+const MUPDF_DAMAGE_NOISE =
+  /(?:^|\n)(?:MuPDF error:|error:|warning:).*(?:xref|syntax error|format error|repair|corrupt|page tree)/i;
 
 /**
  * Parse the JSON line the docs dispatcher prints on stdout. Every doc_* script
@@ -28,6 +41,17 @@ function parseDocsJson<T>(script: string, stdout: string): T {
       } catch {
         // fall through to the earlier lines
       }
+    }
+    if (MUPDF_DAMAGE_NOISE.test(trimmed)) {
+      // Expected-class errors never reach Sentry or the worker's error log, so
+      // keep the raw output on the cause: it is the only artifact left to
+      // check when the classification itself is in question.
+      throw Object.assign(
+        new ToolInputError(
+          "This PDF is damaged (the PDF engine reported broken document structure). Run it through the Repair PDF tool, then try again.",
+        ),
+        { cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`) },
+      );
     }
     throw new SafeError("Document tool returned non-JSON output", {
       kind: "bug",

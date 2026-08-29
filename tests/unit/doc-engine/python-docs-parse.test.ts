@@ -6,7 +6,7 @@ vi.mock("@snapotter/ai", () => ({
   runDocsScript: (...args: unknown[]) => runDocsScript(...args),
 }));
 
-import { isSafeMessageError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import {
   pdfPageCountPy,
   pdfRedactPy,
@@ -80,6 +80,102 @@ describe("python-docs sidecar JSON parsing", () => {
     expect(text).toContain("Traceback");
     // And it identifies which script produced it.
     expect(text).toContain("doc_redact");
+  });
+
+  // A damaged PDF (broken xref) passes the qpdf pre-check (exit 3 = recovered
+  // with warnings) and reaches the worker, where MuPDF's printer floods stdout
+  // with damage diagnostics. That is a user-input problem, not a code bug:
+  // it must classify as ToolInputError (error_class=expected, never Sentry),
+  // not SafeError kind:"bug" (issue #898, Sentry NODE-60).
+  it("classifies MuPDF xref damage noise as a user input error, not a bug", async () => {
+    runDocsScript.mockResolvedValue(
+      "error: cannot find object in xref (14 0 R)\n" + "error: cannot find object in xref (14 0 R)",
+    );
+
+    let caught: unknown;
+    try {
+      await pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false);
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(isToolInputError(caught)).toBe(true);
+    expect(isSafeMessageError(caught)).toBe(false);
+    // The user gets an actionable pointer at the repair path.
+    expect((caught as Error).message).toContain("Repair PDF");
+    // The raw MuPDF output survives on the cause for local triage, mirroring
+    // the SafeError branch; without it a misclassification is unfalsifiable.
+    expect(String(((caught as Error).cause as Error)?.message)).toContain(
+      "cannot find object in xref",
+    );
+  });
+
+  // Ordering guard: the salvage walk must run BEFORE the damage classifier.
+  // MuPDF repairs many PDFs and completes the job while still printing damage
+  // lines; if the classifier ever moves ahead of the walk, every recovered
+  // PDF starts failing with "damaged" and NODE-5M comes back via the new path.
+  it("still salvages the JSON line when damage noise precedes it", async () => {
+    runDocsScript.mockResolvedValue(
+      'error: cannot find object in xref (14 0 R)\n{"found": 2, "verified": true}',
+    );
+    await expect(pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false)).resolves.toEqual({
+      found: 2,
+    });
+  });
+
+  it("classifies warning-prefixed repair noise as a user input error too", async () => {
+    runDocsScript.mockResolvedValue(
+      "warning: repairing PDF document\n" +
+        "warning: trying to repair broken xref\n" +
+        '{"found": ',
+    );
+
+    let caught: unknown;
+    try {
+      await pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false);
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(isToolInputError(caught)).toBe(true);
+  });
+
+  it("classifies interleave-corrupted JSON with MuPDF damage noise as input error", async () => {
+    // Modern PyMuPDF prefixes the printer lines with "MuPDF error:"; a mid-line
+    // interleave can corrupt the JSON line itself so no line parses at all.
+    runDocsScript.mockResolvedValue(
+      "MuPDF error: syntax error: invalid key in dict\n" +
+        "MuPDF error: format error: non-page object in page tree\n" +
+        '{"found": MuPDF error: syntax error: invalid key in dict\n0}',
+    );
+
+    let caught: unknown;
+    try {
+      await pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false);
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(isToolInputError(caught)).toBe(true);
+  });
+
+  it("keeps damage keywords without a MuPDF printer prefix classified as a bug", async () => {
+    // A Python traceback that merely mentions xref is not the MuPDF printer;
+    // it must stay a diagnosable bug, not silently become an input error.
+    runDocsScript.mockResolvedValue(
+      'Traceback (most recent call last):\n  File "doc_redact.py", line 27\n' +
+        "RuntimeError: internal xref cache invariant violated",
+    );
+
+    let caught: unknown;
+    try {
+      await pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false);
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(isToolInputError(caught)).toBe(false);
+    expect(isSafeMessageError(caught)).toBe(true);
   });
 
   it("guards every helper, not only redact", async () => {
