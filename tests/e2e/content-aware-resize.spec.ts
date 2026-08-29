@@ -175,7 +175,10 @@ test.describe("Content-Aware Resize", () => {
     const download = page.getByTestId("resize-download");
     const error = page.getByText(/failed|not available|not found|error/i);
 
-    await expect(download.or(error)).toBeVisible({ timeout: 120_000 });
+    // .first(): a failed run renders the error in the settings banner, the
+    // sr-only live region, and the failure screen (#799), so the tolerant
+    // locator matches more than one element.
+    await expect(download.or(error).first()).toBeVisible({ timeout: 120_000 });
   });
 
   test("HEIC input with content-aware resize", async ({ loggedInPage: page }) => {
@@ -190,6 +193,9 @@ test.describe("Content-Aware Resize", () => {
     const download = page.getByTestId("resize-download");
     const error = page.getByText(/failed|not available|not found|error/i);
 
-    await expect(download.or(error)).toBeVisible({ timeout: 120_000 });
+    // .first(): a failed run renders the error in the settings banner, the
+    // sr-only live region, and the failure screen (#799), so the tolerant
+    // locator matches more than one element.
+    await expect(download.or(error).first()).toBeVisible({ timeout: 120_000 });
   });
 });

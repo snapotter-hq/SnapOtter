@@ -138,6 +138,9 @@ test.describe("AI Canvas Expand", () => {
     const download = page.getByTestId("ai-canvas-expand-download");
     const error = page.getByText(/failed|not available|not installed|requires.*feature|error/i);
 
-    await expect(download.or(error)).toBeVisible({ timeout: 300_000 });
+    // .first(): a failed run renders the error in the settings banner, the
+    // sr-only live region, and the failure screen (#799), so the tolerant
+    // locator matches more than one element.
+    await expect(download.or(error).first()).toBeVisible({ timeout: 300_000 });
   });
 });
