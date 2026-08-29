@@ -168,6 +168,22 @@ describe("streamStoredFile", () => {
     for await (const chunk of stream) chunks.push(chunk as Buffer);
     expect(Buffer.concat(chunks).toString()).toBe("stream me");
   });
+
+  // A blob that exists but can't be opened must also reject up front, so the
+  // download route can tell a storage fault (rethrow, 500) from a missing
+  // blob (404) instead of the EACCES escaping as an async stream error.
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)("rejects with EACCES when the stored file is unreadable", async () => {
+    const { saveFile, streamStoredFile } = await importModule();
+    const name = await saveFile(Buffer.from("locked"), "photo.png");
+    await chmod(join(testDir, name), 0o000);
+    const err = (await streamStoredFile(name).then(
+      () => null,
+      (e: unknown) => e,
+    )) as NodeJS.ErrnoException | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.code).toBe("EACCES");
+  });
 });
 
 // Regression guard for the path-traversal report: stored names are generated

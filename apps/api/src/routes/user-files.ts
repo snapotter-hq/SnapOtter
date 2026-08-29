@@ -482,7 +482,18 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       let stream: Awaited<ReturnType<typeof streamStoredFile>>;
       try {
         stream = await streamStoredFile(file.storedName);
-      } catch {
+      } catch (e) {
+        // streamStoredFile rejects for every open-time fault, not only a
+        // missing blob. A syscall failure other than ENOENT (EACCES, ENOTDIR)
+        // is a storage fault that must keep reaching the global handler and
+        // Sentry. Errors without a syscall (S3 NoSuchKey, a poisoned
+        // stored_name) keep their long-standing 404 mapping.
+        const { code, syscall } = e as NodeJS.ErrnoException;
+        if (syscall && code !== "ENOENT") throw e;
+        request.log.warn(
+          { fileId: id, storedName: file.storedName },
+          "library download: stored blob missing",
+        );
         return reply.status(404).send({ error: "File not found in storage" });
       }
 
