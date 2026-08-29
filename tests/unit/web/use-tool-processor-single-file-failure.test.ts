@@ -14,7 +14,10 @@ vi.mock("@/lib/analytics", () => ({
 
 vi.mock("@/lib/api", () => ({
   formatHeaders: () => new Map<string, string>(),
-  parseApiError: () => "error",
+  parseApiError: (body: { code?: string }) =>
+    body?.code === "feature_not_installed"
+      ? { type: "feature_not_installed", featureName: "Background Removal" }
+      : "error",
 }));
 
 vi.mock("@/lib/utils", async (importOriginal) => {
@@ -56,6 +59,18 @@ class MockEventSource {
 }
 
 let xhrs: MockXhr[];
+
+const JOB_ID = "33333333-3333-4333-8333-333333333333";
+
+function latestSse(): MockEventSource {
+  return MockEventSource.instances[MockEventSource.instances.length - 1];
+}
+
+function sendSingleFrame(frame: Record<string, unknown>) {
+  latestSse().onmessage?.({
+    data: JSON.stringify({ type: "single", jobId: JOB_ID, ...frame }),
+  } as MessageEvent);
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -233,5 +248,98 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().processing).toBe(true);
 
     unmount();
+  });
+
+  it("settles the entry to failed on a post-upload 5xx the app itself emitted", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      // A JSON body means the app answered (html-to-image's own 504), not an
+      // intermediary standing in for a dead sync wait: a real failure, no
+      // degrade even though the upload finished.
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 504;
+      xhrs[0].responseText = JSON.stringify({ error: "render timeout" });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "error",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("carries the feature-not-installed message onto the failed entry", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].status = 409;
+      xhrs[0].responseText = JSON.stringify({ code: "feature_not_installed" });
+      xhrs[0].onload?.();
+    });
+
+    const entry = useFileStore.getState().entries[0];
+    expect(entry.status).toBe("failed");
+    expect(entry.error).toContain('requires the "Background Removal" feature');
+    expect(useFileStore.getState().error).toBe(entry.error);
+
+    unmount();
+  });
+
+  it("does not clobber an SSE-completed entry on a late non-2xx response", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: "server-job",
+          downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+    act(() => {
+      // An onload task queued before the SSE settle dispatches after it;
+      // the status guard must leave the completed result alone.
+      xhrs[0].status = 502;
+      xhrs[0].responseText = "<html>Bad Gateway</html>";
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    });
+
+    unmount();
+  });
+
+  it("fails the entry the run started with, not the currently selected one", () => {
+    const fileA = new File([new ArrayBuffer(64)], "a.mp4", { type: "video/mp4" });
+    const fileB = new File([new ArrayBuffer(64)], "b.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      // The user browses to the other file while the run is in flight.
+      useFileStore.getState().setSelectedIndex(1);
+      xhrs[0].onerror?.();
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("failed");
+    expect(useFileStore.getState().entries[1].status).toBe("pending");
+
+    hook.unmount();
   });
 });
