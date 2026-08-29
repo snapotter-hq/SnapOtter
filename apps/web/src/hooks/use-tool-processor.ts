@@ -577,6 +577,20 @@ export function useToolProcessor(toolId: string) {
         return true;
       };
 
+      // A real failure must settle the entry the kickoff reset to
+      // "processing": the tool page derives the pulse from
+      // status === "processing" and gates the failure screen on
+      // status === "failed", so an unsettled entry pulses on the untouched
+      // original forever (#799, the single-file twin of #798's failRun).
+      const failEntry = (message: string) => {
+        if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
+          useFileStore.getState().updateEntry(capturedIndex, {
+            status: "failed",
+            error: message,
+          });
+        }
+      };
+
       xhr.onload = () => {
         if (xhr.status === 202) {
           asyncModeRef.current = true;
@@ -631,19 +645,20 @@ export function useToolProcessor(toolId: string) {
             setError("Invalid response from server");
           }
         } else {
+          let message: string;
           try {
             const body = JSON.parse(xhr.responseText);
             const parsed = parseApiError(body, xhr.status);
             if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              setError(
-                `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`,
-              );
+              message = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
             } else {
-              setError(parsed as string);
+              message = parsed as string;
             }
           } catch {
-            setError(`Processing failed: ${xhr.status}`);
+            message = `Processing failed: ${xhr.status}`;
           }
+          setError(message);
+          failEntry(message);
         }
 
         setProcessing(false);
@@ -663,7 +678,9 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        setError("Processing was interrupted. Retry when reconnected.");
+        const message = "Processing was interrupted. Retry when reconnected.";
+        setError(message);
+        failEntry(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
@@ -678,7 +695,9 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        setError("Request timed out - the server may be overloaded. Try again.");
+        const message = "Request timed out - the server may be overloaded. Try again.";
+        setError(message);
+        failEntry(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
