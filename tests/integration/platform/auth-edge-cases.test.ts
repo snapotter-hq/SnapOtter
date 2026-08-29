@@ -462,6 +462,48 @@ describe("Register validation", () => {
     expect(body.role).toBe("user");
   });
 
+  it("duplicate username returns 409", async () => {
+    const { username } = await createUser();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username, password: "ValidPass1" },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Username already exists",
+      code: "CONFLICT",
+    });
+  });
+
+  it("concurrent duplicate registers return one 201 and one 409, never 500", async () => {
+    // Issue #900: both requests pass the duplicate pre-check before either
+    // insert commits (scrypt hashing sits between the two), so the loser
+    // used to surface the 23505 unique violation as a 500.
+    const username = uid();
+    const register = () =>
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username, password: "ValidPass1" },
+      });
+
+    const [first, second] = await Promise.all([register(), register()]);
+    const statuses = [first.statusCode, second.statusCode].sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const conflict = first.statusCode === 409 ? first : second;
+    expect(JSON.parse(conflict.body)).toEqual({
+      error: "Username already exists",
+      code: "CONFLICT",
+    });
+
+    const rows = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    expect(rows).toHaveLength(1);
+  });
+
   it("delete non-existent user returns 404", async () => {
     const res = await testApp.app.inject({
       method: "DELETE",

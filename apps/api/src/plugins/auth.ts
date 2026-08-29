@@ -955,14 +955,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const id = randomUUID();
     const passwordHash = await hashPassword(body.password);
 
-    await db.insert(schema.users).values({
-      id,
-      username: body.username,
-      passwordHash,
-      role,
-      team: teamId,
-      mustChangePassword: true,
-    });
+    // The duplicate pre-check above can't close the race: two concurrent
+    // registers both pass the SELECT before either insert commits (issue #900).
+    const inserted = await db
+      .insert(schema.users)
+      .values({
+        id,
+        username: body.username,
+        passwordHash,
+        role,
+        team: teamId,
+        mustChangePassword: true,
+      })
+      .onConflictDoNothing({ target: schema.users.username });
+
+    if (!inserted.rowCount) {
+      return reply.status(409).send({
+        error: "Username already exists",
+        code: "CONFLICT",
+      });
+    }
 
     await auditFromRequest(request)("USER_CREATED", {
       adminId: admin.id,
