@@ -322,6 +322,91 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
+  it("settles the entry to failed when the SSE reports the job failed", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "boom" });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "boom",
+    });
+    expect(useFileStore.getState().error).toBe("boom");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("settles the entry to failed on a 2xx with an unparseable body", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = "<html>not json</html>";
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("settles the entry to failed when the job-evidence timeout fires", () => {
+    const { unmount } = startRun();
+
+    // Degrade first (#722): upload finished, socket died, no frame ever
+    // proves the job exists, so the evidence timeout is the terminal path.
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error:
+        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("settles the entry to failed when cancel finds no job server-side", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    expect(cancel).not.toBeNull();
+    await act(async () => {
+      await cancel?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("fails the entry the run started with, not the currently selected one", () => {
     const fileA = new File([new ArrayBuffer(64)], "a.mp4", { type: "video/mp4" });
     const fileB = new File([new ArrayBuffer(64)], "b.mp4", { type: "video/mp4" });

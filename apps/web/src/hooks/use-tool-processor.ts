@@ -178,6 +178,20 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
+  // A terminal failure must settle every entry its run left at "processing":
+  // the tool page derives the pulse from that status and gates the failure
+  // screen on "failed" (#799, #929). Same sweep as the batch failRun; the
+  // status guard leaves already-settled results alone, and sweeping instead
+  // of indexing works after clearActiveJob has nulled activeEntryIndexRef.
+  const settleProcessingEntries = useCallback((message: string) => {
+    const { entries, updateEntry } = useFileStore.getState();
+    for (let i = 0; i < entries.length; i++) {
+      if (entries[i]?.status === "processing") {
+        updateEntry(i, { status: "failed", error: message });
+      }
+    }
+  }, []);
+
   // Armed only when a dead POST degrades to the async path (#722): heartbeats
   // alone must not keep the client in "processing" forever for a job the
   // server never received.
@@ -196,13 +210,21 @@ export function useToolProcessor(toolId: string) {
       // behind would swallow a later run's cancel-404 settle (#767).
       batchRunRef.current = null;
       clearActiveJob();
-      setError(
-        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
-      );
+      const message =
+        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+      settleProcessingEntries(message);
+      setError(message);
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
     }, JOB_EVIDENCE_TIMEOUT_MS);
-  }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
+  }, [
+    clearJobEvidenceTimer,
+    clearStallTimer,
+    clearActiveJob,
+    settleProcessingEntries,
+    setError,
+    setProcessing,
+  ]);
 
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
@@ -240,6 +262,10 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current = null;
         }
         clearActiveJob();
+        // Same settle the batch failRun gives canceled entries: "failed"
+        // with "Canceled", so the failure screen renders instead of an
+        // eternal pulse (#929).
+        settleProcessingEntries("Canceled");
         setError("Canceled");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
@@ -247,7 +273,14 @@ export function useToolProcessor(toolId: string) {
     } catch {
       // Cancel request failed; SSE handler will clean up
     }
-  }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
+  }, [
+    clearJobEvidenceTimer,
+    clearStallTimer,
+    clearActiveJob,
+    settleProcessingEntries,
+    setError,
+    setProcessing,
+  ]);
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -376,7 +409,9 @@ export function useToolProcessor(toolId: string) {
               // cannot replace this specific error with a generic one.
               xhrRef.current?.abort();
               clearActiveJob();
-              setError(data.error || "Processing failed");
+              const message = data.error || "Processing failed";
+              settleProcessingEntries(message);
+              setError(message);
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
               return;
@@ -413,6 +448,7 @@ export function useToolProcessor(toolId: string) {
       clearStallTimer,
       clearJobEvidenceTimer,
       resetStallTimer,
+      settleProcessingEntries,
       setError,
       setProcessing,
     ],
@@ -642,7 +678,9 @@ export function useToolProcessor(toolId: string) {
                 : {}),
             });
           } catch {
-            setError("Invalid response from server");
+            const message = "Invalid response from server";
+            setError(message);
+            failEntry(message);
           }
         } else {
           let message: string;
