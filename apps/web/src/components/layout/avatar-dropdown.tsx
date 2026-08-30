@@ -12,11 +12,17 @@ interface AvatarDropdownProps {
 
 export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDropdownProps) {
   const { t } = useTranslation();
-  const { authEnabled } = useAuth();
+  const { authEnabled, loading, username: sessionUsername } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const username = localStorage.getItem("snapotter-username") || "admin";
+  // The session is the source of truth: OIDC/SAML logins never run the login
+  // form, so the localStorage copy it writes doesn't exist for them (#862).
+  // localStorage only bridges the gap until the session fetch resolves, and
+  // the "admin" terminal fallback (no-auth mode has no session to name) must
+  // wait for that fetch; flashing it mid-load is #862's symptom again.
+  const username =
+    sessionUsername || localStorage.getItem("snapotter-username") || (loading ? "" : "admin");
   const initial = username.charAt(0).toUpperCase();
 
   useEffect(() => {
