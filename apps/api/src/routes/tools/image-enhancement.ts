@@ -12,6 +12,7 @@ import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -40,14 +41,20 @@ async function processImageEnhancement(
 ) {
   const outputFormat = await resolveOutputFormat(rawBuffer, filename);
 
-  // HDR/EXR decodes can produce 16-bit buffers; CLAHE requires 8-bit (VIPS_FORMAT_UCHAR)
   let inputBuffer = rawBuffer;
-  const inputMeta = await sharp(inputBuffer).metadata();
-  if (inputMeta.depth && inputMeta.depth !== "uchar") {
-    inputBuffer = await sharp(inputBuffer).toColourspace("srgb").png().toBuffer();
+  let analysis: Awaited<ReturnType<typeof analyzeImage>>;
+  try {
+    // HDR/EXR decodes can produce 16-bit buffers; CLAHE requires 8-bit (VIPS_FORMAT_UCHAR)
+    const inputMeta = await sharp(inputBuffer).metadata();
+    if (inputMeta.depth && inputMeta.depth !== "uchar") {
+      inputBuffer = await sharp(inputBuffer).toColourspace("srgb").png().toBuffer();
+    }
+    // analyzeImage() -> .stats() is the first full pixel decode; intake only
+    // parsed headers, so undecodable-but-well-formed files fail here (#897)
+    analysis = await analyzeImage(inputBuffer);
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
   }
-
-  const analysis = await analyzeImage(inputBuffer);
   const meta = await sharp(inputBuffer).metadata();
   const hasAlpha = meta.hasAlpha === true;
 
@@ -106,7 +113,11 @@ export function registerImageEnhancement(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "image-enhancement",
     settingsSchema,
-    process: processImageEnhancement,
+    process: withImageEncodeContext<EnhancementSettings>(
+      "Image enhancement failed",
+      (s) => s.mode,
+      processImageEnhancement,
+    ),
   });
 
   app.post(

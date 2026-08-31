@@ -8,6 +8,7 @@
 
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { settleAsyncFallback } from "../../settle-job.js";
 import {
@@ -1313,5 +1314,18 @@ describe("Low-light image analysis", () => {
     const result = JSON.parse(res.body);
     expect(result.suggestedMode).toBe("low-light");
     expect(result.issues).toContain("underexposed");
+  });
+});
+
+// ── Undecodable input classification (#897) ───────────────────────
+describe("Undecodable input", () => {
+  it("rejects a truncated JPEG as bad input with a readable reason", async () => {
+    // Valid JPEG headers, truncated scan data: passes metadata-only intake,
+    // fails the full pixel decode that analyzeImage() forces via .stats().
+    const truncated = readFixture(fixtures.image.hostile.truncated);
+    const res = await postTool({}, truncated, "truncated.jpg", "image/jpeg");
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });

@@ -8,6 +8,7 @@
 
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -709,5 +710,26 @@ describe("AVIF fixture re-encoding", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+  });
+});
+
+// ── Undecodable input classification (#897) ───────────────────────
+describe("Undecodable input", () => {
+  it("rejects a PNG with truncated pixel data as bad input with a readable reason", async () => {
+    // Deterministic pseudo-noise so the PNG carries enough IDAT that cutting
+    // the buffer in half keeps the header intact (passes metadata-only intake)
+    // but breaks the pixel stream (fails the stripAll re-encode decode).
+    const raw = Buffer.alloc(64 * 64 * 3);
+    for (let i = 0; i < raw.length; i++) raw[i] = (i * 31 + 7) % 256;
+    const valid = await sharp(raw, { raw: { width: 64, height: 64, channels: 3 } })
+      .png()
+      .toBuffer();
+    const truncated = valid.subarray(0, Math.floor(valid.length / 2));
+    // Sanity: the header must still parse or this never reaches the worker path.
+    await expect(sharp(truncated).metadata()).resolves.toBeDefined();
+
+    const res = await postTool({ stripAll: true }, truncated, "truncated.png", "image/png");
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).details).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });
