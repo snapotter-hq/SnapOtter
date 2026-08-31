@@ -202,7 +202,7 @@ function assertWithinImageLimits(
   }
 }
 
-function isPixelSafetyError(error: unknown): boolean {
+export function isPixelSafetyError(error: unknown): boolean {
   return (
     error instanceof Error &&
     /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(error.message)

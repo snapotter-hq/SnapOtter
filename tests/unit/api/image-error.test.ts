@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   asInputErrorIfUndecodable,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
   UNDECODABLE_IMAGE_MESSAGE,
   withImageEncodeContext,
 } from "../../../apps/api/src/lib/image-error.js";
@@ -104,6 +105,17 @@ describe("asInputErrorIfUndecodable", () => {
     const bug = new TypeError("Cannot read properties of undefined (reading 'mean')");
     const err = await asInputErrorIfUndecodable(decodable, bug);
     expect(err).toBe(bug);
+  });
+
+  it("names the pixel limit when an oversized (not corrupt) image trips it", async () => {
+    // Valid PNG headers declaring 50000x50000: passes metadata-only intake but
+    // exceeds libvips' default limitInputPixels, in both the pipeline and the
+    // probe. Calling that "corrupt" would mislead; the message must say "large".
+    const bombPng = readFixture(fixtures.image.hostile.bomb);
+    const sharpErr = new Error("Input image exceeds pixel limit");
+    const err = await asInputErrorIfUndecodable(bombPng, sharpErr);
+    expect(isToolInputError(err)).toBe(true);
+    expect(err.message).toBe(PIXEL_LIMIT_IMAGE_MESSAGE);
   });
 
   it("passes through already-classified errors without reclassifying", async () => {

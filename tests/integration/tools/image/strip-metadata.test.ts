@@ -6,9 +6,11 @@
  * metadata is actually removed from the output.
  */
 
+import { isSafeMessageError, type SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
+import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -731,5 +733,32 @@ describe("Undecodable input", () => {
     const res = await postTool({ stripAll: true }, truncated, "truncated.png", "image/png");
     expect(res.statusCode).toBe(422);
     expect(JSON.parse(res.body).details).toBe(UNDECODABLE_IMAGE_MESSAGE);
+  });
+});
+
+// ── Opaque failure classification (#897) ──────────────────────────
+describe("Opaque failure classification", () => {
+  it("surfaces a non-input process failure as a titled SafeError bug", async () => {
+    // Calls the registered process fn directly (what pipelines and batch
+    // invoke), bypassing intake. Garbage bytes fail the leading metadata()
+    // call, which sits outside the input-probe guard on purpose: on the
+    // normal path intake already ran the identical call, so a worker-side
+    // metadata() failure is anomalous. The withImageEncodeContext wrapper
+    // must title it instead of letting Sentry scrub it to "Error: Error".
+    const config = getToolConfig("strip-metadata");
+    if (!config) throw new Error("strip-metadata missing from tool registry");
+    const rejection = await config
+      .process(
+        Buffer.from("not an image"),
+        { stripExif: false, stripGps: false, stripIcc: false, stripXmp: false, stripAll: true },
+        "garbage.bin",
+      )
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(isSafeMessageError(rejection)).toBe(true);
+    expect((rejection as SafeError).message).toBe("Metadata strip failed");
+    expect((rejection as SafeError).kind).toBe("bug");
   });
 });
