@@ -124,7 +124,9 @@ describe("Dockerfile build args", () => {
       "d502599878eb29af3ae5f0cb5d559134df96534125d452c7a0674a5bad2c5ecf",
       "b651c8bfd5a0a2f6650d6c0830131747ef67a1d9c0475b1399626611419e2205",
       "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76",
-      "817b5a78358d00ed6b71884d70ad5d2eab9934badca1a34299fdc6a2e4a8ad20",
+      // Redis source tarball. Replaced the packages.redis.io keyring hash when
+      // Redis moved to a source build for larger kernel page sizes (#734).
+      "e5cae2686231290bf55ae5cc4da01e646c3424233cae7618ebf3a64250ef1583",
       "8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785",
       "6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae",
       "59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478",
@@ -203,7 +205,7 @@ describe("Dockerfile build args", () => {
 
   it("removes distro-generated snakeoil TLS material after embedded database install", () => {
     const production = stageBody("production");
-    const installIndex = production.indexOf("postgresql-17 postgresql-client-17 redis-server");
+    const installIndex = production.indexOf("postgresql-17 postgresql-client-17");
     const removeIndex = production.indexOf("/etc/ssl/private/ssl-cert-snakeoil.key");
 
     expect(installIndex).toBeGreaterThanOrEqual(0);

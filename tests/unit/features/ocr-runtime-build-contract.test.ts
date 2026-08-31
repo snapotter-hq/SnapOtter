@@ -185,8 +185,19 @@ describe("OCR v3 runtime artifact contract", () => {
   });
 
   it("validates Redis without executing a target-architecture binary during cross-builds", () => {
-    expect(dockerfile).toContain("dpkg-query -W -f='${Version}\\n' redis-server");
+    // Redis is now built from source (#734), so the version comes from the
+    // pinned tarball rather than dpkg. The invariant is unchanged: nothing may
+    // run redis-server during the build, because a cross-build would have to
+    // emulate it and jemalloc is exactly what breaks under emulation.
+    expect(dockerfile).toMatch(/^ARG REDIS_VERSION=8\.\d+\.\d+$/m);
     expect(dockerfile).not.toContain("redis-server --version");
+    expect(dockerfile).not.toContain("redis-cli --version");
+    // The make goals matter too: `test` is a real target in Redis's Makefile
+    // and it starts a server, so it would reintroduce the emulated execution
+    // through a step that looks inert from outside.
+    for (const goals of dockerfile.match(/make -C \/usr\/src\/redis[^\n;]*/g) ?? []) {
+      expect(goals, "Redis make goals must stay build/deploy only").not.toMatch(/\btest\b/);
+    }
   });
 
   it("keeps Korean traineddata out of the official Fast OCR base image", () => {

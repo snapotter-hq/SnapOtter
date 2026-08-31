@@ -24,6 +24,60 @@ RUN go mod download all && go mod verify && \
     go build -trimpath -mod=readonly -o /tmp/pdfcpu github.com/pdfcpu/pdfcpu/cmd/pdfcpu
 
 # ============================================
+# Stage 0c: Redis 8 server + CLI for embedded mode
+# ============================================
+# Built from source because no prebuilt Redis 8 works here. jemalloc bakes in a
+# maximum page size and aborts on any kernel with larger pages, so the 4 KiB
+# packages.redis.io build killed redis-server AND redis-cli on 16 KiB hosts
+# (Asahi Linux, some Apple-silicon VMs) and 64 KiB hosts (aarch64 RHEL), hanging
+# the container in the redis-ready probe (#734). The official images are no help
+# either: redis:8-bookworm is frozen on 8.4.0, and redis:8-trixie needs glibc
+# 2.38 against this base's 2.36. Page flags follow Debian's jemalloc rules, the
+# same ones docker-library/redis copies: 4 KiB on x86, which is always 4 KiB
+# paged, and 64 KiB elsewhere so one arm64 binary covers 4/16/64 KiB kernels.
+# Tarball pinned and checksum-verified against the upstream release asset.
+# Deliberately no --platform=$BUILDPLATFORM, unlike the frontend builder above:
+# these binaries ship inside the runtime image, so they must be built for
+# TARGETPLATFORM. Pinning this to the build platform would put a foreign-arch
+# redis-server in the image, which fails the same way #734 did.
+FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS redis-builder
+ARG REDIS_VERSION=8.10.1
+RUN set -eux; \
+    for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done; \
+    apt-get install -y --no-install-recommends ca-certificates gcc g++ libc6-dev make; \
+    rm -rf /var/lib/apt/lists/*; \
+    curl --fail --location --silent --show-error --retry 3 \
+      --proto '=https' --tlsv1.2 \
+      "https://github.com/redis/redis/releases/download/${REDIS_VERSION}/redis-full.tar.gz" \
+      -o redis.tar.gz; \
+    echo "e5cae2686231290bf55ae5cc4da01e646c3424233cae7618ebf3a64250ef1583 *redis.tar.gz" \
+      | sha256sum -c -; \
+    mkdir -p /usr/src/redis; \
+    tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
+    case "$(dpkg --print-architecture)" in \
+      amd64 | i386) jemallocPage=12 ;; \
+      *) jemallocPage=16 ;; \
+    esac; \
+    # deps/Makefile appends JEMALLOC_CONFIGURE_OPTS to the bundled jemalloc's
+    # configure line. Pass it through the environment: a make-level definition
+    # would clobber the --host the same variable carries for cross-builds.
+    export JEMALLOC_CONFIGURE_OPTS="--with-lg-page=${jemallocPage} --with-lg-hugepage=21"; \
+    # Split so -j reaches the compile. Only `build` carries make's `+` prefix,
+    # so passing -j to `deploy` alone silently drops to -j1.
+    make -C /usr/src/redis -j "$(nproc)" build redis; \
+    make -C /usr/src/redis deploy redis; \
+    # configure exits 0 on an option it does not recognise, then falls back to
+    # probing the build host and answers 12 under emulation. So assert what it
+    # actually compiled, not what we asked for: without this the build stays
+    # green while shipping the 4 KiB Redis that caused #734.
+    grep -qx "#define LG_PAGE ${jemallocPage}" \
+      /usr/src/redis/deps/jemalloc/include/jemalloc/internal/jemalloc_internal_defs.h; \
+    # deploy.sh downgrades a failed core build to a warning on stdout, so the
+    # binaries existing is not implied by make succeeding.
+    test -x /usr/local/bin/redis-server; \
+    test -x /usr/local/bin/redis-cli
+
+# ============================================
 # Stage 1: Build the frontend (Vite + React)
 # ============================================
 # Run on the native build platform to avoid QEMU crashes with esbuild on
@@ -378,13 +432,12 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && pandoc --version \
     && rm -rf /var/lib/apt/lists/*
 
-# Embedded-mode databases: PostgreSQL 17 (PGDG) + Redis 8 (packages.redis.io),
-# each pinned to the same major the Compose stack runs (postgres:17 / redis:8)
-# so embedded and external deployments behave identically and data hands off
-# cleanly. Distro repos would silently downgrade Redis to 7.x. Shipped in every
+# Embedded-mode database: PostgreSQL 17 (PGDG), pinned to the same major the
+# Compose stack runs (postgres:17) so embedded and external deployments behave
+# identically and data hands off cleanly. Distro repos lag. Shipped in every
 # image (single tag); unused in external/Compose mode, ~tens of MB against the
-# multi-GB base. They enter the Trivy CVE surface and ride the existing
-# apt-get upgrade patching.
+# multi-GB base. It enters the Trivy CVE surface and rides the existing
+# apt-get upgrade patching. Redis is handled below, from the redis-builder stage.
 RUN install -d /usr/share/postgresql-common/pgdg \
     && curl --fail --location --silent --show-error --retry 3 \
          --proto '=https' --tlsv1.2 \
@@ -394,24 +447,30 @@ RUN install -d /usr/share/postgresql-common/pgdg \
          "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76" \
          /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
          | sha256sum --check --strict - \
-    && curl --fail --location --silent --show-error --retry 3 \
-         --proto '=https' --tlsv1.2 \
-         https://packages.redis.io/gpg \
-         -o /usr/share/keyrings/redis-archive-keyring.asc \
-    && printf '%s  %s\n' \
-         "817b5a78358d00ed6b71884d70ad5d2eab9934badca1a34299fdc6a2e4a8ad20" \
-         /usr/share/keyrings/redis-archive-keyring.asc \
-         | sha256sum --check --strict - \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
          > /etc/apt/sources.list.d/pgdg.list \
-    && echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.asc] https://packages.redis.io/deb ${VERSION_CODENAME} main" \
-         > /etc/apt/sources.list.d/redis.list \
     && for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $((i * 15)); done \
-    && apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17 redis-server \
-    && dpkg-query -W -f='${Version}\n' redis-server | grep -Eq '(^|:)8\.' \
+    && apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17 \
     && rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem \
     && rm -rf /var/lib/apt/lists/*
+
+# Redis 8 for embedded mode, same major as the Compose stack (redis:8). Built
+# without BUILD_TLS (the server binds 127.0.0.1 with no TLS port), which leaves
+# it linking only libc and libm, so it does not depend on what Postgres happens
+# to drag in. Nothing here executes redis-server: PR #519 removed the one step
+# that did, because a cross-build emulates it and jemalloc is what falls over.
+#
+# Being a source build rather than a deb has two costs worth knowing. Redis
+# carries no package metadata now, so it drops out of the syft SBOM and Trivy's
+# package findings, and Dependabot only bumps FROM digests, never REDIS_VERSION.
+# Nothing will tell us the embedded Redis is stale; that needs a bump (#961).
+COPY --from=redis-builder /usr/local/bin/redis-server /usr/local/bin/redis-cli /usr/local/bin/
+# redis-server dispatches on argv[0], so these cost a symlink each. --appendonly
+# is on, and a truncated AOF makes redis-server tell the operator to run
+# redis-check-aof; the apt package used to supply it. COPY would deref them.
+RUN ln -s redis-server /usr/local/bin/redis-check-aof \
+    && ln -s redis-server /usr/local/bin/redis-check-rdb
 
 # s6-overlay supervises the embedded service tree (postgres + redis + app).
 # Pinned and checksum-verified against repository-controlled literal hashes.
