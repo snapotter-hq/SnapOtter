@@ -94,7 +94,7 @@
     "adm-zip": "^0.6.0",
     "fast-check": "^3.23.2",
     "husky": "^9.1.7",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^4.3.1",
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
     "semantic-release": "^25.0.8",
