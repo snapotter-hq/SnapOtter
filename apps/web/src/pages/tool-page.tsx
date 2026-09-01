@@ -794,11 +794,14 @@ export function ToolPage() {
 
     // Document viewer: pdf.js canvas with pagination
     if (displayMode === "document" && hasFile) {
+      // A document tool can replace the read-only viewer with an editor for a
+      // single document (organize-pdf swaps in a drag-to-reorder page grid).
+      const Panel = !hasProcessed && files.length === 1 ? registryEntry?.ResultsPanel : undefined;
       return (
         <Suspense
           fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
         >
-          <DocumentView />
+          {Panel ? <Panel /> : <DocumentView />}
         </Suspense>
       );
     }

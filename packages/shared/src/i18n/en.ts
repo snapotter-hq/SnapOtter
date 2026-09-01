@@ -3475,6 +3475,10 @@ export const en = {
       submit: "Reorder",
       submitBatch: "Reorder ({count} files)",
       progressLabel: "Reordering",
+      dragHint: "Drag pages to reorder",
+      resetOrder: "Reset order",
+      pageLabel: "Page {n}",
+      orderTooLong: "Too many separate moves to send. Reset and try fewer changes.",
     },
     "protect-pdf": {
       userPassword: "User password",

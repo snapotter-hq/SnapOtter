@@ -665,6 +665,11 @@ const OrganizePdfSettings = lazy(() =>
     default: m.OrganizePdfSettings,
   })),
 );
+const OrganizePdfCanvas = lazy(() =>
+  import("@/components/tools/organize-pdf-canvas").then((m) => ({
+    default: m.OrganizePdfCanvas,
+  })),
+);
 const ProtectPdfSettings = lazy(() =>
   import("@/components/tools/protect-pdf-settings").then((m) => ({
     default: m.ProtectPdfSettings,
@@ -1116,7 +1121,10 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   // PDF depth tools (organize, secure, pdfcpu, layout)
   ["extract-pages", { accept: ".pdf", Settings: ExtractPagesSettings }],
   ["remove-pages", { accept: ".pdf", Settings: RemovePagesSettings }],
-  ["organize-pdf", { accept: ".pdf", Settings: OrganizePdfSettings }],
+  [
+    "organize-pdf",
+    { accept: ".pdf", Settings: OrganizePdfSettings, ResultsPanel: OrganizePdfCanvas },
+  ],
   ["protect-pdf", { accept: ".pdf", Settings: ProtectPdfSettings }],
   ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],
   ["repair-pdf", { accept: ".pdf", Settings: RepairPdfSettings }],
