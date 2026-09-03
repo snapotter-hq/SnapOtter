@@ -1,13 +1,13 @@
 /**
- * Deterministically widens a check-then-insert race (issue #927).
+ * Deterministically widens a check-then-write race (issues #927, #968).
  *
- * Duplicate-name creation paths SELECT for a twin, then INSERT. The race
+ * Duplicate-name paths SELECT for a twin, then INSERT or UPDATE. The race
  * only bites when every contender passes the SELECT before the winner's
- * INSERT commits, a window too narrow to hit reliably with concurrent
+ * write commits, a window too narrow to hit reliably with concurrent
  * requests alone. This helper forces it: an EXCLUSIVE table lock lets the
- * pre-check SELECTs through but parks every INSERT in the lock queue.
- * Once `count` inserts are waiting, the lock is released and they all hit
- * the unique index together.
+ * pre-check SELECTs through but parks every INSERT/UPDATE in the lock
+ * queue. Once `count` writes are waiting, the lock is released and they
+ * all hit the unique index together.
  *
  * The `fire` callback must start the contenders and return a promise for
  * their combined outcome (typically Promise.all of app.inject calls).
@@ -20,6 +20,23 @@ export async function raceInserts<T>(
   table: string,
   count: number,
   fire: () => Promise<T>,
+): Promise<T> {
+  return raceWrites(table, count, fire, `insert into "${table}"`);
+}
+
+export async function raceUpdates<T>(
+  table: string,
+  count: number,
+  fire: () => Promise<T>,
+): Promise<T> {
+  return raceWrites(table, count, fire, `update "${table}"`);
+}
+
+async function raceWrites<T>(
+  table: string,
+  count: number,
+  fire: () => Promise<T>,
+  statement: string,
 ): Promise<T> {
   let pending: Promise<T> | undefined;
 
@@ -35,20 +52,25 @@ export async function raceInserts<T>(
 
       // Wait until every contender is parked on the lock. Sessions from other
       // vitest forks live in other per-fork databases, hence the datname
-      // filter. The transaction ending releases the lock.
-      const deadline = Date.now() + 10_000;
+      // filter. The transaction ending releases the lock. Contenders spend
+      // real time in scrypt auth before their write and a saturated box
+      // stretches that a lot, so the old 10s deadline flaked; 25s stays
+      // under vitest's 30s testTimeout so this helper's diagnostic (which
+      // names the unparked contender's outcome) fires before the generic
+      // "test timed out" kill.
+      const deadline = Date.now() + 25_000;
       for (;;) {
         const res = await db.execute(sql`
           SELECT count(*)::int AS n
           FROM pg_stat_activity
           WHERE datname = current_database()
             AND wait_event_type = 'Lock'
-            AND query ILIKE ${`%insert into "${table}"%`}
+            AND query ILIKE ${`%${statement}%`}
         `);
         const n = Number((res.rows[0] as { n: number }).n);
         if (n >= count) break;
         if (Date.now() > deadline) {
-          throw new Error(`timed out: only ${n}/${count} inserts blocked on "${table}"`);
+          throw new Error(`timed out: only ${n}/${count} writes blocked on "${table}"`);
         }
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
@@ -57,7 +79,7 @@ export async function raceInserts<T>(
     // The rollback above released the lock, so the contenders can now run
     // to completion. Wait for them, both so a failing test doesn't leak
     // writes past its end and because a contender that died before ever
-    // reaching its insert is usually the real story, not the timeout.
+    // reaching its write is usually the real story, not the timeout.
     if (pending) {
       const [settled] = await Promise.allSettled([pending]);
       if (settled.status === "rejected") {

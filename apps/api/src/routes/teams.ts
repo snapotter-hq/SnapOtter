@@ -12,6 +12,7 @@ import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import { requirePermission } from "../permissions.js";
 
 const teamBodySchema = z.object({
@@ -145,7 +146,17 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
       if (storageQuota !== undefined) updateFields.storageQuota = storageQuota;
       if (retentionHours !== undefined) updateFields.retentionHours = retentionHours;
 
-      await db.update(schema.teams).set(updateFields).where(eq(schema.teams.id, id));
+      // The pre-check above can't close the race: two concurrent renames
+      // onto the same name both pass it before either UPDATE commits
+      // (issue #968), so the loser's 23505 maps to the pre-check's 409.
+      try {
+        await db.update(schema.teams).set(updateFields).where(eq(schema.teams.id, id));
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send({ error: "Team name already exists", code: "CONFLICT" });
+        }
+        throw err;
+      }
 
       return reply.send({ ok: true });
     },
