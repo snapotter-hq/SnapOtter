@@ -20,6 +20,7 @@ import {
 import { authAttempts } from "../lib/metrics.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
 import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
+import { userLimitReached } from "../lib/user-limit.js";
 import {
   canAssignRole,
   canManageTargetRole,
@@ -39,8 +40,6 @@ export interface AuthUser {
   role: string;
   apiKeyPermissions?: string[];
 }
-
-const MAX_USERS = env.MAX_USERS;
 
 // ── Password hashing ──────────────────────────────────────────────
 
@@ -842,7 +841,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         hasOidcLink: !!u.externalId,
         createdAt: u.createdAt.toISOString(),
       })),
-      maxUsers: MAX_USERS,
+      maxUsers: env.MAX_USERS,
     });
   });
 
@@ -940,34 +939,37 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Check user limit (0 = unlimited)
-    if (MAX_USERS > 0) {
-      const allUsers = await db.select().from(schema.users);
-      const userCount = allUsers.length;
-      if (userCount >= MAX_USERS) {
-        return reply.status(403).send({
-          error: `User limit reached (${MAX_USERS} max)`,
-          code: "USER_LIMIT_REACHED",
-        });
-      }
-    }
-
     const id = randomUUID();
+    // Hash before the transaction: scrypt takes ~100ms and must not extend
+    // the user-limit lock window.
     const passwordHash = await hashPassword(body.password);
 
-    // The duplicate pre-check above can't close the race: two concurrent
-    // registers both pass the SELECT before either insert commits (issue #900).
-    const inserted = await db
-      .insert(schema.users)
-      .values({
-        id,
-        username: body.username,
-        passwordHash,
-        role,
-        team: teamId,
-        mustChangePassword: true,
-      })
-      .onConflictDoNothing({ target: schema.users.username });
+    // The duplicate pre-check above can't close the username race (issue
+    // #900), and a plain count check can't close the limit race: two
+    // concurrent registers both pass it before either insert commits (issue
+    // #928). The locked count and the insert share one transaction so the
+    // loser sees the winner's committed row.
+    const inserted = await db.transaction(async (tx) => {
+      if (await userLimitReached(tx)) return "limit" as const;
+      return tx
+        .insert(schema.users)
+        .values({
+          id,
+          username: body.username,
+          passwordHash,
+          role,
+          team: teamId,
+          mustChangePassword: true,
+        })
+        .onConflictDoNothing({ target: schema.users.username });
+    });
+
+    if (inserted === "limit") {
+      return reply.status(403).send({
+        error: `User limit reached (${env.MAX_USERS} max)`,
+        code: "USER_LIMIT_REACHED",
+      });
+    }
 
     if (!inserted.rowCount) {
       return reply.status(409).send({

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
-import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { isDisabledRole } from "../permissions.js";
 import { auditLog, sanitizeAuditInput } from "./audit.js";
+import { userLimitReached } from "./user-limit.js";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -179,15 +179,6 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       return { user: null, action: "denied", deniedReason: "user_disabled" };
     }
 
-    // Check user limit
-    if (env.MAX_USERS > 0) {
-      const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(schema.users);
-      if (countResult && countResult.count >= env.MAX_USERS) {
-        logger.warn(`${provider} auto-create blocked: user limit reached`);
-        return { user: null, action: "denied", deniedReason: "user_limit_reached" };
-      }
-    }
-
     // The username scan can't close the race: two concurrent logins both
     // pass it before either insert commits (issue #927), so the insert
     // carries a conflict guard and the loser recovers below.
@@ -203,22 +194,29 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
         .where(eq(schema.teams.name, "Default"));
       const teamId = defaultTeam?.id ?? "default-team-00000000";
 
-      const inserted = await db
-        .insert(schema.users)
-        .values({
-          id: newUserId,
-          username: uniqueUsername,
-          passwordHash: null,
-          role: defaultRole,
-          team: teamId,
-          mustChangePassword: false,
-          authProvider: provider,
-          externalId,
-          email: email ?? null,
-        })
-        .onConflictDoNothing({ target: schema.users.username });
+      // A plain count check can't enforce MAX_USERS either: two concurrent
+      // auto-creates both pass it before their inserts commit (issue #928).
+      // The locked count and the guarded insert share one transaction so the
+      // loser sees the winner's committed row.
+      const inserted = await db.transaction(async (tx) => {
+        if (await userLimitReached(tx)) return "limit" as const;
+        return tx
+          .insert(schema.users)
+          .values({
+            id: newUserId,
+            username: uniqueUsername,
+            passwordHash: null,
+            role: defaultRole,
+            team: teamId,
+            mustChangePassword: false,
+            authProvider: provider,
+            externalId,
+            email: email ?? null,
+          })
+          .onConflictDoNothing({ target: schema.users.username });
+      });
 
-      if (inserted.rowCount) {
+      if (inserted !== "limit" && inserted.rowCount) {
         await audit(`${providerUpper}_USER_CREATED`, {
           userId: newUserId,
           username: uniqueUsername,
@@ -237,14 +235,17 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
         };
       }
 
-      logger.info(
-        { attempt: attempt + 1, username: uniqueUsername },
-        `${provider} auto-create lost a username race, recovering`,
-      );
+      if (inserted !== "limit") {
+        logger.info(
+          { attempt: attempt + 1, username: uniqueUsername },
+          `${provider} auto-create lost a username race, recovering`,
+        );
+      }
 
-      // Race lost. If this same external identity won it in a concurrent
-      // login (say, two tabs finishing first login at once), hand back the
-      // winner's user instead of failing the login.
+      // Create refused: the username raced (issue #927) or the cap is
+      // reached (issue #928). Either way this same external identity may
+      // have just won a concurrent login (say, two tabs finishing first
+      // login at once); hand back the winner's user instead of failing it.
       const [winner] = await db
         .select()
         .from(schema.users)
@@ -265,6 +266,11 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
           user: { id: winner.id, username: winner.username, role: winner.role, team: winner.team },
           action: "matched",
         };
+      }
+
+      if (inserted === "limit") {
+        logger.warn(`${provider} auto-create blocked: user limit reached`);
+        return { user: null, action: "denied", deniedReason: "user_limit_reached" };
       }
       // A different user took the name; rescan and retry.
     }

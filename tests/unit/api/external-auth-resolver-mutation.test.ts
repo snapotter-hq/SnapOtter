@@ -75,37 +75,46 @@ function makeSelectChain() {
   return node;
 }
 
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => makeSelectChain(),
-    update: () => ({
-      set: (v: Record<string, unknown>) => {
-        state.updates.push(v);
-        return { where: () => Promise.resolve() };
-      },
-    }),
-    insert: () => ({
-      values: (v: Record<string, unknown>) => {
-        const rowCount = state.insertRowCounts[state.inserts.length] ?? 1;
-        state.inserts.push(v);
-        const result = Promise.resolve({ rowCount });
-        return Object.assign(result, { onConflictDoNothing: () => result });
-      },
-    }),
-  },
-  schema: {
-    users: {
-      id: "id",
-      username: "username",
-      email: "email",
-      role: "role",
-      team: "team",
-      externalId: "external_id",
-      authProvider: "auth_provider",
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  // Shared by db.insert and tx.insert: the auto-create insert runs inside
+  // the transaction (issue #928) and still needs the #927 rowCount machinery.
+  const insert = () => ({
+    values: (v: Record<string, unknown>) => {
+      const rowCount = state.insertRowCounts[state.inserts.length] ?? 1;
+      state.inserts.push(v);
+      const result = Promise.resolve({ rowCount });
+      return Object.assign(result, { onConflictDoNothing: () => result });
     },
-    teams: { id: "id", name: "name" },
-  },
-}));
+  });
+  return {
+    db: {
+      select: () => makeSelectChain(),
+      update: () => ({
+        set: (v: Record<string, unknown>) => {
+          state.updates.push(v);
+          return { where: () => Promise.resolve() };
+        },
+      }),
+      insert,
+      // The tx reuses the same canned select chain and insert recorder;
+      // execute() is the advisory lock, a no-op here.
+      transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ execute: () => Promise.resolve(), select: () => makeSelectChain(), insert }),
+    },
+    schema: {
+      users: {
+        id: "id",
+        username: "username",
+        email: "email",
+        role: "role",
+        team: "team",
+        externalId: "external_id",
+        authProvider: "auth_provider",
+      },
+      teams: { id: "id", name: "name" },
+    },
+  };
+});
 
 import { resolveExternalUser } from "../../../apps/api/src/lib/external-auth-resolver.js";
 
@@ -321,9 +330,13 @@ describe("resolveExternalUser: auto-create", () => {
 
   it("denies auto-create when the user count is at the MAX_USERS limit", async () => {
     state.maxUsers = 5;
+    // The count runs last, inside the transaction (issue #928), so the
+    // username and team lookups consume their slots first.
     state.selectRows = [
       [], // extId miss
-      [{ count: 5 }], // count query: exactly at the cap (>= limit)
+      [], // username free
+      [{ id: "team-default" }], // Default team lookup
+      [{ count: 5 }], // locked count: exactly at the cap (>= limit)
     ];
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_limit_reached" });
@@ -334,9 +347,9 @@ describe("resolveExternalUser: auto-create", () => {
     state.maxUsers = 5;
     state.selectRows = [
       [], // extId miss
-      [{ count: 4 }], // below cap
       [], // username free
       [{ id: "team-default" }],
+      [{ count: 4 }], // locked count: below cap
     ];
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result.action).toBe("created");
