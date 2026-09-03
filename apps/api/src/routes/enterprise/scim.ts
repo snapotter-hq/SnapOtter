@@ -835,7 +835,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const body = request.body as Record<string, unknown>;
-      const displayName = body.displayName as string | undefined;
+      const displayName = (body.displayName as string | undefined)?.trim();
       const members = body.members as Array<{ value: string }> | undefined;
 
       if (!displayName) {
@@ -1014,9 +1014,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const body = request.body as Record<string, unknown>;
-      const displayName = body.displayName as string | undefined;
+      const displayName = (body.displayName as string | undefined)?.trim();
       const members = body.members as Array<{ value: string }> | undefined;
 
+      if (body.displayName !== undefined && !displayName) {
+        return reply.status(400).send(scimError(400, "displayName cannot be empty"));
+      }
       if (displayName && displayName !== existing.name) {
         // Check for name conflict
         const [conflict] = await db
@@ -1143,18 +1146,21 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           }
         } else if (opType === "replace") {
           if (op.path === "displayName") {
-            const newName = op.value as string;
-            if (newName) {
-              // No conflict pre-check on this path, so before issue #968 a
-              // rename onto a taken name surfaced the 23505 as a 500.
-              try {
-                await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
-              } catch (err) {
-                if (isUniqueViolation(err)) {
-                  return reply.status(409).send(scimError(409, "Group name already taken"));
-                }
-                throw err;
+            const newName = (op.value as string | undefined)?.trim();
+            if (!newName) {
+              // Reject rather than skip: a silent no-op leaves the IdP thinking
+              // the rename applied while the team keeps its old name (#988).
+              return reply.status(400).send(scimError(400, "displayName cannot be empty"));
+            }
+            // No conflict pre-check on this path, so before issue #968 a
+            // rename onto a taken name surfaced the 23505 as a 500.
+            try {
+              await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
+            } catch (err) {
+              if (isUniqueViolation(err)) {
+                return reply.status(409).send(scimError(409, "Group name already taken"));
               }
+              throw err;
             }
           } else if (op.path === "members") {
             // Full member replacement
