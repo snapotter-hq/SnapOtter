@@ -237,6 +237,11 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
         };
       }
 
+      logger.info(
+        { attempt: attempt + 1, username: uniqueUsername },
+        `${provider} auto-create lost a username race, recovering`,
+      );
+
       // Race lost. If this same external identity won it in a concurrent
       // login (say, two tabs finishing first login at once), hand back the
       // winner's user instead of failing the login.

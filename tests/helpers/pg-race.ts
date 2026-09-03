@@ -23,35 +23,65 @@ export async function raceInserts<T>(
 ): Promise<T> {
   let pending: Promise<T> | undefined;
 
-  await db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`LOCK TABLE "${table}" IN EXCLUSIVE MODE`));
+  try {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`LOCK TABLE "${table}" IN EXCLUSIVE MODE`));
 
-    pending = fire();
-    // The outcome can reject before we await it below (a race loser dying
-    // on the constraint); pre-attach a handler so it never counts as an
-    // unhandled rejection in the meantime.
-    pending.catch(() => {});
+      pending = fire();
+      // The outcome can reject before we await it below (a race loser dying
+      // on the constraint); pre-attach a handler so it never counts as an
+      // unhandled rejection in the meantime.
+      pending.catch(() => {});
 
-    // Wait until every contender is parked on the lock. Sessions from other
-    // vitest forks live in other per-fork databases, hence the datname
-    // filter. The transaction ending releases the lock.
-    const deadline = Date.now() + 10_000;
-    for (;;) {
-      const res = await db.execute(sql`
-        SELECT count(*)::int AS n
-        FROM pg_stat_activity
-        WHERE datname = current_database()
-          AND wait_event_type = 'Lock'
-          AND query ILIKE ${`%insert into "${table}"%`}
-      `);
-      const n = Number((res.rows[0] as { n: number }).n);
-      if (n >= count) break;
-      if (Date.now() > deadline) {
-        throw new Error(`timed out: only ${n}/${count} inserts blocked on "${table}"`);
+      // Wait until every contender is parked on the lock. Sessions from other
+      // vitest forks live in other per-fork databases, hence the datname
+      // filter. The transaction ending releases the lock.
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        const res = await db.execute(sql`
+          SELECT count(*)::int AS n
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND query ILIKE ${`%insert into "${table}"%`}
+        `);
+        const n = Number((res.rows[0] as { n: number }).n);
+        if (n >= count) break;
+        if (Date.now() > deadline) {
+          throw new Error(`timed out: only ${n}/${count} inserts blocked on "${table}"`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
       }
-      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+  } catch (err) {
+    // The rollback above released the lock, so the contenders can now run
+    // to completion. Wait for them, both so a failing test doesn't leak
+    // writes past its end and because a contender that died before ever
+    // reaching its insert is usually the real story, not the timeout.
+    if (pending) {
+      const [settled] = await Promise.allSettled([pending]);
+      if (settled.status === "rejected") {
+        throw new Error(`${(err as Error).message}; a contender failed before blocking`, {
+          cause: settled.reason,
+        });
+      }
+      const value = settled.value as unknown;
+      const summary = Array.isArray(value)
+        ? value
+            .map((r) =>
+              r && typeof r === "object" && "statusCode" in r
+                ? String((r as { statusCode: number }).statusCode)
+                : "?",
+            )
+            .join(",")
+        : String(value);
+      throw new Error(
+        `${(err as Error).message}; contenders finished without blocking (outcome: ${summary})`,
+        { cause: err },
+      );
     }
-  });
+    throw err;
+  }
 
   return pending as Promise<T>;
 }
