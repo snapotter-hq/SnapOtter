@@ -86,6 +86,16 @@ export default defineConfig({
     },
     globalSetup: ["tests/global-setup.ts"],
     setupFiles: ["tests/setup/per-fork-env.ts"],
+    // Vitest's default include is **/*.{test,spec}.* over the entire checkout,
+    // which collects stray files anywhere in the working tree (untracked
+    // scratch dirs included) and fails the run when one is not a vitest suite
+    // (issue #947). Pin collection to the three roots vitest tests live in;
+    // the filename pattern is vitest's own default.
+    include: [
+      "tests/unit/**/*.{test,spec}.?(c|m)[jt]s?(x)",
+      "tests/integration/**/*.{test,spec}.?(c|m)[jt]s?(x)",
+      "packages/*/tests/**/*.{test,spec}.?(c|m)[jt]s?(x)",
+    ],
     exclude: [
       "tests/e2e/**",
       "tests/e2e-demo/**",
