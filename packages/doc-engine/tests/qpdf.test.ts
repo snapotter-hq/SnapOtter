@@ -164,6 +164,21 @@ describe("runQpdf timeout", () => {
       vi.useRealTimers();
     }
   });
+
+  it("rejects with QpdfTimeoutError so callers can tell a timeout from damage", async () => {
+    const mod = await import("../src/qpdf.js");
+    vi.useFakeTimers();
+    try {
+      nextManualChild();
+      const settled = expect(mod.qpdfCheck("/doc.pdf")).rejects.toBeInstanceOf(
+        mod.QpdfTimeoutError,
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("qpdfCheck argument shape", () => {
@@ -232,6 +247,21 @@ describe("qpdfRequiresPassword", () => {
       await vi.advanceTimersByTimeAsync(30_000);
       await settled;
       expect(child.killSignals).toContain("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects timeouts with QpdfTimeoutError, matching runQpdf", async () => {
+    const mod = await import("../src/qpdf.js");
+    vi.useFakeTimers();
+    try {
+      nextManualChild();
+      const settled = expect(mod.qpdfRequiresPassword("/enc.pdf")).rejects.toBeInstanceOf(
+        mod.QpdfTimeoutError,
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await settled;
     } finally {
       vi.useRealTimers();
     }

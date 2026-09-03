@@ -50,4 +50,4 @@ export {
   pdfTextPy,
   pdfToWordPy,
 } from "./python-docs.js";
-export { qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";
+export { QpdfTimeoutError, qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";

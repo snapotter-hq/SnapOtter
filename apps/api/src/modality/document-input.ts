@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  QpdfTimeoutError,
   qpdfAvailable,
   qpdfCheck,
   qpdfPageCount,
@@ -11,6 +12,13 @@ import { env } from "../config.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 const ZIP_MAGIC = Buffer.from("PK");
+
+/** instanceof plus a name check, so a future dual copy of doc-engine cannot silently revert timeouts to "damaged". */
+function isQpdfTimeout(err: unknown): boolean {
+  return (
+    err instanceof QpdfTimeoutError || (err instanceof Error && err.name === "QpdfTimeoutError")
+  );
+}
 
 export interface PdfPathValidationOptions {
   lenient?: boolean;
@@ -54,14 +62,40 @@ export async function validatePdfPath(
   try {
     await qpdfCheck(filePath);
   } catch (err) {
-    throw new InputValidationError(
-      `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
+    if (!isQpdfTimeout(err)) {
+      throw new InputValidationError(
+        `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
+      );
+    }
+    // A big-but-healthy PDF on a slow host can outlive the check budget
+    // (issue #920). That is inconclusive, not damage: proceed like the
+    // password-protected branch above, where qpdf also cannot inspect the
+    // structure. Tradeoff: a file crafted to stall qpdf passes this gate,
+    // but every downstream engine (qpdf, ghostscript, LibreOffice, ...)
+    // runs under its own timeout and fails loudly on a broken file.
+    const size = await stat(filePath)
+      .then((s) => s.size)
+      .catch(() => 0);
+    console.warn(
+      `[document-input] ${(err as Error).message} for ${filePath} (${size} bytes); skipping structural validation`,
     );
   }
   opts.signal?.throwIfAborted();
 
   if (env.MAX_PDF_PAGES > 0) {
-    const pages = await qpdfPageCount(filePath);
+    let pages: number;
+    try {
+      pages = await qpdfPageCount(filePath);
+    } catch (err) {
+      if (isQpdfTimeout(err)) {
+        // Fail closed: the cap is a resource guard, so a file that stalls the
+        // page-count probe must not slip past it. Say so instead of a 500.
+        throw new InputValidationError(
+          `Could not count this PDF's pages within the time limit, and this server caps PDFs at ${env.MAX_PDF_PAGES} pages. Try a smaller file.`,
+        );
+      }
+      throw err;
+    }
     opts.signal?.throwIfAborted();
     if (pages > env.MAX_PDF_PAGES) {
       throw new InputValidationError(

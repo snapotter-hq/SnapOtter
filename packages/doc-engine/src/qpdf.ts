@@ -2,6 +2,18 @@ import { spawn } from "node:child_process";
 import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveQpdf } from "./binaries.js";
 
+/**
+ * A qpdf invocation outlived its time budget and was killed. Distinct from a
+ * structural failure: the file may be perfectly healthy, just slow to process
+ * on this host.
+ */
+export class QpdfTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QpdfTimeoutError";
+  }
+}
+
 /** @internal Shared qpdf CLI runner for doc-engine modules; not part of the public package API. */
 export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
   const bin = resolveQpdf();
@@ -16,7 +28,7 @@ export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
       if (settled) return;
       settled = true;
       child.kill("SIGKILL");
-      reject(new Error(`qpdf timed out after ${Math.round(timeoutMs / 1000)}s`));
+      reject(new QpdfTimeoutError(`qpdf timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
     child.stdout.on("data", (c: Buffer) => {
       out += c.toString("utf8");
@@ -74,7 +86,7 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
       if (settled) return;
       settled = true;
       child.kill("SIGKILL");
-      reject(new Error("qpdf timed out after 30s"));
+      reject(new QpdfTimeoutError("qpdf timed out after 30s"));
     }, 30_000);
     child.on("error", (e) => {
       if (settled) return;

@@ -11,13 +11,15 @@ const qpdf = vi.hoisted(() => ({
   requiresPassword: vi.fn(),
 }));
 
-vi.mock("@snapotter/doc-engine", () => ({
+vi.mock("@snapotter/doc-engine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@snapotter/doc-engine")>()),
   qpdfAvailable: qpdf.available,
   qpdfCheck: qpdf.check,
   qpdfPageCount: qpdf.pageCount,
   qpdfRequiresPassword: qpdf.requiresPassword,
 }));
 
+import { QpdfTimeoutError } from "@snapotter/doc-engine";
 import {
   DocumentInputHandler,
   validatePdfPath,
@@ -121,6 +123,64 @@ describe("path-backed PDF validation", () => {
       /Damaged PDF.*xref table is corrupt/i,
     );
     expect(qpdf.pageCount).not.toHaveBeenCalled();
+  });
+
+  it("treats a qpdf check timeout as inconclusive rather than damage", async () => {
+    const inputPath = join(scratchDir, "big-but-healthy.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true }),
+      ).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("timed out"));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("still enforces the page cap when the structural check timed out", async () => {
+    const inputPath = join(scratchDir, "big-and-long.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    qpdf.pageCount.mockResolvedValueOnce(11);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+
+    try {
+      await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toThrow(
+        /11 pages.*maximum of 10/i,
+      );
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+      warn.mockRestore();
+    }
+  });
+
+  it("fails closed with a clear error when the page-count probe times out under a page cap", async () => {
+    const inputPath = join(scratchDir, "stalls-page-count.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockResolvedValueOnce(undefined);
+    qpdf.pageCount.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+
+    try {
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        message: expect.stringMatching(/count this PDF's pages within the time limit/i),
+      });
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+    }
   });
 
   it("stops before invoking qpdf when path validation is canceled", async () => {
