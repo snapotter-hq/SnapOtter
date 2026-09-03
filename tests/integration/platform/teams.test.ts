@@ -135,9 +135,7 @@ describe("POST /api/v1/teams", () => {
     // Issue #927: requests that pass the duplicate pre-check before the
     // winner's insert commits used to surface the 23505 unique violation
     // as a 500. raceInserts holds both requests at the insert so each one
-    // passes the pre-check. Exact-case duplicates only: teams.name is
-    // case-sensitive in Postgres, so the insert guard can't see a
-    // mixed-case twin.
+    // passes the pre-check. Mixed-case twins are the next test's job.
     const create = () =>
       app.inject({
         method: "POST",
@@ -161,6 +159,52 @@ describe("POST /api/v1/teams", () => {
       .from(schema.teams)
       .where(eq(schema.teams.name, "Race Condition"));
     expect(rows).toHaveLength(1);
+  });
+
+  it("concurrent mixed-case twins get one 201 and one 409, never two teams", async () => {
+    // Issue #970: the pre-check compares LOWER(name), but the exact-case
+    // unique constraint can't see a mixed-case twin, so "CaseTwin" and
+    // "casetwin" racing past the pre-check both landed. The lower(name)
+    // unique index makes the loser's insert conflict instead.
+    const create = (name: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/v1/teams",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name },
+      });
+
+    const results = await raceInserts("teams", 2, () =>
+      Promise.all([create("CaseTwin"), create("casetwin")]),
+    );
+    const statuses = results.map((r) => r.statusCode).sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const conflict = results.find((r) => r.statusCode === 409);
+    expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+      error: "Team name already exists",
+      code: "CONFLICT",
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.teams)
+      .where(sql`LOWER(${schema.teams.name}) = 'casetwin'`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("teams carries exactly the unique constraints the create guard assumes", async () => {
+    // The POST insert uses an unqualified onConflictDoNothing and maps every
+    // conflict to "Team name already exists". That's only honest while the
+    // unique surface is the primary key (a fresh UUID) plus the two name
+    // constraints. If this test fails, a new unique constraint joined the
+    // table: give the insert guard an explicit story for it before widening
+    // this list.
+    const res = await db.execute(
+      sql`SELECT indexname FROM pg_indexes WHERE tablename = 'teams' AND indexdef ILIKE '%UNIQUE%' ORDER BY indexname`,
+    );
+    const names = res.rows.map((r) => (r as { indexname: string }).indexname);
+    expect(names).toEqual(["teams_name_lower_unique", "teams_name_unique", "teams_pkey"]);
   });
 
   it("rejects duplicate names (case-insensitive)", async () => {

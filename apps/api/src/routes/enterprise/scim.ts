@@ -833,7 +833,9 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       // The pre-check above can't close the race: IdP retries can send the
       // same create twice, and both pass the SELECT before either insert
-      // commits (issue #927).
+      // commits (issue #927). Unqualified so it also covers the lower(name)
+      // index (issue #970): this pre-check is exact-case, so a mixed-case
+      // twin of an existing team only ever surfaces at the insert.
       const inserted = await db
         .insert(schema.teams)
         .values({
@@ -841,7 +843,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           name: displayName,
           createdAt: now,
         })
-        .onConflictDoNothing({ target: schema.teams.name });
+        .onConflictDoNothing();
 
       if (!inserted.rowCount) {
         return reply.status(409).send(scimError(409, "Group already exists"));

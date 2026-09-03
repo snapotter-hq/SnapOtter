@@ -1630,6 +1630,29 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(rows).toHaveLength(1);
     });
 
+    it("rejects a group whose name differs from an existing team only by case", async () => {
+      // Issue #970: groups are teams rows, and the SCIM pre-check is
+      // exact-case. Before the lower(name) unique index, a mixed-case twin
+      // sailed through and split membership across two teams the rest of
+      // the API treats as the same name.
+      const base = uniqueName("scim-grp-case");
+      await createScimGroup({ displayName: base });
+
+      const res = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Groups",
+        headers: authHeaders(),
+        payload: { displayName: base.toUpperCase() },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group already exists",
+      });
+    });
+
     it("creates a group, assigns members, and reflects it on the user resource", async () => {
       const memberA = await createScimUser({ userName: uniqueName("scim-grp-m1") });
       const memberB = await createScimUser({ userName: uniqueName("scim-grp-m2") });

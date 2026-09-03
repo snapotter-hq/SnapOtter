@@ -50,6 +50,13 @@
       "when": 1784729211461,
       "tag": "0006_majestic_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788439313579,
+      "tag": "0007_needy_fenris",
+      "breakpoints": true
     }
   ]
 }

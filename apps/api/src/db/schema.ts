@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -9,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const jobStatus = pgEnum("job_status", [
@@ -43,16 +45,26 @@ export const users = pgTable("users", {
   recoveryCodesHash: text("recovery_codes_hash"),
 });
 
-export const teams = pgTable("teams", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  legalHold: boolean("legal_hold").notNull().default(false),
-  storageQuota: bigint("storage_quota", { mode: "number" }),
-  retentionHours: integer("retention_hours"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const teams = pgTable(
+  "teams",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull().unique(),
+    legalHold: boolean("legal_hold").notNull().default(false),
+    storageQuota: bigint("storage_quota", { mode: "number" }),
+    retentionHours: integer("retention_hours"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    // Name uniqueness is case-insensitive everywhere the API compares names
+    // (create and rename pre-checks, SCIM group lookups). The plain unique
+    // constraint above is exact-case, so without this index two concurrent
+    // mixed-case creates could land a case-twin pair (issue #970).
+    uniqueIndex("teams_name_lower_unique").on(sql`lower(${table.name})`),
+  ],
+);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
