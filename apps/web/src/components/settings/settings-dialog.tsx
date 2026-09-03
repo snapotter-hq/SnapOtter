@@ -370,7 +370,10 @@ function GeneralSection() {
           setUser({
             id: 0,
             username: localStorage.getItem("snapotter-username") || "",
-            role: "unknown",
+            // Empty, not "unknown": the render site falls back through
+            // `user?.role || t.settings.general.roleUnknown`, and a truthy
+            // English sentinel would bypass the translated label.
+            role: "",
           });
         }),
       apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
