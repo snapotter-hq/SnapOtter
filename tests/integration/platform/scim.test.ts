@@ -1519,6 +1519,34 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
     });
 
+    it("concurrent duplicate group creates return one 201 and one SCIM 409, never 500", async () => {
+      // Issue #927: same race as Users create, one insert lower. Groups
+      // are teams rows, so the loser used to hit the teams.name unique
+      // constraint and 500.
+      const displayName = uniqueName("scim-group-race");
+      const create = () =>
+        crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Groups",
+          headers: authHeaders(),
+          payload: { displayName },
+        });
+
+      const results = await raceInserts("teams", 2, () => Promise.all([create(), create()]));
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([201, 409]);
+
+      const conflict = results.find((r) => r.statusCode === 409);
+      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group already exists",
+      });
+
+      const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, displayName));
+      expect(rows).toHaveLength(1);
+    });
+
     it("creates a group, assigns members, and reflects it on the user resource", async () => {
       const memberA = await createScimUser({ userName: uniqueName("scim-grp-m1") });
       const memberB = await createScimUser({ userName: uniqueName("scim-grp-m2") });

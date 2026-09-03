@@ -27,6 +27,9 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await db
+    .delete(schema.users)
+    .where(inArray(schema.users.username, ["race_shared", "race_shared_2"]));
   await testApp.cleanup();
 }, 10_000);
 

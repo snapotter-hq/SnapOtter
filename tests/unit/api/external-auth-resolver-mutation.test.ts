@@ -418,17 +418,19 @@ describe("resolveExternalUser: auto-create username race", () => {
 
   it("throws after exhausting the retry budget instead of looping forever", async () => {
     state.insertRowCounts = [0, 0, 0];
+    // Three identical attempts, each consuming: username scan (base free),
+    // Default team lookup, then the post-conflict re-check (no winner).
     state.selectRows = [
       [], // extId miss
-      [],
-      [{ id: "team-default" }],
-      [], // attempt 1: scan, team, re-check miss
-      [],
-      [{ id: "team-default" }],
-      [], // attempt 2
-      [],
-      [{ id: "team-default" }],
-      [], // attempt 3
+      [], // attempt 1: scan
+      [{ id: "team-default" }], // attempt 1: team
+      [], // attempt 1: re-check miss
+      [], // attempt 2: scan
+      [{ id: "team-default" }], // attempt 2: team
+      [], // attempt 2: re-check miss
+      [], // attempt 3: scan
+      [{ id: "team-default" }], // attempt 3: team
+      [], // attempt 3: re-check miss
     ];
     await expect(resolveExternalUser(baseParams({ autoCreate: true }))).rejects.toThrow(
       /username race/,

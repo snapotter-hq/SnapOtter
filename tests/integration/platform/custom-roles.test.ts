@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { raceInserts } from "../../helpers/pg-race.js";
@@ -87,6 +87,17 @@ describe("custom roles", () => {
 
     const rows = await db.select().from(schema.roles).where(eq(schema.roles.name, name));
     expect(rows).toHaveLength(1);
+
+    // The 409 loser must not leave a phantom audit row; ROLE_CREATED is
+    // only written after the insert guard.
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'ROLE_CREATED' AND ${schema.auditLog.details}->>'roleName' = ${name}`,
+      );
+    expect(auditRows).toHaveLength(1);
+
     await db.delete(schema.roles).where(eq(schema.roles.name, name));
   });
 
