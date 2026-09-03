@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { raceInserts } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -58,6 +59,35 @@ describe("custom roles", () => {
       payload: { name: "admin", permissions: ["tools:use"] },
     });
     expect(res.statusCode).toBe(409);
+  });
+
+  it("concurrent duplicate creates return one 201 and one 409, never 500", async () => {
+    // Issue #927: requests that pass the duplicate pre-check before the
+    // winner's insert commits used to surface the 23505 unique violation
+    // as a 500. raceInserts holds both requests at the insert so each one
+    // passes the pre-check.
+    const name = `race-role-${Date.now().toString(36)}`;
+    const create = () =>
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/roles",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name, permissions: ["tools:use"] },
+      });
+
+    const results = await raceInserts("roles", 2, () => Promise.all([create(), create()]));
+    const statuses = results.map((r) => r.statusCode).sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const conflict = results.find((r) => r.statusCode === 409);
+    expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+      error: "Role name already exists",
+      code: "CONFLICT",
+    });
+
+    const rows = await db.select().from(schema.roles).where(eq(schema.roles.name, name));
+    expect(rows).toHaveLength(1);
+    await db.delete(schema.roles).where(eq(schema.roles.name, name));
   });
 
   it("can assign custom role to user", async () => {

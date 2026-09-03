@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { raceInserts } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -128,6 +129,38 @@ describe("POST /api/v1/teams", () => {
 
     // Cleanup
     await db.delete(schema.users).where(eq(schema.users.id, userId));
+  });
+
+  it("concurrent duplicate creates return one 201 and one 409, never 500", async () => {
+    // Issue #927: requests that pass the duplicate pre-check before the
+    // winner's insert commits used to surface the 23505 unique violation
+    // as a 500. raceInserts holds both requests at the insert so each one
+    // passes the pre-check. Exact-case duplicates only: teams.name is
+    // case-sensitive in Postgres, so the insert guard can't see a
+    // mixed-case twin.
+    const create = () =>
+      app.inject({
+        method: "POST",
+        url: "/api/v1/teams",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name: "Race Condition" },
+      });
+
+    const results = await raceInserts("teams", 2, () => Promise.all([create(), create()]));
+    const statuses = results.map((r) => r.statusCode).sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const conflict = results.find((r) => r.statusCode === 409);
+    expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+      error: "Team name already exists",
+      code: "CONFLICT",
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.name, "Race Condition"));
+    expect(rows).toHaveLength(1);
   });
 
   it("rejects duplicate names (case-insensitive)", async () => {

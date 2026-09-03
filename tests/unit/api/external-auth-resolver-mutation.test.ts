@@ -28,6 +28,9 @@ const state = vi.hoisted(() => ({
   selectIdx: 0,
   updates: [] as Record<string, unknown>[],
   inserts: [] as Record<string, unknown>[],
+  // rowCount returned by each insert, in call order (default 1). A 0 models
+  // losing a unique-constraint race under onConflictDoNothing.
+  insertRowCounts: [] as number[],
   maxUsers: 0,
   auditCalls: [] as { event: string; details: Record<string, unknown> }[],
 }));
@@ -83,8 +86,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     }),
     insert: () => ({
       values: (v: Record<string, unknown>) => {
+        const rowCount = state.insertRowCounts[state.inserts.length] ?? 1;
         state.inserts.push(v);
-        return Promise.resolve();
+        const result = Promise.resolve({ rowCount });
+        return Object.assign(result, { onConflictDoNothing: () => result });
       },
     }),
   },
@@ -141,6 +146,7 @@ beforeEach(() => {
   state.selectIdx = 0;
   state.updates = [];
   state.inserts = [];
+  state.insertRowCounts = [];
   state.maxUsers = 0;
   state.auditCalls = [];
   vi.clearAllMocks();
@@ -345,6 +351,89 @@ describe("resolveExternalUser: auto-create", () => {
     ];
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result.action).toBe("created");
+  });
+});
+
+// ── 3b. Auto-create username races (issue #927) ─────────────────────────
+//
+// The insert carries onConflictDoNothing, so losing a race surfaces as
+// rowCount 0 instead of a thrown 23505. The resolver must then re-check
+// whether the same external identity won (two-tabs case) and otherwise
+// re-run the username scan.
+
+describe("resolveExternalUser: auto-create username race", () => {
+  it("returns the winner's user when the same identity created it concurrently", async () => {
+    state.insertRowCounts = [0];
+    state.selectRows = [
+      [], // extId miss
+      [], // findUniqueUsername: base free
+      [{ id: "team-default" }], // Default team lookup
+      // Post-conflict re-check by externalId finds the winner.
+      [dbUser({ id: "u-winner", username: "alice", role: "user", team: "team-default" })],
+    ];
+    const result = await resolveExternalUser(baseParams({ autoCreate: true }));
+
+    expect(result).toEqual({
+      user: { id: "u-winner", username: "alice", role: "user", team: "team-default" },
+      action: "matched",
+    });
+    expect(state.inserts).toHaveLength(1);
+    expect(state.auditCalls.map((c) => c.event)).not.toContain("OIDC_USER_CREATED");
+  });
+
+  it("denies when the concurrently created winner is disabled", async () => {
+    state.insertRowCounts = [0];
+    state.selectRows = [
+      [], // extId miss
+      [], // base free
+      [{ id: "team-default" }],
+      [dbUser({ id: "u-winner", role: "disabled" })], // winner re-check
+    ];
+    const result = await resolveExternalUser(baseParams({ autoCreate: true }));
+    expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
+    expect(state.auditCalls.at(-1)?.event).toBe("OIDC_LOGIN_FAILED");
+  });
+
+  it("re-runs the username scan and creates when a different user took the name", async () => {
+    state.insertRowCounts = [0, 1];
+    state.selectRows = [
+      [], // extId miss
+      [], // attempt 1: base "alice" free
+      [{ id: "team-default" }],
+      [], // winner re-check: not our identity
+      [{ username: "alice" }], // attempt 2 scan: base now taken
+      [], // attempt 2 scan: alice_2 free
+      [{ id: "team-default" }],
+    ];
+    const result = await resolveExternalUser(baseParams({ autoCreate: true }));
+
+    expect(result.action).toBe("created");
+    expect(result.user?.username).toBe("alice_2");
+    expect(state.inserts).toHaveLength(2);
+    expect(state.inserts[1].username).toBe("alice_2");
+    const created = state.auditCalls.at(-1);
+    expect(created?.event).toBe("OIDC_USER_CREATED");
+    expect(created?.details.username).toBe("alice_2");
+  });
+
+  it("throws after exhausting the retry budget instead of looping forever", async () => {
+    state.insertRowCounts = [0, 0, 0];
+    state.selectRows = [
+      [], // extId miss
+      [],
+      [{ id: "team-default" }],
+      [], // attempt 1: scan, team, re-check miss
+      [],
+      [{ id: "team-default" }],
+      [], // attempt 2
+      [],
+      [{ id: "team-default" }],
+      [], // attempt 3
+    ];
+    await expect(resolveExternalUser(baseParams({ autoCreate: true }))).rejects.toThrow(
+      /username race/,
+    );
+    expect(state.inserts).toHaveLength(3);
   });
 });
 
