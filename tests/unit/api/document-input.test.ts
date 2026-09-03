@@ -183,6 +183,19 @@ describe("path-backed PDF validation", () => {
     }
   });
 
+  it("fails closed with a clear error when the password probe times out (#982)", async () => {
+    const inputPath = join(scratchDir, "stalls-requires-password.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+
+    await expect(
+      validatePdfPath(inputPath, { rejectPasswordProtected: true }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      message: expect.stringMatching(/inspect this PDF within the time limit/i),
+    });
+  });
+
   it("stops before invoking qpdf when path validation is canceled", async () => {
     const inputPath = join(scratchDir, "canceled.pdf");
     writeFileSync(inputPath, "%PDF-canceled");
