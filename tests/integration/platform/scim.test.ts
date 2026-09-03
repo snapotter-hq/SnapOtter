@@ -822,6 +822,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
   const DEFAULT_TEAM_ID = "default-team-00000000";
   const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error";
   let crudApp: TestApp;
+  // The vi.resetModules() in beforeAll gives crudApp a fresh config module,
+  // so MAX_USERS tests must mutate THAT env instance, not a top-level import.
+  let crudEnv: typeof import("../../../apps/api/src/config.js").env;
   let crudSeq = 0;
 
   function uniqueName(prefix: string): string {
@@ -876,6 +879,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     mockEnterpriseFeatures(["scim"]);
     const { buildTestApp: buildLicensedApp } = await import("../test-server.js");
     crudApp = await buildLicensedApp();
+    crudEnv = (await import("../../../apps/api/src/config.js")).env;
 
     const tokenHash = await hashPassword(SCIM_TOKEN);
     await db
@@ -1499,6 +1503,85 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const body = JSON.parse(res.body);
       expect(body.userName).toBe(userName);
       expect(body.active).toBe(true);
+    });
+  });
+
+  describe("Users create user limit (issue #966)", () => {
+    async function countUsers(): Promise<number> {
+      const rows = await db.select().from(schema.users);
+      return rows.length;
+    }
+
+    it("refuses to provision past MAX_USERS with the SCIM 403 envelope", async () => {
+      const origMaxUsers = crudEnv.MAX_USERS;
+      // Relies on the users table being non-empty (test-server seeds the
+      // default admin); a count of 0 would mean unlimited, not a full cap.
+      (crudEnv as Record<string, unknown>).MAX_USERS = await countUsers();
+      try {
+        const userName = uniqueName("scim-cap-full");
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName },
+        });
+
+        expect(res.statusCode).toBe(403);
+        expect(JSON.parse(res.body)).toMatchObject({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 403,
+          detail: `User limit reached (${crudEnv.MAX_USERS} max)`,
+        });
+
+        const rows = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.username, userName));
+        expect(rows).toHaveLength(0);
+      } finally {
+        (crudEnv as Record<string, unknown>).MAX_USERS = origMaxUsers;
+      }
+    });
+
+    it("still provisions while below the cap", async () => {
+      const origMaxUsers = crudEnv.MAX_USERS;
+      (crudEnv as Record<string, unknown>).MAX_USERS = (await countUsers()) + 1;
+      try {
+        const { id } = await createScimUser({ userName: uniqueName("scim-cap-below") });
+        expect(id).toBeTruthy();
+      } finally {
+        (crudEnv as Record<string, unknown>).MAX_USERS = origMaxUsers;
+      }
+    });
+
+    it("concurrent provisioning stops at the cap with one 201 and one 403", async () => {
+      // Cap enforcement rides the shared advisory lock from issue #928, so
+      // two concurrent creates with different names can't both pass the
+      // count. Without the lock (or with no check at all, the #966 bug)
+      // both come back 201 and the cap is exceeded.
+      const origMaxUsers = crudEnv.MAX_USERS;
+      const cap = (await countUsers()) + 1;
+      (crudEnv as Record<string, unknown>).MAX_USERS = cap;
+      try {
+        const create = (userName: string) =>
+          crudApp.app.inject({
+            method: "POST",
+            url: "/api/v1/scim/v2/Users",
+            headers: authHeaders(),
+            payload: { userName },
+          });
+
+        const [first, second] = await Promise.all([
+          create(uniqueName("scim-cap-race-a")),
+          create(uniqueName("scim-cap-race-b")),
+        ]);
+
+        const statuses = [first.statusCode, second.statusCode].sort();
+        expect(statuses).toEqual([201, 403]);
+        expect(await countUsers()).toBe(cap);
+      } finally {
+        (crudEnv as Record<string, unknown>).MAX_USERS = origMaxUsers;
+      }
     });
   });
 

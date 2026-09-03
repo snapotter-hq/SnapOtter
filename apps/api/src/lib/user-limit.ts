@@ -3,11 +3,10 @@ import { env } from "../config.js";
 import { type db, schema } from "../db/index.js";
 
 // Every path that enforces MAX_USERS (register route, external-auth
-// auto-create) must serialize on this one lock or two concurrent creates can
-// each pass the count and overshoot the cap by one (issue #928). SCIM
-// provisioning does not enforce the cap at all today (issue #966). Lock ids
-// are scoped per database, so parallel test forks with their own DB clones
-// never contend.
+// auto-create, SCIM user provisioning) must serialize on this one lock or two
+// concurrent creates can each pass the count and overshoot the cap by one
+// (issues #928, #966). Lock ids are scoped per database, so parallel test
+// forks with their own DB clones never contend.
 const USER_LIMIT_LOCK_KEY = 7_421_003;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

@@ -1,11 +1,13 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
+import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
 
@@ -392,22 +394,31 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const now = new Date();
       // The pre-check above can't close the race: IdP retries can send the
       // same create twice, and both pass the SELECT before either insert
-      // commits (issue #927).
-      const inserted = await db
-        .insert(schema.users)
-        .values({
-          id,
-          username: userName,
-          email,
-          externalId: externalId ?? null,
-          role: active ? "user" : "disabled",
-          team: teamId,
-          authProvider: "scim",
-          mustChangePassword: false,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoNothing({ target: schema.users.username });
+      // commits (issue #927). MAX_USERS binds provisioning too (issue #966):
+      // the locked count and the insert share one transaction, same as the
+      // register route, so concurrent creates can't overshoot the cap.
+      const inserted = await db.transaction(async (tx) => {
+        if (await userLimitReached(tx)) return "limit" as const;
+        return tx
+          .insert(schema.users)
+          .values({
+            id,
+            username: userName,
+            email,
+            externalId: externalId ?? null,
+            role: active ? "user" : "disabled",
+            team: teamId,
+            authProvider: "scim",
+            mustChangePassword: false,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoNothing({ target: schema.users.username });
+      });
+
+      if (inserted === "limit") {
+        return reply.status(403).send(scimError(403, `User limit reached (${env.MAX_USERS} max)`));
+      }
 
       if (!inserted.rowCount) {
         return reply.status(409).send(scimError(409, "User already exists"));
