@@ -6,6 +6,7 @@ import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
@@ -606,7 +607,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+      // The pre-check above can't close the race: two concurrent renames
+      // onto the same userName both pass it before either UPDATE commits
+      // (issue #968), so the loser's 23505 maps to the pre-check's 409.
+      try {
+        await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send(scimError(409, "userName already taken"));
+        }
+        throw err;
+      }
 
       const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
       const [team] = await db
@@ -726,7 +737,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+      // PATCH has no userName conflict pre-check at all, so before issue
+      // #968 even a sequential rename onto a taken name surfaced the 23505
+      // as a 500. The 409 aborts the whole patch, nothing was applied.
+      try {
+        await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send(scimError(409, "userName already taken"));
+        }
+        throw err;
+      }
 
       const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
       const [team] = await db
@@ -1002,7 +1023,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict && conflict.id !== id) {
           return reply.status(409).send(scimError(409, "Group name already taken"));
         }
-        await db.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
+        // The pre-check can't close the race: two concurrent renames onto
+        // the same displayName both pass it before either UPDATE commits
+        // (issue #968), so the loser's 23505 maps to the pre-check's 409.
+        try {
+          await db.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
+        } catch (err) {
+          if (isUniqueViolation(err)) {
+            return reply.status(409).send(scimError(409, "Group name already taken"));
+          }
+          throw err;
+        }
       }
 
       // Replace membership: remove all current members, add new ones
@@ -1111,7 +1142,16 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           if (op.path === "displayName") {
             const newName = op.value as string;
             if (newName) {
-              await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
+              // No conflict pre-check on this path, so before issue #968 a
+              // rename onto a taken name surfaced the 23505 as a 500.
+              try {
+                await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
+              } catch (err) {
+                if (isUniqueViolation(err)) {
+                  return reply.status(409).send(scimError(409, "Group name already taken"));
+                }
+                throw err;
+              }
             }
           } else if (op.path === "members") {
             // Full member replacement

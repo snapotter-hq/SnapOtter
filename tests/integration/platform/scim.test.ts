@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { hashPassword, verifyPassword } from "../../../apps/api/src/plugins/auth.js";
-import { raceInserts } from "../../helpers/pg-race.js";
+import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -1214,6 +1214,38 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.username).toBe(victim.userName);
     });
 
+    it("concurrent renames onto one userName return one 200 and one SCIM 409, never 500", async () => {
+      // Issue #968: both renames pass the conflict pre-check before either
+      // UPDATE commits; the loser used to surface the 23505 as a 500.
+      const a = await createScimUser({ userName: uniqueName("scim-put-race-a") });
+      const b = await createScimUser({ userName: uniqueName("scim-put-race-b") });
+      const target = uniqueName("scim-put-race-target");
+
+      const rename = (id: string) =>
+        crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { userName: target, active: true },
+        });
+
+      const results = await raceUpdates("users", 2, () =>
+        Promise.all([rename(a.id), rename(b.id)]),
+      );
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const conflict = results.find((r) => r.statusCode === 409);
+      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "userName already taken",
+      });
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
+      expect(rows).toHaveLength(1);
+    });
+
     it("replaces userName, externalId, and primary email", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-put-src") });
       const renamed = uniqueName("scim-put-renamed");
@@ -1309,6 +1341,58 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(JSON.parse(res.body).userName).toBe(renamed);
       const row = await userRow(id);
       expect(row?.username).toBe(renamed);
+    });
+
+    it("rejects a PATCH rename onto an existing userName with the SCIM 409 envelope", async () => {
+      // Issue #968: PATCH has no conflict pre-check at all, so even a
+      // sequential rename onto a taken userName surfaced the 23505 as a 500.
+      const target = await createScimUser({ userName: uniqueName("scim-patch-taken") });
+      const victim = await createScimUser({ userName: uniqueName("scim-patch-victim") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${victim.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "replace", path: "userName", value: target.userName }],
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "userName already taken",
+      });
+      const row = await userRow(victim.id);
+      expect(row?.username).toBe(victim.userName);
+    });
+
+    it("concurrent PATCH renames onto one userName return one 200 and one SCIM 409", async () => {
+      const a = await createScimUser({ userName: uniqueName("scim-patch-race-a") });
+      const b = await createScimUser({ userName: uniqueName("scim-patch-race-b") });
+      const target = uniqueName("scim-patch-race-target");
+
+      const rename = (id: string) =>
+        crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [{ op: "replace", path: "userName", value: target }],
+          },
+        });
+
+      const results = await raceUpdates("users", 2, () =>
+        Promise.all([rename(a.id), rename(b.id)]),
+      );
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
+      expect(rows).toHaveLength(1);
     });
 
     it("adds an externalId with a mixed-case op name", async () => {
@@ -1710,6 +1794,65 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         status: 409,
         detail: "Group already exists",
       });
+    });
+
+    it("concurrent PUT renames onto one displayName return one 200 and one SCIM 409, never 500", async () => {
+      // Issue #968: both renames pass the conflict pre-check before either
+      // UPDATE commits; the loser used to surface the 23505 as a 500.
+      const a = await createScimGroup({ displayName: uniqueName("scim-grp-race-a") });
+      const b = await createScimGroup({ displayName: uniqueName("scim-grp-race-b") });
+      const target = uniqueName("scim-grp-race-target");
+
+      const rename = (id: string) =>
+        crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${id}`,
+          headers: authHeaders(),
+          payload: { displayName: target },
+        });
+
+      const results = await raceUpdates("teams", 2, () =>
+        Promise.all([rename(a.id), rename(b.id)]),
+      );
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const conflict = results.find((r) => r.statusCode === 409);
+      expect(JSON.parse(conflict?.body ?? "{}")).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group name already taken",
+      });
+
+      const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, target));
+      expect(rows).toHaveLength(1);
+    });
+
+    it("rejects a PATCH displayName replace onto an existing group with the SCIM 409 envelope", async () => {
+      // Issue #968: the PATCH displayName path has no conflict pre-check, so
+      // even a sequential rename onto a taken name surfaced the 23505 as a 500.
+      const target = await createScimGroup({ displayName: uniqueName("scim-grp-patch-taken") });
+      const victim = await createScimGroup({ displayName: uniqueName("scim-grp-patch-victim") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${victim.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "replace", path: "displayName", value: target.displayName }],
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group name already taken",
+      });
+
+      const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, victim.id));
+      expect(row?.name).toBe(victim.displayName);
     });
 
     it("returns a group by id with its members and 404 for unknown ids", async () => {
