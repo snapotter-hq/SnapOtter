@@ -79,12 +79,22 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
 
     const id = randomUUID();
 
-    await db.insert(schema.teams).values({
-      id,
-      name: trimmedName,
-      storageQuota: storageQuota ?? null,
-      retentionHours: retentionHours ?? null,
-    });
+    // The pre-check above can't close the race: two concurrent creates both
+    // pass the SELECT before either insert commits (issue #927). This guard
+    // only covers exact-case twins; the unique constraint is case-sensitive.
+    const inserted = await db
+      .insert(schema.teams)
+      .values({
+        id,
+        name: trimmedName,
+        storageQuota: storageQuota ?? null,
+        retentionHours: retentionHours ?? null,
+      })
+      .onConflictDoNothing({ target: schema.teams.name });
+
+    if (!inserted.rowCount) {
+      return reply.status(409).send({ error: "Team name already exists", code: "CONFLICT" });
+    }
 
     return reply.status(201).send({
       id,

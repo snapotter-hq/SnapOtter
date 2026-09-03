@@ -31,7 +31,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       }),
     }),
     insert: () => ({
-      values: () => Promise.resolve({ rowCount: 1 }),
+      values: () => {
+        const result = Promise.resolve({ rowCount: 1 });
+        return Object.assign(result, { onConflictDoNothing: () => result });
+      },
     }),
   },
   schema: {

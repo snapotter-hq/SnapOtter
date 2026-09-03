@@ -188,44 +188,85 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       }
     }
 
-    const uniqueUsername = await findUniqueUsername(username);
-    const newUserId = randomUUID();
+    // The username scan can't close the race: two concurrent logins both
+    // pass it before either insert commits (issue #927), so the insert
+    // carries a conflict guard and the loser recovers below.
+    const MAX_USERNAME_RACE_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_USERNAME_RACE_RETRIES; attempt++) {
+      const uniqueUsername = await findUniqueUsername(username);
+      const newUserId = randomUUID();
 
-    // Look up the default team
-    const [defaultTeam] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.name, "Default"));
-    const teamId = defaultTeam?.id ?? "default-team-00000000";
+      // Look up the default team
+      const [defaultTeam] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.name, "Default"));
+      const teamId = defaultTeam?.id ?? "default-team-00000000";
 
-    await db.insert(schema.users).values({
-      id: newUserId,
-      username: uniqueUsername,
-      passwordHash: null,
-      role: defaultRole,
-      team: teamId,
-      mustChangePassword: false,
-      authProvider: provider,
-      externalId,
-      email: email ?? null,
-    });
+      const inserted = await db
+        .insert(schema.users)
+        .values({
+          id: newUserId,
+          username: uniqueUsername,
+          passwordHash: null,
+          role: defaultRole,
+          team: teamId,
+          mustChangePassword: false,
+          authProvider: provider,
+          externalId,
+          email: email ?? null,
+        })
+        .onConflictDoNothing({ target: schema.users.username });
 
-    await audit(`${providerUpper}_USER_CREATED`, {
-      userId: newUserId,
-      username: uniqueUsername,
-      email,
-      role: defaultRole,
-    });
+      if (inserted.rowCount) {
+        await audit(`${providerUpper}_USER_CREATED`, {
+          userId: newUserId,
+          username: uniqueUsername,
+          email,
+          role: defaultRole,
+        });
 
-    return {
-      user: {
-        id: newUserId,
-        username: uniqueUsername,
-        role: defaultRole,
-        team: teamId,
-      },
-      action: "created",
-    };
+        return {
+          user: {
+            id: newUserId,
+            username: uniqueUsername,
+            role: defaultRole,
+            team: teamId,
+          },
+          action: "created",
+        };
+      }
+
+      // Race lost. If this same external identity won it in a concurrent
+      // login (say, two tabs finishing first login at once), hand back the
+      // winner's user instead of failing the login.
+      const [winner] = await db
+        .select()
+        .from(schema.users)
+        .where(
+          and(eq(schema.users.externalId, externalId), eq(schema.users.authProvider, provider)),
+        )
+        .limit(1);
+
+      if (winner) {
+        if (isDisabledRole(winner.role)) {
+          await audit(`${providerUpper}_LOGIN_FAILED`, {
+            reason: "user_disabled",
+            userId: winner.id,
+          });
+          return { user: null, action: "denied", deniedReason: "user_disabled" };
+        }
+        return {
+          user: { id: winner.id, username: winner.username, role: winner.role, team: winner.team },
+          action: "matched",
+        };
+      }
+      // A different user took the name; rescan and retry.
+    }
+
+    throw new Error(
+      `${provider} auto-create lost the username race ${MAX_USERNAME_RACE_RETRIES} times for "${username}"`,
+    );
   }
 
   // 4. Denied: no matching user, auto-link did not match, auto-create disabled

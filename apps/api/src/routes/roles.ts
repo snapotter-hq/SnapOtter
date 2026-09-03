@@ -132,15 +132,24 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const id = randomUUID();
-    await db.insert(schema.roles).values({
-      id,
-      name,
-      description: description?.trim() ?? "",
-      permissions,
-      toolPermissions: toolPermissions ?? null,
-      isBuiltin: false,
-      createdBy: user.id,
-    });
+    // The pre-check above can't close the race: two concurrent creates both
+    // pass the SELECT before either insert commits (issue #927).
+    const inserted = await db
+      .insert(schema.roles)
+      .values({
+        id,
+        name,
+        description: description?.trim() ?? "",
+        permissions,
+        toolPermissions: toolPermissions ?? null,
+        isBuiltin: false,
+        createdBy: user.id,
+      })
+      .onConflictDoNothing({ target: schema.roles.name });
+
+    if (!inserted.rowCount) {
+      return reply.status(409).send({ error: "Role name already exists", code: "CONFLICT" });
+    }
 
     await auditFromRequest(request)("ROLE_CREATED", {
       adminId: user.id,
