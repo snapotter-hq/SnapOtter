@@ -182,6 +182,18 @@ export async function readStoredFile(storedName: string): Promise<Buffer> {
   return readFile(join(env.FILES_STORAGE_PATH, storedName));
 }
 
+/**
+ * True when a readStoredFile/streamStoredFile rejection is an S3 service
+ * fault (auth failure, bucket policy, S3 5xx) rather than the object simply
+ * not existing. Those must keep reaching the error handler instead of
+ * folding into the missing-blob 404 (#937). Local-backend faults carry an
+ * errno shape the callers already recognize, so this returns false for them.
+ */
+export function isStorageServiceFault(error: unknown): boolean {
+  if (!isS3Enabled() || !s3Mod) return false;
+  return s3Mod.isS3ServiceError(error) && !s3Mod.isMissingObjectError(error);
+}
+
 export async function streamStoredFile(storedName: string): Promise<Readable> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {

@@ -22,6 +22,7 @@ import {
   deleteStoredFile,
   deleteThumbnail,
   getCachedThumbnail,
+  isStorageServiceFault,
   readStoredFile,
   saveFile,
   saveThumbnail,
@@ -485,11 +486,13 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       } catch (e) {
         // streamStoredFile rejects for every open-time fault, not only a
         // missing blob. A syscall failure other than ENOENT (EACCES, ENOTDIR)
-        // is a storage fault that must keep reaching the global handler and
-        // Sentry. Errors without a syscall (S3 NoSuchKey, a poisoned
-        // stored_name) keep their long-standing 404 mapping.
+        // and an S3 service fault other than a missing object (AccessDenied,
+        // rotated credentials, S3 5xx) are storage faults that must keep
+        // reaching the global handler and Sentry (#937). A missing blob and a
+        // poisoned stored_name keep their long-standing 404 mapping.
         const { code, syscall } = e as NodeJS.ErrnoException;
         if (syscall && code !== "ENOENT") throw e;
+        if (isStorageServiceFault(e)) throw e;
         request.log.warn(
           { fileId: id, storedName: file.storedName },
           "library download: stored blob missing",
