@@ -38,7 +38,7 @@ import {
 const PNG = readFixture(fixtures.image.base.png200);
 
 const S3_ENDPOINT = "http://localhost:19000";
-const BUCKET = `snapotter-dlfault-${Date.now()}`;
+const BUCKET = `snapotter-dlfault-${process.pid}-${Date.now()}`;
 const CREDS = { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" };
 
 const minioAvailable = (() => {
@@ -159,8 +159,31 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
       });
 
       expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
     } finally {
       s3Storage.configureS3(s3Config());
     }
+  });
+
+  // A vanished bucket (deleted, recreated elsewhere, or S3_BUCKET fat-fingered
+  // in a config edit) is the same outage class: NoSuchBucket arrives as HTTP
+  // 404 but must not read as per-file deletion. Kept last in the file because
+  // it destroys the bucket; afterAll tolerates the missing bucket.
+  it("returns 500 when the whole bucket is gone", async () => {
+    const { id } = await uploadLibraryFile("s3-bucket-gone.png");
+    const objects = await s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
+    for (const obj of objects.Contents ?? []) {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key! }));
+    }
+    await s3Client.send(new DeleteBucketCommand({ Bucket: BUCKET }));
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/files/${id}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
   });
 });

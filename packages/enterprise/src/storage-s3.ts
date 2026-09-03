@@ -75,24 +75,18 @@ export async function checkConnection(): Promise<void> {
 }
 
 /**
- * True when the error came from the S3 service layer at all: the SDK stamps
- * every dispatched error with $metadata. Combined with isMissingObjectError
- * this lets callers split "object gone" from "storage down" without
- * inspecting AWS error shapes themselves.
- */
-export function isS3ServiceError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "$metadata" in error;
-}
-
-/**
  * True when a getObject/getObjectStream rejection is S3 reporting the object
- * missing: NoSuchKey, or an unmodeled 404 from an S3-compatible store.
- * Service faults (AccessDenied, credential rejection, 5xx) and errors that
- * did not come from the SDK return false.
+ * missing: NoSuchKey, or an unmodeled 404 from an S3-compatible store (the
+ * SDK stamps every dispatched error with $metadata). NoSuchBucket also
+ * arrives as HTTP 404 but means the whole bucket is gone, a storage outage
+ * rather than a missing file, so it stays a fault. Service faults
+ * (AccessDenied, credential rejection, 5xx) and errors that did not come
+ * from the SDK return false.
  */
 export function isMissingObjectError(error: unknown): boolean {
-  if (!isS3ServiceError(error)) return false;
+  if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  if (e.name === "NoSuchBucket") return false;
   return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
 }
 
