@@ -79,9 +79,12 @@ export async function checkConnection(): Promise<void> {
  * missing: NoSuchKey, or an unmodeled 404 from an S3-compatible store (the
  * SDK stamps every dispatched error with $metadata). NoSuchBucket also
  * arrives as HTTP 404 but means the whole bucket is gone, a storage outage
- * rather than a missing file, so it stays a fault. Service faults
- * (AccessDenied, credential rejection, 5xx) and errors that did not come
- * from the SDK return false.
+ * rather than a missing file, so it stays a fault. Caveat: that carve-out
+ * only works for GetObject callers. HEAD responses carry no body, so for
+ * HeadObject the SDK yields the same NotFound/404 shape whether the key or
+ * the whole bucket is missing, and this predicate cannot tell them apart.
+ * Service faults (AccessDenied, credential rejection, 5xx) and errors that
+ * did not come from the SDK return false.
  */
 export function isMissingObjectError(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;

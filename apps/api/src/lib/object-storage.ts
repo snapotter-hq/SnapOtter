@@ -291,12 +291,14 @@ export async function putObjectStream(
  * object missing. Mirrors isStorageServiceFault in lib/file-storage.ts but
  * is bound to this module's own lazy S3 singleton; the two cannot share one
  * because either module may have loaded S3 while the other has not, and a
- * null singleton must fail toward "fault", never toward 404. Local-backend
- * rejections return false; their errno shape already routes them.
+ * null singleton must fail toward "fault", never toward 404. Unlike
+ * file-storage there is no SafeError carve-out: this module throws none on
+ * the read path, and rethrowing one preserves its own statusCode at the
+ * global handler anyway. Local-backend rejections return false; their errno
+ * shape already routes them.
  */
 export function isStorageServiceFault(error: unknown): boolean {
   if (!isS3Enabled()) return false;
-  if (error instanceof SafeError) return false;
   return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 

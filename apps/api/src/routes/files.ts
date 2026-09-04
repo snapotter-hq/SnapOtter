@@ -181,9 +181,13 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // or an S3 service fault (AccessDenied, rotated credentials, S3 5xx)
       // is a storage outage that must keep reaching the global handler and
       // Sentry, not fold into "File not found" (#974, sibling of #937).
+      // ENAMETOOLONG counts as a miss: no object can exist at such a key,
+      // and this route takes unauthenticated client-supplied names (params
+      // up to maxParamLength: 500 exceed the 255-byte filename limit), so
+      // long garbage must stay 404 instead of paging Sentry.
       const rethrowIfStorageFault = (e: unknown): void => {
         const { code, syscall } = e as NodeJS.ErrnoException;
-        if (syscall && code !== "ENOENT") throw e;
+        if (syscall && code !== "ENOENT" && code !== "ENAMETOOLONG") throw e;
         if (isStorageServiceFault(e)) throw e;
       };
 

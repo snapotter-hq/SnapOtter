@@ -143,6 +143,9 @@ export async function buildTestApp(): Promise<TestApp> {
     // request.protocol) matches production. inject() peers on 127.0.0.1 are
     // trusted by the default policy; see tests/unit/security/trust-proxy-policy.test.ts.
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    // Mirrors index.ts: find-my-way otherwise 414s any route param over 100
+    // chars, hiding prod-reachable long-parameter behavior from tests.
+    routerOptions: { maxParamLength: 500 },
   });
 
   // Plugins
