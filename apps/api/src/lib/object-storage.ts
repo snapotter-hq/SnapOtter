@@ -34,8 +34,17 @@ export interface ObjectInfo {
 
 const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
 
+/**
+ * True when a key can name a stored object at all. Exported so routes can
+ * reject garbage input up front instead of catching assertValidKey's plain
+ * Error, which fault classification cannot tell apart from a storage fault.
+ */
+export function isValidObjectKey(key: string): boolean {
+  return VALID_KEY.test(key) && !key.includes("..");
+}
+
 function assertValidKey(key: string): void {
-  if (!VALID_KEY.test(key) || key.includes("..")) {
+  if (!isValidObjectKey(key)) {
     throw new Error(`Invalid object key: ${key}`);
   }
 }
@@ -274,6 +283,21 @@ export async function putObjectStream(
   } finally {
     opts.signal?.removeEventListener("abort", abortSource);
   }
+}
+
+/**
+ * True when a read-path rejection in S3 mode is a storage fault that must
+ * keep reaching the error handler (#974): anything except S3 reporting the
+ * object missing. Mirrors isStorageServiceFault in lib/file-storage.ts but
+ * is bound to this module's own lazy S3 singleton; the two cannot share one
+ * because either module may have loaded S3 while the other has not, and a
+ * null singleton must fail toward "fault", never toward 404. Local-backend
+ * rejections return false; their errno shape already routes them.
+ */
+export function isStorageServiceFault(error: unknown): boolean {
+  if (!isS3Enabled()) return false;
+  if (error instanceof SafeError) return false;
+  return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 
 export async function getObjectStream(
