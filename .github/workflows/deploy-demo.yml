@@ -57,3 +57,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # The demo shares the snapotter.com zone, so anything Cloudflare injects
+      # at the edge for the zone lands here too (#793).
+      - name: Verify the live site loads nothing third-party
+        run: node scripts/check-live-egress.mjs https://demo.snapotter.com/
