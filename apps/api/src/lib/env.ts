@@ -1,6 +1,6 @@
 import { availableParallelism } from "node:os";
 import { z } from "zod";
-import { DEFAULT_TRUST_PROXY } from "./trust-proxy.js";
+import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
 
 const envSchema = z
   .object({
@@ -250,6 +250,18 @@ const envSchema = z
           message: "DATA_ENCRYPTION_KEY_PREVIOUS must be a 64-character hex string (32 bytes)",
         });
       }
+    }
+    // Reject a hop-count TRUST_PROXY here, before anything connects, rather
+    // than letting it throw out of Fastify() after migrations and Redis are
+    // already up. parseTrustProxy stays the single source of truth.
+    try {
+      parseTrustProxy(data.TRUST_PROXY);
+    } catch (err) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TRUST_PROXY"],
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   });
 

@@ -37,16 +37,37 @@ export const DEFAULT_TRUST_PROXY = "loopback,linklocal,uniquelocal";
 /**
  * Turn the raw TRUST_PROXY env string into a Fastify `trustProxy` value.
  *
- * Three forms, all of which proxy-addr understands:
+ * Two forms, both of which proxy-addr understands:
  *   "true" / "false" -> trust every peer / trust none
- *   a number         -> trust that many hops
  *   anything else    -> a comma-separated list of CIDRs or named ranges
  *                       ("loopback", "linklocal", "uniquelocal")
+ *
+ * A hop count (a bare number) used to be a third form. fastify 5.12.1
+ * (GHSA-3m5p-2c4r-xxw2) stopped honouring it: a hop count cannot validate the
+ * immediate peer, so a direct client could spoof X-Forwarded-* by supplying
+ * enough hops, and upstream now fails closed on a number. Passing one through
+ * would turn `TRUST_PROXY=2` into "trust no proxy" with no warning, collapsing
+ * every proxied client into one rate-limit bucket and keying the IP allowlist
+ * on the proxy. Refusing to boot with an actionable message is the honest
+ * failure, so a numeric value throws here.
+ *
+ * A blank value is an unset value rather than a hop count the operator chose
+ * (Zod's .default() only fires on undefined, so `TRUST_PROXY=` in a Compose
+ * file lands here). It used to parse as 0 hops, which proxy-addr treated as
+ * "trust no peer"; `false` keeps that fail-closed meaning.
  */
-export function parseTrustProxy(value: string): boolean | number | string {
+export function parseTrustProxy(value: string): boolean | string {
   if (value === "true") return true;
   if (value === "false") return false;
-  const asNum = Number(value);
-  if (!Number.isNaN(asNum)) return asNum;
+  if (value.trim() === "") return false;
+  if (!Number.isNaN(Number(value))) {
+    throw new Error(
+      `TRUST_PROXY=${value}: a hop count is no longer supported (fastify 5.12 fails closed on ` +
+        'it, see GHSA-3m5p-2c4r-xxw2). Use "false" when nothing proxies this instance, a ' +
+        `comma-separated list of CIDRs or named ranges such as "${DEFAULT_TRUST_PROXY}" to ` +
+        'name the proxies, or "true" only when a proxy you control sits in front on a public ' +
+        "address.",
+    );
+  }
   return value; // CIDR list
 }

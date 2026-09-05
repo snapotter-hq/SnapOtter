@@ -20,9 +20,24 @@ describe("parseTrustProxy", () => {
     expect(parseTrustProxy("false")).toBe(false);
   });
 
-  it("maps a numeric string to a hop count", () => {
-    expect(parseTrustProxy("1")).toBe(1);
-    expect(parseTrustProxy("3")).toBe(3);
+  it("rejects a hop count instead of letting Fastify silently trust nobody", () => {
+    // fastify 5.12.1 (GHSA-3m5p-2c4r-xxw2) stopped honouring numeric
+    // trustProxy: a hop count cannot validate the immediate peer, so a direct
+    // client could spoof X-Forwarded-* by supplying enough hops. Upstream now
+    // fails closed on a number, which would turn `TRUST_PROXY=2` into "trust no
+    // proxy at all" with no warning: every proxied client collapses into one
+    // rate-limit bucket and the IP allowlist keys on the proxy. Refusing to
+    // boot with an actionable message is the honest failure.
+    for (const value of ["1", "2", "3", "0", "1.5", "1e2", " 2", "2 "]) {
+      const attempt = () => parseTrustProxy(value);
+      expect(attempt, value).toThrow(`TRUST_PROXY=${value}:`);
+      expect(attempt, value).toThrow(/hop count/);
+      // Every replacement form is offered: "false" is what `0` meant, the
+      // list form names the proxies, "true" is the public-proxy case.
+      expect(attempt, value).toThrow(/"false"/);
+      expect(attempt, value).toThrow(/loopback,linklocal,uniquelocal/);
+      expect(attempt, value).toThrow(/"true"/);
+    }
   });
 
   it("passes a CIDR or named-range list through untouched", () => {
@@ -33,15 +48,15 @@ describe("parseTrustProxy", () => {
     expect(parseTrustProxy("127.0.0.1,192.168.1.0/24")).toBe("127.0.0.1,192.168.1.0/24");
   });
 
-  it("turns a blank value into zero hops, which trusts nothing", () => {
-    // Number("") and Number("   ") are both 0, so a blank TRUST_PROXY falls
-    // into the hop-count branch. Zod's .default() only fires on undefined, not
-    // on an empty string, so `TRUST_PROXY=` in a Compose file lands here.
-    // Pinned rather than "fixed": 0 hops means proxy-addr trusts no peer and
-    // request.ip stays the socket address, so the blank case already fails
-    // closed. Changing it would be a behaviour change dressed up as tidying.
-    expect(parseTrustProxy("")).toBe(0);
-    expect(parseTrustProxy("   ")).toBe(0);
+  it("turns a blank value into false, which trusts nothing", () => {
+    // Zod's .default() only fires on undefined, not on an empty string, so
+    // `TRUST_PROXY=` in a Compose file lands here. Before the hop-count form
+    // was rejected, Number("") gave 0 hops, which proxy-addr treated as "trust
+    // no peer". A blank value is an unset value rather than a hop count the
+    // operator chose, so it keeps that fail-closed meaning as `false`:
+    // request.ip stays the socket address.
+    expect(parseTrustProxy("")).toBe(false);
+    expect(parseTrustProxy("   ")).toBe(false);
   });
 });
 
@@ -59,7 +74,7 @@ describe("parseTrustProxy", () => {
 
 /** Resolve request.ip for a given trustProxy setting, peer, and forged header. */
 async function resolveIp(
-  trustProxy: boolean | number | string,
+  trustProxy: boolean | string,
   remoteAddress: string,
   forwardedFor?: string,
 ): Promise<string> {
@@ -135,5 +150,14 @@ describe("the old default is what made request.ip client-controlled", () => {
     // deployment into one rate-limit bucket keyed on the proxy.
     const ip = await resolveIp(parseTrustProxy("false"), "172.18.0.1", FORGED);
     expect(ip).toBe("172.18.0.1");
+  });
+
+  it("fastify itself fails closed on a numeric trustProxy, which is why the parser rejects it", async () => {
+    // Pins the upstream behaviour the hop-count rejection exists for. If a
+    // future fastify honours hop counts again, or throws on them, the guard
+    // in parseTrustProxy should change shape and this is what says so.
+    const ip = await resolveIp(2 as never, "172.18.0.1", FORGED);
+    expect(ip).toBe("172.18.0.1");
+    expect(ip).not.toBe(FORGED);
   });
 });

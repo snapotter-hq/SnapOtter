@@ -43,10 +43,14 @@ function composeEnv(relativePath: string, service: string): Map<string, string> 
   return map;
 }
 
-/** The forms `parseTrustProxy` in apps/api/src/index.ts turns into something meaningful. */
-function classifyTrustProxy(value: string): "boolean" | "hops" | "cidr-list" {
+/**
+ * The forms `parseTrustProxy` in apps/api/src/lib/trust-proxy.ts turns into
+ * something meaningful. A bare number used to be a third form (a hop count);
+ * fastify 5.12 fails closed on it, so the parser now rejects it at boot.
+ */
+function classifyTrustProxy(value: string): "boolean" | "rejected-hop-count" | "cidr-list" {
   if (value === "true" || value === "false") return "boolean";
-  if (!Number.isNaN(Number(value))) return "hops";
+  if (!Number.isNaN(Number(value))) return "rejected-hop-count";
   return "cidr-list";
 }
 
@@ -73,7 +77,7 @@ describe("TRUST_PROXY default", () => {
   it("uses a form parseTrustProxy recognises", () => {
     const baked = /^\s*TRUST_PROXY=(\S+?)\s*\\?$/m.exec(dockerfile)?.[1];
     expect(baked).toBeDefined();
-    expect(["boolean", "hops", "cidr-list"]).toContain(classifyTrustProxy(baked as string));
+    expect(["boolean", "cidr-list"]).toContain(classifyTrustProxy(baked as string));
   });
 
   it("pins the shipped default so a change to it is deliberate", () => {

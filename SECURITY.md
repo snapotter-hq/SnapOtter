@@ -166,7 +166,8 @@ The default is `loopback,linklocal,uniquelocal`, so only a peer on a private net
 | `false` | Nobody. `request.ip` is always the socket peer | You want header handling off entirely and accept that a proxied deployment shares one rate-limit bucket |
 | `true` | Anyone who connects | Only when a proxy you control sits in front on a **public** address. Never on a directly exposed instance |
 | `10.0.0.5,192.0.2.7` or a CIDR list | Exactly the peers you name | You want to name your proxies rather than trust a whole range |
-| A number, e.g. `2` | The client is taken that many hops from the right of the chain | A known, fixed depth of proxies |
+
+A bare number (a hop count) is no longer accepted; see the upgrade note below.
 
 Setting `true` on an instance that is reachable directly makes `request.ip` attacker-controlled: a caller who rotates the header gets a fresh rate-limit bucket on every request, which removes brute-force protection from the login route and makes the IP allowlist bypassable.
 
@@ -180,6 +181,12 @@ On Docker Desktop (macOS and Windows) a published port is served through a userl
 No value of `TRUST_PROXY` recovers the real client address on that platform, because it is discarded before the application sees it. Docker Desktop is a development target. Deploy on Linux, where published ports use NAT and the real source address survives, and put a reverse proxy in front for anything internet-facing.
 
 ## Upgrade notes
+
+### Hop counts in `TRUST_PROXY` are rejected
+
+fastify 5.12.1 stopped honouring a numeric `trustProxy` (GHSA-3m5p-2c4r-xxw2): a hop count cannot validate the immediate peer, so a client connecting directly could spoof `X-Forwarded-For` by supplying enough hops. Upstream now fails closed on a number, which would have turned `TRUST_PROXY=2` into "trust no proxy" with no warning. SnapOtter refuses to start on a numeric value instead and says so in the log.
+
+If you had a hop count configured, replace it with one of the forms in the table above: `false` when nothing proxies this instance (the old `0`), a comma-separated list of addresses, CIDRs, or the named ranges (`loopback,linklocal,uniquelocal`) to name the proxies, or `true` when a proxy you control reaches SnapOtter from a public address.
 
 ### Client IP resolution changed (`TRUST_PROXY`)
 

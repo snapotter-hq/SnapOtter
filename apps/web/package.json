@@ -24,7 +24,7 @@
     "jszip": "^3.10.1",
     "konva": "^10",
     "lucide-react": "^0.577.0",
-    "pdfjs-dist": "^6.1.200",
+    "pdfjs-dist": "^6.2.108",
     "posthog-js": "^1.404.1",
     "qr-code-styling": "^1.9.2",
     "react": "^19.2.7",

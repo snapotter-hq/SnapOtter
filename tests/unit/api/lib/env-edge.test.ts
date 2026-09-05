@@ -105,3 +105,20 @@ describe("worker sizing helpers", () => {
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0 })).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("loadEnv TRUST_PROXY validation", () => {
+  it("rejects a hop count at env-parse time, before anything connects", () => {
+    // fastify 5.12 fails closed on a numeric trustProxy (GHSA-3m5p-2c4r-xxw2),
+    // so the value is refused here rather than thrown out of Fastify() after
+    // migrations and Redis are already up. The message carries the fix.
+    expectLoadEnvError({ TRUST_PROXY: "2" }, "TRUST_PROXY=2: a hop count is no longer supported");
+  });
+
+  it("still accepts the boolean and list forms", () => {
+    restoreEnv();
+    for (const value of ["true", "false", "loopback,linklocal,uniquelocal", "10.0.0.0/8"]) {
+      process.env.TRUST_PROXY = value;
+      expect(loadEnv().TRUST_PROXY, value).toBe(value);
+    }
+  });
+});
