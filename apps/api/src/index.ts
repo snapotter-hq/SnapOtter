@@ -343,6 +343,14 @@ const app = Fastify({
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
   routerOptions: { maxParamLength: 500 },
+  // Up to 5.11.0 fastify's default ("idle") closed every connection at
+  // app.close(), so shutdown() returned at once. 5.11.1 made "idle" honour
+  // in-flight requests, and Node's server.close() only reaps connections that
+  // are idle at that instant: a keep-alive socket finishing a response a tick
+  // later lingers until Node's 30s connection sweep, which is the same length
+  // as SHUTDOWN_TIMEOUT_MS and would starve the worker and dispatcher
+  // teardown below. Keep the pre-5.11.1 behaviour explicit.
+  forceCloseConnections: true,
   // Self-hosted boots can be slow: venv bootstrap, AI-model verification, and
   // SPA static serving all touch disk, and some deployments sit on slow or
   // contended volumes. avvio's default 10s pluginTimeout fataled boot at

@@ -146,6 +146,10 @@ export async function buildTestApp(): Promise<TestApp> {
     // Mirrors index.ts: find-my-way otherwise 414s any route param over 100
     // chars, hiding prod-reachable long-parameter behavior from tests.
     routerOptions: { maxParamLength: 500 },
+    // Mirrors index.ts. Without it a test that listens on a real port and
+    // fetches with keep-alive can hang cleanup() for Node's 30s connection
+    // sweep when app.close() lands a tick before the last response finishes.
+    forceCloseConnections: true,
   });
 
   // Plugins
