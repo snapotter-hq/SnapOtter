@@ -6,13 +6,16 @@
  * SP metadata, the login redirect, and the ACS callback's provisioning,
  * session, denial, and MFA branches. Follows the enterprise-gated integration
  * pattern: reset modules, doMock the enterprise gate + @node-saml + mfa, then
- * import buildTestApp so it registers the (licensed) SAML routes.
+ * import buildTestApp so it registers the (licensed) SAML routes. The
+ * external-auth resolver stays real behind a passthrough wrapper that two
+ * tests (#978) use to make one call throw.
  */
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 // Hoisted so the vi.mock factories (which vitest hoists above the imports) can
@@ -30,6 +33,27 @@ const mfaOutcomeMock = vi.hoisted(() => vi.fn(() => "proceed"));
 // "unavailable" sentinel to the outcome resolver, which denies unenrolled
 // users with a distinct retryable error instead of waving them through.
 const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+
+// resolveExternalUser stays REAL by default. The #978 tests swap in a throw for
+// one call each: the retry-exhaustion error the resolver raises after three
+// lost username races (not worth staging against a real DB) and a plain fault
+// that must keep surfacing as a 500.
+const resolverFailure = vi.hoisted(() => ({ next: null as Error | null }));
+vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  const realResolve = actual.resolveExternalUser as (...args: unknown[]) => Promise<unknown>;
+  return {
+    ...actual,
+    resolveExternalUser: async (...args: unknown[]) => {
+      const err = resolverFailure.next;
+      if (err) {
+        resolverFailure.next = null;
+        throw err;
+      }
+      return realResolve(...args);
+    },
+  };
+});
 
 vi.mock("@node-saml/node-saml", () => ({
   ValidateInResponseTo: { ifPresent: "ifPresent", always: "always", never: "never" },
@@ -93,6 +117,12 @@ afterAll(async () => {
   }
   await testApp.cleanup();
 }, 10_000);
+
+afterEach(() => {
+  // An armed throw is consumed only if the ACS route reaches the resolver;
+  // never let one leak into the next test.
+  resolverFailure.next = null;
+});
 
 function postCallback() {
   return testApp.app.inject({
@@ -253,6 +283,52 @@ describe("SAML callback", () => {
     } finally {
       (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
     }
+  });
+
+  it("redirects to saml_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
+    const email = `raced-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    resolverFailure.next = new UsernameRaceExhaustedError("saml", "raced", 3);
+
+    const res = await postCallback();
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+    const setCookie = res.headers["set-cookie"];
+    expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+
+    // Exhaustion gets the same audit trail as every other terminal denial.
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'auto_create_race_exhausted' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
+      );
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0].details).toMatchObject({ attemptedUsername: email.split("@")[0] });
+  });
+
+  it("still surfaces any other resolver throw as a 500 with no misclassified audit row", async () => {
+    // The catch is narrow on purpose: only the resolver's own retry-exhaustion
+    // signal is a login outcome. A fault (DB down, a leaked constraint error)
+    // must keep reaching the global handler instead of being audited as a race.
+    const email = `fault-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    resolverFailure.next = new Error("simulated resolver fault");
+
+    const res = await postCallback();
+
+    expect(res.statusCode).toBe(500);
+    expect(res.headers.location).toBeUndefined();
+    const setCookie = res.headers["set-cookie"];
+    expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
+      );
+    expect(auditRows).toHaveLength(0);
   });
 
   it("fails the login closed when the MFA enrollment-status read throws", async () => {

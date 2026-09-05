@@ -7,13 +7,15 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
-import { auditFromRequest } from "../lib/audit.js";
+import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import {
+  type ExternalAuthResult,
   findUniqueUsername,
   resolveExternalUser,
   sanitizeUsername,
+  UsernameRaceExhaustedError,
 } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
 import { makeRedisSamlCacheProvider } from "../lib/saml-cache.js";
@@ -148,19 +150,48 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
       username = await findUniqueUsername(username);
 
       // Resolve user via shared external-auth resolver
-      const result = await resolveExternalUser({
-        provider: "saml",
-        externalId,
-        email,
-        emailVerified: true, // SAML assertions from a trusted IdP are considered verified
-        username,
-        autoCreate: env.SAML_AUTO_CREATE_USERS,
-        autoLink: env.SAML_AUTO_LINK_USERS,
-        defaultRole: env.SAML_DEFAULT_ROLE,
-        logger: request.log,
-        ip: request.ip,
-        requestId: request.id,
-      });
+      let result: ExternalAuthResult;
+      try {
+        result = await resolveExternalUser({
+          provider: "saml",
+          externalId,
+          email,
+          emailVerified: true, // SAML assertions from a trusted IdP are considered verified
+          username,
+          autoCreate: env.SAML_AUTO_CREATE_USERS,
+          autoLink: env.SAML_AUTO_LINK_USERS,
+          defaultRole: env.SAML_DEFAULT_ROLE,
+          logger: request.log,
+          ip: request.ip,
+          requestId: request.id,
+        });
+      } catch (err) {
+        // Losing the username race on every retry is a login outcome, not a
+        // server fault (#978): the user lands on the login page with an error
+        // like every other denial instead of a bare 500 mid-redirect. Anything
+        // else the resolver throws is a fault and keeps surfacing as one.
+        if (!(err instanceof UsernameRaceExhaustedError)) throw err;
+        request.log.error(
+          { err, externalId },
+          "SAML callback: auto-create exhausted its username-race retries",
+        );
+        // Caught here, the error never reaches the global handler's
+        // reportError; report explicitly so the contention stays visible.
+        void reportError(err, {
+          source: "http",
+          route: request.routeOptions?.url,
+          method: request.method,
+          subsystem: "external-auth",
+        });
+        authAttempts.inc({ method: "saml", result: "failure" });
+        await audit("SAML_LOGIN_FAILED", {
+          reason: "auto_create_race_exhausted",
+          externalId: sanitizeAuditInput(String(externalId)),
+          // Not `username`: auditLog reads that key as the actor.
+          attemptedUsername: username,
+        });
+        return redirectToLogin(reply, "saml_auth_failed");
+      }
 
       if (result.action === "denied" || !result.user) {
         authAttempts.inc({ method: "saml", result: "failure" });

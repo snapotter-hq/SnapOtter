@@ -17,11 +17,14 @@
  *   - the optional-MFA-plugin catch (oidc.ts:325-327): the MFA policy lookup
  *     throwing must fail *open* (login proceeds) because MFA is an optional
  *     enterprise plugin.
+ *   - the resolver's retry-exhaustion throw (#978): caught and turned into a
+ *     login failure, while any other resolver throw still surfaces as a 500.
  *
  * Like oidc-mfa-callback.test.ts, the cryptographic token exchange is mocked
  * at the `openid-client` boundary (only `authorizationCodeGrant`; discovery,
  * PKCE, and URL building stay real) so the REAL callback route, REAL signed
- * state cookie, REAL resolver, and REAL session creation run end to end.
+ * state cookie, REAL resolver (passthrough-wrapped so two tests can make it
+ * throw), and REAL session creation run end to end.
  *
  * This is a new sibling rather than an extension of oidc-auth.test.ts on
  * purpose: that file drives real login handshakes whose token exchange is
@@ -31,7 +34,7 @@
  */
 import { createServer, type Server } from "node:http";
 import { sign } from "@fastify/cookie";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const authorizationCodeGrantMock = vi.hoisted(() => vi.fn());
@@ -49,11 +52,35 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
   return { ...actual, trackEvent: trackEventSpy };
 });
 
+// resolveExternalUser stays REAL by default. The #978 tests swap in a throw for
+// one call each: the retry-exhaustion error the resolver raises after three
+// lost username races (three different identities taking the scanned name
+// between scan and insert, which isn't worth staging against a real DB), and a
+// plain fault that must keep surfacing as a 500.
+const resolverFailure = vi.hoisted(() => ({ next: null as Error | null }));
+vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  const realResolve = actual.resolveExternalUser as (...args: unknown[]) => Promise<unknown>;
+  return {
+    ...actual,
+    resolveExternalUser: async (...args: unknown[]) => {
+      const err = resolverFailure.next;
+      if (err) {
+        resolverFailure.next = null;
+        throw err;
+      }
+      return realResolve(...args);
+    },
+  };
+});
+
 vi.resetModules();
 
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
-const { sanitizeUsername } = await import("../../../apps/api/src/lib/external-auth-resolver.js");
+const { sanitizeUsername, UsernameRaceExhaustedError } = await import(
+  "../../../apps/api/src/lib/external-auth-resolver.js"
+);
 const mfaModule = await import("../../../apps/api/src/plugins/mfa.js");
 const { buildTestApp } = await import("../test-server.js");
 
@@ -237,6 +264,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   afterEach(() => {
     authorizationCodeGrantMock.mockReset();
     trackEventSpy.mockClear();
+    resolverFailure.next = null;
     // Reset the knobs individual tests tweak back to the describe defaults.
     (env as any).OIDC_AUTO_CREATE_USERS = true;
     (env as any).OIDC_USERNAME_CLAIM = "preferred_username";
@@ -376,6 +404,49 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(res.headers.location).toBe("/login?error=oidc_user_limit_reached");
     expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
     expect(await findUserByExternalId(sub)).toBeUndefined();
+  });
+
+  it("redirects to oidc_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
+    const sub = `sub-raced-${Math.random().toString(36).slice(2, 10)}`;
+    resolverFailure.next = new UsernameRaceExhaustedError("oidc", "raced", 3);
+    const res = await callbackWithClaims({ sub, preferred_username: "raced" });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login?error=oidc_auth_failed");
+    expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
+    const setCookie = res.headers["set-cookie"];
+    expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+
+    // Exhaustion gets the same audit trail as every other terminal denial.
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'auto_create_race_exhausted' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
+      );
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0].details).toMatchObject({ attemptedUsername: "raced" });
+  });
+
+  it("still surfaces any other resolver throw as a 500 with no misclassified audit row", async () => {
+    // The catch is narrow on purpose: only the resolver's own retry-exhaustion
+    // signal is a login outcome. A fault (DB down, a leaked constraint error)
+    // must keep reaching the global handler instead of being audited as a race.
+    const sub = `sub-fault-${Math.random().toString(36).slice(2, 10)}`;
+    resolverFailure.next = new Error("simulated resolver fault");
+    const res = await callbackWithClaims({ sub, preferred_username: "faulty" });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.headers.location).toBeUndefined();
+    const setCookie = res.headers["set-cookie"];
+    expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
+      );
+    expect(auditRows).toHaveLength(0);
   });
 
   it("fails closed with a distinct error when the MFA policy lookup throws (#815)", async () => {

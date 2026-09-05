@@ -28,6 +28,18 @@ export interface ExternalAuthResult {
   deniedReason?: "user_not_authorized" | "user_limit_reached" | "user_disabled";
 }
 
+/**
+ * Auto-create lost the username race on every retry. The SSO callbacks catch
+ * this one type and turn it into a login failure (issue #978); any other
+ * throw out of the resolver is a fault and keeps surfacing as one.
+ */
+export class UsernameRaceExhaustedError extends Error {
+  constructor(provider: string, username: string, attempts: number) {
+    super(`${provider} auto-create lost the username race ${attempts} times for "${username}"`);
+    this.name = "UsernameRaceExhaustedError";
+  }
+}
+
 // ── Username helpers ──────────────────────────────────────────────
 
 export function sanitizeUsername(raw: string): string {
@@ -286,9 +298,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       // A different user took the name; rescan and retry.
     }
 
-    throw new Error(
-      `${provider} auto-create lost the username race ${MAX_USERNAME_RACE_RETRIES} times for "${username}"`,
-    );
+    throw new UsernameRaceExhaustedError(provider, username, MAX_USERNAME_RACE_RETRIES);
   }
 
   // 4. Denied: no matching user, auto-link did not match, auto-create disabled

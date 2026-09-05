@@ -118,7 +118,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
   };
 });
 
-import { resolveExternalUser } from "../../../apps/api/src/lib/external-auth-resolver.js";
+import {
+  resolveExternalUser,
+  UsernameRaceExhaustedError,
+} from "../../../apps/api/src/lib/external-auth-resolver.js";
 
 function makeLogger() {
   return { info: vi.fn(), warn: vi.fn() };
@@ -471,9 +474,11 @@ describe("resolveExternalUser: auto-create username race", () => {
       [{ id: "team-default" }], // attempt 3: team
       [], // attempt 3: re-check miss
     ];
-    await expect(resolveExternalUser(baseParams({ autoCreate: true }))).rejects.toThrow(
-      /username race/,
-    );
+    const exhausted = resolveExternalUser(baseParams({ autoCreate: true }));
+    await expect(exhausted).rejects.toThrow(/username race/);
+    // The SSO callbacks catch this one error by type (issue #978), so the
+    // resolver has to keep throwing exactly it, not a plain Error.
+    await expect(exhausted).rejects.toBeInstanceOf(UsernameRaceExhaustedError);
     expect(state.inserts).toHaveLength(3);
   });
 });
