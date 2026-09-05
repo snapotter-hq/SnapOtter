@@ -292,7 +292,11 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       }
 
       if (inserted === "limit") {
-        logger.warn(`${provider} auto-create blocked: user limit reached`);
+        logger.warn({ externalId, email }, `${provider} auto-create blocked: user limit reached`);
+        await audit(`${providerUpper}_LOGIN_FAILED`, {
+          reason: "user_limit_reached",
+          externalId: sanitizeAuditInput(String(externalId)),
+        });
         return { user: null, action: "denied", deniedReason: "user_limit_reached" };
       }
       // A different user took the name; rescan and retry.

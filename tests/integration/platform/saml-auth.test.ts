@@ -280,6 +280,15 @@ describe("SAML callback", () => {
         .from(schema.users)
         .where(eq(schema.users.externalId, email));
       expect(created).toBeUndefined();
+
+      // The denial leaves an audit row like every other one (issue #967).
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'user_limit_reached' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
+        );
+      expect(auditRows).toHaveLength(1);
     } finally {
       (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
     }

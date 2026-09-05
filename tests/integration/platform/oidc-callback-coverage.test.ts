@@ -404,6 +404,15 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(res.headers.location).toBe("/login?error=oidc_user_limit_reached");
     expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
     expect(await findUserByExternalId(sub)).toBeUndefined();
+
+    // The denial leaves an audit row like every other one (issue #967).
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'user_limit_reached' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
+      );
+    expect(auditRows).toHaveLength(1);
   });
 
   it("redirects to oidc_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {

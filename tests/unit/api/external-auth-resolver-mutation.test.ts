@@ -343,9 +343,52 @@ describe("resolveExternalUser: auto-create", () => {
       [{ id: "team-default" }], // Default team lookup
       [{ count: 5 }], // locked count: exactly at the cap (>= limit)
     ];
-    const result = await resolveExternalUser(baseParams({ autoCreate: true }));
+    const logger = makeLogger();
+    const result = await resolveExternalUser(
+      baseParams({
+        autoCreate: true,
+        externalId: "ext<cap>1",
+        email: "capped@example.com",
+        logger: logger as never,
+      }),
+    );
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_limit_reached" });
     expect(state.inserts).toHaveLength(0);
+    // Mirrors the user_not_authorized terminal (issue #967): an audit row with
+    // the sanitized externalId, plus a warn naming who was turned away.
+    expect(state.auditCalls.at(-1)).toEqual({
+      event: "OIDC_LOGIN_FAILED",
+      details: { reason: "user_limit_reached", externalId: "extcap1" },
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      { externalId: "ext<cap>1", email: "capped@example.com" },
+      expect.stringContaining("user limit reached"),
+    );
+  });
+
+  it("joins the concurrent winner at the cap without auditing a denial", async () => {
+    // Two tabs of one new identity finish first login at once while the
+    // instance sits at the cap: the loser's insert is refused by the limit,
+    // but the winner re-check finds the row this same identity just created,
+    // so the login is "matched". The limit audit must stay behind that
+    // re-check or this success would leave a false LOGIN_FAILED row.
+    state.maxUsers = 5;
+    const logger = makeLogger();
+    state.selectRows = [
+      [], // extId miss
+      [], // username free
+      [{ id: "team-default" }], // Default team lookup
+      [{ count: 5 }], // locked count: at the cap
+      [dbUser({ id: "u-winner", username: "alice", role: "user", team: "team-default" })],
+    ];
+    const result = await resolveExternalUser(
+      baseParams({ autoCreate: true, logger: logger as never }),
+    );
+    expect(result.action).toBe("matched");
+    expect(result.user?.id).toBe("u-winner");
+    expect(state.inserts).toHaveLength(0);
+    expect(state.auditCalls).toHaveLength(0);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("allows auto-create when the count is one below the limit (boundary)", async () => {
