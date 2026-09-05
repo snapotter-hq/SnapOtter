@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
 import { isDisabledRole } from "../permissions.js";
@@ -125,12 +125,16 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
     };
   }
 
-  // 2. Auto-link by email
+  // 2. Auto-link by email. Nothing makes email unique, so when several rows
+  // carry it the pick has to be deterministic: two logins of one identity
+  // racing here must land on the same row, or the second one's link would
+  // trip the (auth_provider, external_id) index (issue #969). Oldest wins.
   if (autoLink && email && emailVerified) {
     const [existingByEmail] = await db
       .select()
       .from(schema.users)
       .where(eq(schema.users.email, email))
+      .orderBy(asc(schema.users.createdAt), asc(schema.users.id))
       .limit(1);
 
     if (existingByEmail) {
@@ -181,7 +185,11 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
 
     // The username scan can't close the race: two concurrent logins both
     // pass it before either insert commits (issue #927), so the insert
-    // carries a conflict guard and the loser recovers below.
+    // carries a conflict guard and the loser recovers below. The guard is
+    // unqualified on purpose: it has to cover both the username constraint
+    // and the (auth_provider, external_id) index that refuses a second
+    // account for one identity (issue #969). The only other constraint on
+    // the table is the primary key, on a fresh UUID.
     const MAX_USERNAME_RACE_RETRIES = 3;
     for (let attempt = 0; attempt < MAX_USERNAME_RACE_RETRIES; attempt++) {
       const uniqueUsername = await findUniqueUsername(username);
@@ -213,7 +221,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
             externalId,
             email: email ?? null,
           })
-          .onConflictDoNothing({ target: schema.users.username });
+          .onConflictDoNothing();
       });
 
       if (inserted !== "limit" && inserted.rowCount) {
@@ -236,16 +244,19 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       }
 
       if (inserted !== "limit") {
+        // The guard is unqualified, so this does not say which constraint
+        // refused: the username (issue #927) or the identity (issue #969).
         logger.info(
           { attempt: attempt + 1, username: uniqueUsername },
-          `${provider} auto-create lost a username race, recovering`,
+          `${provider} auto-create refused by a unique constraint (username or identity), recovering`,
         );
       }
 
-      // Create refused: the username raced (issue #927) or the cap is
-      // reached (issue #928). Either way this same external identity may
-      // have just won a concurrent login (say, two tabs finishing first
-      // login at once); hand back the winner's user instead of failing it.
+      // Create refused: the username raced (issue #927), this identity
+      // already has its row (issue #969), or the cap is reached (issue
+      // #928). In each case this same external identity may have just won
+      // a concurrent login (say, two tabs finishing first login at once);
+      // hand back the winner's user instead of failing it.
       const [winner] = await db
         .select()
         .from(schema.users)

@@ -54,9 +54,10 @@ vi.mock("../../../apps/api/src/lib/audit.js", () => ({
 }));
 
 // A select chain that is both awaitable and chainable through
-// .from()/.where()/.limit(). resolveExternalUser awaits the terminal at three
-// different depths (.limit(1) for id/email matches, .from() for the COUNT, and
-// .where() for the username/team lookups), so every level is a thenable. Only
+// .from()/.where()/.orderBy()/.limit(). resolveExternalUser awaits the terminal
+// at three different depths (.limit(1) for id/email matches, .from() for the
+// COUNT, and .where() for the username/team lookups), so every level is a
+// thenable. Only
 // the terminal await consumes one canned row set (settle() increments the index
 // lazily), which keeps call-order pulls correct across the mixed shapes.
 function makeSelectChain() {
@@ -67,6 +68,7 @@ function makeSelectChain() {
   const node: Record<string, unknown> = {
     from: () => node,
     where: () => node,
+    orderBy: () => node,
     limit: () => settle(),
     // biome-ignore lint/suspicious/noThenProperty: intentional thenable mocking an awaitable Drizzle query builder
     then: (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -405,6 +407,30 @@ describe("resolveExternalUser: auto-create username race", () => {
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
     expect(state.auditCalls.at(-1)?.event).toBe("OIDC_LOGIN_FAILED");
+  });
+
+  it("joins the winner when the scan picked a suffixed name and the identity index refused the insert", async () => {
+    // Issue #969: the loser stalled after the externalId miss, so by the time
+    // its scan ran the winner's "alice" was committed and it went for
+    // "alice_2". Only the (auth_provider, external_id) index can refuse that
+    // insert, and the recovery has to land on the winner, not rescan.
+    state.insertRowCounts = [0];
+    state.selectRows = [
+      [], // extId miss
+      [{ username: "alice" }], // scan: base taken by the winner
+      [], // scan: alice_2 free
+      [{ id: "team-default" }],
+      [dbUser({ id: "u-winner", username: "alice", role: "user", team: "team-default" })], // winner re-check
+    ];
+    const result = await resolveExternalUser(baseParams({ autoCreate: true }));
+
+    expect(state.inserts).toHaveLength(1);
+    expect(state.inserts[0].username).toBe("alice_2");
+    expect(result).toEqual({
+      user: { id: "u-winner", username: "alice", role: "user", team: "team-default" },
+      action: "matched",
+    });
+    expect(state.auditCalls.map((c) => c.event)).not.toContain("OIDC_USER_CREATED");
   });
 
   it("re-runs the username scan and creates when a different user took the name", async () => {

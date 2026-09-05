@@ -57,6 +57,13 @@
       "when": 1788439313579,
       "tag": "0007_needy_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788594225746,
+      "tag": "0008_users_identity_unique",
+      "breakpoints": true
     }
   ]
 }

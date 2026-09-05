@@ -396,7 +396,10 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       // same create twice, and both pass the SELECT before either insert
       // commits (issue #927). MAX_USERS binds provisioning too (issue #966):
       // the locked count and the insert share one transaction, same as the
-      // register route, so concurrent creates can't overshoot the cap.
+      // register route, so concurrent creates can't overshoot the cap. The
+      // guard is unqualified so it also covers the (auth_provider,
+      // external_id) index (issue #969): a retry under a fresh userName but
+      // the same externalId is the same identity, and gets the same 409.
       const inserted = await db.transaction(async (tx) => {
         if (await userLimitReached(tx)) return "limit" as const;
         return tx
@@ -413,7 +416,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             createdAt: now,
             updatedAt: now,
           })
-          .onConflictDoNothing({ target: schema.users.username });
+          .onConflictDoNothing();
       });
 
       if (inserted === "limit") {

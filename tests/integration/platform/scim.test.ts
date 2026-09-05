@@ -935,6 +935,34 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.authProvider).toBe("scim");
     });
 
+    it("refuses a second create carrying an already-provisioned externalId with the SCIM 409 envelope", async () => {
+      // Issue #969: only the (auth_provider, external_id) index stops an IdP
+      // retry under a fresh userName from minting a second account for one
+      // identity. The insert guard is unqualified so that refusal lands as
+      // the pre-check's 409 rather than a 500.
+      const externalId = uniqueName("scim-dup-ext");
+      const first = await createScimUser({ userName: uniqueName("scim-dup-a"), externalId });
+
+      const res = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: { userName: uniqueName("scim-dup-b"), externalId },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "User already exists",
+      });
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, externalId));
+      expect(rows.map((r) => r.id)).toEqual([first.id]);
+    });
+
     it("creates a disabled user when active is false and falls back to the first email", async () => {
       const username = uniqueName("scim-create-inactive");
       const res = await crudApp.app.inject({

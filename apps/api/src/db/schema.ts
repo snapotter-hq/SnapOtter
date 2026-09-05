@@ -21,29 +21,42 @@ export const jobStatus = pgEnum("job_status", [
   "canceled",
 ]);
 
-export const users = pgTable("users", {
-  id: text("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  passwordHash: text("password_hash"),
-  role: text("role").notNull().default("user"),
-  team: text("team").notNull().default("Default"),
-  mustChangePassword: boolean("must_change_password").notNull().default(true),
-  authProvider: text("auth_provider").notNull().default("local"),
-  externalId: text("external_id"),
-  email: text("email"),
-  legalHold: boolean("legal_hold").notNull().default(false),
-  storageUsed: bigint("storage_used", { mode: "number" }).notNull().default(0),
-  storageQuota: bigint("storage_quota", { mode: "number" }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  totpSecret: text("totp_secret"),
-  totpEnabled: boolean("totp_enabled").notNull().default(false),
-  recoveryCodesHash: text("recovery_codes_hash"),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    username: text("username").notNull().unique(),
+    passwordHash: text("password_hash"),
+    role: text("role").notNull().default("user"),
+    team: text("team").notNull().default("Default"),
+    mustChangePassword: boolean("must_change_password").notNull().default(true),
+    authProvider: text("auth_provider").notNull().default("local"),
+    externalId: text("external_id"),
+    email: text("email"),
+    legalHold: boolean("legal_hold").notNull().default(false),
+    storageUsed: bigint("storage_used", { mode: "number" }).notNull().default(0),
+    storageQuota: bigint("storage_quota", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    totpSecret: text("totp_secret"),
+    totpEnabled: boolean("totp_enabled").notNull().default(false),
+    recoveryCodesHash: text("recovery_codes_hash"),
+  },
+  (table) => [
+    // One account per external identity. The resolver's lookup-then-insert
+    // can't close the race on its own (issue #969): a login that passes the
+    // identity lookup and stalls while its twin commits picks a suffixed
+    // username and inserts a row nothing else refuses. Partial so local
+    // accounts, which carry no external id, stay outside it.
+    uniqueIndex("users_auth_provider_external_id_unique")
+      .on(table.authProvider, table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
+  ],
+);
 
 export const teams = pgTable(
   "teams",
