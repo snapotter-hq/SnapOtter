@@ -1,59 +1,22 @@
 ---
-// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes these via define:vars + conditional render.
-// Minimal, opt-in landing analytics. Respects the site's near-zero-client-JS
-// ethos: no SDK, just a tiny inline $pageview capture to PostHog's endpoint,
-// and ONLY when PUBLIC_POSTHOG_KEY is set at build time (nothing is emitted to
-// the page otherwise). This is a STANDALONE acquisition funnel: a self-hosted
-// app instance mints its own anonymous id, so landing -> app cannot be joined;
-// correlate landing conversions to fleet growth via the app's instance_started
-// event instead. To track a CTA, add data-ph="event_name" to the element.
-const key = import.meta.env.PUBLIC_POSTHOG_KEY;
-const host = (import.meta.env.PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com").replace(/\/$/, "");
+// biome-ignore-all lint/correctness/noUnusedVariables: the Astro template below consumes `script` via set:html.
+// Full PostHog web SDK for the landing site, loaded through the e.snapotter.com
+// proxy: autocapture, session replay, heatmaps, dead clicks, web vitals. What
+// gets captured is decided in packages/shared/src/analytics/public-site.ts and
+// shared with the docs site. Emitted ONLY when PUBLIC_POSTHOG_KEY is set at
+// build time (the deploy workflow passes it), so forks, PR previews and the
+// Playwright build carry nothing. To track a CTA, add data-ph="event_name" to
+// the element.
+//
+// This is a STANDALONE acquisition funnel: a self-hosted app instance mints its
+// own anonymous id, so landing -> app cannot be joined; correlate landing
+// conversions to fleet growth via the app's instance_started event instead.
+import { publicSiteAnalyticsScript } from "@snapotter/shared";
+
+const script = publicSiteAnalyticsScript({
+  key: import.meta.env.PUBLIC_POSTHOG_KEY ?? "",
+  host: import.meta.env.PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+});
 ---
 
-{
-  key && (
-    <script is:inline define:vars={{ key, host }}>
-      (function () {
-        try {
-          var id = localStorage.getItem("ph_did");
-          if (!id) {
-            id =
-              (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
-              Date.now().toString(36) + Math.random().toString(36).slice(2);
-            localStorage.setItem("ph_did", id);
-          }
-          function send(event, props) {
-            var body = JSON.stringify({
-              api_key: key,
-              event: event,
-              distinct_id: id,
-              properties: Object.assign(
-                // origin + pathname only: never the query string (no PII).
-                { $current_url: location.origin + location.pathname },
-                props || {},
-              ),
-            });
-            var url = host + "/capture/";
-            if (navigator.sendBeacon) {
-              navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
-            } else {
-              fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: body,
-                keepalive: true,
-              });
-            }
-          }
-          send("$pageview");
-          // Opt-in CTA tracking: <a data-ph="download_click"> etc.
-          document.addEventListener("click", function (e) {
-            var el = e.target && e.target.closest ? e.target.closest("[data-ph]") : null;
-            if (el) send(el.getAttribute("data-ph"), {});
-          });
-        } catch (e) {}
-      })();
-    </script>
-  )
-}
+{script && <script is:inline set:html={script} />}

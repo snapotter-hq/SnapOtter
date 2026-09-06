@@ -135,6 +135,7 @@ const htmlDir = dirFor(locale);
 
     <!-- Structured data slot -->
     <slot name="head" />
+    <Analytics />
   </head>
   <body>
     <a href="#main" class="skip-link">{t(locale, "common.skipToContent")}</a>
@@ -162,6 +163,5 @@ const htmlDir = dirFor(locale);
         });
       })();
     </script>
-    <Analytics />
   </body>
 </html>

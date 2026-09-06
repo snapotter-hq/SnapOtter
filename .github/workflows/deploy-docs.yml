@@ -33,6 +33,11 @@ jobs:
           # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
           # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Full PostHog SDK through the first-party proxy (e.snapotter.com),
+          # same key and host as the landing deploy. Forks and PRs have no
+          # secret, so the head stays empty there.
+          PUBLIC_POSTHOG_KEY: ${{ secrets.SNAPOTTER_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: https://e.snapotter.com
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy apps/docs/.vitepress/dist --project-name snapotter-docs --branch main --commit-dirty=true

@@ -3,6 +3,7 @@ export * from "./analytics/error-sanitize.js";
 export * from "./analytics/events.js";
 export * from "./analytics/feedback.js";
 export * from "./analytics/proxy.js";
+export * from "./analytics/public-site.js";
 export { redactMessage } from "./analytics/redact-message.js";
 export * from "./analytics/types.js";
 export * from "./audit-events.js";

@@ -1,7 +1,8 @@
-import { defineConfig } from "vitepress";
+import { defineConfig, type HeadConfig } from "vitepress";
 import llmstxt from "vitepress-plugin-llms";
 import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
+import { publicSiteAnalyticsScript } from "../../../packages/shared/src/analytics/public-site.ts";
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
 import { buildJsonLd } from "./jsonld.mts";
@@ -9,6 +10,16 @@ import { pageOnlySidebar } from "./llms-sidebar.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
+
+// Full PostHog SDK, shared with the landing site. Emitted only when the deploy
+// workflow passes PUBLIC_POSTHOG_KEY, so local, fork and e2e builds carry
+// nothing. VitePress routes client-side; the shared config captures pageviews
+// on history changes for that reason.
+const analyticsScript = publicSiteAnalyticsScript({
+  key: process.env.PUBLIC_POSTHOG_KEY ?? "",
+  host: process.env.PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+});
+const analyticsHead: HeadConfig[] = analyticsScript ? [["script", {}, analyticsScript]] : [];
 
 // Matches a path whose first segment is one of the translated locales, with or
 // without a leading slash (VitePress hands transformItems a relative page path,
@@ -151,6 +162,7 @@ export default defineConfig({
   },
 
   head: [
+    ...analyticsHead,
     ["meta", { name: "theme-color", content: "#E07832" }],
     [
       "link",

@@ -13,7 +13,7 @@ export const POSTHOG_PROXY_PATH = "/ingest";
 
 // Trim trailing slashes without a regex: `/\/+$/` is a polynomial-ReDoS shape
 // (CodeQL js/polynomial-redos) on inputs with many trailing slashes.
-const stripTrailingSlash = (url: string): string => {
+export const stripTrailingSlash = (url: string): string => {
   let end = url.length;
   while (end > 0 && url.charCodeAt(end - 1) === 47) end--; // 47 = "/"
   return url.slice(0, end);
