@@ -52,3 +52,19 @@ jobs:
       # on purpose and allowlisted; anything else fails the run.
       - name: Verify the live site loads nothing third-party
         run: node scripts/check-live-egress.mjs https://docs.snapotter.com/ --allow https://static.cloudflareinsights.com
+
+      # Same guard as the landing deploy: the snippet is only emitted when the
+      # key reaches the build, so check the page visitors get. VitePress
+      # minifies the inline script, but the init call's string literal survives.
+      - name: Verify the live site carries the PostHog snippet
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS -H 'Accept: text/html' https://docs.snapotter.com/ | grep -q 'posthog.init("phc_'; then
+              echo "PostHog snippet is live"
+              exit 0
+            fi
+            echo "attempt $attempt: snippet not visible yet, waiting for Pages to propagate"
+            sleep 20
+          done
+          echo "::error::The deployed page has no posthog.init call. PUBLIC_POSTHOG_KEY was probably missing at build time."
+          exit 1

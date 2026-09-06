@@ -61,9 +61,11 @@ function inlineJson(value: unknown): string {
 
 /**
  * The script body both sites place in `<head>`. Empty when there is no key,
- * so forks, PR previews and the Playwright build emit nothing at all. CTA
- * clicks need no code of their own: autocapture records every click with the
- * element's text and href, and a named event is a PostHog Action on top.
+ * so forks and PR previews emit nothing at all (the landing Playwright build
+ * passes a placeholder key aimed at an unroutable host, so it can assert the
+ * snippet lands in every page). CTA clicks need no code of their own:
+ * autocapture records every click with the element's text and href, and a
+ * named event is a PostHog Action on top.
  */
 export function publicSiteAnalyticsScript(input: { key: string; host: string }): string {
   if (!input.key) return "";

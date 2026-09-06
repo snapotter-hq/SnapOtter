@@ -4,9 +4,11 @@
 // proxy: autocapture, session replay, heatmaps, dead clicks, web vitals. What
 // gets captured is decided in packages/shared/src/analytics/public-site.ts and
 // shared with the docs site. Emitted ONLY when PUBLIC_POSTHOG_KEY is set at
-// build time (the deploy workflow passes it), so forks, PR previews and the
-// Playwright build carry nothing. To track a CTA, add data-ph="event_name" to
-// the element.
+// build time (the deploy workflow passes it), so forks and PR previews carry
+// nothing; the Playwright harness passes a placeholder key aimed at an
+// unroutable host so tests/e2e-landing/analytics-snippet.spec.ts can check
+// the emitted pages. CTA clicks arrive through autocapture; name them as
+// PostHog Actions, no code needed.
 //
 // This is a STANDALONE acquisition funnel: a self-hosted app instance mints its
 // own anonymous id, so landing -> app cannot be joined; correlate landing

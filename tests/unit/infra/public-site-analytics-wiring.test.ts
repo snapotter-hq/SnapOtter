@@ -88,5 +88,17 @@ describe("both deploys", () => {
       const workflow = read(`.github/workflows/${file}`);
       expect(workflow).toContain('"packages/shared/src/analytics/public-site.ts"');
     });
+
+    it(`${file} checks the shipped page for the snippet after the egress guard`, () => {
+      // The key going missing from the build env is the failure that already
+      // happened once; a green deploy with dark analytics must not repeat it.
+      const workflow = read(`.github/workflows/${file}`);
+      const guard = workflow.indexOf("name: Verify the live site loads nothing third-party");
+      const smoke = workflow.indexOf("name: Verify the live site carries the PostHog snippet");
+      expect(guard).toBeGreaterThanOrEqual(0);
+      expect(smoke).toBeGreaterThan(guard);
+      expect(workflow.slice(smoke)).toContain('posthog.init("phc_');
+      expect(workflow.slice(smoke)).not.toMatch(/continue-on-error/);
+    });
   }
 });

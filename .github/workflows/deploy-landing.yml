@@ -83,3 +83,21 @@ jobs:
       # inline script, so it never shows up as a tag here.
       - name: Verify the live site loads nothing third-party
         run: node scripts/check-live-egress.mjs https://snapotter.com/ --allow https://static.cloudflareinsights.com
+
+      # The build emits PostHog only when PUBLIC_POSTHOG_KEY reaches it, and
+      # that gate once failed silently for months (the secret was missing from
+      # the build env, every page shipped without analytics, nothing went red).
+      # So look at the page visitors get. Pages propagation can lag the deploy
+      # by a few seconds, hence the retries.
+      - name: Verify the live site carries the PostHog snippet
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS -H 'Accept: text/html' https://snapotter.com/ | grep -q 'posthog.init("phc_'; then
+              echo "PostHog snippet is live"
+              exit 0
+            fi
+            echo "attempt $attempt: snippet not visible yet, waiting for Pages to propagate"
+            sleep 20
+          done
+          echo "::error::The deployed page has no posthog.init call. PUBLIC_POSTHOG_KEY was probably missing at build time."
+          exit 1
