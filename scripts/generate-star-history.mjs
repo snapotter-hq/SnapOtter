@@ -11,6 +11,7 @@
 //   STAR_HISTORY_OUT          output path (default branding/star-history.svg)
 
 import { writeFileSync } from "node:fs";
+import { escapeXml } from "./lib/xml-escape.mjs";
 
 const REPO = process.env.STAR_HISTORY_REPO ?? "snapotter-hq/SnapOtter";
 const OUT = process.env.STAR_HISTORY_OUT ?? "branding/star-history.svg";
@@ -121,10 +122,6 @@ function samplePoints(times, maxPoints) {
   return pts;
 }
 
-function esc(s) {
-  return String(s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]);
-}
-
 function render(times) {
   const n = times.length;
   const xMin = times[0];
@@ -165,7 +162,7 @@ function render(times) {
   const lastY = yPx(last.y);
   const fontStack = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" font-family="${fontStack}" role="img" aria-label="Star history for ${esc(REPO)}: ${nf.format(n)} stars">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" font-family="${fontStack}" role="img" aria-label="Star history for ${escapeXml(REPO)}: ${nf.format(n)} stars">
   <defs>
     <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${COLOR.line}" stop-opacity="0.28"/>

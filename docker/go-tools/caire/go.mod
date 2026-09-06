@@ -7,4 +7,7 @@ require (
 	golang.org/x/image v0.43.0
 )
 
-require golang.org/x/text v0.39.0 // indirect
+require (
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
+)

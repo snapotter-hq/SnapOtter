@@ -58,16 +58,26 @@ describe("Dockerfile build args", () => {
       "golang:1.25.12-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58";
     expect(dockerfile.split(goBuilder)).toHaveLength(3);
 
+    // Transitive modules pinned above what the application itself requires, so
+    // a vulnerable version can be patched without unpinning the application.
+    // x/image and x/text are linked into both binaries (x/text 0.38.0 carried
+    // CVE-2026-56852, fixed in 0.39.0). x/sys is only in caire's graph; pdfcpu
+    // has no dependency on it. caire resolved x/sys 0.22.0, which carries
+    // CVE-2026-39824 (fixed in 0.44.0): Windows-only code, but Trivy flags the
+    // module version compiled into the shipped binary.
+    const sharedPins = ["golang.org/x/image v0.43.0", "golang.org/x/text v0.39.0"];
     for (const contract of [
       {
         stage: "caire-builder",
         directory: "caire",
         application: "github.com/esimov/caire v1.5.0",
+        pins: [...sharedPins, "golang.org/x/sys v0.44.0"],
       },
       {
         stage: "pdfcpu-builder",
         directory: "pdfcpu",
         application: "github.com/pdfcpu/pdfcpu v0.13.0",
+        pins: sharedPins,
       },
     ]) {
       const modulePath = resolve(root, `docker/go-tools/${contract.directory}/go.mod`);
@@ -82,13 +92,13 @@ describe("Dockerfile build args", () => {
       const stage = stageBody(contract.stage);
 
       expect(module).toContain(contract.application);
-      expect(module).toContain("golang.org/x/image v0.43.0");
-      // x/text is pinned to the patched line the same way x/image is: 0.38.0
-      // carried CVE-2026-56852 (fixed in 0.39.0) and is linked into both binaries.
-      expect(module).toContain("golang.org/x/text v0.39.0");
       expect(checksums).toContain(`${contract.application} h1:`);
-      expect(checksums).toContain("golang.org/x/image v0.43.0 h1:");
-      expect(checksums).toContain("golang.org/x/text v0.39.0 h1:");
+      for (const pin of contract.pins) {
+        expect(module, `${contract.directory} go.mod must pin ${pin}`).toContain(pin);
+        expect(checksums, `${contract.directory} go.sum must checksum ${pin}`).toContain(
+          `${pin} h1:`,
+        );
+      }
       expect(stage).toContain(
         `COPY docker/go-tools/${contract.directory}/go.mod docker/go-tools/${contract.directory}/go.sum ./`,
       );
@@ -97,7 +107,9 @@ describe("Dockerfile build args", () => {
       expect(stage).toContain("-mod=readonly");
     }
 
+    // The pins above are the fix. A suppression would hide the finding instead.
     expect(trivyIgnore).not.toContain("CVE-2026-33809");
+    expect(trivyIgnore).not.toContain("CVE-2026-39824");
   });
 
   it("verifies every downloaded Docker build input against repository-controlled hashes", () => {
