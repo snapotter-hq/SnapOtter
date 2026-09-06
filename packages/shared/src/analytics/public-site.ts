@@ -40,6 +40,10 @@ export function publicSiteAnalyticsConfig(host: string) {
     // Nobody identifies on a marketing page. Anonymous events are what we
     // want, and they cost a fraction of person-profile events.
     person_profiles: "identified_only",
+    // Ad-click ids (gclid, fbclid, ...) are masked in URLs; UTM tags are kept,
+    // so attribution survives and the privacy page's "never to identify you"
+    // stays true.
+    mask_personal_data_properties: true,
   } as const;
 }
 
@@ -70,5 +74,9 @@ function inlineJson(value: unknown): string {
 export function publicSiteAnalyticsScript(input: { key: string; host: string }): string {
   if (!input.key) return "";
   const config = publicSiteAnalyticsConfig(input.host);
-  return `${LOADER}\nposthog.init(${inlineJson(input.key)},${inlineJson(config)});`;
+  // Our own once-guard, independent of PostHog's. VitePress re-appends head
+  // scripts on the first client-side navigation (its SSR adoption compares
+  // the raw config string with the minified node and gives up), so without
+  // this the docs ran posthog.init twice per session and logged a warning.
+  return `if(!window.__snapotterAnalytics){window.__snapotterAnalytics=1;\n${LOADER}\nposthog.init(${inlineJson(input.key)},${inlineJson(config)});}`;
 }

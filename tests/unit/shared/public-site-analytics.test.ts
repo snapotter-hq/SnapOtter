@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   publicSiteAnalyticsConfig,
   publicSiteAnalyticsScript,
@@ -45,6 +45,7 @@ describe("publicSiteAnalyticsConfig", () => {
       capture_performance: { web_vitals: true },
       session_recording: { maskAllInputs: true },
       person_profiles: "identified_only",
+      mask_personal_data_properties: true,
     });
   });
 
@@ -56,6 +57,8 @@ describe("publicSiteAnalyticsConfig", () => {
 describe("publicSiteAnalyticsScript", () => {
   beforeEach(() => {
     window.posthog = undefined;
+    // biome-ignore lint/suspicious/noExplicitAny: our once-guard lives on window.
+    (window as any).__snapotterAnalytics = undefined;
     document.head.innerHTML = "";
     document.body.innerHTML = "";
   });
@@ -94,5 +97,20 @@ describe("publicSiteAnalyticsScript", () => {
 
     expect(window.posthog._i).toHaveLength(1);
     expect(document.querySelectorAll("script[src]")).toHaveLength(1);
+  });
+
+  it("leaves a loaded SDK alone when VitePress re-runs the head script", () => {
+    // VitePress appends the head script again on the first client-side
+    // navigation. By then array.js has replaced the stub, and PostHog's own
+    // guard only covers the loader, so a second posthog.init would run and
+    // warn. Our guard has to cover the init call too.
+    const script = publicSiteAnalyticsScript({ key: KEY, host: HOST });
+    runInPage(script);
+    const init = vi.fn();
+    window.posthog = { __SV: 1, init };
+
+    new Function(script)();
+
+    expect(init).not.toHaveBeenCalled();
   });
 });

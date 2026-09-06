@@ -14,7 +14,9 @@ const HOSTNAME = "https://docs.snapotter.com";
 // Full PostHog SDK, shared with the landing site. Emitted only when the deploy
 // workflow passes PUBLIC_POSTHOG_KEY, so local, fork and e2e builds carry
 // nothing. VitePress routes client-side; the shared config captures pageviews
-// on history changes for that reason.
+// on history changes for that reason. Unlike Astro, VitePress does not load a
+// .env file into process.env for this config, so a local key has to be set in
+// the shell.
 const analyticsScript = publicSiteAnalyticsScript({
   key: process.env.PUBLIC_POSTHOG_KEY ?? "",
   host: process.env.PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
