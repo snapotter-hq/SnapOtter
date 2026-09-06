@@ -47,7 +47,21 @@ export async function validatePdfPath(
   opts.signal?.throwIfAborted();
   if (opts.lenient || !qpdfAvailable()) return;
 
-  const passwordProtected = await qpdfRequiresPassword(filePath);
+  let passwordProtected: boolean;
+  try {
+    passwordProtected = await qpdfRequiresPassword(filePath);
+  } catch (err) {
+    if (!isQpdfTimeout(err)) throw err;
+    // --requires-password only reads the encryption dictionary, so it does not
+    // scale with content the way --check does: a stall here is anomalous (a
+    // pathological xref forcing reconstruction, a dead disk, a crafted file),
+    // not a big-but-healthy file outliving the budget. Fail closed with an
+    // honest message rather than letting the raw QpdfTimeoutError become a 500,
+    // mirroring the page-count probe below.
+    throw new InputValidationError(
+      "Could not inspect this PDF within the time limit. It may be malformed; try a different file.",
+    );
+  }
   opts.signal?.throwIfAborted();
   if (passwordProtected) {
     if (opts.rejectPasswordProtected) {
