@@ -1,5 +1,5 @@
 // Shared, build-time stats for the landing page (GitHub stars + image pulls).
-// The landing site ships zero client JS, so these are fetched in Astro
+// The landing site has no framework runtime, so these are fetched in Astro
 // frontmatter at build time and refreshed by a scheduled rebuild. Both
 // fetchers degrade to a maintained constant if the upstream API is unreachable
 // (or rate-limited), so a build never ships an empty number.

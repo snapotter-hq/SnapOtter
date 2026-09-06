@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Tidak ada data pribadi, isi file, atau nama file yang keluar dari jaringan Anda.",
   "privacy.selfHosted.title": "Perangkat Lunak yang Di-host Sendiri",
   "privacy.title": "Kebijakan Privasi",
-  "privacy.website.item1": "Kami tidak menggunakan cookie pelacak.",
+  "privacy.website.item1": "Kami menggunakan analitik PostHog di situs ini dan di docs.snapotter.com, yang disajikan melalui endpoint kami sendiri, e.snapotter.com. Ia menyetel cookie pihak pertama untuk membedakan pengunjung yang kembali dan mencatat tampilan halaman, klik, kedalaman gulir, waktu pemuatan, serta rekaman sesi dengan semua input yang diketik disamarkan. PostHog, Inc. memproses data ini untuk kami di Amerika Serikat. Kami menggunakannya untuk memahami bagaimana situs digunakan, tidak pernah untuk mengidentifikasi Anda, dan kami tidak pernah menjualnya atau membagikannya kepada pengiklan.",
   "privacy.website.item2": "Kami menggunakan Cloudflare Web Analytics untuk metrik lalu lintas yang anonim dan agregat (tampilan halaman, kunjungan, perujuk). Ini tidak menggunakan cookie, tidak mengumpulkan data pribadi, dan tidak melacak pengguna individu antar situs.",
   "privacy.website.item3": "Pengiriman formulir kontak diproses melalui Formspree. Kebijakan privasi mereka berlaku untuk data tersebut.",
   "privacy.website.title": "Situs Web (snapotter.com)",

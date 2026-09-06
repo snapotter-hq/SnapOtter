@@ -157,7 +157,7 @@
   "privacy.overview.title": "Overview",
   "privacy.overview.body": "SnapOtter is self-hosted software. We do not process, store, or have access to your files or data. This privacy policy covers the snapotter.com website and optional analytics within the software.",
   "privacy.website.title": "Website (snapotter.com)",
-  "privacy.website.item1": "We do not use tracking cookies.",
+  "privacy.website.item1": "We use PostHog analytics on this site and on docs.snapotter.com, served through our own e.snapotter.com endpoint. It sets a first-party cookie to tell returning visitors apart and records page views, clicks, scroll depth, performance timings, and session replays with any typed input masked. PostHog, Inc. processes this data for us in the United States. We use it to understand how the site is used, never to identify you, and we never sell it or share it with advertisers.",
   "privacy.website.item2": "We use Cloudflare Web Analytics for anonymous, aggregate traffic metrics (page views, visits, referrers). It uses no cookies, collects no personal data, and does not track individual users across sites.",
   "privacy.website.item3": "Contact form submissions are processed via Formspree. Their privacy policy applies to that data.",
   "privacy.selfHosted.title": "Self-Hosted Software",

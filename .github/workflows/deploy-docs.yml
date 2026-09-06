@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "apps/docs/**"
+      # What the site captures lives in shared; a change there must go live too.
+      - "packages/shared/src/analytics/public-site.ts"
   # Daily rebuild so the build-time GitHub star count refreshes even when no
   # docs files changed (mirrors deploy-landing.yml, offset an hour so the two
   # scheduled deploys don't fire at once).

@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "沒有任何個人資料、檔案內容或檔案名稱會離開你的網路。",
   "privacy.selfHosted.title": "自架式軟體",
   "privacy.title": "隱私政策",
-  "privacy.website.item1": "我們不使用追蹤 Cookie。",
+  "privacy.website.item1": "本網站與 docs.snapotter.com 使用 PostHog 分析，透過我們自己的端點 e.snapotter.com 提供服務。它會設定一個第一方 Cookie 以區分回訪的訪客，並記錄頁面瀏覽、點擊、捲動深度、效能時間，以及所有輸入內容皆已遮蔽的工作階段錄影。PostHog, Inc. 代表我們在美國處理這些資料。我們只用它來了解網站的使用情形，絕不用於識別您的身分，也絕不會出售或與廣告商分享。",
   "privacy.website.item2": "我們使用 Cloudflare Web Analytics 取得匿名的彙總流量指標（頁面瀏覽、造訪次數、來源網站）。它不使用 Cookie、不收集個人資料，也不會跨網站追蹤個別使用者。",
   "privacy.website.item3": "聯絡表單的送出內容透過 Formspree 處理。該資料適用其隱私政策。",
   "privacy.website.title": "網站（snapotter.com）",

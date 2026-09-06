@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "個人データ、ファイルの内容、ファイル名がネットワークの外に出ることはありません。",
   "privacy.selfHosted.title": "セルフホスト型ソフトウェア",
   "privacy.title": "プライバシーポリシー",
-  "privacy.website.item1": "トラッキングクッキーは使用しません。",
+  "privacy.website.item1": "当サイトおよび docs.snapotter.com では、自社のエンドポイント e.snapotter.com を経由して配信される PostHog アナリティクスを使用しています。再訪問者を区別するためのファーストパーティ Cookie を設定し、ページビュー、クリック、スクロールの深さ、パフォーマンス計測、そして入力内容をすべてマスクしたセッション録画を記録します。PostHog, Inc. がこのデータを当社に代わって米国で処理します。これはサイトの利用状況を理解するためであり、個人を特定するためには決して使用せず、広告主に販売または提供することもありません。",
   "privacy.website.item2": "匿名の集計トラフィック指標（ページビュー、訪問数、リファラー）のために Cloudflare Web Analytics を使用しています。クッキーは使用せず、個人データも収集せず、サイトをまたいで個々のユーザーを追跡することもありません。",
   "privacy.website.item3": "お問い合わせフォームの送信は Formspree を通じて処理されます。そのデータには Formspree のプライバシーポリシーが適用されます。",
   "privacy.website.title": "ウェブサイト（snapotter.com）",

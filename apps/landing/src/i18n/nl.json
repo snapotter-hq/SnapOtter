@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Er verlaten geen persoonsgegevens, bestandsinhoud of bestandsnamen je netwerk.",
   "privacy.selfHosted.title": "Zelf-gehoste software",
   "privacy.title": "Privacybeleid",
-  "privacy.website.item1": "Wij gebruiken geen tracking-cookies.",
+  "privacy.website.item1": "Op deze site en op docs.snapotter.com gebruiken we PostHog-analytics, geleverd via ons eigen endpoint e.snapotter.com. Het plaatst een first-party cookie om terugkerende bezoekers te herkennen en registreert paginaweergaven, klikken, scrolldiepte, laadtijden en sessieopnames waarin alle getypte invoer wordt gemaskeerd. PostHog, Inc. verwerkt deze gegevens voor ons in de Verenigde Staten. We gebruiken ze om te begrijpen hoe de site wordt gebruikt, nooit om u te identificeren, en we verkopen ze niet en delen ze niet met adverteerders.",
   "privacy.website.item2": "Wij gebruiken Cloudflare Web Analytics voor anonieme, geaggregeerde verkeersgegevens (paginaweergaven, bezoeken, verwijzende sites). Het gebruikt geen cookies, verzamelt geen persoonsgegevens en volgt individuele gebruikers niet over verschillende sites.",
   "privacy.website.item3": "Inzendingen van het contactformulier worden verwerkt via Formspree. Op die gegevens is hun privacybeleid van toepassing.",
   "privacy.website.title": "Website (snapotter.com)",

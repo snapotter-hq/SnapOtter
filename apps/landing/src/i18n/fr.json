@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Aucune donnée personnelle, aucun contenu ni nom de fichier ne quitte votre réseau.",
   "privacy.selfHosted.title": "Logiciel auto-hébergé",
   "privacy.title": "Politique de confidentialité",
-  "privacy.website.item1": "Nous n'utilisons pas de cookies de suivi.",
+  "privacy.website.item1": "Sur ce site et sur docs.snapotter.com, nous utilisons l'outil d'analyse PostHog, servi via notre propre point de terminaison e.snapotter.com. Il dépose un cookie propriétaire pour distinguer les visiteurs qui reviennent et enregistre les pages vues, les clics, la profondeur de défilement, les temps de chargement et des relectures de session dans lesquelles toute saisie est masquée. PostHog, Inc. traite ces données pour nous aux États-Unis. Nous les utilisons pour comprendre comment le site est utilisé, jamais pour vous identifier, et nous ne les vendons ni ne les partageons avec des annonceurs.",
   "privacy.website.item2": "Nous utilisons Cloudflare Web Analytics pour des mesures de trafic anonymes et agrégées (pages vues, visites, référents). Ce service n'utilise aucun cookie, ne collecte aucune donnée personnelle et ne suit pas les utilisateurs individuels d'un site à l'autre.",
   "privacy.website.item3": "Les envois du formulaire de contact sont traités via Formspree. Leur politique de confidentialité s'applique à ces données.",
   "privacy.website.title": "Site web (snapotter.com)",

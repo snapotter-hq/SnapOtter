@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Hiçbir kişisel veri, dosya içeriği veya dosya adı ağınızdan çıkmaz.",
   "privacy.selfHosted.title": "Kendi Sunucunuzda Barındırılan Yazılım",
   "privacy.title": "Gizlilik Politikası",
-  "privacy.website.item1": "İzleme çerezleri kullanmıyoruz.",
+  "privacy.website.item1": "Bu sitede ve docs.snapotter.com'da, kendi e.snapotter.com uç noktamız üzerinden sunulan PostHog analitiğini kullanıyoruz. Geri dönen ziyaretçileri ayırt etmek için birinci taraf bir çerez yerleştirir; sayfa görüntülemelerini, tıklamaları, kaydırma derinliğini, yükleme sürelerini ve yazılan her girdinin maskelendiği oturum kayıtlarını kaydeder. PostHog, Inc. bu verileri bizim adımıza Amerika Birleşik Devletleri'nde işler. Bunları sitenin nasıl kullanıldığını anlamak için kullanırız, sizi tanımlamak için asla; ayrıca bu verileri asla satmayız ve reklamverenlerle paylaşmayız.",
   "privacy.website.item2": "Anonim, toplu trafik ölçümleri (sayfa görüntülemeleri, ziyaretler, yönlendirenler) için Cloudflare Web Analytics kullanıyoruz. Çerez kullanmaz, kişisel veri toplamaz ve bireysel kullanıcıları siteler arasında izlemez.",
   "privacy.website.item3": "İletişim formu gönderimleri Formspree aracılığıyla işlenir. Bu veriler için onların gizlilik politikası geçerlidir.",
   "privacy.website.title": "Web Sitesi (snapotter.com)",

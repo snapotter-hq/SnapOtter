@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Không có dữ liệu cá nhân, nội dung tệp hay tên tệp nào rời khỏi mạng của bạn.",
   "privacy.selfHosted.title": "Phần mềm tự lưu trữ",
   "privacy.title": "Chính sách quyền riêng tư",
-  "privacy.website.item1": "Chúng tôi không dùng cookie theo dõi.",
+  "privacy.website.item1": "Chúng tôi sử dụng phân tích PostHog trên trang này và trên docs.snapotter.com, được phục vụ qua điểm cuối riêng của chúng tôi là e.snapotter.com. Nó đặt một cookie bên thứ nhất để phân biệt khách truy cập quay lại và ghi lại lượt xem trang, lượt nhấp, độ sâu cuộn, thời gian tải và bản ghi phiên, trong đó mọi nội dung được nhập đều bị che. PostHog, Inc. xử lý dữ liệu này thay chúng tôi tại Hoa Kỳ. Chúng tôi dùng dữ liệu này để hiểu cách trang được sử dụng, không bao giờ để nhận dạng bạn, và không bao giờ bán hoặc chia sẻ với các nhà quảng cáo.",
   "privacy.website.item2": "Chúng tôi dùng Cloudflare Web Analytics để đo lường lưu lượng tổng hợp và ẩn danh (lượt xem trang, lượt truy cập, nguồn giới thiệu). Nó không dùng cookie, không thu thập dữ liệu cá nhân và không theo dõi người dùng riêng lẻ trên các trang web.",
   "privacy.website.item3": "Các biểu mẫu liên hệ được xử lý qua Formspree. Chính sách quyền riêng tư của họ áp dụng cho dữ liệu đó.",
   "privacy.website.title": "Trang web (snapotter.com)",

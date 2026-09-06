@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "apps/landing/**"
+      # What the site captures lives in shared; a change there must go live too.
+      - "packages/shared/src/analytics/public-site.ts"
   # Daily rebuild so the build-time GitHub stars / Docker Hub pull-count fetches
   # refresh even when no landing files changed.
   schedule:
@@ -32,11 +34,10 @@ jobs:
           # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
           # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Turn on the landing $pageview beacon and route it through the
-          # first-party proxy (e.snapotter.com) so ad blockers don't drop it.
-          # Reuses the same phc_ project key the app image bakes. In forks and
-          # PRs the secret is empty, so Analytics.astro's `key &&` gate keeps the
-          # beacon off and nothing is emitted.
+          # Full PostHog SDK through the first-party proxy (e.snapotter.com) so
+          # ad blockers don't drop it; same phc_ project key the app image bakes
+          # and the docs deploy uses. In forks and PRs the secret is empty and
+          # Analytics.astro emits nothing.
           PUBLIC_POSTHOG_KEY: ${{ secrets.SNAPOTTER_POSTHOG_KEY }}
           PUBLIC_POSTHOG_HOST: https://e.snapotter.com
 

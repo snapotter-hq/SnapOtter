@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "개인 데이터, 파일 내용, 파일 이름은 여러분의 네트워크를 벗어나지 않습니다.",
   "privacy.selfHosted.title": "셀프 호스팅 소프트웨어",
   "privacy.title": "개인정보 처리방침",
-  "privacy.website.item1": "저희는 추적 쿠키를 사용하지 않습니다.",
+  "privacy.website.item1": "이 사이트와 docs.snapotter.com에서는 자체 엔드포인트 e.snapotter.com을 통해 제공되는 PostHog 분석을 사용합니다. 재방문자를 구분하기 위해 자사(first-party) 쿠키를 설정하고, 페이지 조회, 클릭, 스크롤 깊이, 성능 측정치, 그리고 입력한 내용이 모두 마스킹된 세션 리플레이를 기록합니다. PostHog, Inc.가 이 데이터를 미국에서 저희를 대신해 처리합니다. 사이트가 어떻게 사용되는지 이해하기 위해서만 사용하며, 귀하를 식별하는 데는 결코 사용하지 않고, 광고주에게 판매하거나 공유하지도 않습니다.",
   "privacy.website.item2": "저희는 익명 집계 트래픽 지표(페이지 조회수, 방문수, 유입 경로)를 위해 Cloudflare Web Analytics를 사용합니다. 이는 쿠키를 사용하지 않고, 개인 데이터를 수집하지 않으며, 사이트 간에 개별 사용자를 추적하지 않습니다.",
   "privacy.website.item3": "문의 양식 제출은 Formspree를 통해 처리됩니다. 해당 데이터에는 Formspree의 개인정보 처리방침이 적용됩니다.",
   "privacy.website.title": "웹사이트(snapotter.com)",

@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Żadne dane osobowe, zawartość plików ani nazwy plików nie opuszczają Twojej sieci.",
   "privacy.selfHosted.title": "Oprogramowanie hostowane samodzielnie",
   "privacy.title": "Polityka prywatności",
-  "privacy.website.item1": "Nie używamy śledzących plików cookie.",
+  "privacy.website.item1": "Na tej stronie i na docs.snapotter.com korzystamy z analityki PostHog, obsługiwanej przez nasz własny punkt końcowy e.snapotter.com. Ustawia ona własne ciasteczko (first-party), aby odróżniać powracających odwiedzających, i rejestruje odsłony, kliknięcia, głębokość przewijania, czasy ładowania oraz nagrania sesji, w których każdy wpisany tekst jest maskowany. PostHog, Inc. przetwarza te dane dla nas w Stanach Zjednoczonych. Używamy ich, aby zrozumieć, jak strona jest używana, nigdy do identyfikowania Ciebie, i nigdy ich nie sprzedajemy ani nie udostępniamy reklamodawcom.",
   "privacy.website.item2": "Korzystamy z Cloudflare Web Analytics dla anonimowych, zbiorczych metryk ruchu (odsłony, wizyty, źródła odesłań). Nie używa plików cookie, nie zbiera danych osobowych i nie śledzi poszczególnych użytkowników między witrynami.",
   "privacy.website.item3": "Zgłoszenia z formularza kontaktowego są przetwarzane przez Formspree. Do tych danych stosuje się ich polityka prywatności.",
   "privacy.website.title": "Witryna (snapotter.com)",

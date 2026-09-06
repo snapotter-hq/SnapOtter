@@ -484,7 +484,7 @@
   "privacy.selfHosted.item3": "Inga personuppgifter, filinnehåll eller filnamn lämnar ditt nätverk.",
   "privacy.selfHosted.title": "Självhostad programvara",
   "privacy.title": "Integritetspolicy",
-  "privacy.website.item1": "Vi använder inga spårningskakor.",
+  "privacy.website.item1": "På den här webbplatsen och på docs.snapotter.com använder vi PostHog-analys, som levereras via vår egen slutpunkt e.snapotter.com. Den sätter en förstapartskaka för att skilja återkommande besökare åt och registrerar sidvisningar, klick, scrolldjup, laddningstider och sessionsinspelningar där all inmatad text maskeras. PostHog, Inc. behandlar dessa uppgifter åt oss i USA. Vi använder dem för att förstå hur webbplatsen används, aldrig för att identifiera dig, och vi säljer dem aldrig och delar dem inte med annonsörer.",
   "privacy.website.item2": "Vi använder Cloudflare Web Analytics för anonym, aggregerad trafikstatistik (sidvisningar, besök, hänvisningar). Det använder inga kakor, samlar inte in några personuppgifter och spårar inte enskilda användare mellan webbplatser.",
   "privacy.website.item3": "Inlämningar via kontaktformuläret behandlas via Formspree. Deras integritetspolicy gäller för de uppgifterna.",
   "privacy.website.title": "Webbplats (snapotter.com)",
