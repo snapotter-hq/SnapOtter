@@ -41,6 +41,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # The docs share the snapotter.com zone, so anything Cloudflare injects
-      # at the edge for the zone lands here too (#793).
+      # at the edge for the zone lands here too (#793). Web Analytics is kept
+      # on purpose and allowlisted; anything else fails the run.
       - name: Verify the live site loads nothing third-party
-        run: node scripts/check-live-egress.mjs https://docs.snapotter.com/
+        run: node scripts/check-live-egress.mjs https://docs.snapotter.com/ --allow https://static.cloudflareinsights.com

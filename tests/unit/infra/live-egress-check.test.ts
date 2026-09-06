@@ -332,6 +332,17 @@ describe("Cloudflare Pages deploy workflows", () => {
       expect(afterGuard).not.toMatch(/continue-on-error/);
       expect(afterGuard).not.toMatch(/^\s+if:/m);
     });
+
+    it(`${file} allows exactly the origins the public sites chose`, () => {
+      // Cloudflare Web Analytics is accepted on the zone (decided on #793).
+      // PostHog loads at runtime from inline script, so it never appears as
+      // a tag and needs no entry. Anything else added here is a policy change.
+      const workflow = readFileSync(path.resolve(root, ".github/workflows", file), "utf8");
+      const command = workflow.match(/node scripts\/check-live-egress\.mjs[^\n]*/)?.[0] ?? "";
+      const allowed = [...command.matchAll(/--allow (\S+)/g)].map((match) => match[1]);
+
+      expect(allowed).toEqual(["https://static.cloudflareinsights.com"]);
+    });
   }
 });
 

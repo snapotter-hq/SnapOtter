@@ -2,15 +2,15 @@
 /**
  * Fail when a live page loads anything from an origin we did not choose.
  *
- * The landing, docs and demo sites promise no third-party egress: fonts,
- * screenshots and star counts are self-hosted or baked at build time, and
- * PostHog (through our own e.snapotter.com proxy) is the only runtime
- * destination. Nothing in the repo can break that promise silently, because
- * the local e2e suites see the built output. Cloudflare can break it though.
- * Zone features add scripts at the edge on the way to the browser, and the
- * Web Analytics beacon rode every page that way (#793): the built HTML was
- * clean and every test was green while every visitor requested
- * static.cloudflareinsights.com.
+ * The landing, docs and demo sites load from origins we chose and nothing
+ * else: fonts, screenshots and star counts are self-hosted or baked at build
+ * time, PostHog runs through our own e.snapotter.com proxy, and Cloudflare
+ * Web Analytics is the one edge feature we keep. Nothing in the repo can add a
+ * destination silently, because the local e2e suites see the built output.
+ * Cloudflare can though. Zone features add scripts at the edge on the way to
+ * the browser, and the Web Analytics beacon rode every page that way before
+ * anyone had decided to keep it (#793): the built HTML was clean and every
+ * test was green while every visitor requested static.cloudflareinsights.com.
  *
  * So this audits the page a visitor receives, not the one we built. It fetches
  * each URL the way a browser does, collects every origin the HTML's tags make
@@ -279,7 +279,7 @@ function report(result) {
     .map(({ origin, tags }) => `${origin} via <${tags.join(">, <")}>`)
     .join("; ");
   console.log(
-    `FAIL  ${result.url}: loads from ${origins}. Only the page's own host and allowlisted origins may be reached. A Cloudflare zone feature injecting at the edge is the usual cause (#793): turn it off in the dashboard rather than allowlisting it.`,
+    `FAIL  ${result.url}: loads from ${origins}. Only the page's own host and allowlisted origins may be reached. A Cloudflare zone feature injecting at the edge is the usual cause (#793): turn it off in the dashboard, or allowlist it in the deploy workflow if it was a deliberate choice.`,
   );
 }
 
