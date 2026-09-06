@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { raceInserts } from "../../helpers/pg-race.js";
+import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -351,6 +351,37 @@ describe("PUT /api/v1/teams/:id", () => {
     });
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+  });
+
+  it("concurrent renames onto one name return one 200 and one 409, never 500", async () => {
+    // Issue #968: both renames pass the duplicate pre-check before either
+    // UPDATE commits; the loser used to surface the 23505 as a 500.
+    // raceUpdates parks both UPDATEs so each pre-check sees no conflict.
+    const otherId = randomUUID();
+    await db.insert(schema.teams).values({ id: otherId, name: "OtherName" });
+
+    const rename = (id: string) =>
+      app.inject({
+        method: "PUT",
+        url: `/api/v1/teams/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name: "RenameTarget" },
+      });
+
+    const results = await raceUpdates("teams", 2, () =>
+      Promise.all([rename(teamId), rename(otherId)]),
+    );
+    const statuses = results.map((r) => r.statusCode).sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const conflict = results.find((r) => r.statusCode === 409);
+    expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+      error: "Team name already exists",
+      code: "CONFLICT",
+    });
+
+    const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, "RenameTarget"));
+    expect(rows).toHaveLength(1);
   });
 
   it("rejects empty name", async () => {
