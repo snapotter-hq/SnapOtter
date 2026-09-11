@@ -30,6 +30,8 @@ services:
         "--exclude",
         "**/tests/unit/infra/public-tool-counts.test.ts",
         "--exclude",
+        "**/tests/unit/infra/compose-example-policy.test.ts",
+        "--exclude",
         "**/tests/unit/infra/lint-coverage.test.ts",
         "--exclude",
         "**/tests/unit/infra/docs-dev-ports.test.ts",
