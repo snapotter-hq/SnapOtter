@@ -133,12 +133,19 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           // Now the active install: move queued -> installing and track progress.
           const current = get().installing[bundleId];
           const percent = Math.max(updated.progress?.percent ?? 0, current?.percent ?? 0);
+          // The ETA clock starts when the install starts, not when it was
+          // queued: dividing the first real percent by the whole queue wait
+          // read as an ETA of hundreds of minutes (#871).
+          const startTimes = current
+            ? get().startTimes
+            : { ...get().startTimes, [bundleId]: Date.now() };
           set({
             installing: {
               ...get().installing,
               [bundleId]: { percent, stage: updated.progress?.stage ?? current?.stage ?? "" },
             },
             queued: get().queued.filter((id) => id !== bundleId),
+            startTimes,
           });
           return;
         }

@@ -800,4 +800,66 @@ describe("useFeaturesStore", () => {
       expect(useFeaturesStore.getState().bundles).toEqual([makeBundleState({ id: "existing" })]);
     });
   });
+
+  describe("ETA clock for queued installs (#871)", () => {
+    it("restarts the bundle's start time when the server actually begins installing it", async () => {
+      // The ETA in the AI Features panel is a linear extrapolation from
+      // startTimes[bundleId]. A bundle queued behind other installs kept the
+      // time it was clicked, so once it finally started, its first real
+      // percent was divided by the whole queue wait and the ETA read as
+      // hundreds of minutes.
+      const clickedAt = 1_000;
+      const startedAt = clickedAt + 40 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(clickedAt);
+      try {
+        useFeaturesStore.setState({
+          bundles: [makeBundleState({ id: "eta-bundle" })],
+          loaded: true,
+          startTimes: {},
+        });
+        apiPostMock.mockResolvedValueOnce({ jobId: "job-eta", queued: true });
+
+        let status: FeatureBundleState["status"] = "queued";
+        apiGetMock.mockImplementation(() =>
+          Promise.resolve({
+            bundles: [
+              makeBundleState({
+                id: "eta-bundle",
+                status,
+                progress: status === "installing" ? { percent: 3, stage: "Downloading..." } : null,
+              }),
+            ],
+          }),
+        );
+
+        await useFeaturesStore.getState().installBundle("eta-bundle");
+        expect(useFeaturesStore.getState().queued).toContain("eta-bundle");
+        expect(useFeaturesStore.getState().startTimes["eta-bundle"]).toBe(clickedAt);
+
+        // Forty minutes later the queue reaches this bundle; the next poll
+        // moves it queued -> installing and must reset its clock.
+        nowSpy.mockReturnValue(startedAt);
+        status = "installing";
+        await vi.waitFor(
+          () => {
+            expect(useFeaturesStore.getState().installing["eta-bundle"]).toBeDefined();
+          },
+          { timeout: 8000 },
+        );
+        expect(useFeaturesStore.getState().queued).not.toContain("eta-bundle");
+        expect(useFeaturesStore.getState().startTimes["eta-bundle"]).toBe(startedAt);
+
+        // Let the poll observe the terminal state so it stops.
+        status = "installed";
+        await vi.waitFor(
+          () => {
+            expect(useFeaturesStore.getState().installing["eta-bundle"]).toBeUndefined();
+          },
+          { timeout: 8000 },
+        );
+      } finally {
+        nowSpy.mockRestore();
+      }
+    }, 25000);
+  });
 });
