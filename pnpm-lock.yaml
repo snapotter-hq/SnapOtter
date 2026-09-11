@@ -167,6 +167,9 @@ importers:
       '@fastify/multipart':
         specifier: ^9.0.0
         version: 9.4.0
+      '@fastify/proxy-addr':
+        specifier: ^5.0.0
+        version: 5.1.0
       '@fastify/rate-limit':
         specifier: ^10.2.0
         version: 10.3.0

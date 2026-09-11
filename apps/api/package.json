@@ -19,6 +19,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/http-proxy": "^11.6.0",
     "@fastify/multipart": "^9.0.0",
+    "@fastify/proxy-addr": "^5.0.0",
     "@fastify/rate-limit": "^10.2.0",
     "@fastify/static": "^10.1.2",
     "@neplex/vectorizer": "^0.1.0",
