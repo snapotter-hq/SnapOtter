@@ -287,3 +287,60 @@ describe("analytics lib (baked model)", () => {
     });
   });
 });
+
+describe("privacy invariants (#1022)", () => {
+  it("pins heatmap, dead-click and performance capture so project toggles cannot re-enable them", async () => {
+    await mod.initAnalytics(enabledConfig);
+    expect(mockInit).toHaveBeenCalledWith(
+      "phc_test",
+      expect.objectContaining({
+        capture_heatmaps: false,
+        capture_dead_clicks: false,
+        capture_performance: { web_vitals: true, network_timing: false },
+      }),
+    );
+  });
+
+  it("strips query and fragment from the nested $web_vitals_*_event $current_url", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        $current_url: "https://x.test/login?token=abc#frag",
+        $web_vitals_LCP_event: {
+          $current_url: "https://x.test/login?token=abc#frag",
+          name: "LCP",
+        },
+      },
+    });
+    expect(result.properties.$current_url).toBe("https://x.test/login");
+    expect((result.properties.$web_vitals_LCP_event as { $current_url: string }).$current_url).toBe(
+      "https://x.test/login",
+    );
+  });
+
+  it("strips every $web_vitals event's nested url and tolerates malformed entries", async () => {
+    await mod.initAnalytics(enabledConfig);
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({
+      properties: {
+        $web_vitals_LCP_event: { $current_url: "https://x.test/a?q=1" },
+        $web_vitals_CLS_event: { $current_url: "https://x.test/b#f" },
+        $web_vitals_FCP_event: null,
+        $web_vitals_INP_event: "not-an-object",
+      },
+    });
+    expect((result.properties.$web_vitals_LCP_event as { $current_url: string }).$current_url).toBe(
+      "https://x.test/a",
+    );
+    expect((result.properties.$web_vitals_CLS_event as { $current_url: string }).$current_url).toBe(
+      "https://x.test/b",
+    );
+  });
+});
