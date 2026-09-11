@@ -71,8 +71,8 @@ export async function auditLog(
       ipAddress: ip,
       requestId,
     });
-  } catch {
-    logger.warn({ event }, "Failed to write audit log to DB");
+  } catch (err) {
+    logger.warn({ err, event }, "Failed to write audit log to DB");
     return;
   }
 
@@ -100,8 +100,8 @@ export async function auditLog(
         const integrity = computeHmac(rowData, hmacKey);
         await db.update(schema.auditLog).set({ integrity }).where(eq(schema.auditLog.id, id));
       }
-    } catch {
-      logger.warn({ event }, "Failed to compute audit HMAC");
+    } catch (err) {
+      logger.warn({ err, event }, "Failed to compute audit HMAC");
     }
   }
 }
