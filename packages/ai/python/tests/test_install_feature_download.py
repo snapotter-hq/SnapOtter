@@ -117,6 +117,172 @@ def test_download_with_hf_hub_cleans_cache_when_download_raises(monkeypatch, tmp
     assert not (staging / "v2.0.0").exists()
 
 
+class _RecordingTqdm:
+    """Stand-in for huggingface_hub.utils.tqdm.tqdm: the class both xet_get and
+    http_get instantiate through _get_progress_bar_context and feed with
+    update(bytes) as the transfer moves. Mirrors the real constructor shape
+    (keyword-only bar settings, `name` group) so a subclass installed by the
+    installer sees exactly what the library would hand it."""
+
+    instances = []
+
+    def __init__(self, *args, **kwargs):
+        self.n = kwargs.get("initial", 0)
+        self.total = kwargs.get("total")
+        self.disable = kwargs.get("disable", False)
+        _RecordingTqdm.instances.append(self)
+
+    def update(self, n=1):
+        # Real tqdm returns early when disabled, without touching self.n.
+        if self.disable:
+            return
+        self.n += n
+
+    def close(self):
+        pass
+
+
+def _fake_hub_with_progress(monkeypatch, transfer):
+    """Install a fake huggingface_hub whose hf_hub_download drives the
+    library's tqdm seam the way the real client does. `transfer(bar)` runs
+    the simulated download against the bar the installer's hook sees."""
+    hub = types.ModuleType("huggingface_hub")
+    utils = types.ModuleType("huggingface_hub.utils")
+    tqdm_mod = types.ModuleType("huggingface_hub.utils.tqdm")
+    tqdm_mod.tqdm = _RecordingTqdm
+    utils.tqdm = tqdm_mod
+    hub.utils = utils
+
+    def hf_hub_download(repo_id, filename, repo_type, local_dir):
+        # Whatever class sits on the module at call time is what the library
+        # would construct; a hook that swapped it in must therefore be live now.
+        bar = tqdm_mod.tqdm(
+            unit="B", unit_scale=True, total=None, initial=0, desc=filename,
+            disable=True, name="huggingface_hub.xet_get",
+        )
+        transfer(bar)
+        bar.close()
+        target = os.path.join(local_dir, filename)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as f:
+            f.write(b"archive")
+        return target
+
+    hub.hf_hub_download = hf_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils", utils)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils.tqdm", tqdm_mod)
+    return tqdm_mod
+
+
+def test_download_with_hf_hub_reports_bytes_while_transfer_is_in_flight(
+    monkeypatch, tmp_path
+):
+    """Issue #871: the accelerated download emitted one frame at the start
+    and one at the end, so a multi-GB transfer sat at the start percent for
+    its whole duration. The UI extrapolated an ETA of hours from that frozen
+    percent and the stall watchdog (20 min, no frames) killed slow-but-live
+    transfers. The download must report bytes as they arrive, with the
+    percent walking from progress_start toward progress_end."""
+    installer = load_installer()
+    expected_size = 512 * 1024 * 1024
+    step = 32 * 1024 * 1024
+
+    def transfer(bar):
+        for _ in range(expected_size // step):
+            bar.update(step)
+
+    tqdm_mod = _fake_hub_with_progress(monkeypatch, transfer)
+
+    frames = []
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: frames.append((p, s)))
+
+    dest = tmp_path / "staging" / "upscale-enhance-amd64-gpu.tar.gz"
+    dest.parent.mkdir()
+    assert installer.download_with_hf_hub(
+        "deepsafe/feature-bundles",
+        "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
+        str(dest),
+        expected_size,
+        2,
+        85,
+    ) is True
+
+    # Frames between the "starting" frame and the "downloaded" frame are the
+    # in-flight ones; before the fix this list was empty.
+    start = next(i for i, (_, s) in enumerate(frames) if "accelerated" in s.lower())
+    end = next(i for i, (_, s) in enumerate(frames) if s.startswith("Downloaded"))
+    inflight = frames[start + 1 : end]
+    assert len(inflight) >= 8, frames
+
+    percents = [p for p, _ in inflight]
+    assert percents == sorted(percents), "download percent must be monotonic"
+    assert all(2 <= p <= 85 for p in percents)
+    assert percents[-1] >= 80, "reported percent must track the bytes received"
+    assert all("GB" in s for _, s in inflight), "stage carries the byte counter"
+
+    # The hook is scoped to the transfer: the library's class is restored.
+    assert tqdm_mod.tqdm is _RecordingTqdm
+
+
+def test_download_with_hf_hub_restores_tqdm_seam_when_download_raises(
+    monkeypatch, tmp_path
+):
+    installer = load_installer()
+
+    def transfer(bar):
+        raise RuntimeError("xet CAS unreachable")
+
+    tqdm_mod = _fake_hub_with_progress(monkeypatch, transfer)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    dest = tmp_path / "staging" / "upscale-enhance-amd64-gpu.tar.gz"
+    dest.parent.mkdir()
+    assert installer.download_with_hf_hub(
+        "deepsafe/feature-bundles",
+        "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
+        str(dest),
+        100,
+        2,
+        85,
+    ) is False
+    assert tqdm_mod.tqdm is _RecordingTqdm
+
+
+def test_download_with_hf_hub_still_downloads_when_progress_seam_is_missing(
+    monkeypatch, tmp_path
+):
+    """A drifted venv whose huggingface_hub has no utils.tqdm module must keep
+    downloading (silently, as before), never fail the install over progress."""
+    installer = load_installer()
+    hub = types.ModuleType("huggingface_hub")
+
+    def hf_hub_download(repo_id, filename, repo_type, local_dir):
+        target = os.path.join(local_dir, filename)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as f:
+            f.write(b"archive")
+        return target
+
+    hub.hf_hub_download = hf_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.delitem(sys.modules, "huggingface_hub.utils", raising=False)
+    monkeypatch.delitem(sys.modules, "huggingface_hub.utils.tqdm", raising=False)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    dest = tmp_path / "staging" / "face-detection-arm64-cpu.tar.gz"
+    dest.parent.mkdir()
+    assert installer.download_with_hf_hub(
+        "deepsafe/feature-bundles",
+        "v2.0.0/face-detection-arm64-cpu.tar.gz",
+        str(dest),
+        7,
+        2,
+        85,
+    ) is True
+    assert dest.read_bytes() == b"archive"
+
+
 def test_ensure_hf_hub_noops_when_client_already_importable(monkeypatch, tmp_path):
     installer = load_installer()
     fake_module = types.ModuleType("huggingface_hub")
