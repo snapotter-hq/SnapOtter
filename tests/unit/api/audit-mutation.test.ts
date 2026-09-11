@@ -365,7 +365,11 @@ describe("auditLog failure handling", () => {
       auditLog(logger as never, "SETTINGS_UPDATED", { userId: "u1" }),
     ).resolves.toBeUndefined();
     expect(logger.warn).toHaveBeenCalledTimes(1);
-    expect(logger.warn.mock.calls[0][0]).toEqual({ event: "SETTINGS_UPDATED" });
+    // #1012: the caught error rides along under `err` (nothing else leaks in).
+    expect(logger.warn.mock.calls[0][0]).toEqual({
+      event: "SETTINGS_UPDATED",
+      err: expect.any(Error),
+    });
   });
 
   it("does not attempt the HMAC branch after an insert failure", async () => {
@@ -437,7 +441,11 @@ describe("auditLog tamper-resistant integrity", () => {
         auditLog(logger as never, "USER_CREATED", { userId: "u1" }),
       ).resolves.toBeUndefined();
       expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0][0]).toEqual({ event: "USER_CREATED" });
+      // #1012: the caught error rides along under `err` (nothing else leaks in).
+      expect(logger.warn.mock.calls[0][0]).toEqual({
+        event: "USER_CREATED",
+        err: expect.any(Error),
+      });
     } finally {
       (dbModule.db as { update: unknown }).update = original;
     }
