@@ -233,22 +233,35 @@ def make_download_reporter(
     progress_start: int,
     progress_end: int,
     min_delta_bytes: int = 32 * 1024 * 1024,
+    min_interval_s: float = 5.0,
 ):
     """Return a (done_bytes, total) callback that emits a moving-percent frame
-    at most every min_delta_bytes of new transfer.
+    once every min_delta_bytes of new transfer, or every min_interval_s while
+    bytes keep arriving, whichever comes first.
 
     The percent walks from progress_start toward progress_end by the
     manifest's compressed size (falling back to the transport's own total when
     the manifest has none), with the same stage text as the sequential
     downloader so the UI cannot tell the transports apart. Each frame is real
     bytes received, so it doubles as the liveness signal the install watchdog
-    counts; a transfer that truly stalls stops emitting."""
+    counts; a transfer that truly stalls stops emitting. The time bound keeps
+    a slow link alive too: without it a trickle under 32 MB per stall budget
+    would look stalled."""
     last_emitted = [None]
+    last_emitted_at = [0.0]
 
     def report(done_bytes: int, total=None) -> None:
-        if last_emitted[0] is not None and done_bytes - last_emitted[0] < min_delta_bytes:
-            return
+        now = time.monotonic()
+        if last_emitted[0] is not None:
+            if done_bytes <= last_emitted[0]:
+                return
+            if (
+                done_bytes - last_emitted[0] < min_delta_bytes
+                and now - last_emitted_at[0] < min_interval_s
+            ):
+                return
         last_emitted[0] = done_bytes
+        last_emitted_at[0] = now
         size = expected_size if expected_size > 0 else (total or 0)
         if size > 0:
             pct = min(done_bytes / size, 1.0)
@@ -274,8 +287,28 @@ def hf_download_progress(on_bytes):
     assembles the file from its chunk cache, so the staged .incomplete file on
     disk stays at 0 bytes until the transfer is over (issue #871).
 
-    Progress is advisory. A venv whose client lacks the seam downloads exactly
-    as before, just without frames."""
+    Yields None once hooked, or the reason the seam could not be hooked, so
+    the caller can refuse to run a transfer it has no way to watch: the install
+    watchdog counts stderr frames as the only liveness signal, and a silent
+    multi-GB transfer is exactly what it kills."""
+    reporting_broken = [False]
+
+    def report(done: int, total) -> None:
+        # Progress is advisory: a reporter bug must not abort a multi-GB
+        # transfer from inside the client's callback. Stop reporting after
+        # the first failure and leave the reason on stderr for the install
+        # log (the Node side keeps the last lines for error reporting).
+        if reporting_broken[0]:
+            return
+        try:
+            on_bytes(done, total)
+        except Exception as e:
+            reporting_broken[0] = True
+            try:
+                sys.stderr.write(f"download progress reporting stopped: {e}\n")
+            except OSError:
+                pass
+
     try:
         hub_tqdm = importlib.import_module("huggingface_hub.utils.tqdm")
         base = hub_tqdm.tqdm
@@ -289,18 +322,17 @@ def hf_download_progress(on_bytes):
 
             def update(self, n=1):
                 self._bytes_done += n
-                on_bytes(self._bytes_done, self.total)
+                report(self._bytes_done, self.total)
                 return super().update(n)
 
-    except Exception:
-        # No module, or a tqdm that cannot be subclassed: download without
-        # frames rather than fail the install over progress reporting.
-        yield
+    except Exception as e:
+        # No module, or a tqdm that cannot be subclassed.
+        yield f"{type(e).__name__}: {e}"
         return
 
     hub_tqdm.tqdm = ReportingTqdm
     try:
-        yield
+        yield None
     finally:
         hub_tqdm.tqdm = base
 
@@ -420,7 +452,17 @@ def download_with_hf_hub(
     previous_progress = _set_env_temporarily("HF_HUB_DISABLE_PROGRESS_BARS", "1")
     report = make_download_reporter(expected_size, progress_start, progress_end)
     try:
-        with hf_download_progress(report):
+        with hf_download_progress(report) as unhooked:
+            if unhooked:
+                # The sequential downloader frames every chunk, so it is the
+                # transport that can be watched; a silent accelerated transfer
+                # would be killed as stalled after INSTALL_STALL_MS.
+                emit_progress(
+                    progress_start,
+                    f"Accelerated client cannot report progress ({unhooked}); "
+                    "using resumable download.",
+                )
+                return False
             downloaded_path = hf_hub_download(
                 repo_id=bundle_repo,
                 filename=archive_file,

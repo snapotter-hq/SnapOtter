@@ -17,6 +17,23 @@ def load_installer():
     return module
 
 
+def _install_fake_hub_with_seam(monkeypatch, fake_module):
+    """Register a fake huggingface_hub that also carries the progress seam
+    (utils.tqdm.tqdm): a client without one is declined by design, see
+    test_download_with_hf_hub_declines_a_transfer_it_cannot_watch."""
+    sys.path.insert(0, os.path.dirname(__file__))
+    from hf_download_scenarios import RecordingTqdm
+
+    utils = types.ModuleType("huggingface_hub.utils")
+    tqdm_mod = types.ModuleType("huggingface_hub.utils.tqdm")
+    tqdm_mod.tqdm = RecordingTqdm
+    utils.tqdm = tqdm_mod
+    fake_module.utils = utils
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_module)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils", utils)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils.tqdm", tqdm_mod)
+
+
 def test_main_temporarily_lifts_hugging_face_offline_flags(monkeypatch):
     """An explicit bundle install stays online while runtime remains fail-closed."""
     installer = load_installer()
@@ -51,7 +68,7 @@ def test_download_with_hf_hub_uses_accelerated_client(monkeypatch, tmp_path):
 
     fake_module = types.ModuleType("huggingface_hub")
     fake_module.hf_hub_download = fake_hf_hub_download
-    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_module)
+    _install_fake_hub_with_seam(monkeypatch, fake_module)
 
     progress = []
     monkeypatch.setattr(installer, "emit_progress", lambda p, s: progress.append((p, s)))
@@ -96,7 +113,7 @@ def test_download_with_hf_hub_cleans_cache_when_download_raises(monkeypatch, tmp
 
     fake_module = types.ModuleType("huggingface_hub")
     fake_module.hf_hub_download = fake_hf_hub_download
-    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_module)
+    _install_fake_hub_with_seam(monkeypatch, fake_module)
     monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
 
     dest = staging / "object-eraser-colorize-amd64-gpu.tar.gz"
@@ -117,211 +134,132 @@ def test_download_with_hf_hub_cleans_cache_when_download_raises(monkeypatch, tmp
     assert not (staging / "v2.0.0").exists()
 
 
-class _RecordingTqdm:
-    """Stand-in for huggingface_hub.utils.tqdm.tqdm: the class both xet_get and
-    http_get instantiate through _get_progress_bar_context and feed with
-    update(bytes) as the transfer moves. Mirrors the real constructor shape
-    (keyword-only bar settings, `name` group) so a subclass installed by the
-    installer sees exactly what the library would hand it."""
+# -- download_with_hf_hub: progress while the transfer is in flight (#871) --
+#
+# The fakes and scenarios live in hf_download_scenarios.py so the vitest CI
+# gate (tests/unit/features/install-feature-download-progress.test.ts) runs
+# the same code; this file adds the pytest-side assertions.
 
-    instances = []
+sys.path.insert(0, os.path.dirname(__file__))
+import hf_download_scenarios as scenarios  # noqa: E402
 
-    def __init__(self, *args, **kwargs):
-        self.n = kwargs.get("initial", 0)
-        self.total = kwargs.get("total")
-        self.disable = kwargs.get("disable", False)
-        _RecordingTqdm.instances.append(self)
-
-    def update(self, n=1):
-        # Real tqdm returns early when disabled, without touching self.n.
-        if self.disable:
-            return
-        self.n += n
-
-    def close(self):
-        pass
+INSTALLER_PATH = os.path.join(os.path.dirname(__file__), "..", "install_feature.py")
 
 
-def _fake_hub_with_progress(monkeypatch, transfer):
-    """Install a fake huggingface_hub whose hf_hub_download drives the
-    library's tqdm seam the way the real client does. `transfer(bar)` runs
-    the simulated download against the bar the installer's hook sees."""
-    hub = types.ModuleType("huggingface_hub")
-    utils = types.ModuleType("huggingface_hub.utils")
-    tqdm_mod = types.ModuleType("huggingface_hub.utils.tqdm")
-    tqdm_mod.tqdm = _RecordingTqdm
-    utils.tqdm = tqdm_mod
-    hub.utils = utils
-
-    def hf_hub_download(repo_id, filename, repo_type, local_dir):
-        # Whatever class sits on the module at call time is what the library
-        # would construct; a hook that swapped it in must therefore be live now.
-        bar = tqdm_mod.tqdm(
-            unit="B", unit_scale=True, total=None, initial=0, desc=filename,
-            disable=True, name="huggingface_hub.xet_get",
-        )
-        transfer(bar)
-        bar.close()
-        target = os.path.join(local_dir, filename)
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, "wb") as f:
-            f.write(b"archive")
-        return target
-
-    hub.hf_hub_download = hf_hub_download
-    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
-    monkeypatch.setitem(sys.modules, "huggingface_hub.utils", utils)
-    monkeypatch.setitem(sys.modules, "huggingface_hub.utils.tqdm", tqdm_mod)
-    return tqdm_mod
+def run(name):
+    return scenarios.run_scenario(name, INSTALLER_PATH)
 
 
-def test_download_with_hf_hub_reports_bytes_while_transfer_is_in_flight(
-    monkeypatch, tmp_path
-):
+def test_download_with_hf_hub_reports_bytes_while_transfer_is_in_flight():
     """Issue #871: the accelerated download emitted one frame at the start
     and one at the end, so a multi-GB transfer sat at the start percent for
     its whole duration. The UI extrapolated an ETA of hours from that frozen
     percent and the stall watchdog (20 min, no frames) killed slow-but-live
     transfers. The download must report bytes as they arrive, with the
     percent walking from progress_start toward progress_end."""
-    installer = load_installer()
-    expected_size = 512 * 1024 * 1024
-    step = 32 * 1024 * 1024
+    result = run("inflight")
+    assert result["ok"] is True
+    assert result["archive"] == "archive"
 
-    def transfer(bar):
-        for _ in range(expected_size // step):
-            bar.update(step)
-
-    tqdm_mod = _fake_hub_with_progress(monkeypatch, transfer)
-
-    frames = []
-    monkeypatch.setattr(installer, "emit_progress", lambda p, s: frames.append((p, s)))
-
-    dest = tmp_path / "staging" / "upscale-enhance-amd64-gpu.tar.gz"
-    dest.parent.mkdir()
-    assert installer.download_with_hf_hub(
-        "deepsafe/feature-bundles",
-        "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-        str(dest),
-        expected_size,
-        2,
-        85,
-    ) is True
-
-    # Frames between the "starting" frame and the "downloaded" frame are the
-    # in-flight ones; before the fix this list was empty.
-    start = next(i for i, (_, s) in enumerate(frames) if "accelerated" in s.lower())
-    end = next(i for i, (_, s) in enumerate(frames) if s.startswith("Downloaded"))
-    inflight = frames[start + 1 : end]
-    assert len(inflight) >= 8, frames
-
+    inflight = scenarios.in_flight(result["frames"])
+    assert len(inflight) >= 8, result["frames"]
     percents = [p for p, _ in inflight]
     assert percents == sorted(percents), "download percent must be monotonic"
     assert all(2 <= p <= 85 for p in percents)
     assert percents[-1] >= 80, "reported percent must track the bytes received"
-    assert all("GB" in s for _, s in inflight), "stage carries the byte counter"
-
-    # The hook is scoped to the transfer: the library's class is restored.
-    assert tqdm_mod.tqdm is _RecordingTqdm
+    assert all(s.startswith("Downloading... ") and s.endswith(" GB") for _, s in inflight)
+    assert result["seamRestored"], "the library's tqdm class must come back"
 
 
-def test_download_with_hf_hub_restores_tqdm_seam_when_download_raises(
-    monkeypatch, tmp_path
-):
+def test_download_with_hf_hub_throttles_frames_by_bytes():
+    # 12 x 10 MiB with a frozen clock: only the 1st, 5th and 9th updates
+    # cross the 32 MiB threshold. Every frame is a DB write on the Node side.
+    result = run("throttle")
+    percents = [p for p, _ in scenarios.in_flight(result["frames"])]
+    assert len(percents) == 3, result["frames"]
+    assert percents == sorted(percents)
+
+
+def test_download_with_hf_hub_keeps_a_slow_link_alive_by_time():
+    # 1 MiB updates 6 s apart never reach the byte threshold; the time bound
+    # must frame each one or the watchdog reads the trickle as a stall.
+    result = run("trickle")
+    assert len(scenarios.in_flight(result["frames"])) == 8, result["frames"]
+
+
+def test_download_with_hf_hub_counts_a_resumed_transfer_from_its_offset():
+    # http_get hands tqdm initial=resume_size; 96 + 16 of 128 MiB is 87%.
+    result = run("resume")
+    percents = [p for p, _ in scenarios.in_flight(result["frames"])]
+    assert percents == [74], result["frames"]
+
+
+def test_download_with_hf_hub_uses_the_bar_total_without_a_manifest_size():
+    result = run("no_expected_size")
+    percents = [p for p, _ in scenarios.in_flight(result["frames"])]
+    assert percents == [22, 43, 64, 85], result["frames"]
+
+
+def test_download_with_hf_hub_restores_tqdm_seam_when_download_raises():
+    result = run("raises")
+    assert result["ok"] is False
+    assert result["seamRestored"]
+
+
+def test_download_with_hf_hub_never_frames_without_bytes():
+    # The watchdog contract: a frame means bytes moved, never a timer.
+    result = run("no_bytes")
+    assert result["ok"] is True
+    assert scenarios.in_flight(result["frames"]) == []
+
+
+def test_download_with_hf_hub_survives_a_reporter_bug():
+    # Progress is advisory: a raise inside the reporter must not abort the
+    # transfer or demote it to the sequential downloader.
+    result = run("reporter_raises")
+    assert result["ok"] is True
+    assert result["archive"] == "archive"
+    assert scenarios.in_flight(result["frames"]) == []
+
+
+@pytest.mark.parametrize("scenario", ["seam_missing", "not_a_class"])
+def test_download_with_hf_hub_declines_a_transfer_it_cannot_watch(scenario):
+    """A drifted client with no usable progress seam would download silently,
+    and a silent multi-GB transfer is exactly what the stall watchdog kills.
+    Decline it with a frame that says why, so download_and_verify falls back
+    to the sequential downloader, which frames every chunk."""
+    result = run(scenario)
+    assert result["ok"] is False
+    assert result["archive"] is None, "hf_hub_download must not have run"
+    assert result["seamRestored"]
+    stages = [s for _, s in result["frames"]]
+    assert any("cannot report progress" in s and "resumable" in s for s in stages), stages
+
+
+def test_download_with_hf_hub_seam_hooks_the_real_client():
+    """Drive the real huggingface_hub progress-bar factory (the one xet_get and
+    http_get call) through hf_download_progress. Runs only where the client
+    is installed, which is the venv the installer ships in, not CI; it is the
+    only check that the subclass survives real tqdm's constructor."""
+    hub_tqdm = pytest.importorskip("huggingface_hub.utils.tqdm")
     installer = load_installer()
-
-    def transfer(bar):
-        raise RuntimeError("xet CAS unreachable")
-
-    tqdm_mod = _fake_hub_with_progress(monkeypatch, transfer)
-    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
-
-    dest = tmp_path / "staging" / "upscale-enhance-amd64-gpu.tar.gz"
-    dest.parent.mkdir()
-    assert installer.download_with_hf_hub(
-        "deepsafe/feature-bundles",
-        "v2.0.0/upscale-enhance-amd64-gpu.tar.gz",
-        str(dest),
-        100,
-        2,
-        85,
-    ) is False
-    assert tqdm_mod.tqdm is _RecordingTqdm
-
-
-def test_download_with_hf_hub_still_downloads_when_progress_seam_is_missing(
-    monkeypatch, tmp_path
-):
-    """A drifted venv whose huggingface_hub has no utils.tqdm module must keep
-    downloading (silently, as before), never fail the install over progress."""
-    installer = load_installer()
-    hub = types.ModuleType("huggingface_hub")
-
-    def hf_hub_download(repo_id, filename, repo_type, local_dir):
-        target = os.path.join(local_dir, filename)
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, "wb") as f:
-            f.write(b"archive")
-        return target
-
-    hub.hf_hub_download = hf_hub_download
-    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
-    monkeypatch.delitem(sys.modules, "huggingface_hub.utils", raising=False)
-    monkeypatch.delitem(sys.modules, "huggingface_hub.utils.tqdm", raising=False)
-    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
-
-    dest = tmp_path / "staging" / "face-detection-arm64-cpu.tar.gz"
-    dest.parent.mkdir()
-    assert installer.download_with_hf_hub(
-        "deepsafe/feature-bundles",
-        "v2.0.0/face-detection-arm64-cpu.tar.gz",
-        str(dest),
-        7,
-        2,
-        85,
-    ) is True
-    assert dest.read_bytes() == b"archive"
-
-
-def test_download_with_hf_hub_still_downloads_when_tqdm_cannot_be_subclassed(
-    monkeypatch, tmp_path
-):
-    """The seam module exists but its tqdm is not a class (a drifted client
-    that stubs it out): the download must still complete, silently, rather
-    than fall through to the sequential downloader or fail the install."""
-    installer = load_installer()
-    hub = types.ModuleType("huggingface_hub")
-    utils = types.ModuleType("huggingface_hub.utils")
-    tqdm_mod = types.ModuleType("huggingface_hub.utils.tqdm")
-    tqdm_mod.tqdm = 42
-    utils.tqdm = tqdm_mod
-    hub.utils = utils
-
-    def hf_hub_download(repo_id, filename, repo_type, local_dir):
-        target = os.path.join(local_dir, filename)
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, "wb") as f:
-            f.write(b"archive")
-        return target
-
-    hub.hf_hub_download = hf_hub_download
-    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
-    monkeypatch.setitem(sys.modules, "huggingface_hub.utils", utils)
-    monkeypatch.setitem(sys.modules, "huggingface_hub.utils.tqdm", tqdm_mod)
-    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
-
-    dest = tmp_path / "staging" / "face-detection-arm64-cpu.tar.gz"
-    dest.parent.mkdir()
-    assert installer.download_with_hf_hub(
-        "deepsafe/feature-bundles",
-        "v2.0.0/face-detection-arm64-cpu.tar.gz",
-        str(dest),
-        7,
-        2,
-        85,
-    ) is True
-    assert dest.read_bytes() == b"archive"
-    assert tqdm_mod.tqdm == 42
+    frames = []
+    reporter = installer.make_download_reporter(100 * 1024 * 1024, 2, 85)
+    installer.emit_progress = lambda p, s: frames.append((p, s))
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    try:
+        with installer.hf_download_progress(reporter) as unhooked:
+            assert unhooked is None
+            with hub_tqdm._get_progress_bar_context(
+                desc="bundle.tar.gz", log_level=20, total=100 * 1024 * 1024,
+                initial=0, name="huggingface_hub.xet_get",
+            ) as bar:
+                bar.update(50 * 1024 * 1024)
+                bar.update(50 * 1024 * 1024)
+    finally:
+        os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
+    assert [p for p, _ in frames] == [43, 85], frames
+    assert hub_tqdm.tqdm.__name__ == "tqdm", "seam restored to the library class"
 
 
 def test_ensure_hf_hub_noops_when_client_already_importable(monkeypatch, tmp_path):
