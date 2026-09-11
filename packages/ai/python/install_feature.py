@@ -279,21 +279,24 @@ def hf_download_progress(on_bytes):
     try:
         hub_tqdm = importlib.import_module("huggingface_hub.utils.tqdm")
         base = hub_tqdm.tqdm
+
+        class ReportingTqdm(base):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                # tqdm seeds n with `initial` even when the bar is disabled,
+                # which is where a resumed transfer starts counting from.
+                self._bytes_done = self.n
+
+            def update(self, n=1):
+                self._bytes_done += n
+                on_bytes(self._bytes_done, self.total)
+                return super().update(n)
+
     except Exception:
+        # No module, or a tqdm that cannot be subclassed: download without
+        # frames rather than fail the install over progress reporting.
         yield
         return
-
-    class ReportingTqdm(base):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # tqdm seeds n with `initial` even when the bar is disabled, which
-            # is where a resumed transfer starts counting from.
-            self._bytes_done = self.n
-
-        def update(self, n=1):
-            self._bytes_done += n
-            on_bytes(self._bytes_done, self.total)
-            return super().update(n)
 
     hub_tqdm.tqdm = ReportingTqdm
     try:

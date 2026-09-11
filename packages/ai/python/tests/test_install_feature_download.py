@@ -283,6 +283,47 @@ def test_download_with_hf_hub_still_downloads_when_progress_seam_is_missing(
     assert dest.read_bytes() == b"archive"
 
 
+def test_download_with_hf_hub_still_downloads_when_tqdm_cannot_be_subclassed(
+    monkeypatch, tmp_path
+):
+    """The seam module exists but its tqdm is not a class (a drifted client
+    that stubs it out): the download must still complete, silently, rather
+    than fall through to the sequential downloader or fail the install."""
+    installer = load_installer()
+    hub = types.ModuleType("huggingface_hub")
+    utils = types.ModuleType("huggingface_hub.utils")
+    tqdm_mod = types.ModuleType("huggingface_hub.utils.tqdm")
+    tqdm_mod.tqdm = 42
+    utils.tqdm = tqdm_mod
+    hub.utils = utils
+
+    def hf_hub_download(repo_id, filename, repo_type, local_dir):
+        target = os.path.join(local_dir, filename)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as f:
+            f.write(b"archive")
+        return target
+
+    hub.hf_hub_download = hf_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils", utils)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.utils.tqdm", tqdm_mod)
+    monkeypatch.setattr(installer, "emit_progress", lambda p, s: None)
+
+    dest = tmp_path / "staging" / "face-detection-arm64-cpu.tar.gz"
+    dest.parent.mkdir()
+    assert installer.download_with_hf_hub(
+        "deepsafe/feature-bundles",
+        "v2.0.0/face-detection-arm64-cpu.tar.gz",
+        str(dest),
+        7,
+        2,
+        85,
+    ) is True
+    assert dest.read_bytes() == b"archive"
+    assert tqdm_mod.tqdm == 42
+
+
 def test_ensure_hf_hub_noops_when_client_already_importable(monkeypatch, tmp_path):
     installer = load_installer()
     fake_module = types.ModuleType("huggingface_hub")
