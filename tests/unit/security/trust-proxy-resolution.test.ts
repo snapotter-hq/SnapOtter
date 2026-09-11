@@ -58,6 +58,33 @@ describe("parseTrustProxy", () => {
     expect(parseTrustProxy("")).toBe(false);
     expect(parseTrustProxy("   ")).toBe(false);
   });
+
+  it("rejects a malformed list at parse time instead of crashing Fastify (#999)", () => {
+    // A value that is neither a boolean nor a valid proxy-addr list used to be
+    // returned untouched and then threw a bare `TypeError: invalid IP address:
+    // <x>` out of Fastify() after migrations and Redis were already up, naming
+    // neither TRUST_PROXY nor a fix. These are the shapes from the report: a
+    // boolean typo, a boolean with a trailing space (common from a hand-edited
+    // .env), a trailing comma, a semicolon used as a separator, and a range
+    // proxy-addr refuses.
+    for (const value of [
+      "TRUE",
+      "yes",
+      "true ",
+      "10.0.0.0/8,",
+      "10.0.0.0/8;192.168.0.0/16",
+      "0.0.0.0/0",
+    ]) {
+      const attempt = () => parseTrustProxy(value);
+      expect(attempt, value).toThrow(`TRUST_PROXY=${value}:`);
+      // The same three replacement forms the hop-count message offers.
+      expect(attempt, value).toThrow(/"false"/);
+      expect(attempt, value).toThrow(/loopback,linklocal,uniquelocal/);
+      expect(attempt, value).toThrow(/"true"/);
+      // The bare proxy-addr TypeError text never reaches the operator.
+      expect(attempt, value).not.toThrow(/invalid IP address/);
+    }
+  });
 });
 
 /**
@@ -159,5 +186,16 @@ describe("the old default is what made request.ip client-controlled", () => {
     const ip = await resolveIp(2 as never, "172.18.0.1", FORGED);
     expect(ip).toBe("172.18.0.1");
     expect(ip).not.toBe(FORGED);
+  });
+
+  it("fastify itself crashes on a malformed trustProxy, which is why parseTrustProxy rejects it (#999)", () => {
+    // Pins the mechanism the parse-time guard exists for: each value the parser
+    // now rejects would, passed straight to Fastify the way it used to be,
+    // throw at construction (Request.buildRequest compiles trustProxy eagerly).
+    // If a future proxy-addr stops rejecting one of these, this breaks and the
+    // guard would silently start accepting it.
+    for (const value of ["TRUE", "true ", "10.0.0.0/8,", "0.0.0.0/0"]) {
+      expect(() => Fastify({ trustProxy: value }), value).toThrow();
+    }
   });
 });

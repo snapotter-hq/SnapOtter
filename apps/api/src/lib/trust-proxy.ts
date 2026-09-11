@@ -9,6 +9,8 @@
  * pin this behaviour without booting the server.
  */
 
+import proxyAddr from "@fastify/proxy-addr";
+
 /**
  * The shipped TRUST_PROXY default: believe `X-Forwarded-For` only from a peer
  * on a private network.
@@ -40,7 +42,8 @@ export const DEFAULT_TRUST_PROXY = "loopback,linklocal,uniquelocal";
  * Two forms, both of which proxy-addr understands:
  *   "true" / "false" -> trust every peer / trust none
  *   anything else    -> a comma-separated list of CIDRs or named ranges
- *                       ("loopback", "linklocal", "uniquelocal")
+ *                       ("loopback", "linklocal", "uniquelocal"), validated
+ *                       here against proxy-addr before it is returned
  *
  * A hop count (a bare number) used to be a third form. fastify 5.12.1
  * (GHSA-3m5p-2c4r-xxw2) stopped honouring it: a hop count cannot validate the
@@ -69,5 +72,22 @@ export function parseTrustProxy(value: string): boolean | string {
         "address.",
     );
   }
-  return value; // CIDR list
+  // Validate the list against the exact parser Fastify will use, so a value
+  // that is neither a boolean nor a valid list fails here, at env-parse time,
+  // instead of throwing a bare `TypeError: invalid IP address: <x>` out of
+  // Fastify() after migrations and Redis are already up (that stack trace names
+  // neither TRUST_PROXY nor a fix, and s6 restarts the API into it forever).
+  // Fastify splits the string on commas and trims each token before compiling
+  // (fastify/lib/request.js getTrustProxyFn), so mirror that split exactly.
+  try {
+    proxyAddr.compile(value.split(",").map((token) => token.trim()));
+  } catch {
+    throw new Error(
+      `TRUST_PROXY=${value}: not a recognized trust value. Use "false" when ` +
+        "nothing proxies this instance, a comma-separated list of CIDRs or named " +
+        `ranges such as "${DEFAULT_TRUST_PROXY}" to name the proxies, or "true" ` +
+        "only when a proxy you control sits in front on a public address.",
+    );
+  }
+  return value; // validated CIDR / named-range list
 }
