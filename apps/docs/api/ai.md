@@ -75,6 +75,27 @@ Tools with cross-bundle dependencies:
 
 A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
 
+### Installing every bundle at once {#installing-every-bundle-at-once}
+
+Settings, AI Features has an **Install All** button that queues every bundle the host can run. It skips anything already installed, skips bundles reported incompatible with the host, and retries a failed bundle once before moving on. For a normal instance that button is the whole answer, and nothing below is needed.
+
+Budget the disk first. Together the bundles are roughly 20-25 GB installed, and they land in `/data/ai` on the data volume rather than in the image, so they survive `docker compose down` and container recreation. You install them once per host, not once per upgrade.
+
+For unattended provisioning where nobody is going to click anything, POST each bundle to the install endpoint with an admin API key. The server queues them, so send all eight without waiting:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Each call returns `202` with a `jobId` and a `queued` flag: `false` for the one that starts immediately, `true` for the rest. A bundle that is already installed returns `409` and is safe to ignore, which makes the loop re-runnable. Poll `GET /api/v1/features` for progress; every bundle reads `installed` when the run is done.
+
+Two things to expect. The `ocr` bundle runs a host-compatibility preflight and refuses hosts below its signed minimum, so it can fail while the other seven succeed (see [Accurate OCR runtime installation](#accurate-ocr-runtime-installation)). And `POST /api/v1/admin/features/reset` returns `409` while any install is in progress, so a run that is part way through has to finish or the container has to be restarted before the environment can be wiped.
+
 ### Accurate OCR runtime installation {#accurate-ocr-runtime-installation}
 
 The accurate OCR pack is a platform-specific runtime for the official Linux amd64 or Linux arm64 container. The amd64 build uses Python 3.12; the arm64 build uses Python 3.11. Both builds run RapidOCR through ONNX Runtime's `CPUExecutionProvider`, so the same pack works on CPU-only and NVIDIA Docker hosts. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. A system below that signed compatibility minimum is rejected before download. This requirement does not apply to built-in Fast OCR. Bare-metal builds are rejected because their libc and Python ABI cannot be inferred safely; Fast OCR remains available when the host provides Tesseract and Ghostscript. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`). Korean therefore requires a supported accurate runtime and a `balanced` or `best` tier; unsupported hosts receive an explicit incompatibility response rather than a silent Fast fallback.
