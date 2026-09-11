@@ -69,6 +69,15 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
           api_host: apiHost,
           ...(uiHost ? { ui_host: uiHost } : {}),
           autocapture: false,
+          // Unset, posthog-js obeys the PostHog project's server-side capture
+          // toggles, which stay on for the public sites, so a self-hosted
+          // instance would report every click and dead click (#1022). Set them
+          // explicitly so the client decides: heatmaps and dead clicks off, and
+          // capture_performance limited to web vitals (documented in TELEMETRY.md),
+          // not network timing.
+          capture_heatmaps: false,
+          capture_dead_clicks: false,
+          capture_performance: { web_vitals: true, network_timing: false },
           // Fire $pageview on SPA history changes, not just the initial hard
           // load, so react-router route changes (tool pages, editor, automate,
           // files) are captured. capture_pageleave gives accurate time-on-page.
@@ -89,6 +98,15 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
               props.$current_url = strip(props.$current_url);
               props.$referrer = strip(props.$referrer);
+              // $web_vitals_*_event objects nest their own $current_url, which
+              // skips the top-level strip above, so walk them too (#1022).
+              for (const key of Object.keys(props)) {
+                if (!key.startsWith("$web_vitals_")) continue;
+                const nested = props[key] as Record<string, unknown>;
+                if (nested && typeof nested === "object" && "$current_url" in nested) {
+                  nested.$current_url = strip(nested.$current_url);
+                }
+              }
             }
             return event;
           },
