@@ -45,7 +45,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { recordRecentTool } from "@/hooks/use-recent-tools";
-import { formatFileSize } from "@/lib/download";
+import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
@@ -559,12 +559,7 @@ export function ToolPage() {
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
-    const url = URL.createObjectURL(batchZipBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = batchZipFilename ?? "processed-files.zip";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
   }, [batchZipBlob, batchZipFilename]);
 
   if (tool && disabledTools.includes(tool.id)) {
