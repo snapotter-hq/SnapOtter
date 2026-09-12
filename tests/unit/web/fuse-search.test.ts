@@ -15,6 +15,11 @@ describe("app fuzzy search finds converters by variation", () => {
     ["heic jpg", "heic-to-jpg"],
     ["mov mp4", "mov-to-mp4"],
     ["convert mp4 to mp3", "mp4-to-mp3"],
+    ["ico", "favicon"],
+    ["jpg to ico", "favicon"],
+    ["jpg2ico", "favicon"],
+    ["png to ico", "favicon"],
+    ["png2ico", "favicon"],
   ])("%s finds %s", (q, id) => {
     expect(search(q).slice(0, 5)).toContain(id);
   });
