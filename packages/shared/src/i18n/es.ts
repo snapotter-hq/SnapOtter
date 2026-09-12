@@ -3849,6 +3849,17 @@ export const es: TranslationKeys = {
     downloadFiles: "Descargar {count} archivos",
     audioDecodeUnsupported: "Este formato de audio no se puede previsualizar en el navegador",
   },
+  navigationGuard: {
+    processingTitle: "Este proceso no ha terminado",
+    processingBody: "Si sales ahora, pierdes el resultado.",
+    unsavedTitle: "Este resultado no está guardado",
+    unsavedBody: "Si sales ahora, lo pierdes.",
+    editorTitle: "Tienes cambios sin guardar",
+    editorBody: "Si sales ahora, pierdes todo lo hecho desde el último guardado.",
+    stay: "Permanecer aquí",
+    leave: "Salir de todos modos",
+    downloadAndLeave: "Descargar y salir",
+  },
   homePage: {
     generatingPreview: "Generando vista previa...",
     loadingPreview: "Cargando vista previa...",

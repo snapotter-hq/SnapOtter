@@ -3858,6 +3858,17 @@ export const ru: TranslationKeys = {
     downloadFiles: "Скачать {count} файлов",
     audioDecodeUnsupported: "Этот аудиоформат не поддерживается для предпросмотра в браузере",
   },
+  navigationGuard: {
+    processingTitle: "Эта операция ещё не завершена",
+    processingBody: "Если уйти сейчас, результат будет потерян.",
+    unsavedTitle: "Этот результат не сохранён",
+    unsavedBody: "Если уйти сейчас, он пропадёт.",
+    editorTitle: "Есть несохранённые изменения",
+    editorBody: "Если уйти сейчас, пропадёт всё, что сделано после последнего сохранения.",
+    stay: "Остаться здесь",
+    leave: "Всё равно уйти",
+    downloadAndLeave: "Скачать и уйти",
+  },
   homePage: {
     generatingPreview: "Генерация предпросмотра...",
     loadingPreview: "Загрузка предпросмотра...",

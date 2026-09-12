@@ -3874,6 +3874,17 @@ export const fr: TranslationKeys = {
     downloadFiles: "Télécharger {count} fichiers",
     audioDecodeUnsupported: "Ce format audio ne peut pas être prévisualisé dans le navigateur",
   },
+  navigationGuard: {
+    processingTitle: "Ce traitement n'est pas terminé",
+    processingBody: "Si vous partez maintenant, vous perdez le résultat.",
+    unsavedTitle: "Ce résultat n'est pas enregistré",
+    unsavedBody: "Si vous partez maintenant, il est perdu.",
+    editorTitle: "Vous avez des modifications non enregistrées",
+    editorBody: "Si vous partez maintenant, vous perdez tout depuis le dernier enregistrement.",
+    stay: "Rester ici",
+    leave: "Partir quand même",
+    downloadAndLeave: "Télécharger puis partir",
+  },
   homePage: {
     generatingPreview: "Génération de l'aperçu...",
     loadingPreview: "Chargement de l'aperçu...",

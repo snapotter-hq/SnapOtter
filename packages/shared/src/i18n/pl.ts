@@ -3855,6 +3855,17 @@ export const pl: TranslationKeys = {
     downloadFiles: "Pobierz {count} plików",
     audioDecodeUnsupported: "Ten format audio nie może być odtworzony w przeglądarce",
   },
+  navigationGuard: {
+    processingTitle: "To zadanie nie jest ukończone",
+    processingBody: "Jeśli teraz wyjdziesz, stracisz wynik.",
+    unsavedTitle: "Ten wynik nie jest zapisany",
+    unsavedBody: "Jeśli teraz wyjdziesz, przepadnie.",
+    editorTitle: "Masz niezapisane zmiany",
+    editorBody: "Jeśli teraz wyjdziesz, stracisz wszystko od ostatniego zapisu.",
+    stay: "Zostań tutaj",
+    leave: "Wyjdź mimo to",
+    downloadAndLeave: "Pobierz i wyjdź",
+  },
   homePage: {
     generatingPreview: "Generowanie podglądu...",
     loadingPreview: "Ładowanie podglądu...",

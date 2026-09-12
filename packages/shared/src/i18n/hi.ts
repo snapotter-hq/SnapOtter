@@ -3659,6 +3659,17 @@ export const hi: TranslationKeys = {
     downloadFiles: "{count} फ़ाइलें डाउनलोड करें",
     audioDecodeUnsupported: "इस ऑडियो फ़ॉर्मैट का ब्राउज़र में प्रीव्यू नहीं हो सकता",
   },
+  navigationGuard: {
+    processingTitle: "यह प्रक्रिया अभी पूरी नहीं हुई है",
+    processingBody: "अभी छोड़ने पर आप परिणाम खो देंगे।",
+    unsavedTitle: "यह परिणाम सहेजा नहीं गया है",
+    unsavedBody: "अभी छोड़ने पर यह खो जाएगा।",
+    editorTitle: "आपके पास बिना सहेजे बदलाव हैं",
+    editorBody: "अभी छोड़ने पर पिछली बार सहेजने के बाद का सब कुछ खो जाएगा।",
+    stay: "यहीं रहें",
+    leave: "फिर भी छोड़ें",
+    downloadAndLeave: "डाउनलोड करके छोड़ें",
+  },
   homePage: {
     generatingPreview: "प्रीव्यू जनरेट हो रहा है...",
     loadingPreview: "प्रीव्यू लोड हो रहा है...",

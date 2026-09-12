@@ -3864,6 +3864,17 @@ export const it: TranslationKeys = {
     audioDecodeUnsupported:
       "Questo formato audio non può essere visualizzato in anteprima nel browser",
   },
+  navigationGuard: {
+    processingTitle: "Questa elaborazione non è finita",
+    processingBody: "Se esci ora, perdi il risultato.",
+    unsavedTitle: "Questo risultato non è salvato",
+    unsavedBody: "Se esci ora, lo perdi.",
+    editorTitle: "Hai modifiche non salvate",
+    editorBody: "Se esci ora, perdi tutto dall'ultimo salvataggio.",
+    stay: "Resta qui",
+    leave: "Esci comunque",
+    downloadAndLeave: "Scarica, poi esci",
+  },
   homePage: {
     generatingPreview: "Generazione anteprima...",
     loadingPreview: "Caricamento anteprima...",

@@ -3872,6 +3872,17 @@ export const de: TranslationKeys = {
     downloadFiles: "{count} Dateien herunterladen",
     audioDecodeUnsupported: "Dieses Audioformat kann im Browser nicht wiedergegeben werden",
   },
+  navigationGuard: {
+    processingTitle: "Dieser Vorgang ist noch nicht fertig",
+    processingBody: "Beim Verlassen geht das Ergebnis verloren.",
+    unsavedTitle: "Dieses Ergebnis ist nicht gespeichert",
+    unsavedBody: "Beim Verlassen geht es verloren.",
+    editorTitle: "Nicht gespeicherte Änderungen",
+    editorBody: "Beim Verlassen geht alles seit dem letzten Speichern verloren.",
+    stay: "Hier bleiben",
+    leave: "Trotzdem verlassen",
+    downloadAndLeave: "Herunterladen, dann verlassen",
+  },
   homePage: {
     generatingPreview: "Vorschau wird generiert...",
     loadingPreview: "Vorschau wird geladen...",
