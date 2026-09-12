@@ -27,6 +27,33 @@ export const MODALITY_POOL: Record<Modality, "image" | "media" | "docs"> = {
   file: "docs",
 };
 
+/** Camera RAW extensions supported by the image decoder (with dots). */
+export const CAMERA_RAW_INPUTS = [
+  ".dng",
+  ".cr2",
+  ".cr3",
+  ".nef",
+  ".nrw",
+  ".arw",
+  ".orf",
+  ".rw2",
+  ".raf",
+  ".pef",
+  ".3fr",
+  ".iiq",
+  ".srw",
+  ".x3f",
+  ".rwl",
+  ".gpr",
+  ".fff",
+  ".mrw",
+  ".mef",
+  ".kdc",
+  ".dcr",
+  ".erf",
+  ".ptx",
+] as const;
+
 // Default accepted input extensions per modality (with dots; drives the
 // file picker accept attribute and docs). Tools may narrow this.
 export const IMAGE_INPUTS = [
@@ -50,12 +77,7 @@ export const IMAGE_INPUTS = [
   ".tga",
   ".exr",
   ".hdr",
-  ".dng",
-  ".cr2",
-  ".nef",
-  ".arw",
-  ".orf",
-  ".rw2",
+  ...CAMERA_RAW_INPUTS,
   ".ppm",
   ".pgm",
   ".pbm",

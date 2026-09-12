@@ -115,6 +115,15 @@ describe("saveFile", () => {
     }
   });
 
+  it("preserves every supported camera RAW extension", async () => {
+    const { CAMERA_RAW_INPUTS } = await import("@snapotter/shared");
+    const { saveFile } = await importModule();
+    for (const ext of CAMERA_RAW_INPUTS) {
+      const name = await saveFile(Buffer.from("x"), `photo${ext}`);
+      expect(name).toMatch(new RegExp(`\\${ext}$`));
+    }
+  });
+
   it("lowercases extensions", async () => {
     const { saveFile } = await importModule();
     const name = await saveFile(Buffer.from("x"), "PHOTO.PNG");
