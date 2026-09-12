@@ -179,6 +179,28 @@ export const TESTIMONIALS: Testimonial[] = [
     url: "https://www.youtube.com/watch?v=HWC3jX8-tiw",
     hero: true,
   },
+  {
+    quote: "Keep going my guy, you are killing it <3",
+    author: "Self-hosted user",
+    context: "Shared via in-app feedback",
+    hero: true,
+  },
+  {
+    quote: "Everything fine, love it so far! ... Nice work, thanks!",
+    author: "SnapOtter user",
+    context: "Shared via in-app feedback",
+  },
+  {
+    quote: "Herzliche Grüße und Danke für euer tolles Produkt!",
+    author: "SnapOtter user",
+    context: "Shared via in-app feedback",
+    lang: "de",
+  },
+  {
+    quote: "I am using pipeline builder (what a brilliant!)...",
+    author: "Self-hosted user",
+    context: "Shared via in-app feedback",
+  },
 ];
 
 /**
