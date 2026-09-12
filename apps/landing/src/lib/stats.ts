@@ -4,15 +4,18 @@
 // fetchers degrade to a maintained constant if the upstream API is unreachable
 // (or rate-limited), so a build never ships an empty number.
 
-// ghcr.io exposes no pull-count API (`gh api orgs/snapotter-hq/packages/
-// container/snapotter` 404s), but the count IS visible on the package page at
-// github.com/orgs/snapotter-hq/packages. So this is read off by hand and cannot
-// be fetched at build time like the Docker Hub figure below.
+// ghcr.io exposes no pull-count API. The REST packages endpoint does answer
+// for this account (under /users, not the /orgs path an earlier comment here
+// blamed for the 404: snapotter-hq is a user), but the response carries no
+// download field at all. The total exists only on the package page, so it is
+// parsed out of that markup at build time by parseGhcrDownloads below.
 //
-// OBSERVED 2026-09-12: 176,000. A previous value sat at 36,000 long enough to
-// understate the real number by more than half, so re-read the package page
-// whenever you touch this file and update the date with it.
-const GHCR_ESTIMATE = 176_000;
+// This was a hand-copied constant until 2026-09-12, and it drifted every time:
+// 36,000 against a real number more than twice that, then 122,000 against
+// 176,180. A scheduled rebuild cannot refresh a number no build ever reads.
+const GHCR_PACKAGE_URL =
+  "https://github.com/users/snapotter-hq/packages/container/package/snapotter";
+const GHCR_FALLBACK = 176_000; // live 2026-09-12: 176,180
 
 // Fallbacks for when an upstream fetch fails. These are a safety net, not a
 // source of truth: a successful build overwrites them with live values, and the
@@ -61,6 +64,26 @@ export function formatPulls(total: number): string {
   return `${Math.floor(total / 10_000) * 10}K+`;
 }
 
+/**
+ * Pull the exact GHCR download total out of the package page.
+ *
+ * The page renders the rounded figure as text ("176K") and keeps the real
+ * number in the heading's title attribute, so the match is anchored on the
+ * "Total downloads" label rather than on the markup around it: the Issues
+ * counter directly above uses the identical `<h3 title="...">` shape, and a
+ * looser pattern reports the issue count as downloads.
+ *
+ * Returns undefined rather than a guess when the label, the heading, or the
+ * title attribute is missing, which is what a GitHub redesign looks like from
+ * here. The caller then falls back to the constant and says so in the log.
+ */
+export function parseGhcrDownloads(html: string): number | undefined {
+  const match = html.match(/Total downloads<\/span>\s*<h3[^>]*\stitle="(\d+)"/);
+  if (!match) return undefined;
+  const total = Number(match[1]);
+  return Number.isFinite(total) && total > 0 ? total : undefined;
+}
+
 // Both stats are read from Astro frontmatter, and Navbar/TrustSignals render on
 // every page, so an un-memoized fetch fires once PER PAGE: ~800 GitHub calls per
 // full build. That blows through the unauthenticated 60 req/hr limit almost
@@ -105,9 +128,9 @@ async function fetchStarCount(): Promise<number> {
 }
 
 /**
- * Total image pulls = live Docker Hub pull_count + the GHCR estimate.
- * Returns the raw total and a display string. Docker Hub degrades to
- * DOCKER_FALLBACK if the API is unreachable.
+ * Total image pulls across both registries, fetched once per build. Each half
+ * degrades to its own constant if that upstream is unreachable, so a partial
+ * outage costs one registry's freshness rather than the whole figure.
  */
 export function getImagePulls(): Promise<{ total: number; display: string }> {
   imagePullsPromise ??= fetchImagePulls();
@@ -115,16 +138,19 @@ export function getImagePulls(): Promise<{ total: number; display: string }> {
 }
 
 async function fetchImagePulls(): Promise<{ total: number; display: string }> {
-  let dockerPulls = DOCKER_FALLBACK;
+  // One registry being down must not cost the other its live number.
+  const [dockerPulls, ghcrPulls] = await Promise.all([fetchDockerPulls(), fetchGhcrPulls()]);
+  const total = dockerPulls + ghcrPulls;
+  return { total, display: formatPulls(total) };
+}
+
+async function fetchDockerPulls(): Promise<number> {
   try {
     const res = await fetch(`https://hub.docker.com/v2/repositories/${DOCKERHUB_REPO}/`);
     if (res.ok) {
       const data = await res.json();
-      if (typeof data.pull_count === "number" && data.pull_count > 0) {
-        dockerPulls = data.pull_count;
-      } else {
-        warnStale("Docker Hub pulls", "response missing pull_count", DOCKER_FALLBACK);
-      }
+      if (typeof data.pull_count === "number" && data.pull_count > 0) return data.pull_count;
+      warnStale("Docker Hub pulls", "response missing pull_count", DOCKER_FALLBACK);
     } else {
       warnStale("Docker Hub pulls", `HTTP ${res.status}`, DOCKER_FALLBACK);
     }
@@ -135,6 +161,21 @@ async function fetchImagePulls(): Promise<{ total: number; display: string }> {
       DOCKER_FALLBACK,
     );
   }
-  const total = dockerPulls + GHCR_ESTIMATE;
-  return { total, display: formatPulls(total) };
+  return DOCKER_FALLBACK;
+}
+
+async function fetchGhcrPulls(): Promise<number> {
+  try {
+    const res = await fetch(GHCR_PACKAGE_URL, { headers: { "User-Agent": "SnapOtter-Landing" } });
+    if (res.ok) {
+      const total = parseGhcrDownloads(await res.text());
+      if (total !== undefined) return total;
+      warnStale("GHCR downloads", "response missing the Total downloads figure", GHCR_FALLBACK);
+    } else {
+      warnStale("GHCR downloads", `HTTP ${res.status}`, GHCR_FALLBACK);
+    }
+  } catch (err) {
+    warnStale("GHCR downloads", err instanceof Error ? err.message : "fetch threw", GHCR_FALLBACK);
+  }
+  return GHCR_FALLBACK;
 }

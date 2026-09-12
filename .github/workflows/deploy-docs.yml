@@ -9,9 +9,10 @@ on:
       - "packages/shared/src/analytics/public-site.ts"
   # Daily rebuild so the build-time GitHub star count refreshes even when no
   # docs files changed (mirrors deploy-landing.yml, offset an hour so the two
-  # scheduled deploys don't fire at once).
+  # scheduled deploys don't fire at once, and off the top of the hour for the
+  # queueing reason described there).
   schedule:
-    - cron: "0 8 * * *"
+    - cron: "23 8 * * *"
   workflow_dispatch:
 
 concurrency:
