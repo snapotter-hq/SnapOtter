@@ -34,8 +34,12 @@ const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
  * stays itself. React Router matches routes case-insensitively unless a route
  * opts in to caseSensitive, which none here do, so "/EDITOR" renders the editor
  * and the guard has to recognise it.
+ *
+ * Exported because the navigation blocker compares pathnames too. Both halves
+ * of the guard have to spell a path the same way or they disagree about which
+ * page you are on.
  */
-function normalizePath(pathname: string): string {
+export function normalizePath(pathname: string): string {
   const lower = pathname.toLowerCase();
   return lower.length > 1 && lower.endsWith("/") ? lower.slice(0, -1) : lower;
 }
