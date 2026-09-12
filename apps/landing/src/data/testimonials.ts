@@ -2,14 +2,18 @@
 //
 // RULES FOR EDITING THIS FILE:
 //   1. Never write a quote nobody actually said. Every entry traces to a public
-//      URL or a `feedback_submitted` PostHog event.
+//      URL, a `feedback_submitted` PostHog event, or a Discord message a
+//      maintainer relayed. Discord has no permalink here, so the maintainer who
+//      added it is the source of record.
 //   2. Keep the author's typos and phrasing. "Painless proces" is not a bug.
 //   3. Square brackets mark the only words we changed; "..." marks a cut. Both
 //      stay visible to the reader.
 //   4. `context: "Shared via in-app feedback"` quotes came through the feedback
 //      dialog, which only ever promised "You can contact me about this feedback."
 //      They are published unattributed for that reason. Do not attach names to
-//      them without asking the author first.
+//      them without asking the author first. Same for `context: "SnapOtter
+//      Discord"`: nobody in the server agreed to appear on the marketing site,
+//      so those stay handle-free until the member says yes.
 //
 // Deliberately EXCLUDED, so nobody re-adds them later:
 //   - Four r/selfhosted comments that read as astroturf (two sit at negative
@@ -200,6 +204,18 @@ export const TESTIMONIALS: Testimonial[] = [
     quote: "I am using pipeline builder (what a brilliant!)...",
     author: "Self-hosted user",
     context: "Shared via in-app feedback",
+  },
+  {
+    quote: "Thank you so much! That was fast!",
+    author: "@gravelfreeman",
+    context: "GitHub",
+    url: "https://github.com/snapotter-hq/SnapOtter/discussions/764#discussioncomment-18001709",
+  },
+  {
+    quote: "i got out of bed at 3 in the morning to set up this tool. i love it tyvm",
+    author: "Discord member",
+    context: "SnapOtter Discord",
+    hero: true,
   },
 ];
 
