@@ -1,6 +1,15 @@
 import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
+import {
+  type ClientOnErrorFunction,
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  useLocation,
+} from "react-router";
+// The /dom build injects ReactDOM.flushSync; the bare one leaves it undefined
+// and degrades view transitions and flushSync navigations to a console warning.
+import { RouterProvider } from "react-router/dom";
 import { Toaster, toast } from "sonner";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
@@ -36,6 +45,27 @@ const NotFoundPage = lazy(() =>
   import("./pages/not-found-page").then((m) => ({ default: m.NotFoundPage })),
 );
 
+/**
+ * The one place render crashes turn into telemetry. Both boundaries that can
+ * catch one (ours and react-router's) report through here, so the analytics
+ * opt-out gate cannot drift between them.
+ */
+function reportRenderError(error: unknown, errorInfo?: ErrorInfo): void {
+  console.error("Uncaught render error:", error, errorInfo?.componentStack);
+  if (!isAnalyticsActive()) return; // respect the runtime opt-out
+  // Mirror the crash class only (no PII). track() and Sentry are best-effort.
+  track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, {
+    error_name: error instanceof Error ? error.name : typeof error,
+  });
+  void import("@sentry/react")
+    .then((Sentry) => {
+      // errorInfo is absent for loader and middleware errors.
+      if (errorInfo) Sentry.captureReactException(error, errorInfo);
+      else Sentry.captureException(error);
+    })
+    .catch(() => {});
+}
+
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { hasError: boolean; error: Error | null }
@@ -50,15 +80,7 @@ class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Uncaught render error:", error, info.componentStack);
-    if (!isAnalyticsActive()) return; // respect the runtime opt-out
-    // Mirror the crash class only (no PII). track() and Sentry are best-effort.
-    track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, { error_name: error.name });
-    import("@sentry/react")
-      .then((Sentry) => {
-        Sentry.captureReactException(error, info);
-      })
-      .catch(() => {});
+    reportRenderError(error, info);
   }
 
   render() {
@@ -138,6 +160,71 @@ function PageLoader() {
   );
 }
 
+/**
+ * Everything that wraps every page. A layout route rather than JSX nesting
+ * because useBlocker (the navigation guard) requires a data router.
+ */
+function RootLayout() {
+  // A data router wraps the root match in its own error boundary, so without
+  // this the "Unexpected Application Error!" screen would replace our fallback
+  // and componentDidCatch would never run (no crash event, no Sentry report).
+  // Ours sits closer to the pages, so it catches first.
+  return (
+    <ErrorBoundary>
+      <nav aria-label={en.a11y.skipToContent}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:start-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg"
+        >
+          {en.a11y.skipToContent}
+        </a>
+      </nav>
+      <RouteAnnouncer />
+      <KeyboardShortcutProvider>
+        <AuthGuard>
+          <MigrationBanner />
+          <UsageSurveyOverlay />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
+        </AuthGuard>
+      </KeyboardShortcutProvider>
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Anything that throws above the layout route's ErrorBoundary lands in
+ * react-router's own boundary, which reports nothing and, in the production
+ * build, prints the raw stack to the page. Reporting only: react-router owns
+ * whatever gets rendered.
+ */
+const reportRouterError: ClientOnErrorFunction = (error, { errorInfo }) =>
+  reportRenderError(error, errorInfo);
+
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: "/login", element: <LoginPage /> },
+      { path: "/change-password", element: <ChangePasswordPage /> },
+      { path: "/automate", element: <AutomatePage /> },
+      { path: "/files", element: <FilesPage /> },
+      { path: "/privacy", element: <PrivacyPolicyPage /> },
+      { path: "/editor", element: <EditorPage /> },
+      // Legacy 1.x color tools were consolidated into adjust-colors;
+      // redirect old bookmarks to the section route.
+      { path: "/brightness-contrast", element: <Navigate to="/image/adjust-colors" replace /> },
+      { path: "/saturation", element: <Navigate to="/image/adjust-colors" replace /> },
+      { path: "/color-channels", element: <Navigate to="/image/adjust-colors" replace /> },
+      { path: "/color-effects", element: <Navigate to="/image/adjust-colors" replace /> },
+      { path: "/:section/:toolId", element: <ToolPage /> },
+      { path: "/", element: <HomePage /> },
+      { path: "*", element: <NotFoundPage /> },
+    ],
+  },
+]);
+
 export function App() {
   const isMobile = useMobile();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
@@ -184,54 +271,7 @@ export function App() {
       <I18nProvider>
         <ConnectionMonitor />
         <Toaster position={isMobile ? "top-center" : "bottom-right"} />
-        <BrowserRouter>
-          <nav aria-label={en.a11y.skipToContent}>
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:start-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg"
-            >
-              {en.a11y.skipToContent}
-            </a>
-          </nav>
-          <RouteAnnouncer />
-          <KeyboardShortcutProvider>
-            <AuthGuard>
-              <MigrationBanner />
-              <UsageSurveyOverlay />
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/change-password" element={<ChangePasswordPage />} />
-                  <Route path="/automate" element={<AutomatePage />} />
-                  <Route path="/files" element={<FilesPage />} />
-                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/editor" element={<EditorPage />} />
-                  {/* Legacy 1.x color tools were consolidated into adjust-colors;
-                      redirect old bookmarks to the section route. */}
-                  <Route
-                    path="/brightness-contrast"
-                    element={<Navigate to="/image/adjust-colors" replace />}
-                  />
-                  <Route
-                    path="/saturation"
-                    element={<Navigate to="/image/adjust-colors" replace />}
-                  />
-                  <Route
-                    path="/color-channels"
-                    element={<Navigate to="/image/adjust-colors" replace />}
-                  />
-                  <Route
-                    path="/color-effects"
-                    element={<Navigate to="/image/adjust-colors" replace />}
-                  />
-                  <Route path="/:section/:toolId" element={<ToolPage />} />
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </Suspense>
-            </AuthGuard>
-          </KeyboardShortcutProvider>
-        </BrowserRouter>
+        <RouterProvider router={router} onError={reportRouterError} />
       </I18nProvider>
     </ErrorBoundary>
   );
