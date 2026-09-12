@@ -162,6 +162,7 @@ const BASE_TOOLS: Tool[] = [
     id: "favicon",
     name: "Favicon Generator",
     description: "Generate all favicon and app icon sizes",
+    keywords: ["ico", "jpg to ico", "png to ico"],
     category: "optimization",
     icon: "AppWindow",
     route: "/favicon",

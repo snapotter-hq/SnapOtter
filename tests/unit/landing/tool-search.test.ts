@@ -338,6 +338,16 @@ describe("landing searchTools with real catalog metadata", () => {
     expect(result.results[0]?.item.id).toBe("pdf-to-jpg");
   });
 
+  it.each(["ico", "jpg to ico", "jpg2ico", "png to ico", "png2ico"])(
+    "surfaces the favicon tool for %s",
+    (query) => {
+      const result = searchTools(realTools, { query, modality: "all", limit: 5 });
+
+      expect(result.results[0]?.item.id).toBe("favicon");
+      expect(result.hasConfidentMatch).toBe(true);
+    },
+  );
+
   it("does not create confident results for same-format alias conversions", () => {
     const result = searchTools(realTools, { query: "jpg to jpeg", modality: "all", limit: 8 });
 
