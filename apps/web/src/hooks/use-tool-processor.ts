@@ -397,6 +397,9 @@ export function useToolProcessor(toolId: string) {
                   ? { serverFileId: result.savedFileId }
                   : {}),
               });
+              // An auto-saved result is already in the library, so it was never at risk.
+              // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+              if (result.savedFileId) useFileStore.getState().markClaimed(idx);
               clearActiveJob();
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -680,6 +683,9 @@ export function useToolProcessor(toolId: string) {
                 ? { serverFileId: result.savedFileId }
                 : {}),
             });
+            // An auto-saved result is already in the library, so it was never at risk.
+            // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+            if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
           } catch {
             const message = "Invalid response from server";
             setError(message);

@@ -8,6 +8,7 @@ import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useFileStore } from "@/stores/file-store";
 import { ToolFeedbackPrompt } from "../feedback/tool-feedback-prompt";
 
 /** Tools whose primary output is text/data, not a downloadable file. */
@@ -81,11 +82,17 @@ export function ReviewPanel({
       track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
     triggerDownload(downloadUrl, filename);
+    const { markClaimed, selectedIndex } = useFileStore.getState();
+    markClaimed(selectedIndex);
   };
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const handleSaveToFiles = useCallback(async () => {
+    // Capture before the awaits below: the thumbnail strip can move the
+    // selection while the upload is in flight, and the claim must land on the
+    // entry that was actually saved.
+    const claimIndex = useFileStore.getState().selectedIndex;
     setSaveStatus("saving");
     try {
       const res = await fetch(downloadUrl);
@@ -102,6 +109,7 @@ export function ReviewPanel({
       });
       if (!uploadRes.ok) throw new Error("Upload failed");
       setSaveStatus("saved");
+      useFileStore.getState().markClaimed(claimIndex);
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
       // fired, so save-rate was unmeasurable.

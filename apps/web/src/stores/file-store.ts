@@ -169,6 +169,7 @@ interface FileState {
   /** `claimed` is excluded: a patch touching `processedUrl` always resets it. */
   updateEntry: (index: number, patch: Omit<Partial<FileEntry>, "claimed">) => void;
   setBatchZip: (blob: Blob, filename: string) => void;
+  /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
   markBatchClaimed: () => void;
   setProcessing: (v: boolean) => void;
@@ -387,8 +388,6 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   markClaimed: (index) => {
     const { entries, selectedIndex } = get();
-    // The index is required: selectedIndex is not trustworthy at completion
-    // time, since the user can change selection while a job runs.
     if (!entries[index] || entries[index].claimed) return;
     const next = [...entries];
     next[index] = { ...next[index], claimed: true };

@@ -560,6 +560,7 @@ export function ToolPage() {
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
     downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
+    useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename]);
 
   if (tool && disabledTools.includes(tool.id)) {

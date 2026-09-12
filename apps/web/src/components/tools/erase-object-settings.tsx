@@ -314,6 +314,9 @@ export function EraseObjectSettings({
           ? { serverFileId: r.savedFileId as string }
           : {}),
       });
+      // An auto-saved result is already in the library, so it was never at risk.
+      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+      if (r.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
     };
 
     const finishUi = () => {
