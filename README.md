@@ -154,7 +154,7 @@ If SnapOtter has replaced a paid subscription or two in your workflow, a small s
 
 <!-- sponsors -->
 <p align="center">
-  SnapOtter is free under the AGPL and always will be. These people sponsor it anyway. Thank you.
+  SnapOtter is free and open source, made possible by the people below.
 </p>
 
 <p align="center">
