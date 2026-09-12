@@ -153,6 +153,15 @@ If SnapOtter has replaced a paid subscription or two in your workflow, a small s
 </a>
 
 <!-- sponsors -->
+<p align="center">
+  <a href="https://github.com/dominic427"><img src="https://github.com/dominic427.png?size=72" width="72" height="72" alt="Dominic Lopez"></a>
+  <a href="https://github.com/highb"><img src="https://github.com/highb.png?size=72" width="72" height="72" alt="Brandon High"></a>
+  <a href="https://github.com/CSP-Tom"><img src="https://github.com/CSP-Tom.png?size=72" width="72" height="72" alt="Tom"></a>
+</p>
+
+<p align="center">
+  Backed by <a href="https://github.com/dominic427">@dominic427</a>, <a href="https://github.com/highb">@highb</a>, <a href="https://github.com/CSP-Tom">@CSP-Tom</a>. Thank you.
+</p>
 <!-- sponsors -->
 
 <p align="center">
