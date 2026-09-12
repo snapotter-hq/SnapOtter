@@ -3856,6 +3856,17 @@ export const uk: TranslationKeys = {
     downloadFiles: "Завантажити {count} файлів",
     audioDecodeUnsupported: "Цей аудіоформат не можна переглянути у браузері",
   },
+  navigationGuard: {
+    processingTitle: "Це завдання ще не завершено",
+    processingBody: "Якщо піти зараз, результат буде втрачено.",
+    unsavedTitle: "Цей результат не збережено",
+    unsavedBody: "Якщо піти зараз, він зникне.",
+    editorTitle: "Є незбережені зміни",
+    editorBody: "Якщо піти зараз, зникне все, що зроблено після останнього збереження.",
+    stay: "Залишитися тут",
+    leave: "Усе одно піти",
+    downloadAndLeave: "Завантажити й піти",
+  },
   homePage: {
     generatingPreview: "Генерація попереднього перегляду...",
     loadingPreview: "Завантаження попереднього перегляду...",

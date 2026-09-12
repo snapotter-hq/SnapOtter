@@ -1,5 +1,6 @@
-import { Download, Loader2, Upload } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
@@ -180,17 +181,7 @@ export function ComposeSettings() {
         {processing ? t.toolSettings.compose.processing : t.toolSettings.compose.submit}
       </button>
 
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="compose-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="compose-download" />}
     </div>
   );
 }

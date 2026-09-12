@@ -3867,6 +3867,17 @@ export const nl: TranslationKeys = {
     downloadFiles: "{count} bestanden downloaden",
     audioDecodeUnsupported: "Dit audioformaat kan niet worden afgespeeld in de browser",
   },
+  navigationGuard: {
+    processingTitle: "Deze bewerking is nog niet klaar",
+    processingBody: "Als je nu weggaat, ben je het resultaat kwijt.",
+    unsavedTitle: "Dit resultaat is niet opgeslagen",
+    unsavedBody: "Als je nu weggaat, is het weg.",
+    editorTitle: "Je hebt niet-opgeslagen wijzigingen",
+    editorBody: "Als je nu weggaat, ben je alles sinds het laatste opslaan kwijt.",
+    stay: "Hier blijven",
+    leave: "Toch weggaan",
+    downloadAndLeave: "Downloaden, dan weggaan",
+  },
   homePage: {
     generatingPreview: "Preview genereren...",
     loadingPreview: "Preview laden...",

@@ -326,7 +326,7 @@ describe("E2E navigation targets", () => {
 
   function declaredStaticRoutes(): Set<string> {
     const app = fs.readFileSync(path.join(root, "apps", "web", "src", "App.tsx"), "utf8");
-    const paths = [...app.matchAll(/\bpath="([^"]+)"/g)].map((match) => match[1]);
+    const paths = [...app.matchAll(/\bpath:\s*"([^"]+)"/g)].map((match) => match[1]);
     expect(paths, "App.tsx declared no routes; the parser is broken").not.toHaveLength(0);
     return new Set(paths.filter((value) => value !== "*" && !value.includes(":")));
   }

@@ -3858,6 +3858,17 @@ export const ptBR: TranslationKeys = {
     downloadFiles: "Baixar {count} arquivos",
     audioDecodeUnsupported: "Este formato de áudio não pode ser pré-visualizado no navegador",
   },
+  navigationGuard: {
+    processingTitle: "Este processamento não terminou",
+    processingBody: "Se você sair agora, perde o resultado.",
+    unsavedTitle: "Este resultado não está salvo",
+    unsavedBody: "Se você sair agora, ele some.",
+    editorTitle: "Você tem edições não salvas",
+    editorBody: "Se você sair agora, perde tudo desde o último salvamento.",
+    stay: "Ficar aqui",
+    leave: "Sair mesmo assim",
+    downloadAndLeave: "Baixar e sair",
+  },
   homePage: {
     generatingPreview: "Gerando visualização...",
     loadingPreview: "Carregando visualização...",

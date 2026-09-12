@@ -3596,6 +3596,17 @@ export const zhCN: TranslationKeys = {
     downloadFiles: "下载 {count} 个文件",
     audioDecodeUnsupported: "此音频格式无法在浏览器中预览",
   },
+  navigationGuard: {
+    processingTitle: "此次处理尚未完成",
+    processingBody: "现在离开将无法获得结果。",
+    unsavedTitle: "此结果尚未保存",
+    unsavedBody: "现在离开，结果将丢失。",
+    editorTitle: "您有未保存的编辑",
+    editorBody: "现在离开将丢失上次保存之后的所有内容。",
+    stay: "留在此页",
+    leave: "仍要离开",
+    downloadAndLeave: "下载后离开",
+  },
   homePage: {
     generatingPreview: "正在生成预览...",
     loadingPreview: "正在加载预览...",

@@ -3850,6 +3850,17 @@ export const sv: TranslationKeys = {
     downloadFiles: "Ladda ner {count} filer",
     audioDecodeUnsupported: "Det här ljudformatet kan inte förhandsgranskas i webbläsaren",
   },
+  navigationGuard: {
+    processingTitle: "Den här körningen är inte klar",
+    processingBody: "Lämnar du nu förlorar du resultatet.",
+    unsavedTitle: "Det här resultatet är inte sparat",
+    unsavedBody: "Lämnar du nu är det borta.",
+    editorTitle: "Du har osparade ändringar",
+    editorBody: "Lämnar du nu förlorar du allt sedan den senaste sparningen.",
+    stay: "Stanna kvar",
+    leave: "Lämna ändå",
+    downloadAndLeave: "Ladda ner och lämna",
+  },
   homePage: {
     generatingPreview: "Genererar förhandsvisning...",
     loadingPreview: "Laddar förhandsvisning...",

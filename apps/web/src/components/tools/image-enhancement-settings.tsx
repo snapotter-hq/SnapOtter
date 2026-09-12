@@ -1,16 +1,7 @@
-import {
-  Download,
-  FileText,
-  Moon,
-  Mountain,
-  Sparkles,
-  User,
-  UtensilsCrossed,
-  Wand2,
-  X,
-} from "lucide-react";
+import { FileText, Moon, Mountain, Sparkles, User, UtensilsCrossed, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -513,15 +504,7 @@ export function ImageEnhancementSettings({
       )}
 
       {downloadUrl && files.length <= 1 && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="image-enhancement-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
+        <ResultDownloadLink href={downloadUrl} testId="image-enhancement-download" />
       )}
     </form>
   );

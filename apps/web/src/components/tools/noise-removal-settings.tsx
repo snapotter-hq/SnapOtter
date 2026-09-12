@@ -1,6 +1,6 @@
-import { Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -312,15 +312,7 @@ export function NoiseRemovalSettings() {
 
       {/* Download (single file - batch uses Download All ZIP in tool-page) */}
       {!hasMultiple && downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="noise-removal-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
+        <ResultDownloadLink href={downloadUrl} testId="noise-removal-download" />
       )}
     </div>
   );

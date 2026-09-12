@@ -3596,6 +3596,17 @@ export const zhTW: TranslationKeys = {
     downloadFiles: "下載 {count} 個檔案",
     audioDecodeUnsupported: "此音訊格式無法在瀏覽器中預覽",
   },
+  navigationGuard: {
+    processingTitle: "這次處理尚未完成",
+    processingBody: "現在離開將無法取得結果。",
+    unsavedTitle: "此結果尚未儲存",
+    unsavedBody: "現在離開，結果將遺失。",
+    editorTitle: "您有未儲存的編輯",
+    editorBody: "現在離開將遺失上次儲存之後的所有內容。",
+    stay: "留在此頁",
+    leave: "仍要離開",
+    downloadAndLeave: "下載後離開",
+  },
   homePage: {
     generatingPreview: "正在產生預覽...",
     loadingPreview: "正在載入預覽...",

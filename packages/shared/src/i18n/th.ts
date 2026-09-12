@@ -3809,6 +3809,17 @@ export const th: TranslationKeys = {
     downloadFiles: "ดาวน์โหลด {count} ไฟล์",
     audioDecodeUnsupported: "รูปแบบเสียงนี้ไม่สามารถแสดงตัวอย่างในเบราว์เซอร์ได้",
   },
+  navigationGuard: {
+    processingTitle: "งานนี้ยังไม่เสร็จ",
+    processingBody: "ถ้าออกตอนนี้ คุณจะไม่ได้ผลลัพธ์",
+    unsavedTitle: "ผลลัพธ์นี้ยังไม่ได้บันทึก",
+    unsavedBody: "ถ้าออกตอนนี้ ผลลัพธ์จะหายไป",
+    editorTitle: "คุณมีการแก้ไขที่ยังไม่ได้บันทึก",
+    editorBody: "ถ้าออกตอนนี้ ทุกอย่างหลังการบันทึกครั้งล่าสุดจะหายไป",
+    stay: "อยู่ต่อ",
+    leave: "ออกเลย",
+    downloadAndLeave: "ดาวน์โหลดแล้วออก",
+  },
   homePage: {
     generatingPreview: "กำลังสร้างตัวอย่าง...",
     loadingPreview: "กำลังโหลดตัวอย่าง...",

@@ -3784,6 +3784,17 @@ export const ko: TranslationKeys = {
     downloadFiles: "{count}개 파일 다운로드",
     audioDecodeUnsupported: "이 오디오 형식은 브라우저에서 미리 들을 수 없습니다",
   },
+  navigationGuard: {
+    processingTitle: "이 작업이 아직 끝나지 않았습니다",
+    processingBody: "지금 나가면 결과를 잃게 됩니다.",
+    unsavedTitle: "이 결과가 저장되지 않았습니다",
+    unsavedBody: "지금 나가면 사라집니다.",
+    editorTitle: "저장하지 않은 편집 내용이 있습니다",
+    editorBody: "지금 나가면 마지막 저장 이후의 내용이 모두 사라집니다.",
+    stay: "여기 머무르기",
+    leave: "그래도 나가기",
+    downloadAndLeave: "다운로드 후 나가기",
+  },
   homePage: {
     generatingPreview: "미리보기 생성 중...",
     loadingPreview: "미리보기 로딩 중...",

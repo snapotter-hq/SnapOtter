@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
@@ -1017,15 +1018,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
               {applyingEffects ? t.toolSettings["remove-background"].rendering : t.common.download}
             </button>
           ) : (
-            <a
+            <ResultDownloadLink
               href={downloadUrl || ""}
-              download
-              data-testid="remove-background-download"
+              testId="remove-background-download"
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 hover:bg-primary/90"
-            >
-              <Download className="h-4 w-4" />
-              {t.common.download}
-            </a>
+            />
           )}
         </div>
       )}

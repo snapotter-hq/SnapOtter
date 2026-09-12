@@ -1,6 +1,7 @@
-import { Download, ImageIcon, Upload } from "lucide-react";
+import { ImageIcon, Upload } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -301,15 +302,12 @@ export function RemoveGifBackgroundSettings() {
       )}
 
       {downloadUrl && !processing && files.length <= 1 && (
-        <a
+        <ResultDownloadLink
           href={downloadUrl}
-          download
-          data-testid="remove-gif-background-download"
+          testId="remove-gif-background-download"
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Download className="h-4 w-4" />
-          {s.download}
-        </a>
+          label={s.download}
+        />
       )}
     </div>
   );

@@ -3808,6 +3808,17 @@ export const ja: TranslationKeys = {
     downloadFiles: "{count} 件のファイルをダウンロード",
     audioDecodeUnsupported: "この音声形式はブラウザでプレビューできません",
   },
+  navigationGuard: {
+    processingTitle: "この処理はまだ完了していません",
+    processingBody: "ここを離れると結果は失われます。",
+    unsavedTitle: "この結果は保存されていません",
+    unsavedBody: "ここを離れると失われます。",
+    editorTitle: "保存していない編集があります",
+    editorBody: "ここを離れると、最後に保存した時点以降の内容がすべて失われます。",
+    stay: "ここに留まる",
+    leave: "それでも離れる",
+    downloadAndLeave: "ダウンロードしてから離れる",
+  },
   homePage: {
     generatingPreview: "プレビューを生成中...",
     loadingPreview: "プレビューを読み込み中...",

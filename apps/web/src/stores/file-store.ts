@@ -38,6 +38,17 @@ export interface FileEntry {
   originalWidth: number | null;
   originalHeight: number | null;
   status: "pending" | "processing" | "completed" | "failed";
+  /**
+   * The user took this result: downloaded it, saved it, or it auto-saved.
+   *
+   * The invariant: a result that just changed has not been taken. Any patch
+   * that touches `processedUrl` invalidates the claim, changed value or not,
+   * so a re-run never inherits the previous result's claim. Keying on the
+   * field being present rather than on the value differing is the fail-safe
+   * choice: the cost of over-clearing is one extra warning, the cost of
+   * under-clearing is the navigation guard going silent on unsaved work.
+   */
+  claimed: boolean;
   error: string | null;
   serverFileId?: string;
   modality: Modality;
@@ -65,6 +76,7 @@ function createEntry(file: File): FileEntry {
     originalWidth: null,
     originalHeight: null,
     status: "pending",
+    claimed: false,
     error: null,
     serverFileId: undefined,
     modality,
@@ -124,6 +136,7 @@ interface FileState {
   selectedIndex: number;
   batchZipBlob: Blob | null;
   batchZipFilename: string | null;
+  batchZipClaimed: boolean;
   processing: boolean;
   error: string | null;
   activeJobId: string | null;
@@ -153,8 +166,16 @@ interface FileState {
   setSelectedIndex: (index: number) => void;
   navigateNext: () => void;
   navigatePrev: () => void;
-  updateEntry: (index: number, patch: Partial<FileEntry>) => void;
+  /** `claimed` is excluded: a patch touching `processedUrl` always resets it. */
+  updateEntry: (index: number, patch: Omit<Partial<FileEntry>, "claimed">) => void;
   setBatchZip: (blob: Blob, filename: string) => void;
+  /** Index is required: selectedIndex can change while a job runs. */
+  markClaimed: (index: number) => void;
+  markBatchClaimed: () => void;
+  /** Claim the entry the UI is currently showing. Safe only from synchronous
+   *  handlers: across an await the selection can move, so capture the index
+   *  first and use markClaimed instead. */
+  claimSelected: () => void;
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
   setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
@@ -172,6 +193,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   selectedIndex: 0,
   batchZipBlob: null,
   batchZipFilename: null,
+  batchZipClaimed: false,
   processing: false,
   error: null,
   activeJobId: null,
@@ -195,6 +217,10 @@ export const useFileStore = create<FileState>((set, get) => ({
       entries,
       selectedIndex: 0,
       error: null,
+      // The previous run's zip describes files that are no longer loaded.
+      batchZipBlob: null,
+      batchZipFilename: null,
+      batchZipClaimed: false,
       // A fresh file set is a fresh edit: the save-mode choice made for a
       // previous file must not carry over (#495 defaults to non-destructive).
       librarySaveMode: "new",
@@ -354,12 +380,38 @@ export const useFileStore = create<FileState>((set, get) => ({
   updateEntry: (index, patch) => {
     const entries = [...get().entries];
     if (!entries[index]) return;
-    entries[index] = { ...entries[index], ...patch };
+    // Enforces the claim invariant; see the `claimed` field on FileEntry.
+    const claimReset = "processedUrl" in patch ? { claimed: false } : null;
+    entries[index] = { ...entries[index], ...patch, ...claimReset };
     const idx = get().selectedIndex;
     set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
   },
 
-  setBatchZip: (blob, filename) => set({ batchZipBlob: blob, batchZipFilename: filename }),
+  setBatchZip: (blob, filename) =>
+    set({ batchZipBlob: blob, batchZipFilename: filename, batchZipClaimed: false }),
+
+  markClaimed: (index) => {
+    const { entries, selectedIndex } = get();
+    if (!entries[index] || entries[index].claimed) return;
+    const next = [...entries];
+    next[index] = { ...next[index], claimed: true };
+    set({ entries: next, files: deriveFiles(next), ...deriveSelected(next, selectedIndex) });
+  },
+
+  markBatchClaimed: () => {
+    const { entries, selectedIndex } = get();
+    // The zip holds every result, so taking it takes all of them.
+    const next = entries.map((e) => (e.claimed ? e : { ...e, claimed: true }));
+    set({
+      entries: next,
+      batchZipClaimed: true,
+      files: deriveFiles(next),
+      ...deriveSelected(next, selectedIndex),
+    });
+  },
+
+  // Synchronous handlers only; see the declaration above for why.
+  claimSelected: () => get().markClaimed(get().selectedIndex),
 
   setProcessing: (v) => set({ processing: v }),
 
@@ -374,6 +426,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   setProcessedUrl: (url, previewUrl) => {
     const { entries, selectedIndex } = get();
     if (!entries[selectedIndex]) return;
+    // Both branches reset `claimed`; see the invariant on FileEntry.
     const updated = [...entries];
     if (url) {
       updated[selectedIndex] = {
@@ -382,6 +435,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         processedPreviewUrl: previewUrl ?? null,
         processedFilename: null,
         status: "completed",
+        claimed: false,
       };
     } else {
       updated[selectedIndex] = {
@@ -390,6 +444,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         processedPreviewUrl: null,
         processedFilename: null,
         status: "pending",
+        claimed: false,
       };
     }
     set({ entries: updated, ...deriveSelected(updated, selectedIndex) });
@@ -417,6 +472,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       if (entry.processedUrl) URL.revokeObjectURL(entry.processedUrl);
       if (entry.processedPreviewUrl) URL.revokeObjectURL(entry.processedPreviewUrl);
     }
+    // Dropping every result clears every claim; see the invariant on FileEntry.
     const resetEntries = entries.map((e) => ({
       ...e,
       processedUrl: null,
@@ -424,12 +480,14 @@ export const useFileStore = create<FileState>((set, get) => ({
       processedFilename: null,
       processedSize: null,
       status: "pending" as const,
+      claimed: false,
       error: null,
     }));
     set({
       entries: resetEntries,
       batchZipBlob: null,
       batchZipFilename: null,
+      batchZipClaimed: false,
       processing: false,
       error: null,
       activeJobId: null,
@@ -448,6 +506,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       selectedIndex: 0,
       batchZipBlob: null,
       batchZipFilename: null,
+      batchZipClaimed: false,
       processing: false,
       error: null,
       activeJobId: null,

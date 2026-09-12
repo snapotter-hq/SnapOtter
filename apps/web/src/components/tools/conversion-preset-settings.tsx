@@ -1,8 +1,8 @@
 import { BASE_CONFIG, CONVERSION_PRESET_BY_ID } from "@snapotter/shared";
-import { Download } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -161,17 +161,7 @@ export function ConversionPresetSettings() {
         </button>
       )}
 
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="preset-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="preset-download" />}
     </form>
   );
 }

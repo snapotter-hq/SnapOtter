@@ -1,7 +1,7 @@
-import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format, plural } from "@/lib/format";
@@ -408,15 +408,11 @@ export function ImageToPdfSettings() {
       )}
 
       {downloadUrl && (
-        <a
+        <ResultDownloadLink
           href={downloadUrl}
-          download
-          data-testid="image-to-pdf-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {collate ? ts.downloadPdf : ts.downloadZip}
-        </a>
+          testId="image-to-pdf-download"
+          label={collate ? ts.downloadPdf : ts.downloadZip}
+        />
       )}
 
       {compressionResult && (

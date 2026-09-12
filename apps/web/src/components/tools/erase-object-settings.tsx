@@ -1,6 +1,7 @@
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
@@ -314,6 +315,9 @@ export function EraseObjectSettings({
           ? { serverFileId: r.savedFileId as string }
           : {}),
       });
+      // An auto-saved result is already in the library, so it was never at risk.
+      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+      if (r.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
     };
 
     const finishUi = () => {
@@ -738,15 +742,7 @@ export function EraseObjectSettings({
 
       {/* Download */}
       {currentEntry?.processedUrl && (
-        <a
-          href={currentEntry.processedUrl}
-          download
-          data-testid="erase-object-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
+        <ResultDownloadLink href={currentEntry.processedUrl} testId="erase-object-download" />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
-import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink, SOLID_CLASS_NAME } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -141,16 +141,7 @@ export function OcrPdfSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} className={SOLID_CLASS_NAME} />}
     </form>
   );
 }

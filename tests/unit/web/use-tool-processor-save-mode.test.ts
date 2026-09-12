@@ -271,3 +271,84 @@ describe("useToolProcessor library save mode (issue #495)", () => {
     unmount();
   });
 });
+
+describe("useToolProcessor claim tracking (nav guard)", () => {
+  it("claims the entry once the auto-saved result lands", async () => {
+    const file = stageLibraryFile();
+    const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+    act(() => {
+      result.current.processFiles([file], {});
+    });
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+
+    act(() => {
+      completeRun(xhrs[0], "lib-copy");
+    });
+
+    // Pins the ordering: the claim has to be made after the updateEntry that
+    // writes processedUrl, since that patch resets `claimed`.
+    expect(useFileStore.getState().entries[0].claimed).toBe(true);
+    unmount();
+  });
+
+  it("claims the entry when the auto-saved result lands over SSE", async () => {
+    const file = stageLibraryFile();
+    const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+    act(() => {
+      result.current.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+    act(() => {
+      MockEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: {
+            jobId: "job-1",
+            downloadUrl: "/api/v1/download/job-1/photo_resize.png",
+            originalSize: 64,
+            processedSize: 32,
+            savedFileId: "lib-copy",
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    expect(useFileStore.getState().entries[0].claimed).toBe(true);
+    unmount();
+  });
+
+  it("leaves a result the user still has to take unclaimed", async () => {
+    const file = new File([new ArrayBuffer(64)], "plain.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+    act(() => {
+      result.current.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        jobId: "job-1",
+        downloadUrl: "/api/v1/download/job-1/plain_resize.png",
+        originalSize: 64,
+        processedSize: 32,
+      });
+      xhrs[0].onload?.();
+    });
+
+    // Nothing auto-saved it, so the guard must still have something to warn
+    // about until the user downloads or saves.
+    expect(useFileStore.getState().entries[0].processedUrl).toBe(
+      "/api/v1/download/job-1/plain_resize.png",
+    );
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+    unmount();
+  });
+});

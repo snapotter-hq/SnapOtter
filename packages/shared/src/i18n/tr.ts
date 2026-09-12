@@ -3857,6 +3857,17 @@ export const tr: TranslationKeys = {
     downloadFiles: "{count} dosya indir",
     audioDecodeUnsupported: "Bu ses formatı tarayıcıda önizlenemez",
   },
+  navigationGuard: {
+    processingTitle: "Bu işlem henüz bitmedi",
+    processingBody: "Şimdi ayrılırsanız sonucu kaybedersiniz.",
+    unsavedTitle: "Bu sonuç kaydedilmedi",
+    unsavedBody: "Şimdi ayrılırsanız kaybolur.",
+    editorTitle: "Kaydedilmemiş değişiklikleriniz var",
+    editorBody: "Şimdi ayrılırsanız son kayıttan sonraki her şeyi kaybedersiniz.",
+    stay: "Burada kal",
+    leave: "Yine de ayrıl",
+    downloadAndLeave: "İndir, sonra ayrıl",
+  },
   homePage: {
     generatingPreview: "Önizleme oluşturuluyor...",
     loadingPreview: "Önizleme yükleniyor...",

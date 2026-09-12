@@ -3849,6 +3849,17 @@ export const vi: TranslationKeys = {
     downloadFiles: "Tải xuống {count} tệp",
     audioDecodeUnsupported: "Định dạng âm thanh này không thể xem trước trong trình duyệt",
   },
+  navigationGuard: {
+    processingTitle: "Tiến trình này chưa xong",
+    processingBody: "Nếu rời đi bây giờ, bạn sẽ mất kết quả.",
+    unsavedTitle: "Kết quả này chưa được lưu",
+    unsavedBody: "Nếu rời đi bây giờ, kết quả sẽ mất.",
+    editorTitle: "Bạn có chỉnh sửa chưa lưu",
+    editorBody: "Nếu rời đi bây giờ, bạn sẽ mất mọi thứ kể từ lần lưu gần nhất.",
+    stay: "Ở lại đây",
+    leave: "Vẫn rời đi",
+    downloadAndLeave: "Tải xuống rồi rời đi",
+  },
   homePage: {
     generatingPreview: "Đang tạo bản xem trước...",
     loadingPreview: "Đang tải bản xem trước...",

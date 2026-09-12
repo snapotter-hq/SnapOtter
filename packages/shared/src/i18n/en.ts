@@ -3796,6 +3796,17 @@ export const en = {
     downloadFiles: "Download {count} files",
     audioDecodeUnsupported: "This audio format cannot be previewed in the browser",
   },
+  navigationGuard: {
+    processingTitle: "This run isn't finished",
+    processingBody: "Leave now and you lose the result.",
+    unsavedTitle: "This result isn't saved",
+    unsavedBody: "Leave now and it's gone.",
+    editorTitle: "You have unsaved edits",
+    editorBody: "Leave now and you lose everything since the last save.",
+    stay: "Stay here",
+    leave: "Leave anyway",
+    downloadAndLeave: "Download, then leave",
+  },
   homePage: {
     generatingPreview: "Generating preview...",
     loadingPreview: "Loading preview...",

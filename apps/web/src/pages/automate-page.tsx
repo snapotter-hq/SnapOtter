@@ -38,7 +38,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
-import { formatFileSize } from "@/lib/download";
+import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -390,20 +390,18 @@ export function AutomatePage() {
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
-    const url = URL.createObjectURL(batchZipBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = batchZipFilename ?? "batch-pipeline.zip";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(batchZipBlob, batchZipFilename ?? "batch-pipeline.zip");
+    useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename]);
 
+  // The store owns processedUrl (an API download URL here, a blob URL after a
+  // batch run) and revokes it in reset(). Hand the existing URL to
+  // triggerDownload; downloadBlob would mint and revoke a URL this page
+  // does not own.
   const handleDownloadSingle = useCallback(() => {
     if (!processedUrl) return;
-    const a = document.createElement("a");
-    a.href = processedUrl;
-    a.download = currentEntry?.processedFilename ?? "result";
-    a.click();
+    triggerDownload(processedUrl, currentEntry?.processedFilename ?? "result");
+    useFileStore.getState().claimSelected();
   }, [processedUrl, currentEntry]);
 
   const handleNavKeyDown = useCallback(
@@ -467,7 +465,10 @@ export function AutomatePage() {
           <Suspense
             fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
           >
-            <WaveformPlayer src={processedUrl} />
+            <WaveformPlayer
+              src={processedUrl}
+              onDownload={() => useFileStore.getState().claimSelected()}
+            />
           </Suspense>
         );
       }

@@ -1,6 +1,6 @@
-import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format as formatMessage } from "@/lib/format";
@@ -387,17 +387,7 @@ export function SvgToRasterSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="svg-to-raster-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="svg-to-raster-download" />}
     </div>
   );
 }

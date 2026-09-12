@@ -3851,6 +3851,17 @@ export const id: TranslationKeys = {
     downloadFiles: "Unduh {count} file",
     audioDecodeUnsupported: "Format audio ini tidak dapat dipratinjau di browser",
   },
+  navigationGuard: {
+    processingTitle: "Proses ini belum selesai",
+    processingBody: "Jika keluar sekarang, Anda kehilangan hasilnya.",
+    unsavedTitle: "Hasil ini belum disimpan",
+    unsavedBody: "Jika keluar sekarang, hasilnya hilang.",
+    editorTitle: "Ada perubahan yang belum disimpan",
+    editorBody: "Jika keluar sekarang, semua sejak penyimpanan terakhir akan hilang.",
+    stay: "Tetap di sini",
+    leave: "Tetap keluar",
+    downloadAndLeave: "Unduh, lalu keluar",
+  },
   homePage: {
     generatingPreview: "Membuat pratinjau...",
     loadingPreview: "Memuat pratinjau...",

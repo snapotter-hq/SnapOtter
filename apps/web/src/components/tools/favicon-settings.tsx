@@ -1,7 +1,7 @@
-import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
@@ -385,15 +385,12 @@ export function FaviconSettings() {
       )}
 
       {downloadUrl && (
-        <a
+        <ResultDownloadLink
           href={downloadUrl}
-          download="favicons.zip"
-          data-testid="favicon-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.toolSettings.favicon.downloadZip}
-        </a>
+          testId="favicon-download"
+          downloadName="favicons.zip"
+          label={t.toolSettings.favicon.downloadZip}
+        />
       )}
     </div>
   );

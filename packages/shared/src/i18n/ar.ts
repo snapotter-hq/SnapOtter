@@ -3830,6 +3830,17 @@ export const ar: TranslationKeys = {
     downloadFiles: "تنزيل {count} ملفات",
     audioDecodeUnsupported: "لا يمكن معاينة تنسيق الصوت هذا في المتصفح",
   },
+  navigationGuard: {
+    processingTitle: "لم تنتهِ هذه العملية بعد",
+    processingBody: "إذا غادرت الآن ستفقد النتيجة.",
+    unsavedTitle: "لم يتم حفظ هذه النتيجة",
+    unsavedBody: "إذا غادرت الآن فستفقدها.",
+    editorTitle: "لديك تعديلات غير محفوظة",
+    editorBody: "إذا غادرت الآن ستفقد كل شيء منذ آخر عملية حفظ.",
+    stay: "البقاء هنا",
+    leave: "المغادرة على أي حال",
+    downloadAndLeave: "التحميل ثم المغادرة",
+  },
   homePage: {
     generatingPreview: "جاري إنشاء المعاينة...",
     loadingPreview: "جاري تحميل المعاينة...",
