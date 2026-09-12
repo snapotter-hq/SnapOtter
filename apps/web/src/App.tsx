@@ -14,6 +14,7 @@ import { Toaster, toast } from "sonner";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { MigrationBanner } from "./components/common/migration-banner";
+import { NavigationGuard } from "./components/common/navigation-guard";
 import { RouteAnnouncer } from "./components/common/route-announcer";
 import { UsageSurveyOverlay } from "./components/onboarding/usage-survey-overlay";
 import { I18nProvider } from "./contexts/i18n-context";
@@ -182,6 +183,7 @@ function RootLayout() {
       <RouteAnnouncer />
       <KeyboardShortcutProvider>
         <AuthGuard>
+          <NavigationGuard />
           <MigrationBanner />
           <UsageSurveyOverlay />
           <Suspense fallback={<PageLoader />}>
