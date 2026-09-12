@@ -12,7 +12,7 @@ const GITHUB_REPO = "snapotter-hq/SnapOtter";
 // Fallback used when the upstream fetch fails. Keep roughly current so a
 // degraded build still shows a believable figure (matches STAR_FALLBACK in
 // apps/landing/src/lib/stats.ts).
-const STAR_FALLBACK = 1720;
+const STAR_FALLBACK = 2630;
 
 export interface GitHubStarsData {
   /** Compact star count for display, e.g. "1.7k". */
