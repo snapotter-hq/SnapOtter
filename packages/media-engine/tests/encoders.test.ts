@@ -1,13 +1,28 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { type EncoderTarget, resolveEncoder } from "../src/encoders.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  type EncoderTarget,
+  resolveEncoder,
+  setEncoderInventoryForTests,
+} from "../src/encoders.js";
 
 /**
  * resolveEncoder reads process.env.SNAPOTTER_HW_ACCEL at call time, so each
  * test sets or clears it. Assertions are exact strings: an existence-only test
  * would leave every map-entry mutant alive.
+ *
+ * These tests cover the family mapping, so they pin an inventory that has
+ * every hardware encoder. Whether a real build provides them is a separate
+ * concern, covered in encoder-availability.test.ts (#1054).
  */
+const ALL_HARDWARE = new Set(["h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_vaapi", "hevc_vaapi"]);
+
+beforeEach(() => {
+  setEncoderInventoryForTests(ALL_HARDWARE);
+});
+
 afterEach(() => {
   delete process.env.SNAPOTTER_HW_ACCEL;
+  setEncoderInventoryForTests(undefined);
 });
 
 const ALL_TARGETS: EncoderTarget[] = ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"];

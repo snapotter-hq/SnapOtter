@@ -27,6 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
+import { HW_ACCEL_FAMILIES, hwAccelStatus } from "@snapotter/media-engine";
 import {
   ANALYTICS_EVENTS,
   extractErrorCode,
@@ -1705,6 +1706,55 @@ export function startWorkers(): void {
 
   logger.info(
     `Workers started: ${POOLS.map((p) => `${p}(${p === "system" || p === "ai" ? 1 : concurrency})`).join(", ")}`,
+  );
+  logHwAccel();
+}
+
+/**
+ * Say what SNAPOTTER_HW_ACCEL actually does on this host. Without it a wrong
+ * value is invisible: encoding silently stays on software and the only symptom
+ * is that nothing got faster (#1054).
+ *
+ * Deliberately says "listed by" rather than "enabled": the probe reads
+ * `ffmpeg -encoders`, which proves the encoder was compiled in, not that it
+ * can run. A general-purpose ffmpeg lists h264_nvenc with or without an
+ * NVIDIA device present (#1089).
+ */
+function logHwAccel(): void {
+  const status = hwAccelStatus();
+  if (!status.requested) return;
+
+  const softwareNote =
+    status.unmapped.length > 0 ? `; ${status.unmapped.join(", ")} always use software` : "";
+
+  if (!status.recognized) {
+    logger.warn(
+      { requested: status.requested, supported: HW_ACCEL_FAMILIES },
+      `SNAPOTTER_HW_ACCEL="${status.requested}" is not a recognised encoder family (${HW_ACCEL_FAMILIES.join(", ")}); using software encoders`,
+    );
+    return;
+  }
+
+  if (status.active.length === 0) {
+    const why = status.probeError ?? "this ffmpeg build lists none of them";
+    logger.warn(
+      { requested: status.requested, missing: status.missing, probeError: status.probeError },
+      `SNAPOTTER_HW_ACCEL="${status.requested}" was requested but ${why}; using software encoders`,
+    );
+    return;
+  }
+
+  if (status.missing.length > 0) {
+    logger.warn(
+      { requested: status.requested, active: status.active, missing: status.missing },
+      `SNAPOTTER_HW_ACCEL="${status.requested}" is partly available; ${status.missing.join(", ")} fall back to software${softwareNote}`,
+    );
+    return;
+  }
+
+  logger.info(
+    { requested: status.requested, active: status.active, unmapped: status.unmapped },
+    `Hardware encoders listed by this ffmpeg build: ${status.active.join(", ")}${softwareNote}`,
   );
 }
 
