@@ -1,8 +1,9 @@
-import { Download, ExternalLink, Loader2, MapPin } from "lucide-react";
+import { ExternalLink, Loader2, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
@@ -435,17 +436,7 @@ export function StripMetadataSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="strip-metadata-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="strip-metadata-download" />}
     </form>
   );
 }

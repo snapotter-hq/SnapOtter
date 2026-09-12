@@ -401,8 +401,7 @@ export function AutomatePage() {
   const handleDownloadSingle = useCallback(() => {
     if (!processedUrl) return;
     triggerDownload(processedUrl, currentEntry?.processedFilename ?? "result");
-    const { markClaimed, selectedIndex } = useFileStore.getState();
-    markClaimed(selectedIndex);
+    useFileStore.getState().claimSelected();
   }, [processedUrl, currentEntry]);
 
   const handleNavKeyDown = useCallback(
@@ -466,7 +465,10 @@ export function AutomatePage() {
           <Suspense
             fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
           >
-            <WaveformPlayer src={processedUrl} />
+            <WaveformPlayer
+              src={processedUrl}
+              onDownload={() => useFileStore.getState().claimSelected()}
+            />
           </Suspense>
         );
       }

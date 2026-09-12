@@ -56,6 +56,16 @@ describe("file store claim tracking", () => {
     expect(entries[1].claimed).toBe(true);
   });
 
+  it("claims whichever entry the UI is showing", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore.getState().setSelectedIndex(1);
+    useFileStore.getState().claimSelected();
+
+    const { entries } = useFileStore.getState();
+    expect(entries[1].claimed).toBe(true);
+    expect(entries[0].claimed).toBe(false);
+  });
+
   it("ignores a claim for an entry that is not there", () => {
     useFileStore.getState().setFiles([makeFile("a.png")]);
     useFileStore.getState().markClaimed(7);

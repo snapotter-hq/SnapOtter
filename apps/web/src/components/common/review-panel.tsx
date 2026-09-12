@@ -82,8 +82,7 @@ export function ReviewPanel({
       track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
     triggerDownload(downloadUrl, filename);
-    const { markClaimed, selectedIndex } = useFileStore.getState();
-    markClaimed(selectedIndex);
+    useFileStore.getState().claimSelected();
   };
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");

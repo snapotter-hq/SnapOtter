@@ -1,8 +1,8 @@
 import { SOCIAL_MEDIA_PRESETS } from "@snapotter/shared";
-import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HintIcon } from "@/components/common/hint-icon";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { largestRatioBox, pairedDimension, RESIZE_RATIO_PRESETS } from "@/lib/aspect-ratio";
@@ -515,17 +515,7 @@ export function ResizeSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="resize-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
-      )}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="resize-download" />}
     </form>
   );
 }

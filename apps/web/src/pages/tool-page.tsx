@@ -722,7 +722,13 @@ export function ToolPage() {
             <Suspense
               fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
             >
-              <WaveformPlayer src={audioSrc} />
+              <WaveformPlayer
+                src={audioSrc}
+                // audioSrc falls back to the original, and only a result claims.
+                onDownload={
+                  processedUrl ? () => useFileStore.getState().claimSelected() : undefined
+                }
+              />
             </Suspense>
           );
         }

@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
@@ -310,13 +311,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {downloadUrl ? (
-        <a
+        <ResultDownloadLink
           href={downloadUrl}
-          download
           className="block w-full rounded-lg bg-primary py-2.5 text-center font-semibold text-primary-foreground"
         >
           {sp.downloadSigned}
-        </a>
+        </ResultDownloadLink>
       ) : (
         <button
           type="button"

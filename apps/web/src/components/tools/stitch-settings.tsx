@@ -1,5 +1,6 @@
-import { Download, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { format as formatMessage } from "@/lib/format";
@@ -335,15 +336,11 @@ export function StitchSettings() {
       </button>
 
       {downloadUrl && (
-        <a
+        <ResultDownloadLink
           href={downloadUrl}
-          download
-          data-testid="stitch-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.toolSettings.stitch.downloadStitchedImage}
-        </a>
+          testId="stitch-download"
+          label={t.toolSettings.stitch.downloadStitchedImage}
+        />
       )}
     </div>
   );

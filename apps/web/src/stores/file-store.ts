@@ -172,6 +172,10 @@ interface FileState {
   /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
   markBatchClaimed: () => void;
+  /** Claim the entry the UI is currently showing. Safe only from synchronous
+   *  handlers: across an await the selection can move, so capture the index
+   *  first and use markClaimed instead. */
+  claimSelected: () => void;
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
   setActiveJob: (id: string | null, cancelFn: (() => Promise<void>) | null) => void;
@@ -405,6 +409,9 @@ export const useFileStore = create<FileState>((set, get) => ({
       ...deriveSelected(next, selectedIndex),
     });
   },
+
+  // Synchronous handlers only; see the declaration above for why.
+  claimSelected: () => get().markClaimed(get().selectedIndex),
 
   setProcessing: (v) => set({ processing: v }),
 

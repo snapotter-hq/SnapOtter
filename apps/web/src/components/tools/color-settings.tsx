@@ -1,6 +1,7 @@
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -445,15 +446,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
 
       {/* Download (single-file only - batch uses Download All ZIP in tool-page) */}
       {downloadUrl && files.length <= 1 && (
-        <a
-          href={downloadUrl}
-          download
-          data-testid="adjust-colors-download"
-          className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
-        >
-          <Download className="h-4 w-4" />
-          {t.common.download}
-        </a>
+        <ResultDownloadLink href={downloadUrl} testId="adjust-colors-download" />
       )}
     </form>
   );

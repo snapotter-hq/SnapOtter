@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 interface WaveformPlayerProps {
   src: string;
   className?: string;
+  /** Runs when the decode fallback's download link is used. Result call sites
+   *  pass the file-store claim; elsewhere `src` is the original audio. */
+  onDownload?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -18,7 +21,7 @@ function formatTime(seconds: number): string {
 /** Timeout (ms) after which we assume WaveSurfer cannot decode the audio. */
 const DECODE_TIMEOUT_MS = 15_000;
 
-export function WaveformPlayer({ src, className }: WaveformPlayerProps) {
+export function WaveformPlayer({ src, className, onDownload }: WaveformPlayerProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
@@ -131,6 +134,7 @@ export function WaveformPlayer({ src, className }: WaveformPlayerProps) {
               href={src}
               download
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+              onClick={onDownload}
             >
               <Download className="h-4 w-4" />
               {t.common.download}
