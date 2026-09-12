@@ -3,7 +3,7 @@ import { mkdir, open, readFile, statfs, unlink, writeFile } from "node:fs/promis
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { SafeError } from "@snapotter/shared";
+import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
@@ -41,12 +41,7 @@ const SAFE_STORAGE_EXTENSIONS = new Set([
   ".heif",
   ".jxl",
   ".ico",
-  ".dng",
-  ".cr2",
-  ".nef",
-  ".arw",
-  ".orf",
-  ".rw2",
+  ...CAMERA_RAW_INPUTS,
   ".tga",
   ".psd",
   ".exr",

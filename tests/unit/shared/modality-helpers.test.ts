@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { TOOLS } from "../../../packages/shared/src/constants.js";
 import {
+  CAMERA_RAW_INPUTS,
+  IMAGE_INPUTS,
   modalityForExtension,
   toolInputModality,
   toolOutputModality,
@@ -23,6 +25,14 @@ describe("modalityForExtension", () => {
   it("is case-insensitive and tolerates a missing dot", () => {
     expect(modalityForExtension("PNG")).toBe("image");
     expect(modalityForExtension(".JPG")).toBe("image");
+  });
+  it("exposes every supported camera RAW extension through image tool metadata", () => {
+    const resizeInputs = tool("resize").acceptedInputs;
+    for (const ext of CAMERA_RAW_INPUTS) {
+      expect(IMAGE_INPUTS).toContain(ext);
+      expect(resizeInputs).toContain(ext);
+      expect(modalityForExtension(ext)).toBe("image");
+    }
   });
   it("returns null for unknown extensions", () => {
     expect(modalityForExtension(".xyz")).toBeNull();

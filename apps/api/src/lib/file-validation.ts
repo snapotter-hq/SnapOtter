@@ -1,3 +1,4 @@
+import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { isSvgBuffer } from "./svg-sanitize.js";
@@ -129,31 +130,7 @@ export interface ValidationError {
 }
 
 /** Camera RAW extensions that share TIFF magic bytes. */
-const RAW_EXTENSIONS = new Set([
-  "dng",
-  "cr2",
-  "cr3",
-  "nef",
-  "nrw",
-  "arw",
-  "orf",
-  "rw2",
-  "raf",
-  "pef",
-  "3fr",
-  "iiq",
-  "srw",
-  "x3f",
-  "rwl",
-  "gpr",
-  "fff",
-  "mrw",
-  "mef",
-  "kdc",
-  "dcr",
-  "erf",
-  "ptx",
-]);
+const RAW_EXTENSIONS = new Set(CAMERA_RAW_INPUTS.map((ext) => ext.slice(1)));
 
 /** Formats that Sharp cannot decode natively — skip dimension check. */
 const CLI_DECODED_FORMATS = new Set([
