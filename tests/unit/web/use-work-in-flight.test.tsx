@@ -114,7 +114,7 @@ describe("an untaken result", () => {
 
     expect(workAt(TOOL_ROUTE)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "a-compressed.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
     });
   });
 
@@ -124,7 +124,7 @@ describe("an untaken result", () => {
 
     expect(workAt(TOOL_ROUTE)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "a.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a.png" }],
     });
   });
 
@@ -147,7 +147,7 @@ describe("an untaken result", () => {
 
     expect(workAt(TOOL_ROUTE)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:two", filename: "two.png" }],
+      downloads: [{ kind: "result", index: 1, url: "blob:two", filename: "two.png" }],
     });
   });
 
@@ -162,7 +162,7 @@ describe("an untaken result", () => {
     expect(useFileStore.getState().entries[0].status).not.toBe("completed");
     expect(workAt(TOOL_ROUTE)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "out.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "out.png" }],
     });
   });
 });
@@ -234,7 +234,7 @@ describe("a batch zip", () => {
     expect(useFileStore.getState().batchZipClaimed).toBe(true);
     expect(workAt(TOOL_ROUTE)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:rerun", filename: "rerun.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:rerun", filename: "rerun.png" }],
     });
   });
 
@@ -280,7 +280,7 @@ describe("route scoping", () => {
 
     expect(workAt("/automate/")).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "a-compressed.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
     });
   });
 
@@ -292,7 +292,7 @@ describe("route scoping", () => {
 
     expect(workAt(`${TOOL_ROUTE}/`)).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "a-compressed.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
     });
   });
 
@@ -303,7 +303,7 @@ describe("route scoping", () => {
 
     expect(workAt("/IMAGE/Compress-Image")).toEqual({
       kind: "unsaved",
-      downloads: [{ kind: "result", url: "blob:result", filename: "a-compressed.png" }],
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
     });
   });
 
@@ -322,7 +322,7 @@ describe("route scoping", () => {
     for (const section of SECTIONS.map((s) => s.id)) {
       expect(workAt(`/${section}/some-tool`)).toEqual({
         kind: "unsaved",
-        downloads: [{ kind: "result", url: "blob:result", filename: "a-compressed.png" }],
+        downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
       });
     }
   });

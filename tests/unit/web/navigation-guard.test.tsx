@@ -25,14 +25,20 @@ function makeFile(name: string): File {
   return new File(["x"], name, { type: "image/png" });
 }
 
+let mintedObjectUrls = 0;
+
 /**
  * jsdom ships no URL.createObjectURL and the file store needs one. A subclass,
  * not the usual plain-object stub: the router builds `new URL(...)` on every
  * navigation, so the global has to stay constructable.
+ *
+ * Both halves are mocks, and every mint is a distinct string, so a test can say
+ * WHICH url was revoked and WHEN. Against a constant url and a silent no-op
+ * revoke, an assertion about blob lifetimes passes whatever the component does.
  */
 class MockURL extends URL {
-  static createObjectURL = (): string => "blob:fake";
-  static revokeObjectURL = (): void => {};
+  static createObjectURL = vi.fn<() => string>();
+  static revokeObjectURL = vi.fn<(url: string) => void>();
 }
 
 const NodeRequest = globalThis.Request;
@@ -108,6 +114,37 @@ function leaveABatchZip(): void {
   useFileStore.getState().setBatchZip(new Blob(["zip"]), "processed-files.zip");
 }
 
+function leaveTwoResults(): void {
+  useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+  useFileStore
+    .getState()
+    .updateEntry(0, { processedUrl: "blob:result-a", processedFilename: "a-small.png" });
+  useFileStore
+    .getState()
+    .updateEntry(1, { processedUrl: "blob:result-b", processedFilename: "b-small.png" });
+}
+
+/**
+ * What the page actually handed the browser, in order. The anchor click is the
+ * only observable: triggerDownload builds an anchor, clicks it and drops it.
+ */
+function recordDownloads(): Array<{ url: string; filename: string }> {
+  const started: Array<{ url: string; filename: string }> = [];
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    started.push({ url: this.getAttribute("href") ?? "", filename: this.download });
+  });
+  return started;
+}
+
+/** Let the dialog's deferred claim-and-go run, on real timers. */
+async function flushDeferredWork(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 async function clickButton(name: string): Promise<void> {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name }));
@@ -151,6 +188,9 @@ let addSpy: ReturnType<typeof vi.spyOn>;
 let removeSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+  mintedObjectUrls = 0;
+  MockURL.createObjectURL.mockReset().mockImplementation(() => `blob:mock-${++mintedObjectUrls}`);
+  MockURL.revokeObjectURL.mockReset();
   vi.stubGlobal("URL", MockURL);
   vi.stubGlobal("Request", MockRequest);
   useFileStore.getState().reset();
@@ -161,6 +201,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -526,6 +567,273 @@ describe("NavigationGuard dialog controls", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: en.navigationGuard.stay }),
     );
+  });
+});
+
+describe("NavigationGuard download then leave", () => {
+  it("offers the download when an untaken result is what is at risk", async () => {
+    leaveAResult();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+
+    expect(screen.getByRole("button", { name: en.navigationGuard.downloadAndLeave })).toBeDefined();
+  });
+
+  // There is no result yet, so there is nothing the dialog could hand over.
+  it("offers no download while the run is still going", async () => {
+    startRun();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.queryByRole("button", { name: en.navigationGuard.downloadAndLeave })).toBeNull();
+  });
+
+  // The editor owns its own export path and hands the guard no downloads.
+  it("offers no download for unsaved editor edits", async () => {
+    useEditorStore.setState({ isDirty: true });
+    const { router } = renderGuard("/editor");
+
+    await navigateTo(router, "/files");
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.queryByRole("button", { name: en.navigationGuard.downloadAndLeave })).toBeNull();
+  });
+
+  // Whatever sits first is what the focus trap focuses and a reflexive Enter
+  // answers, so the third button goes after staying put, never before it.
+  it("keeps staying put first once there are three answers", async () => {
+    leaveAResult();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      en.navigationGuard.stay,
+      en.navigationGuard.downloadAndLeave,
+      en.navigationGuard.leave,
+    ]);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: en.navigationGuard.stay }),
+    );
+  });
+
+  // The reason the claim and the proceed are deferred at all. Committing the
+  // navigation remounts tool-page, whose reset() revokes the very url the
+  // anchor was handed, so a commit in this tick can cancel a download the
+  // browser has not started. Drop the setTimeout and the router is already on
+  // /files by the time this looks.
+  it("starts the download before it commits the navigation", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    leaveAResult();
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    expect(started).toEqual([{ url: "blob:result", filename: "a-small.png" }]);
+    expect(router.state.location.pathname).toBe(TOOL_ROUTE);
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  // Claiming drops hasWork, and the effect that gives up on work that settled
+  // under the dialog would commit the navigation mid-download. Anything that
+  // settles the store between the click and the deferred claim walks into it.
+  it("does not auto-proceed while the download it started is pending", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    leaveAResult();
+    recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    // The work settles from somewhere else while the download is in flight.
+    await act(async () => {
+      useFileStore.getState().markClaimed(0);
+    });
+    expect(router.state.location.pathname).toBe(TOOL_ROUTE);
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  // Two owners can answer one block: this action's deferred proceed, and the
+  // effect that gives up on work that settled. The claim wakes that effect, and
+  // it still holds the blocker from the blocked render, so a second proceed
+  // lands on a block that is already gone. react-router throws that into an
+  // error boundary rather than ignoring it.
+  it("commits the navigation exactly once", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    leaveAResult();
+    recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(router.state.location.pathname).toBe("/files");
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("Invalid blocker state transition");
+  });
+
+  // The claim is fixed to what actually went out, by the indices the downloads
+  // carry, and is not re-read from the store a tick later. A result that lands
+  // in that window was never handed over, so claiming it would silence the
+  // warning for a file nobody took, which is the loss this whole dialog exists
+  // to prevent. optimize-for-web writes a live preview into the store as a
+  // finished result with no run in flight, so this window is reachable (#1112).
+  it("claims only what it downloaded, not a result that landed since", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore
+      .getState()
+      .updateEntry(0, { processedUrl: "blob:result-a", processedFilename: "a-small.png" });
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    // The second entry finishes while the download is on its way out.
+    await act(async () => {
+      useFileStore
+        .getState()
+        .updateEntry(1, { processedUrl: "blob:result-b", processedFilename: "b-small.png" });
+    });
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(started).toEqual([{ url: "blob:result-a", filename: "a-small.png" }]);
+    expect(useFileStore.getState().entries.map((e) => e.claimed)).toEqual([true, false]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  // An impatient double click lands both clicks before the deferred tick, and
+  // the dialog is still on screen for the second one.
+  it("takes the result once however many times the button is clicked", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    leaveAResult();
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    expect(started).toHaveLength(1);
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    expect(router.state.location.pathname).toBe("/files");
+    // A second queued leave would proceed on a block that is already answered.
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("Invalid blocker state transition");
+  });
+
+  // AuthGuard swaps this component out on session expiry, and useBlocker's
+  // cleanup deletes the blocker on that unmount. A deferred leave that fires
+  // afterwards proceeds on a blocker that is gone, which react-router throws
+  // on, out of a timer where nothing catches it.
+  it("drops its deferred leave when it is unmounted first", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let expireSession: () => void = () => {};
+
+    function AuthLike() {
+      const [authed, setAuthed] = useState(true);
+      expireSession = () => setAuthed(false);
+      return authed ? <NavigationGuard /> : <Navigate to="/login" replace />;
+    }
+
+    leaveAResult();
+    recordDownloads();
+    const router = createMemoryRouter([{ path: "*", element: <AuthLike /> }], {
+      initialEntries: [TOOL_ROUTE],
+    });
+    render(<RouterProvider router={router} />);
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await act(async () => {
+      expireSession();
+    });
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(router.state.location.pathname).toBe("/login");
+  });
+
+  // A zip is a raw Blob, so downloadBlob mints an object url for it and owns
+  // revoking that url. Taking the zip takes every result in it.
+  it("takes the batch zip once and claims the whole batch", async () => {
+    leaveABatchZip();
+    const started = recordDownloads();
+    MockURL.createObjectURL.mockClear();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(MockURL.createObjectURL).toHaveBeenCalledTimes(1);
+    const zipUrl = MockURL.createObjectURL.mock.results[0].value;
+    expect(started).toEqual([{ url: zipUrl, filename: "processed-files.zip" }]);
+    expect(MockURL.revokeObjectURL).toHaveBeenCalledWith(zipUrl);
+
+    const store = useFileStore.getState();
+    expect(store.batchZipClaimed).toBe(true);
+    expect(store.entries.every((e) => e.claimed)).toBe(true);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("takes every unclaimed result and leaves a claimed one alone", async () => {
+    leaveTwoResults();
+    useFileStore.getState().markClaimed(0);
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(started).toEqual([{ url: "blob:result-b", filename: "b-small.png" }]);
+    expect(useFileStore.getState().entries.map((e) => e.claimed)).toEqual([true, true]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  // The store minted the result url and revokes it in reset(); revoking it here
+  // pulls it out from under the download, and from under the preview still on
+  // screen. Cleared after the setup so this is about what the dialog did.
+  it("never revokes the result url the store still owns", async () => {
+    leaveAResult();
+    recordDownloads();
+    MockURL.revokeObjectURL.mockClear();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(MockURL.revokeObjectURL.mock.calls.flat()).not.toContain("blob:result");
+    expect(useFileStore.getState().entries[0].processedUrl).toBe("blob:result");
+    expect(router.state.location.pathname).toBe("/files");
   });
 });
 

@@ -14,6 +14,10 @@ import { useFileStore } from "@/stores/file-store";
 export type GuardDownload =
   | {
       kind: "result";
+      /** The file-store entry this came from. Carried so a caller claims the
+       *  entries it actually downloaded, rather than re-reading the store a
+       *  tick later and claiming a result that landed in between. */
+      index: number;
       /** Usually an API download URL from the server, and a blob URL after a
        *  batch run settles from the zip. Hand it to triggerDownload; it is not
        *  always revocable and the store owns it. */
@@ -94,11 +98,12 @@ export function useWorkInFlight(): WorkReason | null {
 
     // Key on processedUrl, NOT on status === "completed". A result is a thing
     // the user can lose; a status is not.
-    const downloads: GuardDownload[] = entries.flatMap((e) =>
+    const downloads: GuardDownload[] = entries.flatMap((e, index) =>
       e.processedUrl && !e.claimed
         ? [
             {
               kind: "result" as const,
+              index,
               url: e.processedUrl,
               filename: e.processedFilename ?? e.file.name,
             },
