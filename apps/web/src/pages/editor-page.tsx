@@ -34,7 +34,6 @@ export function EditorPage() {
   usePageTitle(t.sidebar.editor);
   const isMobile = useMobile();
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
-  const isDirty = useEditorStore((s) => s.isDirty);
   const loadImage = useEditorStore((s) => s.loadImage);
   const rulersVisible = useEditorStore((s) => s.rulersVisible);
   const [showExport, setShowExport] = useState(false);
@@ -63,16 +62,6 @@ export function EditorPage() {
     window.addEventListener("snapotter:open-fill-dialog", handler);
     return () => window.removeEventListener("snapotter:open-fill-dialog", handler);
   }, []);
-
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
 
   const handlePaste = useCallback(
     (e: ClipboardEvent) => {
