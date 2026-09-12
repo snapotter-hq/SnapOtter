@@ -180,6 +180,15 @@ test.describe("State bleed between tools", () => {
       timeout: 15_000,
     });
 
+    // Take the result before leaving, the way a user does. This is the only
+    // in-app navigation in this file (everything else goes through page.goto,
+    // which the navigation guard's router blocker never sees), so without the
+    // download the guard would raise its dialog and the click below would go
+    // nowhere.
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("[data-download-button]").first().click();
+    await downloadPromise;
+
     // 2.0 removed the sidebar. Navigate home via the top-nav "Tools" breadcrumb link.
     await page.locator("header").getByRole("link", { name: "Tools", exact: true }).click();
     await expect(page).toHaveURL("/");
