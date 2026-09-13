@@ -10,6 +10,19 @@ import { useMemeStore } from "@/stores/meme-store";
 import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
+import {
+  base64ResultKey,
+  collageResultKey,
+  duplicateResultKey,
+  htmlToImageResultKey,
+  isUnclaimed,
+  memeResultKey,
+  passportPhotoResultKey,
+  pdfToImageResultKey,
+  type ResultKey,
+  splitResultKey,
+  useToolResultClaims,
+} from "@/stores/tool-result-claims";
 
 /**
  * One unclaimed result the guard can offer to download before leaving.
@@ -88,7 +101,13 @@ type OwnStoreToolId = (typeof OWN_STORE_TOOL_IDS)[number];
 /** What one of those stores says about the page: mid-run, or holding a result. */
 interface OwnStoreWork {
   busy: boolean;
-  unsaved: boolean;
+  /**
+   * Which result is sitting there, or null for none. Not a boolean: the guard
+   * compares it against the one the user took, and a run that produces a new
+   * result produces a new key, so the claim lapses on its own
+   * (stores/tool-result-claims.ts).
+   */
+  key: ResultKey;
 }
 
 /**
@@ -141,6 +160,7 @@ export function useWorkInFlight(): WorkReason | null {
   const batchZipFilename = useFileStore((s) => s.batchZipFilename);
   const batchZipClaimed = useFileStore((s) => s.batchZipClaimed);
   const editorDirty = useEditorStore((s) => s.isDirty);
+  const claimed = useToolResultClaims((s) => s.claimed);
 
   // The stores behind OWN_STORE_TOOL_IDS. Subscribed unconditionally, as the
   // rules of hooks require; the route decides which one is worth reading.
@@ -171,26 +191,26 @@ export function useWorkInFlight(): WorkReason | null {
     // the answer. A tool that lands nothing here still falls through, so this
     // only ever adds coverage.
     const ownStoreWork: Record<OwnStoreToolId, OwnStoreWork> = {
-      collage: { busy: collagePhase === "processing", unsaved: collageResultUrl !== null },
-      "find-duplicates": { busy: duplicateScanning, unsaved: duplicateResults !== null },
-      "html-to-image": { busy: captureRunning, unsaved: captureResultUrl !== null },
-      "image-to-base64": { busy: base64Processing, unsaved: base64Results.length > 0 },
-      "meme-generator": { busy: memeGenerating, unsaved: memeResultUrl !== null },
+      collage: { busy: collagePhase === "processing", key: collageResultKey(collageResultUrl) },
+      "find-duplicates": { busy: duplicateScanning, key: duplicateResultKey(duplicateResults) },
+      "html-to-image": { busy: captureRunning, key: htmlToImageResultKey(captureResultUrl) },
+      "image-to-base64": { busy: base64Processing, key: base64ResultKey(base64Results) },
+      "meme-generator": { busy: memeGenerating, key: memeResultKey(memeResultUrl) },
       // Both requests count as a run: the analysis is a face-detection job the
       // user waits on. Only the generated photo counts as a result, though. The
       // analysis lands on its own the moment a file is dropped, so warning about
       // it would fire on a page nobody has run anything on.
       "passport-photo": {
         busy: passportAnalyzing || passportGenerating,
-        unsaved: passportResult !== null,
+        key: passportPhotoResultKey(passportResult),
       },
       "pdf-to-image": {
         busy: pdfToImageProcessing,
-        unsaved: (pdfToImageResults?.length ?? 0) > 0 || pdfToImageZipUrl !== null,
+        key: pdfToImageResultKey(pdfToImageResults, pdfToImageZipUrl),
       },
       split: {
         busy: splitProcessing,
-        unsaved: splitTiles.length > 0 || splitZipBlobUrl !== null,
+        key: splitResultKey(splitTiles, splitZipBlobUrl),
       },
     };
 
@@ -198,11 +218,15 @@ export function useWorkInFlight(): WorkReason | null {
     // OwnStoreToolId so a new id there has to bring its store reading with it.
     const byToolId: Record<string, OwnStoreWork | undefined> = ownStoreWork;
     const toolId = toolIdFromPath(path);
-    const own = toolId ? byToolId[toolId] : undefined;
-    if (own?.busy) return { kind: "processing" };
-    // Warn only. These results come in too many shapes (two kinds of zip, three
-    // plain urls, text, a report) to offer as downloads from here.
-    if (own?.unsaved) return { kind: "unsaved", downloads: [] };
+    if (toolId) {
+      const own = byToolId[toolId];
+      if (own?.busy) return { kind: "processing" };
+      // Warn only. These results come in too many shapes (two kinds of zip,
+      // three plain urls, text, a report) to offer as downloads from here.
+      // Quiet once the user has taken this result, and loud again the moment a
+      // run produces another one (#1123).
+      if (own && isUnclaimed(own.key, claimed[toolId])) return { kind: "unsaved", downloads: [] };
+    }
 
     if (processing) return { kind: "processing" };
 

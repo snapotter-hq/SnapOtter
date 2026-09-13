@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
@@ -136,6 +136,33 @@ function usesToolProcessor(file: string): boolean {
 const COVERED = new Set<string>([...OWN_STORE_TOOL_IDS, ...WARN_ONLY_TOOL_IDS]);
 const TOOL_IDS = new Set(TOOLS.map((t) => t.id));
 
+/** Every .ts/.tsx file the web app ships, so a claim anywhere in it counts. */
+function webSources(dir: string = WEB_SRC): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...webSources(full));
+    else if (/\.tsx?$/.test(entry.name)) files.push(full);
+  }
+  return files;
+}
+
+/**
+ * The tool ids some component claims a result for, read off the call sites
+ * themselves rather than off a list that could agree with nothing.
+ */
+function claimedToolIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const file of webSources()) {
+    for (const m of readFileSync(file, "utf8").matchAll(/claimToolResult\(\s*"([a-z0-9-]+)"/g)) {
+      ids.add(m[1]);
+    }
+  }
+  return ids;
+}
+
+const CLAIMED = claimedToolIds();
+
 describe("navigation guard tool coverage", () => {
   it("maps every tool to a settings component through the registry", () => {
     const unmapped = TOOLS.map((t) => t.id).filter((id) => settingsFileFor(id) === null);
@@ -183,6 +210,38 @@ describe("navigation guard tool coverage", () => {
     const both = Object.keys(EXEMPT).filter((id) => COVERED.has(id));
 
     expect(both, "Covered by useWorkInFlight and exempt here. Drop the exemption.").toEqual([]);
+  });
+
+  /**
+   * The sibling of the coverage check above. Seeing a tool's result is half the
+   * job; knowing when the user has taken it is the other half. Without a claim
+   * path the guard warns about a file the user already downloaded (#1123), and
+   * a dialog that cries wolf is one people learn to dismiss.
+   *
+   * compare is deliberately absent: its file-store processedUrl holds the image
+   * it compares AGAINST, and the diff it really produces lives in component
+   * state. It claims through the file store (claimSelected) like any other tool
+   * there, and is warn-only here on purpose.
+   */
+  it("gives every own-store tool a way to say the result was taken", () => {
+    const unclaimable = [...OWN_STORE_TOOL_IDS].filter((id) => !CLAIMED.has(id));
+
+    expect(
+      unclaimable,
+      "useWorkInFlight warns about these tools' results and nothing ever tells it one was taken. " +
+        'Call claimToolResult("<tool-id>", <tool>ResultKey(...)) from every control that hands ' +
+        "the user the file: a download click, a copy that succeeded.",
+    ).toEqual([]);
+  });
+
+  it("claims only for tools the guard reads a store for", () => {
+    const stray = [...CLAIMED].filter((id) => !new Set<string>(OWN_STORE_TOOL_IDS).has(id));
+
+    expect(
+      stray,
+      "These claim a result under an id useWorkInFlight has no own-store entry for, so the claim " +
+        "answers nothing. A typo, a rename, or a tool that belongs in OWN_STORE_TOOL_IDS.",
+    ).toEqual([]);
   });
 
   it("drops exemptions for tools that have moved onto useToolProcessor", () => {

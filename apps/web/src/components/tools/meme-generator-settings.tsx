@@ -16,6 +16,7 @@ import {
   type TemplateTextBox,
   useMemeStore,
 } from "@/stores/meme-store";
+import { claimToolResult, memeResultKey } from "@/stores/tool-result-claims";
 
 const INPUT_CLASS =
   "w-full px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground";
@@ -305,6 +306,7 @@ function ResultSettings() {
           href={resultUrl}
           download
           data-testid="sidebar-download-meme"
+          onClick={() => claimToolResult("meme-generator", memeResultKey(resultUrl))}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2"
         >
           <Download className="h-4 w-4" />

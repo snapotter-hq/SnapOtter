@@ -31,6 +31,7 @@ import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
+import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
 // Checkerboard pattern for transparent background
 const CHECKER_BG = "repeating-conic-gradient(#e0e0e0 0% 25%, #ffffff 0% 50%) 0 0 / 16px 16px";
@@ -709,6 +710,7 @@ function ResultView() {
         <a
           href={resultUrl}
           download
+          onClick={() => claimToolResult("collage", collageResultKey(resultUrl))}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Download className="h-4 w-4" />

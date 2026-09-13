@@ -4,6 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import { claimToolResult, pdfToImageResultKey } from "@/stores/tool-result-claims";
 
 const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
@@ -246,6 +247,9 @@ export function PdfToImageSettings() {
           href={store.zipUrl}
           download="pdf-pages.zip"
           data-testid="pdf-to-image-download"
+          onClick={() =>
+            claimToolResult("pdf-to-image", pdfToImageResultKey(store.results, store.zipUrl))
+          }
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />

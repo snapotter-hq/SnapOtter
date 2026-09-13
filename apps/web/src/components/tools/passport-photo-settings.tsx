@@ -30,6 +30,7 @@ import {
   type GenerateResult,
   usePassportPhotoStore,
 } from "@/stores/passport-photo-store";
+import { claimToolResult, passportPhotoResultKey } from "@/stores/tool-result-claims";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -814,6 +815,7 @@ export function PassportPhotoSettings() {
         <a
           href={generateResult.downloadUrl}
           download
+          onClick={() => claimToolResult("passport-photo", passportPhotoResultKey(generateResult))}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 hover:bg-primary/90"
         >
           <Download className="h-4 w-4" />

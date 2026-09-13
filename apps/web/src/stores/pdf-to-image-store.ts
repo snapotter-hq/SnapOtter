@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
 
-interface PageResult {
+export interface PageResult {
   page: number;
   downloadUrl: string;
   size: number;

@@ -33,6 +33,18 @@ import { useMemeStore } from "@/stores/meme-store";
 import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
+import {
+  base64ResultKey,
+  claimToolResult,
+  collageResultKey,
+  duplicateResultKey,
+  htmlToImageResultKey,
+  memeResultKey,
+  passportPhotoResultKey,
+  pdfToImageResultKey,
+  splitResultKey,
+  useToolResultClaims,
+} from "@/stores/tool-result-claims";
 
 const TOOL_ROUTE = "/image/compress-image";
 
@@ -73,8 +85,18 @@ interface OwnStoreCase {
   toolId: string;
   /** Put the store in the state it holds while the run is in flight. */
   busy: () => void;
-  /** Each distinct shape of result this tool can leave sitting on the page. */
-  results: Array<{ what: string; seed: () => void }>;
+  /**
+   * Take whatever result is on the page, the way the tool's download control
+   * does. Reads the store at call time and goes through the same key function
+   * the hook reads, which is the pairing the fix rests on.
+   */
+  claim: () => void;
+  /**
+   * Each distinct shape of result this tool can leave sitting on the page.
+   * `again` lands a second, different result of that same shape: the claim from
+   * the first must not cover it.
+   */
+  results: Array<{ what: string; seed: () => void; again: () => void }>;
 }
 
 /**
@@ -86,6 +108,10 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
   {
     toolId: "split",
     busy: () => useSplitStore.setState({ processing: true }),
+    claim: () => {
+      const { tiles, zipBlobUrl } = useSplitStore.getState();
+      claimToolResult("split", splitResultKey(tiles, zipBlobUrl));
+    },
     results: [
       {
         what: "tiles are on screen",
@@ -93,16 +119,25 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
           useSplitStore.setState({
             tiles: [{ row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:tile" }],
           }),
+        again: () =>
+          useSplitStore.setState({
+            tiles: [{ row: 1, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:tile-2" }],
+          }),
       },
       {
         what: "only the zip landed",
         seed: () => useSplitStore.setState({ zipBlobUrl: "blob:tiles.zip" }),
+        again: () => useSplitStore.setState({ zipBlobUrl: "blob:tiles-rerun.zip" }),
       },
     ],
   },
   {
     toolId: "pdf-to-image",
     busy: () => usePdfToImageStore.setState({ processing: true }),
+    claim: () => {
+      const { results, zipUrl } = usePdfToImageStore.getState();
+      claimToolResult("pdf-to-image", pdfToImageResultKey(results, zipUrl));
+    },
     results: [
       {
         what: "pages are on screen",
@@ -110,51 +145,88 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
           usePdfToImageStore.setState({
             results: [{ page: 1, downloadUrl: "/api/v1/download/page-1.png", size: 1024 }],
           }),
+        again: () =>
+          usePdfToImageStore.setState({
+            results: [{ page: 1, downloadUrl: "/api/v1/download/rerun/page-1.png", size: 2048 }],
+          }),
       },
       {
         what: "only the zip landed",
         seed: () => usePdfToImageStore.setState({ zipUrl: "/api/v1/download/pages.zip" }),
+        again: () => usePdfToImageStore.setState({ zipUrl: "/api/v1/download/rerun/pages.zip" }),
       },
     ],
   },
   {
     toolId: "collage",
     busy: () => useCollageStore.setState({ phase: "processing" }),
+    claim: () => claimToolResult("collage", collageResultKey(useCollageStore.getState().resultUrl)),
     results: [
       {
         what: "the collage is on screen",
         seed: () => useCollageStore.setState({ phase: "result", resultUrl: "blob:collage" }),
+        again: () => useCollageStore.setState({ phase: "result", resultUrl: "blob:collage-2" }),
       },
     ],
   },
   {
     toolId: "meme-generator",
     busy: () => useMemeStore.setState({ generating: true }),
+    claim: () =>
+      claimToolResult("meme-generator", memeResultKey(useMemeStore.getState().resultUrl)),
     results: [
       {
         what: "the meme is on screen",
         seed: () =>
           useMemeStore.setState({ phase: "result", resultUrl: "/api/v1/download/meme.png" }),
+        again: () =>
+          useMemeStore.setState({ phase: "result", resultUrl: "/api/v1/download/meme-2.png" }),
       },
     ],
   },
   {
     toolId: "html-to-image",
     busy: () => useHtmlToImageStore.setState({ capturing: true }),
+    claim: () =>
+      claimToolResult(
+        "html-to-image",
+        htmlToImageResultKey(useHtmlToImageStore.getState().resultUrl),
+      ),
     results: [
       {
         what: "the capture is on screen",
         seed: () => useHtmlToImageStore.setState({ resultUrl: "/api/v1/download/capture.png" }),
+        again: () => useHtmlToImageStore.setState({ resultUrl: "/api/v1/download/capture-2.png" }),
       },
     ],
   },
   {
     toolId: "image-to-base64",
     busy: () => useBase64Store.setState({ processing: true }),
+    claim: () =>
+      claimToolResult("image-to-base64", base64ResultKey(useBase64Store.getState().results)),
     results: [
       {
         what: "encoded text is on screen",
         seed: () =>
+          useBase64Store.setState({
+            results: [
+              {
+                filename: "a.png",
+                mimeType: "image/png",
+                width: 1,
+                height: 1,
+                originalSize: 10,
+                encodedSize: 14,
+                overheadPercent: 40,
+                base64: "aGk=",
+                dataUri: "data:image/png;base64,aGk=",
+              },
+            ],
+          }),
+        // Same file re-encoded: identical text, a new run. Only the array the
+        // run built tells the two apart.
+        again: () =>
           useBase64Store.setState({
             results: [
               {
@@ -176,6 +248,11 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
   {
     toolId: "passport-photo",
     busy: () => usePassportPhotoStore.setState({ generating: true }),
+    claim: () =>
+      claimToolResult(
+        "passport-photo",
+        passportPhotoResultKey(usePassportPhotoStore.getState().generateResult),
+      ),
     results: [
       {
         what: "the generated photo is on screen",
@@ -187,16 +264,39 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
               spec: { country: "US", document: "passport" },
             },
           }),
+        // generate writes under the jobId the upload was analyzed as, so a
+        // regenerated photo comes back at the SAME url. Nudging the crop or
+        // switching country is a new photo all the same.
+        again: () =>
+          usePassportPhotoStore.setState({
+            generateResult: {
+              downloadUrl: "/api/v1/download/passport.jpg",
+              dimensions: { width: 600, height: 600 },
+              spec: { country: "US", document: "visa" },
+            },
+          }),
       },
     ],
   },
   {
     toolId: "find-duplicates",
     busy: () => useDuplicateStore.setState({ scanning: true }),
+    claim: () =>
+      claimToolResult("find-duplicates", duplicateResultKey(useDuplicateStore.getState().results)),
     results: [
       {
         what: "the report is on screen",
         seed: () =>
+          useDuplicateStore.setState({
+            results: {
+              totalImages: 2,
+              uniqueImages: 1,
+              spaceSaveable: 1024,
+              duplicateGroups: [],
+            },
+          }),
+        // The same folder rescanned: identical numbers, a new scan.
+        again: () =>
           useDuplicateStore.setState({
             results: {
               totalImages: 2,
@@ -225,6 +325,7 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useEditorStore.setState({ isDirty: false });
+  useToolResultClaims.getState().reset();
   for (const store of OWN_STORES) store.getState().reset();
   // No reset action on this one: the panel drives it field by field.
   usePassportPhotoStore.setState({
@@ -557,7 +658,41 @@ describe("tools that keep their results outside the file store", () => {
 
           expect(workAt(routeFor(toolCase.toolId))).toEqual({ kind: "unsaved", downloads: [] });
         });
+
+        // The bug (#1123): downloading a split zip and then navigating still
+        // raised the dialog, because nothing these tools do reaches the file
+        // store's claim.
+        it(`goes quiet once the user takes it, ${result.what}`, () => {
+          result.seed();
+          toolCase.claim();
+
+          expect(workAt(routeFor(toolCase.toolId))).toBeNull();
+        });
+
+        // Why the claim records WHICH result was taken rather than a flag: the
+        // next run invalidates it without any store remembering to clear
+        // anything. A plain boolean passes the test above and fails this one.
+        it(`warns again on a fresh result after the last one was taken, ${result.what}`, () => {
+          result.seed();
+          toolCase.claim();
+          result.again();
+
+          expect(workAt(routeFor(toolCase.toolId))).toEqual({ kind: "unsaved", downloads: [] });
+        });
       }
+
+      // A claim is scoped to the tool that made it. Claiming under one id must
+      // not answer for another's result, which a shared flag would.
+      it("is not answered by another tool's claim", () => {
+        for (const result of toolCase.results) result.seed();
+        for (const other of OWN_STORE_CASES) {
+          if (other.toolId === toolCase.toolId) continue;
+          for (const result of other.results) result.seed();
+          other.claim();
+        }
+
+        expect(workAt(routeFor(toolCase.toolId))).toEqual({ kind: "unsaved", downloads: [] });
+      });
 
       // A default in the store is not a result. Without this, a busy check
       // written as "anything other than idle" passes the tests above and warns

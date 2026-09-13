@@ -7,6 +7,7 @@ import { format, plural } from "@/lib/format";
 import type { DuplicateResult } from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFileStore } from "@/stores/file-store";
+import { claimToolResult, duplicateResultKey } from "@/stores/tool-result-claims";
 
 type Preset = "exact" | "similar" | "loose";
 const PRESET_THRESHOLDS: Record<Preset, number> = { exact: 2, similar: 8, loose: 14 };
@@ -154,6 +155,7 @@ export function FindDuplicatesSettings() {
     a.download = "unique-files.zip";
     a.click();
     URL.revokeObjectURL(url);
+    claimToolResult("find-duplicates", duplicateResultKey(results));
   }, [files, results, bestOverrides]);
 
   const handleDownloadGrouped = useCallback(async () => {
@@ -211,6 +213,7 @@ export function FindDuplicatesSettings() {
     a.download = "duplicates-grouped.zip";
     a.click();
     URL.revokeObjectURL(url);
+    claimToolResult("find-duplicates", duplicateResultKey(results));
   }, [files, results]);
 
   const hasFiles = files.length >= 2;

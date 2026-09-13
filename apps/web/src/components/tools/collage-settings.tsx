@@ -13,6 +13,7 @@ import {
 import { format, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
+import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
   { value: "free", label: "Free" },
@@ -403,6 +404,7 @@ export function CollageSettings() {
           href={resultUrl}
           download
           data-testid="collage-download"
+          onClick={() => claimToolResult("collage", collageResultKey(resultUrl))}
           className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
         >
           <Download className="h-4 w-4" />

@@ -1,6 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
+import { claimToolResult, htmlToImageResultKey } from "@/stores/tool-result-claims";
 
 export function HtmlToImageResults() {
   const store = useHtmlToImageStore();
@@ -31,6 +32,7 @@ export function HtmlToImageResults() {
     a.href = resultUrl;
     a.download = `screenshot.${store.format}`;
     a.click();
+    claimToolResult("html-to-image", htmlToImageResultKey(resultUrl));
   };
 
   return (

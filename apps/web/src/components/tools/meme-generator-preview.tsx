@@ -21,6 +21,7 @@ import {
   type TextLayout,
   useMemeStore,
 } from "@/stores/meme-store";
+import { claimToolResult, memeResultKey } from "@/stores/tool-result-claims";
 
 const INPUT_CLASS =
   "w-full px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground";
@@ -424,6 +425,7 @@ function ResultView() {
           href={resultUrl}
           download
           data-testid="download-meme"
+          onClick={() => claimToolResult("meme-generator", memeResultKey(resultUrl))}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Download className="h-4 w-4" />
