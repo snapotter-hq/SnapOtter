@@ -310,6 +310,9 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
   },
 ];
 
+/** One tile, for the claim-keeping tests below. */
+const SEED_TILE = { row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:tile" };
+
 /** The route the app really serves this tool at, section included. */
 function routeFor(toolId: string): string {
   const tool = TOOLS.find((t) => t.id === toolId);
@@ -714,6 +717,43 @@ describe("tools that keep their results outside the file store", () => {
       });
     });
   }
+
+  /**
+   * tool-page resets most of these stores on tool navigation, so the claim map
+   * would be the only thing still holding the result: for image-to-base64, every
+   * base64 and dataUri of the last batch. Object keys are kept behind a WeakRef
+   * for that reason, and strings as themselves, since a string cannot be weakly
+   * held at all (new WeakRef("...") throws).
+   */
+  describe("how a claim is kept", () => {
+    it("keeps an object key behind a weak reference", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE] });
+      claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
+
+      const claim = useToolResultClaims.getState().claimed.split;
+      expect(claim).toBeInstanceOf(WeakRef);
+      expect((claim as WeakRef<object>).deref()).toBe(useSplitStore.getState().tiles);
+    });
+
+    it("keeps a string key as itself", () => {
+      useCollageStore.setState({ phase: "result", resultUrl: "blob:collage" });
+      claimToolResult("collage", collageResultKey(useCollageStore.getState().resultUrl));
+
+      expect(useToolResultClaims.getState().claimed.collage).toBe("blob:collage");
+    });
+
+    // A collected ref cannot be produced on demand (nothing forces a GC), so
+    // this stands one in. The result is still on the page, and a claim that no
+    // longer resolves must read as untaken rather than as taken.
+    it("warns again when the claimed result has been collected", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE] });
+      useToolResultClaims.setState({
+        claimed: { split: { deref: () => undefined } as unknown as WeakRef<object> },
+      });
+
+      expect(workAt(routeFor("split"))).toEqual({ kind: "unsaved", downloads: [] });
+    });
+  });
 
   // The store check runs first, and then gives way: it does not narrow what the
   // file-store path can still find on these routes.

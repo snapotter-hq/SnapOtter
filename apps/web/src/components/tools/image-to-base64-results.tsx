@@ -108,7 +108,14 @@ function CopyButton({
 
 // -- Single file result view ------------------------------------------------
 
-function FileResult({ result, onTaken }: { result: Base64Result; onTaken: () => void }) {
+/**
+ * One file's encoded text. Neither control here claims: with several files
+ * loaded, taking this one leaves the rest untaken, and the claim is per tool
+ * rather than per file. Per-file granularity is the right answer; until then
+ * the copy-all and download-all controls are what claim the run, and this
+ * over-warns rather than going quiet on text the user never took.
+ */
+function FileResult({ result }: { result: Base64Result }) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>("datauri");
   const tab = TABS.find((t) => t.id === activeTab) ?? TABS[0];
@@ -131,8 +138,7 @@ function FileResult({ result, onTaken }: { result: Base64Result; onTaken: () => 
     a.download = `${result.filename}.base64.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    onTaken();
-  }, [output, result.filename, onTaken]);
+  }, [output, result.filename]);
 
   return (
     <div className="flex flex-col h-full">
@@ -187,7 +193,6 @@ function FileResult({ result, onTaken }: { result: Base64Result; onTaken: () => 
         <CopyButton
           text={output}
           label={t.toolSettings["image-to-base64-results"].copyToClipboard}
-          onCopied={onTaken}
         />
         <button
           type="button"
@@ -210,9 +215,9 @@ export function ImageToBase64Results() {
   const { results, errors, processing, progress } = useBase64Store();
   const { entries, selectedIndex, originalBlobUrl, selectedFileName } = useFileStore();
 
-  // Copying one snippet, saving one txt or taking the whole set all count as
-  // taking this run: the navigation guard stops warning about it, and starts
-  // again the moment another run replaces these results.
+  // Taking the whole set counts as taking this run: the navigation guard stops
+  // warning about it, and starts again the moment another run replaces these
+  // results. The per-file controls claim nothing; see FileResult.
   const claimResults = useCallback(() => {
     claimToolResult("image-to-base64", base64ResultKey(results));
   }, [results]);
@@ -359,7 +364,7 @@ export function ImageToBase64Results() {
       {/* Current file result */}
       <div className="flex-1 min-h-0">
         {currentResult ? (
-          <FileResult result={currentResult} onTaken={claimResults} />
+          <FileResult result={currentResult} />
         ) : currentError ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

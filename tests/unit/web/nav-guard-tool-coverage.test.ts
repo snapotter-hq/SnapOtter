@@ -136,7 +136,7 @@ function usesToolProcessor(file: string): boolean {
 const COVERED = new Set<string>([...OWN_STORE_TOOL_IDS, ...WARN_ONLY_TOOL_IDS]);
 const TOOL_IDS = new Set(TOOLS.map((t) => t.id));
 
-/** Every .ts/.tsx file the web app ships, so a claim anywhere in it counts. */
+/** Every .ts/.tsx file the web app ships. */
 function webSources(dir: string = WEB_SRC): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -148,20 +148,59 @@ function webSources(dir: string = WEB_SRC): string[] {
 }
 
 /**
- * The tool ids some component claims a result for, read off the call sites
- * themselves rather than off a list that could agree with nothing.
+ * Source with its comments removed.
+ *
+ * A commented-out `// claimToolResult("smart-crop", null)` is not a claim, and
+ * counting one turns this whole file green while the tool stays unguarded.
+ * Block comments go entirely; line comments only where the line is one, so a
+ * url inside a string keeps its `//`.
  */
-function claimedToolIds(): Set<string> {
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*(?:\/\/|\*).*$/gm, "");
+}
+
+/** The tool ids claimed in these files, read off the call sites themselves. */
+function claimedIdsIn(files: string[]): Set<string> {
   const ids = new Set<string>();
-  for (const file of webSources()) {
-    for (const m of readFileSync(file, "utf8").matchAll(/claimToolResult\(\s*"([a-z0-9-]+)"/g)) {
+  for (const file of files) {
+    const source = withoutComments(readFileSync(file, "utf8"));
+    for (const m of source.matchAll(/claimToolResult\(\s*"([a-z0-9-]+)"/g)) {
       ids.add(m[1]);
     }
   }
   return ids;
 }
 
-const CLAIMED = claimedToolIds();
+/** One registry entry's object literal, bounded by the next entry's opening. */
+function entryBodies(): Map<string, string> {
+  const bodies = new Map<string, string>();
+  const starts = [...registrySource.matchAll(/\[\s*"([a-z0-9-]+)",\s*\{/g)];
+  for (let i = 0; i < starts.length; i++) {
+    const from = starts[i].index ?? 0;
+    const to = i + 1 < starts.length ? (starts[i + 1].index ?? undefined) : undefined;
+    bodies.set(starts[i][1], registrySource.slice(from, to));
+  }
+  return bodies;
+}
+
+const ENTRY_BODIES = entryBodies();
+
+/** The results panel the registry pairs with this tool, if it has one. */
+function resultsFileFor(toolId: string): string | null {
+  const componentName = ENTRY_BODIES.get(toolId)?.match(/ResultsPanel:\s*(\w+)/)?.[1];
+  const spec = componentName ? IMPORT_SPECS.get(componentName) : undefined;
+  return spec ? fileFor(spec) : null;
+}
+
+/**
+ * The components this tool actually renders: its settings panel and its results
+ * panel. Scoped the way usesToolProcessor is, so a claim written in some
+ * unrelated component cannot answer for this tool. That is the realistic
+ * copy-paste failure, and an unscoped scan reads it as coverage.
+ */
+function claimFilesFor(toolId: string): string[] {
+  return [settingsFileFor(toolId), resultsFileFor(toolId)].filter((f): f is string => f !== null);
+}
 
 describe("navigation guard tool coverage", () => {
   it("maps every tool to a settings component through the registry", () => {
@@ -218,24 +257,44 @@ describe("navigation guard tool coverage", () => {
    * path the guard warns about a file the user already downloaded (#1123), and
    * a dialog that cries wolf is one people learn to dismiss.
    *
-   * compare is deliberately absent: its file-store processedUrl holds the image
-   * it compares AGAINST, and the diff it really produces lives in component
-   * state. It claims through the file store (claimSelected) like any other tool
-   * there, and is warn-only here on purpose.
+   * WARN_ONLY_TOOL_IDS is exempt, which is right for its one member and a gap
+   * for any future one. compare claims through the file store (claimSelected),
+   * so it has a take-path this scan cannot see. A tool parked there with no
+   * file-store claim either would reproduce #1123 with nothing here noticing:
+   * check that by hand before adding one.
    */
   it("gives every own-store tool a way to say the result was taken", () => {
-    const unclaimable = [...OWN_STORE_TOOL_IDS].filter((id) => !CLAIMED.has(id));
+    const unclaimable = [...OWN_STORE_TOOL_IDS].filter(
+      (id) => !claimedIdsIn(claimFilesFor(id)).has(id),
+    );
 
     expect(
       unclaimable,
-      "useWorkInFlight warns about these tools' results and nothing ever tells it one was taken. " +
-        'Call claimToolResult("<tool-id>", <tool>ResultKey(...)) from every control that hands ' +
-        "the user the file: a download click, a copy that succeeded.",
+      "useWorkInFlight warns about these tools' results and nothing in their own panels ever " +
+        'tells it one was taken. Call claimToolResult("<tool-id>", <tool>ResultKey(...)) from a ' +
+        "control that hands over the whole result: a download click, a copy that succeeded, the " +
+        "zip of everything a run produced. Not from a per-item control, which would answer for " +
+        "the items the user never took.",
+    ).toEqual([]);
+  });
+
+  it("keeps each tool's panels claiming under its own id", () => {
+    const crossed = [...OWN_STORE_TOOL_IDS].flatMap((id) =>
+      [...claimedIdsIn(claimFilesFor(id))]
+        .filter((claimed) => claimed !== id)
+        .map((claimed) => `${id} panel claims ${claimed}`),
+    );
+
+    expect(
+      crossed,
+      "A panel claims a result under another tool's id. Copied call site, or a rename that " +
+        "missed one: the claim answers for a tool whose page this is not.",
     ).toEqual([]);
   });
 
   it("claims only for tools the guard reads a store for", () => {
-    const stray = [...CLAIMED].filter((id) => !new Set<string>(OWN_STORE_TOOL_IDS).has(id));
+    const ownStore = new Set<string>(OWN_STORE_TOOL_IDS);
+    const stray = [...claimedIdsIn(webSources())].filter((id) => !ownStore.has(id));
 
     expect(
       stray,

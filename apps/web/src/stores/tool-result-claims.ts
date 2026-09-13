@@ -29,18 +29,35 @@ import type { TileInfo } from "@/stores/split-store";
  *
  * null means no result, which is also how the guard asks "is there anything
  * here to lose": a null key is never unclaimed.
- *
- * Holding the object keeps it reachable after the store has moved on, so a
- * claimed result outlives the run that made it. The ceiling is one per
- * own-store tool, replaced by that tool's next claim.
  */
 export type ResultKey = string | object | null;
 
+/**
+ * How a claim is kept: strings as themselves, objects behind a WeakRef.
+ *
+ * tool-page resets most of these stores on tool navigation, which would leave
+ * this map the only thing still holding the result. For image-to-base64 that is
+ * every base64 and dataUri string of the last batch, pinned for the rest of the
+ * session. The WeakRef costs nothing in behaviour: while the store still holds
+ * the result the ref resolves, and once the store has dropped it the guard's
+ * key is null, so a dead ref can never disagree with a live one.
+ */
+type StoredKey = string | WeakRef<object>;
+
 interface ToolResultClaimsState {
   /** Tool id -> the identity of the result that tool has had taken. */
-  claimed: Record<string, ResultKey>;
+  claimed: Record<string, StoredKey>;
   claim: (toolId: string, key: ResultKey) => void;
   reset: () => void;
+}
+
+/** Whether a stored claim still stands for this result. */
+function matches(stored: StoredKey | undefined, key: ResultKey): boolean {
+  if (key === null || stored === undefined) return false;
+  if (typeof key === "string") return stored === key;
+  // A ref whose result has been collected resolves to undefined, which is not
+  // the live key and so does not match.
+  return typeof stored !== "string" && stored.deref() === key;
 }
 
 export const useToolResultClaims = create<ToolResultClaimsState>((set) => ({
@@ -50,9 +67,14 @@ export const useToolResultClaims = create<ToolResultClaimsState>((set) => ({
     set((s) =>
       // Nothing to claim, or claimed already: leave the map alone so a second
       // click on the same download does not re-render everything reading it.
-      key === null || Object.is(s.claimed[toolId], key)
+      key === null || matches(s.claimed[toolId], key)
         ? s
-        : { claimed: { ...s.claimed, [toolId]: key } },
+        : {
+            claimed: {
+              ...s.claimed,
+              [toolId]: typeof key === "string" ? key : new WeakRef(key),
+            },
+          },
     ),
 
   reset: () => set({ claimed: {} }),
@@ -60,21 +82,24 @@ export const useToolResultClaims = create<ToolResultClaimsState>((set) => ({
 
 /**
  * Record that the user has taken this result, so the navigation guard stops
- * warning about it. Call it from wherever the file is handed over: a download
- * click, a copy that succeeded.
+ * warning about it. Call it from a control that hands over the whole result: a
+ * download click, a copy that succeeded, the zip of everything a run produced.
  *
- * Where a run leaves several artifacts (split's tiles and their zip,
- * pdf-to-image's pages and theirs), they share one key, so taking any of them
- * claims the set. That is how the file store already treats a batch zip:
- * markBatchClaimed claims every entry behind it.
+ * NOT from a per-item control. A claim is per tool, so the tile, page or file a
+ * user saved one of many would answer for the ones they never took, and silence
+ * about work nobody has seen is the failure this guard exists to prevent. The
+ * file store can claim a batch zip across every entry (markBatchClaimed)
+ * because the zip really does contain all of them; one tile does not. Per-item
+ * granularity is the right long-term answer. Until then those controls claim
+ * nothing and the guard asks again, which is the safe way to be wrong.
  */
 export function claimToolResult(toolId: string, key: ResultKey): void {
   useToolResultClaims.getState().claim(toolId, key);
 }
 
 /** Whether a result is sitting there that the user has not taken. */
-export function isUnclaimed(key: ResultKey, claimed: ResultKey | undefined): boolean {
-  return key !== null && !Object.is(key, claimed);
+export function isUnclaimed(key: ResultKey, claimed: StoredKey | undefined): boolean {
+  return key !== null && !matches(claimed, key);
 }
 
 // -- Result keys ------------------------------------------------------------
@@ -131,7 +156,7 @@ export function passportPhotoResultKey(generateResult: GenerateResult | null): R
 /**
  * The converted pages, or the zip of them. One response carries both, so the
  * pages identify the whole set and the zip url stands in for a run that landed
- * nothing else.
+ * nothing else. Only the zip control claims this; a single page does not.
  */
 export function pdfToImageResultKey(
   results: PageResult[] | null,
@@ -142,7 +167,8 @@ export function pdfToImageResultKey(
 
 /**
  * The tiles, or the zip of them. One run produces both, so the tiles identify
- * the set: zipping does not change what the user has already taken.
+ * the set: zipping does not change what the user has already taken. Only the
+ * zip control claims this; a single tile does not.
  */
 export function splitResultKey(tiles: TileInfo[], zipBlobUrl: string | null): ResultKey {
   return tiles.length > 0 ? tiles : zipBlobUrl;
