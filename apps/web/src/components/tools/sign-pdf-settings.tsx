@@ -1,7 +1,9 @@
+import { SafeError } from "@snapotter/shared";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
 import {
@@ -110,6 +112,23 @@ export function subscribeSignPdfJobProgress(
   return cleanup;
 }
 
+/**
+ * The name the server gave the signed PDF (`<original>_signed.pdf`), which it
+ * puts in the download URL's last segment. The navigation guard offers a result
+ * under this name; without it the signed file would be offered under the name
+ * of the file that went in.
+ */
+function signedFilenameFrom(downloadUrl: string): string | null {
+  const last = downloadUrl.split("/").pop();
+  if (!last) return null;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    // A malformed percent sequence is still a usable name.
+    return last;
+  }
+}
+
 export interface SignProps {
   canvasRef: React.RefObject<SignCanvasRef | null>;
   hasSelection: boolean;
@@ -150,23 +169,94 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       setError(sp.addFirst);
       return;
     }
+    // The entry this run belongs to, read before anything can await. The
+    // thumbnail strip is not gated on the run, so the selection can move while
+    // the PDF is being signed; a result written to the live selection would
+    // land on a bystander entry and the signed file would go unguarded.
+    const capturedIndex = useFileStore.getState().selectedIndex;
+
     setError(null);
     setDownloadUrl(null);
     setProgress(0);
     setProcessing(true);
+    // The state above draws this panel; the copy below is what the navigation
+    // guard reads, and it is the only reason the store is touched here.
+    // Clearing the entry's result also clears its claim (see the `claimed`
+    // invariant in file-store), so a second run cannot inherit the first's.
+    useFileStore.getState().setProcessing(true);
+    useFileStore.getState().updateEntry(capturedIndex, {
+      processedUrl: null,
+      processedPreviewUrl: null,
+      processedFilename: null,
+      status: "pending",
+      error: null,
+    });
 
-    const { pngs, placements } = await canvas.exportPlacements();
+    /** Both copies of the flag, together. One cleared without the other leaves
+     *  the guard warning about a run that is over, with no way to answer it. */
+    const endRun = () => {
+      setProcessing(false);
+      useFileStore.getState().setProcessing(false);
+    };
+
+    const exported = await canvas.exportPlacements().catch((cause: unknown) => {
+      // Without this the run never ends: the button stays disabled and the
+      // navigation guard warns for as long as the page is open. Reported
+      // rather than swallowed, because catching it takes the rejection out of
+      // Sentry's global handler.
+      void captureHandledError(
+        new SafeError("Signature export failed", { kind: "operational", cause }),
+        { error_class: "operational", tool_id: "sign-pdf" },
+      );
+      return null;
+    });
+    if (!exported) {
+      setError("Could not read the placed signatures. Try again.");
+      endRun();
+      return;
+    }
+    const { pngs, placements } = exported;
     const clientJobId = generateId();
 
     const finish = () => {
       progressCleanupRef.current = null;
-      setProcessing(false);
+      endRun();
+    };
+
+    /**
+     * A fast sign answers twice: waitForJob returns 200 and the worker has
+     * already published the terminal SSE frame, so both reach this panel for
+     * one run. Only the first writes, because a second write would reset the
+     * claim the first one earned.
+     */
+    let landed = false;
+    const landResult = (r: Record<string, unknown>) => {
+      if (landed) return;
+      const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
+      if (!url) {
+        setError("Invalid response");
+        return;
+      }
+      landed = true;
+      setDownloadUrl(url);
+      useFileStore.getState().updateEntry(capturedIndex, {
+        processedUrl: url,
+        processedFilename: signedFilenameFrom(url),
+        status: "completed",
+        // processedSize stays null on purpose. tool-page renders its
+        // ReviewPanel on `hasProcessed && processedSize != null`, and this
+        // panel already offers the signed PDF, so filling the size in would
+        // put a second download button beside this tool's own.
+      });
+      // An auto-saved result is already in the library, so it was never at risk.
+      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+      if (typeof r.savedFileId === "string") useFileStore.getState().markClaimed(capturedIndex);
     };
 
     const stopProgress = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => setProgress(percent),
       onComplete: (r) => {
-        setDownloadUrl(r.downloadUrl as string);
+        landResult(r);
         finish();
       },
       onFailed: (err) => {
@@ -206,7 +296,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          setDownloadUrl(JSON.parse(xhr.responseText).downloadUrl);
+          landResult(JSON.parse(xhr.responseText));
         } catch {
           setError("Invalid response");
         }
@@ -224,19 +314,19 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           setError(`Processing failed: ${xhr.status}`);
         }
       }
-      setProcessing(false);
+      endRun();
     };
     xhr.onerror = () => {
       stopProgress();
       progressCleanupRef.current = null;
       setError("Network error");
-      setProcessing(false);
+      endRun();
     };
     xhr.ontimeout = () => {
       stopProgress();
       progressCleanupRef.current = null;
       setError("Request timed out. Try again.");
-      setProcessing(false);
+      endRun();
     };
     xhr.open("POST", "/api/v1/tools/pdf/sign-pdf");
     formatHeaders().forEach((value, key) => {

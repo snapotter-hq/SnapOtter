@@ -633,6 +633,12 @@ export function ToolPage() {
   const displayMode = registryEntry.displayMode;
   const isNoDropzone = displayMode === "no-dropzone";
   const isLivePreview = registryEntry.livePreview ?? false;
+  // A landed result normally swaps the image area for a view of it. interactive-sign
+  // is the exception: renderImageArea keeps the sign canvas either way, and the
+  // result is a download its own settings panel offers. Remounting on a new key
+  // would throw away the signatures the user just placed, and fading the area
+  // back in would flash the page for a view that did not change.
+  const resultOwnsImageArea = hasProcessed && displayMode !== "interactive-sign";
 
   // Derive processed file info: use stored filename for batch results (blob URLs),
   // fall back to parsing the download URL for single-file results
@@ -1461,13 +1467,13 @@ export function ToolPage() {
           </div>
           <div
             key={
-              hasProcessed
+              resultOwnsImageArea
                 ? `processed-${selectedIndex}`
                 : displayMode === "interactive-eraser"
                   ? "pending-eraser"
                   : `pending-${selectedIndex}`
             }
-            className={`flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0 ${hasProcessed ? "animate-fade-in" : ""}${isProcessing ? " animate-pulse" : ""}`}
+            className={`flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0 ${resultOwnsImageArea ? "animate-fade-in" : ""}${isProcessing ? " animate-pulse" : ""}`}
           >
             {renderNavArrows()}
             {renderImageArea()}

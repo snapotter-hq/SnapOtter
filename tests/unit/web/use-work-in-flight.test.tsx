@@ -566,3 +566,46 @@ describe("tools that keep their results outside the file store", () => {
     });
   });
 });
+
+/**
+ * sign-pdf hand-rolls its request, so none of useToolProcessor's reporting runs
+ * for it. It writes the run and the result into the file store itself (#1111),
+ * which puts it back on the ordinary path these tests cover. Pinned on the route
+ * the app really serves it at, because the guard scopes on the route.
+ */
+describe("sign-pdf", () => {
+  const SIGN_ROUTE = routeFor("sign-pdf");
+  const SIGNED_URL = "/api/v1/download/job-1/contract_signed.pdf";
+
+  function seedSigned(): void {
+    useFileStore.getState().setFiles([makeFile("contract.pdf")]);
+    useFileStore.getState().updateEntry(0, {
+      processedUrl: SIGNED_URL,
+      processedFilename: "contract_signed.pdf",
+      status: "completed",
+    });
+  }
+
+  it("reports processing while the sign is in flight", () => {
+    useFileStore.getState().setFiles([makeFile("contract.pdf")]);
+    useFileStore.getState().setProcessing(true);
+
+    expect(workAt(SIGN_ROUTE)).toEqual({ kind: "processing" });
+  });
+
+  it("offers the signed pdf while it is still untaken", () => {
+    seedSigned();
+
+    expect(workAt(SIGN_ROUTE)).toEqual({
+      kind: "unsaved",
+      downloads: [{ kind: "result", index: 0, url: SIGNED_URL, filename: "contract_signed.pdf" }],
+    });
+  });
+
+  it("goes quiet once the signed pdf has been taken", () => {
+    seedSigned();
+    useFileStore.getState().markClaimed(0);
+
+    expect(workAt(SIGN_ROUTE)).toBeNull();
+  });
+});

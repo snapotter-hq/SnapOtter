@@ -47,6 +47,8 @@ const EXEMPT: Record<string, string> = {
     "puts the image it compares against in the file store (setProcessedUrl), which the guard already reads",
   "erase-object":
     "writes its result back onto the file-store entry (updateEntry), which the guard already reads",
+  "sign-pdf":
+    "writes its result back onto the file-store entry (updateEntry), which the guard already reads",
   "barcode-read":
     "writes the annotated image onto the file-store entry (updateEntry), which the guard already reads; the decoded text beside it is component state (#1111)",
   "bulk-rename":
@@ -59,8 +61,6 @@ const EXEMPT: Record<string, string> = {
     "result lives in component state no store exposes, so the guard can only see the run itself, through the file store's processing flag (#1111)",
   "image-to-pdf":
     "result lives in component state no store exposes, so the guard can only see the run itself, through the file store's processing flag (#1111)",
-  "sign-pdf":
-    "result and progress both live in component state no store exposes, so the guard sees neither (#1111)",
 };
 
 /** const X = lazy(() => import("@/components/tools/x-settings")... */
