@@ -7,6 +7,7 @@ import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { useMemeStore } from "@/stores/meme-store";
+import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
 
@@ -59,9 +60,28 @@ export const OWN_STORE_TOOL_IDS = [
   "html-to-image",
   "image-to-base64",
   "meme-generator",
+  "passport-photo",
   "pdf-to-image",
   "split",
 ] as const;
+
+/**
+ * Tools whose file-store processedUrl is not a result.
+ *
+ * compare puts a blob url of the SECOND input image there so the before/after
+ * slider can show the two originals (compare-settings.tsx). The checks below
+ * key on processedUrl and cannot tell that apart from a result, so offering it
+ * would hand the user image B under image A's name (setProcessedUrl leaves
+ * processedFilename null) and then claim the entry, which silences the guard on
+ * the real diff: that url lives in the panel's own state, where nothing here
+ * can reach it.
+ *
+ * So these warn with nothing to download, like the own-store tools above. The
+ * empty list is the point, not an oversight to be filled in later.
+ *
+ * Exported for the drift test, which counts these as covered.
+ */
+export const WARN_ONLY_TOOL_IDS = new Set<string>(["compare"]);
 
 type OwnStoreToolId = (typeof OWN_STORE_TOOL_IDS)[number];
 
@@ -134,6 +154,9 @@ export function useWorkInFlight(): WorkReason | null {
   const base64Results = useBase64Store((s) => s.results);
   const memeGenerating = useMemeStore((s) => s.generating);
   const memeResultUrl = useMemeStore((s) => s.resultUrl);
+  const passportAnalyzing = usePassportPhotoStore((s) => s.analyzing);
+  const passportGenerating = usePassportPhotoStore((s) => s.generating);
+  const passportResult = usePassportPhotoStore((s) => s.generateResult);
   const pdfToImageProcessing = usePdfToImageStore((s) => s.processing);
   const pdfToImageResults = usePdfToImageStore((s) => s.results);
   const pdfToImageZipUrl = usePdfToImageStore((s) => s.zipUrl);
@@ -153,6 +176,14 @@ export function useWorkInFlight(): WorkReason | null {
       "html-to-image": { busy: captureRunning, unsaved: captureResultUrl !== null },
       "image-to-base64": { busy: base64Processing, unsaved: base64Results.length > 0 },
       "meme-generator": { busy: memeGenerating, unsaved: memeResultUrl !== null },
+      // Both requests count as a run: the analysis is a face-detection job the
+      // user waits on. Only the generated photo counts as a result, though. The
+      // analysis lands on its own the moment a file is dropped, so warning about
+      // it would fire on a page nobody has run anything on.
+      "passport-photo": {
+        busy: passportAnalyzing || passportGenerating,
+        unsaved: passportResult !== null,
+      },
       "pdf-to-image": {
         busy: pdfToImageProcessing,
         unsaved: (pdfToImageResults?.length ?? 0) > 0 || pdfToImageZipUrl !== null,
@@ -174,6 +205,15 @@ export function useWorkInFlight(): WorkReason | null {
     if (own?.unsaved) return { kind: "unsaved", downloads: [] };
 
     if (processing) return { kind: "processing" };
+
+    // Warn, but offer nothing: what sits in processedUrl here is an input, not
+    // a result. See WARN_ONLY_TOOL_IDS. The claim still counts, because the
+    // panel's own download link claims the entry when the user takes the real
+    // result.
+    if (toolId && WARN_ONLY_TOOL_IDS.has(toolId)) {
+      const unsaved = entries.some((e) => e.processedUrl && !e.claimed);
+      return unsaved ? { kind: "unsaved", downloads: [] } : null;
+    }
 
     // Nothing gates the zip on the entries having results. A batch settles by
     // storing the zip first and filling in per-entry results after, so a run

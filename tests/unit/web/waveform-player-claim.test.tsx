@@ -15,7 +15,19 @@ vi.mock("@/lib/analytics", () => ({
 }));
 
 import { WaveformPlayer } from "@/components/common/waveform-player";
+import { playerDownloadClaim } from "@/lib/result-display";
 import { useFileStore } from "@/stores/file-store";
+
+/**
+ * Both cases go through playerDownloadClaim, which is the decision tool-page
+ * makes when it renders this player: claim on a result, hand over nothing on
+ * the original. Rendering the player with a handler the test picked itself
+ * would pass whatever tool-page did, which is how the original negative case
+ * here passed by construction (it passed no handler at all).
+ */
+function claimIfResult(processedUrl: string | null): (() => void) | undefined {
+  return playerDownloadClaim(processedUrl, () => useFileStore.getState().claimSelected());
+}
 
 /** jsdom has no navigation, so let the click run but drop the default action. */
 function swallowNavigation(e: Event) {
@@ -53,11 +65,9 @@ afterEach(() => {
 
 describe("WaveformPlayer decode fallback download", () => {
   it("claims the entry when the source is the result", async () => {
+    const processedUrl = "blob:result";
     const { container } = render(
-      <WaveformPlayer
-        src="blob:result"
-        onDownload={() => useFileStore.getState().claimSelected()}
-      />,
+      <WaveformPlayer src={processedUrl} onDownload={claimIfResult(processedUrl)} />,
     );
 
     fireEvent.click(await findFallbackLink(container));
@@ -65,8 +75,13 @@ describe("WaveformPlayer decode fallback download", () => {
     expect(useFileStore.getState().entries[0].claimed).toBe(true);
   });
 
+  // With no result, the player is showing the upload and the download takes the
+  // upload. A claim here would silence the navigation guard on a result the
+  // user has not seen yet, let alone taken.
   it("leaves the entry unclaimed when the source is the original audio", async () => {
-    const { container } = render(<WaveformPlayer src="blob:original" />);
+    const { container } = render(
+      <WaveformPlayer src="blob:original" onDownload={claimIfResult(null)} />,
+    );
 
     fireEvent.click(await findFallbackLink(container));
 

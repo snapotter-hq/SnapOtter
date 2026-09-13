@@ -146,9 +146,32 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const progressCleanupRef = useRef<(() => void) | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  /** Set while this panel owns the store's processing flag; see endRun. */
+  const runOwnedRef = useRef(false);
 
-  // Tear down any live SSE subscription if the panel unmounts mid-job.
-  useEffect(() => () => progressCleanupRef.current?.(), []);
+  // Tear down the whole run if the panel unmounts mid-job, not just its SSE.
+  //
+  // The request has to be aborted, the way use-tool-processor aborts its own:
+  // a stale onload still runs, still calls endRun, and endRun writes the file
+  // store's processing flag, which by then belongs to whatever the next page
+  // started. The guard would go quiet during someone else's run.
+  //
+  // Aborting is not enough on its own. A 202 has already been answered, so
+  // there is no request left to abort, and the SSE that would have ended the
+  // run goes with this panel: the flag would stay on with nothing left to clear
+  // it, and the guard would warn forever about a sign that is over (#1122).
+  useEffect(
+    () => () => {
+      progressCleanupRef.current?.();
+      xhrRef.current?.abort();
+      if (runOwnedRef.current) {
+        runOwnedRef.current = false;
+        useFileStore.getState().setProcessing(false);
+      }
+    },
+    [],
+  );
 
   const refresh = () => setSigs(listSignatures());
 
@@ -184,6 +207,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // Clearing the entry's result also clears its claim (see the `claimed`
     // invariant in file-store), so a second run cannot inherit the first's.
     useFileStore.getState().setProcessing(true);
+    runOwnedRef.current = true;
     useFileStore.getState().updateEntry(capturedIndex, {
       processedUrl: null,
       processedPreviewUrl: null,
@@ -195,6 +219,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     /** Both copies of the flag, together. One cleared without the other leaves
      *  the guard warning about a run that is over, with no way to answer it. */
     const endRun = () => {
+      runOwnedRef.current = false;
       setProcessing(false);
       useFileStore.getState().setProcessing(false);
     };
@@ -288,6 +313,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     });
 
     const xhr = new XMLHttpRequest();
+    // Held so the unmount cleanup can abort it. Nothing clears the ref: abort
+    // on a request that is already done does nothing.
+    xhrRef.current = xhr;
     xhr.timeout = 600_000;
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.

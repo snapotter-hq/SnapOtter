@@ -182,6 +182,22 @@ export function AutomatePage() {
     })();
   }, [location.state, location.pathname, navigate, resetFiles, setFiles]);
 
+  // Arrive with a clean file store, the way tool-page does on every tool change.
+  //
+  // A tool page can hand this one a run that is already over: use-tool-processor
+  // aborts and closes on unmount without clearing the store's processing flag,
+  // and nothing on this page owns that flag afterwards. The navigation guard
+  // counts /automate as owning the file store, so the leftovers would have it
+  // asking about finished work on every navigation away and every tab close,
+  // for as long as the tab stayed open (#1122).
+  //
+  // Not when the navigation carries a library import: those files are the point
+  // of the visit, and the effect above owns the store from there.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: arrival only; a later state change must not wipe the page
+  useEffect(() => {
+    if (!(location.state as { libraryFileIds?: string[] } | null)?.libraryFileIds) resetFiles();
+  }, []);
+
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
       if (files.length === 0) {

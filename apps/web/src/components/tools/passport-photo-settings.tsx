@@ -18,7 +18,6 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { create } from "zustand";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
@@ -26,34 +25,13 @@ import { formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
+import {
+  type FaceLandmarks,
+  type GenerateResult,
+  usePassportPhotoStore,
+} from "@/stores/passport-photo-store";
 
 // ── Types ──────────────────────────────────────────────────────────
-
-interface FaceLandmarks {
-  leftEye: { x: number; y: number };
-  rightEye: { x: number; y: number };
-  eyeCenter: { x: number; y: number };
-  chin: { x: number; y: number };
-  forehead: { x: number; y: number };
-  crown: { x: number; y: number };
-  nose: { x: number; y: number };
-  faceCenterX: number;
-}
-
-interface AnalyzeResult {
-  preview: string; // base64 PNG
-  landmarks: FaceLandmarks;
-  imageWidth: number;
-  imageHeight: number;
-  jobId: string;
-  filename: string;
-}
-
-interface GenerateResult {
-  downloadUrl: string;
-  dimensions: { width: number; height: number };
-  spec: { country: string; document: string };
-}
 
 type ComplianceCheckId = "faceCentered" | "headLevel" | "lookingStraight" | "faceSize";
 
@@ -61,70 +39,6 @@ interface ComplianceCheck {
   id: ComplianceCheckId;
   pass: boolean;
 }
-
-// ── Zustand store ─────────────────────────────────────────────────
-
-interface PassportPhotoStore {
-  analyzeResult: AnalyzeResult | null;
-  setAnalyzeResult: (r: AnalyzeResult | null) => void;
-  countryCode: string;
-  setCountryCode: (c: string) => void;
-  documentType: string;
-  setDocumentType: (t: string) => void;
-  bgColor: string;
-  setBgColor: (c: string) => void;
-  maxFileSizeKb: number;
-  setMaxFileSizeKb: (s: number) => void;
-  dpi: number;
-  setDpi: (d: number) => void;
-  customWidthMm: number | null;
-  customHeightMm: number | null;
-  setCustomDimensions: (w: number | null, h: number | null) => void;
-  adjustX: number;
-  adjustY: number;
-  setAdjustX: (x: number) => void;
-  setAdjustY: (y: number) => void;
-  zoom: number;
-  setZoom: (z: number) => void;
-  generateResult: GenerateResult | null;
-  setGenerateResult: (r: GenerateResult | null) => void;
-  analyzing: boolean;
-  setAnalyzing: (a: boolean) => void;
-  generating: boolean;
-  setGenerating: (g: boolean) => void;
-}
-
-const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
-  analyzeResult: null,
-  setAnalyzeResult: (analyzeResult) => set({ analyzeResult, generateResult: null }),
-  countryCode: "US",
-  setCountryCode: (countryCode) =>
-    set({ countryCode, generateResult: null, customWidthMm: null, customHeightMm: null }),
-  documentType: "passport",
-  setDocumentType: (documentType) => set({ documentType, generateResult: null }),
-  bgColor: "#FFFFFF",
-  setBgColor: (bgColor) => set({ bgColor, generateResult: null }),
-  maxFileSizeKb: 0,
-  setMaxFileSizeKb: (maxFileSizeKb) => set({ maxFileSizeKb }),
-  dpi: 300,
-  setDpi: (dpi) => set({ dpi, generateResult: null }),
-  customWidthMm: null,
-  customHeightMm: null,
-  setCustomDimensions: (customWidthMm, customHeightMm) =>
-    set({ customWidthMm, customHeightMm, countryCode: "CUSTOM", generateResult: null }),
-  adjustX: 0,
-  adjustY: 0,
-  setAdjustX: (adjustX) => set({ adjustX, generateResult: null }),
-  setAdjustY: (adjustY) => set({ adjustY, generateResult: null }),
-  zoom: 1,
-  setZoom: (zoom) => set({ zoom }),
-  generateResult: null,
-  setGenerateResult: (generateResult) => set({ generateResult }),
-  analyzing: false,
-  setAnalyzing: (analyzing) => set({ analyzing }),
-  generating: false,
-  setGenerating: (generating) => set({ generating }),
-}));
 
 // ── Region groups ──────────────────────────────────────────────────
 

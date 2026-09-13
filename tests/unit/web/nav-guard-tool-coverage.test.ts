@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
-import { OWN_STORE_TOOL_IDS } from "@/hooks/use-work-in-flight";
+import { OWN_STORE_TOOL_IDS, WARN_ONLY_TOOL_IDS } from "@/hooks/use-work-in-flight";
 
 /**
  * Drift guard for the navigation guard's blind spot.
@@ -12,7 +12,8 @@ import { OWN_STORE_TOOL_IDS } from "@/hooks/use-work-in-flight";
  * useWorkInFlight reads the file store, so every tool that runs through
  * useToolProcessor is covered for free. A tool that bypasses it has to be
  * accounted for by hand: either useWorkInFlight reads its store
- * (OWN_STORE_TOOL_IDS), or it is exempt here with a reason. Anything else is a
+ * (OWN_STORE_TOOL_IDS) or warns without offering a download
+ * (WARN_ONLY_TOOL_IDS), or it is exempt here with a reason. Anything else is a
  * tool that can throw a result away without warning, which is the failure this
  * whole guard exists to prevent.
  *
@@ -43,8 +44,6 @@ const EXEMPT: Record<string, string> = {
     "hand-rolls its fetch but puts the result in the file store (setProcessedUrl), which the guard already reads",
   stitch:
     "hand-rolls its fetch but puts the result in the file store (setProcessedUrl), which the guard already reads",
-  compare:
-    "puts the image it compares against in the file store (setProcessedUrl), which the guard already reads",
   "erase-object":
     "writes its result back onto the file-store entry (updateEntry), which the guard already reads",
   "sign-pdf":
@@ -119,11 +118,22 @@ function settingsFileFor(toolId: string): string | null {
   return wrapped ? fileFor(wrapped) : null;
 }
 
+/**
+ * Whether the tool's run really goes through useToolProcessor, which is what
+ * puts it in the file store where the guard can see it.
+ *
+ * Evidence of a run, not of an import. passport-photo held the hook for its
+ * `error` string alone, hand-rolled both of its fetches, and kept the result in
+ * a store of its own: a bare name check called that covered while the guard was
+ * silent on a generated passport photo (#1122). processFiles and processBatch
+ * are the only two ways anything reaches the store.
+ */
 function usesToolProcessor(file: string): boolean {
-  return /\buseToolProcessor\b/.test(readFileSync(file, "utf8"));
+  const source = readFileSync(file, "utf8");
+  return /\buseToolProcessor\b/.test(source) && /\bprocess(Files|Batch)\b/.test(source);
 }
 
-const COVERED = new Set<string>(OWN_STORE_TOOL_IDS);
+const COVERED = new Set<string>([...OWN_STORE_TOOL_IDS, ...WARN_ONLY_TOOL_IDS]);
 const TOOL_IDS = new Set(TOOLS.map((t) => t.id));
 
 describe("navigation guard tool coverage", () => {
@@ -150,6 +160,7 @@ describe("navigation guard tool coverage", () => {
       unaccounted,
       "These tools keep their results outside the file store, so the navigation guard cannot see them. " +
         "Either teach useWorkInFlight to read the tool's store and add it to OWN_STORE_TOOL_IDS, " +
+        "or add it to WARN_ONLY_TOOL_IDS if all it can do is warn, " +
         "or add it to EXEMPT here with the reason it has nothing to lose.",
     ).toEqual([]);
   });

@@ -30,6 +30,7 @@ import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { useMemeStore } from "@/stores/meme-store";
+import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
 
@@ -173,6 +174,23 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
     ],
   },
   {
+    toolId: "passport-photo",
+    busy: () => usePassportPhotoStore.setState({ generating: true }),
+    results: [
+      {
+        what: "the generated photo is on screen",
+        seed: () =>
+          usePassportPhotoStore.setState({
+            generateResult: {
+              downloadUrl: "/api/v1/download/passport.jpg",
+              dimensions: { width: 600, height: 600 },
+              spec: { country: "US", document: "passport" },
+            },
+          }),
+      },
+    ],
+  },
+  {
     toolId: "find-duplicates",
     busy: () => useDuplicateStore.setState({ scanning: true }),
     results: [
@@ -208,6 +226,13 @@ beforeEach(() => {
   useFileStore.getState().reset();
   useEditorStore.setState({ isDirty: false });
   for (const store of OWN_STORES) store.getState().reset();
+  // No reset action on this one: the panel drives it field by field.
+  usePassportPhotoStore.setState({
+    analyzing: false,
+    generating: false,
+    analyzeResult: null,
+    generateResult: null,
+  });
 });
 
 afterEach(() => {
@@ -563,6 +588,115 @@ describe("tools that keep their results outside the file store", () => {
     expect(workAt(routeFor("split"))).toEqual({
       kind: "unsaved",
       downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
+    });
+  });
+});
+
+/**
+ * passport-photo held useToolProcessor for its error string alone and ran both
+ * of its requests by hand, so nothing about it ever reached the file store: no
+ * processing flag, no result. The guard was silent on a generated passport
+ * photo, and the drift test called it covered (#1122).
+ */
+describe("passport-photo", () => {
+  const PASSPORT_ROUTE = routeFor("passport-photo");
+
+  // Its own case in OWN_STORE_CASES covers the generate half. The analysis is
+  // the other request: a face-detection job the user sits and waits for.
+  it("reports processing while the face analysis runs", () => {
+    usePassportPhotoStore.setState({ analyzing: true });
+
+    expect(workAt(PASSPORT_ROUTE)).toEqual({ kind: "processing" });
+  });
+
+  // The analysis fires on its own the moment a file is dropped. Warning about
+  // it would mean a dialog on a page where the user has run nothing.
+  it("stays quiet on an analysis with no generated photo behind it", () => {
+    usePassportPhotoStore.setState({
+      analyzeResult: {
+        preview: "data:image/png;base64,aGk=",
+        landmarks: {
+          leftEye: { x: 0.4, y: 0.4 },
+          rightEye: { x: 0.6, y: 0.4 },
+          eyeCenter: { x: 0.5, y: 0.4 },
+          chin: { x: 0.5, y: 0.8 },
+          forehead: { x: 0.5, y: 0.3 },
+          crown: { x: 0.5, y: 0.25 },
+          nose: { x: 0.5, y: 0.55 },
+          faceCenterX: 0.5,
+        },
+        imageWidth: 1000,
+        imageHeight: 1400,
+        jobId: "job-1",
+        filename: "face.jpg",
+      },
+    });
+
+    expect(workAt(PASSPORT_ROUTE)).toBeNull();
+  });
+});
+
+/**
+ * compare writes a blob url of the SECOND input image into the file store's
+ * processedUrl so the before/after slider can show the two originals. That is
+ * an input, not a result, and the guard cannot tell them apart: it offered that
+ * image as a download, under the FIRST input's name (setProcessedUrl leaves
+ * processedFilename null), and the claim that followed silenced the guard on
+ * the diff the run actually produced (#1122).
+ */
+describe("compare", () => {
+  const COMPARE_ROUTE = routeFor("compare");
+
+  /** What the panel leaves in the store when a comparison lands. */
+  function seedComparison(): void {
+    useFileStore.getState().setFiles([makeFile("a.png")]);
+    useFileStore.getState().setProcessedUrl("blob:second-image");
+  }
+
+  it("warns with nothing to download", () => {
+    seedComparison();
+
+    expect(workAt(COMPARE_ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+  });
+
+  // The name the old download would have carried, which is the giveaway that
+  // the url is not a result: image B saved as image A.
+  it("has no result filename to offer in the first place", () => {
+    seedComparison();
+
+    expect(useFileStore.getState().entries[0].processedFilename).toBeNull();
+  });
+
+  it("reports nothing before a comparison has run", () => {
+    useFileStore.getState().setFiles([makeFile("a.png")]);
+
+    expect(workAt(COMPARE_ROUTE)).toBeNull();
+  });
+
+  // The panel's own link claims the entry, so taking the diff answers the
+  // guard. Nothing else claims on this page.
+  it("goes quiet once the diff has been taken", () => {
+    seedComparison();
+    useFileStore.getState().claimSelected();
+
+    expect(workAt(COMPARE_ROUTE)).toBeNull();
+  });
+
+  it("reports processing while the comparison runs", () => {
+    seedComparison();
+    useFileStore.getState().setProcessing(true);
+
+    expect(workAt(COMPARE_ROUTE)).toEqual({ kind: "processing" });
+  });
+
+  // Scoped to the route, not to the shape of the entry: the same store on any
+  // other tool's page is a real result and is still offered.
+  it("does not silence the download on another tool's route", () => {
+    seedComparison();
+
+    expect(workAt(TOOL_ROUTE)).toEqual({
+      kind: "unsaved",
+      downloads: [{ kind: "result", index: 0, url: "blob:second-image", filename: "a.png" }],
     });
   });
 });

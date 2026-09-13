@@ -88,9 +88,11 @@ function guardDialog(
       return {
         title: t.navigationGuard.unsavedTitle,
         body: t.navigationGuard.unsavedBody,
-        // useWorkInFlight hands back no empty list today. The check is what
-        // stops a button labelled Download appearing with nothing behind it if
-        // a later reason for "unsaved" ever does.
+        // The empty list is a real case, not a defensive one: the tools that
+        // keep results in a store of their own, and compare, whose processedUrl
+        // is an input image, all warn with nothing to hand over. Two buttons
+        // then, because a Download with nothing behind it is worse than no
+        // Download at all.
         buttons: reason.downloads.length > 0 ? [stay, download, leave] : [stay, leave],
       };
     }
@@ -253,11 +255,19 @@ export function NavigationGuard() {
   const dialog = guardDialog(t, reason, { stay, leave, downloadThenLeave });
 
   return (
-    // Above every other fixed layer in the app: the migration banner sits at 55
-    // and the connection banner and editor menus at 60, and the survey overlay
-    // shares 50 but renders after this one, so a plain z-50 leaves a mouse user
-    // clickable buttons outside a dialog aria-modal says is the only thing here.
-    // The skip-to-content link at 100 stays on top, as it should.
+    // Above every fixed layer that can still be on screen when this opens: the
+    // migration banner sits at 55 and the connection banner and editor menus at
+    // 60, and the survey overlay shares 50 but renders after this one, so a
+    // plain z-50 leaves a mouse user clickable buttons outside a dialog
+    // aria-modal says is the only thing here.
+    //
+    // Two layers do sit higher. The skip-to-content link at 100, as it should.
+    // And the editor's colour popover at 9999 (shape-color-picker.tsx), on the
+    // one route where the editor-dirty reason fires. It outranks this dialog by
+    // number, and is gone before the dialog opens only because it closes on the
+    // mousedown of the click that starts the navigation. Nothing enforces that,
+    // so a fixed layer above 65 that outlives a click has to be renumbered, or
+    // this does.
     <div className="fixed inset-0 z-[65] flex items-center justify-center">
       {/* Inert on purpose. A misplaced click on the backdrop is exactly the
           accident this dialog exists to catch, so it answers nothing. */}

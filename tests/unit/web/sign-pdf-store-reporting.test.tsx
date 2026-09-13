@@ -62,6 +62,7 @@ class FakeXhr {
   ontimeout: (() => void) | null = null;
   url = "";
   body: FormData | null = null;
+  aborted = false;
 
   constructor() {
     FakeXhr.instances.push(this);
@@ -77,8 +78,14 @@ class FakeXhr {
     this.body = body;
   }
 
+  /** As the real one does: no load event ever fires after this. */
+  abort() {
+    this.aborted = true;
+  }
+
   /** Answer the request the way the API does for a fast sign. */
   respond(status: number, body: unknown) {
+    if (this.aborted) return;
     act(() => {
       this.status = status;
       this.responseText = JSON.stringify(body);
@@ -288,6 +295,78 @@ describe("sign-pdf clears the store's processing flag on every exit path", () =>
       expect.objectContaining({ message: "Signature export failed" }),
       expect.objectContaining({ tool_id: "sign-pdf" }),
     );
+  });
+});
+
+/**
+ * The panel writes the store's processing flag, so it owes the store the same
+ * teardown use-tool-processor does on unmount. Without it, leaving the page
+ * mid-sign leaves the flag behind: on the sync path a stale onload clears a
+ * flag that by then belongs to the next page's run, and on the async path
+ * nothing is left to clear it at all (#1122).
+ *
+ * cleanup() is the unmount: navigating away takes the panel with it.
+ */
+describe("sign-pdf lets go of the store when the panel unmounts mid-run", () => {
+  it("clears the flag it set when the sign is still in flight", async () => {
+    renderPanel();
+
+    await apply();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    cleanup();
+
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  // The 202 path has no request left to abort: the SSE drives it, and the SSE
+  // goes with the panel. Nothing else would ever end this run.
+  it("clears the flag when the run went async", async () => {
+    renderPanel();
+
+    (await apply()).respond(202, { jobId: "job-1", async: true });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    cleanup();
+
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("aborts the request instead of leaving it to answer later", async () => {
+    renderPanel();
+
+    const xhr = await apply();
+    cleanup();
+
+    expect(xhr.aborted).toBe(true);
+  });
+
+  // The worst of the three. The user signs, leaves before the 200 lands, and
+  // starts a run on the next tool. An unaborted request answers into endRun,
+  // which writes setProcessing(false) over the new run's flag and leaves the
+  // guard silent while real work is going on.
+  it("does not clear the next run's flag when a stale answer arrives", async () => {
+    renderPanel();
+
+    const xhr = await apply();
+    cleanup();
+    // The next tool page starts its own run.
+    act(() => useFileStore.getState().setProcessing(true));
+
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(useFileStore.getState().processing).toBe(true);
+  });
+
+  it("leaves a finished run's flag alone", async () => {
+    renderPanel();
+
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+    act(() => useFileStore.getState().setProcessing(true));
+
+    cleanup();
+
+    expect(useFileStore.getState().processing).toBe(true);
   });
 });
 

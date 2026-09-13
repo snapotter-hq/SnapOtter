@@ -49,7 +49,7 @@ import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
-import { shouldShowConversionCard } from "@/lib/result-display";
+import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
 import {
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
   MULTI_FILE_TOOLS,
@@ -731,9 +731,9 @@ export function ToolPage() {
               <WaveformPlayer
                 src={audioSrc}
                 // audioSrc falls back to the original, and only a result claims.
-                onDownload={
-                  processedUrl ? () => useFileStore.getState().claimSelected() : undefined
-                }
+                onDownload={playerDownloadClaim(processedUrl, () =>
+                  useFileStore.getState().claimSelected(),
+                )}
               />
             </Suspense>
           );

@@ -1,4 +1,24 @@
 /**
+ * The claim handler for a media player's download link, or undefined when the
+ * player is showing the original upload.
+ *
+ * The player is handed one source (`processedUrl ?? originalBlobUrl`) and offers
+ * that same file for download, so the link is a result download only when a
+ * result exists. Claiming on the original would tell the navigation guard the
+ * result had been taken when nothing was taken at all, and the guard would then
+ * let a real, untaken result go without a word.
+ *
+ * A function rather than a ternary at the call site so the decision can be
+ * tested: inverting it has to fail something.
+ */
+export function playerDownloadClaim(
+  processedUrl: string | null | undefined,
+  claim: () => void,
+): (() => void) | undefined {
+  return processedUrl ? claim : undefined;
+}
+
+/**
  * Whether the result area should render the "conversion complete" success card
  * instead of an image, because the processed result has no renderable source.
  *

@@ -608,6 +608,24 @@ describe("NavigationGuard download then leave", () => {
     ]);
   });
 
+  // compare parks the second input image in processedUrl so the slider can
+  // show the two originals. Offering that saved image B under image A's name
+  // and claimed the entry, which silenced the guard on the diff the panel is
+  // still holding (#1122). Two buttons, no third.
+  it("offers no download on compare, whose result url is an input", async () => {
+    useFileStore.getState().setFiles([makeFile("a.png")]);
+    useFileStore.getState().setProcessedUrl("blob:second-image");
+    const { router } = renderGuard("/image/compare");
+
+    await navigateTo(router, "/files");
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      en.navigationGuard.stay,
+      en.navigationGuard.leave,
+    ]);
+  });
+
   // The editor owns its own export path and hands the guard no downloads.
   it("offers no download for unsaved editor edits", async () => {
     useEditorStore.setState({ isDirty: true });
