@@ -22,6 +22,15 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
+// jsdom has no clipboard and no execCommand, so the real copyToClipboard always
+// reports failure. Drivable here, because whether the copy worked is what
+// decides whether anything is claimed.
+const clipboard = vi.hoisted(() => ({ ok: true }));
+vi.mock("@/lib/utils", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return { ...actual, copyToClipboard: vi.fn(async () => clipboard.ok) };
+});
+
 import { ImageToBase64Results } from "@/components/tools/image-to-base64-results";
 import { PdfToImagePreview } from "@/components/tools/pdf-to-image-preview";
 import { PdfToImageSettings } from "@/components/tools/pdf-to-image-settings";
@@ -96,6 +105,7 @@ function swallowNavigation(event: MouseEvent) {
 }
 
 beforeEach(() => {
+  clipboard.ok = true;
   vi.stubGlobal("URL", {
     ...URL,
     createObjectURL: () => "blob:fake",
@@ -259,7 +269,9 @@ describe("image-to-base64 download controls", () => {
     useBase64Store.setState({ results: [base64Result("a.png"), base64Result("b.png")] });
   }
 
-  it("keeps warning after one file's text is saved", () => {
+  // The half that stops the single-result case being widened: with two results,
+  // taking one leaves the other, and the guard has to keep saying so.
+  it("keeps warning after one file's text is saved out of two", () => {
     seedEncoded();
     const { getByText } = renderPanel(<ImageToBase64Results />);
 
@@ -267,6 +279,60 @@ describe("image-to-base64 download controls", () => {
 
     expect(useToolResultClaims.getState().claimed["image-to-base64"]).toBeUndefined();
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+  });
+
+  // The set rule where the set has one member: this file is everything the
+  // guard is warning about, and the copy-all bar does not render at all in that
+  // state, so the per-file controls are the only way to take the result.
+  describe("a run that encoded one file", () => {
+    function seedOne() {
+      useFileStore.getState().setFiles([new File(["a"], "a.png", { type: "image/png" })]);
+      useBase64Store.setState({ results: [base64Result("a.png")] });
+    }
+
+    it("goes quiet once that file's text is saved", () => {
+      seedOne();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download .txt"));
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("goes quiet once that file's text is copied", async () => {
+      seedOne();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      await act(async () => {
+        fireEvent.click(getByText("Copy to Clipboard"));
+      });
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    // The claim rides on the copy working. A clipboard that refused hands the
+    // user nothing, and the guard has to keep saying so.
+    it("keeps warning when the copy failed", async () => {
+      clipboard.ok = false;
+      seedOne();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      await act(async () => {
+        fireEvent.click(getByText("Copy to Clipboard"));
+      });
+
+      expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+    });
+
+    it("claims the results the guard is looking at", () => {
+      seedOne();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download .txt"));
+
+      const claim = useToolResultClaims.getState().claimed["image-to-base64"];
+      expect((claim as WeakRef<object>).deref()).toBe(useBase64Store.getState().results);
+    });
   });
 
   it("goes quiet once every file's text is saved at once", () => {
