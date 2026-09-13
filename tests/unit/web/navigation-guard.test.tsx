@@ -18,6 +18,7 @@ vi.mock("@/lib/analytics", async () => {
 import { NavigationGuard } from "@/components/common/navigation-guard";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
+import { useSplitStore } from "@/stores/split-store";
 
 const TOOL_ROUTE = "/image/compress-image";
 
@@ -195,6 +196,7 @@ beforeEach(() => {
   vi.stubGlobal("Request", MockRequest);
   useFileStore.getState().reset();
   useEditorStore.setState({ isDirty: false });
+  useSplitStore.getState().reset();
   addSpy = vi.spyOn(window, "addEventListener");
   removeSpy = vi.spyOn(window, "removeEventListener");
 });
@@ -589,6 +591,21 @@ describe("NavigationGuard download then leave", () => {
 
     expect(screen.getByRole("dialog")).toBeDefined();
     expect(screen.queryByRole("button", { name: en.navigationGuard.downloadAndLeave })).toBeNull();
+  });
+
+  // split keeps its tiles in its own store and hands the guard no downloads,
+  // so the empty array has to come out of the dialog as two buttons, not three.
+  it("offers no download for a result held outside the file store", async () => {
+    useSplitStore.setState({ zipBlobUrl: "blob:tiles.zip" });
+    const { router } = renderGuard("/image/split");
+
+    await navigateTo(router, "/files");
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      en.navigationGuard.stay,
+      en.navigationGuard.leave,
+    ]);
   });
 
   // The editor owns its own export path and hands the guard no downloads.

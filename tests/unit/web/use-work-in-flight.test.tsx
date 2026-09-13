@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { SECTIONS } from "@snapotter/shared";
+import { SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/image-preview", () => ({
   needsServerPreview: vi.fn(() => false),
   fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
+  revokePreviewUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/analytics", async () => {
@@ -21,9 +22,16 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
-import { useWorkInFlight } from "@/hooks/use-work-in-flight";
+import { OWN_STORE_TOOL_IDS, useWorkInFlight } from "@/hooks/use-work-in-flight";
+import { useBase64Store } from "@/stores/base64-store";
+import { useCollageStore } from "@/stores/collage-store";
+import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
+import { useHtmlToImageStore } from "@/stores/html-to-image-store";
+import { useMemeStore } from "@/stores/meme-store";
+import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import { useSplitStore } from "@/stores/split-store";
 
 const TOOL_ROUTE = "/image/compress-image";
 
@@ -49,6 +57,148 @@ function seedResult(name = "a.png", processedFilename = "a-compressed.png"): voi
   });
 }
 
+/** Every store the guard reads besides the file store, so a test can wipe them all. */
+const OWN_STORES: Array<{ getState: () => { reset: () => void } }> = [
+  useBase64Store,
+  useCollageStore,
+  useDuplicateStore,
+  useHtmlToImageStore,
+  useMemeStore,
+  usePdfToImageStore,
+  useSplitStore,
+];
+
+interface OwnStoreCase {
+  toolId: string;
+  /** Put the store in the state it holds while the run is in flight. */
+  busy: () => void;
+  /** Each distinct shape of result this tool can leave sitting on the page. */
+  results: Array<{ what: string; seed: () => void }>;
+}
+
+/**
+ * The seven tools that keep their results in their own store. Seeds go through
+ * setState rather than the store actions, because most of those actions fire
+ * the real fetch that produced the state in the first place.
+ */
+const OWN_STORE_CASES: OwnStoreCase[] = [
+  {
+    toolId: "split",
+    busy: () => useSplitStore.setState({ processing: true }),
+    results: [
+      {
+        what: "tiles are on screen",
+        seed: () =>
+          useSplitStore.setState({
+            tiles: [{ row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:tile" }],
+          }),
+      },
+      {
+        what: "only the zip landed",
+        seed: () => useSplitStore.setState({ zipBlobUrl: "blob:tiles.zip" }),
+      },
+    ],
+  },
+  {
+    toolId: "pdf-to-image",
+    busy: () => usePdfToImageStore.setState({ processing: true }),
+    results: [
+      {
+        what: "pages are on screen",
+        seed: () =>
+          usePdfToImageStore.setState({
+            results: [{ page: 1, downloadUrl: "/api/v1/download/page-1.png", size: 1024 }],
+          }),
+      },
+      {
+        what: "only the zip landed",
+        seed: () => usePdfToImageStore.setState({ zipUrl: "/api/v1/download/pages.zip" }),
+      },
+    ],
+  },
+  {
+    toolId: "collage",
+    busy: () => useCollageStore.setState({ phase: "processing" }),
+    results: [
+      {
+        what: "the collage is on screen",
+        seed: () => useCollageStore.setState({ phase: "result", resultUrl: "blob:collage" }),
+      },
+    ],
+  },
+  {
+    toolId: "meme-generator",
+    busy: () => useMemeStore.setState({ generating: true }),
+    results: [
+      {
+        what: "the meme is on screen",
+        seed: () =>
+          useMemeStore.setState({ phase: "result", resultUrl: "/api/v1/download/meme.png" }),
+      },
+    ],
+  },
+  {
+    toolId: "html-to-image",
+    busy: () => useHtmlToImageStore.setState({ capturing: true }),
+    results: [
+      {
+        what: "the capture is on screen",
+        seed: () => useHtmlToImageStore.setState({ resultUrl: "/api/v1/download/capture.png" }),
+      },
+    ],
+  },
+  {
+    toolId: "image-to-base64",
+    busy: () => useBase64Store.setState({ processing: true }),
+    results: [
+      {
+        what: "encoded text is on screen",
+        seed: () =>
+          useBase64Store.setState({
+            results: [
+              {
+                filename: "a.png",
+                mimeType: "image/png",
+                width: 1,
+                height: 1,
+                originalSize: 10,
+                encodedSize: 14,
+                overheadPercent: 40,
+                base64: "aGk=",
+                dataUri: "data:image/png;base64,aGk=",
+              },
+            ],
+          }),
+      },
+    ],
+  },
+  {
+    toolId: "find-duplicates",
+    busy: () => useDuplicateStore.setState({ scanning: true }),
+    results: [
+      {
+        what: "the report is on screen",
+        seed: () =>
+          useDuplicateStore.setState({
+            results: {
+              totalImages: 2,
+              uniqueImages: 1,
+              spaceSaveable: 1024,
+              duplicateGroups: [],
+            },
+          }),
+      },
+    ],
+  },
+];
+
+/** The route the app really serves this tool at, section included. */
+function routeFor(toolId: string): string {
+  const tool = TOOLS.find((t) => t.id === toolId);
+  if (!tool) throw new Error(`No tool "${toolId}" in the shared catalog`);
+  return `/${toolSection(tool)}/${tool.id}`;
+}
+
 beforeEach(() => {
   vi.stubGlobal("URL", {
     ...URL,
@@ -57,6 +207,7 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useEditorStore.setState({ isDirty: false });
+  for (const store of OWN_STORES) store.getState().reset();
 });
 
 afterEach(() => {
@@ -355,5 +506,63 @@ describe("the editor", () => {
     useEditorStore.setState({ isDirty: true });
 
     expect(workAt(TOOL_ROUTE)).toBeNull();
+  });
+});
+
+describe("tools that keep their results outside the file store", () => {
+  // Keeps the table honest: an id added to the hook without a case here fails
+  // rather than quietly going untested.
+  it("has a case for every id the hook covers", () => {
+    expect(OWN_STORE_CASES.map((c) => c.toolId).sort()).toEqual([...OWN_STORE_TOOL_IDS].sort());
+  });
+
+  for (const toolCase of OWN_STORE_CASES) {
+    describe(toolCase.toolId, () => {
+      it("reports processing while the run is in flight", () => {
+        toolCase.busy();
+
+        expect(workAt(routeFor(toolCase.toolId))).toEqual({ kind: "processing" });
+      });
+
+      for (const result of toolCase.results) {
+        // No downloads: the guard warns, it does not offer to save these. An
+        // empty array is what makes the dialog render Stay and Leave only.
+        it(`warns with nothing to download when ${result.what}`, () => {
+          result.seed();
+
+          expect(workAt(routeFor(toolCase.toolId))).toEqual({ kind: "unsaved", downloads: [] });
+        });
+      }
+
+      // A default in the store is not a result. Without this, a busy check
+      // written as "anything other than idle" passes the tests above and warns
+      // on a page the user never ran anything on.
+      it("reports nothing on a clean store", () => {
+        expect(workAt(routeFor(toolCase.toolId))).toBeNull();
+      });
+
+      it("does not leak onto another tool's route", () => {
+        toolCase.busy();
+        for (const result of toolCase.results) result.seed();
+
+        for (const other of OWN_STORE_CASES) {
+          if (other.toolId === toolCase.toolId) continue;
+          expect(workAt(routeFor(other.toolId))).toBeNull();
+        }
+        expect(workAt(TOOL_ROUTE)).toBeNull();
+        expect(workAt("/automate")).toBeNull();
+      });
+    });
+  }
+
+  // The store check runs first, and then gives way: it does not narrow what the
+  // file-store path can still find on these routes.
+  it("still offers a file-store result on a covered tool's route", () => {
+    seedResult();
+
+    expect(workAt(routeFor("split"))).toEqual({
+      kind: "unsaved",
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
+    });
   });
 });
