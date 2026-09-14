@@ -28,6 +28,41 @@ function acceptedExtensions(): string[] {
   return [...extensions].sort();
 }
 
+/**
+ * Camera RAW extensions the catalog accepts that the repo has no sample file
+ * for, so the sweep cannot exercise them (#1095 widened the picker to all 23
+ * formats LibRaw decodes; fixtures exist for only 6).
+ *
+ * These are proprietary per-vendor containers. A stand-in cannot be faked and
+ * must not be aliased to a sibling: `EXT_ALIASES` is only for extensions the
+ * decoder treats identically, and a DNG renamed .cr3 would prove nothing since
+ * CR3 is ISO BMFF, RAF carries its own "FUJIFILMCCD-RAW" magic and X3F "FOVb".
+ * Real samples are tracked in #1155.
+ *
+ * Our code treats every RAW extension the same way (isRawExtension ->
+ * dcraw_emu), so the 6 covered formats do exercise the whole SnapOtter-side
+ * path; what is uncovered is LibRaw's per-vendor parsing.
+ */
+const RAW_WITHOUT_FIXTURES: readonly string[] = [
+  ".3fr",
+  ".cr3",
+  ".dcr",
+  ".erf",
+  ".fff",
+  ".gpr",
+  ".iiq",
+  ".kdc",
+  ".mef",
+  ".mrw",
+  ".nrw",
+  ".pef",
+  ".ptx",
+  ".raf",
+  ".rwl",
+  ".srw",
+  ".x3f",
+];
+
 /** First live tool declaring an extension, so failures name a real tool. */
 function toolsAccepting(ext: string): string[] {
   return TOOLS.filter((tool) =>
@@ -36,19 +71,42 @@ function toolsAccepting(ext: string): string[] {
 }
 
 describe("QA sweep fixture resolution", () => {
+  /** True when the extension resolves to a non-empty file on disk. */
+  function hasFixture(ext: string): boolean {
+    const modality = TOOLS.find((tool) => tool.id === toolsAccepting(ext)[0])?.modality ?? "image";
+    const path = resolveFixture(ext, modality);
+    return Boolean(path && existsSync(path) && statSync(path).size !== 0);
+  }
+
   it("resolves every extension in the live tool catalog to a real file", () => {
     const unresolved: string[] = [];
     for (const ext of acceptedExtensions()) {
+      if (RAW_WITHOUT_FIXTURES.includes(ext)) continue;
+      if (hasFixture(ext)) continue;
       const tools = toolsAccepting(ext);
-      const modality = TOOLS.find((tool) => tool.id === tools[0])?.modality ?? "image";
-      const path = resolveFixture(ext, modality);
-      if (!path || !existsSync(path) || statSync(path).size === 0) {
-        unresolved.push(`${ext} (${tools.length} tools, e.g. ${tools.slice(0, 3).join(", ")})`);
-      }
+      unresolved.push(`${ext} (${tools.length} tools, e.g. ${tools.slice(0, 3).join(", ")})`);
     }
     expect(
       unresolved,
       `extensions with no usable QA fixture:\n  ${unresolved.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("keeps the known-gap list honest in both directions", () => {
+    // Drop an entry the moment a real sample lands, so the list cannot quietly
+    // hide a format the sweep could be covering.
+    const nowCovered = RAW_WITHOUT_FIXTURES.filter(hasFixture);
+    expect(
+      nowCovered,
+      `these now have a fixture; remove them from RAW_WITHOUT_FIXTURES:\n  ${nowCovered.join("\n  ")}`,
+    ).toEqual([]);
+
+    // And an entry the catalog no longer accepts is dead weight.
+    const accepted = new Set(acceptedExtensions());
+    const stale = RAW_WITHOUT_FIXTURES.filter((ext) => !accepted.has(ext));
+    expect(
+      stale,
+      `no live tool accepts these; remove them from RAW_WITHOUT_FIXTURES:\n  ${stale.join("\n  ")}`,
     ).toEqual([]);
   });
 
