@@ -193,4 +193,4 @@ const times = await fetchStarredAt();
 if (times.length === 0) throw new Error(`No stargazers returned for ${REPO}`);
 const svg = render(times);
 writeFileSync(OUT, svg);
-console.log(`Wrote ${OUT} — ${times.length} stars, ${(svg.length / 1024).toFixed(1)} KiB`);
+console.log(`Wrote ${OUT}: ${times.length} stars, ${(svg.length / 1024).toFixed(1)} KiB`);
