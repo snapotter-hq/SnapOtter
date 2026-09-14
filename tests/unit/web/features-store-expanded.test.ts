@@ -254,6 +254,48 @@ describe("useFeaturesStore (expanded)", () => {
       expect(state.startTimes).toEqual({});
     });
 
+    it("records that the venv survived a reset with no base to reseed from", async () => {
+      apiPostMock.mockResolvedValueOnce({ ok: true, venvReseeded: false });
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      // A native install's reset clears models and the ledger but cannot
+      // rebuild the venv, and that has to look different from a full one (#796).
+      expect(useFeaturesStore.getState().resetVenvKept).toBe(true);
+      expect(useFeaturesStore.getState().resetError).toBeNull();
+    });
+
+    it("does not flag a kept venv when the reseed ran", async () => {
+      apiPostMock.mockResolvedValueOnce({ ok: true, venvReseeded: true });
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      expect(useFeaturesStore.getState().resetVenvKept).toBe(false);
+    });
+
+    it("assumes a complete reset when an older server omits the flag", async () => {
+      // A server that predates venvReseeded deleted the venv, so warning that
+      // it was kept would be actively wrong.
+      apiPostMock.mockResolvedValueOnce({ ok: true });
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      expect(useFeaturesStore.getState().resetVenvKept).toBe(false);
+    });
+
+    it("clears a previous kept-venv notice when a later reset reseeds", async () => {
+      useFeaturesStore.setState({ resetVenvKept: true });
+      apiPostMock.mockResolvedValueOnce({ ok: true, venvReseeded: true });
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+
+      await useFeaturesStore.getState().resetEnvironment();
+
+      expect(useFeaturesStore.getState().resetVenvKept).toBe(false);
+    });
+
     it("sets resetError on failure and does not refresh bundles", async () => {
       apiPostMock.mockRejectedValueOnce(new Error("a bundle install is already in progress"));
 

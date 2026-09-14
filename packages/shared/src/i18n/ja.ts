@@ -4692,6 +4692,8 @@ export const ja: TranslationKeys = {
       resetConfirmMessage:
         "インストール済みのAI機能とモデルがすべて削除されます。Hugging Faceから再インストールする必要があります。この操作は取り消せません。",
       resetFailed: "リセットに失敗しました: {error}",
+      resetVenvKept:
+        "共有のPython環境はそのまま残しました。このインストールには、環境を作り直すための同梱のベースがありません。モデル、ダウンロードキャッシュ、インストール記録は削除済みです。環境内の古いパッケージが原因の場合は、その環境をご自身で作り直してください。",
     },
     about: {
       heading: "SnapOtterについて",

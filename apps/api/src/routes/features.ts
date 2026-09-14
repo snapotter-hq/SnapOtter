@@ -70,8 +70,8 @@ import {
   ImportValidationError,
   importBundleArchive,
   invalidateCache,
-  isDockerEnvironment,
   isFeatureInstalled,
+  isManagedAiEnvironment,
   markUninstalled,
   releaseInstallLock,
   resetAiEnvironment,
@@ -858,8 +858,9 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       const user = requireAuth(request, reply);
       if (!user) return;
 
-      // In non-Docker environments, all bundles are available natively
-      if (!isDockerEnvironment()) {
+      // Where no venv is managed for us (a dev checkout), the developer's own
+      // environment already has the ML packages, so every bundle is available.
+      if (!isManagedAiEnvironment()) {
         const ocrCapability = getOcrRuntimeCapability();
         const selectedOcrTarget = ocrCapability.available
           ? ocrCapability.descriptor.artifact.target
@@ -1110,7 +1111,9 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
   // POST /api/v1/admin/features/reset - Wipe the AI venv/models/pip-cache and
   // reset every bundle to not-installed. Existing installs can't self-heal a
   // stale/conflicting venv via uninstall+reinstall alone (uninstall only
-  // removes model weights), so this is the reliable full reset.
+  // removes model weights), so this is the reliable full reset. Where there is
+  // no baked base to rebuild the venv from the venv survives, and the response
+  // says so via venvReseeded.
   app.post(
     "/api/v1/admin/features/reset",
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
@@ -1125,6 +1128,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         });
       }
       const installLockFd = getInstallLockFdForChild();
+      let venvReseeded = false;
       try {
         advanceAiMutationEpoch();
         // Reset routing first across every replica, then drain local children
@@ -1133,7 +1137,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         await drainOcrDispatcher();
         await runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd });
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
-        resetAiEnvironment({ installLockHeld: true, mutationEpochAdvanced: true });
+        ({ venvReseeded } = resetAiEnvironment({
+          installLockHeld: true,
+          mutationEpochAdvanced: true,
+        }));
       } catch (err) {
         return reply.status(409).send({
           error: err instanceof Error ? err.message : "Reset failed",
@@ -1151,7 +1158,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         duration_ms: 0,
       });
 
-      return reply.send({ ok: true });
+      // false means the shared venv survived the reset because there was no
+      // base to rebuild it from, so the admin UI can say the reset was partial
+      // rather than leave it looking like every other successful one.
+      return reply.send({ ok: true, venvReseeded });
     },
   );
 

@@ -4756,6 +4756,8 @@ export const ptBR: TranslationKeys = {
       resetConfirmMessage:
         "Isso exclui todos os recursos e modelos de AI instalados. Você precisará reinstalá-los pelo Hugging Face. Essa ação não pode ser desfeita.",
       resetFailed: "Falha ao redefinir: {error}",
+      resetVenvKept:
+        "O ambiente Python compartilhado foi mantido: esta instalação não tem uma base incluída para reconstruí-lo. Os modelos, o cache de download e os registros de instalação foram apagados. Recrie esse ambiente você mesmo se o problema for um pacote desatualizado nele.",
     },
     about: {
       heading: "Sobre",

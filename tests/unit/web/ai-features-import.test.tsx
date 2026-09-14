@@ -19,7 +19,7 @@ import { useFeaturesStore } from "@/stores/features-store";
 
 const fetchMock = vi.fn();
 
-function renderSection() {
+function renderSection(overrides: Partial<ReturnType<typeof useFeaturesStore.getState>> = {}) {
   useFeaturesStore.setState({
     bundles: [],
     loaded: true,
@@ -36,6 +36,8 @@ function renderSection() {
     installAll: vi.fn(async () => {}),
     resetEnvironment: vi.fn(async () => {}),
     resetError: null,
+    resetVenvKept: false,
+    ...overrides,
   });
   return render(<AiFeaturesSection />);
 }
@@ -128,5 +130,24 @@ describe("offline AI bundle import", () => {
     );
     expect(indexInput.files).toHaveLength(1);
     expect(archiveInput.files).toHaveLength(1);
+  });
+});
+
+describe("AI environment reset", () => {
+  it("tells the admin when the reset left the shared venv in place", async () => {
+    renderSection({ resetVenvKept: true });
+
+    // Without this the admin sees a reset that looks fully successful while
+    // the stale venv it was meant to clear is still there (#796).
+    expect(
+      await screen.findByText(/shared Python environment was left in place/i),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when the venv was reseeded", async () => {
+    renderSection({ resetVenvKept: false });
+    await waitFor(() => expect(apiGetMock).toHaveBeenCalled());
+
+    expect(screen.queryByText(/shared Python environment was left in place/i)).toBeNull();
   });
 });

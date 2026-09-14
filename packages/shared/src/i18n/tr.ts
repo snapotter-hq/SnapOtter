@@ -4753,6 +4753,8 @@ export const tr: TranslationKeys = {
       resetConfirmMessage:
         "Bu işlem, kurulu tüm AI özelliklerini ve modellerini siler. Bunları Hugging Face üzerinden yeniden kurmanız gerekir. Bu işlem geri alınamaz.",
       resetFailed: "Sıfırlama başarısız oldu: {error}",
+      resetVenvKept:
+        "Paylaşılan Python ortamı olduğu gibi bırakıldı: bu kurulumda ortamı yeniden oluşturacak paketlenmiş bir temel yok. Modeller, indirme önbelleği ve kurulum kayıtları temizlendi. Sorun ortamdaki eski bir paketse, o ortamı kendiniz yeniden oluşturun.",
     },
     about: {
       heading: "Hakkında",

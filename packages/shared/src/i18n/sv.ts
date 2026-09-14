@@ -4743,6 +4743,8 @@ export const sv: TranslationKeys = {
       resetConfirmMessage:
         "Detta tar bort alla installerade AI-funktioner och modeller. Du måste installera om dem från Hugging Face. Det går inte att ångra.",
       resetFailed: "Återställning misslyckades: {error}",
+      resetVenvKept:
+        "Den delade Python-miljön lämnades orörd: den här installationen har ingen medföljande bas att bygga om den från. Modeller, nedladdningscachen och installationsposterna rensades. Skapa om miljön själv om ett föråldrat paket i den är problemet.",
     },
     about: {
       heading: "Om",

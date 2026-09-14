@@ -31,20 +31,28 @@ const fsFaults = vi.hoisted(() => ({
   existsSequencePath: null as string | null,
   existsSequence: [] as boolean[],
   forceNonDocker: false,
-  pretendBaseVenvExists: false,
+  // Override existsSync for the two image-only reseed inputs. null = real fs.
+  bakedBaseVenv: null as boolean | null,
+  reseedScript: null as boolean | null,
 }));
 
 const childProcessFaults = vi.hoisted(() => ({
   nextKernelLockFailure: null as string | null,
   reseedOutcomes: [] as Array<"fail" | "success">,
+  reseedCalls: [] as Array<{ stdio: unknown }>,
 }));
+
+const RESEED_SCRIPT = "/usr/local/bin/reseed-ai-venv.sh";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
   return {
     ...actual,
     execFileSync: (...args: Parameters<typeof actual.execFileSync>) => {
-      if (args[0] === "/usr/local/bin/reseed-ai-venv.sh") {
+      if (args[0] === RESEED_SCRIPT) {
+        childProcessFaults.reseedCalls.push({
+          stdio: (args[1] as { stdio?: unknown } | undefined)?.stdio,
+        });
         const outcome = childProcessFaults.reseedOutcomes.shift();
         if (outcome === "fail") throw new Error("simulated reseed failure");
         if (outcome === "success") return Buffer.alloc(0);
@@ -81,7 +89,12 @@ vi.mock("node:fs", async (importOriginal) => {
         return fsFaults.existsSequence.shift() ?? false;
       }
       if (args[0] === "/.dockerenv" && fsFaults.forceNonDocker) return false;
-      if (args[0] === "/opt/venv" && fsFaults.pretendBaseVenvExists) return true;
+      if (args[0] === "/opt/venv" && fsFaults.bakedBaseVenv !== null) {
+        return fsFaults.bakedBaseVenv;
+      }
+      if (args[0] === RESEED_SCRIPT && fsFaults.reseedScript !== null) {
+        return fsFaults.reseedScript;
+      }
       return actual.existsSync(...args);
     },
     fchmodSync: (...args: Parameters<typeof actual.fchmodSync>) => {
@@ -128,9 +141,11 @@ beforeEach(async () => {
   fsFaults.existsSequencePath = null;
   fsFaults.existsSequence.length = 0;
   fsFaults.forceNonDocker = false;
-  fsFaults.pretendBaseVenvExists = false;
+  fsFaults.bakedBaseVenv = null;
+  fsFaults.reseedScript = null;
   childProcessFaults.nextKernelLockFailure = null;
   childProcessFaults.reseedOutcomes.length = 0;
+  childProcessFaults.reseedCalls.length = 0;
   ocrRuntime.getCapability.mockReset();
   ocrRuntime.getEffectiveMemory.mockReset();
   ocrRuntime.selectTarget.mockReset();
@@ -168,6 +183,18 @@ afterEach(() => {
   delete process.env.FEATURE_MANIFEST_PATH;
   rmSync(tempDir, { recursive: true, force: true });
 });
+
+/** The official image: a baked base venv plus the script that copies it. */
+function markOfficialImage() {
+  fsFaults.bakedBaseVenv = true;
+  fsFaults.reseedScript = true;
+}
+
+/** Nothing to reseed from, whatever happens to sit at /opt on the runner. */
+function markNoReseedAvailable() {
+  fsFaults.bakedBaseVenv = false;
+  fsFaults.reseedScript = false;
+}
 
 function writeTestManifest(
   bundles: Record<string, { models: Array<{ id: string; path?: string; minSize?: number }> }>,
@@ -628,31 +655,93 @@ describe("Install lock", () => {
 });
 
 describe("resetAiEnvironment", () => {
-  function markDockerEnvironment() {
-    // isDockerEnvironment() checks for the manifest path, which the
+  function markManagedEnvironment() {
+    // isManagedAiEnvironment() checks for the manifest path, which the
     // beforeEach already points at a file under tempDir; write something
     // there so ensureAiDirs() actually recreates the skeleton afterward.
     writeFileSync(process.env.FEATURE_MANIFEST_PATH ?? "", JSON.stringify({ bundles: {} }));
+    // A contributor with a venv at the conventional /opt/venv would otherwise
+    // flip these tests into the reseed branch; markOfficialImage() opts in.
+    markNoReseedAvailable();
   }
 
-  it("removes venv, models, and pip-cache directories", () => {
-    markDockerEnvironment();
-    const venvDir = join(aiDir, "venv");
+  /** A native install: bundles are managed, but no image to reseed from. */
+  function markNativeEnvironment() {
+    markManagedEnvironment();
+    fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
+  }
+
+  it("removes models and pip-cache directories", () => {
+    markManagedEnvironment();
     const pipCacheDir = join(aiDir, "pip-cache");
-    mkdirSync(join(venvDir, "lib", "python3.12", "site-packages", "scipy"), { recursive: true });
     writeFileSync(join(modelsDir, "some-model.onnx"), "fake weights");
     mkdirSync(pipCacheDir, { recursive: true });
     writeFileSync(join(pipCacheDir, "cached.whl"), "fake wheel");
 
     mod.resetAiEnvironment();
 
-    expect(existsSync(join(venvDir, "lib"))).toBe(false);
     expect(existsSync(join(modelsDir, "some-model.onnx"))).toBe(false);
     expect(existsSync(join(pipCacheDir, "cached.whl"))).toBe(false);
   });
 
+  it("reseeds the venv from the baked base and reports it", () => {
+    markManagedEnvironment();
+    markOfficialImage();
+    childProcessFaults.reseedOutcomes.push("success");
+
+    expect(mod.resetAiEnvironment()).toEqual({ venvReseeded: true });
+    // venvReseeded: true has to mean the script ran, and ran holding the
+    // install lock the child inherits on fd 3.
+    expect(childProcessFaults.reseedCalls).toHaveLength(1);
+    expect(childProcessFaults.reseedCalls[0].stdio).toEqual([
+      "ignore",
+      "ignore",
+      "ignore",
+      expect.any(Number),
+    ]);
+  });
+
+  it("keeps the venv when a base venv exists but the reseed script does not", () => {
+    // /opt/venv is also where a native install puts its own venv when
+    // PYTHON_VENV_PATH is unset, so its presence alone proves nothing.
+    markManagedEnvironment();
+    fsFaults.bakedBaseVenv = true;
+    fsFaults.reseedScript = false;
+    const venvPython = join(aiDir, "venv", "bin", "python3");
+    mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
+    writeFileSync(venvPython, "#!/bin/sh\n");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(mod.resetAiEnvironment()).toEqual({ venvReseeded: false });
+    expect(childProcessFaults.reseedCalls).toHaveLength(0);
+    expect(existsSync(venvPython)).toBe(true);
+    warn.mockRestore();
+  });
+
+  it("keeps the shared venv when there is no baked base to reseed from", () => {
+    markNativeEnvironment();
+    const venvPython = join(aiDir, "venv", "bin", "python3");
+    mkdirSync(join(aiDir, "venv", "bin"), { recursive: true });
+    writeFileSync(venvPython, "#!/bin/sh\n");
+    writeFileSync(join(modelsDir, "some-model.onnx"), "fake weights");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = mod.resetAiEnvironment();
+
+    // Deleting an interpreter we cannot rebuild is what made the next install
+    // die with "spawn <venv>/bin/python3 ENOENT" on native installs (#796).
+    expect(existsSync(venvPython)).toBe(true);
+    expect(result).toEqual({ venvReseeded: false });
+    // Everything that CAN be reset still is.
+    expect(existsSync(join(modelsDir, "some-model.onnx"))).toBe(false);
+    expect(JSON.parse(readFileSync(installedPath, "utf-8")).bundles).toEqual({});
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/venv/i);
+    warn.mockRestore();
+  });
+
   it("resets installed.json to empty", () => {
-    markDockerEnvironment();
+    markManagedEnvironment();
     mod.markInstalled("ocr", "2.0.0", ["paddleocr-server-det"]);
     mod.markInstalled("background-removal", "2.0.0", ["rembg-u2net"]);
     expect(mod.isFeatureInstalled("background-removal")).toBe(true);
@@ -666,7 +755,7 @@ describe("resetAiEnvironment", () => {
   });
 
   it("advances the shared mutation epoch so older queued work is invalidated", () => {
-    markDockerEnvironment();
+    markManagedEnvironment();
     const before = mod.getAiMutationEpoch();
 
     mod.resetAiEnvironment();
@@ -677,7 +766,7 @@ describe("resetAiEnvironment", () => {
   });
 
   it("recreates an empty directory skeleton so a fresh install has somewhere to write", () => {
-    markDockerEnvironment();
+    markManagedEnvironment();
     mod.resetAiEnvironment();
 
     expect(existsSync(join(aiDir, "venv"))).toBe(true);
@@ -686,7 +775,7 @@ describe("resetAiEnvironment", () => {
   });
 
   it("refuses to reset while a bundle install is in progress", () => {
-    markDockerEnvironment();
+    markManagedEnvironment();
     mod.acquireInstallLock("ocr");
 
     expect(() => mod.resetAiEnvironment()).toThrow(/install.*progress/i);
@@ -696,7 +785,7 @@ describe("resetAiEnvironment", () => {
   });
 
   it("releases its own lock after completing", () => {
-    markDockerEnvironment();
+    markManagedEnvironment();
     mod.resetAiEnvironment();
     expect(existsSync(lockPath)).toBe(false);
     expect(existsSync(kernelLockPath)).toBe(true);
@@ -1115,7 +1204,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 
   it("retains venv.writing and reports incomplete recovery when Docker reseed fails", () => {
     writeTestManifest({});
-    fsFaults.pretendBaseVenvExists = true;
+    markOfficialImage();
     childProcessFaults.reseedOutcomes.push("fail");
     const marker = join(aiDir, "venv.writing");
     writeFileSync(
@@ -1136,7 +1225,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     try {
       writeTestManifest({ "background-removal": { models: [] } });
       mod.markInstalled("background-removal", "2.1.0", []);
-      fsFaults.pretendBaseVenvExists = true;
+      markOfficialImage();
       childProcessFaults.reseedOutcomes.push("fail", "success");
       const marker = join(aiDir, "venv.writing");
       writeFileSync(
@@ -1163,6 +1252,7 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
 
   it("warns and consumes an unmanaged non-Docker venv.writing breadcrumb", () => {
     fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
     const marker = join(aiDir, "venv.writing");
     writeFileSync(
       marker,
@@ -1177,6 +1267,89 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     // And the interruption is surfaced in the logs.
     expect(warn.mock.calls.flat().join(" ")).toMatch(/interrupted|venv/i);
     warn.mockRestore();
+  });
+
+  it("completes recovery on a managed install that has no baked base venv", () => {
+    // A native install (the community-scripts LXC) configures a manifest but
+    // has no image-baked /opt/venv. Keying the reseed off the manifest made
+    // recovery retry a restore that can never succeed, so the breadcrumb
+    // survived forever and every AI tool stayed flagged broken (#796).
+    writeTestManifest({});
+    fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+    expect(existsSync(marker)).toBe(false);
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/interrupted/i);
+    // Nothing is retried, so nothing is logged as a recovery failure.
+    expect(error).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
+  it("completes recovery when a base venv exists but the reseed script does not", () => {
+    // /opt/venv doubles as a native install's own venv path, so gating the
+    // reseed on the directory alone put that host straight back into the
+    // retained-breadcrumb loop this fix exists to remove.
+    writeTestManifest({});
+    fsFaults.forceNonDocker = true;
+    fsFaults.bakedBaseVenv = true;
+    fsFaults.reseedScript = false;
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+    expect(existsSync(marker)).toBe(false);
+    expect(childProcessFaults.reseedCalls).toHaveLength(0);
+    expect(error).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
+  it("stops retrying and runs post-recovery startup work on a native install", async () => {
+    // The reported harm was not the return value: a retained breadcrumb re-runs
+    // recovery every few seconds forever and never lets onRecovered (the OCR
+    // startup reconciliation) fire, so every AI tool stays flagged broken.
+    vi.useFakeTimers();
+    try {
+      writeTestManifest({});
+      fsFaults.forceNonDocker = true;
+      markNoReseedAvailable();
+      const marker = join(aiDir, "venv.writing");
+      writeFileSync(
+        marker,
+        JSON.stringify({ bundleId: "background-removal", startedAt: new Date().toISOString() }),
+      );
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const recovered = vi.fn(() => true);
+
+      mod.startInterruptedInstallRecovery({ retryMs: 25, onRecovered: recovered });
+
+      expect(existsSync(marker)).toBe(false);
+      expect(recovered).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(200);
+      expect(recovered).toHaveBeenCalledTimes(1);
+
+      warn.mockRestore();
+    } finally {
+      mod.stopInterruptedInstallRecovery();
+      vi.useRealTimers();
+    }
   });
 
   it("handles missing directories gracefully", async () => {
@@ -1846,7 +2019,7 @@ describe("ensureAiDirs", () => {
   });
 
   // /.dockerenv always exists inside the test container, which makes
-  // isDockerEnvironment() true regardless of the manifest path; skip there.
+  // isManagedAiEnvironment() true regardless of the manifest path; skip there.
   it.skipIf(existsSync("/.dockerenv"))(
     "is a no-op outside managed environments (no manifest, no /.dockerenv)",
     async () => {

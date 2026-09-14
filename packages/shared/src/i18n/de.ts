@@ -4774,6 +4774,8 @@ export const de: TranslationKeys = {
       resetConfirmMessage:
         "Dadurch werden alle installierten AI-Funktionen und Modelle gelöscht. Sie müssen sie erneut von Hugging Face installieren. Dies kann nicht rückgängig gemacht werden.",
       resetFailed: "Zurücksetzen fehlgeschlagen: {error}",
+      resetVenvKept:
+        "Die gemeinsame Python-Umgebung wurde beibehalten: Diese Installation hat keine mitgelieferte Basis, aus der sie neu aufgebaut werden könnte. Modelle, der Download-Cache und die Installationseinträge wurden gelöscht. Erstellen Sie diese Umgebung selbst neu, wenn ein veraltetes Paket darin das Problem ist.",
     },
     about: {
       heading: "Info",

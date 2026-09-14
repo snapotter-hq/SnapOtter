@@ -4472,6 +4472,8 @@ export const zhCN: TranslationKeys = {
       resetConfirmMessage:
         "此操作将删除所有已安装的 AI 功能和模型，你需要从 Hugging Face 重新安装它们。此操作无法撤销。",
       resetFailed: "重置失败：{error}",
+      resetVenvKept:
+        "共享的 Python 环境已原样保留：此安装没有可用于重建它的内置基础包。模型、下载缓存和安装记录已清除。如果问题出在其中某个过时的包上，请你自行重建该环境。",
     },
     about: {
       heading: "关于",

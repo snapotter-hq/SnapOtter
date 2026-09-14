@@ -4668,6 +4668,8 @@ export const ko: TranslationKeys = {
       resetConfirmMessage:
         "설치된 모든 AI 기능과 모델이 삭제됩니다. Hugging Face에서 다시 설치해야 합니다. 이 작업은 되돌릴 수 없습니다.",
       resetFailed: "재설정 실패: {error}",
+      resetVenvKept:
+        "공유 Python 환경은 그대로 두었습니다. 이 설치본에는 환경을 다시 만들 기본 패키지가 포함되어 있지 않습니다. 모델, 다운로드 캐시, 설치 기록은 삭제되었습니다. 환경 안의 오래된 패키지가 문제라면 해당 환경을 직접 다시 만드세요.",
     },
     about: {
       heading: "정보",

@@ -178,7 +178,7 @@ const manifestPath = join(testRoot, "feature-manifest.json");
 process.env.DATA_DIR = testRoot;
 // A crafted manifest (instead of the real docker one) so the tests control
 // exactly which model files each bundle owns and which are shared. While the
-// file exists, isDockerEnvironment() is true; deleting it flips the GET
+// file exists, isManagedAiEnvironment() is true; deleting it flips the GET
 // /api/v1/features handler into its native (non-Docker) branch.
 process.env.FEATURE_MANIFEST_PATH = manifestPath;
 

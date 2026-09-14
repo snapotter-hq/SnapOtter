@@ -4774,6 +4774,8 @@ export const fr: TranslationKeys = {
       resetConfirmMessage:
         "Cette action supprime toutes les fonctionnalités et tous les modèles AI installés. Vous devrez les réinstaller depuis Hugging Face. Cette action est irréversible.",
       resetFailed: "Échec de la réinitialisation : {error}",
+      resetVenvKept:
+        "L'environnement Python partagé a été conservé : cette installation ne dispose d'aucune base fournie permettant de le reconstruire. Les modèles, le cache de téléchargement et les enregistrements d'installation ont été effacés. Recréez cet environnement vous-même si un paquet obsolète qu'il contient est à l'origine du problème.",
     },
     about: {
       heading: "À propos",

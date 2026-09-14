@@ -71,6 +71,7 @@ export function AiFeaturesSection() {
     installAll,
     resetEnvironment,
     resetError,
+    resetVenvKept,
   } = useFeaturesStore();
   const [diskUsage, setDiskUsage] = useState<number | null>(null);
   const installableBundles = bundles.filter((bundle) => bundle.compatibility !== "incompatible");
@@ -152,6 +153,7 @@ export function AiFeaturesSection() {
       <ResetEnvironmentSection
         onReset={resetEnvironment}
         error={resetError}
+        venvKept={resetVenvKept}
         onResetDone={loadDiskUsage}
       />
     </div>
@@ -161,10 +163,12 @@ export function AiFeaturesSection() {
 function ResetEnvironmentSection({
   onReset,
   error,
+  venvKept,
   onResetDone,
 }: {
   onReset: () => Promise<void>;
   error: string | null;
+  venvKept: boolean;
   onResetDone: () => void;
 }) {
   const { t } = useTranslation();
@@ -238,6 +242,12 @@ function ResetEnvironmentSection({
       {error && (
         <p className="text-xs text-destructive">
           {format(t.settings.aiFeatures.resetFailed, { error })}
+        </p>
+      )}
+
+      {!error && venvKept && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {t.settings.aiFeatures.resetVenvKept}
         </p>
       )}
     </div>

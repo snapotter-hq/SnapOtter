@@ -4744,6 +4744,8 @@ export const id: TranslationKeys = {
       resetConfirmMessage:
         "Ini akan menghapus semua fitur dan model AI yang terinstal. Anda perlu menginstalnya kembali dari Hugging Face. Tindakan ini tidak dapat dibatalkan.",
       resetFailed: "Reset gagal: {error}",
+      resetVenvKept:
+        "Lingkungan Python bersama dibiarkan apa adanya: instalasi ini tidak memiliki basis bawaan untuk membangunnya kembali. Model, cache unduhan, dan catatan instalasi sudah dihapus. Buat ulang lingkungan tersebut sendiri jika paket usang di dalamnya adalah penyebab masalahnya.",
     },
     about: {
       heading: "Tentang",

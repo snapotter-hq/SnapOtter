@@ -176,7 +176,7 @@ const modelsDir = join(aiDir, "models");
 const installedPath = join(aiDir, "installed.json");
 
 process.env.DATA_DIR = testRoot;
-// Point at the real manifest so isDockerEnvironment() is true (GET /features
+// Point at the real manifest so isManagedAiEnvironment() is true (GET /features
 // then goes through getFeatureStates instead of the native "all installed"
 // short-circuit) and import bundleId validation has a manifest to read.
 process.env.FEATURE_MANIFEST_PATH = join(process.cwd(), "docker/feature-manifest.json");

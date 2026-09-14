@@ -4736,6 +4736,8 @@ export const vi: TranslationKeys = {
       resetConfirmMessage:
         "Thao tác này sẽ xóa mọi tính năng và mô hình AI đã cài đặt. Bạn sẽ cần cài đặt lại chúng từ Hugging Face. Hành động này không thể hoàn tác.",
       resetFailed: "Đặt lại thất bại: {error}",
+      resetVenvKept:
+        "Môi trường Python dùng chung được giữ nguyên: bản cài đặt này không có nền tảng đi kèm để dựng lại nó. Các mô hình, bộ nhớ đệm tải xuống và bản ghi cài đặt đã được xóa. Hãy tự tạo lại môi trường đó nếu một gói cũ bên trong là nguyên nhân.",
     },
     about: {
       heading: "Giới thiệu",

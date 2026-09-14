@@ -128,7 +128,7 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
 // ── Directory setup ─────────────────────────────────────────────────────
 
 export function ensureAiDirs(): void {
-  if (!isDockerEnvironment()) return;
+  if (!isManagedAiEnvironment()) return;
   try {
     mkdirSync(join(AI_DIR, "venv"), { recursive: true });
     mkdirSync(MODELS_DIR, { recursive: true });
@@ -143,10 +143,42 @@ export function ensureAiDirs(): void {
   }
 }
 
-// ── Docker detection ────────────────────────────────────────────────────
+// ── Environment detection ───────────────────────────────────────────────
 
-export function isDockerEnvironment(): boolean {
+/** Base venv the official image bakes, and the only thing a reseed can copy. */
+const BAKED_BASE_VENV = "/opt/venv";
+/** Copies BAKED_BASE_VENV over the shared venv. Installed only by the image. */
+const RESEED_SCRIPT = "/usr/local/bin/reseed-ai-venv.sh";
+
+/**
+ * True where AI bundles are installed on demand into a shared venv we manage:
+ * the official image, and native installs (bare metal, the community-scripts
+ * LXC) that point FEATURE_MANIFEST_PATH at a manifest. False on a plain dev
+ * checkout, where the developer's own venv already has the ML packages and
+ * every bundle reports as installed.
+ */
+export function isManagedAiEnvironment(): boolean {
   return existsSync("/.dockerenv") || existsSync(MANIFEST_PATH);
+}
+
+/**
+ * True only where the shared AI venv can actually be rebuilt: both the baked
+ * base to copy and the script that copies it are present, which together mean
+ * the official image. This is deliberately NOT isManagedAiEnvironment(): a
+ * native install configures a manifest but owns its venv itself, so anything
+ * that destroys or restores the venv must ask this instead. Treating a
+ * configured manifest as proof of a baked base is what left native installs
+ * with an empty venv after a reset (issue #796). The script has to be checked
+ * too, because /opt/venv is also where a native install puts its own venv when
+ * PYTHON_VENV_PATH is unset (see venvPath in routes/features.ts).
+ */
+function canReseedFromBakedBase(): boolean {
+  return existsSync(RESEED_SCRIPT) && existsSync(BAKED_BASE_VENV);
+}
+
+/** The venv bundle installs write into, and the dispatcher runs python from. */
+function sharedVenvPath(): string {
+  return process.env.PYTHON_VENV_PATH || join(AI_DIR, "venv");
 }
 
 // ── installed.json cache ────────────────────────────────────────────────
@@ -813,10 +845,14 @@ export function advanceAiMutationEpoch(): string {
  * related is deleted and every bundle needs reinstalling (a fresh download
  * from the HuggingFace bundle repo), but there is no partial/stale state left
  * to reason about afterward.
+ *
+ * Reports whether the shared venv itself was reseeded. Without a baked base to
+ * reseed from it is not, and the caller has to say so: a partial reset that
+ * looks identical to a full one sends the operator back around the same loop.
  */
 export function resetAiEnvironment(
   options: { installLockHeld?: boolean; mutationEpochAdvanced?: boolean } = {},
-): void {
+): { venvReseeded: boolean } {
   const ownsLock = options.installLockHeld !== true;
   if (ownsLock && !acquireInstallLock("__reset__")) {
     const installing = getInstallingBundle();
@@ -837,17 +873,24 @@ export function resetAiEnvironment(
     // upgrade. A fresh install right after a reset needs a real, working venv
     // to install into -- leaving an empty directory (no python3 binary) would
     // make the very next install fail with "spawn .../python3 ENOENT".
-    if (existsSync("/opt/venv")) {
-      execFileSync("/usr/local/bin/reseed-ai-venv.sh", {
+    let venvReseeded = false;
+    if (canReseedFromBakedBase()) {
+      execFileSync(RESEED_SCRIPT, {
         stdio: ["ignore", "ignore", "ignore", getInstallLockFdForChild()],
         timeout: 120_000,
       });
+      venvReseeded = true;
     } else {
-      // Not a Docker image build (local dev, or a test fixture): nothing to
-      // reseed from, just leave an empty directory.
-      rmSync(join(AI_DIR, "venv"), { recursive: true, force: true });
+      // Native install or dev checkout: nothing to reseed from, so the venv
+      // stays. Deleting one we cannot rebuild is strictly worse than keeping a
+      // stale one, because the next install spawns <venv>/bin/python3 and dies
+      // with ENOENT (#796). Clear what we can and let the operator decide.
+      console.warn(
+        `[feature-status] No base venv at ${BAKED_BASE_VENV} to reseed from; left the shared AI venv at ${sharedVenvPath()} untouched. Models, the pip cache and the install ledger were cleared. Recreate that venv yourself if a stale package in it is the problem.`,
+      );
     }
     ensureAiDirs();
+    return { venvReseeded };
   } finally {
     if (ownsLock) releaseInstallLock();
   }
@@ -1012,37 +1055,32 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
     // crash-broken install self-heals instead of leaving mysteriously dead tools.
     if (existsSync(VENV_WRITING_MARKER)) {
       let consumeMarker = false;
-      if (isDockerEnvironment()) {
-        if (existsSync("/opt/venv")) {
-          console.warn(
-            "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
-          );
-          try {
-            execFileSync("/usr/local/bin/reseed-ai-venv.sh", {
-              stdio: ["ignore", "ignore", "ignore", getInstallLockFdForChild()],
-              timeout: 120_000,
-            });
-            writeInstalled({ bundles: {} });
-            consumeMarker = true;
-          } catch (err) {
-            recoveryIncomplete = true;
-            console.error(
-              "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry:",
-              err,
-            );
-          }
-        } else {
+      if (canReseedFromBakedBase()) {
+        console.warn(
+          "[feature-status] An install was interrupted mid venv-write; reseeding the AI venv to a clean state and clearing installed bundles (reinstall to restore).",
+        );
+        try {
+          execFileSync(RESEED_SCRIPT, {
+            stdio: ["ignore", "ignore", "ignore", getInstallLockFdForChild()],
+            timeout: 120_000,
+          });
+          writeInstalled({ bundles: {} });
+          consumeMarker = true;
+        } catch (err) {
           recoveryIncomplete = true;
           console.error(
-            "[feature-status] Cannot recover an interrupted AI venv write because /opt/venv is missing; retaining venv.writing for retry.",
+            "[feature-status] Failed to reseed AI venv after interrupted install; retaining venv.writing for retry:",
+            err,
           );
         }
       } else {
-        // Local/unmanaged development has no image-owned base venv to restore.
-        // Retrying cannot change that, so surface the risk once and let the
-        // developer repair/reinstall the affected environment manually.
+        // Native installs and dev checkouts have no base venv to restore from.
+        // Retrying cannot change that, and a retained breadcrumb re-runs this
+        // every few seconds forever while holding back the rest of startup
+        // recovery, so surface the risk once and let the operator repair or
+        // reinstall the affected environment themselves.
         console.warn(
-          "[feature-status] An install was interrupted mid venv-write (non-Docker); the AI venv may be inconsistent. Reinstall the affected bundle.",
+          `[feature-status] An install was interrupted mid venv-write and there is no base venv at ${BAKED_BASE_VENV} to restore from; the AI venv at ${sharedVenvPath()} may be inconsistent. Reinstall the affected bundle.`,
         );
         consumeMarker = true;
       }

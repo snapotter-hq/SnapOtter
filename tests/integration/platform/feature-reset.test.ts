@@ -16,7 +16,24 @@ const hoisted = vi.hoisted(() => ({
   shutdownDispatcherMock: vi.fn(),
   drainOcrDispatcherMock: vi.fn(async () => {}),
   runOcrRuntimeMaintenanceMock: vi.fn(async () => ({ deactivatedFamilies: 1 })),
+  // null runs the real reset; a boolean stands in for an environment this
+  // runner is not (the official image, which can reseed).
+  venvReseededOverride: null as boolean | null,
 }));
+
+vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/feature-status.js")>();
+  return {
+    ...actual,
+    resetAiEnvironment: (options?: Parameters<typeof actual.resetAiEnvironment>[0]) => {
+      const result = actual.resetAiEnvironment(options);
+      return hoisted.venvReseededOverride === null
+        ? result
+        : { venvReseeded: hoisted.venvReseededOverride };
+    },
+  };
+});
 
 vi.mock("@snapotter/ai", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -46,7 +63,7 @@ const installedPath = join(aiDir, "installed.json");
 const lockPath = join(aiDir, "install.lock");
 
 process.env.DATA_DIR = testRoot;
-// Point at the real manifest so isDockerEnvironment() is true and
+// Point at the real manifest so isManagedAiEnvironment() is true and
 // ensureAiDirs() actually recreates the skeleton after a reset.
 process.env.FEATURE_MANIFEST_PATH = join(process.cwd(), "docker/feature-manifest.json");
 
@@ -147,21 +164,49 @@ describe("POST /api/v1/admin/features/reset", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("wipes the venv, models, and installed.json, and returns ok", async () => {
+  it("wipes models and installed.json, and returns ok", async () => {
     markInstalled("ocr", "2.0.0", ["paddleocr-server-det"]);
-    mkdirSync(join(venvDir, "lib", "python3.12", "site-packages"), { recursive: true });
     writeFileSync(join(modelsDir, "leftover.onnx"), "stale weights");
 
     const epochBefore = getAiMutationEpoch();
     const res = await postReset();
 
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ ok: true });
-    expect(existsSync(join(venvDir, "lib"))).toBe(false);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, venvReseeded: false });
     expect(existsSync(join(modelsDir, "leftover.onnx"))).toBe(false);
     const installed = JSON.parse(readFileSync(installedPath, "utf-8"));
     expect(installed.bundles).toEqual({});
     expect(getAiMutationEpoch()).not.toBe(epochBefore);
+  });
+
+  it("reports a reseeded venv when the environment can rebuild one", async () => {
+    // Guards the route wiring: without it, dropping the destructuring leaves
+    // venvReseeded permanently false and every official-image reset reports
+    // itself as partial.
+    hoisted.venvReseededOverride = true;
+    try {
+      const res = await postReset();
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({ ok: true, venvReseeded: true });
+    } finally {
+      hoisted.venvReseededOverride = null;
+    }
+  });
+
+  it("keeps the shared venv when there is no baked base to reseed from", async () => {
+    // Tests run outside the official image, so this is the native-install path
+    // (issue #796): the interpreter the next install spawns has to survive a
+    // reset, or that install dies with "spawn <venv>/bin/python3 ENOENT".
+    const venvPython = join(venvDir, "bin", "python3");
+    mkdirSync(join(venvDir, "bin"), { recursive: true });
+    writeFileSync(venvPython, "#!/bin/sh\n");
+
+    const res = await postReset();
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).venvReseeded).toBe(false);
+    expect(existsSync(venvPython)).toBe(true);
   });
 
   it("drains accurate OCR before GC so in-flight work completes", async () => {

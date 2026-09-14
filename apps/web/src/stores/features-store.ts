@@ -49,6 +49,8 @@ interface FeaturesState {
   clearError: (bundleId: string) => void;
   resetEnvironment: () => Promise<void>;
   resetError: string | null;
+  /** The last reset left the shared venv in place for want of a base to rebuild it from. */
+  resetVenvKept: boolean;
 }
 
 export const useFeaturesStore = create<FeaturesState>((set, get) => {
@@ -269,6 +271,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     installAllActive: false,
     startTimes: {},
     resetError: null,
+    resetVenvKept: false,
 
     fetch: async () => {
       if (get().loaded && !get().loadError) {
@@ -491,10 +494,21 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     },
 
     resetEnvironment: async () => {
-      set({ resetError: null });
+      set({ resetError: null, resetVenvKept: false });
       try {
-        await apiPost("/v1/admin/features/reset", {});
-        set({ installing: {}, errors: {}, queued: [], startTimes: {} });
+        const result = await apiPost<{ ok: boolean; venvReseeded?: boolean }>(
+          "/v1/admin/features/reset",
+          {},
+        );
+        set({
+          installing: {},
+          errors: {},
+          queued: [],
+          startTimes: {},
+          // Older servers omit the flag; assume the reset was complete rather
+          // than warning about a venv this build knows nothing about.
+          resetVenvKept: result?.venvReseeded === false,
+        });
         await refreshBundles();
       } catch (err) {
         set({ resetError: err instanceof Error ? err.message : "Reset failed" });

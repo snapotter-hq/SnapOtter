@@ -4665,6 +4665,8 @@ export const en = {
       resetConfirmMessage:
         "This deletes all installed AI features and models. You'll need to reinstall them from Hugging Face. This can't be undone.",
       resetFailed: "Reset failed: {error}",
+      resetVenvKept:
+        "The shared Python environment was left in place: this install has no packaged base to rebuild it from. Models, the download cache and the install records were cleared. Recreate that environment yourself if a stale package in it is the problem.",
     },
     fileManagement: {
       title: "File Management",

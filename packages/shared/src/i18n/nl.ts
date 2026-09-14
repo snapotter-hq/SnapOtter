@@ -4761,6 +4761,8 @@ export const nl: TranslationKeys = {
       resetConfirmMessage:
         "Hiermee worden alle geïnstalleerde AI-functies en modellen verwijderd. Je moet ze opnieuw installeren vanaf Hugging Face. Dit kan niet ongedaan worden gemaakt.",
       resetFailed: "Resetten mislukt: {error}",
+      resetVenvKept:
+        "De gedeelde Python-omgeving is blijven staan: deze installatie heeft geen meegeleverde basis om die opnieuw op te bouwen. Modellen, de downloadcache en de installatiegegevens zijn gewist. Maak die omgeving zelf opnieuw aan als een verouderd pakket erin het probleem is.",
     },
     about: {
       heading: "Over",

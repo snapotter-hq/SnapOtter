@@ -4756,6 +4756,8 @@ export const pl: TranslationKeys = {
       resetConfirmMessage:
         "Spowoduje to usunięcie wszystkich zainstalowanych funkcji i modeli AI. Konieczna będzie ich ponowna instalacja z Hugging Face. Tej operacji nie można cofnąć.",
       resetFailed: "Resetowanie nie powiodło się: {error}",
+      resetVenvKept:
+        "Współdzielone środowisko Python pozostało nietknięte: ta instalacja nie zawiera dołączonej bazy, z której można je odtworzyć. Modele, pamięć podręczna pobierania i wpisy instalacji zostały wyczyszczone. Odtwórz to środowisko samodzielnie, jeśli problemem jest nieaktualny pakiet w środku.",
     },
     about: {
       heading: "Informacje",

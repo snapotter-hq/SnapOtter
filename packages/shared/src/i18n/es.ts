@@ -4749,6 +4749,8 @@ export const es: TranslationKeys = {
       resetConfirmMessage:
         "Esto elimina todas las funciones y modelos de AI instalados. Tendrás que reinstalarlos desde Hugging Face. Esta acción no se puede deshacer.",
       resetFailed: "Error al restablecer: {error}",
+      resetVenvKept:
+        "El entorno de Python compartido se mantuvo: esta instalación no tiene una base incluida a partir de la cual reconstruirlo. Se borraron los modelos, la caché de descargas y los registros de instalación. Vuelve a crear ese entorno tú mismo si el problema es un paquete obsoleto que contiene.",
     },
     about: {
       heading: "Acerca de",
