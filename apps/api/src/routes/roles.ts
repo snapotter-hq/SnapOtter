@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import {
   canAssignRole,
   canGrantRoleDefinition,
@@ -240,22 +241,39 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         updates.toolPermissions = body.toolPermissions ?? null;
       }
 
-      await db.transaction(async (tx) => {
-        if (body.name) {
-          const renamedDisabledRole = `disabled:${body.name}`;
-          await tx
-            .update(schema.users)
-            .set({
-              role: sql<string>`CASE
-                WHEN ${schema.users.role} = ${role.name} THEN ${body.name}
-                ELSE ${renamedDisabledRole}
-              END`,
-              updatedAt: new Date(),
-            })
-            .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
+      // The pre-check above can't close the race: two concurrent renames onto
+      // the same name both pass it before either UPDATE commits (issue #991).
+      // The catch wraps the whole transaction rather than the UPDATE itself
+      // because a failed statement has already poisoned the transaction, so
+      // nothing further can run inside it. Postgres takes the users.role
+      // rewrite back on the rollback.
+      try {
+        await db.transaction(async (tx) => {
+          if (body.name) {
+            const renamedDisabledRole = `disabled:${body.name}`;
+            await tx
+              .update(schema.users)
+              .set({
+                role: sql<string>`CASE
+                  WHEN ${schema.users.role} = ${role.name} THEN ${body.name}
+                  ELSE ${renamedDisabledRole}
+                END`,
+                updatedAt: new Date(),
+              })
+              .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
+          }
+          await tx.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
+        });
+      } catch (err) {
+        // Narrowed to the rename: `name` is the only unique column on roles, so
+        // a 23505 from a permissions-only update is something else entirely and
+        // must not come back wearing this message.
+        if (body.name && isUniqueViolation(err)) {
+          return reply.status(409).send({ error: "Role name already exists", code: "CONFLICT" });
         }
-        await tx.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
-      });
+        throw err;
+      }
+
       await auditFromRequest(request)("ROLE_UPDATED", { adminId: user.id, roleId: id });
 
       return reply.send({ ok: true });
