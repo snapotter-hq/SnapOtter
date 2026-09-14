@@ -4805,6 +4805,12 @@ export const es: TranslationKeys = {
       "Tu organización requiere autenticación multifactor. Configura MFA en los ajustes de tu cuenta.",
     mfaPolicyUnavailable:
       "No se pudo comprobar la política de MFA. Inténtalo de nuevo en un momento.",
+    loginThrottled:
+      "Demasiados intentos de inicio de sesión. Inténtalo de nuevo en {minutes} minuto.",
+    loginThrottledPlural:
+      "Demasiados intentos de inicio de sesión. Inténtalo de nuevo en {minutes} minutos.",
+    loginThrottledUnknownWait:
+      "Demasiados intentos de inicio de sesión. Espera antes de volver a intentarlo.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Los cambios de contraseña son administrados por tu proveedor de identidad.",

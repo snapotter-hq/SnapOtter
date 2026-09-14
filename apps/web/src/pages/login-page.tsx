@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { setToken } from "@/lib/api";
-import { format } from "@/lib/format";
+import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 
 function parseManualSecret(uri: string): string {
@@ -14,6 +14,25 @@ function parseManualSecret(uri: string): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * Minutes to wait after a 429, or null when the response carries no usable
+ * hint. The per-username throttle sends `retryAfter` seconds in its body
+ * (#820), and it and the per-IP limiter both set Retry-After, but a reverse
+ * proxy doing its own rate limiting can answer with neither.
+ *
+ * The two sources are read independently rather than with `??` so that a body
+ * field which is present but unusable (a duration string, an HTTP-date, a
+ * shape some other 429 producer invented) falls through to a header that does
+ * parse, instead of burying a number the response was carrying all along.
+ */
+function retryAfterMinutes(bodyRetryAfter: unknown, header: string | null): number | null {
+  for (const source of [bodyRetryAfter, header]) {
+    const seconds = Number(source);
+    if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds / 60);
+  }
+  return null;
 }
 
 function QrCode({ uri }: { uri: string }) {
@@ -239,6 +258,20 @@ export function LoginPage() {
           setError(t.auth.mfaEnrollmentRequired);
         } else if (failure?.code === "MFA_POLICY_UNAVAILABLE") {
           setError(t.auth.mfaPolicyUnavailable);
+        } else if (res.status === 429) {
+          // Every 429 this route can produce (the per-username throttle from
+          // #820, the per-IP limiter, a proxy in front of us) is a "come back
+          // later", so the message has to say so. Calling it bad credentials
+          // sends a user who typed the right password off to guess more or
+          // reset it, and the extra guesses are what keep the window hot.
+          const minutes = retryAfterMinutes(failure?.retryAfter, res.headers.get("Retry-After"));
+          setError(
+            minutes === null
+              ? t.auth.loginThrottledUnknownWait
+              : format(plural(minutes, t.auth.loginThrottled, t.auth.loginThrottledPlural), {
+                  minutes,
+                }),
+          );
         } else if (res.status >= 500) {
           // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
           // is not a credentials problem; claiming "invalid credentials"

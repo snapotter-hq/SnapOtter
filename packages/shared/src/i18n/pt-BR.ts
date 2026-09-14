@@ -4812,6 +4812,9 @@ export const ptBR: TranslationKeys = {
       "Sua organização exige autenticação multifator. Configure o MFA nas configurações da sua conta.",
     mfaPolicyUnavailable:
       "Não foi possível verificar a política de MFA. Tente novamente em instantes.",
+    loginThrottled: "Muitas tentativas de login. Tente novamente em {minutes} minuto.",
+    loginThrottledPlural: "Muitas tentativas de login. Tente novamente em {minutes} minutos.",
+    loginThrottledUnknownWait: "Muitas tentativas de login. Aguarde antes de tentar novamente.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Alterações de senha são gerenciadas pelo seu provedor de identidade.",

@@ -4798,6 +4798,10 @@ export const id: TranslationKeys = {
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
     mfaPolicyUnavailable: "Kebijakan MFA tidak dapat diperiksa. Silakan coba lagi sebentar lagi.",
+    loginThrottled: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
+    loginThrottledPlural: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
+    loginThrottledUnknownWait:
+      "Terlalu banyak percobaan masuk. Silakan tunggu sebelum mencoba lagi.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Perubahan kata sandi dikelola oleh penyedia identitas Anda.",
     enterUsername: "Masukkan nama pengguna",

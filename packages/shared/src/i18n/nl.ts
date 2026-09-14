@@ -4816,6 +4816,10 @@ export const nl: TranslationKeys = {
       "Uw organisatie vereist meerfactorauthenticatie. Stel MFA in via uw accountinstellingen.",
     mfaPolicyUnavailable:
       "Het MFA-beleid kon niet worden gecontroleerd. Probeer het over enkele ogenblikken opnieuw.",
+    loginThrottled: "Te veel aanmeldpogingen. Probeer het over {minutes} minuut opnieuw.",
+    loginThrottledPlural: "Te veel aanmeldpogingen. Probeer het over {minutes} minuten opnieuw.",
+    loginThrottledUnknownWait:
+      "Te veel aanmeldpogingen. Wacht even voordat u het opnieuw probeert.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Wachtwoordwijzigingen worden beheerd door je identiteitsprovider.",
     enterUsername: "Voer gebruikersnaam in",

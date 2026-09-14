@@ -4806,6 +4806,10 @@ export const ru: TranslationKeys = {
     mfaEnrollmentRequired:
       "Ваша организация требует многофакторную аутентификацию. Настройте MFA в параметрах учётной записи.",
     mfaPolicyUnavailable: "Не удалось проверить политику MFA. Повторите попытку чуть позже.",
+    loginThrottled: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
+    loginThrottledPlural: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
+    loginThrottledUnknownWait:
+      "Слишком много попыток входа. Подождите, прежде чем повторять попытку.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Управление паролем осуществляется Вашим провайдером идентификации.",
     enterUsername: "Введите имя пользователя",

@@ -4804,6 +4804,9 @@ export const uk: TranslationKeys = {
     mfaEnrollmentRequired:
       "Ваша організація вимагає багатофакторну автентифікацію. Налаштуйте MFA в параметрах облікового запису.",
     mfaPolicyUnavailable: "Не вдалося перевірити політику MFA. Повторіть спробу трохи пізніше.",
+    loginThrottled: "Забагато спроб входу. Повторіть спробу через {minutes} хв.",
+    loginThrottledPlural: "Забагато спроб входу. Повторіть спробу через {minutes} хв.",
+    loginThrottledUnknownWait: "Забагато спроб входу. Зачекайте, перш ніж повторювати спробу.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Керування паролем здійснюється Вашим постачальником ідентифікації.",
     enterUsername: "Введіть ім'я користувача",

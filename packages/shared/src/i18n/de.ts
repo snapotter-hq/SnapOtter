@@ -4830,6 +4830,10 @@ export const de: TranslationKeys = {
       "Ihre Organisation erfordert Multi-Faktor-Authentifizierung. Bitte richten Sie MFA in Ihren Kontoeinstellungen ein.",
     mfaPolicyUnavailable:
       "Die MFA-Richtlinie konnte nicht überprüft werden. Bitte versuchen Sie es gleich erneut.",
+    loginThrottled: "Zu viele Anmeldeversuche. Versuchen Sie es in {minutes} Minute erneut.",
+    loginThrottledPlural: "Zu viele Anmeldeversuche. Versuchen Sie es in {minutes} Minuten erneut.",
+    loginThrottledUnknownWait:
+      "Zu viele Anmeldeversuche. Bitte warten Sie, bevor Sie es erneut versuchen.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Passwortänderungen werden von Ihrem Identitätsanbieter verwaltet.",
     enterUsername: "Benutzernamen eingeben",

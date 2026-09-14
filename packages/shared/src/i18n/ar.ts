@@ -4763,6 +4763,11 @@ export const ar: TranslationKeys = {
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired: "تتطلب مؤسستك المصادقة متعددة العوامل. يرجى إعداد MFA في إعدادات حسابك.",
     mfaPolicyUnavailable: "تعذّر التحقق من سياسة MFA. يرجى المحاولة مرة أخرى بعد قليل.",
+    loginThrottled: "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقيقة.",
+    loginThrottledPlural:
+      "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقائق.",
+    loginThrottledUnknownWait:
+      "عدد كبير جدًا من محاولات تسجيل الدخول. يرجى الانتظار قبل المحاولة مرة أخرى.",
     methodSaml: "SAML",
     passwordManagedByProvider: "يتم إدارة تغيير كلمة المرور بواسطة مزود الهوية الخاص بك.",
     enterUsername: "أدخل اسم المستخدم",

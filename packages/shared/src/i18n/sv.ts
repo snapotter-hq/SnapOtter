@@ -4797,6 +4797,10 @@ export const sv: TranslationKeys = {
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
     mfaPolicyUnavailable: "MFA-policyn kunde inte kontrolleras. Försök igen om en stund.",
+    loginThrottled: "För många inloggningsförsök. Försök igen om {minutes} minut.",
+    loginThrottledPlural: "För många inloggningsförsök. Försök igen om {minutes} minuter.",
+    loginThrottledUnknownWait:
+      "För många inloggningsförsök. Vänta en stund innan du försöker igen.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Lösenordsändringar hanteras av din identitetsleverantör.",
     enterUsername: "Ange användarnamn",
