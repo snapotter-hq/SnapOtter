@@ -15,7 +15,7 @@
     "pagefind": "^1.5.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.13",
     "vite": "6.4.3",
     "vitepress": "^1.1.4",
     "vitepress-plugin-llms": "^1.13.3",
