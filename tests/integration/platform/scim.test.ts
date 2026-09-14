@@ -2156,7 +2156,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(JSON.parse(noMatch.body).members).toHaveLength(1);
     });
 
-    it("PATCH replaces displayName and skips empty replacement names", async () => {
+    it("PATCH replaces displayName and rejects an empty replacement name", async () => {
       const group = await createScimGroup({ displayName: uniqueName("scim-group-rename") });
       const renamed = uniqueName("scim-group-renamed");
 
@@ -2175,8 +2175,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         headers: authHeaders(),
         payload: { Operations: [{ op: "replace", path: "displayName", value: "" }] },
       });
-      expect(emptyRename.statusCode).toBe(200);
-      expect(JSON.parse(emptyRename.body).displayName).toBe(renamed);
+      // #988 flipped this from a silent skip: a 200 carrying the old name told
+      // the IdP the rename had applied. The name is still left alone.
+      expect(emptyRename.statusCode).toBe(400);
       const [teamRowDb] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
       expect(teamRowDb?.name).toBe(renamed);
     });
