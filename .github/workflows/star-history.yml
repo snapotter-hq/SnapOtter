@@ -9,7 +9,10 @@ name: Star History
 
 on:
   schedule:
-    - cron: "23 7 * * 1" # Mondays 07:23 UTC
+    # Daily. A weekly cron let the README chart drift a full week behind the
+    # real star count. Off the hour and outside the US/EU working day, because
+    # GitHub queues scheduled runs and drops them under load.
+    - cron: "41 5 * * *" # 05:41 UTC
   workflow_dispatch:
 
 concurrency:
