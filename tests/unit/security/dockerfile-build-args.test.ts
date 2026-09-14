@@ -16,6 +16,8 @@ const postgresReady = readFileSync(
   resolve(here, "../../../docker/s6/s6-rc.d/postgres-ready/up"),
   "utf8",
 );
+const redisReady = readFileSync(resolve(here, "../../../docker/s6/s6-rc.d/redis-ready/up"), "utf8");
+const embeddedLib = readFileSync(resolve(here, "../../../docker/embedded-lib.sh"), "utf8");
 const composeCpu = readFileSync(resolve(here, "../../../docker/docker-compose.yml"), "utf8");
 const composeGpu = readFileSync(resolve(here, "../../../docker/docker-compose-gpu.yml"), "utf8");
 const composeDev = readFileSync(resolve(here, "../../../docker-compose.dev.yml"), "utf8");
@@ -282,10 +284,49 @@ describe("Dockerfile build args", () => {
     }
   });
 
-  it("checks embedded Postgres readiness with the app database role", () => {
-    expect(postgresReady).toContain("pg_isready");
-    expect(postgresReady).toContain("-U snapotter");
-    expect(postgresReady).toContain("-d snapotter");
+  // What each readiness probe actually checks is pinned behaviourally in
+  // tests/unit/security/embedded-mode.test.ts, which runs the real shell. What
+  // is left for this file is the wiring the image has to get right for any of
+  // that to run at all.
+  it("wires both readiness oneshots to the shared lib at the path the image installs", () => {
+    const dest = dockerfile.match(/^COPY docker\/embedded-lib\.sh (\S+)$/m)?.[1];
+    expect(dest).toBeDefined();
+    for (const [name, up, gate] of [
+      ["redis-ready", redisReady, "redis_ready"],
+      ["postgres-ready", postgresReady, "postgres_ready"],
+    ] as const) {
+      expect(up, `${name}/up must source ${dest}`).toContain(`. ${dest}`);
+      expect(up, `${name}/up must call ${gate}`).toContain(gate);
+    }
+  });
+
+  it("keeps the app gated behind both databases, which is what bounding the probes buys", () => {
+    // Without these two dependency links the oneshots still run and still fail,
+    // but the app starts anyway against a database that never came up.
+    for (const gate of ["redis-ready", "postgres-ready"]) {
+      expect(
+        existsSync(resolve(root, `docker/s6/s6-rc.d/snapotter/dependencies.d/${gate}`)),
+        `snapotter must depend on ${gate}`,
+      ).toBe(true);
+    }
+  });
+
+  it("stops the container when a service fails to come up instead of continuing quietly", () => {
+    // s6-overlay defaults S6_BEHAVIOUR_IF_STAGE2_FAILS to 0, "continue
+    // silently", which leaves the container up with the app never started
+    // because its readiness dependency was never satisfied (#962).
+    expect(dockerfile).toContain("S6_BEHAVIOUR_IF_STAGE2_FAILS=2");
+  });
+
+  it("documents the readiness timeouts the lib actually ships", () => {
+    const docs = readFileSync(resolve(root, "apps/docs/guide/configuration.md"), "utf8");
+    for (const knob of ["EMBEDDED_REDIS_TIMEOUT_S", "EMBEDDED_POSTGRES_TIMEOUT_S"]) {
+      const shipped = embeddedLib.match(new RegExp(`\\$\\{${knob}:-(\\d+)\\}`))?.[1];
+      expect(shipped, `${knob} must have a default in embedded-lib.sh`).toBeDefined();
+      const row = docs.split("\n").find((line) => line.startsWith(`| \`${knob}\``));
+      expect(row, `${knob} must have a row in the configuration guide`).toBeDefined();
+      expect(row, `${knob} documents a default the lib does not ship`).toContain(`\`${shipped}\``);
+    }
   });
 
   it("bakes a real, non-zero rate limit default for the one-liner all-in-one install", () => {

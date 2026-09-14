@@ -150,6 +150,15 @@ async function waitHealthy(timeoutMs) {
   return false;
 }
 
+async function waitExited(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (quiet(["inspect", "--format", "{{.State.Running}}", NAME]).trim() === "false") return true;
+    await sleep(3000);
+  }
+  return false;
+}
+
 const countMatches = (haystack, re) => (haystack.match(re) || []).length;
 
 async function main() {
@@ -261,6 +270,59 @@ async function main() {
   countMatches(dockerLogs(NAME), /Imported 1\.x SQLite database/g) === 1
     ? ok("did not re-import on the second boot")
     : bad("re-imported on the second boot");
+  cleanup();
+
+  // 7. A database that cannot start fails the boot instead of hanging it.
+  //    Before #962 the readiness oneshots looped forever with `2>/dev/null`, so
+  //    the container sat "Up" with nothing serving and no clue why (#734 was a
+  //    real instance). REDIS_MAXMEMORY is passed straight through to
+  //    redis-server, so a garbage value makes it exit at startup the same way.
+  console.log("\n[7] a Redis that never starts fails the boot");
+  cleanup();
+  createVolume();
+  if (quiet(["inspect", NAME])) throw new Error(`Unique container name collision: ${NAME}`);
+  docker([
+    "run",
+    "-d",
+    "--name",
+    NAME,
+    "--label",
+    OWNER_LABEL,
+    "-v",
+    `${VOL}:/data`,
+    "-e",
+    "SNAPOTTER_TELEMETRY=0",
+    "-e",
+    "REDIS_MAXMEMORY=not-a-size",
+    "-e",
+    "EMBEDDED_REDIS_TIMEOUT_S=20",
+    IMAGE,
+  ]);
+  if (!containerIsOwned()) {
+    throw new Error(`Created container failed ownership validation: ${NAME}`);
+  }
+  // Same budget as the other first-boot waits: this pays for initdb too, since
+  // s6 brings the Postgres branch up in parallel and the transition has to
+  // settle before the container halts.
+  (await waitExited(300000))
+    ? ok("container exited instead of hanging")
+    : bad("container still running (the old silent hang)");
+  // Exiting is not enough. `restart: on-failure`, Kubernetes and systemd all
+  // read the code, and a zero would tell them the boot was a clean shutdown.
+  Number(quiet(["inspect", "--format", "{{.State.ExitCode}}", NAME]).trim()) !== 0
+    ? ok("exited non-zero, so restart policies see a failure")
+    : bad("exited 0; orchestrators would read a dead database as a clean stop");
+  const brokenLogs = dockerLogs(NAME);
+  brokenLogs.includes("FATAL: Redis did not become ready")
+    ? ok("failure names Redis")
+    : bad("no Redis failure message in the logs");
+  brokenLogs.includes("Last probe output:\n  Could not connect to Redis")
+    ? ok("carried the probe's own error into the report")
+    : bad("probe error still discarded");
+  // The 20s cap crosses the 15s heartbeat, so a slow boot proves it looks alive.
+  /Waiting for Redis\.\.\. \d+s/.test(brokenLogs)
+    ? ok("printed progress while waiting")
+    : bad("no progress output during the wait");
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);

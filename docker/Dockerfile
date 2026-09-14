@@ -771,9 +771,12 @@ ENV NVIDIA_VISIBLE_DEVICES=all \
 # s6-overlay (embedded mode): propagate the runtime-exported environment (the
 # 127.0.0.1 URLs, resolved _FILE secrets, auth defaults) into supervised
 # services, and never time out waiting for first-boot readiness (initdb can take
-# minutes). Inert in external mode, which never invokes s6.
+# minutes; the readiness probes in embedded-lib.sh bound their own wait instead).
+# Stop the container when a service fails to come up rather than s6's default of
+# continuing silently, so a database that cannot start says so (#962).
 ENV S6_KEEP_ENV=1 \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 
 # Suppress noisy ML library output in docker logs
 ENV PYTHONWARNINGS=default \
