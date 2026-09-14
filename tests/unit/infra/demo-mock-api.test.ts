@@ -252,3 +252,53 @@ describe("demo mock API", () => {
     expect(list.files.some((f) => f.id === "file_assets")).toBe(false);
   });
 });
+
+/**
+ * The demo boots already signed in, so primeDemoAuth rewrites a /login or
+ * /change-password url to the dashboard before the app reads it. The window
+ * for that is narrower than it looks: App.tsx calls createBrowserRouter at
+ * module scope, which reads window.location once and keeps it, and every
+ * import declaration in a module evaluates before that module's first
+ * statement. A static `import { App } from "@/App"` in the demo entry
+ * therefore runs before installMocks() no matter where the call sits, leaving
+ * the router on /login while the address bar reads /, and the demo rendering
+ * the login screen it just bounced away from.
+ *
+ * tests/e2e-demo/demo-preview.spec.ts catches that, but only after a merge:
+ * the demo deploy workflow runs on push to main, not on pull requests (#1128).
+ * This assertion is the part that runs on the PR.
+ */
+describe("demo boot order", () => {
+  const mainSource = readFileSync(path.resolve(process.cwd(), "apps/demo/src/main.tsx"), "utf8");
+
+  it("loads the app only after the mocks have rewritten the url", () => {
+    expect(
+      mainSource,
+      'A static import of "@/App" evaluates before installMocks() can rewrite /login. ' +
+        'Load it with `const { App } = await import("@/App")` after the call instead.',
+    ).not.toMatch(/^\s*import\s[^;]*from\s+"@\/App"/m);
+
+    const installed = mainSource.indexOf("installMocks()");
+    const loaded = mainSource.indexOf('import("@/App")');
+
+    expect(installed, "The demo entry no longer installs the mocks.").toBeGreaterThan(-1);
+    expect(loaded, "The demo entry no longer loads the app dynamically.").toBeGreaterThan(-1);
+    expect(
+      loaded,
+      "The app is loaded before installMocks(), so it reads the url the mocks were going to fix.",
+    ).toBeGreaterThan(installed);
+  });
+
+  it("still rewrites the routes the app would otherwise render as a login screen", () => {
+    const mockSource = readFileSync(
+      path.resolve(process.cwd(), "apps/demo/src/mock-api.ts"),
+      "utf8",
+    );
+
+    expect(
+      mockSource,
+      "Nothing rewrites /login any more, so the demo shows a login form it cannot use: " +
+        "its own mock reports authEnabled true, which leaves /login ungated in AuthGuard.",
+    ).toMatch(/window\.history\.replaceState\(null, "", "\/"\)/);
+  });
+});

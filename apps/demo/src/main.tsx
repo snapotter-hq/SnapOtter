@@ -1,11 +1,7 @@
-import { installMocks } from "./mock-api";
-
-installMocks();
-
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "@/App";
 import { DemoBanner } from "./demo-banner";
+import { installMocks } from "./mock-api";
 import "./styles/globals.css";
 
 const DEMO_MARKER = "demo instance";
@@ -48,6 +44,18 @@ function patchDemoErrors(root: Element) {
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 patchDemoErrors(rootElement);
+
+installMocks();
+
+// Loaded here instead of imported at the top, and the order is load-bearing.
+// installMocks rewrites a /login url to /, and the app reads window.location
+// the moment its module runs, because createBrowserRouter sits at App.tsx's
+// module scope. A static import would win that race every time: every import
+// declaration in a module evaluates before the module's first statement. The
+// router would hold /login while the address bar showed /, and the demo would
+// sit on the login screen it had just bounced away from.
+const { App } = await import("@/App");
+
 createRoot(rootElement).render(
   <StrictMode>
     <DemoBanner />
