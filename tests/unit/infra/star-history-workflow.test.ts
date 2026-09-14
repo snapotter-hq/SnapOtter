@@ -15,6 +15,9 @@ const root = path.resolve(import.meta.dirname, "../../..");
 const CHART_URL =
   "https://raw.githubusercontent.com/snapotter-hq/SnapOtter/star-history/star-history.svg";
 
+/** Cover for a run GitHub delays or drops, so one bad slot never costs a day. */
+const MIN_GAP_MINUTES = 6 * 60;
+
 interface Workflow {
   on?: { schedule?: { cron?: string }[] };
   jobs?: Record<string, { steps?: { run?: string }[] }>;
@@ -26,24 +29,53 @@ function workflow(): Workflow {
   ) as Workflow;
 }
 
+function crons(): string[] {
+  return (workflow().on?.schedule ?? []).map((entry) => entry.cron ?? "");
+}
+
+/** Plain integers only, list form included, so "5,17" counts as two hours. */
+function fixedValues(field: string): number[] {
+  return field
+    .split(",")
+    .filter((part) => /^\d+$/.test(part))
+    .map(Number);
+}
+
+/** Minutes past midnight UTC for every run the schedule fires on every day. */
+function dailyRunTimes(): number[] {
+  const times: number[] = [];
+
+  for (const cron of crons()) {
+    const fields = cron.trim().split(/\s+/);
+    if (fields.length !== 5) continue;
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+    if (dayOfMonth !== "*" || month !== "*" || dayOfWeek !== "*") continue;
+
+    for (const h of fixedValues(hour)) {
+      for (const m of fixedValues(minute)) times.push(h * 60 + m);
+    }
+  }
+
+  return times.sort((a, b) => a - b);
+}
+
 describe("star history workflow", () => {
   it("regenerates the chart every day", () => {
-    const schedules = workflow().on?.schedule ?? [];
-    expect(schedules.length).toBeGreaterThan(0);
-
-    const daily = schedules.filter((entry) => {
-      const fields = (entry.cron ?? "").trim().split(/\s+/);
-      if (fields.length !== 5) return false;
-      const [, , dayOfMonth, month, dayOfWeek] = fields;
-      return dayOfMonth === "*" && month === "*" && dayOfWeek === "*";
-    });
-
     expect(
-      daily,
-      `every cron field after the hour must be "*" so the chart refreshes daily, got ${schedules
-        .map((entry) => entry.cron)
-        .join(", ")}`,
+      dailyRunTimes(),
+      `every cron field after the hour must be "*" so the chart refreshes daily, got ${crons().join(", ")}`,
     ).not.toHaveLength(0);
+  });
+
+  it("keeps a spare run far enough from the first to cover a dropped one", () => {
+    const times = dailyRunTimes();
+    expect(times.length, `expected two daily runs, got ${crons().join(", ")}`).toBeGreaterThan(1);
+
+    const gaps = times.map((time, i) => (times[(i + 1) % times.length] - time + 1440) % 1440);
+    expect(
+      Math.min(...gaps),
+      `daily runs must sit at least ${MIN_GAP_MINUTES} minutes apart to be real cover, got ${crons().join(", ")}`,
+    ).toBeGreaterThanOrEqual(MIN_GAP_MINUTES);
   });
 
   it("publishes to the branch the README embeds", () => {
