@@ -11,6 +11,10 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  COMPOSE_LINK_VERSION,
+  updateReleaseReferences,
+} from "../../../scripts/sync-published-docs-version.mjs";
 
 const root = process.cwd();
 const rootPackage = JSON.parse(readFileSync(path.resolve(root, "package.json"), "utf8"));
@@ -90,12 +94,14 @@ describe("release version domains", () => {
     for (const page of releasePages()) {
       const source = readFileSync(path.resolve(root, page), "utf8");
       const versions = [
-        ...source.matchAll(/SnapOtter\/(?:blob\/)?v([^/]+)\/docker\/docker-compose(?:-gpu)?\.yml/g),
-        ...source.matchAll(
-          /snapotter-v([0-9][0-9A-Za-z.+-]*?)-(?:release-subjects|image-linux-amd64-sbom)/g,
-        ),
-        ...source.matchAll(/snapotter\/snapotter:([0-9][0-9A-Za-z.+-]*)/g),
-      ].map((match) => match[1]);
+        ...(source.match(COMPOSE_LINK_VERSION) ?? []),
+        ...[
+          ...source.matchAll(
+            /snapotter-v([0-9][0-9A-Za-z.+-]*?)-(?:release-subjects|image-linux-amd64-sbom)/g,
+          ),
+          ...source.matchAll(/snapotter\/snapotter:([0-9][0-9A-Za-z.+-]*)/g),
+        ].map((match) => match[1]),
+      ];
       expect(versions.length, `${page} must contain release-coupled examples`).toBeGreaterThan(0);
       expect(new Set(versions), `${page} has a stale release example`).toEqual(
         new Set([rootPackage.version]),
@@ -103,27 +109,28 @@ describe("release version domains", () => {
     }
   });
 
-  it("pins every canonical Compose link in the release pages to the release tag", () => {
-    // main's Compose files describe the next image, not the published one: a
-    // blob/main link pairs the pulled `latest` with settings it cannot honour.
+  it("keeps every Compose link in the release pages in a shape the release sync rewrites", () => {
+    // A link the release sync cannot rewrite (blob/main in #1035) pairs the pulled
+    // latest image with settings the published release cannot honor.
     for (const page of releasePages()) {
       const source = readFileSync(path.resolve(root, page), "utf8");
-      const mainLinks = [
-        ...source.matchAll(
-          /SnapOtter\/(?:blob\/|raw\/|tree\/)?main\/docker\/docker-compose[^\s)]*/g,
-        ),
+      const links = [
+        ...source.matchAll(/snapotter-hq\/snapotter\/[^\s)]*docker-compose[^\s)]*/gi),
       ].map((match) => match[0]);
-      expect(
-        mainLinks,
-        `${page} links a Compose file from main instead of the release tag`,
-      ).toEqual([]);
+      for (const link of links) {
+        expect(
+          updateReleaseReferences(link, "9.9.9"),
+          `${page}: the release sync would leave ${link} stale; link the file at blob/v<version>`,
+        ).toContain("9.9.9");
+      }
     }
   });
 
   it("rewrites every published release-reference shape for the next version", () => {
     const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-docs-version-"));
-    const guide = path.join(fixtureRoot, "apps/docs/guide");
-    mkdirSync(guide, { recursive: true });
+    const pages = ["guide/getting-started.md", "guide/security.md", "de/guide/security.md"].map(
+      (page) => path.join(fixtureRoot, "apps/docs", page),
+    );
     const fixture = [
       "https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v1.9.0/docker/docker-compose.yml",
       "https://github.com/snapotter-hq/SnapOtter/blob/v1.9.0/docker/docker-compose.yml",
@@ -134,9 +141,11 @@ describe("release version domains", () => {
       "snapotter/snapotter:1.9.0",
     ].join("\n");
     try {
-      writeFileSync(path.join(guide, "getting-started.md"), fixture);
-      writeFileSync(path.join(guide, "security.md"), fixture);
-      execFileSync(
+      for (const page of pages) {
+        mkdirSync(path.dirname(page), { recursive: true });
+        writeFileSync(page, fixture);
+      }
+      const stdout = execFileSync(
         process.execPath,
         [
           path.resolve(root, "scripts/sync-published-docs-version.mjs"),
@@ -146,8 +155,9 @@ describe("release version domains", () => {
         ],
         { encoding: "utf8" },
       );
-      for (const page of ["getting-started.md", "security.md"]) {
-        const source = readFileSync(path.join(guide, page), "utf8");
+      expect(stdout).toContain("Updated 3 published documentation version file(s)");
+      for (const page of pages) {
+        const source = readFileSync(page, "utf8");
         expect(source).not.toContain("1.9.0");
         expect(source.match(/3\.0\.0-rc\.1/g)).toHaveLength(7);
       }

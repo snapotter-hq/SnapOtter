@@ -7,12 +7,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const SEMVER =
   /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/;
 
+// Version segment of a release-pinned Compose link. Shared with the release
+// policy test so the guard and the rewrite agree on which links count.
+export const COMPOSE_LINK_VERSION =
+  /(?<=SnapOtter\/(?:blob\/)?v)[0-9][^/]*(?=\/docker\/docker-compose(?:-gpu)?\.yml)/g;
+
 export function updateReleaseReferences(source, version) {
   return source
-    .replace(
-      /(SnapOtter\/(?:blob\/)?v)[^/]+(\/docker\/docker-compose(?:-gpu)?\.yml)/g,
-      `$1${version}$2`,
-    )
+    .replace(COMPOSE_LINK_VERSION, version)
     .replace(
       /(snapotter-v)[0-9][0-9A-Za-z.+-]*?(?=-(?:release-subjects|image-linux-amd64-sbom))/g,
       `$1${version}`,
