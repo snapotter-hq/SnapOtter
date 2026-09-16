@@ -72,14 +72,14 @@ describe.skipIf(!hasWeasyprint)("html-to-pdf (requires weasyprint)", () => {
     const { jobId } = JSON.parse(res.body);
     const { db, schema } = await import("../../../../apps/api/src/db/index.js");
     const { eq } = await import("drizzle-orm");
-    let row: { status: string; error: string | null } | undefined;
+    let row: { status: string; error: { message: string } | null } | undefined;
     for (let i = 0; i < 120; i++) {
       [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
       if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
       await new Promise((r) => setTimeout(r, 500));
     }
     expect(row?.status).toBe("failed");
-    expect(row?.error).toMatch(/remote resources are disabled/i);
+    expect(row?.error?.message).toMatch(/remote resources are disabled/i);
   }, 90_000);
 });
 
