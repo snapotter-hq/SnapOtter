@@ -223,8 +223,8 @@ FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae
 ARG TARGETARCH
 FROM libheif-base-${TARGETARCH} AS libheif-builder
 
-ARG LIBHEIF_VERSION=1.23.1
-ARG LIBDE265_VERSION=1.1.1
+ARG LIBHEIF_VERSION=1.23.4
+ARG LIBDE265_VERSION=1.1.3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake pkg-config gcc g++ make curl ca-certificates \
@@ -244,7 +244,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
       --output /tmp/libde265.tar.gz \
       "https://github.com/strukturag/libde265/releases/download/v${LIBDE265_VERSION}/libde265-${LIBDE265_VERSION}.tar.gz" \
     && printf '%s  %s\n' \
-      "fd48a927e94ed74fc7ce8829d222b9d8599fcbfe8b6448ba66705babc56ab219" \
+      "554228bd17788c99a7e63b37ab5634722190e6e2bf60c1dcb01cef328e133905" \
       /tmp/libde265.tar.gz | sha256sum --check --strict - \
     && tar -xzf /tmp/libde265.tar.gz \
     && cmake -B build-de265 -S "libde265-${LIBDE265_VERSION}" \
@@ -259,7 +259,7 @@ RUN curl --fail --location --silent --show-error --retry 3 \
       --output /tmp/libheif.tar.gz \
       "https://github.com/strukturag/libheif/releases/download/v${LIBHEIF_VERSION}/libheif-${LIBHEIF_VERSION}.tar.gz" \
     && printf '%s  %s\n' \
-      "0de0327f60fcd47de90d5654c6fe152232738d60d84fe084ec3e0f35e03b166a" \
+      "d0c02b4b0e978f34a1974b6f3eea7975a537bf7a9195ffeea38e7242ff316fdd" \
       /tmp/libheif.tar.gz | sha256sum --check --strict - \
     && tar -xzf /tmp/libheif.tar.gz \
     && PKG_CONFIG_PATH=/opt/libheif/lib/pkgconfig \
@@ -520,7 +520,7 @@ COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 COPY --from=pdfcpu-builder /tmp/pdfcpu /usr/local/bin/pdfcpu
 
 # libheif tools (heif-convert, heif-dec, heif-enc) built from source.
-# LD_LIBRARY_PATH ensures our custom 1.21.2 libs take precedence over distro libheif1.
+# LD_LIBRARY_PATH ensures our source-built libs take precedence over distro libheif1.
 COPY --from=libheif-builder /opt/libheif/bin/ /usr/local/bin/
 COPY --from=libheif-builder /opt/libheif/lib/ /usr/local/lib/
 

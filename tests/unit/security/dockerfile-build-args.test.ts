@@ -120,12 +120,12 @@ describe("Dockerfile build args", () => {
       ["Dockerfile.test", dockerfileTest],
     ] as const) {
       expect(source, `${name} must pin libheif bytes`).toContain(
-        "0de0327f60fcd47de90d5654c6fe152232738d60d84fe084ec3e0f35e03b166a",
+        "d0c02b4b0e978f34a1974b6f3eea7975a537bf7a9195ffeea38e7242ff316fdd",
       );
       // libde265 is built from source too: Debian 12's 1.0.11 is the decoder a
       // .heic upload actually reaches, and it carries twelve unfixed advisories.
       expect(source, `${name} must pin libde265 bytes`).toContain(
-        "fd48a927e94ed74fc7ce8829d222b9d8599fcbfe8b6448ba66705babc56ab219",
+        "554228bd17788c99a7e63b37ab5634722190e6e2bf60c1dcb01cef328e133905",
       );
       expect(source, `${name} must verify downloads`).toContain("sha256sum --check --strict");
       // The source build is worthless if libheif silently links the distro copy.

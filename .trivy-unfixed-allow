@@ -270,12 +270,12 @@ CVE-2026-53615
 # why the status is will_not_fix. The vulnerable function is not in the image.
 CVE-2023-45853
 
-# libheif1 1.15.1, shadowed. The Dockerfile builds libheif 1.23.1 into
+# libheif1 1.15.1, shadowed. The Dockerfile builds libheif 1.23.4 into
 # /usr/local/lib and sets LD_LIBRARY_PATH=/usr/local/lib, which the app
 # propagates to every child process (execFile inherits it, and the Python
 # dispatcher passes it explicitly in packages/ai/src/bridge.ts). Verified:
 # LD_DEBUG=libs heif-dec resolves libheif.so.1 to /usr/local/lib and reports
-# 1.23.1, and ImageMagick's heic.so resolves the same way. The distro package
+# 1.23.4, and ImageMagick's heic.so resolves the same way. The distro package
 # stays installed only as a transitive dependency of libmagickcore-6.q16-6 and
 # cannot be purged without removing ImageMagick.
 #
