@@ -14,7 +14,7 @@ SnapOtter फ़ाइलों को पूरी तरह आपके इ�
 
 ## कंटेनर हार्डनिंग {#container-hardening}
 
-विहित [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) और [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) कंपोज़ फ़ाइलें सत्य का स्रोत हैं। किसी संक्षिप्त उदाहरण को उत्पादन में कॉपी न करें; आपके द्वारा सत्यापित रिलीज़ टैग से फ़ाइल को तैनात करें।
+विहित [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) और [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) कंपोज़ फ़ाइलें सत्य का स्रोत हैं। किसी संक्षिप्त उदाहरण को उत्पादन में कॉपी न करें; आपके द्वारा सत्यापित रिलीज़ टैग से फ़ाइल को तैनात करें।
 
 दोनों स्टैक निम्नलिखित नियंत्रण लागू करते हैं:
 

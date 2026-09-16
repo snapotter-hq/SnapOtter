@@ -14,7 +14,7 @@ SnapOtter 完全在你的基礎架構上處理檔案。它預設會傳送匿名�
 
 ## 容器硬化 {#container-hardening}
 
-規範的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) 和 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose 檔案是事實來源。不要將縮寫範例複製到生產中；從您驗證的發布標籤部署檔案。
+規範的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) 和 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose 檔案是事實來源。不要將縮寫範例複製到生產中；從您驗證的發布標籤部署檔案。
 
 兩個堆疊都應用以下控制：
 

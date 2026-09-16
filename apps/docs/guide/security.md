@@ -10,7 +10,7 @@ The container runs as a dedicated non-root user (`snapotter`) with all Linux cap
 
 ## Container Hardening {#container-hardening}
 
-The canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) and [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose files are the source of truth. Do not copy an abbreviated example into production; deploy the file from the release tag you verified.
+The canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) and [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose files are the source of truth. Do not copy an abbreviated example into production; deploy the file from the release tag you verified.
 
 Both stacks apply the following controls:
 

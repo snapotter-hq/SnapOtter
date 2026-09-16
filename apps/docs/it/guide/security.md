@@ -14,7 +14,7 @@ Il container gira come utente non-root dedicato (`snapotter`) con tutte le capac
 
 ## Indurimento del contenitore {#container-hardening}
 
-I file canonici Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) e [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) sono la fonte della verità. Non copiare un esempio abbreviato nella produzione; distribuisci il file dal tag di rilascio che hai verificato.
+I file canonici Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) e [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) sono la fonte della verità. Non copiare un esempio abbreviato nella produzione; distribuisci il file dal tag di rilascio che hai verificato.
 
 Entrambi gli stack applicano i seguenti controlli:
 

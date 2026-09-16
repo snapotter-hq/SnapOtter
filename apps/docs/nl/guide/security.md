@@ -14,7 +14,7 @@ De container draait als een dedicated niet-root-gebruiker (`snapotter`) met alle
 
 ## Containerharding {#container-hardening}
 
-De canonieke [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) en [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose-bestanden zijn de bron van de waarheid. Kopieer geen verkort voorbeeld naar productie; implementeer het bestand vanaf de releasetag die u heeft geverifieerd.
+De canonieke [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) en [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose-bestanden zijn de bron van de waarheid. Kopieer geen verkort voorbeeld naar productie; implementeer het bestand vanaf de releasetag die u heeft geverifieerd.
 
 Beide stapels passen de volgende besturingselementen toe:
 

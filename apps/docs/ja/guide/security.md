@@ -14,7 +14,7 @@ SnapOtter はファイルを完全にあなたのインフラ上で処理しま�
 
 ## コンテナの強化 {#container-hardening}
 
-正規の [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) および [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose ファイルが信頼できる情報源です。短縮された例を運用環境にコピーしないでください。確認したリリース タグからファイルをデプロイします。
+正規の [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) および [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose ファイルが信頼できる情報源です。短縮された例を運用環境にコピーしないでください。確認したリリース タグからファイルをデプロイします。
 
 どちらのスタックも次の制御を適用します。
 

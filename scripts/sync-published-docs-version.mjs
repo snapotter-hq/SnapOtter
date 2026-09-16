@@ -9,7 +9,10 @@ const SEMVER =
 
 export function updateReleaseReferences(source, version) {
   return source
-    .replace(/(SnapOtter\/(?:blob\/)?v)[^/]+(\/docker\/docker-compose\.yml)/g, `$1${version}$2`)
+    .replace(
+      /(SnapOtter\/(?:blob\/)?v)[^/]+(\/docker\/docker-compose(?:-gpu)?\.yml)/g,
+      `$1${version}$2`,
+    )
     .replace(
       /(snapotter-v)[0-9][0-9A-Za-z.+-]*?(?=-(?:release-subjects|image-linux-amd64-sbom))/g,
       `$1${version}`,

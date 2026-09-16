@@ -14,7 +14,7 @@ Le conteneur s'exécute sous un utilisateur non-root dédié (`snapotter`) avec 
 
 ## Durcissement des conteneurs {#container-hardening}
 
-Les fichiers canoniques [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) et [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose sont la source de vérité. Ne copiez pas un exemple abrégé en production ; déployez le fichier à partir de la balise de version que vous avez vérifiée.
+Les fichiers canoniques [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) et [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose sont la source de vérité. Ne copiez pas un exemple abrégé en production ; déployez le fichier à partir de la balise de version que vous avez vérifiée.
 
 Les deux piles appliquent les contrôles suivants :
 

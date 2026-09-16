@@ -14,7 +14,7 @@ SnapOtter обрабатывает файлы полностью на вашей
 
 ## Укрепление контейнера {#container-hardening}
 
-Канонические файлы Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) и [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) являются источником истины. Не копируйте сокращенный пример в производство; разверните файл из проверенного вами тега выпуска.
+Канонические файлы Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) и [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) являются источником истины. Не копируйте сокращенный пример в производство; разверните файл из проверенного вами тега выпуска.
 
 Оба стека применяют следующие элементы управления:
 

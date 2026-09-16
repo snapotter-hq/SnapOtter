@@ -14,7 +14,7 @@ SnapOtter ประมวลผลไฟล์ทั้งหมดบนโค�
 
 ## การชุบแข็งตู้คอนเทนเนอร์ {#container-hardening}
 
-ไฟล์เขียน Canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) และ [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) เป็นแหล่งที่มาของความจริง อย่าคัดลอกตัวอย่างย่อไปสู่การใช้งานจริง ปรับใช้ไฟล์จากแท็ก release ที่คุณตรวจสอบแล้ว
+ไฟล์เขียน Canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) และ [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) เป็นแหล่งที่มาของความจริง อย่าคัดลอกตัวอย่างย่อไปสู่การใช้งานจริง ปรับใช้ไฟล์จากแท็ก release ที่คุณตรวจสอบแล้ว
 
 สแต็กทั้งสองใช้การควบคุมต่อไปนี้:
 

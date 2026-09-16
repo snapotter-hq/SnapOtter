@@ -14,7 +14,7 @@ Kontainer berjalan sebagai pengguna non-root khusus (`snapotter`) dengan semua k
 
 ## Pengerasan Kontainer {#container-hardening}
 
-File Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) dan [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) kanonik adalah sumber kebenarannya. Jangan menyalin contoh yang disingkat ke dalam produksi; menyebarkan file dari tag rilis yang Anda verifikasi.
+File Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) dan [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) kanonik adalah sumber kebenarannya. Jangan menyalin contoh yang disingkat ke dalam produksi; menyebarkan file dari tag rilis yang Anda verifikasi.
 
 Kedua tumpukan menerapkan kontrol berikut:
 

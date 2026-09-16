@@ -14,7 +14,7 @@ i18n_hash_version: 2
 
 ## تصلب الحاويات {#container-hardening}
 
-تعد ملفات الإنشاء الأساسية [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) و[GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) مصدر الحقيقة. لا تنسخ مثالًا مختصرًا إلى الإنتاج؛ انشر الملف من علامة الإصدار التي قمت بالتحقق منها.
+تعد ملفات الإنشاء الأساسية [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) و[GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) مصدر الحقيقة. لا تنسخ مثالًا مختصرًا إلى الإنتاج؛ انشر الملف من علامة الإصدار التي قمت بالتحقق منها.
 
 تطبق كلا المجموعتين عناصر التحكم التالية:
 

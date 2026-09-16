@@ -14,7 +14,7 @@ Konteyner, gerekli minimum küme dışında tüm Linux yetenekleri düşürülm�
 
 ## Konteyner Sertleştirme {#container-hardening}
 
-Kurallı [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) ve [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose dosyaları gerçeğin kaynağıdır. Kısaltılmış bir örneği üretime kopyalamayın; dosyayı doğruladığınız sürüm etiketinden dağıtın.
+Kurallı [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) ve [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose dosyaları gerçeğin kaynağıdır. Kısaltılmış bir örneği üretime kopyalamayın; dosyayı doğruladığınız sürüm etiketinden dağıtın.
 
 Her iki yığın da aşağıdaki kontrolleri uygular:
 

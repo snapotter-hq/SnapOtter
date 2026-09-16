@@ -14,7 +14,7 @@ Container chạy dưới danh nghĩa một người dùng không phải root chu
 
 ## Làm cứng thùng chứa {#container-hardening}
 
-Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
+Các tệp soạn thảo [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) và [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) chuẩn là nguồn gốc của sự thật. Không sao chép một ví dụ viết tắt vào sản xuất; triển khai tệp từ thẻ phát hành mà bạn đã xác minh.
 
 Cả hai ngăn xếp đều áp dụng các điều khiển sau:
 

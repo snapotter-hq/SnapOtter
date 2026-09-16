@@ -14,7 +14,7 @@ SnapOtter는 파일을 전적으로 사용자의 인프라에서 처리한다. �
 
 ## 컨테이너 경화 {#container-hardening}
 
-표준 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) 및 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose 파일이 정보의 소스입니다. 축약된 예제를 프로덕션에 복사하지 마십시오. 확인한 릴리스 태그에서 파일을 배포합니다.
+표준 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) 및 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose 파일이 정보의 소스입니다. 축약된 예제를 프로덕션에 복사하지 마십시오. 확인한 릴리스 태그에서 파일을 배포합니다.
 
 두 스택 모두 다음 컨트롤을 적용합니다.
 

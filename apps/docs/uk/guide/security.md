@@ -14,7 +14,7 @@ SnapOtter обробляє файли повністю на вашій інфр�
 
 ## Зміцнення контейнера {#container-hardening}
 
-Канонічні файли Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) і [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) є джерелом правди. Не копіюйте скорочений приклад у виробництво; розгорнути файл із тегу випуску, який ви перевірили.
+Канонічні файли Compose [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) і [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) є джерелом правди. Не копіюйте скорочений приклад у виробництво; розгорнути файл із тегу випуску, який ви перевірили.
 
 Обидва стеки застосовують такі елементи керування:
 

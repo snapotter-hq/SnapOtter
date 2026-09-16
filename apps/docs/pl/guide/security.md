@@ -14,7 +14,7 @@ Kontener działa jako dedykowany użytkownik nie-root (`snapotter`) z odrzuconym
 
 ## Hartowanie kontenera {#container-hardening}
 
-Źródłem prawdy są kanoniczne pliki [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) i [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml). Nie kopiuj skróconego przykładu do produkcji; wdróż plik ze zweryfikowanego tagu wydania.
+Źródłem prawdy są kanoniczne pliki [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) i [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml). Nie kopiuj skróconego przykładu do produkcji; wdróż plik ze zweryfikowanego tagu wydania.
 
 Obydwa stosy stosują następujące elementy sterujące:
 

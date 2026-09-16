@@ -14,7 +14,7 @@ Der Container läuft als dedizierter Non-Root-Benutzer (`snapotter`) mit allen e
 
 ## Containerhärtung {#container-hardening}
 
-Die kanonischen Compose-Dateien [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) sind die Quelle der Wahrheit. Kopieren Sie kein gekürztes Beispiel in die Produktion. Stellen Sie die Datei mit dem von Ihnen überprüften Release-Tag bereit.
+Die kanonischen Compose-Dateien [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) sind die Quelle der Wahrheit. Kopieren Sie kein gekürztes Beispiel in die Produktion. Stellen Sie die Datei mit dem von Ihnen überprüften Release-Tag bereit.
 
 Beide Stapel wenden die folgenden Steuerelemente an:
 

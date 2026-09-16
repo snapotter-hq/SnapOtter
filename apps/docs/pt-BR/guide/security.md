@@ -14,7 +14,7 @@ O contêiner roda como um usuário dedicado não-root (`snapotter`) com todas as
 
 ## Endurecimento de contêineres {#container-hardening}
 
-Os arquivos canônicos [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) e [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose são a fonte da verdade. Não copie um exemplo abreviado para produção; implante o arquivo da tag de lançamento que você verificou.
+Os arquivos canônicos [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) e [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose são a fonte da verdade. Não copie um exemplo abreviado para produção; implante o arquivo da tag de lançamento que você verificou.
 
 Ambas as pilhas aplicam os seguintes controles:
 

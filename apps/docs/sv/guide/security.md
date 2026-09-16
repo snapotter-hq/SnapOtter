@@ -14,7 +14,7 @@ Containern körs som en dedikerad icke-root-användare (`snapotter`) med alla Li
 
 ## Behållarhärdning {#container-hardening}
 
-De kanoniska [CPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose.yml) och [GPU](https://github.com/snapotter-hq/SnapOtter/blob/main/docker/docker-compose-gpu.yml) Compose-filerna är källan till sanningen. Kopiera inte ett förkortat exempel till produktion; distribuera filen från releasetaggen du verifierade.
+De kanoniska [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose.yml) och [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.2.0/docker/docker-compose-gpu.yml) Compose-filerna är källan till sanningen. Kopiera inte ett förkortat exempel till produktion; distribuera filen från releasetaggen du verifierade.
 
 Båda stackarna tillämpar följande kontroller:
 
