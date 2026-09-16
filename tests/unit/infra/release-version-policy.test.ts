@@ -32,6 +32,17 @@ function workspaceManifests(): string[] {
   );
 }
 
+function releasePages(): string[] {
+  const pages = ["apps/docs/guide/getting-started.md", "apps/docs/guide/security.md"];
+  for (const locale of readdirSync(path.resolve(root, "apps/docs"))) {
+    for (const page of ["getting-started.md", "security.md"]) {
+      const candidate = path.join("apps/docs", locale, "guide", page);
+      if (existsSync(path.resolve(root, candidate))) pages.push(candidate);
+    }
+  }
+  return pages;
+}
+
 describe("release version domains", () => {
   it("keeps every private workspace package on the root release version", () => {
     for (const manifest of workspaceManifests()) {
@@ -76,17 +87,10 @@ describe("release version domains", () => {
     const syncScript = readFileSync(path.resolve(root, "scripts/sync-version.sh"), "utf8");
     expect(syncScript).toContain('node "$ROOT/scripts/sync-published-docs-version.mjs" "$VERSION"');
 
-    const releasePages = ["apps/docs/guide/getting-started.md", "apps/docs/guide/security.md"];
-    for (const locale of readdirSync(path.resolve(root, "apps/docs"))) {
-      for (const page of ["getting-started.md", "security.md"]) {
-        const candidate = path.join("apps/docs", locale, "guide", page);
-        if (existsSync(path.resolve(root, candidate))) releasePages.push(candidate);
-      }
-    }
-    for (const page of releasePages) {
+    for (const page of releasePages()) {
       const source = readFileSync(path.resolve(root, page), "utf8");
       const versions = [
-        ...source.matchAll(/SnapOtter\/(?:blob\/)?v([^/]+)\/docker\/docker-compose\.yml/g),
+        ...source.matchAll(/SnapOtter\/(?:blob\/)?v([^/]+)\/docker\/docker-compose(?:-gpu)?\.yml/g),
         ...source.matchAll(
           /snapotter-v([0-9][0-9A-Za-z.+-]*?)-(?:release-subjects|image-linux-amd64-sbom)/g,
         ),
@@ -99,6 +103,23 @@ describe("release version domains", () => {
     }
   });
 
+  it("pins every canonical Compose link in the release pages to the release tag", () => {
+    // main's Compose files describe the next image, not the published one: a
+    // blob/main link pairs the pulled `latest` with settings it cannot honour.
+    for (const page of releasePages()) {
+      const source = readFileSync(path.resolve(root, page), "utf8");
+      const mainLinks = [
+        ...source.matchAll(
+          /SnapOtter\/(?:blob\/|raw\/|tree\/)?main\/docker\/docker-compose[^\s)]*/g,
+        ),
+      ].map((match) => match[0]);
+      expect(
+        mainLinks,
+        `${page} links a Compose file from main instead of the release tag`,
+      ).toEqual([]);
+    }
+  });
+
   it("rewrites every published release-reference shape for the next version", () => {
     const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-docs-version-"));
     const guide = path.join(fixtureRoot, "apps/docs/guide");
@@ -106,6 +127,7 @@ describe("release version domains", () => {
     const fixture = [
       "https://raw.githubusercontent.com/snapotter-hq/SnapOtter/v1.9.0/docker/docker-compose.yml",
       "https://github.com/snapotter-hq/SnapOtter/blob/v1.9.0/docker/docker-compose.yml",
+      "https://github.com/snapotter-hq/SnapOtter/blob/v1.9.0/docker/docker-compose-gpu.yml",
       "snapotter-v1.9.0-release-subjects.json",
       "snapotter-v1.9.0-image-linux-amd64-sbom.cdx.json",
       "snapotter-v1.9.0-image-linux-amd64-sbom.spdx.json",
@@ -127,7 +149,7 @@ describe("release version domains", () => {
       for (const page of ["getting-started.md", "security.md"]) {
         const source = readFileSync(path.join(guide, page), "utf8");
         expect(source).not.toContain("1.9.0");
-        expect(source.match(/3\.0\.0-rc\.1/g)).toHaveLength(6);
+        expect(source.match(/3\.0\.0-rc\.1/g)).toHaveLength(7);
       }
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true });
