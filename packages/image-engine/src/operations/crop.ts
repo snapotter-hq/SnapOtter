@@ -4,7 +4,10 @@ import type { CropOptions, Sharp } from "../types.js";
 export async function crop(image: Sharp, options: CropOptions): Promise<Sharp> {
   const metadata = await image.metadata();
   const imgWidth = metadata.width ?? 0;
-  const imgHeight = metadata.height ?? 0;
+  // An animated pipeline reports the stacked strip as its height, while extract
+  // cuts each page. Measuring against the strip lets an out-of-frame crop past
+  // the bounds check below and into a raw libvips failure (issue #1083).
+  const imgHeight = metadata.pageHeight ?? metadata.height ?? 0;
 
   let left: number;
   let top: number;

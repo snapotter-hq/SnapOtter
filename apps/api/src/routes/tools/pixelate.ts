@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp, { type Sharp } from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -61,59 +62,66 @@ export function registerPixelate(app: FastifyInstance) {
     toolId: "pixelate",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const meta = await sharp(inputBuffer).metadata();
-      if (!meta.width || !meta.height) {
-        // Defaulting to 1x1 here would hand back a one-pixel image with a 200.
-        throw new InputValidationError("Could not read image dimensions");
-      }
-      const w = meta.width;
-      const h = meta.height;
-      const bs = settings.blockSize;
+      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      // mosaic() re-encodes to PNG between its two resizes, and the region path
+      // composites, so animation is handled a frame at a time (#1083).
+      const core = async (source: Buffer): Promise<Buffer> => {
+        const meta = await sharp(source).metadata();
+        if (!meta.width || !meta.height) {
+          // Defaulting to 1x1 here would hand back a one-pixel image with a 200.
+          throw new InputValidationError("Could not read image dimensions");
+        }
+        const w = meta.width;
+        const h = meta.height;
+        const bs = settings.blockSize;
 
-      let pixelated: Sharp;
+        let pixelated: Sharp;
 
-      if (settings.region) {
-        // Reject if origin is completely outside image bounds
-        if (settings.region.left >= w || settings.region.top >= h) {
-          throw new InputValidationError("Region exceeds image bounds");
+        if (settings.region) {
+          // Reject if origin is completely outside image bounds
+          if (settings.region.left >= w || settings.region.top >= h) {
+            throw new InputValidationError("Region exceeds image bounds");
+          }
+
+          // Clamp region dimensions to image edges (handles rounding from normalized coords)
+          const r = {
+            left: settings.region.left,
+            top: settings.region.top,
+            width: Math.min(settings.region.width, w - settings.region.left),
+            height: Math.min(settings.region.height, h - settings.region.top),
+          };
+
+          const region = await mosaic(sharp(source).extract(r), r.width, r.height, bs);
+
+          // The mosaic has to REPLACE the region, not blend into it. Compositing
+          // straight over means any block whose averaged alpha is below 255 lets
+          // the original show through, so a partly transparent image keeps the
+          // detail the user asked to hide. Punching the region out with an opaque
+          // rectangle first leaves nothing underneath to bleed back in.
+          pixelated = sharp(source)
+            .ensureAlpha()
+            .composite([
+              {
+                input: await opaqueRect(r.width, r.height),
+                left: r.left,
+                top: r.top,
+                blend: "dest-out",
+              },
+              { input: region, left: r.left, top: r.top },
+            ]);
+        } else {
+          pixelated = sharp(await mosaic(sharp(source), w, h, bs));
         }
 
-        // Clamp region dimensions to image edges (handles rounding from normalized coords)
-        const r = {
-          left: settings.region.left,
-          top: settings.region.top,
-          width: Math.min(settings.region.width, w - settings.region.left),
-          height: Math.min(settings.region.height, h - settings.region.top),
-        };
+        // resolveOutputFormat leaves quality undefined for PNG, which keeps the
+        // flat blocks free of palette dithering (#710).
+        return await pixelated
+          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toBuffer();
+      };
 
-        const region = await mosaic(sharp(inputBuffer).extract(r), r.width, r.height, bs);
-
-        // The mosaic has to REPLACE the region, not blend into it. Compositing
-        // straight over means any block whose averaged alpha is below 255 lets
-        // the original show through, so a partly transparent image keeps the
-        // detail the user asked to hide. Punching the region out with an opaque
-        // rectangle first leaves nothing underneath to bleed back in.
-        pixelated = sharp(inputBuffer)
-          .ensureAlpha()
-          .composite([
-            {
-              input: await opaqueRect(r.width, r.height),
-              left: r.left,
-              top: r.top,
-              blend: "dest-out",
-            },
-            { input: region, left: r.left, top: r.top },
-          ]);
-      } else {
-        pixelated = sharp(await mosaic(sharp(inputBuffer), w, h, bs));
-      }
-
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      // resolveOutputFormat leaves quality undefined for PNG, which keeps the
-      // flat blocks free of palette dithering (#710).
-      const buffer = await pixelated
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
-        .toBuffer();
+      const buffer =
+        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
       const base = filename.replace(/\.[^.]+$/, "");
       const ext = outputFormat.extension;
       return {

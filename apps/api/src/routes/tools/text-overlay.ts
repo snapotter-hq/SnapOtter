@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -35,55 +36,62 @@ export function registerTextOverlay(app: FastifyInstance) {
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      const image = sharp(inputBuffer);
-      const metadata = await image.metadata();
-      const width = metadata.width ?? 800;
-      const height = metadata.height ?? 600;
-      const escapedText = escapeXml(settings.text);
+      // The text is composited, and a composite lands on the first frame only,
+      // so animation is handled a frame at a time (#1083).
+      const core = async (source: Buffer): Promise<Buffer> => {
+        const image = sharp(source);
+        const metadata = await image.metadata();
+        const width = metadata.width ?? 800;
+        const height = metadata.height ?? 600;
+        const escapedText = escapeXml(settings.text);
 
-      let y: number;
-      const pad = settings.fontSize;
+        let y: number;
+        const pad = settings.fontSize;
 
-      switch (settings.position) {
-        case "top":
-          y = pad + settings.fontSize;
-          break;
-        case "center":
-          y = height / 2;
-          break;
-        default:
-          y = height - pad;
-          break;
-      }
+        switch (settings.position) {
+          case "top":
+            y = pad + settings.fontSize;
+            break;
+          case "center":
+            y = height / 2;
+            break;
+          default:
+            y = height - pad;
+            break;
+        }
 
-      const x = width / 2;
+        const x = width / 2;
 
-      // Build SVG text element with optional effects
-      let filter = "";
-      let filterRef = "";
-      if (settings.shadow) {
-        filter = `<defs><filter id="shadow"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.7)"/></filter></defs>`;
-        filterRef = ' filter="url(#shadow)"';
-      }
+        // Build SVG text element with optional effects
+        let filter = "";
+        let filterRef = "";
+        if (settings.shadow) {
+          filter = `<defs><filter id="shadow"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.7)"/></filter></defs>`;
+          filterRef = ' filter="url(#shadow)"';
+        }
 
-      let bgRect = "";
-      if (settings.backgroundBox) {
-        const boxH = settings.fontSize * 1.8;
-        const boxY = y - settings.fontSize * 0.9;
-        bgRect = `<rect x="0" y="${boxY}" width="${width}" height="${boxH}" fill="${settings.backgroundColor}" opacity="0.7"/>`;
-      }
+        let bgRect = "";
+        if (settings.backgroundBox) {
+          const boxH = settings.fontSize * 1.8;
+          const boxY = y - settings.fontSize * 0.9;
+          bgRect = `<rect x="0" y="${boxY}" width="${width}" height="${boxH}" fill="${settings.backgroundColor}" opacity="0.7"/>`;
+        }
 
-      const svgOverlay = `<svg width="${width}" height="${height}">
+        const svgOverlay = `<svg width="${width}" height="${height}">
         ${filter}
         ${bgRect}
         <text x="${x}" y="${y}" font-size="${settings.fontSize}" fill="${settings.color}" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle"${filterRef}>${escapedText}</text>
       </svg>`;
 
-      const svgBuffer = Buffer.from(svgOverlay);
-      const result = await image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
-      const buffer = await result
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
-        .toBuffer();
+        const svgBuffer = Buffer.from(svgOverlay);
+        const result = await image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
+        return await result
+          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toBuffer();
+      };
+
+      const buffer =
+        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
 
       return { buffer, filename, contentType: outputFormat.contentType };
     },

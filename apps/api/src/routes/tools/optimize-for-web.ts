@@ -1,8 +1,8 @@
 import { extname } from "node:path";
 import { optimizeForWeb } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -44,7 +44,12 @@ async function processImage(inputBuffer: Buffer, settings: Settings, filename: s
   const isJxl = settings.format === "jxl";
   const engineSettings = isJxl ? { ...settings, format: "png" as const } : settings;
 
-  const image = sharp(inputBuffer);
+  // Only WebP among the target formats can hold an animation; the others
+  // legitimately flatten to a still, and readAnimationFor keeps them there.
+  const image = openAnimated(
+    inputBuffer,
+    await readAnimationFor(inputBuffer, engineSettings.format),
+  );
   const result = await optimizeForWeb(image, engineSettings);
   let buffer: Buffer = await result.toBuffer();
 

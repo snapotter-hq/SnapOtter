@@ -1,7 +1,7 @@
 import { compress } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -16,13 +16,15 @@ export function registerCompress(app: FastifyInstance) {
     toolId: "compress",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const image = sharp(inputBuffer);
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      const animation = await readAnimationFor(inputBuffer, outputFormat.format);
+      const image = openAnimated(inputBuffer, animation);
 
       const compressOptions: {
         quality?: number;
         targetSizeBytes?: number;
-      } = {};
+        animated?: boolean;
+      } = { animated: animation.animated };
 
       if (settings.mode === "targetSize" && settings.targetSizeKb) {
         // Convert KB to bytes for the engine

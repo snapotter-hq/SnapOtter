@@ -2,6 +2,7 @@ import { parseExif, parseGps, parseXmp, stripMetadata } from "@snapotter/image-e
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -197,7 +198,7 @@ export function registerStripMetadata(app: FastifyInstance) {
       async (inputBuffer, settings, filename) => {
         const metadata = await sharp(inputBuffer).metadata();
         const format = metadata.format ?? "png";
-        const image = sharp(inputBuffer);
+        const image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, format));
         const result = await stripMetadata(image, settings);
 
         // Re-encode in the original format so we don't inflate the file.

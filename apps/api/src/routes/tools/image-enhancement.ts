@@ -7,6 +7,7 @@ import { analyzeImage, applyCorrections } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -41,72 +42,91 @@ async function processImageEnhancement(
 ) {
   const outputFormat = await resolveOutputFormat(rawBuffer, filename);
 
-  let inputBuffer = rawBuffer;
+  // Measure once, for the whole upload. Analysing each frame of an animation
+  // separately gives every frame its own auto exposure and white balance, so a
+  // frame that happens to be darker gets lifted and the next one does not, which
+  // plays back as flicker (#1083).
   let analysis: Awaited<ReturnType<typeof analyzeImage>>;
   try {
     // HDR/EXR decodes can produce 16-bit buffers; CLAHE requires 8-bit (VIPS_FORMAT_UCHAR)
+    let analysisSource = rawBuffer;
+    const rawMeta = await sharp(analysisSource).metadata();
+    if (rawMeta.depth && rawMeta.depth !== "uchar") {
+      analysisSource = await sharp(analysisSource).toColourspace("srgb").png().toBuffer();
+    }
+    // analyzeImage() -> .stats() is the first full pixel decode; intake only
+    // parsed headers, so undecodable-but-well-formed files fail here (#897)
+    analysis = await analyzeImage(analysisSource);
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(rawBuffer, err);
+  }
+
+  // The alpha channel is split out and rejoined through separate pipelines, and
+  // a rejoin re-opens the buffer as a still, so animation is handled a frame at
+  // a time (#1083).
+  const core = async (frameBuffer: Buffer): Promise<Buffer> => {
+    let inputBuffer = frameBuffer;
     const inputMeta = await sharp(inputBuffer).metadata();
     if (inputMeta.depth && inputMeta.depth !== "uchar") {
       inputBuffer = await sharp(inputBuffer).toColourspace("srgb").png().toBuffer();
     }
-    // analyzeImage() -> .stats() is the first full pixel decode; intake only
-    // parsed headers, so undecodable-but-well-formed files fail here (#897)
-    analysis = await analyzeImage(inputBuffer);
-  } catch (err) {
-    throw await asInputErrorIfUndecodable(inputBuffer, err);
-  }
-  const meta = await sharp(inputBuffer).metadata();
-  const hasAlpha = meta.hasAlpha === true;
+    const meta = await sharp(inputBuffer).metadata();
+    const hasAlpha = meta.hasAlpha === true;
 
-  let alphaBuffer: Buffer | undefined;
-  if (hasAlpha) {
-    alphaBuffer = await sharp(inputBuffer).extractChannel(3).toBuffer();
-  }
+    let alphaBuffer: Buffer | undefined;
+    if (hasAlpha) {
+      alphaBuffer = await sharp(inputBuffer).extractChannel(3).toBuffer();
+    }
 
-  let image = sharp(inputBuffer);
-  if (hasAlpha) {
-    image = image.removeAlpha();
-  }
+    let image = sharp(inputBuffer);
+    if (hasAlpha) {
+      image = image.removeAlpha();
+    }
 
-  image = applyCorrections(
-    image,
-    analysis.corrections,
-    settings.mode,
-    settings.intensity,
-    settings.corrections,
-    { width: meta.width ?? 1, height: meta.height ?? 1 },
-  );
+    image = applyCorrections(
+      image,
+      analysis.corrections,
+      settings.mode,
+      settings.intensity,
+      settings.corrections,
+      { width: meta.width ?? 1, height: meta.height ?? 1 },
+    );
 
-  let buffer: Buffer = await image
-    .toFormat(outputFormat.format, { quality: outputFormat.quality })
-    .toBuffer();
-
-  if (alphaBuffer) {
-    buffer = await sharp(buffer)
-      .joinChannel(alphaBuffer)
+    let buffer: Buffer = await image
       .toFormat(outputFormat.format, { quality: outputFormat.quality })
       .toBuffer();
-  }
 
-  if (settings.deepEnhance && isToolInstalled("noise-removal")) {
-    const scratchDir = join(tmpdir(), "snapotter-scratch", randomUUID());
-    try {
-      await mkdir(scratchDir, { recursive: true });
-      const result = await noiseRemoval(buffer, scratchDir, {
-        tier: "quality",
-        strength: 35,
-        detailPreservation: 70,
-        colorNoise: 20,
-      });
-      buffer = result.buffer;
-    } catch {
-      // SCUNet unavailable -- fall back to Sharp-only result
-    } finally {
-      await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+    if (alphaBuffer) {
+      buffer = await sharp(buffer)
+        .joinChannel(alphaBuffer)
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
     }
-  }
 
-  return { buffer, filename, contentType: outputFormat.contentType };
+    if (settings.deepEnhance && isToolInstalled("noise-removal")) {
+      const scratchDir = join(tmpdir(), "snapotter-scratch", randomUUID());
+      try {
+        await mkdir(scratchDir, { recursive: true });
+        const result = await noiseRemoval(buffer, scratchDir, {
+          tier: "quality",
+          strength: 35,
+          detailPreservation: 70,
+          colorNoise: 20,
+        });
+        buffer = result.buffer;
+      } catch {
+        // SCUNet unavailable, fall back to the Sharp-only result
+      } finally {
+        await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+
+    return buffer;
+  };
+
+  const finalBuffer =
+    (await runPerFrame(rawBuffer, outputFormat.format, core)) ?? (await core(rawBuffer));
+  return { buffer: finalBuffer, filename, contentType: outputFormat.contentType };
 }
 
 export function registerImageEnhancement(app: FastifyInstance) {

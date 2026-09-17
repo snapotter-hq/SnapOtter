@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -41,54 +42,67 @@ export function registerReplaceColor(app: FastifyInstance) {
     toolId: "replace-color",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const source = hexToRgb(settings.sourceColor);
+      const sourceColor = hexToRgb(settings.sourceColor);
       const target = hexToRgb(settings.targetColor);
-
-      // Get raw RGBA pixels
-      const image = sharp(inputBuffer).ensureAlpha();
-      const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-
-      const pixels = Buffer.from(data);
-      const maxDist = settings.tolerance * 1.73; // sqrt(3) for RGB distance scaling
-
-      for (let i = 0; i < pixels.length; i += 4) {
-        const dist = colorDistance(
-          pixels[i],
-          pixels[i + 1],
-          pixels[i + 2],
-          source.r,
-          source.g,
-          source.b,
-        );
-
-        if (dist <= maxDist) {
-          if (settings.makeTransparent) {
-            pixels[i + 3] = 0; // Make transparent
-          } else {
-            // Blend: closer to source color = more of target color
-            const blend = maxDist > 0 ? 1 - dist / maxDist : 1;
-            pixels[i] = Math.round(pixels[i] * (1 - blend) + target.r * blend);
-            pixels[i + 1] = Math.round(pixels[i + 1] * (1 - blend) + target.g * blend);
-            pixels[i + 2] = Math.round(pixels[i + 2] * (1 - blend) + target.b * blend);
-          }
-        }
-      }
 
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
       const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
       const needsAlpha = settings.makeTransparent;
-      // No quality on the forced PNG: even 100 turns on Sharp's palette
-      // quantisation, which is lossy past 256 distinct colours (#710).
+      // GIF carries one bit of alpha, so knocking a colour out has to change
+      // container. PNG is the right landing place for a still, but it cannot
+      // hold frames, and falling back to it discards the animation (#1083).
+      // WebP has both full alpha and frames.
       const useFormat =
         needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
-          ? { format: "png" as const, quality: undefined, contentType: "image/png" }
+          ? (await isAnimated(inputBuffer))
+            ? { format: "webp" as const, quality: outputFormat.quality, contentType: "image/webp" }
+            : // No quality on the forced PNG: even 100 turns on Sharp's palette
+              // quantisation, which is lossy past 256 distinct colours (#710).
+              { format: "png" as const, quality: undefined, contentType: "image/png" }
           : outputFormat;
 
-      const buffer = await sharp(pixels, {
-        raw: { width: info.width, height: info.height, channels: 4 },
-      })
-        .toFormat(useFormat.format, { quality: useFormat.quality })
-        .toBuffer();
+      // The result is rebuilt from a raw buffer, which Sharp always reads as a
+      // single page, so animation is handled a frame at a time (#1083).
+      const core = async (frame: Buffer): Promise<Buffer> => {
+        // Get raw RGBA pixels
+        const image = sharp(frame).ensureAlpha();
+        const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+
+        const pixels = Buffer.from(data);
+        const maxDist = settings.tolerance * 1.73; // sqrt(3) for RGB distance scaling
+
+        for (let i = 0; i < pixels.length; i += 4) {
+          const dist = colorDistance(
+            pixels[i],
+            pixels[i + 1],
+            pixels[i + 2],
+            sourceColor.r,
+            sourceColor.g,
+            sourceColor.b,
+          );
+
+          if (dist <= maxDist) {
+            if (settings.makeTransparent) {
+              pixels[i + 3] = 0; // Make transparent
+            } else {
+              // Blend: closer to source color = more of target color
+              const blend = maxDist > 0 ? 1 - dist / maxDist : 1;
+              pixels[i] = Math.round(pixels[i] * (1 - blend) + target.r * blend);
+              pixels[i + 1] = Math.round(pixels[i + 1] * (1 - blend) + target.g * blend);
+              pixels[i + 2] = Math.round(pixels[i + 2] * (1 - blend) + target.b * blend);
+            }
+          }
+        }
+
+        return await sharp(pixels, {
+          raw: { width: info.width, height: info.height, channels: 4 },
+        })
+          .toFormat(useFormat.format, { quality: useFormat.quality })
+          .toBuffer();
+      };
+
+      const buffer =
+        (await runPerFrame(inputBuffer, useFormat.format, core)) ?? (await core(inputBuffer));
 
       return { buffer, filename, contentType: useFormat.contentType };
     },

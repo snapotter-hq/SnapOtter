@@ -4,8 +4,8 @@ import {
   resize,
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -27,7 +27,10 @@ export function registerResize(app: FastifyInstance) {
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      const image = sharp(inputBuffer);
+      const image = openAnimated(
+        inputBuffer,
+        await readAnimationFor(inputBuffer, outputFormat.format),
+      );
       const result = await resize(image, settings);
       const buffer = await result
         .toFormat(outputFormat.format, { quality: outputFormat.quality })

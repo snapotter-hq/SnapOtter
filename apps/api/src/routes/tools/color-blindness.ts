@@ -1,7 +1,7 @@
 import { colorBlindness } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -25,10 +25,10 @@ export function registerColorBlindness(app: FastifyInstance) {
     toolId: "color-blindness",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const image = sharp(inputBuffer);
-      const result = await colorBlindness(image, { type: settings.simulationType });
-
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      const animation = await readAnimationFor(inputBuffer, outputFormat.format);
+      const image = openAnimated(inputBuffer, animation);
+      const result = await colorBlindness(image, { type: settings.simulationType });
       const buffer = await result
         .toFormat(outputFormat.format, { quality: outputFormat.quality })
         .toBuffer();

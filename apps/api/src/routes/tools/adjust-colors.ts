@@ -8,8 +8,8 @@ import {
   sepia,
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -63,7 +63,22 @@ async function processColorAdjustments(
   filename: string,
 ) {
   const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-  let image = sharp(inputBuffer);
+
+  // Everything here works pixel by pixel except sharpening, which samples
+  // neighbouring rows and so reaches into the next frame of Sharp's stacked
+  // strip. That one setting goes frame by frame; the rest keep the cheaper
+  // single pass over the whole animation (#1083).
+  if (settings.sharpness > 0) {
+    const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
+      const result = await processColorAdjustments(frame, settings, filename);
+      return result.buffer;
+    });
+    if (perFrame) {
+      return { buffer: perFrame, filename, contentType: outputFormat.contentType };
+    }
+  }
+
+  let image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, outputFormat.format));
 
   // Light
   if (settings.brightness !== 0) {

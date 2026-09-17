@@ -70,6 +70,12 @@ export interface CompressOptions {
   quality?: number;
   targetSizeBytes?: number;
   format?: OutputFormat;
+  /**
+   * Keep every frame when searching for a target size. The search re-opens the
+   * buffer from scratch on each pass, so without this the animation is lost
+   * even when the caller handed in an animated pipeline (issue #1083).
+   */
+  animated?: boolean;
 }
 
 export interface StripMetadataOptions {

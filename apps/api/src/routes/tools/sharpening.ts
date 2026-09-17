@@ -2,6 +2,7 @@ import { sharpenAdvanced } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -31,27 +32,36 @@ export function registerSharpening(app: FastifyInstance) {
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
       const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      let image = sharp(inputBuffer);
 
-      image = await sharpenAdvanced(image, {
-        method: settings.method,
-        sigma: settings.sigma,
-        m1: settings.m1,
-        m2: settings.m2,
-        x1: settings.x1,
-        y2: settings.y2,
-        y3: settings.y3,
-        amount: settings.amount,
-        radius: settings.radius,
-        threshold: settings.threshold,
-        strength: settings.strength,
-        kernelSize: settings.kernelSize,
-        denoise: settings.denoise,
-      });
+      // sharpen, median and convolve sample neighbouring rows. Run over Sharp's
+      // stacked frame strip they reach into the next frame and leave a halo
+      // along every frame edge, so animation goes a frame at a time (#1083).
+      const core = async (source: Buffer): Promise<Buffer> => {
+        let image = sharp(source);
 
-      const buffer = await image
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
-        .toBuffer();
+        image = await sharpenAdvanced(image, {
+          method: settings.method,
+          sigma: settings.sigma,
+          m1: settings.m1,
+          m2: settings.m2,
+          x1: settings.x1,
+          y2: settings.y2,
+          y3: settings.y3,
+          amount: settings.amount,
+          radius: settings.radius,
+          threshold: settings.threshold,
+          strength: settings.strength,
+          kernelSize: settings.kernelSize,
+          denoise: settings.denoise,
+        });
+
+        return await image
+          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toBuffer();
+      };
+
+      const buffer =
+        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
       return { buffer, filename, contentType: outputFormat.contentType };
     },
   });

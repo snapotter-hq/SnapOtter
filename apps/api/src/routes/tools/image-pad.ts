@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -51,81 +52,98 @@ export function registerImagePad(app: FastifyInstance) {
     toolId: "image-pad",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const meta = await sharp(inputBuffer).metadata();
-      const w = meta.width ?? 1;
-      const h = meta.height ?? 1;
+      // A transparent background forces a container with alpha. PNG is that
+      // container for a still, but it cannot hold frames, so an animation goes
+      // to WebP instead of being flattened (#1083). No quality for the forced
+      // PNG: Sharp reads it as palette quantisation, which dithers the padded
+      // image (#710).
+      const outputFormat =
+        settings.background !== "transparent"
+          ? await resolveOutputFormat(inputBuffer, filename)
+          : (await isAnimated(inputBuffer))
+            ? {
+                format: "webp" as const,
+                extension: "webp",
+                contentType: "image/webp",
+                quality: 95,
+              }
+            : {
+                format: "png" as const,
+                extension: "png",
+                contentType: "image/png",
+                quality: undefined,
+              };
 
-      // Resolve target ratio -- custom uses ratioW:ratioH
-      const ratioStr =
-        settings.target === "custom" ? `${settings.ratioW}:${settings.ratioH}` : settings.target;
+      // The blur background composites the original over a blurred canvas, and
+      // a composite lands on the first frame only, so animation is handled a
+      // frame at a time (#1083).
+      const core = async (source: Buffer): Promise<Buffer> => {
+        const meta = await sharp(source).metadata();
+        const w = meta.width ?? 1;
+        const h = meta.height ?? 1;
 
-      const { cw, ch } = canvasFor(w, h, ratioStr);
+        // Resolve target ratio; custom uses ratioW:ratioH
+        const ratioStr =
+          settings.target === "custom" ? `${settings.ratioW}:${settings.ratioH}` : settings.target;
 
-      // Extra uniform padding margin (% of the canvas larger side)
-      const margin =
-        settings.padding > 0 ? Math.round((Math.max(cw, ch) * settings.padding) / 100) : 0;
-      const finalW = cw + margin * 2;
-      const finalH = ch + margin * 2;
+        const { cw, ch } = canvasFor(w, h, ratioStr);
 
-      const padTop = Math.floor((finalH - h) / 2);
-      const padBottom = finalH - h - padTop;
-      const padLeft = Math.floor((finalW - w) / 2);
-      const padRight = finalW - w - padLeft;
+        // Extra uniform padding margin (% of the canvas larger side)
+        const margin =
+          settings.padding > 0 ? Math.round((Math.max(cw, ch) * settings.padding) / 100) : 0;
+        const finalW = cw + margin * 2;
+        const finalH = ch + margin * 2;
 
-      let buf: Buffer;
+        const padTop = Math.floor((finalH - h) / 2);
+        const padBottom = finalH - h - padTop;
+        const padLeft = Math.floor((finalW - w) / 2);
+        const padRight = finalW - w - padLeft;
 
-      if (settings.background === "blur") {
-        // Instagram-style: blurred cover fill + sharp original composited on top
-        const blurred = await sharp(inputBuffer)
-          .resize(finalW, finalH, { fit: "cover" })
-          .blur(20)
-          .png()
+        let buf: Buffer;
+
+        if (settings.background === "blur") {
+          // Instagram-style: blurred cover fill + sharp original composited on top
+          const blurred = await sharp(source)
+            .resize(finalW, finalH, { fit: "cover" })
+            .blur(20)
+            .png()
+            .toBuffer();
+          buf = await sharp(blurred)
+            .composite([{ input: source, top: padTop, left: padLeft }])
+            .png()
+            .toBuffer();
+        } else if (settings.background === "transparent") {
+          buf = await sharp(source)
+            .ensureAlpha()
+            .extend({
+              top: padTop,
+              bottom: padBottom,
+              left: padLeft,
+              right: padRight,
+              background: { r: 0, g: 0, b: 0, alpha: 0 },
+            })
+            .png()
+            .toBuffer();
+        } else {
+          const c = parseHex(settings.color);
+          buf = await sharp(source)
+            .extend({
+              top: padTop,
+              bottom: padBottom,
+              left: padLeft,
+              right: padRight,
+              background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
+            })
+            .toBuffer();
+        }
+
+        return await sharp(buf)
+          .toFormat(outputFormat.format, { quality: outputFormat.quality })
           .toBuffer();
-        buf = await sharp(blurred)
-          .composite([{ input: inputBuffer, top: padTop, left: padLeft }])
-          .png()
-          .toBuffer();
-      } else if (settings.background === "transparent") {
-        buf = await sharp(inputBuffer)
-          .ensureAlpha()
-          .extend({
-            top: padTop,
-            bottom: padBottom,
-            left: padLeft,
-            right: padRight,
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          })
-          .png()
-          .toBuffer();
-      } else {
-        const c = parseHex(settings.color);
-        buf = await sharp(inputBuffer)
-          .extend({
-            top: padTop,
-            bottom: padBottom,
-            left: padLeft,
-            right: padRight,
-            background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
-          })
-          .toBuffer();
-      }
+      };
 
-      // Transparent forces PNG to preserve alpha; otherwise detect from input.
-      // No quality for the forced PNG: Sharp reads it as palette quantisation,
-      // which dithers the padded image (#710).
-      const forcePng = settings.background === "transparent";
-      const outputFormat = forcePng
-        ? {
-            format: "png" as const,
-            extension: "png",
-            contentType: "image/png",
-            quality: undefined,
-          }
-        : await resolveOutputFormat(inputBuffer, filename);
-
-      const buffer = await sharp(buf)
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
-        .toBuffer();
+      const buffer =
+        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
       const base = filename.replace(/\.[^.]+$/, "");
       const ext = outputFormat.extension;
       return {

@@ -82,18 +82,23 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
     throw new ToolInputError("Cannot determine image dimensions for resize");
   }
 
+  // An animated pipeline reports the stacked strip as its height, while resize
+  // sizes each page. Working off the strip stretches every frame by the frame
+  // count (issue #1083).
+  const sourceHeight = metadata.pageHeight ?? metadata.height;
+
   if (percentage !== undefined) {
     width = Math.max(1, Math.round(metadata.width * (percentage / 100)));
-    height = Math.max(1, Math.round(metadata.height * (percentage / 100)));
+    height = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
   }
 
   if (withoutEnlargement) {
     if (width !== undefined && width > metadata.width) width = metadata.width;
-    if (height !== undefined && height > metadata.height) height = metadata.height;
+    if (height !== undefined && height > sourceHeight) height = sourceHeight;
   }
 
   const resolvedFit = fit ?? "cover";
-  const target = outputDimensions(metadata.width, metadata.height, width, height, resolvedFit);
+  const target = outputDimensions(metadata.width, sourceHeight, width, height, resolvedFit);
   if (target.width > MAX_RESIZE_OUTPUT_DIMENSION || target.height > MAX_RESIZE_OUTPUT_DIMENSION) {
     throw new ToolInputError(
       `Resize output must not exceed ${MAX_RESIZE_OUTPUT_DIMENSION} pixels on either side`,

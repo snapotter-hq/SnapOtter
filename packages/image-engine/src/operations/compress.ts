@@ -21,7 +21,7 @@ function formatOpts(format: SharpFormat, quality: number): Record<string, unknow
 }
 
 export async function compress(image: Sharp, options: CompressOptions): Promise<Sharp> {
-  const { quality, targetSizeBytes, format } = options;
+  const { quality, targetSizeBytes, format, animated = false } = options;
 
   const explicitFormat = FORMAT_MAP[format ?? ""];
   if (format !== undefined && explicitFormat === undefined) {
@@ -52,7 +52,7 @@ export async function compress(image: Sharp, options: CompressOptions): Promise<
 
   if (targetSizeBytes !== undefined) {
     const inputBuffer = await image.toBuffer();
-    return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes);
+    return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes, animated);
   }
 
   const q = quality ?? 80;
@@ -63,11 +63,17 @@ interface CompressionCandidate {
   quality: number;
 }
 
+/** Re-open the source, keeping frames when the caller is compressing an animation. */
+function openSource(inputBuffer: Buffer, animated: boolean): Sharp {
+  return animated ? sharp(inputBuffer, { animated: true }) : sharp(inputBuffer);
+}
+
 async function findBestQuality(
   inputBuffer: Buffer,
   resize: { width: number; height: number } | null,
   format: SharpFormat,
   targetBytes: number,
+  animated: boolean,
 ): Promise<CompressionCandidate | null> {
   let low = 1;
   let high = 100;
@@ -76,7 +82,7 @@ async function findBestQuality(
 
   while (low <= high) {
     const mid = Math.min(100, Math.max(1, Math.round((low + high) / 2)));
-    let pipeline = sharp(inputBuffer);
+    let pipeline = openSource(inputBuffer, animated);
     if (resize) pipeline = pipeline.resize(resize.width, resize.height);
     const resultBuffer = await pipeline.toFormat(format, formatOpts(format, mid)).toBuffer();
     const resultSize = resultBuffer.length;
@@ -97,14 +103,20 @@ async function compressToTargetSize(
   inputBuffer: Buffer,
   format: SharpFormat,
   targetBytes: number,
+  animated: boolean,
 ): Promise<Sharp> {
-  const fullSizeCandidate = await findBestQuality(inputBuffer, null, format, targetBytes);
+  const fullSizeCandidate = await findBestQuality(inputBuffer, null, format, targetBytes, animated);
   if (fullSizeCandidate !== null) {
-    return sharp(inputBuffer).toFormat(format, formatOpts(format, fullSizeCandidate.quality));
+    return openSource(inputBuffer, animated).toFormat(
+      format,
+      formatOpts(format, fullSizeCandidate.quality),
+    );
   }
 
   const metadata = await sharp(inputBuffer).metadata();
   const originalWidth = metadata.width ?? 0;
+  // A plain handle reports the per-frame height, which is what resize wants:
+  // Sharp sizes animated output per page, not by the height of the strip.
   const originalHeight = metadata.height ?? 0;
 
   if (originalWidth === 0 || originalHeight === 0) {
@@ -121,9 +133,9 @@ async function compressToTargetSize(
     if (newWidth < 10 || newHeight < 10) break;
 
     const dims = { width: newWidth, height: newHeight };
-    const candidate = await findBestQuality(inputBuffer, dims, format, targetBytes);
+    const candidate = await findBestQuality(inputBuffer, dims, format, targetBytes, animated);
     if (candidate !== null) {
-      return sharp(inputBuffer)
+      return openSource(inputBuffer, animated)
         .resize(newWidth, newHeight)
         .toFormat(format, formatOpts(format, candidate.quality));
     }
