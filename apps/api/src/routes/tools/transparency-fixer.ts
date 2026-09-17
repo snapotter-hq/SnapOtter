@@ -51,12 +51,21 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   }
 
   const blurRadius = Math.max(0.3, Math.round(intensity / 20));
+  // Sharp's output colourspace defaults to sRGB, so a 1-channel raw buffer
+  // comes back out of .raw() as three bytes per pixel unless the output is
+  // pinned to b-w. The loop below indexes one byte per pixel (#1082).
   const blurredAlphaRaw = await sharp(alpha, {
     raw: { width: info.width, height: info.height, channels: 1 },
   })
     .blur(blurRadius)
+    .toColourspace("b-w")
     .raw()
     .toBuffer();
+  if (blurredAlphaRaw.length !== pixelCount) {
+    throw new Error(
+      `Defringe mask has ${blurredAlphaRaw.length} bytes for ${pixelCount} pixels. Set defringe to 0 to skip it.`,
+    );
+  }
 
   const threshold = Math.round(128 + (intensity / 100) * 80);
   const result = Buffer.from(data);
