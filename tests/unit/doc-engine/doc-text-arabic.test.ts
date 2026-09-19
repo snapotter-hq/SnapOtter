@@ -1,6 +1,6 @@
 // Pure-Unicode unit tests for the text cleanup in doc_text.py.
 // Runs python3 against the actual module helpers (no PyMuPDF needed), the same
-// way ssrf-prescan-regex.test.ts exercises doc_html_pdf.py.
+// way ssrf-url-fetcher.test.ts exercises doc_html_pdf.py.
 // Invisible codepoints are written as \u escapes so they survive review and
 // reformatting; the Arabic literals are left as-is because they are the point.
 

@@ -36,8 +36,9 @@ export function registerEpubConvert(app: FastifyInstance) {
       if (format === "pdf") {
         // Two-step chain: epub -> standalone HTML -> PDF via WeasyPrint.
         // Resource embedding MUST stay OFF: pandoc --self-contained / --embed-resources
-        // would fetch remote refs server-side (SSRF). The weasyprint bridge pre-scan
-        // enforces remote-ref rejection so the PDF path fails safely on remote content.
+        // would fetch remote refs server-side (SSRF). WeasyPrint's url_fetcher then
+        // refuses every non-data: URL, so a book that links to or embeds remote
+        // content converts with that content omitted rather than fetched (#1157).
         const intermediateHtml = join(ctx.scratchDir, "book.html");
         await runPandoc(inPath, intermediateHtml, { extraArgs: ["--standalone"] });
         const outPath = join(ctx.scratchDir, `${base}.pdf`);

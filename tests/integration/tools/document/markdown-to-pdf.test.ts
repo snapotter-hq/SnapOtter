@@ -1,10 +1,12 @@
 // markdown-to-pdf integration suite.
-// Requires WeasyPrint AND the markdown Python module.
-// Both are Docker-only, absent locally; gated describes skip cleanly.
+// Requires WeasyPrint AND the markdown Python module. No automated lane
+// installs either (#1174), so these skip unless the resolved interpreter has
+// them; locally, symlink a venv that does to .venv.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { pythonWith } from "../../../helpers/python-gate.js";
+import { waitForDownloadedJobArtifact } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -42,30 +44,29 @@ async function runTool(filename: string, content: Buffer) {
   });
 }
 
+/** markdown-to-pdf is a "long" tool: it answers 202 + jobId and runs async. */
+async function convertToPdf(filename: string, content: Buffer) {
+  const res = await runTool(filename, content);
+  expect(res.statusCode).toBe(202);
+  const { jobId } = JSON.parse(res.body) as { jobId: string };
+  return waitForDownloadedJobArtifact(testApp.app, adminToken, "markdown-to-pdf", jobId);
+}
+
 describe.skipIf(!hasWeasyprint || !hasMarkdownMod)(
   "markdown-to-pdf (requires weasyprint + markdown)",
   () => {
     it("returns 202 (long hint) and the job completes with a PDF", async () => {
-      const res = await runTool("tiny.md", MD);
-      expect(res.statusCode).toBe(202);
-      const { jobId } = JSON.parse(res.body);
-      const { db, schema } = await import("../../../../apps/api/src/db/index.js");
-      const { eq } = await import("drizzle-orm");
-      let row: { status: string; outputRefs: unknown } | undefined;
-      for (let i = 0; i < 120; i++) {
-        [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-        if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      if (!row) throw new Error("job row not found after polling");
-      expect(row.status).toBe("completed");
-      const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
-      const dl = await testApp.app.inject({
-        method: "GET",
-        url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
-      });
-      expect(dl.statusCode).toBe(200);
-      expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+      const artifact = await convertToPdf("tiny.md", MD);
+      expect(artifact.buffer.subarray(0, 5).toString()).toBe("%PDF-");
+    }, 90_000);
+
+    it("converts a note whose only external reference is an inline link", async () => {
+      // md.markdown() rewrites [docs](https://...) into <a href="https://...">,
+      // so the pre-scan rejected HTML the user never wrote: a one-link note
+      // could not be converted at all (#1157).
+      const note = Buffer.from("# Notes\n\nSee [the docs](https://example.com) for more.\n");
+      const artifact = await convertToPdf("linked.md", note);
+      expect(artifact.buffer.subarray(0, 5).toString()).toBe("%PDF-");
     }, 90_000);
   },
 );

@@ -1,33 +1,35 @@
 """HTML or Markdown to PDF via WeasyPrint (no-phone-home posture).
-Remote references (src/href/action/url()) are REJECTED before conversion
-with a clear error listing up to 5 offending URLs. The url_fetcher remains
-as a defense-in-depth backstop: it blocks any reference that slips past
-the scan, raising ValueError so WeasyPrint omits the resource with zero
-outbound requests.
+Every resource WeasyPrint would dereference (images, stylesheets, fonts, SVG
+<image>, <object> data) is routed through the fetcher _make_url_fetcher builds,
+which serves data: URIs and refuses every other scheme. A refusal is not fatal:
+WeasyPrint logs it and lays the page out without that resource, so a document
+that links to or embeds remote content still converts, with zero outbound
+requests (#1157).
 Args: {"path": in, "out": o, "mode": "html"|"markdown"}. Prints {"ok": true}."""
 import json
-import re
 import sys
 
-_REMOTE_REF_RE = re.compile(
-    r'(?:src|href|action|srcset|poster|formaction)\s*=\s*["\']?\s*(https?:/{1,2}[^\s"\'>\)]{1,200})',
-    re.IGNORECASE,
-)
-_REMOTE_CSS_URL_RE = re.compile(
-    r'(?:url\s*\(|@import)\s*["\']?\s*(https?:/{1,2}[^\s"\'>\)]{1,200})',
-    re.IGNORECASE,
-)
 
+def _make_url_fetcher(default_fetcher):
+    """Build the url_fetcher: serve data: URIs, refuse every other scheme.
 
-def _find_remote_refs(source):
-    """Return up to 5 remote URLs found in HTML/CSS source."""
-    refs = []
-    for pattern in (_REMOTE_REF_RE, _REMOTE_CSS_URL_RE):
-        for m in pattern.finditer(source):
-            refs.append(m.group(1)[:120])
-            if len(refs) >= 5:
-                return refs
-    return refs
+    This is the single network chokepoint for the three tools that reach
+    WeasyPrint. Scheme matching is case-sensitive, so an unrecognised spelling
+    fails closed rather than open.
+
+    main() passes the delegate in rather than this importing weasyprint itself,
+    because WeasyPrint turns any exception a fetcher raises into an omitted
+    resource. An ImportError in here would drop every data: image from the PDF
+    and still report success; raised from main() it stops the job. That is not
+    hypothetical: default_url_fetcher is deprecated in the pinned 69.0.
+    """
+
+    def fetch(url, *args, **kwargs):
+        if url.startswith("data:"):
+            return default_fetcher(url, *args, **kwargs)
+        raise ValueError(f"remote resources are disabled: {url[:120]}")
+
+    return fetch
 
 
 def main():
@@ -39,14 +41,9 @@ def main():
     try:
         from weasyprint import HTML
         from weasyprint.urls import default_url_fetcher
-    except ImportError:
-        print(json.dumps({"error": "weasyprint not installed"}))
+    except ImportError as exc:
+        print(json.dumps({"error": f"weasyprint not usable: {exc}"}))
         sys.exit(1)
-
-    def no_remote_fetcher(url, *fargs, **kwargs):
-        if url.startswith("data:"):
-            return default_url_fetcher(url, *fargs, **kwargs)
-        raise ValueError(f"remote resources are disabled: {url[:120]}")
 
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -64,16 +61,16 @@ def main():
                 "code,pre{background:#f4f4f4;}table,td,th{border:1px solid #999;border-collapse:collapse;padding:4px;}</style>"
                 f"</head><body>{body}</body></html>"
             )
-        remote_refs = _find_remote_refs(source)
-        if remote_refs:
-            print(json.dumps({"error": f"remote resources are disabled: {', '.join(remote_refs)}"}))
-            sys.exit(1)
-        HTML(string=source, url_fetcher=no_remote_fetcher, base_url=None).write_pdf(out)
+        fetcher = _make_url_fetcher(default_url_fetcher)
+        HTML(string=source, url_fetcher=fetcher, base_url=None).write_pdf(out)
         print(json.dumps({"ok": True}))
     except SystemExit:
         raise
     except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"error": str(exc)}))
+        # str() is empty for an exception built with no args (MemoryError being
+        # the one that matters here), and an empty message reads as success to
+        # the falsy check in htmlToPdfPy. Never emit one.
+        print(json.dumps({"error": str(exc) or type(exc).__name__}))
         sys.exit(1)
 
 

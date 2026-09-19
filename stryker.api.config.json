@@ -54,6 +54,7 @@
     "/.local-wiki",
     "/.worktrees",
     "/.claude",
+    "/.venv",
     "/.codex",
     "/.superpowers",
     "/.playwright",

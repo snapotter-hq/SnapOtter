@@ -99,3 +99,9 @@ run-ai-*.py
 
 # i18n Claude Code batch handoff scratch (export/import intermediates)
 .i18n-batches/
+
+# Local Python venv. tests/helpers/python-gate.ts and packages/ai/src/bridge.ts
+# both resolve .venv/bin/python3 first, so this is how you open the
+# weasyprint/PyMuPDF-gated suites locally. No trailing slash: it is usually a
+# symlink to a venv elsewhere, which a directory-only pattern would miss.
+.venv

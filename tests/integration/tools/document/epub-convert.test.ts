@@ -7,6 +7,7 @@ import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { pythonWith } from "../../../helpers/python-gate.js";
+import { startRequestRecorder } from "../../../helpers/request-recorder.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -16,8 +17,13 @@ import {
 
 const EPUB = readFixture(fixtures.document.tiny("epub"));
 
-/** Build a minimal valid epub in memory containing a remote image reference. */
-function buildRemoteRefEpub(): Buffer {
+/**
+ * Build a minimal valid epub in memory containing a remote image reference and
+ * an external link. `imageOrigin` points the image at a caller-supplied host so
+ * a test can prove nothing ever asked for it; the default closed port keeps the
+ * pandoc-only cases self-contained.
+ */
+function buildRemoteRefEpub(imageOrigin = "http://127.0.0.1:9"): Buffer {
   const zip = new AdmZip();
   // mimetype must be first entry, stored (no compression)
   zip.addFile("mimetype", Buffer.from("application/epub+zip"), "", 0o644);
@@ -59,7 +65,8 @@ function buildRemoteRefEpub(): Buffer {
 <body>
   <h1>RemoteRefBook</h1>
   <p>Content for remote-ref SSRF test.</p>
-  <img src="http://127.0.0.1:9/x.png" alt="remote"/>
+  <p>See <a href="https://example.com">the publisher</a>.</p>
+  <img src="${imageOrigin}/x.png" alt="remote"/>
 </body>
 </html>`,
     ),
@@ -167,25 +174,25 @@ describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
 describe.skipIf(!pandocAvailable() || !pythonWith("weasyprint"))(
   "epub-convert pdf (requires pandoc + weasyprint)",
   () => {
-    it("pdf output rejects remote refs in epub content", async () => {
-      const remoteEpub = buildRemoteRefEpub();
-      const res = await runTool("remote.epub", remoteEpub, { format: "pdf" });
-      // Long hint: expects 202 with jobId
-      expect(res.statusCode).toBe(202);
-      const { jobId } = JSON.parse(res.body);
-      const { db, schema } = await import("../../../../apps/api/src/db/index.js");
-      const { eq } = await import("drizzle-orm");
-      let row: { status: string; error: { message: string } | null } | undefined;
-      for (let i = 0; i < 120; i++) {
-        [row] = await db
-          .select({ status: schema.jobs.status, error: schema.jobs.error })
-          .from(schema.jobs)
-          .where(eq(schema.jobs.id, jobId));
-        if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
-        await new Promise((r) => setTimeout(r, 500));
+    it("converts a book with an external link and never fetches its remote image", async () => {
+      // A link in the colophon is close to universal, and the pre-scan read
+      // every href as a fetch, so most books could not be converted at all
+      // (#1157). This is the two-hop path: pandoc keeps both refs in the
+      // intermediate HTML (rewriting http:// to http:/ on the way), and
+      // WeasyPrint's url_fetcher is what stops the image from being read.
+      // The image points at a live recorder, so an empty log means refused
+      // rather than unreachable.
+      const remote = await startRequestRecorder();
+      try {
+        await remote.probe();
+        const remoteEpub = buildRemoteRefEpub(remote.origin);
+        const dl = await convertAndDownload("remote.epub", remoteEpub, { format: "pdf" });
+        expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+        expect(remote.requests).toEqual([]);
+        expect(remote.connections()).toBe(0);
+      } finally {
+        await remote.close();
       }
-      expect(row?.status).toBe("failed");
-      expect(row?.error?.message).toMatch(/remote resources are disabled/i);
     }, 90_000);
 
     it("converts epub to PDF via the weasyprint chain", async () => {
