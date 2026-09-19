@@ -3886,6 +3886,7 @@ export const zhTW: TranslationKeys = {
         freehandShort: "手繪",
         polygonalLasso: "多邊形套索",
         polygonalShort: "多邊形",
+        polygonalHint: "按 Enter、連按兩下或點擊第一個頂點閉合。",
         toleranceLabel: "容許度：",
       },
       text: {

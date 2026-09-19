@@ -179,6 +179,11 @@ export function SelectionOptions() {
               {t.editor.options.selection.polygonalShort}
             </ToggleButton>
           </div>
+          {activeTool === "lasso-poly" && (
+            <span className="text-[10px] text-muted-foreground">
+              {t.editor.options.selection.polygonalHint}
+            </span>
+          )}
         </>
       )}
 

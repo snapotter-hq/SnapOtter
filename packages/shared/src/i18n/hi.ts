@@ -3950,6 +3950,7 @@ export const hi: TranslationKeys = {
         freehandShort: "फ्रीहैंड",
         polygonalLasso: "पॉलीगॉनल लैसो",
         polygonalShort: "पॉलीगॉनल",
+        polygonalHint: "Enter, डबल-क्लिक या पहला बिंदु बंद करता है।",
         toleranceLabel: "टॉलरेंस:",
       },
       text: {

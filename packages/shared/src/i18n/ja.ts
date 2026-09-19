@@ -4099,6 +4099,7 @@ export const ja: TranslationKeys = {
         freehandShort: "フリーハンド",
         polygonalLasso: "多角形なげなわ",
         polygonalShort: "多角形",
+        polygonalHint: "Enter・ダブルクリック・最初の点で閉じます。",
         toleranceLabel: "許容値：",
       },
       text: {

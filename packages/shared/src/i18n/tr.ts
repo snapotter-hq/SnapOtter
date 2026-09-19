@@ -4149,6 +4149,7 @@ export const tr: TranslationKeys = {
         freehandShort: "Serbest",
         polygonalLasso: "Çokgen Kement",
         polygonalShort: "Çokgen",
+        polygonalHint: "Enter, çift tıklama veya ilk nokta kapatır.",
         toleranceLabel: "Tolerans:",
       },
       text: {

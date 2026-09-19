@@ -4164,6 +4164,7 @@ export const de: TranslationKeys = {
         freehandShort: "Freihand",
         polygonalLasso: "Polygon-Lasso",
         polygonalShort: "Polygon",
+        polygonalHint: "Enter, Doppelklick oder erster Punkt schließt.",
         toleranceLabel: "Toleranz:",
       },
       text: {

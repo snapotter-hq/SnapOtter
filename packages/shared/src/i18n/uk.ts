@@ -4148,6 +4148,7 @@ export const uk: TranslationKeys = {
         freehandShort: "Вільне",
         polygonalLasso: "Багатокутне ласо",
         polygonalShort: "Багатокутне",
+        polygonalHint: "Enter, подвійний клік або перша точка замикає.",
         toleranceLabel: "Допуск:",
       },
       text: {

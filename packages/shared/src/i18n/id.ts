@@ -4143,6 +4143,7 @@ export const id: TranslationKeys = {
         freehandShort: "Bebas",
         polygonalLasso: "Laso Poligonal",
         polygonalShort: "Poligonal",
+        polygonalHint: "Enter, klik dua kali, atau titik pertama menutup.",
         toleranceLabel: "Toleransi:",
       },
       text: {

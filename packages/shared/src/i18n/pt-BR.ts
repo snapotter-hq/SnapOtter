@@ -4150,6 +4150,7 @@ export const ptBR: TranslationKeys = {
         freehandShort: "Livre",
         polygonalLasso: "Laço poligonal",
         polygonalShort: "Poligonal",
+        polygonalHint: "Enter, duplo clique ou o primeiro ponto fecha.",
         toleranceLabel: "Tolerância:",
       },
       text: {

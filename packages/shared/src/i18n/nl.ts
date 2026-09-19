@@ -4159,6 +4159,7 @@ export const nl: TranslationKeys = {
         freehandShort: "Vrije hand",
         polygonalLasso: "Veelhoeklasso",
         polygonalShort: "Veelhoek",
+        polygonalHint: "Enter, dubbelklik of het eerste punt sluit.",
         toleranceLabel: "Tolerantie:",
       },
       text: {

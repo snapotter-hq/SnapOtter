@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
+import { polygonalLassoRefHolder } from "@/components/editor/tools/selection-tool";
 import { copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
@@ -698,12 +699,13 @@ export function useEditorShortcuts(callbacks?: {
     { preventDefault: true },
   );
 
-  // Enter - Apply current operation (crop, transform)
+  // Enter - Close an in-progress polygonal lasso, else apply current operation (crop, transform)
   useHotkeys(
     "enter",
     (e) => {
       if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
       e.preventDefault();
+      if (polygonalLassoRefHolder.current?.close()) return;
       const state = useEditorStore.getState();
       if (state.isCropping && state.cropState) {
         state.applyCrop();

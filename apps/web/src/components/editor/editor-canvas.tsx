@@ -710,7 +710,7 @@ function useActiveToolHandlers(stageRef: React.RefObject<Konva.Stage | null>) {
         const pointer = stage?.getPointerPosition();
         if (!pointer) return;
         const pos = { x: (pointer.x - panOffset.x) / zoom, y: (pointer.y - panOffset.y) / zoom };
-        selectionTool.onMouseDown(pos, stage ?? undefined);
+        selectionTool.onMouseDown(pos, stage ?? undefined, e.evt.detail);
       },
       handleMouseMove: (e: Konva.KonvaEventObject<MouseEvent>) => {
         const pointer = e.target.getStage()?.getPointerPosition();
@@ -1072,6 +1072,8 @@ export function EditorCanvas({
             <ActiveSelectionPreview
               type={selectionTool.selectionType}
               points={selectionTool.currentPoints}
+              closeTarget={selectionTool.polygonCloseTarget}
+              zoom={zoom}
             />
           )}
         </Layer>

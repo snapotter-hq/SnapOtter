@@ -4121,6 +4121,7 @@ export const ar: TranslationKeys = {
         freehandShort: "حر",
         polygonalLasso: "لاسو مضلع",
         polygonalShort: "مضلع",
+        polygonalHint: "اضغط Enter أو انقر مزدوجًا أو انقر النقطة الأولى للإغلاق.",
         toleranceLabel: "التسامح:",
       },
       text: {

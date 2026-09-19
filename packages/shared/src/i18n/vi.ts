@@ -4140,6 +4140,7 @@ export const vi: TranslationKeys = {
         freehandShort: "Tự do",
         polygonalLasso: "Lasso đa giác",
         polygonalShort: "Đa giác",
+        polygonalHint: "Enter, nhấp đúp hoặc điểm đầu tiên sẽ đóng.",
         toleranceLabel: "Dung sai:",
       },
       text: {

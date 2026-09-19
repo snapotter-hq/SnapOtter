@@ -4142,6 +4142,7 @@ export const sv: TranslationKeys = {
         freehandShort: "Frihand",
         polygonalLasso: "Polygonlasso",
         polygonalShort: "Polygon",
+        polygonalHint: "Enter, dubbelklick eller första punkten stänger.",
         toleranceLabel: "Tolerans:",
       },
       text: {

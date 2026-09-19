@@ -4087,6 +4087,7 @@ export const en = {
         freehandShort: "Freehand",
         polygonalLasso: "Polygonal Lasso",
         polygonalShort: "Polygonal",
+        polygonalHint: "Enter, double-click or the first point closes.",
         toleranceLabel: "Tolerance:",
       },
       text: {

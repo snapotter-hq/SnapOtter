@@ -4100,6 +4100,7 @@ export const th: TranslationKeys = {
         freehandShort: "อิสระ",
         polygonalLasso: "ลาสโซหลายเหลี่ยม",
         polygonalShort: "หลายเหลี่ยม",
+        polygonalHint: "Enter ดับเบิลคลิก หรือจุดแรกเพื่อปิด",
         toleranceLabel: "ค่าความคลาดเคลื่อน:",
       },
       text: {

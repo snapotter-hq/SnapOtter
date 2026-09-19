@@ -1,6 +1,6 @@
 import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Ellipse, Group, Line, Rect, Shape } from "react-konva";
+import { Circle, Ellipse, Group, Line, Rect, Shape } from "react-konva";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, SelectionState } from "@/types/editor";
 import { captureDocumentCanvas } from "../stage-capture";
@@ -251,6 +251,55 @@ export function pointInPolygon(x: number, y: number, points: number[]): boolean 
 }
 
 // ---------------------------------------------------------------------------
+// Polygonal lasso -- closing gestures
+// ---------------------------------------------------------------------------
+
+/** Close-target radius on the first vertex, in SCREEN pixels so it stays
+ * clickable at any zoom. */
+export const POLY_CLOSE_TOLERANCE_PX = 8;
+
+/** Three vertices (x,y pairs => 6 numbers) is the smallest closable polygon. */
+const POLY_MIN_CLOSE_POINTS = 6;
+
+/** Squared screen-pixel distance between two canvas points at the given zoom. */
+function screenDistanceSq(ax: number, ay: number, bx: number, by: number, zoom: number): number {
+  const dx = (ax - bx) * zoom;
+  const dy = (ay - by) * zoom;
+  return dx * dx + dy * dy;
+}
+
+/** True when `pos` (canvas coordinates) is within the close target on the first vertex. */
+export function isNearFirstVertex(
+  points: number[],
+  pos: { x: number; y: number },
+  zoom: number,
+  tolerancePx = POLY_CLOSE_TOLERANCE_PX,
+): boolean {
+  if (points.length < 2) return false;
+  return screenDistanceSq(pos.x, pos.y, points[0], points[1], zoom) <= tolerancePx * tolerancePx;
+}
+
+/**
+ * Lets the editor shortcuts (registered in EditorPage) reach the polygonal lasso
+ * inside EditorCanvas, the way editorStageRefHolder exposes the stage. `close`
+ * reports whether a polygon was in progress, so Enter can stop there instead of
+ * falling through to its crop behaviour.
+ */
+export const polygonalLassoRefHolder: { current: { close: () => boolean } | null } = {
+  current: null,
+};
+
+/**
+ * The first vertex of an in-progress polygon once clicking it would close the
+ * polygon. `active` means the pointer is inside the target right now.
+ */
+export interface PolygonCloseTarget {
+  x: number;
+  y: number;
+  active: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Hook: useSelectionTool
 // ---------------------------------------------------------------------------
 
@@ -259,10 +308,13 @@ export interface SelectionToolApi {
   setSelectionType: (t: SelectionType) => void;
   isDrawing: boolean;
   currentPoints: number[];
-  onMouseDown: (pos: { x: number; y: number }, stage?: Konva.Stage) => void;
+  polygonCloseTarget: PolygonCloseTarget | null;
+  /** `clickCount` is the native MouseEvent.detail: 2 on the second press of a double-click. */
+  onMouseDown: (pos: { x: number; y: number }, stage?: Konva.Stage, clickCount?: number) => void;
   onMouseMove: (pos: { x: number; y: number }) => void;
   onMouseUp: () => void;
-  onDoubleClick: () => void;
+  /** Closes an in-progress polygonal lasso (Enter). Returns false when none is in progress. */
+  closePolygon: () => boolean;
   selectAll: () => void;
   deselect: () => void;
   magicWandSelect: (
@@ -282,7 +334,9 @@ export function useSelectionTool(): SelectionToolApi {
   const isDrawingRef = useRef(false);
   // Polygon vertices for lasso-poly mode
   const polyVerticesRef = useRef<number[]>([]);
+  const [polygonCloseTarget, setPolygonCloseTarget] = useState<PolygonCloseTarget | null>(null);
 
+  const activeTool = useEditorStore((s) => s.activeTool);
   const selectionMode = useEditorStore((s) => s.selectionMode);
 
   const setSelection = useEditorStore((s) => s.setSelection);
@@ -437,55 +491,6 @@ export function useSelectionTool(): SelectionToolApi {
     return useEditorStore.getState().activeTool === "lasso-poly";
   }, []);
 
-  const onMouseDown = useCallback(
-    (pos: { x: number; y: number }, _stage?: Konva.Stage) => {
-      if (selectionType === "lasso" && isPolyLasso()) {
-        // Polygonal lasso: each click adds a vertex
-        if (!isDrawingRef.current) {
-          // Start a new polygon
-          setIsDrawing(true);
-          isDrawingRef.current = true;
-          polyVerticesRef.current = [pos.x, pos.y];
-          setCurrentPoints([pos.x, pos.y]);
-        } else {
-          // Add another vertex
-          polyVerticesRef.current = [...polyVerticesRef.current, pos.x, pos.y];
-          setCurrentPoints([...polyVerticesRef.current]);
-        }
-      } else {
-        // Freehand lasso, rect, or ellipse
-        setIsDrawing(true);
-        isDrawingRef.current = true;
-        startRef.current = pos;
-        if (selectionType === "lasso") {
-          setCurrentPoints([pos.x, pos.y]);
-        } else {
-          setCurrentPoints([]);
-        }
-      }
-    },
-    [selectionType, isPolyLasso],
-  );
-
-  const onMouseMove = useCallback(
-    (pos: { x: number; y: number }) => {
-      if (!isDrawingRef.current) return;
-
-      if (selectionType === "lasso" && isPolyLasso()) {
-        // Polygonal lasso: show rubber band line from last vertex to cursor
-        const verts = polyVerticesRef.current;
-        setCurrentPoints([...verts, pos.x, pos.y]);
-      } else if (selectionType === "lasso") {
-        // Freehand lasso
-        setCurrentPoints((prev) => [...prev, pos.x, pos.y]);
-      } else {
-        const s = startRef.current;
-        setCurrentPoints([s.x, s.y, pos.x, pos.y]);
-      }
-    },
-    [selectionType, isPolyLasso],
-  );
-
   const finalizeLasso = useCallback(
     (points: number[]) => {
       if (points.length < 6) {
@@ -505,6 +510,121 @@ export function useSelectionTool(): SelectionToolApi {
       setCurrentPoints([]);
     },
     [selectionMode, mergeSelection, setSelection],
+  );
+
+  const resetPolygon = useCallback(() => {
+    setIsDrawing(false);
+    isDrawingRef.current = false;
+    polyVerticesRef.current = [];
+    setCurrentPoints([]);
+    setPolygonCloseTarget(null);
+  }, []);
+
+  // The one exit for every close gesture (Enter, double-click, clicking the
+  // first vertex), so they all merge into the selection the same way. A polygon
+  // is in progress while its vertex list is non-empty, and only this tool fills it.
+  const closePolygon = useCallback((): boolean => {
+    if (!isDrawingRef.current || polyVerticesRef.current.length === 0) return false;
+    const verts = polyVerticesRef.current;
+    resetPolygon();
+    // Under three vertices is not a polygon: drop the stub, keep any selection.
+    if (verts.length >= POLY_MIN_CLOSE_POINTS) {
+      finalizeLasso(verts);
+    }
+    return true;
+  }, [resetPolygon, finalizeLasso]);
+
+  // Expose the close gesture to the keyboard shortcuts registered in EditorPage.
+  useEffect(() => {
+    polygonalLassoRefHolder.current = { close: closePolygon };
+    return () => {
+      polygonalLassoRefHolder.current = null;
+    };
+  }, [closePolygon]);
+
+  // Switching tools mid-polygon discards it, so Enter cannot later close an
+  // invisible polygon under another tool.
+  useEffect(() => {
+    if (activeTool !== "lasso-poly" && polyVerticesRef.current.length > 0) {
+      resetPolygon();
+    }
+  }, [activeTool, resetPolygon]);
+
+  const onMouseDown = useCallback(
+    (pos: { x: number; y: number }, _stage?: Konva.Stage, clickCount = 1) => {
+      if (selectionType === "lasso" && isPolyLasso()) {
+        // Polygonal lasso: each click adds a vertex. The browser's click count
+        // is the double-click test, not Konva's dblclick, which fires for any
+        // two clicks within 400 ms even at different spots and would close on
+        // quickly placed vertices. The first press of a double-click already
+        // placed a vertex, so the second only ever closes.
+        if (clickCount >= 2) {
+          closePolygon();
+          return;
+        }
+        if (!isDrawingRef.current) {
+          // Start a new polygon
+          setIsDrawing(true);
+          isDrawingRef.current = true;
+          polyVerticesRef.current = [pos.x, pos.y];
+          setCurrentPoints([pos.x, pos.y]);
+          setPolygonCloseTarget(null);
+          return;
+        }
+        const verts = polyVerticesRef.current;
+        if (
+          verts.length >= POLY_MIN_CLOSE_POINTS &&
+          isNearFirstVertex(verts, pos, useEditorStore.getState().zoom)
+        ) {
+          // Clicking the first vertex closes the polygon instead of adding a vertex
+          closePolygon();
+          return;
+        }
+        // Add another vertex
+        polyVerticesRef.current = [...verts, pos.x, pos.y];
+        setCurrentPoints([...polyVerticesRef.current]);
+        if (polyVerticesRef.current.length >= POLY_MIN_CLOSE_POINTS) {
+          setPolygonCloseTarget({ x: verts[0], y: verts[1], active: false });
+        }
+      } else {
+        // Freehand lasso, rect, or ellipse
+        setIsDrawing(true);
+        isDrawingRef.current = true;
+        startRef.current = pos;
+        if (selectionType === "lasso") {
+          setCurrentPoints([pos.x, pos.y]);
+        } else {
+          setCurrentPoints([]);
+        }
+      }
+    },
+    [selectionType, isPolyLasso, closePolygon],
+  );
+
+  const onMouseMove = useCallback(
+    (pos: { x: number; y: number }) => {
+      if (!isDrawingRef.current) return;
+
+      if (selectionType === "lasso" && isPolyLasso()) {
+        // Polygonal lasso: show rubber band line from last vertex to cursor
+        const verts = polyVerticesRef.current;
+        setCurrentPoints([...verts, pos.x, pos.y]);
+        if (verts.length >= POLY_MIN_CLOSE_POINTS) {
+          // Light the close target up while the pointer is over it
+          const active = isNearFirstVertex(verts, pos, useEditorStore.getState().zoom);
+          setPolygonCloseTarget((prev) =>
+            prev && prev.active === active ? prev : { x: verts[0], y: verts[1], active },
+          );
+        }
+      } else if (selectionType === "lasso") {
+        // Freehand lasso
+        setCurrentPoints((prev) => [...prev, pos.x, pos.y]);
+      } else {
+        const s = startRef.current;
+        setCurrentPoints([s.x, s.y, pos.x, pos.y]);
+      }
+    },
+    [selectionType, isPolyLasso],
   );
 
   const onMouseUp = useCallback(() => {
@@ -556,17 +676,6 @@ export function useSelectionTool(): SelectionToolApi {
     isPolyLasso,
   ]);
 
-  const onDoubleClick = useCallback(() => {
-    // Close polygonal lasso
-    if (selectionType === "lasso" && isDrawingRef.current) {
-      setIsDrawing(false);
-      isDrawingRef.current = false;
-      const verts = polyVerticesRef.current;
-      finalizeLasso(verts);
-      polyVerticesRef.current = [];
-    }
-  }, [selectionType, finalizeLasso]);
-
   const selectAll = useCallback(() => {
     setSelection({
       type: "rect",
@@ -608,10 +717,11 @@ export function useSelectionTool(): SelectionToolApi {
     setSelectionType,
     isDrawing,
     currentPoints,
+    polygonCloseTarget,
     onMouseDown,
     onMouseMove,
     onMouseUp,
-    onDoubleClick,
+    closePolygon,
     selectAll,
     deselect,
     magicWandSelect,
@@ -781,13 +891,32 @@ export function SelectionOverlay({ layerRef }: { layerRef: React.RefObject<Konva
 export function ActiveSelectionPreview({
   type,
   points,
+  closeTarget = null,
+  zoom = 1,
 }: {
   type: SelectionType;
   points: number[];
+  /** Polygonal lasso only: the click-to-close target, sized against `zoom` so it
+   * keeps its screen size on a layer the stage has already scaled. */
+  closeTarget?: PolygonCloseTarget | null;
+  zoom?: number;
 }) {
   if (type === "lasso" && points.length >= 4) {
     return (
-      <Line points={points} stroke="#E07832" strokeWidth={1} dash={[4, 4]} listening={false} />
+      <Group>
+        <Line points={points} stroke="#E07832" strokeWidth={1} dash={[4, 4]} listening={false} />
+        {closeTarget && (
+          <Circle
+            x={closeTarget.x}
+            y={closeTarget.y}
+            radius={POLY_CLOSE_TOLERANCE_PX / zoom}
+            stroke="#E07832"
+            strokeWidth={1.5 / zoom}
+            fill={closeTarget.active ? "#E07832" : "rgba(255, 255, 255, 0.85)"}
+            listening={false}
+          />
+        )}
+      </Group>
     );
   }
 

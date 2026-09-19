@@ -3886,6 +3886,7 @@ export const zhCN: TranslationKeys = {
         freehandShort: "自由",
         polygonalLasso: "多边形套索",
         polygonalShort: "多边形",
+        polygonalHint: "按 Enter、双击或点击第一个顶点闭合。",
         toleranceLabel: "容差：",
       },
       text: {

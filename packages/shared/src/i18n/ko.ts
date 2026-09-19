@@ -4075,6 +4075,7 @@ export const ko: TranslationKeys = {
         freehandShort: "자유",
         polygonalLasso: "다각형 올가미",
         polygonalShort: "다각형",
+        polygonalHint: "Enter, 더블클릭 또는 첫 점으로 닫습니다.",
         toleranceLabel: "허용 범위:",
       },
       text: {
