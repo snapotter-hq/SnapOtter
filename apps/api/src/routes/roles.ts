@@ -247,23 +247,47 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       // because a failed statement has already poisoned the transaction, so
       // nothing further can run inside it. Postgres takes the users.role
       // rewrite back on the rollback.
+      //
+      // The role row is locked and re-read inside the transaction instead of
+      // trusted from the select above (issue #1152). Two renames of one role
+      // both read the old name up there; the second one's users.role rewrite
+      // then matched nothing, its roles UPDATE still landed, and every
+      // assignee was left on a name with no row behind it. Under the lock the
+      // second rename waits for the first and rewrites from the name it
+      // committed, and a role deleted in that window comes back as no row
+      // rather than a no-op 200. Lock order is the roles row, then users
+      // rows; the delete below takes them in the same order, so one always
+      // waits for the other instead of the two deadlocking.
       try {
-        await db.transaction(async (tx) => {
+        const found = await db.transaction(async (tx) => {
+          const [locked] = await tx
+            .select()
+            .from(schema.roles)
+            .where(eq(schema.roles.id, id))
+            .for("update");
+          if (!locked) return false;
           if (body.name) {
             const renamedDisabledRole = `disabled:${body.name}`;
             await tx
               .update(schema.users)
               .set({
                 role: sql<string>`CASE
-                  WHEN ${schema.users.role} = ${role.name} THEN ${body.name}
+                  WHEN ${schema.users.role} = ${locked.name} THEN ${body.name}
                   ELSE ${renamedDisabledRole}
                 END`,
                 updatedAt: new Date(),
               })
-              .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
+              .where(
+                sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${locked.name}`,
+              );
           }
           await tx.update(schema.roles).set(updates).where(eq(schema.roles.id, id));
+          return true;
         });
+        if (!found) {
+          request.log.info({ roleId: id }, "role deleted between its pre-checks and the row lock");
+          return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
+        }
       } catch (err) {
         // Narrowed to the rename: `name` is the only unique column on roles, so
         // a 23505 from a permissions-only update is something else entirely and
@@ -316,23 +340,39 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      await db.transaction(async (tx) => {
+      // Same lock, same order as the rename above (issue #1152): the role row
+      // first, then its users, with the name taken from the locked row. A
+      // rename that committed since the select above has already moved the
+      // assignees onto its new name, and matching on the stale one would
+      // leave them there with no row behind it.
+      const removed = await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select()
+          .from(schema.roles)
+          .where(eq(schema.roles.id, id))
+          .for("update");
+        if (!locked) return null;
         await tx
           .update(schema.users)
           .set({
             role: sql<string>`CASE
-              WHEN ${schema.users.role} = ${role.name} THEN 'user'
+              WHEN ${schema.users.role} = ${locked.name} THEN 'user'
               ELSE 'disabled:user'
             END`,
             updatedAt: new Date(),
           })
-          .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${role.name}`);
+          .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${locked.name}`);
         await tx.delete(schema.roles).where(eq(schema.roles.id, id));
+        return locked;
       });
+      if (!removed) {
+        request.log.info({ roleId: id }, "role deleted between its pre-checks and the row lock");
+        return reply.status(404).send({ error: "Role not found", code: "NOT_FOUND" });
+      }
       await auditFromRequest(request)("ROLE_DELETED", {
         adminId: user.id,
         roleId: id,
-        roleName: role.name,
+        roleName: removed.name,
       });
 
       return reply.send({ ok: true });

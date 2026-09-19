@@ -2,7 +2,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
+import { raceInserts, raceRowLocks, waitForLockWaiters } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -19,6 +19,20 @@ afterAll(async () => {
 
 describe("custom roles", () => {
   let customRoleId: string;
+
+  const rename = (id: string, name: string) =>
+    testApp.app.inject({
+      method: "PUT",
+      url: `/api/v1/roles/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name },
+    });
+  const remove = (id: string) =>
+    testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
 
   it("lists built-in roles", async () => {
     const res = await testApp.app.inject({
@@ -168,16 +182,10 @@ describe("custom roles", () => {
       .insert(schema.users)
       .values(names.map((name, i) => ({ id: userIds[i], username: userIds[i], role: name })));
 
-    const rename = (id: string) =>
-      testApp.app.inject({
-        method: "PUT",
-        url: `/api/v1/roles/${id}`,
-        headers: { authorization: `Bearer ${adminToken}` },
-        payload: { name: target },
-      });
-
-    const results = await raceUpdates("roles", 2, () =>
-      Promise.all([rename(ids[0]), rename(ids[1])]),
+    // The rename opens its transaction by locking the role row (#1152), so
+    // the contenders park at that read rather than at the UPDATE.
+    const results = await raceRowLocks("roles", 2, () =>
+      Promise.all([rename(ids[0], target), rename(ids[1], target)]),
     );
     const statuses = results.map((r) => r.statusCode).sort();
     expect(statuses).toEqual([200, 409]);
@@ -219,6 +227,164 @@ describe("custom roles", () => {
 
     await db.delete(schema.users).where(inArray(schema.users.id, userIds));
     await db.delete(schema.roles).where(inArray(schema.roles.id, ids));
+  });
+
+  it("concurrent renames of one role to two names keep its users on the surviving name", async () => {
+    // Issue #1152: both renames read the role's name before either
+    // transaction opened, then used it as the users.role predicate. The
+    // second one's rewrite matched nothing (the rows already carried the
+    // first new name), its roles UPDATE still landed, and every assignee was
+    // stranded on a name with no row behind it. The row lock makes the
+    // second rename wait for the first and re-read the name it commits.
+    const suffix = Date.now().toString(36);
+    const name = `race-fork-${suffix}`;
+    const created = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name, permissions: ["tools:use"] },
+    });
+    expect(created.statusCode).toBe(201);
+    const roleId = JSON.parse(created.body).id;
+    const userId = `assignee-${name}`;
+    await db.insert(schema.users).values({ id: userId, username: userId, role: name });
+
+    const targets = [`${name}-x`, `${name}-y`];
+    const results = await raceRowLocks("roles", 2, () =>
+      Promise.all(targets.map((target) => rename(roleId, target))),
+    );
+    expect(results.map((r) => r.statusCode)).toEqual([200, 200]);
+
+    // Serialized, so the later rename wins. Whichever that was, the assignee
+    // has to follow it: a role name nobody holds means the user has no
+    // permissions and the role lists nobody.
+    const [row] = await db.select().from(schema.roles).where(eq(schema.roles.id, roleId));
+    expect(targets).toContain(row?.name);
+    const [assignee] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    expect(assignee?.role).toBe(row?.name);
+
+    await db.delete(schema.users).where(eq(schema.users.id, userId));
+    await db.delete(schema.roles).where(eq(schema.roles.id, roleId));
+  });
+
+  it("renaming a role deleted after its pre-checks returns 404 and audits nothing", async () => {
+    // Issue #1152, second symptom: with the role read outside the
+    // transaction, a delete landing in between left the roles UPDATE
+    // matching zero rows while the caller still got 200 and a ROLE_UPDATED
+    // audit row for a role that no longer existed. The delete runs on the
+    // harness's locking transaction, which is the only session that can
+    // write while the rename is parked at its row lock.
+    const suffix = Date.now().toString(36);
+    const created = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: `race-gone-${suffix}`, permissions: ["tools:use"] },
+    });
+    expect(created.statusCode).toBe(201);
+    const roleId = JSON.parse(created.body).id;
+
+    const res = await raceRowLocks(
+      "roles",
+      1,
+      () => rename(roleId, `race-gone-${suffix}-x`),
+      (tx) => tx.delete(schema.roles).where(eq(schema.roles.id, roleId)),
+    );
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "Role not found", code: "NOT_FOUND" });
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_UPDATED'`);
+    expect(
+      auditRows.filter((r) => (r.details as { roleId?: string } | null)?.roleId === roleId),
+    ).toHaveLength(0);
+  });
+
+  it("a rename racing a delete of the same role never deadlocks and frees its users", async () => {
+    // The rename locks the role row before it rewrites users.role, so the
+    // delete has to take that same lock first too. Left as users-then-roles,
+    // the two would each hold the row the other needs and Postgres would
+    // kill one of them with 40P01, a 500 for a pair of valid requests.
+    // The order is staged: the rename is holding the role row (parked at its
+    // users rewrite) before the delete starts, so the delete queues behind
+    // that lock and has to rewrite from the renamed row it re-reads. A
+    // delete that starts with users instead either deadlocks against the
+    // rename or strands the assignee on the renamed name.
+    const suffix = Date.now().toString(36);
+    const name = `race-drop-${suffix}`;
+    const created = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name, permissions: ["tools:use"] },
+    });
+    expect(created.statusCode).toBe(201);
+    const roleId = JSON.parse(created.body).id;
+    const userId = `assignee-${name}`;
+    await db.insert(schema.users).values({ id: userId, username: userId, role: name });
+
+    const [renamed, deleted] = await raceRowLocks("users", 2, async () => {
+      const renaming = rename(roleId, `${name}-x`);
+      await waitForLockWaiters(1);
+      return Promise.all([renaming, remove(roleId)]);
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(deleted.statusCode).toBe(200);
+
+    const rows = await db.select().from(schema.roles).where(eq(schema.roles.id, roleId));
+    expect(rows).toHaveLength(0);
+    const [assignee] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    expect(assignee?.role).toBe("user");
+
+    // The audit names the role as it was when the delete ran, the renamed
+    // one, not the name the handler read before its transaction.
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_DELETED'`);
+    const mine = auditRows.filter(
+      (r) => (r.details as { roleId?: string } | null)?.roleId === roleId,
+    );
+    expect(mine.map((r) => (r.details as { roleName?: string } | null)?.roleName)).toEqual([
+      `${name}-x`,
+    ]);
+
+    await db.delete(schema.users).where(eq(schema.users.id, userId));
+  });
+
+  it("deleting a role removed after its pre-checks returns 404 and audits nothing", async () => {
+    // The delete's side of the same window: its pre-checks read the row, the
+    // harness removes it before the transaction can lock it, and the
+    // transaction finds nothing to lock. Without the lock this committed an
+    // empty users rewrite, deleted zero rows and still audited ROLE_DELETED.
+    const suffix = Date.now().toString(36);
+    const created = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: `race-gone-del-${suffix}`, permissions: ["tools:use"] },
+    });
+    expect(created.statusCode).toBe(201);
+    const roleId = JSON.parse(created.body).id;
+
+    const res = await raceRowLocks(
+      "roles",
+      1,
+      () => remove(roleId),
+      (tx) => tx.delete(schema.roles).where(eq(schema.roles.id, roleId)),
+    );
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "Role not found", code: "NOT_FOUND" });
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_DELETED'`);
+    expect(
+      auditRows.filter((r) => (r.details as { roleId?: string } | null)?.roleId === roleId),
+    ).toHaveLength(0);
   });
 
   it("rethrows a non-unique constraint failure instead of answering 200", async () => {
