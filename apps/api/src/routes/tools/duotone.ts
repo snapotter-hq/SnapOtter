@@ -40,11 +40,22 @@ export function registerDuotone(app: FastifyInstance) {
         const offsets = [a.r, a.g, a.b];
 
         // Grayscale to single channel, then expand back to 3-channel sRGB
-        // so that .linear() can apply per-channel multipliers/offsets
+        // so that .linear() can apply per-channel multipliers/offsets.
+        //
+        // The .png() is load-bearing. A bare toBuffer() re-encodes in whatever
+        // the input was, and Sharp's GIF writer reuses the palette it read the
+        // image in with, so a grayscale ramp has to be expressed in the colors
+        // the source happened to contain. A flat red GIF has no grays in its
+        // palette at all and the result bears no relation to the input: red,
+        // green and blue all came out as 76,105,113 (issue #1180). A GIF whose
+        // palette already holds grays round-trips fine, which is why photographs
+        // mostly survived this and it went unnoticed. PNG then carries through
+        // the rest of the chain.
         const grayBuf = await sharp(source)
           .removeAlpha()
           .grayscale()
           .toColourspace("srgb")
+          .png()
           .toBuffer();
 
         let buf = await sharp(grayBuf).linear(multipliers, offsets).toBuffer();
