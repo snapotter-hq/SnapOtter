@@ -834,7 +834,8 @@ export const tr: TranslationKeys = {
     },
     "chart-maker": {
       name: "Grafik Oluşturucu",
-      description: "CSV veya JSON verilerinden çubuk, çizgi veya pasta grafik oluştur",
+      description:
+        "CSV veya JSON verilerinden çubuk, çizgi veya pasta grafik oluştur, en fazla 100 satır",
     },
     "convert-video": {
       name: "Video Dönüştür",

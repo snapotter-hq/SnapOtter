@@ -840,7 +840,7 @@ export const fr: TranslationKeys = {
     "chart-maker": {
       name: "Créateur de graphiques",
       description:
-        "Créez des graphiques en barres, en lignes ou circulaires à partir de données CSV ou JSON",
+        "Créez des graphiques en barres, en lignes ou circulaires à partir de données CSV ou JSON, jusqu'à 100 lignes",
     },
     "convert-video": {
       name: "Convertir une vidéo",

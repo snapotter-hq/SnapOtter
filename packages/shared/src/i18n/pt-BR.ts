@@ -834,7 +834,8 @@ export const ptBR: TranslationKeys = {
     },
     "chart-maker": {
       name: "Criador de Gráficos",
-      description: "Crie gráficos de barras, linhas ou pizza a partir de dados CSV ou JSON",
+      description:
+        "Crie gráficos de barras, linhas ou pizza a partir de dados CSV ou JSON, até 100 linhas",
     },
     "convert-video": {
       name: "Converter Vídeo",

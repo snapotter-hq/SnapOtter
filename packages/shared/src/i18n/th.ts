@@ -823,7 +823,7 @@ export const th: TranslationKeys = {
     },
     "chart-maker": {
       name: "สร้างแผนภูมิ",
-      description: "สร้างแผนภูมิแท่ง เส้น หรือวงกลมจากข้อมูล CSV หรือ JSON",
+      description: "สร้างแผนภูมิแท่ง เส้น หรือวงกลมจากข้อมูล CSV หรือ JSON สูงสุด 100 แถว",
     },
     "convert-video": {
       name: "แปลงวิดีโอ",

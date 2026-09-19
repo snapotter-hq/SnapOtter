@@ -835,7 +835,8 @@ export const nl: TranslationKeys = {
     },
     "chart-maker": {
       name: "Grafiekmaker",
-      description: "Maak staaf-, lijn- of cirkeldiagrammen van CSV- of JSON-gegevens",
+      description:
+        "Maak staaf-, lijn- of cirkeldiagrammen van CSV- of JSON-gegevens, tot 100 rijen",
     },
     "convert-video": {
       name: "Video converteren",

@@ -825,7 +825,7 @@ export const ar: TranslationKeys = {
     },
     "chart-maker": {
       name: "صانع المخططات",
-      description: "إنشاء مخططات أعمدة أو خطية أو دائرية من بيانات CSV أو JSON",
+      description: "إنشاء مخططات أعمدة أو خطية أو دائرية من بيانات CSV أو JSON، حتى 100 صف",
     },
     "convert-video": {
       name: "تحويل الفيديو",

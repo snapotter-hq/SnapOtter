@@ -613,7 +613,7 @@ export const zhTW: TranslationKeys = {
     },
     "chart-maker": {
       name: "圖表製作",
-      description: "從 CSV 或 JSON 資料建立長條圖、折線圖或圓餅圖",
+      description: "從 CSV 或 JSON 資料建立長條圖、折線圖或圓餅圖，最多 100 列",
     },
     "convert-video": {
       name: "轉換影片",

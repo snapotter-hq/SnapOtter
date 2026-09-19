@@ -1778,7 +1778,7 @@ const BASE_TOOLS: Tool[] = [
   {
     id: "chart-maker",
     name: "Chart Maker",
-    description: "Create bar, line, or pie charts from CSV or JSON data",
+    description: "Create bar, line, or pie charts from CSV or JSON data, up to 100 rows",
     category: "data",
     icon: "BarChart3",
     route: "/chart-maker",

@@ -790,7 +790,7 @@ export const en = {
     },
     "chart-maker": {
       name: "Chart Maker",
-      description: "Create bar, line, or pie charts from CSV or JSON data",
+      description: "Create bar, line, or pie charts from CSV or JSON data, up to 100 rows",
     },
     "convert-video": {
       name: "Convert Video",

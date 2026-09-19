@@ -833,7 +833,8 @@ export const pl: TranslationKeys = {
     },
     "chart-maker": {
       name: "Kreator wykresów",
-      description: "Twórz wykresy słupkowe, liniowe lub kołowe z danych CSV lub JSON",
+      description:
+        "Twórz wykresy słupkowe, liniowe lub kołowe z danych CSV lub JSON, do 100 wierszy",
     },
     "convert-video": {
       name: "Konwertuj wideo",

@@ -1,4 +1,4 @@
-import { ToolInputError } from "@snapotter/shared";
+import { isToolInputError, ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import sharp from "sharp";
@@ -40,49 +40,253 @@ interface DataPoint {
   value: number;
 }
 
-function parseInput(buf: Buffer, filename: string): DataPoint[] {
-  const lower = filename.toLowerCase();
+/**
+ * A grid of raw cells plus, when the source had them, the column names.
+ * CSV builds one from the parsed rows and JSON from the object keys, so both
+ * go through the same column detection below.
+ */
+interface Table {
+  /** Column names, used to name columns back to the user in errors. */
+  header?: string[];
+  rows: string[][];
+}
 
-  if (lower.endsWith(".json")) {
-    const raw: unknown = JSON.parse(buf.toString("utf8"));
-    // Array of {label, value}
-    if (Array.isArray(raw)) {
-      return raw.map((item: Record<string, unknown>) => ({
-        label: String(item.label ?? ""),
-        value: Number(item.value),
-      }));
-    }
-    // Object: key -> number
-    if (raw && typeof raw === "object") {
-      return Object.entries(raw as Record<string, unknown>).map(([label, value]) => ({
-        label,
-        value: Number(value),
-      }));
-    }
-    throw new Error("JSON must be an array of {label,value} or an object");
+const JSON_SHAPES =
+  'Chart Maker reads JSON as an array of objects ([{"label": "Q1", "value": 12}]), ' +
+  'an object of name to number ({"Q1": 12}), or an array wrapped in a single ' +
+  'property ({"data": [...]}).';
+
+/** A column carries the values only if MORE than half its rows hold a number. */
+const NUMERIC_MAJORITY = 0.5;
+
+/**
+ * Error messages wider than friendlyError's 280-character limit collapse to a
+ * generic "Processing failed", which would throw away the column names that
+ * are the point of this message. Stay well under it.
+ */
+function noNumericColumnMessage(header: string[] | undefined, width: number): string {
+  const lead = "Chart Maker needs a numeric column to plot, and ";
+  if (header?.length) {
+    const shown = header.slice(0, 6).map((name) => name.trim().slice(0, 24));
+    const rest = header.length - shown.length;
+    const names = shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+    const message = `${lead}none of these have numbers: ${names}.`;
+    if (message.length <= 260) return message;
+  }
+  return `${lead}none of the ${width} columns in this file have numbers.`;
+}
+
+/**
+ * Read one cell as a chart value, or null when it holds no number.
+ *
+ * The null cases carry the weight here. Number("") and Number(" ") are both 0,
+ * so without the blank guard an empty column would win the vote below and
+ * render a chart of zeros. Number("Infinity") is Infinity, which renders as a
+ * degenerate SVG that Sharp drops on the floor.
+ */
+function numericCell(cell: unknown): number | null {
+  if (typeof cell === "number") return Number.isFinite(cell) ? cell : null;
+  if (typeof cell !== "string") return null;
+  const trimmed = cell.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toCell(value: unknown): string {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Work out which column holds the labels and which holds the numbers, then
+ * read the points off.
+ *
+ * Spreadsheets put dimensions on the left and measures on the right, so the
+ * value is the RIGHTMOST column that parses as a number in most rows and the
+ * label is the LEFTMOST column that does not. Rightmost beats leftmost for the
+ * value because a leading "id" or "year" column is numeric but is never the
+ * measure anyone wants plotted. The tradeoff runs the other way for a file
+ * ending in a numeric column nobody wants charted (name,score,year); that one
+ * is genuinely ambiguous, and picking left would break the far more common
+ * leading-id shape instead.
+ */
+function tableToPoints({ header, rows }: Table): DataPoint[] {
+  if (rows.length === 0) return [];
+
+  // Counted in a loop, not Math.max(...spread): the row cap is applied after
+  // parsing, so a large CSV reaches here and would blow the argument limit.
+  let width = header?.length ?? 0;
+  for (const row of rows) {
+    if (row.length > width) width = row.length;
   }
 
-  // CSV: column 1 = label, column 2 = numeric value
-  const parsed = Papa.parse<string[]>(buf.toString("utf8"), {
-    header: false,
-    skipEmptyLines: true,
-  });
-
-  if (parsed.errors.length > 0) {
-    throw new Error(`CSV parse failed: ${parsed.errors[0].message}`);
+  const numericShare: number[] = [];
+  const hasNegative: boolean[] = [];
+  for (let col = 0; col < width; col++) {
+    let numeric = 0;
+    let negative = false;
+    for (const row of rows) {
+      const cell = numericCell(row[col]);
+      if (cell === null) continue;
+      numeric += 1;
+      if (cell < 0) negative = true;
+    }
+    numericShare.push(numeric / rows.length);
+    hasNegative.push(negative);
   }
 
+  // Skip past a rightmost column that holds negatives: the renderers cannot
+  // draw a negative bar or arc, so a growth or delta column on the right is
+  // not a chartable column. Keep it as the fallback so a file whose only
+  // numbers are negative still gets the specific message further down rather
+  // than "no numeric column".
+  let valueCol = -1;
+  let negativeCol = -1;
+  for (let col = width - 1; col >= 0; col--) {
+    if (numericShare[col] <= NUMERIC_MAJORITY) continue;
+    if (negativeCol < 0) negativeCol = col;
+    if (!hasNegative[col]) {
+      valueCol = col;
+      break;
+    }
+  }
+  if (valueCol < 0) valueCol = negativeCol;
+  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
+
+  let labelCol = -1;
+  for (let col = 0; col < width; col++) {
+    if (col !== valueCol && numericShare[col] <= NUMERIC_MAJORITY) {
+      labelCol = col;
+      break;
+    }
+  }
+  // Every other column is numeric too (a year/sales pair, say). Fall back to
+  // the leftmost column that is not the value, and to row numbers when the
+  // file has only the one column.
+  if (labelCol < 0 && width > 1) labelCol = valueCol === 0 ? 1 : 0;
+
+  const points: DataPoint[] = [];
+  for (const row of rows) {
+    // A row with no number in the value column is not a data row. Blank cells
+    // are the common case. Numbers written the way a spreadsheet displays them
+    // ("1,200", "$40") are not read as numbers and are dropped here too, which
+    // is issue #1198.
+    const value = numericCell(row[valueCol]);
+    if (value === null) continue;
+    points.push({
+      label: labelCol < 0 ? String(points.length + 1) : toCell(row[labelCol]).trim(),
+      value,
+    });
+  }
+  return points;
+}
+
+function parseCsv(text: string): Table {
+  // "greedy" also drops rows of bare commas, which every spreadsheet export
+  // trails. Plain `true` keeps them as [""] cells that drag the numeric vote
+  // below the majority and rejected the file.
+  const parsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: "greedy" });
   const rows = parsed.data;
-  // Skip header row if first row col2 is non-numeric
-  let start = 0;
-  if (rows.length > 1 && Number.isNaN(Number(rows[0][1]))) {
-    start = 1;
+
+  // A one-column CSV always reports UndetectableDelimiter and Papa hands back
+  // the rows anyway, so treating that as fatal rejected single-column files
+  // outright. Forgive it only when the parse really did yield one column:
+  // the same code fires when detection failed and the comma fallback split
+  // the data, and "sales / 1,200 / 2,400" must stay an error rather than
+  // become a chart of 200 and 400.
+  const singleColumn = rows.every((row) => row.length === 1);
+  const fatal = parsed.errors.filter(
+    (err) => !(err.code === "UndetectableDelimiter" && singleColumn),
+  );
+  if (fatal.length > 0) {
+    throw new ToolInputError(`CSV parse failed: ${fatal[0].message}`);
+  }
+  // The first row is a header when nothing in it is a number. This replaces
+  // the old probe, which asked only whether column 2 was numeric and so read
+  // the wrong thing for every file whose numbers live elsewhere.
+  const hasHeader = rows.length > 1 && rows[0].every((cell) => numericCell(cell) === null);
+  return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
+}
+
+function pointsFromJsonArray(items: unknown[]): DataPoint[] {
+  if (items.length === 0) return [];
+
+  const objects = items.filter(
+    (item): item is Record<string, unknown> =>
+      typeof item === "object" && item !== null && !Array.isArray(item),
+  );
+  if (objects.length !== items.length) throw new ToolInputError(JSON_SHAPES);
+
+  // An explicit {label, value} shape wins: the file named its fields, so don't
+  // second-guess it by sniffing the other keys.
+  if (objects.every((item) => "value" in item)) {
+    return objects.map((item) => {
+      const value = numericCell(item.value);
+      if (value === null) {
+        // Sliced: the value can be an arbitrarily large nested object, and a
+        // message over 280 characters collapses to a generic one.
+        const shown = JSON.stringify(item.value) ?? "undefined";
+        throw new ToolInputError(
+          `Chart Maker needs every "value" to be a number, and ${shown.slice(0, 60)} is not.`,
+        );
+      }
+      return { label: toCell(item.label).trim(), value };
+    });
   }
 
-  return rows.slice(start).map((row) => ({
-    label: String(row[0] ?? ""),
-    value: Number(row[1]),
-  }));
+  // Union of every object's keys, not just the first one's: records that omit
+  // an optional field would otherwise read as blank and be dropped.
+  const keys = [...new Set(objects.flatMap((item) => Object.keys(item)))];
+  if (keys.length === 0) throw new ToolInputError(JSON_SHAPES);
+  return tableToPoints({
+    header: keys,
+    rows: objects.map((item) => keys.map((key) => toCell(item[key]))),
+  });
+}
+
+function isNumericEntry(entry: { label: string; value: number | null }): entry is DataPoint {
+  return entry.value !== null;
+}
+
+function pointsFromJson(raw: unknown): DataPoint[] {
+  if (Array.isArray(raw)) return pointsFromJsonArray(raw);
+  if (typeof raw !== "object" || raw === null) throw new ToolInputError(JSON_SHAPES);
+
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length === 0) throw new ToolInputError(JSON_SHAPES);
+
+  const flat = entries.map(([label, value]) => ({ label, value: numericCell(value) }));
+  if (flat.every(isNumericEntry)) return flat;
+
+  // Exports wrap their rows: {"data": [...]}, {"results": [...]}, and friends.
+  const wrapped = entries.filter(([, value]) => Array.isArray(value));
+  if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[]);
+
+  throw new ToolInputError(JSON_SHAPES);
+}
+
+function parseInput(buf: Buffer): DataPoint[] {
+  // Strip a UTF-8 BOM. JS counts U+FEFF as whitespace so the sniff below still
+  // matches, but JSON.parse rejects it, which killed every BOM'd export.
+  // Papa strips it from CSV on its own.
+  const text = buf.toString("utf8").replace(/^﻿/, "");
+
+  // Sniff the content instead of trusting the extension. Dispatching on the
+  // filename sent every .json file holding CSV, and the reverse, into the
+  // wrong parser, where it died on a syntax error about the wrong format.
+  if (/^\s*[[{]/.test(text)) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch (err) {
+      throw new ToolInputError(
+        `This file starts like JSON but does not parse: ${err instanceof Error ? err.message : "invalid JSON"}`,
+      );
+    }
+    return pointsFromJson(raw);
+  }
+
+  return tableToPoints(parseCsv(text));
 }
 
 function renderBarSvg(data: DataPoint[], w: number, h: number, title: string | undefined): string {
@@ -206,9 +410,17 @@ export function registerChartMaker(app: FastifyInstance) {
 
       let data: DataPoint[];
       try {
-        data = parseInput(input.buffer, input.filename);
+        data = parseInput(input.buffer);
       } catch (err) {
-        throw new ToolInputError(err instanceof Error ? err.message : "Failed to parse input");
+        // Every throw inside parseInput is already a ToolInputError. Blanket
+        // rewrapping anything else as one told the user their file was at
+        // fault and, because worker.ts skips logger.error for input errors,
+        // kept our own bugs out of Sentry entirely.
+        if (isToolInputError(err)) throw err;
+        if (err instanceof RangeError) {
+          throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+        }
+        throw err;
       }
 
       if (data.length === 0) {
@@ -218,12 +430,8 @@ export function registerChartMaker(app: FastifyInstance) {
         throw new ToolInputError("Too many data points (max 100)");
       }
 
-      // Validate numeric values
-      for (const point of data) {
-        if (Number.isNaN(point.value)) {
-          throw new ToolInputError("Column 2 must be numeric");
-        }
-      }
+      // Every parse path above returns finite numbers or throws, so there is
+      // no NaN left to screen for here.
       // Negative values render as invalid/degenerate SVG (negative bar heights,
       // backward pie arcs that Sharp silently drops); reject with a clear message.
       if (data.some((point) => point.value < 0)) {

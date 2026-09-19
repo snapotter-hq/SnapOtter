@@ -835,7 +835,8 @@ export const ru: TranslationKeys = {
     },
     "chart-maker": {
       name: "Создание диаграмм",
-      description: "Создание столбчатых, линейных и круговых диаграмм из данных CSV или JSON",
+      description:
+        "Создание столбчатых, линейных и круговых диаграмм из данных CSV или JSON, до 100 строк",
     },
     "convert-video": {
       name: "Конвертация видео",

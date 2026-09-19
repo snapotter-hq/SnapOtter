@@ -657,7 +657,7 @@ export const hi: TranslationKeys = {
     },
     "chart-maker": {
       name: "चार्ट मेकर",
-      description: "CSV या JSON डेटा से बार, लाइन, या पाई चार्ट बनाएँ",
+      description: "CSV या JSON डेटा से बार, लाइन, या पाई चार्ट बनाएँ, अधिकतम 100 पंक्तियाँ",
     },
     "convert-video": {
       name: "वीडियो कन्वर्ट",

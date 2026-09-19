@@ -835,7 +835,7 @@ export const vi: TranslationKeys = {
     },
     "chart-maker": {
       name: "Tạo biểu đồ",
-      description: "Tạo biểu đồ cột, đường hoặc tròn từ dữ liệu CSV hoặc JSON",
+      description: "Tạo biểu đồ cột, đường hoặc tròn từ dữ liệu CSV hoặc JSON, tối đa 100 hàng",
     },
     "convert-video": {
       name: "Chuyển đổi video",

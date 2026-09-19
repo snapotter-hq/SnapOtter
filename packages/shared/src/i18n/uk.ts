@@ -834,7 +834,8 @@ export const uk: TranslationKeys = {
     },
     "chart-maker": {
       name: "Створення діаграм",
-      description: "Створити стовпчикові, лінійні або кругові діаграми з даних CSV або JSON",
+      description:
+        "Створити стовпчикові, лінійні або кругові діаграми з даних CSV або JSON, до 100 рядків",
     },
     "convert-video": {
       name: "Конвертація відео",

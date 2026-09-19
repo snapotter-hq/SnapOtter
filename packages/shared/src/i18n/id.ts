@@ -833,7 +833,8 @@ export const id: TranslationKeys = {
     },
     "chart-maker": {
       name: "Pembuat Grafik",
-      description: "Buat grafik batang, garis, atau lingkaran dari data CSV atau JSON",
+      description:
+        "Buat grafik batang, garis, atau lingkaran dari data CSV atau JSON, hingga 100 baris",
     },
     "convert-video": {
       name: "Konversi Video",

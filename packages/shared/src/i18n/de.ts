@@ -836,7 +836,8 @@ export const de: TranslationKeys = {
     },
     "chart-maker": {
       name: "Diagramm-Ersteller",
-      description: "Balken-, Linien- oder Kreisdiagramme aus CSV- oder JSON-Daten erstellen",
+      description:
+        "Balken-, Linien- oder Kreisdiagramme aus CSV- oder JSON-Daten erstellen, bis zu 100 Zeilen",
     },
     "convert-video": {
       name: "Video konvertieren",

@@ -613,7 +613,7 @@ export const zhCN: TranslationKeys = {
     },
     "chart-maker": {
       name: "图表制作器",
-      description: "从 CSV 或 JSON 数据创建柱状图、折线图或饼图",
+      description: "从 CSV 或 JSON 数据创建柱状图、折线图或饼图，最多 100 行",
     },
     "convert-video": {
       name: "转换视频",

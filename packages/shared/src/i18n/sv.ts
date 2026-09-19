@@ -831,7 +831,8 @@ export const sv: TranslationKeys = {
     },
     "chart-maker": {
       name: "Diagramskapare",
-      description: "Skapa stapel-, linje- eller cirkeldiagram från CSV- eller JSON-data",
+      description:
+        "Skapa stapel-, linje- eller cirkeldiagram från CSV- eller JSON-data, upp till 100 rader",
     },
     "convert-video": {
       name: "Konvertera video",

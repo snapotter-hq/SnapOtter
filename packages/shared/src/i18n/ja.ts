@@ -797,7 +797,7 @@ export const ja: TranslationKeys = {
     },
     "chart-maker": {
       name: "チャート作成",
-      description: "CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成",
+      description: "CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成（最大100行）",
     },
     "convert-video": {
       name: "動画変換",

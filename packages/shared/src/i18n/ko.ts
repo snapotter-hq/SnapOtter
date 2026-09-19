@@ -782,7 +782,7 @@ export const ko: TranslationKeys = {
     },
     "chart-maker": {
       name: "차트 만들기",
-      description: "CSV 또는 JSON 데이터로 막대, 선, 원형 차트 생성",
+      description: "CSV 또는 JSON 데이터로 막대, 선, 원형 차트 생성 (최대 100행)",
     },
     "convert-video": {
       name: "동영상 변환",

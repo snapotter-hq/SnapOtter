@@ -836,7 +836,7 @@ export const it: TranslationKeys = {
     },
     "chart-maker": {
       name: "Generatore di Grafici",
-      description: "Crea grafici a barre, lineari o a torta da dati CSV o JSON",
+      description: "Crea grafici a barre, lineari o a torta da dati CSV o JSON, fino a 100 righe",
     },
     "convert-video": {
       name: "Converti Video",
