@@ -4,10 +4,11 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "../../../apps/api/src/db/index.js";
 import {
   MIGRATED_TABLES,
+  type MigrationResult,
   migrateFromSqlite,
 } from "../../../apps/api/src/db/migrate-from-sqlite.js";
 import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
@@ -598,6 +599,191 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
   });
 
   // Note: sessions are intentionally NOT migrated (see the real-1.17.2 suite below).
+});
+
+/**
+ * 1.x had the same auto-create race migration 0008 cleans up (issue #969), so a
+ * source database can hold two rows for one external identity. The partial
+ * unique index exists by the time the copy runs, so the importer has to settle
+ * the twins itself rather than let the second INSERT roll the import back.
+ */
+describe("migrate-from-sqlite (twin SSO identities)", () => {
+  const twinDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-twin-"));
+  const twinPath = join(twinDir, "snapotter-1x-twins.db");
+  const laterPath = join(twinDir, "snapotter-1x-later.db");
+  let warnings: string[] = [];
+
+  function createUsersTable(s: Database.Database): void {
+    // users only: the importer skips tables an older 1.x file lacks.
+    s.exec(`
+      CREATE TABLE users (id text PRIMARY KEY, username text NOT NULL, password_hash text,
+        role text NOT NULL DEFAULT 'user', team text NOT NULL DEFAULT 'Default',
+        must_change_password integer NOT NULL DEFAULT 1, auth_provider text NOT NULL DEFAULT 'local',
+        external_id text, email text, created_at integer NOT NULL, updated_at integer NOT NULL);
+    `);
+  }
+
+  function userInsert(s: Database.Database): Database.Statement {
+    return s.prepare(
+      `INSERT INTO users (id, username, password_hash, role, team, must_change_password,
+        auth_provider, external_id, email, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    );
+  }
+
+  function buildTwinSqlite(path: string): void {
+    const s = new Database(path);
+    createUsersTable(s);
+    const ins = userInsert(s);
+    // The twins: one (oidc, ext-twin) identity, two rows minted a minute apart
+    // by the 1.x race. Ids run counter to age so a naive id sort picks wrong.
+    ins.run(
+      "u-twin-b",
+      "sso-user",
+      null,
+      "user",
+      "Default",
+      0,
+      "oidc",
+      "ext-twin",
+      "s@corp.com",
+      1748000000,
+      1748000000,
+    );
+    ins.run(
+      "u-twin-a",
+      "sso-user-2",
+      null,
+      "user",
+      "Default",
+      0,
+      "oidc",
+      "ext-twin",
+      "s@corp.com",
+      1748000060,
+      1748000060,
+    );
+    // Neither a local account nor a different identity may be touched.
+    ins.run(
+      "u-local",
+      "admin",
+      "scrypt-hash",
+      "admin",
+      "Default",
+      0,
+      "local",
+      null,
+      null,
+      1747000000,
+      1747000000,
+    );
+    ins.run(
+      "u-other",
+      "other-sso",
+      null,
+      "user",
+      "Default",
+      0,
+      "oidc",
+      "ext-other",
+      null,
+      1748000000,
+      1748000000,
+    );
+    s.close();
+  }
+
+  /** A second 1.x file claiming an identity the target already holds, and older than it. */
+  function buildLaterSqlite(path: string): void {
+    const s = new Database(path);
+    createUsersTable(s);
+    userInsert(s).run(
+      "u-relink",
+      "late-sso",
+      null,
+      "user",
+      "Default",
+      0,
+      "oidc",
+      "ext-twin",
+      null,
+      1700000000,
+      1700000000,
+    );
+    s.close();
+  }
+
+  /** Run an import with console.warn captured, so the operator log can be asserted. */
+  async function importCapturingWarnings(
+    path: string,
+    opts: { force: boolean },
+  ): Promise<{ result: MigrationResult; warnings: string[] }> {
+    const captured: string[] = [];
+    const spy = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      captured.push(args.map(String).join(" "));
+    });
+    try {
+      return { result: await migrateFromSqlite(path, opts), warnings: captured };
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  beforeAll(async () => {
+    buildTwinSqlite(twinPath);
+    buildLaterSqlite(laterPath);
+    await truncateMigratedTables();
+    const run = await importCapturingWarnings(twinPath, { force: false });
+    warnings = run.warnings;
+    expect(run.result.tables.users).toBe(4);
+  });
+
+  afterAll(async () => {
+    await truncateMigratedTables();
+  });
+
+  it("imports every row, leaving the oldest twin holding the identity", async () => {
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows).toHaveLength(4);
+    const older = rows.find((u) => u.id === "u-twin-b");
+    expect(older?.external_id).toBe("ext-twin");
+    expect(older?.auth_provider).toBe("oidc");
+    // The younger twin still arrives, keeps its provider, and stops answering
+    // to the identity: the same shape migration 0008 leaves behind.
+    const younger = rows.find((u) => u.id === "u-twin-a");
+    expect(younger?.external_id).toBeNull();
+    expect(younger?.auth_provider).toBe("oidc");
+    expect(younger?.username).toBe("sso-user-2");
+  });
+
+  it("leaves local accounts and unrelated identities alone", async () => {
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows.find((u) => u.id === "u-local")?.external_id).toBeNull();
+    expect(rows.find((u) => u.id === "u-other")?.external_id).toBe("ext-other");
+  });
+
+  it("names the detached row so the operator can find it afterwards", () => {
+    const line = warnings.find((w) => w.includes("u-twin-a"));
+    expect(line).toBeDefined();
+    expect(line).toContain("sso-user-2");
+    expect(line).toContain("oidc");
+    expect(line).toContain("ext-twin");
+    // Only the twin is reported; the untouched rows are not.
+    expect(warnings.filter((w) => w.includes("ext-twin"))).toHaveLength(1);
+  });
+
+  it("does not take an identity away from a row already in the target", async () => {
+    // --force against a populated target: the incoming row is older, so 0008's
+    // oldest-wins rule would hand it the identity. An import must not unlink an
+    // account that is already here, so the incoming row is the one detached.
+    const run = await importCapturingWarnings(laterPath, { force: true });
+    expect(run.result.tables.users).toBe(1);
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows).toHaveLength(5);
+    expect(rows.find((u) => u.id === "u-twin-b")?.external_id).toBe("ext-twin");
+    expect(rows.find((u) => u.id === "u-relink")?.external_id).toBeNull();
+    expect(rows.find((u) => u.id === "u-relink")?.username).toBe("late-sso");
+    expect(run.warnings.find((w) => w.includes("u-relink"))).toContain("ext-twin");
+  });
 });
 
 describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
