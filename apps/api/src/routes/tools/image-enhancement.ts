@@ -75,7 +75,11 @@ async function processImageEnhancement(
 
     let alphaBuffer: Buffer | undefined;
     if (hasAlpha) {
-      alphaBuffer = await sharp(inputBuffer).extractChannel(3).toBuffer();
+      // .png() is load-bearing. A bare toBuffer() re-encodes in whatever the
+      // input was, and Sharp's GIF writer reuses the palette it read the image
+      // in with, so a one-band alpha mask has to be expressed in that palette's
+      // colors instead of staying a mask (issue #1187, same trap as #1180).
+      alphaBuffer = await sharp(inputBuffer).extractChannel(3).png().toBuffer();
     }
 
     let image = sharp(inputBuffer);
@@ -92,13 +96,24 @@ async function processImageEnhancement(
       { width: meta.width ?? 1, height: meta.height ?? 1 },
     );
 
-    let buffer: Buffer = await image
-      .toFormat(outputFormat.format, { quality: outputFormat.quality })
-      .toBuffer();
-
+    let buffer: Buffer;
     if (alphaBuffer) {
-      buffer = await sharp(buffer)
+      // The corrected color pass has to land as a named lossless intermediate
+      // here too, not the final output format. Materializing straight to GIF
+      // carries the read-time GIF palette forward, so the encoder quantizes
+      // the corrected pixels against a palette built for the pre-correction
+      // image, and rereading those bytes for joinChannel() gets back a GIF
+      // decode that always reports a fourth (phantom, always-opaque) alpha
+      // band. joinChannel() then appends the real mask as a fifth channel,
+      // which the final encoder silently drops, so alpha ends up wrong
+      // regardless of what alphaBuffer itself holds (issue #1187).
+      const colorBuffer = await image.png().toBuffer();
+      buffer = await sharp(colorBuffer)
         .joinChannel(alphaBuffer)
+        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toBuffer();
+    } else {
+      buffer = await image
         .toFormat(outputFormat.format, { quality: outputFormat.quality })
         .toBuffer();
     }
