@@ -3,6 +3,7 @@ import { extname } from "node:path";
 import { pipeline, type Readable, Transform } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { reportError } from "../lib/error-report.js";
 import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
@@ -125,8 +126,32 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
         const isValidImage = validation?.valid === true;
 
-        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
-        const safeBuffer = isValidImage && isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
+        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
+        // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+        // an external entity, say) makes Sharp fail validation, and gating the
+        // sanitizer on a successful decode would store the payload untouched.
+        // Throwing out of the multipart loop gets rewritten to a generic 400 by
+        // the stream teardown, so handle it here like the quota check below:
+        // return the sanitizer's reason for a size/element-cap rejection, and
+        // report + 500 for anything unexpected rather than storing the file.
+        let safeBuffer: Buffer = buffer;
+        if (isSvgBuffer(buffer)) {
+          try {
+            safeBuffer = sanitizeSvg(buffer);
+          } catch (err) {
+            if ((err as { statusCode?: number }).statusCode === 400) {
+              return reply.status(400).send({ error: (err as Error).message });
+            }
+            request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+            void reportError(err, {
+              source: "http",
+              route: "/api/v1/upload",
+              method: "POST",
+              statusCode: 500,
+            });
+            return reply.status(500).send({ error: "Internal server error" });
+          }
+        }
 
         // Sanitize filename (canonical; do NOT re-sanitize downstream)
         const safeName = sanitizeFilename(part.filename ?? "upload");

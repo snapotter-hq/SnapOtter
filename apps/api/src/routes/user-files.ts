@@ -18,6 +18,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { reportError } from "../lib/error-report.js";
 import {
   deleteStoredFile,
   deleteThumbnail,
@@ -301,8 +302,32 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
         const isValidImage = validation?.valid === true;
 
-        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection
-        const safeBuffer = isValidImage && isSvgBuffer(buffer) ? sanitizeSvg(buffer) : buffer;
+        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
+        // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+        // an external entity, say) makes Sharp fail validation, and gating the
+        // sanitizer on a successful decode would store the payload untouched.
+        // Throwing out of the multipart loop gets rewritten to a generic 400 by
+        // the stream teardown, so handle it here like the quota check below:
+        // return the sanitizer's reason for a size/element-cap rejection, and
+        // report + 500 for anything unexpected rather than storing the file.
+        let safeBuffer: Buffer = buffer;
+        if (isSvgBuffer(buffer)) {
+          try {
+            safeBuffer = sanitizeSvg(buffer);
+          } catch (err) {
+            if ((err as { statusCode?: number }).statusCode === 400) {
+              return reply.status(400).send({ error: (err as Error).message });
+            }
+            request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+            void reportError(err, {
+              source: "http",
+              route: "/api/v1/files/upload",
+              method: "POST",
+              statusCode: 500,
+            });
+            return reply.status(500).send({ error: "Internal server error" });
+          }
+        }
 
         // Re-check quota with actual file size before persisting
         try {

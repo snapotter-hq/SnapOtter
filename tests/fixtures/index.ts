@@ -162,6 +162,8 @@ export const fixtures = {
   security: {
     svgXxeFile: p("security/svg-xxe-file-read.svg"),
     svgXxeSsrf: p("security/svg-xxe-ssrf.svg"),
+    svgXssNamespace: p("security/svg-xss-namespace.svg"),
+    svgDoctypeFirst: p("security/svg-doctype-first.svg"),
     polyglot: p("image/hostile/png-bytes.jpg"),
     htmlSsrf: p("document/edge/remote-img.html"),
   },

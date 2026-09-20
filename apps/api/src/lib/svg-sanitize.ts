@@ -27,15 +27,42 @@ function stripUntilStable(input: string, ...patterns: RegExp[]): string {
 }
 
 /**
+ * Source for a whole `<!DOCTYPE ...>` declaration, including an internal
+ * subset. Each `(?:[^...]|"[^"]*"|'[^']*')*` run skips double- and
+ * single-quoted strings so a `>` or `]` inside a quoted value (an entity
+ * value, a system id) does not terminate the match early and leave the rest
+ * of the DOCTYPE behind. Kept as a string so it can be reused anchored (SVG
+ * detection) and unanchored/global (sanitization) without sharing regex
+ * lastIndex state.
+ */
+const DOCTYPE_SOURCE =
+  "<!DOCTYPE\\b(?:[^>[\\]\"']|\"[^\"]*\"|'[^']*')*(?:\\[(?:[^\\]\"']|\"[^\"]*\"|'[^']*')*\\]\\s*)?>";
+const DOCTYPE_PATTERN = new RegExp(DOCTYPE_SOURCE, "gi");
+
+/**
  * Sanitize an SVG buffer to prevent XXE, SSRF, and script injection.
  * Throws if the SVG exceeds the maximum allowed size.
  */
 const MAX_SVG_ELEMENTS = 5_000;
 
+/**
+ * A rejection of an SVG that is too large or too complex to sanitize. It
+ * carries statusCode 400 so the HTTP error handler returns the reason as a
+ * 4xx (not a generic 500) and skips Sentry. The BullMQ worker classifies by
+ * error name, not statusCode, so its handling of a rejected tool input is
+ * unchanged. Callers therefore let sanitizeSvg throw and get a clean 400 with
+ * a message the user can act on, rather than a swallowed generic error.
+ */
+function svgLimitError(message: string): Error & { statusCode: number } {
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = 400;
+  return err;
+}
+
 export function sanitizeSvg(buffer: Buffer): Buffer {
   const maxSvgSize = env.MAX_SVG_SIZE_MB > 0 ? env.MAX_SVG_SIZE_MB * 1024 * 1024 : Infinity;
   if (buffer.length > maxSvgSize) {
-    throw new Error(`SVG exceeds maximum size of ${env.MAX_SVG_SIZE_MB}MB`);
+    throw svgLimitError(`SVG exceeds maximum size of ${env.MAX_SVG_SIZE_MB}MB`);
   }
   let svg = buffer.toString("utf-8");
 
@@ -45,7 +72,7 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
 
   const elementCount = (svg.match(/<[a-zA-Z][^>]*\/?>/g) || []).length;
   if (elementCount > MAX_SVG_ELEMENTS) {
-    throw new Error(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
+    throw svgLimitError(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
   }
   // Decode numeric entities so obfuscated URIs (e.g. &#106;avascript:) are visible.
   svg = decodeNumericEntities(svg);
@@ -59,8 +86,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
     return `${prefix}${cleaned}${suffix}`;
   });
 
-  // Remove DOCTYPE (XXE prevention, including internal subsets)
-  svg = svg.replace(/<!DOCTYPE[^>[]*(?:\[[^\]]*\])?>/gi, "");
+  // Remove DOCTYPE (XXE prevention, including internal subsets). The subset
+  // and external-id patterns skip over quoted strings so a '>' or ']' inside
+  // a quoted entity value (e.g. `<!ENTITY z "]">`) cannot end the match early
+  // and leave the rest of the DOCTYPE, entity declarations included, behind.
+  svg = svg.replace(DOCTYPE_PATTERN, "");
   // Remove XML processing instructions except <?xml version...?>
   svg = svg.replace(/<\?(?!xml\s)[^?]*\?>/gi, "");
   // Remove XInclude elements and namespace declarations
@@ -76,6 +106,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // animateTransform/animateMotion/animateColor are distinct element names (a
   // word boundary stops the "animate" pattern from matching them), and <handler>
   // is the SVG-Tiny event-handler element; all can carry runtime script/URIs.
+  // `NS` is an optional namespace prefix (e.g. `x:` in `<x:script>` or `svg:`
+  // in `<svg:foreignObject>`). librsvg honours a prefixed element the same as
+  // the bare name, so the strip patterns must too; matching only the bare name
+  // let `<x:script>` through.
+  const NS = "(?:[A-Za-z_][\\w.-]*:)?";
   for (const tag of [
     "script",
     "foreignObject",
@@ -91,9 +126,9 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   ]) {
     svg = stripUntilStable(
       svg,
-      new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"),
-      new RegExp(`<${tag}\\b[^>]*>`, "gi"),
-      new RegExp(`<\\/${tag}\\s*>`, "gi"),
+      new RegExp(`<${NS}${tag}\\b[\\s\\S]*?<\\/${NS}${tag}\\s*>`, "gi"),
+      new RegExp(`<${NS}${tag}\\b[^>]*>`, "gi"),
+      new RegExp(`<\\/${NS}${tag}\\s*>`, "gi"),
     );
   }
 
@@ -150,11 +185,31 @@ export function decompressSvgz(buffer: Buffer): Buffer {
   return decompressed;
 }
 
+const SVG_PROLOG_COMMENT = /^<!--[\s\S]*?-->\s*/;
+const SVG_PROLOG_PI = /^<\?[\s\S]*?\?>\s*/;
+const SVG_PROLOG_DOCTYPE = new RegExp(`^${DOCTYPE_SOURCE}\\s*`, "i");
+// The first element must be an <svg>, optionally namespace-prefixed
+// (`<svg:svg>`); the trailing `[\s/>]` stops it matching `<svgfoo>`.
+const SVG_ROOT_ELEMENT = /^<(?:[A-Za-z_][\w.-]*:)?svg[\s/>]/i;
+
 /**
  * Check whether a buffer looks like SVG content.
- * Examines the first 4KB for an <svg tag.
+ *
+ * Examines the first 4KB. An SVG can open with an XML declaration, comments,
+ * or a DOCTYPE before the root element, so those are stripped first and the
+ * check keys off the FIRST element being an `<svg>`. Keying off a bare
+ * substring instead would both miss a payload SVG whose first construct is a
+ * DOCTYPE and misfire on an HTML document that merely embeds an inline `<svg>`.
  */
 export function isSvgBuffer(buffer: Buffer): boolean {
-  const head = buffer.subarray(0, 4096).toString("utf-8").trim();
-  return head.startsWith("<svg") || (head.startsWith("<?xml") && head.includes("<svg"));
+  let head = buffer.subarray(0, 4096).toString("utf-8").trim();
+  let prev: string;
+  do {
+    prev = head;
+    head = head
+      .replace(SVG_PROLOG_COMMENT, "")
+      .replace(SVG_PROLOG_PI, "")
+      .replace(SVG_PROLOG_DOCTYPE, "");
+  } while (head !== prev);
+  return SVG_ROOT_ELEMENT.test(head);
 }
