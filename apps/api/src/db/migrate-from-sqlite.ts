@@ -149,6 +149,8 @@ export interface DetachedIdentity {
   username: string;
   authProvider: string;
   externalId: string;
+  /** The imported row that kept the identity, or null when an existing account holds it. */
+  keptBy: { id: string; username: string } | null;
 }
 
 /**
@@ -159,11 +161,19 @@ export interface DetachedIdentity {
 export function identityKey(row: SqliteRow): string | null {
   const external = row.external_id;
   if (external === null || external === undefined) return null;
-  const provider = String(row.auth_provider ?? "");
+  // A source predating the auth_provider column leaves it absent, and the target
+  // column defaults to 'local', so key the row the way Postgres will store it.
+  // Keying it as "" instead would miss a collision the INSERT then hits.
+  const provider = row.auth_provider == null ? "local" : String(row.auth_provider);
   return `${provider.length}:${provider}:${String(external)}`;
 }
 
-/** Migration 0008's rule: oldest created_at first, ties broken on the smallest id. */
+/**
+ * Migration 0008's rule (`apps/api/drizzle/0008_users_identity_unique.sql`):
+ * oldest created_at first, ties broken on the smallest id. 1.x stores epoch
+ * seconds and the #969 race fires well inside one second, so ties are the
+ * normal case here rather than the exotic one.
+ */
 function oldestFirst(a: SqliteRow, b: SqliteRow): number {
   const at = a.created_at instanceof Date ? a.created_at.getTime() : 0;
   const bt = b.created_at instanceof Date ? b.created_at.getTime() : 0;
@@ -205,24 +215,45 @@ export function detachTwinIdentities(
     else groups.set(key, [row]);
   }
 
-  const losers = new Set<SqliteRow>();
+  // Maps each losing row to the imported row that kept the identity, or to null
+  // when the target already holds it and no imported row wins.
+  const losers = new Map<SqliteRow, SqliteRow | null>();
   for (const [key, group] of groups) {
     group.sort(oldestFirst);
-    for (const row of group.slice(taken.has(key) ? 0 : 1)) losers.add(row);
+    const targetHolds = taken.has(key);
+    for (const row of group.slice(targetHolds ? 0 : 1)) {
+      losers.set(row, targetHolds ? null : group[0]);
+    }
   }
 
   const detached: DetachedIdentity[] = [];
   for (const row of rows) {
     if (!losers.has(row)) continue;
+    const keeper = losers.get(row) ?? null;
     detached.push({
       id: String(row.id),
       username: String(row.username),
-      authProvider: String(row.auth_provider ?? ""),
+      authProvider: row.auth_provider == null ? "local" : String(row.auth_provider),
       externalId: String(row.external_id),
+      keptBy: keeper ? { id: String(keeper.id), username: String(keeper.username) } : null,
     });
     row.external_id = null;
   }
   return detached;
+}
+
+/**
+ * One operator-facing line per detached row. It has to name the row that kept
+ * the identity, because unpicking this afterwards means hand-written SQL against
+ * external_id: there is no UI for it.
+ */
+export function detachedIdentityWarning(d: DetachedIdentity): string {
+  const who = `user "${d.username}" (id ${d.id})`;
+  const identity = `${d.authProvider} identity "${d.externalId}"`;
+  if (d.keptBy) {
+    return `1.x import: ${who} shares the ${identity} with user "${d.keptBy.username}" (id ${d.keptBy.id}), which keeps the link. Both rows were imported; only the older one signs in through that identity.`;
+  }
+  return `1.x import: ${who} was imported without its ${identity}, which an account already in this database holds. The imported row keeps its files and its provider, but no longer answers to that identity.`;
 }
 
 /** External identities the target already answers for. Empty on a fresh import. */
@@ -334,12 +365,7 @@ export async function migrateFromSqlite(
   }
   // Reported only once the transaction committed: a rolled-back import detached
   // nothing, and saying otherwise sends the operator looking for ghosts.
-  for (const d of detached) {
-    console.warn(
-      `1.x import: user "${d.username}" (id ${d.id}) was imported without its ` +
-        `${d.authProvider} identity "${d.externalId}"; another account already answers to it.`,
-    );
-  }
+  for (const d of detached) console.warn(detachedIdentityWarning(d));
   return result;
 }
 // The CLI (including --dry-run) lives in sqlite-import.ts, the orchestrator that
