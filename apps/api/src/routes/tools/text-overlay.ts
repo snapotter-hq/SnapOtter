@@ -85,9 +85,7 @@ export function registerTextOverlay(app: FastifyInstance) {
 
         const svgBuffer = Buffer.from(svgOverlay);
         const result = await image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
-        return await result
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+        return await result.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
       };
 
       const buffer =

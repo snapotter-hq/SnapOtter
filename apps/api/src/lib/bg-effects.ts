@@ -45,9 +45,15 @@ export async function blurBackground(
   const subjectMeta = await sharp(subjectBuffer).metadata();
   const { width, height } = subjectMeta;
 
+  // Every background layer below names PNG on the way out. These read the
+  // user's own upload, and resize and blur both invent colours between the ones
+  // it held; an intermediate that names no format goes back out in that
+  // upload's container, so a GIF background came back as flat 76,105,113 where
+  // the gradient should be (#1190).
   const blurredBg = await sharp(originalBuffer)
     .resize(width, height, { fit: "fill" })
     .blur(sigma)
+    .png()
     .toBuffer();
 
   return sharp(blurredBg)
@@ -175,6 +181,7 @@ export async function compositeOnImage(
 
   const resizedBg = await sharp(backgroundBuffer)
     .resize(width, height, { fit: "cover" })
+    .png()
     .toBuffer();
 
   return sharp(resizedBg)
@@ -224,12 +231,13 @@ export async function applyEffects(
     // Custom uploaded background image
     background = await sharp(settings.backgroundImageBuffer)
       .resize(width, height, { fit: "cover" })
+      .png()
       .toBuffer();
     // Apply blur to the uploaded bg image if enabled
     if (settings.blurEnabled) {
       const intensity = settings.blurIntensity ?? 50;
       const sigma = 1 + (Math.max(0, Math.min(100, intensity)) / 100) * 49;
-      background = await sharp(background).blur(sigma).toBuffer();
+      background = await sharp(background).blur(sigma).png().toBuffer();
     }
   } else if (settings.blurEnabled && (bgType === "transparent" || bgType === "blur")) {
     // Blur the original background (portrait mode)
@@ -238,6 +246,7 @@ export async function applyEffects(
     background = await sharp(originalBuffer)
       .resize(width, height, { fit: "fill" })
       .blur(sigma)
+      .png()
       .toBuffer();
   } else if (bgType === "color" && settings.backgroundColor) {
     const hex = settings.backgroundColor.replace("#", "");

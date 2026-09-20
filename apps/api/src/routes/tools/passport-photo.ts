@@ -84,9 +84,12 @@ async function generatePrintSheet(
   const offsetX = Math.round((paperWidthPx - gridWidth) / 2);
   const offsetY = Math.round((paperHeightPx - gridHeight) / 2);
 
-  // Resize photo to exact pixel dimensions
+  // Resize photo to exact pixel dimensions. PNG, because this cell is about to
+  // be composited onto the sheet several times and should not carry a
+  // generation of its own into each one (#1190).
   const resizedPhoto = await sharp(photoBuffer)
     .resize(photoWidthPx, photoHeightPx, { fit: "fill" })
+    .png()
     .toBuffer();
 
   // Build composite inputs
@@ -457,6 +460,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         let sourceForCrop = bgLayer;
         if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+          // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
           sourceForCrop = await sharp(bgLayer)
             .extend({
               top: padTop,
@@ -465,6 +469,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
               right: padRight,
               background: bgRgb,
             })
+            .png()
             .toBuffer();
         }
 
@@ -651,6 +656,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
       let sourceForCrop = bgLayer;
       if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+        // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
         sourceForCrop = await sharp(bgLayer)
           .extend({
             top: padTop,
@@ -659,6 +665,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
             right: padRight,
             background: bgRgb,
           })
+          .png()
           .toBuffer();
       }
 

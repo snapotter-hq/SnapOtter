@@ -61,6 +61,12 @@ function clampRegion(
   };
 }
 
+// The three crop strategies below hand their result back as a buffer for the
+// route to encode once, at the output format it resolved. Every one of those
+// hand-offs names PNG: an intermediate that names no format is written back in
+// whatever container the upload arrived in, so a JPEG paid a second lossy
+// generation per step and a GIF had the padding colour and the resampled edges
+// forced through the palette it was read with (#1190).
 async function processSubject(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
@@ -77,6 +83,7 @@ async function processSubject(
 
     const oversize = await sharp(inputBuffer)
       .resize(oversizeW, oversizeH, { fit: "cover", position: strategy })
+      .png()
       .toBuffer();
 
     const extractLeft = Math.round((oversizeW - w) / 2);
@@ -84,10 +91,11 @@ async function processSubject(
 
     return sharp(oversize)
       .extract({ left: extractLeft, top: extractTop, width: w, height: h })
+      .png()
       .toBuffer();
   }
 
-  return sharp(inputBuffer).resize(w, h, { fit: "cover", position: strategy }).toBuffer();
+  return sharp(inputBuffer).resize(w, h, { fit: "cover", position: strategy }).png().toBuffer();
 }
 
 async function processFace(
@@ -140,8 +148,8 @@ async function processFace(
     return processSubject(inputBuffer, { ...settings, strategy: "attention" });
   }
 
-  const extracted = await sharp(inputBuffer).extract(region).toBuffer();
-  return sharp(extracted).resize(targetW, targetH, { fit: "fill" }).toBuffer();
+  const extracted = await sharp(inputBuffer).extract(region).png().toBuffer();
+  return sharp(extracted).resize(targetW, targetH, { fit: "fill" }).png().toBuffer();
 }
 
 async function processTrim(
@@ -151,6 +159,7 @@ async function processTrim(
   if (settings.padToSquare || settings.targetSize) {
     const trimmed = await sharp(inputBuffer)
       .trim({ threshold: settings.threshold })
+      .png()
       .toBuffer({ resolveWithObject: true });
 
     const w = trimmed.info.width;
@@ -167,10 +176,11 @@ async function processTrim(
         fit: "contain",
         background: { r: padR, g: padG, b: padB, alpha: 1 },
       })
+      .png()
       .toBuffer();
   }
 
-  return sharp(inputBuffer).trim({ threshold: settings.threshold }).toBuffer();
+  return sharp(inputBuffer).trim({ threshold: settings.threshold }).png().toBuffer();
 }
 
 export function registerSmartCrop(app: FastifyInstance) {
@@ -190,7 +200,7 @@ export function registerSmartCrop(app: FastifyInstance) {
       }
 
       result = await sharp(result)
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
 
       const stem = filename.replace(/\.[^.]+$/, "");

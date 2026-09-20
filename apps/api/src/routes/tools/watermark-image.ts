@@ -175,7 +175,7 @@ export function registerWatermarkImage(app: FastifyInstance) {
       const outputFormat = await resolveOutputFormat(mainBuffer, filename);
       const result = await sharp(mainBuffer)
         .composite([{ input: wmBuffer, top, left }])
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
 
       const jobId = randomUUID();

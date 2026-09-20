@@ -72,8 +72,11 @@ export function registerSpriteSheet(app: FastifyInstance) {
         if (i === 0) {
           cellBuf = ctx.inputs[i].buffer;
         } else {
+          // PNG, so the cell is not re-encoded in its own input's container on
+          // the way onto the sheet (#1190).
           cellBuf = await sharp(ctx.inputs[i].buffer)
             .resize(cellW, cellH, { fit: "cover" })
+            .png()
             .toBuffer();
         }
 

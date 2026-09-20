@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -61,18 +61,8 @@ export function registerImagePad(app: FastifyInstance) {
         settings.background !== "transparent"
           ? await resolveOutputFormat(inputBuffer, filename)
           : (await isAnimated(inputBuffer))
-            ? {
-                format: "webp" as const,
-                extension: "webp",
-                contentType: "image/webp",
-                quality: 95,
-              }
-            : {
-                format: "png" as const,
-                extension: "png",
-                contentType: "image/png",
-                quality: undefined,
-              };
+            ? outputFormatFor("webp", 95)
+            : outputFormatFor("png");
 
       // The blur background composites the original over a blurred canvas, and
       // a composite lands on the first frame only, so animation is handled a
@@ -127,6 +117,9 @@ export function registerImagePad(app: FastifyInstance) {
         } else {
           const c = parseHex(settings.color);
           buf = await sharp(source)
+            // PNG for the same reason as the transparent branch above: out of a
+            // GIF, the padding colour has to exist in the source palette
+            // (#1190). Animated input is already PNG frames by this point.
             .extend({
               top: padTop,
               bottom: padBottom,
@@ -134,11 +127,12 @@ export function registerImagePad(app: FastifyInstance) {
               right: padRight,
               background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
             })
+            .png()
             .toBuffer();
         }
 
         return await sharp(buf)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
           .toBuffer();
       };
 

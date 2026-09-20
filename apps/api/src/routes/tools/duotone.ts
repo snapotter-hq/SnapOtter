@@ -88,7 +88,7 @@ export function registerDuotone(app: FastifyInstance) {
         }
 
         return await sharp(buf)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
           .toBuffer();
       };
 

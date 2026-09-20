@@ -30,7 +30,7 @@ export function registerColorBlindness(app: FastifyInstance) {
       const image = openAnimated(inputBuffer, animation);
       const result = await colorBlindness(image, { type: settings.simulationType });
       const buffer = await result
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
 
       return { buffer, filename, contentType: outputFormat.contentType };

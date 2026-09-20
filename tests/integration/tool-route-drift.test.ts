@@ -2,61 +2,21 @@ import { apiToolPath, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getRegisteredToolIds, getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
+import { REGISTRY_EXEMPT } from "../helpers/registry-exempt.js";
 import { buildTestApp, createMultipartPayload, loginAsAdmin, type TestApp } from "./test-server.js";
 
 /**
  * Drift guards between the shared TOOLS catalog and the API.
  *
  * Two intentional asymmetries exist and are pinned exactly:
- *  - REGISTRY_EXEMPT: tools whose contract does not fit the single-buffer
+ *  - REGISTRY_EXEMPT (in tests/helpers, because the container-independence
+ *    guard reads it too): tools whose contract does not fit the single-buffer
  *    process fn (multi-file, ZIP/JSON output, no-input generators, custom AI
  *    routes). They expose an HTTP route but are not in the pipeline/batch
- *    registry. If one of these gains registry support, remove it here.
+ *    registry. If one of these gains registry support, remove it there.
  *  - LEGACY_ALIASES: extra registered toolIds kept for backwards-compatible
  *    URLs (consolidated into adjust-colors).
  */
-const REGISTRY_EXEMPT = new Set([
-  "auto-subtitles",
-  "background-replace",
-  "barcode-generate",
-  "barcode-read",
-  "blur-background",
-  "bulk-rename",
-  "collage",
-  "color-palette",
-  "compare",
-  "compose",
-  "erase-object",
-  "favicon",
-  "find-duplicates",
-  "html-to-image",
-  "image-to-base64",
-  "image-to-pdf",
-  "info",
-  "pdf-to-image",
-  "qr-generate",
-  "sign-pdf",
-  "stitch",
-  "svg-to-raster",
-  "transcribe-audio",
-  "watermark-image",
-  // Conversion presets riding the three custom ZIP routes above (image-to-pdf,
-  // pdf-to-image, svg-to-raster). They share those routes' contracts, so like
-  // their bases they are not in the process-fn registry.
-  "jpg-to-pdf",
-  "png-to-pdf",
-  "heic-to-pdf",
-  "tiff-to-pdf",
-  "webp-to-pdf",
-  "gif-to-pdf",
-  "eps-to-pdf",
-  "pdf-to-jpg",
-  "pdf-to-png",
-  "pdf-to-tiff",
-  "svg-to-png",
-  "svg-to-jpg",
-]);
-
 const LEGACY_ALIASES = new Set([
   "brightness-contrast",
   "saturation",

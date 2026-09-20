@@ -93,11 +93,16 @@ function matchesAccept(filename: string, accept: string[]): boolean {
   return accept.some((ext) => lower.endsWith(ext.toLowerCase()));
 }
 
-async function flattenAlpha(buf: Buffer): Promise<Buffer> {
+/** Exported for the container-independence guard; not part of the route API. */
+export async function flattenAlpha(buf: Buffer): Promise<Buffer> {
   const meta = await sharp(buf).metadata();
   if (meta.hasAlpha) {
+    // PNG, because white is the one colour a transparent GIF's palette is least
+    // likely to hold: unnamed, the backing came through as 76,105,113 and the
+    // page behind the image was grey-blue (#1190).
     return sharp(buf)
       .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .png()
       .toBuffer();
   }
   return buf;

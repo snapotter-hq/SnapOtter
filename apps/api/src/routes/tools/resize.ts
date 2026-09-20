@@ -33,7 +33,7 @@ export function registerResize(app: FastifyInstance) {
       );
       const result = await resize(image, settings);
       const buffer = await result
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
       return { buffer, filename, contentType: outputFormat.contentType };
     },

@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -55,10 +55,10 @@ export function registerReplaceColor(app: FastifyInstance) {
       const useFormat =
         needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
           ? (await isAnimated(inputBuffer))
-            ? { format: "webp" as const, quality: outputFormat.quality, contentType: "image/webp" }
+            ? outputFormatFor("webp", outputFormat.quality)
             : // No quality on the forced PNG: even 100 turns on Sharp's palette
               // quantisation, which is lossy past 256 distinct colours (#710).
-              { format: "png" as const, quality: undefined, contentType: "image/png" }
+              outputFormatFor("png")
           : outputFormat;
 
       // The result is rebuilt from a raw buffer, which Sharp always reads as a
@@ -97,7 +97,7 @@ export function registerReplaceColor(app: FastifyInstance) {
         return await sharp(pixels, {
           raw: { width: info.width, height: info.height, channels: 4 },
         })
-          .toFormat(useFormat.format, { quality: useFormat.quality })
+          .toFormat(useFormat.format, useFormat.encoderOptions)
           .toBuffer();
       };
 

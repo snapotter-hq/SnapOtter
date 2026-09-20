@@ -86,7 +86,9 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
 }
 
 async function removeWatermarkMedian(buffer: Buffer): Promise<Buffer> {
-  return sharp(buffer).median(5).toBuffer();
+  // PNG: a median filter averages neighbourhoods into colours the source never
+  // held, which a GIF's own palette cannot carry to the matting model (#1190).
+  return sharp(buffer).median(5).png().toBuffer();
 }
 
 /**

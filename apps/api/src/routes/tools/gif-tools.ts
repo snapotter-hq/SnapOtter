@@ -199,7 +199,16 @@ export function registerGifTools(app: FastifyInstance) {
               image.resize(settings.width, settings.height, { fit: "inside" });
             }
 
-            const buffer = await image.gif({ loop }).toBuffer();
+            // Resampling invents colours between the ones the source held, and
+            // Sharp's writer would otherwise express them in the palette it
+            // read the input with, so a resized GIF came back in the wrong
+            // colours (#1190).
+            //
+            // Only this mode. The reverse and rotate modes hand their frames to
+            // assembleAnimatedGif, which splices them keeping the first frame's
+            // colour table, so a fresh palette per frame would leave every
+            // later frame indexed against a table that no longer describes it.
+            const buffer = await image.gif({ loop, reuse: false }).toBuffer();
             return { buffer, filename, contentType: "image/gif" };
           }
 

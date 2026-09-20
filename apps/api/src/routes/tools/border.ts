@@ -35,6 +35,10 @@ export function registerBorder(app: FastifyInstance) {
     process: async (inputBuffer, settings, filename) => {
       let buf = inputBuffer;
 
+      // Both steps below name PNG so the colour they paint is not re-encoded in
+      // the input's own container: a green border came back as 76,105,113 out
+      // of a GIF, whose palette has no green in it (#1190).
+
       // 1. Add padding
       if (settings.padding > 0) {
         const c = parseHex(settings.paddingColor);
@@ -46,6 +50,7 @@ export function registerBorder(app: FastifyInstance) {
             right: settings.padding,
             background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
           })
+          .png()
           .toBuffer();
       }
 
@@ -60,6 +65,7 @@ export function registerBorder(app: FastifyInstance) {
             right: settings.borderWidth,
             background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
           })
+          .png()
           .toBuffer();
       }
 
@@ -156,7 +162,7 @@ export function registerBorder(app: FastifyInstance) {
       }
 
       const buffer = await sharp(buf)
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
       return { buffer, filename, contentType: outputFormat.contentType };
     },

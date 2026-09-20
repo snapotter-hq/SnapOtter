@@ -55,9 +55,7 @@ export function registerSharpening(app: FastifyInstance) {
           denoise: settings.denoise,
         });
 
-        return await image
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+        return await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
       };
 
       const buffer =

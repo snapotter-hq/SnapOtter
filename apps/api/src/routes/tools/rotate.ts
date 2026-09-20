@@ -42,18 +42,22 @@ export function registerRotate(app: FastifyInstance) {
           });
         }
 
-        return await image
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
-          .toBuffer();
+        return await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
       };
 
       // Nothing to turn means nothing to decompose. Re-encoding the animation
-      // in one pass keeps every frame without paying a requantisation for a
-      // transform that was never asked for.
+      // in one pass keeps every frame, rather than splitting and rebuilding it
+      // for a transform that was never asked for.
+      //
+      // It does still pay one palette pass: GIF output asks for a fresh palette
+      // so that the turning cases can express the colours they introduce
+      // (#1190), and this path cannot opt out of that without deciding per
+      // setting which cases are pure. On a photographic animation that costs up
+      // to 36 on a channel.
       if (settings.angle === 0 && !settings.horizontal && !settings.vertical) {
         const animation = await readAnimationFor(inputBuffer, outputFormat.format);
         const buffer = await openAnimated(inputBuffer, animation)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
           .toBuffer();
         return { buffer, filename, contentType: outputFormat.contentType };
       }

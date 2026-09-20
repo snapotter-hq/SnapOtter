@@ -13,6 +13,33 @@ export interface OutputFormat {
    * without caring about the format.
    */
   quality?: number;
+  /**
+   * The whole option bag for `toFormat()`, so a route never has to know which
+   * encoder it is about to drive: `.toFormat(f.format, f.encoderOptions)`.
+   *
+   * It carries `quality` plus, for GIF, `reuse: false`. Sharp's GIF writer
+   * defaults to reusing the palette libvips read the input with, so a tool that
+   * introduces a colour the source never held cannot express it: a green border
+   * on a GIF came back as 76,105,113, with a 200 and no warning (issue #1190).
+   *
+   * A fresh palette is not free, and the cost falls on the tools that needed it
+   * least. Reuse hands an unchanged photographic animation back byte for byte,
+   * where regenerating moved a channel by up to 36 on animated-simpsons.gif and
+   * added 5% to the file, for about a fifth more encode time. That is the price
+   * of not deciding per tool whether its settings can introduce a colour, which
+   * is a judgement that goes stale: `border` looks like a pure frame until
+   * someone sets a colour, and it is wrong for exactly the settings a user
+   * would pick.
+   *
+   * Every other encoder ignores keys it does not know, which is what lets one
+   * bag serve them all.
+   */
+  encoderOptions: EncoderOptions;
+}
+
+export interface EncoderOptions {
+  quality?: number;
+  reuse?: false;
 }
 
 const FORMAT_MAP: Record<string, { format: SharpFormat; extension: string; contentType: string }> =
@@ -62,5 +89,24 @@ export async function resolveOutputFormat(
   // every other encoder wants the default hint.
   const quality = qualityOverride ?? (config.format === "png" ? undefined : DEFAULT_QUALITY);
 
-  return { ...config, quality };
+  return outputFormatFor(config.format, quality);
+}
+
+/**
+ * Describe one output format, without asking what the input was.
+ *
+ * For the handful of routes that pick their format themselves rather than from
+ * the input: a transparent background forcing PNG, say. Going through here
+ * keeps them on the GIF palette rule (issue #1190) and keeps `quality` and
+ * `encoderOptions.quality` from being written out twice by hand and drifting
+ * apart, which is what the literals it replaced did.
+ */
+export function outputFormatFor(format: SharpFormat, quality?: number): OutputFormat {
+  const config = FORMAT_MAP[format] ?? PNG_FALLBACK;
+  return {
+    ...config,
+    format,
+    quality,
+    encoderOptions: format === "gif" ? { quality, reuse: false } : { quality },
+  };
 }

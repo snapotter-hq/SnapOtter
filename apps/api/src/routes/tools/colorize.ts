@@ -43,7 +43,7 @@ registerAiJobHandler("colorize", async (input, data, ctx) => {
   let outputBuffer = result.buffer;
   if (outputFormat.format !== "png") {
     outputBuffer = await sharp(result.buffer)
-      .toFormat(outputFormat.format, { quality: outputFormat.quality })
+      .toFormat(outputFormat.format, outputFormat.encoderOptions)
       .toBuffer();
   }
 

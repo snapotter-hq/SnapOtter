@@ -51,9 +51,11 @@ export function registerCircleCrop(app: FastifyInstance) {
       const bw = Math.min(settings.borderWidth, Math.floor(d / 2));
       const canvas = d + 2 * bw;
 
-      // Extract the square, mask it to a circle.
+      // Extract the square, mask it to a circle. PNG, so a JPEG source does not
+      // pay a second generation at Sharp's default quality here (#1190).
       const squareBuf = await sharp(inputBuffer)
         .extract({ left, top, width: d, height: d })
+        .png()
         .toBuffer();
       const circleMask = Buffer.from(
         `<svg width="${d}" height="${d}"><circle cx="${d / 2}" cy="${d / 2}" r="${d / 2}" fill="#fff"/></svg>`,

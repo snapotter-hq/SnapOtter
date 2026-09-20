@@ -56,7 +56,7 @@ registerAiJobHandler("restore-photo", async (input, data, ctx) => {
   let outputBuffer = result.buffer;
   if (outputFormat.format !== "png") {
     outputBuffer = await sharp(result.buffer)
-      .toFormat(outputFormat.format, { quality: outputFormat.quality })
+      .toFormat(outputFormat.format, outputFormat.encoderOptions)
       .toBuffer();
   }
 
@@ -254,7 +254,7 @@ export function registerRestorePhoto(app: FastifyInstance) {
         let outputBuffer = result.buffer;
         if (outputFormat.format !== "png") {
           outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, { quality: outputFormat.quality })
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
             .toBuffer();
         }
         const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;

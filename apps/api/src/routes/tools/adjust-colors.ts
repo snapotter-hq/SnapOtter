@@ -141,9 +141,7 @@ async function processColorAdjustments(
       break;
   }
 
-  const buffer = await image
-    .toFormat(outputFormat.format, { quality: outputFormat.quality })
-    .toBuffer();
+  const buffer = await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
   return { buffer, filename, contentType: outputFormat.contentType };
 }
 

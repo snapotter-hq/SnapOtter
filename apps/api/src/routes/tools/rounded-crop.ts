@@ -90,9 +90,11 @@ export function registerRoundedCrop(app: FastifyInstance) {
       // Percent of the shorter side, capped at half (a full round = circle).
       const radiusPx = Math.min((settings.cornerRadius / 100) * d, d / 2);
 
-      // Extract the square, mask it to the chosen shape.
+      // Extract the square, mask it to the chosen shape. PNG, so a JPEG source
+      // does not pay a second generation here (#1190).
       const squareBuf = await sharp(inputBuffer)
         .extract({ left, top, width: d, height: d })
+        .png()
         .toBuffer();
       const mask = shapeSvg(settings.shape, d, radiusPx, "#fff");
       const imgShape = await sharp(squareBuf)

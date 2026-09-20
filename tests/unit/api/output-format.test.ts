@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { resolveOutputFormat } from "../../../apps/api/src/lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../../apps/api/src/lib/output-format.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const JPG = readFixture(fixtures.image.base.jpg100);
 const PNG = readFixture(fixtures.image.base.png200);
 const WEBP = readFixture(fixtures.image.base.webp50);
+const GIF = readFixture(fixtures.image.animated.gif);
 
 describe("resolveOutputFormat", () => {
   it("detects JPEG input and returns jpeg config", async () => {
@@ -53,5 +54,57 @@ describe("resolveOutputFormat", () => {
     const result = await resolveOutputFormat(PNG, "image.png", 50);
     expect(result.format).toBe("png");
     expect(result.quality).toBe(50);
+  });
+});
+
+/**
+ * Issue #1190: Sharp's GIF writer reuses the palette it read the input with, so
+ * a tool that introduces a colour the source never held cannot express it. The
+ * whole fix rests on the bag below carrying `reuse: false` for GIF and nothing
+ * extra for anything else, and until this existed that contract was observable
+ * only by running two dozen tools end to end.
+ */
+describe("encoderOptions", () => {
+  it("asks for a fresh palette when the output is a GIF", async () => {
+    const result = await resolveOutputFormat(GIF, "animation.gif");
+    expect(result.format).toBe("gif");
+    expect(result.encoderOptions).toEqual({ quality: 95, reuse: false });
+  });
+
+  it("passes no reuse key to any other encoder", async () => {
+    for (const [label, buffer] of [
+      ["jpeg", JPG],
+      ["png", PNG],
+      ["webp", WEBP],
+    ] as const) {
+      const result = await resolveOutputFormat(buffer, `image.${label}`);
+      // Absent, not merely false. The GIF rule leans on every other encoder
+      // ignoring keys it does not know, and the narrower the bag stays the less
+      // that assumption has to carry.
+      expect(Object.keys(result.encoderOptions), label).toEqual(["quality"]);
+    }
+  });
+
+  it("keeps quality and encoderOptions.quality saying the same thing", async () => {
+    for (const buffer of [JPG, PNG, WEBP, GIF]) {
+      const result = await resolveOutputFormat(buffer, "image");
+      expect(result.encoderOptions.quality).toBe(result.quality);
+    }
+    const override = await resolveOutputFormat(JPG, "photo.jpg", 50);
+    expect(override.encoderOptions.quality).toBe(50);
+  });
+
+  it("applies the same rule when a route picks the format itself", () => {
+    // The forced-PNG and forced-WebP branches in replace-color and image-pad go
+    // through here rather than writing the bag out by hand, which is how the
+    // two copies of the quality could drift apart.
+    expect(outputFormatFor("gif", 80).encoderOptions).toEqual({ quality: 80, reuse: false });
+    expect(outputFormatFor("png")).toMatchObject({
+      format: "png",
+      extension: "png",
+      contentType: "image/png",
+      quality: undefined,
+      encoderOptions: { quality: undefined },
+    });
   });
 });

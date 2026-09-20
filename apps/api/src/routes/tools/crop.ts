@@ -25,7 +25,7 @@ export function registerCrop(app: FastifyInstance) {
       );
       const result = await crop(image, settings);
       const buffer = await result
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
       return { buffer, filename, contentType: outputFormat.contentType };
     },

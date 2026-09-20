@@ -311,6 +311,13 @@ function alignOffset(containerSize: number, itemSize: number, alignment: string)
   return Math.round((containerSize - itemSize) / 2);
 }
 
+// The three prepare functions below each resize one input before it is laid
+// onto the canvas, and every one of those intermediates names PNG. Left
+// unnamed, Sharp writes each one back in whatever container that input arrived
+// in, so a stitch of eight JPEGs paid eight lossy generations at the encoder's
+// own default rather than the 95 the output asked for, and a GIF had its
+// resampled colours forced through the palette it was read with (#1190). One
+// resize per input is where that cost multiplies.
 async function prepareForHorizontal(
   images: PreparedImage[],
   resizeMode: string,
@@ -325,13 +332,14 @@ async function prepareForHorizontal(
 
       if (resizeMode === "fit") {
         const scaledWidth = Math.round((img.width * minHeight) / img.height);
-        const resized = await sharp(img.buffer).resize(scaledWidth, minHeight).toBuffer();
+        const resized = await sharp(img.buffer).resize(scaledWidth, minHeight).png().toBuffer();
         return { buffer: resized, width: scaledWidth, height: minHeight };
       }
 
       if (resizeMode === "stretch") {
         const resized = await sharp(img.buffer)
           .resize(img.width, minHeight, { fit: "fill" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: img.width, height: minHeight };
       }
@@ -340,6 +348,7 @@ async function prepareForHorizontal(
         const scaledWidth = Math.round((img.width * minHeight) / img.height);
         const resized = await sharp(img.buffer)
           .resize(scaledWidth, minHeight, { fit: "cover" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: scaledWidth, height: minHeight };
       }
@@ -363,13 +372,14 @@ async function prepareForVertical(
 
       if (resizeMode === "fit") {
         const scaledHeight = Math.round((img.height * minWidth) / img.width);
-        const resized = await sharp(img.buffer).resize(minWidth, scaledHeight).toBuffer();
+        const resized = await sharp(img.buffer).resize(minWidth, scaledHeight).png().toBuffer();
         return { buffer: resized, width: minWidth, height: scaledHeight };
       }
 
       if (resizeMode === "stretch") {
         const resized = await sharp(img.buffer)
           .resize(minWidth, img.height, { fit: "fill" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: minWidth, height: img.height };
       }
@@ -378,6 +388,7 @@ async function prepareForVertical(
         const scaledHeight = Math.round((img.height * minWidth) / img.width);
         const resized = await sharp(img.buffer)
           .resize(minWidth, scaledHeight, { fit: "cover" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: minWidth, height: scaledHeight };
       }
@@ -403,13 +414,14 @@ async function prepareForGrid(
         if (scale >= 1) return img;
         const newW = Math.round(img.width * scale);
         const newH = Math.round(img.height * scale);
-        const resized = await sharp(img.buffer).resize(newW, newH).toBuffer();
+        const resized = await sharp(img.buffer).resize(newW, newH).png().toBuffer();
         return { buffer: resized, width: newW, height: newH };
       }
 
       if (settings.resizeMode === "stretch") {
         const resized = await sharp(img.buffer)
           .resize(medianWidth, medianHeight, { fit: "fill" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: medianWidth, height: medianHeight };
       }
@@ -417,6 +429,7 @@ async function prepareForGrid(
       if (settings.resizeMode === "crop") {
         const resized = await sharp(img.buffer)
           .resize(medianWidth, medianHeight, { fit: "cover" })
+          .png()
           .toBuffer();
         return { buffer: resized, width: medianWidth, height: medianHeight };
       }

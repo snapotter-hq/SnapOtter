@@ -129,8 +129,11 @@ export function registerCompose(app: FastifyInstance) {
           .png()
           .toBuffer();
 
+        // PNG: the mask has just given the overlay partial alpha, which its own
+        // container may not carry (#1190).
         processedOverlay = await sharp(overlayBuf)
           .composite([{ input: opacityMask, blend: "dest-in" }])
+          .png()
           .toBuffer();
       }
 
@@ -145,6 +148,7 @@ export function registerCompose(app: FastifyInstance) {
             width: Math.min(overlayWidth, availableWidth),
             height: Math.min(overlayHeight, availableHeight),
           })
+          .png()
           .toBuffer();
       }
 
@@ -158,7 +162,7 @@ export function registerCompose(app: FastifyInstance) {
             blend: settings.blendMode as Blend,
           },
         ])
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
 
       const jobId = randomUUID();

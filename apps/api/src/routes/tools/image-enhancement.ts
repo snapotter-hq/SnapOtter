@@ -110,12 +110,15 @@ async function processImageEnhancement(
       const colorBuffer = await image.png().toBuffer();
       buffer = await sharp(colorBuffer)
         .joinChannel(alphaBuffer)
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
+        .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
     } else {
-      buffer = await image
-        .toFormat(outputFormat.format, { quality: outputFormat.quality })
-        .toBuffer();
+      // No intermediate to break the lineage on this branch, so the encoder
+      // still holds the palette it read the GIF with and quantizes the
+      // corrected pixels back onto their pre-correction colours: the tool
+      // returned the input unchanged, with a 200 (#1219). encoderOptions
+      // carries the fresh-palette request that fixes it.
+      buffer = await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
     }
 
     if (settings.deepEnhance && isToolInstalled("noise-removal")) {

@@ -651,6 +651,8 @@ export function registerCollage(app: FastifyInstance) {
               // Panned entirely out of the cell: background only.
               cellBuffer = await canvas.png().toBuffer();
             } else {
+              // PNG, so the cell is not re-encoded in its own input's container
+              // on the way to the canvas (#1190).
               const visible = await sharp(files[i].buffer)
                 .resize(contentW, contentH, { fit: "fill" })
                 .extract({
@@ -659,6 +661,7 @@ export function registerCollage(app: FastifyInstance) {
                   width: visRight - visLeft,
                   height: visBottom - visTop,
                 })
+                .png()
                 .toBuffer();
               cellBuffer = await canvas
                 .composite([{ input: visible, left: visLeft, top: visTop }])

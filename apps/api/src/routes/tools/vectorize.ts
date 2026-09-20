@@ -56,7 +56,9 @@ async function vectorizeBuffer(
   let buf = inputBuffer;
 
   if (settings.invert) {
-    buf = await sharp(buf).negate({ alpha: false }).toBuffer();
+    // PNG: negating a GIF through its own palette traced inverted magenta as
+    // 76,105,113 instead of green (#1190).
+    buf = await sharp(buf).negate({ alpha: false }).png().toBuffer();
   }
 
   let svg: string;

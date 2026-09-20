@@ -65,12 +65,15 @@ export function registerVignette(app: FastifyInstance) {
 
         const overlay = await sharp(svg).resize(w, h).toBuffer();
 
+        // PNG: the overlay darkens toward a colour the source palette need not
+        // hold, and a GIF intermediate could not express the gradient (#1190).
         const buf = await sharp(source)
           .composite([{ input: overlay, blend: "over" }])
+          .png()
           .toBuffer();
 
         return await sharp(buf)
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
           .toBuffer();
       };
 

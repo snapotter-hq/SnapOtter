@@ -116,7 +116,7 @@ export function registerPixelate(app: FastifyInstance) {
         // resolveOutputFormat leaves quality undefined for PNG, which keeps the
         // flat blocks free of palette dithering (#710).
         return await pixelated
-          .toFormat(outputFormat.format, { quality: outputFormat.quality })
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
           .toBuffer();
       };
 
