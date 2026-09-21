@@ -5,20 +5,21 @@
  * reads it at module load time), then exercises the importBundleArchive
  * helper and the POST /api/v1/admin/features/import endpoint.
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   createReadStream,
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // tar lives in apps/api/node_modules; resolve via createRequire (same
 // pattern as tests/global-setup.ts for pg/drizzle).
@@ -425,25 +426,104 @@ describe("importBundleArchive", () => {
 
 describe("site-packages import", () => {
   beforeEach(resetState);
+  afterEach(() => {
+    delete process.env.PYTHON_VENV_PATH;
+    // The positive test's successful import leaves mediapipe/face.tflite in
+    // the shared modelsDir; clear it so a later test's "not moved" assertion
+    // reflects that test's own import, not a previous one's leftovers.
+    rmSync(join(modelsDir, "mediapipe"), { recursive: true, force: true });
+  });
 
-  it("extracts site-packages into venv site-packages directory", async () => {
-    const venvSitePackages = join(aiDir, "venv", "lib", "python3.12", "site-packages");
-    mkdirSync(venvSitePackages, { recursive: true });
-    process.env.PYTHON_VENV_PATH = join(aiDir, "venv");
-
-    const tarPath = await createBundleTarWithSitePackages(
+  async function buildSitePackagesArchive(): Promise<string> {
+    return createBundleTarWithSitePackages(
       testBundleId,
       testVersion,
       { "mediapipe/face.tflite": "model-data" },
       { "fakepkg/__init__.py": "# fake package" },
     );
+  }
+
+  async function expectRejectedImport(tarPath: string, messagePattern: RegExp): Promise<void> {
+    invalidateCache();
+    const error = await importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ImportValidationError);
+    expect((error as Error).message).toMatch(messagePattern);
+
+    const installed = JSON.parse(readFileSync(installedPath, "utf-8"));
+    expect(installed.bundles[testBundleId]).toBeUndefined();
+    // The venv is validated before either move now, so a rejected import
+    // leaves no half-applied bundle (models included) behind (#1139).
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+  }
+
+  it("extracts site-packages into venv site-packages directory", async () => {
+    // A real venv, not a hand-built directory layout: resolution now asks the
+    // venv's own interpreter (sysconfig purelib), so it has to actually run.
+    const venvPath = join(aiDir, `venv-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarPath = await buildSitePackagesArchive();
 
     invalidateCache();
     const result = await importBundleArchive(createReadStream(tarPath));
     expect(result.bundleId).toBe(testBundleId);
-    expect(existsSync(join(venvSitePackages, "fakepkg", "__init__.py"))).toBe(true);
 
-    delete process.env.PYTHON_VENV_PATH;
+    // Assert the contract that matters: the venv's own interpreter can now
+    // import what was moved, not just that some directory matched a guess.
+    const imported = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import fakepkg; print(fakepkg.__file__)"],
+      { encoding: "utf-8" },
+    );
+    expect(imported).toContain("site-packages");
+  }, 30_000);
+
+  it("fails the import instead of reporting success when the venv has no interpreter to ask (#1139)", async () => {
+    // No bin/python3 at all: exactly the layout the old code silently
+    // skipped past while still marking the bundle installed.
+    const venvPath = join(aiDir, `venv-broken-${randomUUID()}`);
+    mkdirSync(venvPath, { recursive: true });
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    await expectRejectedImport(await buildSitePackagesArchive(), /could not be queried/i);
+  });
+
+  it("fails the import when the venv's interpreter names a site-packages directory that doesn't exist (#1139)", async () => {
+    // The interpreter runs fine and sysconfig resolves a purelib path, but
+    // the directory itself is gone (a partial rm -rf, a relocated venv).
+    const venvPath = join(aiDir, `venv-nopurelib-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    const purelib = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    rmSync(purelib, { recursive: true, force: true });
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    await expectRejectedImport(await buildSitePackagesArchive(), /has no site-packages directory/i);
+  }, 30_000);
+
+  it("fails the import when the venv's interpreter reports a site-packages directory outside the venv", async () => {
+    // bin/python3 symlinked straight to the system interpreter, no
+    // pyvenv.cfg: sysconfig then reports the SYSTEM site-packages, which
+    // must never be treated as a valid destination for a bundle's packages.
+    const venvPath = join(aiDir, `venv-escaped-${randomUUID()}`);
+    mkdirSync(join(venvPath, "bin"), { recursive: true });
+    const systemPython = execFileSync(
+      process.env.PYTHON || "python3",
+      ["-c", "import sys; print(sys.executable)"],
+      { encoding: "utf-8" },
+    ).trim();
+    symlinkSync(systemPython, join(venvPath, "bin", "python3"));
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    await expectRejectedImport(await buildSitePackagesArchive(), /outside the environment itself/i);
   });
 });
 

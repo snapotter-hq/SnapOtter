@@ -16,6 +16,7 @@ import {
   readdirSync,
   readFileSync,
   readSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -23,7 +24,7 @@ import {
   writeFileSync,
   writeSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
@@ -1687,6 +1688,13 @@ export async function importBundleArchive(
       );
     }
 
+    // Resolve where site-packages must land, before moving anything: a
+    // rejected import must not leave models half-applied on disk (#1139).
+    const stagingSitePackages = join(stagingDir, "site-packages");
+    const sitePackagesDir = existsSync(stagingSitePackages)
+      ? resolveVenvSitePackages(sharedVenvPath())
+      : "";
+
     // Move models/* into MODELS_DIR
     const stagingModels = join(stagingDir, "models");
     if (existsSync(stagingModels)) {
@@ -1695,20 +1703,8 @@ export async function importBundleArchive(
     }
 
     // Move site-packages/* into venv site-packages
-    const stagingSitePackages = join(stagingDir, "site-packages");
-    if (existsSync(stagingSitePackages)) {
-      const venvPath = process.env.PYTHON_VENV_PATH || join(AI_DIR, "venv");
-      let sitePackagesDir = "";
-      const libDir = join(venvPath, "lib");
-      if (existsSync(libDir)) {
-        const pyDirs = readdirSync(libDir).filter((d) => d.startsWith("python"));
-        if (pyDirs.length > 0) {
-          sitePackagesDir = join(libDir, pyDirs[0], "site-packages");
-        }
-      }
-      if (sitePackagesDir && existsSync(sitePackagesDir)) {
-        moveTreeRecursive(stagingSitePackages, sitePackagesDir);
-      }
+    if (sitePackagesDir) {
+      moveTreeRecursive(stagingSitePackages, sitePackagesDir);
     }
 
     // Apply fixups (NCCL wheel) if present
@@ -1716,7 +1712,7 @@ export async function importBundleArchive(
     if (existsSync(stagingFixups)) {
       const wheels = readdirSync(stagingFixups).filter((f) => f.endsWith(".whl"));
       if (wheels.length > 0) {
-        const venvPython = `${process.env.PYTHON_VENV_PATH || join(AI_DIR, "venv")}/bin/python3`;
+        const venvPython = join(sharedVenvPath(), "bin", "python3");
         for (const wheel of wheels) {
           try {
             execFileSync(
@@ -1757,6 +1753,64 @@ export async function importBundleArchive(
     }
     if (acquiredInstallLock) releaseInstallLock();
   }
+}
+
+/**
+ * Resolve a venv's site-packages directory through its own interpreter
+ * (mirrors the `sysconfig.get_paths()["purelib"]` resolution docker/Dockerfile
+ * uses to build the base venv), rather than guessing from directory layout.
+ * Throws ImportValidationError, carrying the interpreter's own stderr, when
+ * the venv has no usable interpreter to ask; spawnSync reports a missing
+ * binary as `result.error` rather than throwing, so that failure is caught
+ * here instead of surfacing raw.
+ *
+ * Also refuses a resolved path outside venvPath. A directory whose
+ * `bin/python3` is a symlink to the system interpreter, or a venv missing
+ * its `pyvenv.cfg`, answers with the SYSTEM site-packages; treating that as
+ * a valid destination would move a bundle's packages into the host Python
+ * instead of just failing to place them (#1139's regression risk, not its
+ * original bug).
+ */
+function resolveVenvSitePackages(venvPath: string): string {
+  const result = spawnSync(
+    join(venvPath, "bin", "python3"),
+    ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+    { stdio: ["ignore", "pipe", "pipe"], timeout: 10_000, encoding: "utf-8" },
+  );
+  if (result.error || result.status !== 0 || !result.stdout?.trim()) {
+    const detail =
+      result.error?.message ||
+      result.stderr?.trim() ||
+      `python3 exited with status ${String(result.status)}`;
+    throw new ImportValidationError(
+      `The AI environment's Python interpreter at ${venvPath} could not be queried (${detail}). Recreate the AI environment and retry.`,
+    );
+  }
+  // Take the last non-empty line: a .pth file or import-time shim can print
+  // warnings to stdout ahead of the path sysconfig actually printed.
+  const lines = result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sitePackagesDir = resolve(lines[lines.length - 1] ?? "");
+  // realpathSync, not resolve: venvPath came in from config, but the
+  // interpreter's own reported prefix is already canonicalized by the OS
+  // (e.g. macOS resolves /var to /private/var), so comparing against the
+  // literal, symlink-carrying venvPath false-flags every legitimate venv
+  // that happens to sit under such a path. venvPath is proven to exist by
+  // the spawn above (its bin/python3 just ran), so this cannot throw here.
+  const resolvedVenvPath = realpathSync(venvPath);
+  if (sitePackagesDir !== resolvedVenvPath && !sitePackagesDir.startsWith(resolvedVenvPath + sep)) {
+    throw new ImportValidationError(
+      `The AI environment's Python interpreter at ${venvPath} reports a site-packages directory (${sitePackagesDir}) outside the environment itself. Recreate the AI environment and retry.`,
+    );
+  }
+  if (!existsSync(sitePackagesDir)) {
+    throw new ImportValidationError(
+      `The AI environment at ${venvPath} has no site-packages directory at ${sitePackagesDir}. Recreate the AI environment and retry.`,
+    );
+  }
+  return sitePackagesDir;
 }
 
 /** Recursively move entries from src into dest, merging directories. */
