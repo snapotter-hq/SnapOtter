@@ -163,6 +163,25 @@ describe("analytics lib (baked model)", () => {
       });
     });
 
+    it("forwards the batch_processed reason and total_bytes (#1161)", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mod.track("batch_processed", {
+        tool_id: "resize",
+        file_count: 40,
+        status: "failed",
+        reason: "http-503",
+        total_bytes: 123_456,
+        filenames: "leak",
+      });
+      expect(mockCapture).toHaveBeenCalledWith("batch_processed", {
+        tool_id: "resize",
+        file_count: 40,
+        status: "failed",
+        reason: "http-503",
+        total_bytes: 123_456,
+      });
+    });
+
     it("drops all properties for an unknown event", async () => {
       await mod.initAnalytics(enabledConfig);
       mod.track("not_allow_listed", { tool_id: "resize" });

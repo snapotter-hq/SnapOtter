@@ -8,6 +8,7 @@ import {
   assertLocalCapacity,
   computeWorkspaceUsedBytes,
   isOverWorkspaceCap,
+  workspaceHeadroomBytes,
 } from "../../../apps/api/src/lib/object-storage.js";
 
 describe("isOverWorkspaceCap", () => {
@@ -151,5 +152,66 @@ describe("assertLocalCapacity capacity guard", () => {
     await unlink(big);
     expect(existsSync(big)).toBe(false);
     await expect(assertLocalCapacity()).rejects.toMatchObject({ statusCode: 503 });
+  });
+});
+
+// The batch route asks for the remaining headroom before it reads an upload,
+// so a batch that cannot fit is refused from its Content-Length instead of
+// being buffered whole and failing at the first store (#1161).
+describe("workspaceHeadroomBytes", () => {
+  const originalWorkspace = env.WORKSPACE_PATH;
+  const originalMaxGb = env.MAX_WORKSPACE_SIZE_GB;
+  let root = "";
+  let nowBase = 2_000_000_000_000;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = originalMaxGb;
+    if (root) await rm(root, { recursive: true, force: true });
+    root = "";
+    nowBase += 10 * 60_000;
+  });
+
+  it("is null when the cap is disabled", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-headroom-off-"));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    expect(await workspaceHeadroomBytes()).toBeNull();
+  });
+
+  it("is null before the workspace root exists", async () => {
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = join(
+      tmpdir(),
+      `snapotter-headroom-absent-${process.pid}-${Date.now()}`,
+    );
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 1;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    expect(await workspaceHeadroomBytes()).toBeNull();
+  });
+
+  it("is the cap minus the bytes already stored", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-headroom-"));
+    await mkdir(join(root, "uploads", "job1"), { recursive: true });
+    await writeFile(join(root, "uploads", "job1", "a.bin"), Buffer.alloc(4096));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 1;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    expect(await workspaceHeadroomBytes()).toBe(1024 ** 3 - 4096);
+  });
+
+  it("never goes below zero once the cap is already exceeded", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-headroom-over-"));
+    await mkdir(join(root, "outputs", "job1"), { recursive: true });
+    await writeFile(join(root, "outputs", "job1", "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    expect(await workspaceHeadroomBytes()).toBe(0);
   });
 });

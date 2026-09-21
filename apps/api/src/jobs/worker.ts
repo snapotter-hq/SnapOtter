@@ -33,6 +33,7 @@ import {
   extractErrorCode,
   getBundleForTool,
   getOptionalBundleForTool,
+  isSafeMessageError,
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
   type PipelineExecutedProperties,
@@ -1514,7 +1515,12 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   try {
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
-    const packagingError = "Failed to package batch results";
+    // A SafeError's message is authored by us and names what to do (the
+    // workspace cap is the one that fills after a large batch, #1161); the
+    // generic sentence is for faults that carry no user-safe message.
+    const packagingError = isSafeMessageError(err)
+      ? err.message
+      : "Failed to package batch results";
     // The terminal write must not displace the packaging root cause: the
     // rethrow below is what reaches the job record and Sentry.
     await failBatchJob({

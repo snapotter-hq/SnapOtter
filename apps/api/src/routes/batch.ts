@@ -28,7 +28,12 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
+import {
+  deleteObject,
+  getObjectStream,
+  putObject,
+  workspaceHeadroomBytes,
+} from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
 import { prepareOcrIngressImage } from "../lib/ocr-image-input.js";
 import {
@@ -52,6 +57,8 @@ import { getToolConfig } from "./tool-factory.js";
 type ParsedFile =
   | { kind: "buffer"; buffer: Buffer; filename: string; size: number }
   | ({ kind: "path" } & SpooledMultipartFile);
+
+const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 /** Recursively inject OTel trace context into every node of a FlowJob tree. */
 function injectTraceContextIntoFlow(node: FlowJob): void {
@@ -90,10 +97,39 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: `Tool "${toolId}" not found` });
       }
 
+      // Refuse an upload the workspace cannot hold before reading it. The
+      // whole body is buffered below, so without this a batch that could
+      // never fit was accepted in full and then failed at its first store,
+      // and every request after it failed the same way until the TTL sweep
+      // freed the space (#1161). Absent Content-Length (chunked upload)
+      // leaves it to the per-write check.
+      const contentLength = Number(request.headers["content-length"]);
+      if (Number.isFinite(contentLength) && contentLength > 0) {
+        const headroom = await workspaceHeadroomBytes();
+        if (headroom !== null && contentLength > headroom) {
+          return reply.status(503).send({
+            error: "This batch does not fit in the remaining workspace storage",
+            code: "workspace-cap",
+            details:
+              `The upload is ${formatMb(contentLength)} but only ${formatMb(headroom)} of the ` +
+              `${env.MAX_WORKSPACE_SIZE_GB} GB workspace (MAX_WORKSPACE_SIZE_GB) is free. Send fewer ` +
+              "files at a time, or raise the limit; " +
+              (env.FILE_MAX_AGE_HOURS > 0
+                ? `stored results expire after ${env.FILE_MAX_AGE_HOURS} hours (FILE_MAX_AGE_HOURS)`
+                : "stored results never expire while FILE_MAX_AGE_HOURS is 0"),
+          });
+        }
+      }
+
       return withRouteScratch("batch", async (scratchDir) => {
         const ingressAbort = new AbortController();
         const abortIngress = () => ingressAbort.abort();
-        const uncommittedOcrKeys = new Set<string>();
+        // Every key stored for this batch until the flow is enqueued. An
+        // ingress failure after some files were stored (the workspace cap
+        // tripping on a later file) must not leave them behind: they are
+        // unreachable, and until the TTL sweep they kept the workspace full
+        // so every following request failed the same way (#1161).
+        const uncommittedKeys = new Set<string>();
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -307,7 +343,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   maxBytes: ocrUploadLimits?.fileBytes ?? file.size,
                   signal: ingressAbort.signal,
                 });
-                uncommittedOcrKeys.add(key);
+                uncommittedKeys.add(key);
               } catch (err) {
                 if (err instanceof InputValidationError) {
                   preFailures.push({
@@ -421,6 +457,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               }
 
               key = `uploads/${childId}/${processFilename}`;
+              // Tracked before the write so a store that fails part-way is
+              // cleaned up too; deleting a key that was never written is a no-op.
+              uncommittedKeys.add(key);
               await putObject(key, processBuffer);
             }
 
@@ -524,7 +563,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           injectTraceContextIntoFlow(batchTree);
 
           await getFlowProducer().add(batchTree);
-          uncommittedOcrKeys.clear();
+          uncommittedKeys.clear();
 
           // ── Wait for completion and stream the stored ZIP ──────────────
           const batchResult = await waitForJob("system", parentId, 30 * 60_000);
@@ -615,9 +654,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
         } finally {
           request.raw.removeListener("aborted", abortIngress);
-          await Promise.all(
-            [...uncommittedOcrKeys].map((key) => deleteObject(key).catch(() => {})),
-          );
+          await Promise.all([...uncommittedKeys].map((key) => deleteObject(key).catch(() => {})));
         }
       });
     },

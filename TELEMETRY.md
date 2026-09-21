@@ -56,7 +56,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `tool_opened` | A tool page opens | `tool_id`, `category`, `modality` |
 | `file_added` | Files are added | `file_count` |
 | `tool_started` | Processing starts | `tool_id`, `is_batch`, `file_count` |
-| `batch_processed` | A batch run finishes | `tool_id`, `file_count`, `status` (`completed`, `failed`, or `canceled`; canceled means the server acknowledged a cancel request during the run, even if every file had already finished) |
+| `batch_processed` | A batch run finishes, including a run the client gave up on because the server never confirmed it | `tool_id`, `file_count`, `total_bytes` (sum of the input file sizes), `status` (`completed`, `failed`, or `canceled`; canceled means the server acknowledged a cancel request during the run, even if every file had already finished), `reason` (failed and canceled runs only: the path that ended the run, e.g. `http-503` for an error response with that status, `socket`, `timeout`, `all-files-failed`, `server-failed`, `no-durable-result`, `download-404`, `download-failed`, `unzip-failed`, `unconfirmed`, `canceled`) |
 | `result_downloaded` | A result is downloaded | `tool_id` |
 | `result_saved` | A result is saved to the library | `tool_id` |
 | `search` | A tool search runs | `results_count`, `clicked_tool_id` |
@@ -72,7 +72,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `sponsor_clicked` | The sponsor link is clicked | none |
 | `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
 | `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |
-| `tool_run_degraded` | A run's sync HTTP response died after the upload finished and the client fell back to the async SSE path instead of failing the job (#750, #766). High volume on one instance means a reverse proxy is killing sync waits; the fallback hides that from users, so this event is the only operator-visible signal | `tool_id` (pipeline runs report `pipeline`), `is_batch`, `trigger` (`socket`, `timeout`, `http-502`, or `http-504`), `had_evidence` |
+| `tool_run_degraded` | A run's sync HTTP response died after the upload finished and the client fell back to the async SSE path instead of failing the job (#750, #766). High volume on one instance means a reverse proxy is killing sync waits; the fallback hides that from users, so this event is the only operator-visible signal | `tool_id` (pipeline runs report `pipeline`), `is_batch`, `trigger` (`socket`, `timeout`, or `http-<status>` for an intermediary's 5xx with a non-JSON body: `http-502` and `http-504` from nginx, `http-524` from Cloudflare's 100 s origin limit; single-file runs only degrade on 502 and 504), `had_evidence` |
 
 ### SDK-generated events
 

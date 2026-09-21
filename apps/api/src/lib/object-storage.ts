@@ -144,25 +144,49 @@ export function isOverWorkspaceCap(usedBytes: number, maxGb: number): boolean {
   return maxGb > 0 && usedBytes / 1024 ** 3 > maxGb;
 }
 
+async function cachedWorkspaceUsedBytes(root: string): Promise<number> {
+  const now = Date.now();
+  if (workspaceSizeCache && now - workspaceSizeCache.at < WORKSPACE_SIZE_CACHE_MS) {
+    return workspaceSizeCache.bytes;
+  }
+  const used = await computeWorkspaceUsedBytes(root);
+  workspaceSizeCache = { bytes: used, at: now };
+  return used;
+}
+
+/**
+ * Bytes still available under MAX_WORKSPACE_SIZE_GB, or null when no cap
+ * applies (S3 backend, cap disabled, workspace not created yet). Lets a
+ * route refuse an upload it can see will not fit before reading it (#1161).
+ * Shares assertWorkspaceSizeCap's cache, so it costs nothing extra on a
+ * busy instance.
+ */
+export async function workspaceHeadroomBytes(): Promise<number | null> {
+  const maxGb = env.MAX_WORKSPACE_SIZE_GB;
+  if (isS3Enabled() || maxGb <= 0) return null;
+  const root = env.WORKSPACE_PATH;
+  if (!existsSync(root)) return null;
+  const used = await cachedWorkspaceUsedBytes(root);
+  return Math.max(0, maxGb * 1024 ** 3 - used);
+}
+
 async function assertWorkspaceSizeCap(root: string): Promise<void> {
   const maxGb = env.MAX_WORKSPACE_SIZE_GB;
   if (maxGb <= 0) return;
-  const now = Date.now();
-  let used: number;
-  if (workspaceSizeCache && now - workspaceSizeCache.at < WORKSPACE_SIZE_CACHE_MS) {
-    used = workspaceSizeCache.bytes;
-  } else {
-    used = await computeWorkspaceUsedBytes(root);
-    workspaceSizeCache = { bytes: used, at: now };
-  }
+  const used = await cachedWorkspaceUsedBytes(root);
   if (isOverWorkspaceCap(used, maxGb)) {
     // "Disk full" is the canonical operational condition (error-report.ts);
-    // as a plain Error this reported to Sentry as a bug (NODE-5Y).
-    throw new SafeError("Workspace storage limit reached; try again shortly", {
-      kind: "operational",
-      code: "workspace-cap",
-      statusCode: 503,
-    });
+    // as a plain Error this reported to Sentry as a bug (NODE-5Y). Stored
+    // results only leave when the TTL sweep expires them, so "try again
+    // shortly" was false for up to FILE_MAX_AGE_HOURS (#1161).
+    throw new SafeError(
+      "Workspace storage limit reached: stored results count against MAX_WORKSPACE_SIZE_GB until they expire (FILE_MAX_AGE_HOURS). Send fewer files at a time, or raise the limit",
+      {
+        kind: "operational",
+        code: "workspace-cap",
+        statusCode: 503,
+      },
+    );
   }
 }
 

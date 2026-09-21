@@ -13,11 +13,14 @@ import { join } from "node:path";
 import { qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import AdmZip from "adm-zip";
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
+import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import { objectExists } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -46,6 +49,11 @@ const heicMock = vi.hoisted(() => ({ failDecode: false }));
 
 const storageMock = vi.hoisted(() => ({
   poison: new Map<string, "reject" | "stream-error">(),
+  // Key prefix -> SafeError message. Fails the store of a matching key the
+  // way the workspace cap does (#1161), so the route's cleanup and the
+  // finalize's message pass-through are testable without filling a disk.
+  putObjectFail: new Map<string, string>(),
+  putObjectStreamFail: new Map<string, string>(),
 }));
 
 // Simulates the 30-minute sync wait expiring for a specific parent id: the
@@ -88,8 +96,23 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
   const { Readable } = await import("node:stream");
+  const { SafeError } = await import("@snapotter/shared");
+  const capError = (message: string) =>
+    new SafeError(message, { kind: "operational", code: "workspace-cap", statusCode: 503 });
   return {
     ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      for (const [prefix, message] of storageMock.putObjectFail) {
+        if (key.startsWith(prefix)) throw capError(message);
+      }
+      return actual.putObject(key, data);
+    },
+    putObjectStream: async (key: string, stream: Parameters<typeof actual.putObjectStream>[1]) => {
+      for (const [prefix, message] of storageMock.putObjectStreamFail) {
+        if (key.startsWith(prefix)) throw capError(message);
+      }
+      return actual.putObjectStream(key, stream);
+    },
     getObjectStream: async (key: string) => {
       for (const [prefix, mode] of storageMock.poison) {
         if (!key.startsWith(prefix)) continue;
@@ -1103,6 +1126,110 @@ describe("ZIP packaging failure", () => {
       storageMock.poison.clear();
     }
   }, 60_000);
+
+  it("carries the storage failure's own message when the ZIP cannot be stored (#1161)", async () => {
+    const clientJobId = randomUUID();
+    // A batch that fills the workspace fails exactly here, after every file
+    // was processed. "Failed to package batch results" tells the user
+    // nothing they can act on; the cap's own message does.
+    storageMock.putObjectStreamFail.set(`outputs/${clientJobId}/`, "Injected cap at packaging");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBeGreaterThanOrEqual(500);
+
+      const frame = await waitForTerminalFrame(clientJobId);
+      expect(frame.status).toBe("failed");
+      const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
+      expect(errors.some((e) => e.filename === "" && e.error === "Injected cap at packaging")).toBe(
+        true,
+      );
+    } finally {
+      storageMock.putObjectStreamFail.clear();
+    }
+  }, 60_000);
+});
+
+// ── Workspace storage cap during ingress (#1161) ────────────────
+describe("Workspace storage cap during batch ingress", () => {
+  it("rejects an upload that cannot fit in the remaining workspace before storing anything", async () => {
+    const clientJobId = randomUUID();
+    const originalCap = env.MAX_WORKSPACE_SIZE_GB;
+    // A one-byte cap: no real upload fits, so the route must answer from the
+    // request's Content-Length alone, before it buffers the body, inserts
+    // the parent row, or stores a file.
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 1 / 1024 ** 3;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(503);
+      const payload = JSON.parse(res.body) as Record<string, unknown>;
+      expect(payload.code).toBe("workspace-cap");
+      expect(payload.error).toBe("This batch does not fit in the remaining workspace storage");
+      expect(payload.details).toMatch(/MAX_WORKSPACE_SIZE_GB/);
+
+      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(rows).toHaveLength(0);
+      expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+    } finally {
+      (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = originalCap;
+    }
+  }, 30_000);
+
+  it("deletes the files it already stored when a later file cannot be stored", async () => {
+    const clientJobId = randomUUID();
+    storageMock.putObjectFail.set(`uploads/${clientJobId}-f1/`, "Injected cap during ingress");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      // The cap's own status and message propagate out of the route. (The
+      // test app runs Fastify's default error handler; the production
+      // handler's rendering of a SafeError is pinned in
+      // tests/unit/api/error-handler.test.ts.)
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toContain("Injected cap during ingress");
+
+      // The first file was stored before the second failed. Leaving it
+      // behind is what kept a full workspace full until the TTL sweep, so
+      // every later request on the instance failed the same way.
+      expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+    } finally {
+      storageMock.putObjectFail.clear();
+    }
+  }, 30_000);
 });
 
 // ── All files fail ingress validation (#750) ────────────────────

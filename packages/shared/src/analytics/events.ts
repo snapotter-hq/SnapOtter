@@ -114,8 +114,9 @@ export interface ToolRunDegradedProperties {
   tool_id: string;
   is_batch: boolean;
   /** What killed the sync response: a socket error, a client-side timeout, or
-   * an intermediary's 502/504 with an unparseable body. */
-  trigger: "socket" | "timeout" | "http-502" | "http-504";
+   * an intermediary's 5xx with an unparseable body (`http-<status>`: nginx's
+   * 502/504, Cloudflare's 52x). */
+  trigger: "socket" | "timeout" | `http-${number}`;
   /** Whether an SSE frame had already proven the job reached the server when
    * the degrade happened. */
   had_evidence: boolean;

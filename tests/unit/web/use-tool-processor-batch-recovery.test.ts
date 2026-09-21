@@ -232,7 +232,14 @@ describe("useToolProcessor batch recovery (#750)", () => {
       .mocked(track)
       .mock.calls.filter(([event]) => event === "batch_processed");
     expect(batchEvents).toHaveLength(1);
-    expect(batchEvents[0][1]).toMatchObject({ status: "completed" });
+    // total_bytes is the sum of the two 16-byte inputs; a completed run
+    // carries no failure reason (#1161).
+    expect(batchEvents[0][1]).toEqual({
+      tool_id: "resize",
+      file_count: 2,
+      status: "completed",
+      total_bytes: 32,
+    });
 
     unmount();
   });
@@ -306,6 +313,38 @@ describe("useToolProcessor batch recovery (#750)", () => {
       "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
     );
     expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("reports an abandoned run on batch_processed with the unconfirmed reason (#945, #1161)", async () => {
+    vi.useFakeTimers();
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+      latestSse().onmessage?.({
+        data: JSON.stringify({ type: "heartbeat" }),
+      } as MessageEvent);
+      vi.advanceTimersByTime(30_001);
+    });
+    // The event rides a dynamic import of the analytics module, so it lands
+    // a tick after the timer; real timers from here so waitFor can see it.
+    vi.useRealTimers();
+
+    // The evidence timer ends the run, so it must land in analytics like
+    // every other terminal path; a run that vanishes from batch_processed
+    // is exactly the failure mode the event exists to count.
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("batch_processed", {
+        tool_id: "resize",
+        file_count: 2,
+        status: "failed",
+        reason: "unconfirmed",
+        total_bytes: 32,
+      });
+    });
 
     unmount();
   });
@@ -474,6 +513,62 @@ describe("useToolProcessor batch recovery (#750)", () => {
       "Processing was interrupted. Retry when reconnected.",
     );
     expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("degrades a batch 524 whose blob body is not JSON (#1161)", async () => {
+    const { unmount } = startBatchRun();
+
+    // Cloudflare answers 524 with an HTML page when the origin holds the
+    // batch response past its 100 s limit. The batch keeps running
+    // server-side exactly as it does behind an nginx 504, so the client
+    // must ride the SSE instead of failing the run.
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 524;
+      xhrs[0].response = new Blob(["<html><body>524 A timeout occurred</body></html>"], {
+        type: "text/html",
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "resize",
+        is_batch: true,
+        trigger: "http-524",
+        had_evidence: false,
+      });
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("reports the HTTP status as the failure reason when the app answers with an error (#1161)", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].response = new Blob([JSON.stringify({ error: "All files failed processing" })], {
+        type: "application/json",
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(vi.mocked(track)).toHaveBeenCalledWith("batch_processed", {
+      tool_id: "resize",
+      file_count: 2,
+      status: "failed",
+      reason: "http-422",
+      total_bytes: 32,
+    });
 
     unmount();
   });

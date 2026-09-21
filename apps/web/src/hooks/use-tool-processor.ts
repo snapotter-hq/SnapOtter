@@ -1,4 +1,10 @@
-import { ANALYTICS_EVENTS, apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  apiToolPath,
+  PYTHON_SIDECAR_TOOLS,
+  TOOLS,
+  type ToolRunDegradedProperties,
+} from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
@@ -49,6 +55,8 @@ const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-e
 
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
+
+type DegradeTrigger = ToolRunDegradedProperties["trigger"];
 // After degrading a dead POST to the async path (#722), how long to wait for
 // any SSE frame proving the job reached the server. Only armed when no frame
 // arrived before the degrade; the progress route replays live queued and
@@ -129,6 +137,10 @@ export function useToolProcessor(toolId: string) {
     onTerminal: (frame: BatchProgressFrame) => void;
     markCanceled: () => void;
     cancelLocally: () => boolean;
+    // Ends the run when the server never confirmed the batch (#722's
+    // evidence timer), through the run's own failure path so it is counted
+    // like every other outcome (#1161).
+    abandon: (message: string) => void;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -138,7 +150,7 @@ export function useToolProcessor(toolId: string) {
   // the fallback masks the network failure from the user by design, so this
   // event is the only signal a reverse proxy is killing sync waits (#750).
   const trackDegrade = useCallback(
-    (trigger: "socket" | "timeout" | "http-502" | "http-504", isBatch: boolean) => {
+    (trigger: DegradeTrigger, isBatch: boolean) => {
       track(ANALYTICS_EVENTS.TOOL_RUN_DEGRADED, {
         tool_id: toolId,
         is_batch: isBatch,
@@ -200,18 +212,24 @@ export function useToolProcessor(toolId: string) {
     jobEvidenceTimerRef.current = setTimeout(() => {
       jobEvidenceTimerRef.current = null;
       if (!activeJobIdRef.current) return;
+      const message =
+        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+      // This teardown ends whatever run armed it; a batch closure left
+      // behind would swallow a later run's cancel-404 settle (#767). A batch
+      // run ends through its own failure path, which clears the closure and
+      // reports the outcome to batch_processed (#1161).
+      const run = batchRunRef.current;
+      if (run) {
+        run.abandon(message);
+        return;
+      }
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      // This teardown ends whatever run armed it; a batch closure left
-      // behind would swallow a later run's cancel-404 settle (#767).
-      batchRunRef.current = null;
       clearActiveJob();
-      const message =
-        "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
       settleProcessingEntries(message);
       setError(message);
       setProcessing(false);
@@ -796,14 +814,19 @@ export function useToolProcessor(toolId: string) {
 
       // batch_processed fires once for the batch as a unit (distinct from the N
       // per-file tool_used events), so batch usage is separable from single runs.
-      const trackBatch = (status: "completed" | "failed" | "canceled") =>
-        void import("@/lib/analytics").then(({ track }) =>
-          track(ANALYTICS_EVENTS.BATCH_PROCESSED, {
-            tool_id: toolId,
-            file_count: files.length,
-            status,
-          }),
-        );
+      // reason names the path that ended a failed or canceled run (an HTTP
+      // status, a dead socket, a failed terminal frame) and total_bytes the
+      // input size, so a failure rate can be read against the cause and the
+      // upload size instead of file_count alone (#1161).
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      const trackBatch = (status: "completed" | "failed" | "canceled", reason?: string) =>
+        track(ANALYTICS_EVENTS.BATCH_PROCESSED, {
+          tool_id: toolId,
+          file_count: files.length,
+          status,
+          ...(reason ? { reason } : {}),
+          total_bytes: totalBytes,
+        });
 
       // Set on the user's cancel click; drives outcome labeling and the
       // batch_processed status. The server keeps its own truth in the row
@@ -872,7 +895,7 @@ export function useToolProcessor(toolId: string) {
         setProgress(IDLE_PROGRESS);
       };
 
-      const failRun = (message: string) => {
+      const failRun = (message: string, reason: string) => {
         // Entries were set to "processing" at kickoff (the reset loop above). A
         // whole-run failure that never reached settleFromZip must settle them,
         // or the result pane keeps pulsing on the stale original because the
@@ -885,7 +908,7 @@ export function useToolProcessor(toolId: string) {
         }
         setError(message);
         finishRun();
-        trackBatch(canceledByUser ? "canceled" : "failed");
+        trackBatch(canceledByUser ? "canceled" : "failed", reason);
       };
 
       const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
@@ -955,6 +978,7 @@ export function useToolProcessor(toolId: string) {
                 res.status === 404
                   ? "Completed result is no longer available. Run the job again."
                   : "The finished batch could not be downloaded. Refresh and try again.",
+                `download-${res.status}`,
               );
               return;
             }
@@ -970,7 +994,7 @@ export function useToolProcessor(toolId: string) {
           }
         }
         if (activeJobIdRef.current !== clientJobId) return;
-        failRun("Processing was interrupted. Retry when reconnected.");
+        failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
       };
 
       batchRunRef.current = {
@@ -983,9 +1007,10 @@ export function useToolProcessor(toolId: string) {
           // The upload may still be in flight; aborting it is what actually
           // stops ingress when no job row exists server-side yet.
           xhrRef.current?.abort();
-          failRun("Canceled");
+          failRun("Canceled", "canceled");
           return true;
         },
+        abandon: (message) => failRun(message, "unconfirmed"),
         onTerminal: (frame) => {
           if (activeJobIdRef.current !== clientJobId) return;
           if (
@@ -1000,17 +1025,17 @@ export function useToolProcessor(toolId: string) {
             // A batch route without a durable result (custom sub-routes like
             // pdf-to-image): its ZIP only ever existed on the response this
             // run lost, so the outcome matches a plain interruption.
-            failRun("Processing was interrupted. Retry when reconnected.");
+            failRun("Processing was interrupted. Retry when reconnected.", "no-durable-result");
             return;
           }
           // Replay-synthesized failures carry their message in a blank-name
           // errors entry (packaging failure, expired result).
           const syntheticError = frame.errors?.find((e) => e.filename === "")?.error;
+          const allFilesFailed = frame.totalFiles > 0 && frame.failedFiles >= frame.totalFiles;
           failRun(
             syntheticError ??
-              (frame.totalFiles > 0 && frame.failedFiles >= frame.totalFiles
-                ? "All files failed processing"
-                : "Batch processing failed"),
+              (allFilesFailed ? "All files failed processing" : "Batch processing failed"),
+            !syntheticError && allFilesFailed ? "all-files-failed" : "server-failed",
           );
         },
       };
@@ -1056,7 +1081,7 @@ export function useToolProcessor(toolId: string) {
       // finished upload does not mean a dead batch. The flow keeps running
       // server-side and the terminal SSE frame carries the durable ZIP's
       // download URL, so the run can settle without the HTTP response (#750).
-      const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
+      const degradeToAsync = (trigger: DegradeTrigger) => {
         if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
         asyncModeRef.current = true;
         trackDegrade(trigger, true);
@@ -1098,7 +1123,7 @@ export function useToolProcessor(toolId: string) {
               await settleFromZip(zipBlob, fileResults);
             } catch {
               if (activeJobIdRef.current !== clientJobId) return;
-              failRun("Batch processing failed");
+              failRun("Batch processing failed", "unzip-failed");
             }
           })();
           return;
@@ -1130,19 +1155,19 @@ export function useToolProcessor(toolId: string) {
               errorMsg = parsed as string;
             }
           } catch {
-            // An unparseable 502/504 body is an intermediary answering for a
-            // dead sync wait, not the app (app 5xx always carries JSON).
-            if (
-              (xhr.status === 502 || xhr.status === 504) &&
-              degradeToAsync(xhr.status === 502 ? "http-502" : "http-504")
-            ) {
+            // An unparseable 5xx body is an intermediary answering for a
+            // dead sync wait, not the app (app 5xx always carries JSON):
+            // nginx's 502/504 at its 60 s default, Cloudflare's 524 at its
+            // 100 s origin limit (#1161). The batch keeps running server-side
+            // either way, so the run rides the SSE instead of failing.
+            if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
               return;
             }
             errorMsg = `Batch processing failed: ${xhr.status}`;
           }
           // "Canceled" (not the route's message) so the existing i18n
           // mapping renders it localized.
-          failRun(serverCanceled ? "Canceled" : errorMsg);
+          failRun(serverCanceled ? "Canceled" : errorMsg, `http-${xhr.status}`);
         })();
       };
 
@@ -1151,13 +1176,13 @@ export function useToolProcessor(toolId: string) {
         // events (#722 run-identity guard).
         if (activeJobIdRef.current !== clientJobId) return;
         if (degradeToAsync("socket")) return;
-        failRun("Processing was interrupted. Retry when reconnected.");
+        failRun("Processing was interrupted. Retry when reconnected.", "socket");
       };
 
       xhr.ontimeout = () => {
         if (activeJobIdRef.current !== clientJobId) return;
         if (degradeToAsync("timeout")) return;
-        failRun("Request timed out - the server may be overloaded. Try again.");
+        failRun("Request timed out - the server may be overloaded. Try again.", "timeout");
       };
 
       xhr.open("POST", `${apiToolPath(toolId)}/batch`);

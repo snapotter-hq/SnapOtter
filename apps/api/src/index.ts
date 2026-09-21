@@ -27,8 +27,7 @@ import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
-import { reportError, setSentryInstanceTag } from "./lib/error-report.js";
-import { stripInternalPaths } from "./lib/errors.js";
+import { setSentryInstanceTag } from "./lib/error-report.js";
 import {
   acquireInstallLock,
   ensureAiDirs,
@@ -60,6 +59,7 @@ import {
   ensureDefaultTeam,
   getAuthUser,
 } from "./plugins/auth.js";
+import { registerErrorHandler } from "./plugins/error-handler.js";
 import { registerMfa } from "./plugins/mfa.js";
 import { oidcRoutes } from "./plugins/oidc.js";
 import { registerPostHogProxy } from "./plugins/posthog-proxy.js";
@@ -377,29 +377,7 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, b
   }
 });
 
-app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
-  const statusCode = error.statusCode ?? 500;
-  if (statusCode === 429) {
-    request.log.warn({ url: request.url, method: request.method }, "Rate limit exceeded");
-  } else if (statusCode >= 500) {
-    request.log.error(
-      { err: error, url: request.url, method: request.method },
-      "Unhandled request error",
-    );
-    void reportError(error, {
-      source: "http",
-      route: request.routeOptions?.url ?? undefined,
-      method: request.method,
-      statusCode,
-    });
-  } else {
-    request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
-  }
-  reply.status(statusCode).send({
-    error: statusCode >= 500 ? "Internal server error" : stripInternalPaths(error.message),
-    ...(statusCode < 500 && { details: stripInternalPaths(error.message) }),
-  });
-});
+registerErrorHandler(app);
 
 // Plugins
 await app.register(cors, {

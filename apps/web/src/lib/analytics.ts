@@ -17,7 +17,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   result_saved: new Set(["tool_id"]),
   search: new Set(["results_count", "clicked_tool_id"]),
   ai_bundle_prompted: new Set(["bundle_id"]),
-  batch_processed: new Set(["tool_id", "file_count", "status"]),
+  batch_processed: new Set(["tool_id", "file_count", "status", "reason", "total_bytes"]),
   editor_opened: new Set<string>([]),
   editor_tool_used: new Set(["editor_tool"]),
   editor_exported: new Set(["output_format"]),
