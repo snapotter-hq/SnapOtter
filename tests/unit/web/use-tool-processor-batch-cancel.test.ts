@@ -287,10 +287,10 @@ describe("useToolProcessor batch cancel (#767)", () => {
     expect(useFileStore.getState().error).toBe("Canceled");
     expect(useFileStore.getState().activeJobId).toBeNull();
 
-    // trackBatch lands through a dynamic analytics import, one tick after
-    // the run settles; assert with a wait so the event is not raced.
     await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
-    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+    // A canceled run reports the cancel as its reason, whichever path
+    // carried it (#1161).
+    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled", reason: "canceled" });
 
     hook.unmount();
   });

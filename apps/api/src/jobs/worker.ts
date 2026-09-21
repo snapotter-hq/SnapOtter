@@ -48,7 +48,7 @@ import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
-import { friendlyError } from "../lib/errors.js";
+import { friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { createUniqueNamer } from "../lib/filename.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -1487,13 +1487,18 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   }
 
   if (successEntries.length === 0) {
+    // One shared reason (the workspace cap on every output write) becomes
+    // the batch's own message and a blank-name entry the client reads as
+    // the run's error, appended after the per-file entries like the
+    // packaging failure's; a mixed bag keeps the generic summary (#1161).
+    const shared = sharedFailureReason(counters.errors);
     await failBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: counters.errors,
-      message: "All files failed processing",
+      errors: shared ? [...counters.errors, { filename: "", error: shared }] : counters.errors,
+      message: shared ?? "All files failed processing",
     });
     return {
       outputRefs: [],
@@ -1515,12 +1520,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   try {
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
-    // A SafeError's message is authored by us and names what to do (the
-    // workspace cap is the one that fills after a large batch, #1161); the
-    // generic sentence is for faults that carry no user-safe message.
+    // A SafeError's message names what to do (the workspace cap is the one
+    // that fills after a large batch, #1161); it still goes through the same
+    // sanitizer as every other worker error, since the AI bridge's SafeErrors
+    // carry sidecar output. The generic sentence is for faults with no
+    // user-safe message.
     const packagingError = isSafeMessageError(err)
-      ? err.message
+      ? friendlyError(err.message)
       : "Failed to package batch results";
+    const packagingCode = isSafeMessageError(err) ? err.code : undefined;
     // The terminal write must not displace the packaging root cause: the
     // rethrow below is what reaches the job record and Sentry.
     await failBatchJob({
@@ -1530,6 +1538,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       failedFiles,
       errors: [...counters.errors, { filename: "", error: packagingError }],
       message: packagingError,
+      code: packagingCode,
     }).catch((persistErr) => {
       logger.error(
         { err: persistErr, jobId: data.jobId },

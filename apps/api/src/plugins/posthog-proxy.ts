@@ -65,7 +65,7 @@ export async function registerPostHogProxy(app: FastifyInstance): Promise<void> 
           //
           // The reply is a hand-built terminal response, NOT reply.send(error):
           // sending an Error instance would route through the app's global error
-          // handler (index.ts setErrorHandler), which logs error-level per event
+          // handler (plugins/error-handler.ts), which logs error-level per event
           // and reports >=500s to Sentry as bug-class. reply-from's wrappers carry
           // no cause chain, so classifyError cannot see the underlying network
           // code, and a PostHog outage would storm Sentry from every instance.

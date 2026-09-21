@@ -10,19 +10,19 @@
  */
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
-import { FEATURE_BUNDLES, TOOLS, toolSection } from "@snapotter/shared";
+import { FEATURE_BUNDLES, isSafeMessageError, TOOLS, toolSection } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
-import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
+import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
-import { formatZodErrors } from "../lib/errors.js";
+import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
@@ -59,6 +59,34 @@ type ParsedFile =
   | ({ kind: "path" } & SpooledMultipartFile);
 
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+// Storage capacity failures answer 503 wherever they surface, so a client
+// keys on one status and code for "the instance is full" (#1161).
+const CAPACITY_CODES = new Set(["workspace-cap", "disk-free-floor"]);
+
+/**
+ * The failure a finalize committed to the parent row before it rethrew, or
+ * null when the row is not settled as failed. The rejection that reaches the
+ * route through BullMQ is a plain Error, so the row is the only carrier of
+ * the user-facing reason and code.
+ */
+async function settledFailure(jobId: string): Promise<{
+  message: string;
+  code?: string;
+  errors: Array<{ filename: string; error: string }>;
+} | null> {
+  const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+  if (row?.status !== "failed") return null;
+  const error = row.error as { message?: string; code?: string; details?: unknown } | null;
+  if (!error?.message) return null;
+  return {
+    message: error.message,
+    ...(typeof error.code === "string" ? { code: error.code } : {}),
+    errors: Array.isArray(error.details)
+      ? (error.details as Array<{ filename: string; error: string }>)
+      : [],
+  };
+}
 
 /** Recursively inject OTel trace context into every node of a FlowJob tree. */
 function injectTraceContextIntoFlow(node: FlowJob): void {
@@ -97,7 +125,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: `Tool "${toolId}" not found` });
       }
 
-      // Refuse an upload the workspace cannot hold before reading it. The
+      // Refuse an upload the workspace cannot hold before buffering it. The
       // whole body is buffered below, so without this a batch that could
       // never fit was accepted in full and then failed at its first store,
       // and every request after it failed the same way until the TTL sweep
@@ -130,6 +158,10 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         // unreachable, and until the TTL sweep they kept the workspace full
         // so every following request failed the same way (#1161).
         const uncommittedKeys = new Set<string>();
+        // The rows this request inserted, until the flow owns them. Set once
+        // the parent row exists, cleared once the flow is enqueued; an
+        // ingress failure in between settles them (see the catch below).
+        let stagedBatch: { parentId: string; totalFiles: number; childIds: string[] } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -298,6 +330,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             inputRefs: [],
             settings: { flowChildCount: 0 },
           });
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
 
           updateJobProgress({
             jobId: parentId,
@@ -474,6 +507,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               inputRefs: [key],
               settings: settings as Record<string, unknown>,
             });
+            stagedBatch?.childIds.push(childId);
 
             // Build flow child node
             flowChildren.push({
@@ -564,9 +598,27 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           await getFlowProducer().add(batchTree);
           uncommittedKeys.clear();
+          stagedBatch = null;
 
           // ── Wait for completion and stream the stored ZIP ──────────────
-          const batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          let batchResult: ToolJobResult | null;
+          try {
+            batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          } catch (err) {
+            // A failed finalize settles the parent row with its reason (the
+            // workspace cap's message, for one) before it rethrows, but the
+            // rejection that reaches this side is BullMQ's plain Error, which
+            // the error handler would mask as "Internal server error". The
+            // row is what the sync client and API consumers must see (#1161).
+            const failure = await settledFailure(parentId);
+            if (!failure) throw err;
+            const status = failure.code && CAPACITY_CODES.has(failure.code) ? 503 : 500;
+            return reply.status(status).send({
+              error: failure.message,
+              ...(failure.code ? { code: failure.code } : {}),
+              errors: failure.errors,
+            });
+          }
 
           if (!batchResult) {
             // The flow is still running and nothing couples this response to
@@ -601,18 +653,26 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // canceled batch is not a processing failure; keep the message
             // honest for API consumers that never see the SSE (#767).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
+            const errors = [
+              ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              ...manifestFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error ?? "Failed",
+              })),
+            ];
+            // When every file failed for the same reason (the workspace cap
+            // tripping on the children's output writes), that reason is the
+            // batch's error; the generic summary would hide the one thing
+            // the user could act on (#1161).
+            const shared = sharedFailureReason(errors);
             return reply.status(422).send({
-              error: payload?.canceled ? "Batch canceled" : "All files failed processing",
+              error: payload?.canceled
+                ? "Batch canceled"
+                : (shared ?? "All files failed processing"),
               // Structured so clients key on the outcome instead of matching
               // the message string.
               ...(payload?.canceled ? { canceled: true } : {}),
-              errors: [
-                ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
-                ...manifestFailures.map((f) => ({
-                  filename: f.filename,
-                  error: f.error ?? "Failed",
-                })),
-              ],
+              errors,
             });
           }
 
@@ -652,9 +712,47 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             request.log.error({ err, jobId: parentId }, "Failed to open stored batch ZIP");
             reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
           }
+        } catch (err) {
+          // Ingress died after the parent row existed but before the flow
+          // was enqueued (a store refused by the workspace cap, a decoder
+          // crash). Settle the rows and publish the terminal frame so job
+          // history and a client watching the SSE see the reason instead
+          // of "processing" forever; the finally removes the uploads (#1161).
+          if (stagedBatch) {
+            const { parentId, totalFiles, childIds } = stagedBatch;
+            const message = friendlyError(err instanceof Error ? err.message : String(err));
+            try {
+              if (childIds.length > 0) {
+                await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
+              }
+              await failBatchJob({
+                jobId: parentId,
+                totalFiles,
+                completedFiles: totalFiles,
+                failedFiles: totalFiles,
+                errors: [{ filename: "", error: message }],
+                message,
+                ...(isSafeMessageError(err) && err.code ? { code: err.code } : {}),
+              });
+            } catch (settleErr) {
+              request.log.error(
+                { err: settleErr, jobId: parentId },
+                "failed to settle a batch whose ingress died",
+              );
+            }
+          }
+          throw err;
         } finally {
           request.raw.removeListener("aborted", abortIngress);
-          await Promise.all([...uncommittedKeys].map((key) => deleteObject(key).catch(() => {})));
+          await Promise.all(
+            [...uncommittedKeys].map((key) =>
+              deleteObject(key).catch((cleanupErr) => {
+                // The workspace stays full if this fails; say so, or the next
+                // request's 503 looks unexplained.
+                request.log.warn({ err: cleanupErr, key }, "batch ingress cleanup failed");
+              }),
+            ),
+          );
         }
       });
     },

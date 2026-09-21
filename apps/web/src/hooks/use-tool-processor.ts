@@ -139,8 +139,10 @@ export function useToolProcessor(toolId: string) {
     cancelLocally: () => boolean;
     // Ends the run when the server never confirmed the batch (#722's
     // evidence timer), through the run's own failure path so it is counted
-    // like every other outcome (#1161).
-    abandon: (message: string) => void;
+    // like every other outcome (#1161). Reports whether it acted, like
+    // cancelLocally: a stale closure refuses and the timer's caller falls
+    // through to the single-run settle.
+    abandon: (message: string) => boolean;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -218,11 +220,7 @@ export function useToolProcessor(toolId: string) {
       // behind would swallow a later run's cancel-404 settle (#767). A batch
       // run ends through its own failure path, which clears the closure and
       // reports the outcome to batch_processed (#1161).
-      const run = batchRunRef.current;
-      if (run) {
-        run.abandon(message);
-        return;
-      }
+      if (batchRunRef.current?.abandon(message)) return;
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
@@ -908,7 +906,8 @@ export function useToolProcessor(toolId: string) {
         }
         setError(message);
         finishRun();
-        trackBatch(canceledByUser ? "canceled" : "failed", reason);
+        // A canceled run reports the cancel, whichever path carried it in.
+        trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
       };
 
       const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
@@ -956,7 +955,10 @@ export function useToolProcessor(toolId: string) {
         }
 
         finishRun();
-        trackBatch(canceledByUser ? "canceled" : "completed");
+        trackBatch(
+          canceledByUser ? "canceled" : "completed",
+          canceledByUser ? "canceled" : undefined,
+        );
       };
 
       // A degraded run settles here: download the durable ZIP the terminal
@@ -1010,7 +1012,11 @@ export function useToolProcessor(toolId: string) {
           failRun("Canceled", "canceled");
           return true;
         },
-        abandon: (message) => failRun(message, "unconfirmed"),
+        abandon: (message) => {
+          if (activeJobIdRef.current !== clientJobId) return false;
+          failRun(message, "unconfirmed");
+          return true;
+        },
         onTerminal: (frame) => {
           if (activeJobIdRef.current !== clientJobId) return;
           if (
@@ -1141,6 +1147,10 @@ export function useToolProcessor(toolId: string) {
           if (activeJobIdRef.current !== clientJobId) return;
           let errorMsg: string;
           let serverCanceled = false;
+          // The server's own code (workspace-cap, FEATURE_NOT_INSTALLED) beats
+          // the bare status as the failure reason: the cap and the disk floor
+          // are both 503s, and telling them apart is what the reason is for.
+          let reason = `http-${xhr.status}`;
           try {
             const body = JSON.parse(text);
             // The route marks a fully canceled batch structurally; only that
@@ -1148,6 +1158,8 @@ export function useToolProcessor(toolId: string) {
             // (the cancel lost the race, a 500) keeps its own message
             // instead of being repainted as "Canceled".
             serverCanceled = (body as { canceled?: boolean } | null)?.canceled === true;
+            const code = (body as { code?: unknown } | null)?.code;
+            if (typeof code === "string" && code.length > 0) reason = code;
             const parsed = parseApiError(body, xhr.status);
             if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
               errorMsg = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
@@ -1167,7 +1179,7 @@ export function useToolProcessor(toolId: string) {
           }
           // "Canceled" (not the route's message) so the existing i18n
           // mapping renders it localized.
-          failRun(serverCanceled ? "Canceled" : errorMsg, `http-${xhr.status}`);
+          failRun(serverCanceled ? "Canceled" : errorMsg, reason);
         })();
       };
 

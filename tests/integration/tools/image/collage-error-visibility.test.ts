@@ -9,8 +9,9 @@
  * the global handler (a 500 with telemetry).
  *
  * The test app (test-server.ts) uses Fastify's default error handling, so a
- * propagated error surfaces here as 500. In production the setErrorHandler at
- * index.ts:350 turns that same propagation into request.log.error + reportError.
+ * propagated error surfaces here as 500. In production the handler in
+ * apps/api/src/plugins/error-handler.ts turns that same propagation into
+ * request.log.error + reportError.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";

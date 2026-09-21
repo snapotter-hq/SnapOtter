@@ -60,6 +60,17 @@ const RAW_TOOL_FAILURE =
  * server logs and telemetry by the caller -- only the client-facing string is
  * sanitized. Idempotent, so it is safe to apply at every error surface.
  */
+/**
+ * The one reason every file in a batch failed for, or null when they differ.
+ * "All files failed processing" is the honest summary of a mixed bag; when
+ * the failures agree (the workspace cap tripping on every output write) the
+ * shared reason is the only thing the user can act on (#1161).
+ */
+export function sharedFailureReason(errors: Array<{ error: string }>): string | null {
+  const distinct = new Set(errors.map((e) => e.error));
+  return distinct.size === 1 ? [...distinct][0] : null;
+}
+
 export function friendlyError(message: string): string {
   const cleaned = stripInternalPaths(stripControlChars(message));
   if (RAW_TOOL_FAILURE.test(cleaned) || cleaned.length > 280 || cleaned.split("\n").length > 3) {

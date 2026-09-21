@@ -5,11 +5,14 @@ import { stripInternalPaths } from "../lib/errors.js";
 
 /**
  * Renders every error that escapes a route. A 4xx keeps its message; a 5xx is
- * masked behind a generic sentence unless it is a SafeError, whose message is
- * authored by us and constant, so it is safe to show at any status. Masking
- * those too left a full workspace (503) with nothing the user could act on:
- * every request on the instance failed with "Internal server error" until
- * the TTL sweep freed space (#1161).
+ * masked behind a generic sentence unless it is a SafeError that was authored
+ * with an HTTP status (the workspace cap, the disk floor), whose message is
+ * ours and constant, so it is safe to show. Masking those too left a full
+ * workspace (503) with nothing the user could act on: every request on the
+ * instance failed with "Internal server error" until the TTL sweep freed
+ * space (#1161). SafeErrors without a status keep the mask: the AI bridge
+ * builds them from the sidecar's stderr, and they are only ever meant for
+ * Sentry and the worker's own sanitizer.
  */
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
@@ -30,7 +33,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
     } else {
       request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
     }
-    const safe = isSafeMessageError(error);
+    const safe = isSafeMessageError(error) && error.statusCode !== undefined;
     reply.status(statusCode).send({
       error:
         statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message),

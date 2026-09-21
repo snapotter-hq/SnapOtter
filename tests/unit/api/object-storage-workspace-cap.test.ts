@@ -7,6 +7,7 @@ import { env } from "../../../apps/api/src/config.js";
 import {
   assertLocalCapacity,
   computeWorkspaceUsedBytes,
+  deleteObject,
   isOverWorkspaceCap,
   workspaceHeadroomBytes,
 } from "../../../apps/api/src/lib/object-storage.js";
@@ -127,10 +128,14 @@ describe("assertLocalCapacity capacity guard", () => {
 
     // "Disk full" is the canonical operational condition in error-report.ts.
     // As a plain Error it lands in Sentry as a bug-class event (NODE-5Y).
+    // The code is what the error handler forwards to clients, and the
+    // message must name the two knobs an operator can turn (#1161).
     await expect(assertLocalCapacity()).rejects.toMatchObject({
       isSafeMessage: true,
       kind: "operational",
       statusCode: 503,
+      code: "workspace-cap",
+      message: expect.stringMatching(/MAX_WORKSPACE_SIZE_GB[\s\S]*FILE_MAX_AGE_HOURS/),
     });
   });
 
@@ -152,6 +157,23 @@ describe("assertLocalCapacity capacity guard", () => {
     await unlink(big);
     expect(existsSync(big)).toBe(false);
     await expect(assertLocalCapacity()).rejects.toMatchObject({ statusCode: 503 });
+  });
+
+  it("forgets the cached total when an object is deleted through the store", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-cap-invalidate-"));
+    await mkdir(join(root, "outputs", "job1"), { recursive: true });
+    await writeFile(join(root, "outputs", "job1", "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    await expect(assertLocalCapacity()).rejects.toMatchObject({ statusCode: 503 });
+
+    // The batch route deletes what it stored when ingress fails so the next
+    // request can go through; a cached "full" for 30 s after that would
+    // refuse the retry the message asked for (#1161).
+    await deleteObject("outputs/job1/big.bin");
+    await expect(assertLocalCapacity()).resolves.toBeUndefined();
   });
 });
 
@@ -180,6 +202,17 @@ describe("workspaceHeadroomBytes", () => {
     vi.spyOn(Date, "now").mockReturnValue(nowBase);
 
     expect(await workspaceHeadroomBytes()).toBeNull();
+  });
+
+  it("is null on the S3 backend, where the local cap does not apply", async () => {
+    const originalMode = env.STORAGE_MODE;
+    (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 1;
+    try {
+      expect(await workspaceHeadroomBytes()).toBeNull();
+    } finally {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+    }
   });
 
   it("is null before the workspace root exists", async () => {

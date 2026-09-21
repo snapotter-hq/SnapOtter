@@ -1114,8 +1114,11 @@ describe("ZIP packaging failure", () => {
         body,
       });
 
-      expect(res.statusCode).toBeGreaterThanOrEqual(500);
+      expect(res.statusCode).toBe(500);
       expect(res.headers["content-type"]).toContain("application/json");
+      // The sync client renders this body, not the frame, so the reason the
+      // finalize recorded must be here too (#1161).
+      expect(JSON.parse(res.body).error).toBe("Failed to package batch results");
 
       // The failure is durable: a degraded client settles from this frame.
       const frame = await waitForTerminalFrame(clientJobId);
@@ -1147,7 +1150,14 @@ describe("ZIP packaging failure", () => {
         body,
       });
 
-      expect(res.statusCode).toBeGreaterThanOrEqual(500);
+      // BullMQ rejects the sync wait with a plain Error, so the message and
+      // code have to come from the row the finalize settled, not from the
+      // rejection; a capacity code answers 503 like the ingress paths do.
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({
+        error: "Injected cap at packaging",
+        code: "workspace-cap",
+      });
 
       const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.status).toBe("failed");
@@ -1157,6 +1167,46 @@ describe("ZIP packaging failure", () => {
       );
     } finally {
       storageMock.putObjectStreamFail.clear();
+    }
+  }, 60_000);
+});
+
+// ── Workspace storage cap on the children's output writes (#1161) ──
+describe("Workspace storage cap during batch processing", () => {
+  it("names the shared reason when every child failed the same way", async () => {
+    const clientJobId = randomUUID();
+    // The likelier place for a big batch to trip the cap is a child's output
+    // write, part-way through the run. Every child then fails with the same
+    // SafeError, and "All files failed processing" hides the one thing the
+    // user could act on.
+    storageMock.putObjectFail.set(`outputs/${clientJobId}-f`, "Injected cap on child output");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(422);
+      const payload = JSON.parse(res.body) as { error: string; errors: unknown[] };
+      expect(payload.error).toBe("Injected cap on child output");
+      expect(payload.errors).toHaveLength(2);
+
+      const frame = await waitForTerminalFrame(clientJobId);
+      expect(frame.status).toBe("failed");
+      const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
+      expect(
+        errors.some((e) => e.filename === "" && e.error === "Injected cap on child output"),
+      ).toBe(true);
+    } finally {
+      storageMock.putObjectFail.clear();
     }
   }, 60_000);
 });
@@ -1226,6 +1276,21 @@ describe("Workspace storage cap during batch ingress", () => {
       // behind is what kept a full workspace full until the TTL sweep, so
       // every later request on the instance failed the same way.
       expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+
+      // The parent row already existed, so it must settle instead of sitting
+      // at "processing" in job history, and the terminal frame must carry
+      // the reason for a client that is only watching the SSE.
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row?.status).toBe("failed");
+      expect((row?.error as { message?: string } | null)?.message).toBe(
+        "Injected cap during ingress",
+      );
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.status).toBe("failed");
+      const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
+      expect(
+        errors.some((e) => e.filename === "" && e.error === "Injected cap during ingress"),
+      ).toBe(true);
     } finally {
       storageMock.putObjectFail.clear();
     }
@@ -1311,8 +1376,10 @@ describe("Batch where every worker job fails", () => {
 
     expect(res.statusCode).toBe(422);
     const result = JSON.parse(res.body);
-    expect(result.error).toBe("All files failed processing");
     expect(result.errors).toHaveLength(1);
+    // When every file failed for one reason, that reason is the batch's own
+    // error rather than the generic summary (#1161).
+    expect(result.error).toBe(result.errors[0].error);
     // The CLI-decode fallback renames the upload to .png before enqueueing.
     expect(String(result.errors[0].filename)).toMatch(/garbage/);
     expect(typeof result.errors[0].error).toBe("string");

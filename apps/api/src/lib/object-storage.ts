@@ -468,6 +468,9 @@ export async function deleteObject(key: string): Promise<void> {
     return;
   }
   await unlink(localPath(key)).catch(() => {});
+  // A delete is the one write that frees space; a cached total that outlives
+  // it would keep refusing the retry the cap message just asked for (#1161).
+  workspaceSizeCache = null;
 }
 
 export async function deletePrefix(prefix: string): Promise<void> {
@@ -480,6 +483,7 @@ export async function deletePrefix(prefix: string): Promise<void> {
     return;
   }
   await rm(join(env.WORKSPACE_PATH, prefix), { recursive: true, force: true });
+  workspaceSizeCache = null;
 }
 
 export async function listObjects(prefix: string): Promise<ObjectInfo[]> {

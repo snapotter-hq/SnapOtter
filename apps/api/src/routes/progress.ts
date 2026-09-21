@@ -552,6 +552,10 @@ export interface FailBatchJobArgs {
   failedFiles: number;
   errors: Array<{ filename: string; error: string }>;
   message: string;
+  /** The failing SafeError's code, when there was one, so the batch route
+   * can answer a capacity failure with the same 503 and code its own
+   * ingress checks use (#1161). */
+  code?: string;
 }
 
 /**
@@ -579,6 +583,7 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
         progress: buildPersistedJobProgress(frame),
         error: {
           message: args.message,
+          ...(args.code ? { code: args.code } : {}),
           ...(args.errors.length > 0 ? { details: args.errors } : {}),
         },
       })
