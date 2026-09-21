@@ -4822,6 +4822,9 @@ export const it: TranslationKeys = {
     loginThrottled: "Troppi tentativi di accesso. Riprova tra {minutes} minuto.",
     loginThrottledPlural: "Troppi tentativi di accesso. Riprova tra {minutes} minuti.",
     loginThrottledUnknownWait: "Troppi tentativi di accesso. Attendi prima di riprovare.",
+    mfaThrottled: "Troppi tentativi. Riprova tra {minutes} minuto.",
+    mfaThrottledPlural: "Troppi tentativi. Riprova tra {minutes} minuti.",
+    mfaThrottledUnknownWait: "Troppi tentativi. Attendi prima di riprovare.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Le modifiche alla password sono gestite dal tuo provider di identità.",

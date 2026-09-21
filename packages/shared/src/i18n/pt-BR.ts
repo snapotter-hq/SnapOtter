@@ -4817,6 +4817,9 @@ export const ptBR: TranslationKeys = {
     loginThrottled: "Muitas tentativas de login. Tente novamente em {minutes} minuto.",
     loginThrottledPlural: "Muitas tentativas de login. Tente novamente em {minutes} minutos.",
     loginThrottledUnknownWait: "Muitas tentativas de login. Aguarde antes de tentar novamente.",
+    mfaThrottled: "Muitas tentativas. Tente novamente em {minutes} minuto.",
+    mfaThrottledPlural: "Muitas tentativas. Tente novamente em {minutes} minutos.",
+    mfaThrottledUnknownWait: "Muitas tentativas. Aguarde antes de tentar novamente.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Alterações de senha são gerenciadas pelo seu provedor de identidade.",

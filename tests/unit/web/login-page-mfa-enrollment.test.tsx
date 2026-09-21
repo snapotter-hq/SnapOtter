@@ -140,6 +140,7 @@ describe("LoginPage forced MFA enrollment", () => {
       .mockResolvedValueOnce({
         ok: false,
         status: 401,
+        headers: new Headers(),
         json: async () => ({ code: "INVALID_CODE" }),
       });
     vi.stubGlobal("fetch", fetchMock);

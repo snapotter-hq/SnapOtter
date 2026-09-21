@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "@snapotter/shared";
 import { KeyRound } from "lucide-react";
 import QRCodeStyling from "qr-code-styling";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -33,6 +34,37 @@ function retryAfterMinutes(bodyRetryAfter: unknown, header: string | null): numb
     if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds / 60);
   }
   return null;
+}
+
+/**
+ * Shared by handleMfaComplete and handleEnrollComplete: both hit a per-IP
+ * throttle tighter than the login route's own (#1148), and neither should
+ * clear the code the user just typed on a 429 or 5xx, since the code was
+ * probably fine and clearing it invites an immediate retype that earns
+ * another 429. "Too many login attempts" (the message #826 gave handleSubmit)
+ * is also wrong here: this user is past the password and one code away, not
+ * guessing credentials.
+ */
+function mfaFailureMessage(
+  status: number,
+  bodyRetryAfter: unknown,
+  header: string | null,
+  t: TranslationKeys,
+): { message: string; clearCode: boolean } {
+  if (status === 429) {
+    const minutes = retryAfterMinutes(bodyRetryAfter, header);
+    return {
+      message:
+        minutes === null
+          ? t.auth.mfaThrottledUnknownWait
+          : format(plural(minutes, t.auth.mfaThrottled, t.auth.mfaThrottledPlural), { minutes }),
+      clearCode: false,
+    };
+  }
+  if (status >= 500) {
+    return { message: t.auth.connectionError, clearCode: false };
+  }
+  return { message: t.auth.mfaInvalidCode, clearCode: true };
 }
 
 function QrCode({ uri }: { uri: string }) {
@@ -326,8 +358,15 @@ export function LoginPage() {
         body: JSON.stringify({ mfaToken, code: mfaCode }),
       });
       if (!res.ok) {
-        setError(t.auth.mfaInvalidCode);
-        setMfaCode("");
+        const failure = await res.json().catch(() => null);
+        const { message, clearCode } = mfaFailureMessage(
+          res.status,
+          failure?.retryAfter,
+          res.headers.get("Retry-After"),
+          t,
+        );
+        setError(message);
+        if (clearCode) setMfaCode("");
         return;
       }
       const data = await res.json();
@@ -355,8 +394,15 @@ export function LoginPage() {
         body: JSON.stringify({ enrollmentToken, code: enrollmentCode }),
       });
       if (!res.ok) {
-        setError(t.auth.mfaInvalidCode);
-        setEnrollmentCode("");
+        const failure = await res.json().catch(() => null);
+        const { message, clearCode } = mfaFailureMessage(
+          res.status,
+          failure?.retryAfter,
+          res.headers.get("Retry-After"),
+          t,
+        );
+        setError(message);
+        if (clearCode) setEnrollmentCode("");
         return;
       }
       const data = await res.json();

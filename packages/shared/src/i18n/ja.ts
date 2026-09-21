@@ -4751,6 +4751,9 @@ export const ja: TranslationKeys = {
     loginThrottledPlural: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledUnknownWait:
       "ログインの試行が多すぎます。しばらくしてからもう一度お試しください。",
+    mfaThrottled: "試行回数が多すぎます。{minutes}分後にもう一度お試しください。",
+    mfaThrottledPlural: "試行回数が多すぎます。{minutes}分後にもう一度お試しください。",
+    mfaThrottledUnknownWait: "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
     methodSaml: "SAML",
     passwordManagedByProvider: "パスワードはIDプロバイダーで管理されています。",
     enterUsername: "ユーザー名を入力",

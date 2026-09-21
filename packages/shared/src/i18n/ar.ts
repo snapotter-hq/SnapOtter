@@ -4769,6 +4769,9 @@ export const ar: TranslationKeys = {
       "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقائق.",
     loginThrottledUnknownWait:
       "عدد كبير جدًا من محاولات تسجيل الدخول. يرجى الانتظار قبل المحاولة مرة أخرى.",
+    mfaThrottled: "عدد كبير جدًا من المحاولات. حاول مرة أخرى بعد {minutes} دقيقة.",
+    mfaThrottledPlural: "عدد كبير جدًا من المحاولات. حاول مرة أخرى بعد {minutes} دقائق.",
+    mfaThrottledUnknownWait: "عدد كبير جدًا من المحاولات. يرجى الانتظار قبل المحاولة مرة أخرى.",
     methodSaml: "SAML",
     passwordManagedByProvider: "يتم إدارة تغيير كلمة المرور بواسطة مزود الهوية الخاص بك.",
     enterUsername: "أدخل اسم المستخدم",

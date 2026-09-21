@@ -4836,6 +4836,9 @@ export const de: TranslationKeys = {
     loginThrottledPlural: "Zu viele Anmeldeversuche. Versuchen Sie es in {minutes} Minuten erneut.",
     loginThrottledUnknownWait:
       "Zu viele Anmeldeversuche. Bitte warten Sie, bevor Sie es erneut versuchen.",
+    mfaThrottled: "Zu viele Versuche. Versuchen Sie es in {minutes} Minute erneut.",
+    mfaThrottledPlural: "Zu viele Versuche. Versuchen Sie es in {minutes} Minuten erneut.",
+    mfaThrottledUnknownWait: "Zu viele Versuche. Bitte warten Sie, bevor Sie es erneut versuchen.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Passwortänderungen werden von Ihrem Identitätsanbieter verwaltet.",
     enterUsername: "Benutzernamen eingeben",

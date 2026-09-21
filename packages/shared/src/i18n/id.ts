@@ -4804,6 +4804,9 @@ export const id: TranslationKeys = {
     loginThrottledPlural: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
     loginThrottledUnknownWait:
       "Terlalu banyak percobaan masuk. Silakan tunggu sebelum mencoba lagi.",
+    mfaThrottled: "Terlalu banyak percobaan. Coba lagi dalam {minutes} menit.",
+    mfaThrottledPlural: "Terlalu banyak percobaan. Coba lagi dalam {minutes} menit.",
+    mfaThrottledUnknownWait: "Terlalu banyak percobaan. Silakan tunggu sebelum mencoba lagi.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Perubahan kata sandi dikelola oleh penyedia identitas Anda.",
     enterUsername: "Masukkan nama pengguna",

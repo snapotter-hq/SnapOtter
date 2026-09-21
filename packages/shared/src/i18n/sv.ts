@@ -4803,6 +4803,9 @@ export const sv: TranslationKeys = {
     loginThrottledPlural: "För många inloggningsförsök. Försök igen om {minutes} minuter.",
     loginThrottledUnknownWait:
       "För många inloggningsförsök. Vänta en stund innan du försöker igen.",
+    mfaThrottled: "För många försök. Försök igen om {minutes} minut.",
+    mfaThrottledPlural: "För många försök. Försök igen om {minutes} minuter.",
+    mfaThrottledUnknownWait: "För många försök. Vänta en stund innan du försöker igen.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Lösenordsändringar hanteras av din identitetsleverantör.",
     enterUsername: "Ange användarnamn",

@@ -4822,6 +4822,9 @@ export const nl: TranslationKeys = {
     loginThrottledPlural: "Te veel aanmeldpogingen. Probeer het over {minutes} minuten opnieuw.",
     loginThrottledUnknownWait:
       "Te veel aanmeldpogingen. Wacht even voordat u het opnieuw probeert.",
+    mfaThrottled: "Te veel pogingen. Probeer het over {minutes} minuut opnieuw.",
+    mfaThrottledPlural: "Te veel pogingen. Probeer het over {minutes} minuten opnieuw.",
+    mfaThrottledUnknownWait: "Te veel pogingen. Wacht even voordat u het opnieuw probeert.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Wachtwoordwijzigingen worden beheerd door je identiteitsprovider.",
     enterUsername: "Voer gebruikersnaam in",

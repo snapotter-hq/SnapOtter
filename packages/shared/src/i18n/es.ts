@@ -4813,6 +4813,9 @@ export const es: TranslationKeys = {
       "Demasiados intentos de inicio de sesión. Inténtalo de nuevo en {minutes} minutos.",
     loginThrottledUnknownWait:
       "Demasiados intentos de inicio de sesión. Espera antes de volver a intentarlo.",
+    mfaThrottled: "Demasiados intentos. Inténtalo de nuevo en {minutes} minuto.",
+    mfaThrottledPlural: "Demasiados intentos. Inténtalo de nuevo en {minutes} minutos.",
+    mfaThrottledUnknownWait: "Demasiados intentos. Espera antes de volver a intentarlo.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Los cambios de contraseña son administrados por tu proveedor de identidad.",

@@ -4835,6 +4835,9 @@ export const fr: TranslationKeys = {
     loginThrottledPlural: "Trop de tentatives de connexion. Réessayez dans {minutes} minutes.",
     loginThrottledUnknownWait:
       "Trop de tentatives de connexion. Veuillez patienter avant de réessayer.",
+    mfaThrottled: "Trop de tentatives. Réessayez dans {minutes} minute.",
+    mfaThrottledPlural: "Trop de tentatives. Réessayez dans {minutes} minutes.",
+    mfaThrottledUnknownWait: "Trop de tentatives. Veuillez patienter avant de réessayer.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Les modifications de mot de passe sont gérées par votre fournisseur d'identité.",

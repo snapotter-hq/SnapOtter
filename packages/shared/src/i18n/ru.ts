@@ -4812,6 +4812,9 @@ export const ru: TranslationKeys = {
     loginThrottledPlural: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
     loginThrottledUnknownWait:
       "Слишком много попыток входа. Подождите, прежде чем повторять попытку.",
+    mfaThrottled: "Слишком много попыток. Повторите попытку через {minutes} мин.",
+    mfaThrottledPlural: "Слишком много попыток. Повторите попытку через {minutes} мин.",
+    mfaThrottledUnknownWait: "Слишком много попыток. Подождите, прежде чем повторять попытку.",
     methodSaml: "SAML",
     passwordManagedByProvider: "Управление паролем осуществляется Вашим провайдером идентификации.",
     enterUsername: "Введите имя пользователя",

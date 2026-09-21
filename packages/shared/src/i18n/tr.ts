@@ -4812,6 +4812,9 @@ export const tr: TranslationKeys = {
     loginThrottled: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledPlural: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledUnknownWait: "Çok fazla giriş denemesi. Lütfen tekrar denemeden önce bekleyin.",
+    mfaThrottled: "Çok fazla deneme. {minutes} dakika sonra tekrar deneyin.",
+    mfaThrottledPlural: "Çok fazla deneme. {minutes} dakika sonra tekrar deneyin.",
+    mfaThrottledUnknownWait: "Çok fazla deneme. Lütfen tekrar denemeden önce bekleyin.",
     methodSaml: "SAML",
     passwordManagedByProvider:
       "Parola değişiklikleri kimlik sağlayıcınız tarafından yönetilmektedir.",
