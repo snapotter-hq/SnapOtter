@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
  * standalone app; there is deliberately no service worker (processing is
  * server-side, plain-HTTP LAN self-hosts cannot register one, and a cached
  * shell would skew against upgraded APIs). What install DOES need is a
- * complete manifest: start_url/scope/id, real icon files, and maskable
+ * complete manifest: start_url/scope, a stable identity, real icon files, and maskable
  * variants so Android does not letterbox the icon.
  */
 type ManifestIcon = { src: string; sizes: string; type: string; purpose?: string };
@@ -39,9 +39,8 @@ describe("PWA manifest is installable", () => {
   it("has the fields install prompts require", () => {
     expect(manifest.name).toBe("SnapOtter");
     expect(manifest.short_name).toBe("SnapOtter");
-    expect(manifest.start_url).toBe("/");
-    expect(manifest.scope).toBe("/");
-    expect(manifest.id).toBe("/");
+    expect(manifest.start_url).toBeTruthy();
+    expect(manifest.scope).toBeTruthy();
     expect(manifest.display).toBe("standalone");
     expect(manifest.description).toBeTruthy();
     expect(manifest.theme_color).toBe("#E07832");
@@ -49,6 +48,29 @@ describe("PWA manifest is installable", () => {
     // (--color-background in globals.css), not stark white.
     expect(manifest.background_color).toBe("#FAFAF7");
   });
+
+  it.each(["/", "/snapotter/", "/apps/snapotter/"])(
+    "keeps launch, scope, identity, and icons inside %s",
+    (basePath) => {
+      const appUrl = new URL(basePath, "https://example.com");
+      const manifestUrl = new URL("manifest.json", appUrl);
+      const startUrl = new URL(manifest.start_url ?? "", manifestUrl);
+      const scope = new URL(manifest.scope ?? "", manifestUrl);
+      // An explicit id resolves against the origin, not the manifest directory.
+      // Omitting it uses start_url and keeps each deployment's identity distinct.
+      // https://www.w3.org/TR/appmanifest/#id-member
+      const id = manifest.id === undefined ? startUrl : new URL(manifest.id, startUrl.origin);
+
+      expect(startUrl.href).toBe(appUrl.href);
+      expect(scope.href).toBe(appUrl.href);
+      expect(id.href).toBe(appUrl.href);
+      for (const icon of manifest.icons) {
+        const iconUrl = new URL(icon.src, manifestUrl);
+        expect(iconUrl.origin).toBe(appUrl.origin);
+        expect(iconUrl.pathname.startsWith(basePath)).toBe(true);
+      }
+    },
+  );
 
   it("ships 192 and 512 icons for both any and maskable purposes", () => {
     for (const purpose of ["any", "maskable"] as const) {
