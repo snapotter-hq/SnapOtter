@@ -5,17 +5,6 @@ import { formatHeaders } from "@/lib/api";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
 
-const PROGRESS_MESSAGES = [
-  "Warming up the otter...",
-  "Crunching pixels...",
-  "Teaching the codec...",
-  "Almost there...",
-  "Brewing the preview...",
-  "Convincing the frames...",
-  "Polishing the output...",
-  "Just a moment...",
-];
-
 type PreviewState = "idle" | "generating" | "ready" | "error";
 
 export interface NonNativePreviewProps {
@@ -53,7 +42,7 @@ export function NonNativePreview({
   const startMessageRotation = useCallback(() => {
     setMessageIndex(0);
     intervalRef.current = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      setMessageIndex((prev) => (prev + 1) % t.features.progressMessages.length);
     }, 2500);
   }, []);
 
@@ -162,7 +151,9 @@ export function NonNativePreview({
               )}
             />
           </div>
-          <p className="text-sm text-muted-foreground">{PROGRESS_MESSAGES[messageIndex]}</p>
+          <p className="text-sm text-muted-foreground">
+            {t.features.progressMessages[messageIndex]}
+          </p>
         </div>
       </div>
     );
